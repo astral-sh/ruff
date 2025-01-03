@@ -140,15 +140,10 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
                 Ok(type_diagnostics) => type_diagnostics,
                 Err(info) => {
-                    eprintln!("panic in test");
                     let mut by_line = matcher::FailuresByLine::default();
                     by_line.push(
                         OneIndexed::from_zero_indexed(0),
-                        info.info
-                            .to_string()
-                            .split('\n')
-                            .map(String::from)
-                            .collect(),
+                        info.info.split('\n').map(String::from).collect(),
                     );
                     return Some(FileFailures {
                         backtick_offset: test_file.backtick_offset,
