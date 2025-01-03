@@ -33,9 +33,9 @@ use crate::checkers::ast::Checker;
 ///     y: float
 /// ```
 #[derive(ViolationMetadata)]
-pub(crate) struct TooFewPublicMethods;
+pub(crate) struct ClassAsDataStructure;
 
-impl Violation for TooFewPublicMethods {
+impl Violation for ClassAsDataStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Class could be dataclass or namedtuple".to_string()
@@ -43,7 +43,7 @@ impl Violation for TooFewPublicMethods {
 }
 
 /// R0903
-pub(crate) fn too_few_public_methods(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     // allow decorated classes
     if !class_def.decorator_list.is_empty() {
         return;
@@ -90,6 +90,6 @@ pub(crate) fn too_few_public_methods(checker: &mut Checker, class_def: &ast::Stm
     if has_dunder_init && public_methods == 1 {
         checker
             .diagnostics
-            .push(Diagnostic::new(TooFewPublicMethods, class_def.range()));
+            .push(Diagnostic::new(ClassAsDataStructure, class_def.range()));
     }
 }
