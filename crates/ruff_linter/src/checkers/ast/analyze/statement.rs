@@ -369,7 +369,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UnreachableCode) {
                 checker
                     .diagnostics
-                    .extend(ruff::rules::unreachable::in_function(name, body));
+                    .extend(pylint::rules::in_function(name, body));
             }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());

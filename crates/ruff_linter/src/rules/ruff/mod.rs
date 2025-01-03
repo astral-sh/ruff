@@ -42,7 +42,6 @@ mod tests {
         Path::new("RUF015.py")
     )]
     #[test_case(Rule::InvalidIndexType, Path::new("RUF016.py"))]
-    #[test_case(Rule::UnreachableCode, Path::new("RUF014.py"))]
     #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_1.py"))]
     #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_0.py"))]
     #[test_case(Rule::AssignmentInAssert, Path::new("RUF018.py"))]

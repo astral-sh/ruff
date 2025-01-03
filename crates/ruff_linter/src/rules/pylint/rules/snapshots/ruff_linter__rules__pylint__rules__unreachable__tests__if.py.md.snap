@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_linter/src/rules/ruff/rules/unreachable.rs
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
 description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
 ---
 ## Function 0

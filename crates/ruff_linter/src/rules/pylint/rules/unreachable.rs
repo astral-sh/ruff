@@ -1053,7 +1053,7 @@ mod tests {
     use std::fmt::Write;
     use test_case::test_case;
 
-    use crate::rules::ruff::rules::unreachable::{BasicBlocks, BlockIndex, Condition, NextBlock};
+    use crate::rules::pylint::rules::unreachable::{BasicBlocks, BlockIndex, Condition, NextBlock};
 
     #[test_case("simple.py")]
     #[test_case("if.py")]
