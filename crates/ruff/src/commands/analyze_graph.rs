@@ -15,11 +15,33 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-/// Generate an import map.
+/// Generate and print an import map.
 pub(crate) fn analyze_graph(
     args: AnalyzeGraphArgs,
     config_arguments: &ConfigArguments,
 ) -> Result<ExitStatus> {
+    let import_map = generate_import_map(args, config_arguments);
+
+    match import_map {
+        Ok(import_map) => {
+            // Print to JSON.
+            writeln!(
+                std::io::stdout(),
+                "{}",
+                serde_json::to_string_pretty(&import_map)?
+            )?;
+        }
+        Err(err) => return Err(err),
+    };
+
+    Ok(ExitStatus::Success)
+}
+
+/// Generate an import map.
+pub(crate) fn generate_import_map(
+    args: AnalyzeGraphArgs,
+    config_arguments: &ConfigArguments,
+) -> Result<ImportMap> {
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside the hierarchy.
     let pyproject_config = resolve(config_arguments, None)?;
@@ -37,7 +59,7 @@ pub(crate) fn analyze_graph(
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
-        return Ok(ExitStatus::Success);
+        return Ok(ImportMap::default());
     }
 
     // Resolve all package roots.
@@ -180,16 +202,9 @@ pub(crate) fn analyze_graph(
         Direction::Dependents => ImportMap::dependents(imports),
     };
 
-    // Print to JSON.
-    writeln!(
-        std::io::stdout(),
-        "{}",
-        serde_json::to_string_pretty(&import_map)?
-    )?;
-
     std::mem::forget(db);
 
-    Ok(ExitStatus::Success)
+    Ok(import_map)
 }
 
 /// A resolver for glob sets.

@@ -1,5 +1,6 @@
 pub(crate) mod add_noqa;
 pub(crate) mod analyze_graph;
+pub(crate) mod analyze_live;
 pub(crate) mod check;
 pub(crate) mod check_stdin;
 pub(crate) mod clean;
