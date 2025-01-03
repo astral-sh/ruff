@@ -276,6 +276,19 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
+@@ -251,9 +251,9 @@
+ print(**{1: 3} if False else {x: x for x in range(3)})
+ print(*lambda x: x)
+ assert not Test, "Short message"
+-assert this is ComplexTest and not requirements.fit_in_a_single_line(
+-    force=False
+-), "Short message"
++assert this is ComplexTest and not requirements.fit_in_a_single_line(force=False), (
++    "Short message"
++)
+ assert parens is TooMany
+ for (x,) in (1,), (2,), (3,):
+     ...
 ```
 
 ## Ruff Output
@@ -534,9 +547,9 @@ print(*[] or [1])
 print(**{1: 3} if False else {x: x for x in range(3)})
 print(*lambda x: x)
 assert not Test, "Short message"
-assert this is ComplexTest and not requirements.fit_in_a_single_line(
-    force=False
-), "Short message"
+assert this is ComplexTest and not requirements.fit_in_a_single_line(force=False), (
+    "Short message"
+)
 assert parens is TooMany
 for (x,) in (1,), (2,), (3,):
     ...

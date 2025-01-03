@@ -4,8 +4,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::preview::is_f_string_formatting_enabled;
-use crate::string::{Quoting, StringNormalizer, StringQuotes};
+use crate::string::{StringNormalizer, StringQuotes};
 
 use super::f_string_element::FormatFStringElement;
 
@@ -13,66 +12,25 @@ use super::f_string_element::FormatFStringElement;
 ///
 /// For example, this would be used to format the f-string part in `"foo" f"bar {x}"`
 /// or the standalone f-string in `f"foo {x} bar"`.
-pub(crate) struct FormatFString<'a> {
-    value: &'a FString,
-    /// The quoting of an f-string. This is determined by the parent node
-    /// (f-string expression) and is required to format an f-string correctly.
-    quoting: Quoting,
-}
+#[derive(Default)]
+pub struct FormatFString;
 
-impl<'a> FormatFString<'a> {
-    pub(crate) fn new(value: &'a FString, quoting: Quoting) -> Self {
-        Self { value, quoting }
-    }
-}
+impl FormatNodeRule<FString> for FormatFString {
+    fn fmt_fields(&self, item: &FString, f: &mut PyFormatter) -> FormatResult<()> {
+        let normalizer = StringNormalizer::from_context(f.context());
 
-impl Format<PyFormatContext<'_>> for FormatFString<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        // If the preview style is enabled, make the decision on what quotes to use locally for each
-        // f-string instead of globally for the entire f-string expression.
-        let quoting = if is_f_string_formatting_enabled(f.context()) {
-            Quoting::CanChange
-        } else {
-            self.quoting
-        };
-
-        let normalizer = StringNormalizer::from_context(f.context()).with_quoting(quoting);
-
-        // If f-string formatting is disabled (not in preview), then we will
-        // fall back to the previous behavior of normalizing the f-string.
-        if !is_f_string_formatting_enabled(f.context()) {
-            let result = normalizer.normalize(self.value.into()).fmt(f);
-            let comments = f.context().comments();
-            self.value.elements.iter().for_each(|value| {
-                comments.mark_verbatim_node_comments_formatted(value.into());
-                // Above method doesn't mark the trailing comments of the f-string elements
-                // as formatted, so we need to do it manually. For example,
-                //
-                // ```python
-                // f"""foo {
-                //     x:.3f
-                //     # comment
-                // }"""
-                // ```
-                for trailing_comment in comments.trailing(value) {
-                    trailing_comment.mark_formatted();
-                }
-            });
-            return result;
-        }
-
-        let string_kind = normalizer.choose_quotes(self.value.into()).flags();
+        let string_kind = normalizer.choose_quotes(item.into()).flags();
 
         let context = FStringContext::new(
             string_kind,
-            FStringLayout::from_f_string(self.value, f.context().source()),
+            FStringLayout::from_f_string(item, f.context().source()),
         );
 
         // Starting prefix and quote
         let quotes = StringQuotes::from(string_kind);
         write!(f, [string_kind.prefix(), quotes])?;
 
-        for element in &self.value.elements {
+        for element in &item.elements {
             FormatFStringElement::new(element, context).fmt(f)?;
         }
 

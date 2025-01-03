@@ -323,24 +323,20 @@ aaaaaaaaaaaaaaaaaaaaa = [
 # Leading expression comments:
 y = [
     a
-    for
-    (
+    for (
         # comment
         a
-    ) in
-    (
+    ) in (
         # comment
         x
     )
-    if
-    (
+    if (
         # asdasd
         "askldaklsdnmklasmdlkasmdlkasmdlkasmdasd"
         != "as,mdnaskldmlkasdmlaksdmlkasdlkasdm"
         and "zxcm,.nzxclm,zxnckmnzxckmnzxczxc" != "zxcasdasdlmnasdlknaslkdnmlaskdm"
     )
-    if
-    (
+    if (
         # comment
         x
     )
@@ -382,40 +378,4 @@ y = [
     # comment
     x
 ]
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -142,24 +142,20 @@
- # Leading expression comments:
- y = [
-     a
--    for
--    (
-+    for (
-         # comment
-         a
--    ) in
--    (
-+    ) in (
-         # comment
-         x
-     )
--    if
--    (
-+    if (
-         # asdasd
-         "askldaklsdnmklasmdlkasmdlkasmdlkasmdasd"
-         != "as,mdnaskldmlkasdmlaksdmlkasdlkasdm"
-         and "zxcm,.nzxclm,zxnckmnzxckmnzxczxc" != "zxcasdasdlmnasdlknaslkdnmlaskdm"
-     )
--    if
--    (
-+    if (
-         # comment
-         x
-     )
 ```

@@ -34,21 +34,6 @@ use crate::Locator;
 /// ```python
 /// z = "The quick brown fox."
 /// ```
-///
-/// # Formatter compatibility
-/// Use of this rule alongside the [formatter] must be handled with care.
-/// Currently, the [formatter] can introduce new single-line implicitly
-/// concatenated strings, therefore we suggest rerunning the linter and
-/// [formatter] in the following order:
-/// 1. Run the linter with this rule (`ISC001`) disabled
-/// 2. Run the [formatter]
-/// 3. Rerun the linter with this rule (`ISC001`) enabled
-///
-/// This is one of very few cases where the [formatter] can produce code that
-/// contains lint violations. It is a known issue that should be resolved by the
-/// new 2025 style guide.
-///
-/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 pub(crate) struct SingleLineImplicitStringConcatenation;
 
@@ -96,19 +81,13 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// ## Options
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 ///
-/// # Formatter compatibility
-/// Use of this rule alongside the [formatter] must be handled with care.
-/// Currently, the [formatter] can introduce new multi-line implicitly
-/// concatenated strings, therefore we suggest rerunning the linter and
-/// [formatter] in the following order:
+/// ## Formatter compatibility
+/// Using this rule with `allow-multiline = false` can be incompatible with the
+/// formatter because the [formatter] can introduce new multi-line implicitly
+/// concatenated strings. We recommend to either:
 ///
-/// 1. Run the linter with this rule (`ISC002`) disabled
-/// 2. Run the [formatter]
-/// 3. Rerun the linter with this rule (`ISC002`) enabled
-///
-/// This is one of very few cases where the [formatter] can produce code that
-/// contains lint violations. It is a known issue that should be resolved by the
-/// new 2025 style guide.
+/// * Enable `ISC001` to disallow all implicit concatenated strings
+/// * Setting `allow-multiline = true`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
