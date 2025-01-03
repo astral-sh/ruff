@@ -499,8 +499,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
             let scope = self.scope();
             let inference = infer_expression_types(self.db, cls);
-            let ty =
-                inference.expression_ty(cls.node_ref(self.db).scoped_expression_id(self.db, scope));
+            let ty = inference
+                .expression_ty(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
+                .to_instance(self.db);
             let mut constraints = NarrowingConstraints::default();
             constraints.insert(symbol, ty);
             Some(constraints)
