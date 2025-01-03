@@ -186,9 +186,8 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
         // ```
         (
             RoundedValue::Int(InferredType::Equivalent),
-            NdigitsValue::LiteralNegativeInt
-            | NdigitsValue::LiteralNonNegativeInt
-            | NdigitsValue::NonLiteralInt(InferredType::Equivalent)
+            NdigitsValue::LiteralInt { .. }
+            | NdigitsValue::Int(InferredType::Equivalent)
             | NdigitsValue::NotGivenOrNone,
         ) => Some(Applicability::Safe),
 
@@ -209,9 +208,8 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
         // ```
         (
             RoundedValue::Int(InferredType::AssignableTo),
-            NdigitsValue::LiteralNonNegativeInt
-            | NdigitsValue::LiteralNegativeInt
-            | NdigitsValue::NonLiteralInt(InferredType::Equivalent)
+            NdigitsValue::LiteralInt { .. }
+            | NdigitsValue::Int(InferredType::Equivalent)
             | NdigitsValue::NotGivenOrNone,
         ) => Some(Applicability::Unsafe),
 

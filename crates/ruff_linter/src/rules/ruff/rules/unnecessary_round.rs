@@ -54,7 +54,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
 
     if !matches!(
         ndigits_value,
-        NdigitsValue::NotGivenOrNone | NdigitsValue::LiteralNonNegativeInt
+        NdigitsValue::NotGivenOrNone | NdigitsValue::LiteralInt { is_negative: false }
     ) {
         return;
     }
@@ -114,9 +114,8 @@ pub(super) enum RoundedValue {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NdigitsValue {
     NotGivenOrNone,
-    LiteralNegativeInt,
-    LiteralNonNegativeInt,
-    NonLiteralInt(InferredType),
+    LiteralInt { is_negative: bool },
+    Int(InferredType),
     Other,
 }
 
@@ -163,7 +162,7 @@ pub(super) fn rounded_and_ndigits<'a>(
         Some(Expr::Name(name)) => {
             match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
-                    NdigitsValue::NonLiteralInt(InferredType::AssignableTo)
+                    NdigitsValue::Int(InferredType::AssignableTo)
                 }
                 _ => NdigitsValue::Other,
             }
@@ -173,19 +172,15 @@ pub(super) fn rounded_and_ndigits<'a>(
             value: Number::Int(int),
             ..
         })) => match int.as_i64() {
-            None => NdigitsValue::NonLiteralInt(InferredType::Equivalent),
-            Some(value) => {
-                if value < 0 {
-                    NdigitsValue::LiteralNegativeInt
-                } else {
-                    NdigitsValue::LiteralNonNegativeInt
-                }
-            }
+            None => NdigitsValue::Int(InferredType::Equivalent),
+            Some(value) => NdigitsValue::LiteralInt {
+                is_negative: value < 0,
+            },
         },
 
         Some(ndigits) => match ResolvedPythonType::from(ndigits) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {
-                NdigitsValue::NonLiteralInt(InferredType::Equivalent)
+                NdigitsValue::Int(InferredType::Equivalent)
             }
             _ => NdigitsValue::Other,
         },
