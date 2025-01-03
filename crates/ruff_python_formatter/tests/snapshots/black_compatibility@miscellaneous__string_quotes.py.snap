@@ -71,7 +71,15 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 ```diff
 --- Black
 +++ Ruff
-@@ -25,7 +25,12 @@
+@@ -18,14 +18,19 @@
+ quote"""
+ f"just a normal {f} string"
+ f"""This is a triple-quoted {f}-string"""
+-f'MOAR {" ".join([])}'
+ f"MOAR {' '.join([])}"
++f"MOAR {' '.join([])}"
+ r"raw string ftw"
+ r"Date d\'expiration:(.*)"
  r'Tricky "quote'
  r"Not-so-tricky \"quote"
  rf"{yay}"
@@ -85,6 +93,25 @@ f"\"{a}\"{'hello' * b}\"{c}\""
  re.compile(r'[\\"]')
  "x = ''; y = \"\""
  "x = '''; y = \"\""
+@@ -40,14 +45,14 @@
+ '\\""'
+ "\\''"
+ "Lots of \\\\\\\\'quotes'"
+-f'{y * " "} \'{z}\''
++f"{y * ' '} '{z}'"
+ f"{{y * \" \"}} '{z}'"
+-f'\'{z}\' {y * " "}'
++f"'{z}' {y * ' '}"
+ f"{y * x} '{z}'"
+ "'{z}' {y * \" \"}"
+ "{y * x} '{z}'"
+ 
+ # We must bail out if changing the quotes would introduce backslashes in f-string
+ # expressions. xref: https://github.com/psf/black/issues/2348
+-f"\"{b}\"{' ' * (long-len(b)+1)}: \"{sts}\",\n"
+-f"\"{a}\"{'hello' * b}\"{c}\""
++f'"{b}"{" " * (long - len(b) + 1)}: "{sts}",\n'
++f'"{a}"{"hello" * b}"{c}"'
 ```
 
 ## Ruff Output
@@ -110,7 +137,7 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 quote"""
 f"just a normal {f} string"
 f"""This is a triple-quoted {f}-string"""
-f'MOAR {" ".join([])}'
+f"MOAR {' '.join([])}"
 f"MOAR {' '.join([])}"
 r"raw string ftw"
 r"Date d\'expiration:(.*)"
@@ -137,17 +164,17 @@ re.compile(r'[\\"]')
 '\\""'
 "\\''"
 "Lots of \\\\\\\\'quotes'"
-f'{y * " "} \'{z}\''
+f"{y * ' '} '{z}'"
 f"{{y * \" \"}} '{z}'"
-f'\'{z}\' {y * " "}'
+f"'{z}' {y * ' '}"
 f"{y * x} '{z}'"
 "'{z}' {y * \" \"}"
 "{y * x} '{z}'"
 
 # We must bail out if changing the quotes would introduce backslashes in f-string
 # expressions. xref: https://github.com/psf/black/issues/2348
-f"\"{b}\"{' ' * (long-len(b)+1)}: \"{sts}\",\n"
-f"\"{a}\"{'hello' * b}\"{c}\""
+f'"{b}"{" " * (long - len(b) + 1)}: "{sts}",\n'
+f'"{a}"{"hello" * b}"{c}"'
 ```
 
 ## Black Output

@@ -1,0 +1,74 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/fstring.py
+---
+## Input
+
+```python
+f"f-string without formatted values is just a string"
+f"{{NOT a formatted value}}"
+f"{{NOT 'a' \"formatted\" \"value\"}}"
+f"some f-string with {a} {few():.2f} {formatted.values!r}"
+f'some f-string with {a} {few(""):.2f} {formatted.values!r}'
+f"{f'''{'nested'} inner'''} outer"
+f"\"{f'{nested} inner'}\" outer"
+f"space between opening braces: { {a for a in (1, 2, 3)}}"
+f'Hello \'{tricky + "example"}\''
+f"Tried directories {str(rootdirs)} \
+but none started with prefix {parentdir_prefix}"
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -2,10 +2,10 @@
+ f"{{NOT a formatted value}}"
+ f'{{NOT \'a\' "formatted" "value"}}'
+ f"some f-string with {a} {few():.2f} {formatted.values!r}"
+-f'some f-string with {a} {few(""):.2f} {formatted.values!r}'
+-f"{f'''{'nested'} inner'''} outer"
+-f"\"{f'{nested} inner'}\" outer"
+-f"space between opening braces: { {a for a in (1, 2, 3)}}"
+-f'Hello \'{tricky + "example"}\''
++f"some f-string with {a} {few(''):.2f} {formatted.values!r}"
++f"{f'''{"nested"} inner'''} outer"
++f'"{f"{nested} inner"}" outer'
++f"space between opening braces: { {a for a in (1, 2, 3)} }"
++f"Hello '{tricky + 'example'}'"
+ f"Tried directories {str(rootdirs)} \
+ but none started with prefix {parentdir_prefix}"
+```
+
+## Ruff Output
+
+```python
+f"f-string without formatted values is just a string"
+f"{{NOT a formatted value}}"
+f'{{NOT \'a\' "formatted" "value"}}'
+f"some f-string with {a} {few():.2f} {formatted.values!r}"
+f"some f-string with {a} {few(''):.2f} {formatted.values!r}"
+f"{f'''{"nested"} inner'''} outer"
+f'"{f"{nested} inner"}" outer'
+f"space between opening braces: { {a for a in (1, 2, 3)} }"
+f"Hello '{tricky + 'example'}'"
+f"Tried directories {str(rootdirs)} \
+but none started with prefix {parentdir_prefix}"
+```
+
+## Black Output
+
+```python
+f"f-string without formatted values is just a string"
+f"{{NOT a formatted value}}"
+f'{{NOT \'a\' "formatted" "value"}}'
+f"some f-string with {a} {few():.2f} {formatted.values!r}"
+f'some f-string with {a} {few(""):.2f} {formatted.values!r}'
+f"{f'''{'nested'} inner'''} outer"
+f"\"{f'{nested} inner'}\" outer"
+f"space between opening braces: { {a for a in (1, 2, 3)}}"
+f'Hello \'{tricky + "example"}\''
+f"Tried directories {str(rootdirs)} \
+but none started with prefix {parentdir_prefix}"
+```
