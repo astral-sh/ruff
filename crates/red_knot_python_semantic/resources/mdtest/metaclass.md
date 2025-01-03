@@ -170,8 +170,35 @@ def f(*args, **kwargs) -> int: ...
 
 class A(metaclass=f): ...
 
-# TODO should be `type[int]`
-reveal_type(A.__class__)  # revealed: @Todo(metaclass not a class)
+# TODO: Should be `int`
+reveal_type(A)  # revealed: Literal[A]
+reveal_type(A.__class__)  # revealed: type[int]
+
+def _(n: int):
+    # error: [invalid-metaclass]
+    class B(metaclass=n): ...
+    # TODO: Should be `Unknown`
+    reveal_type(B)  # revealed: Literal[B]
+    reveal_type(B.__class__)  # revealed: type[Unknown]
+
+def _(flag: bool):
+    m = f if flag else 42
+
+    # error: [invalid-metaclass]
+    class C(metaclass=m): ...
+    # TODO: Should be `int | Unknown`
+    reveal_type(C)  # revealed: Literal[C]
+    reveal_type(C.__class__)  # revealed: type[Unknown]
+
+class SignatureMismatch: ...
+
+# TODO: Emit a diagnostic
+class D(metaclass=SignatureMismatch): ...
+
+# TODO: Should be `Unknown`
+reveal_type(D)  # revealed: Literal[D]
+# TODO: Should be `type[Unknown]`
+reveal_type(D.__class__)  # revealed: Literal[SignatureMismatch]
 ```
 
 ## Cyclic
