@@ -4201,14 +4201,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
 
         let argument_types = match (special_form, arguments) {
-            (TypeApiSpecialForm::TypeOf, expr) => {
-                Either::Right(std::iter::once(self.infer_expression(expr)))
-            }
             (_, ast::Expr::Tuple(tuple)) => Either::Left(
                 tuple
                     .iter()
                     .map(|element| self.infer_type_expression(element)),
             ),
+            (TypeApiSpecialForm::TypeOf, expr) => {
+                Either::Right(std::iter::once(self.infer_expression(expr)))
+            }
             (_, expr) => Either::Right(std::iter::once(self.infer_type_expression(expr))),
         };
 

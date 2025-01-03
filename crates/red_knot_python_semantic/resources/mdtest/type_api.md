@@ -262,7 +262,7 @@ is_fully_static(int, int)
 ```py
 from red_knot import Not, Unknown, TypeOf
 
-# error: [non-subscriptable]
+# error: "Special form `red_knot.Unknown` expected no type parameter"
 u: Unknown[str]
 
 # error: "Expected 1 type argument, got 2"
