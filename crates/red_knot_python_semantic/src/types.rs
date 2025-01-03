@@ -1408,6 +1408,29 @@ impl<'db> Type<'db> {
 
     /// Returns true if this type and `other` are "exactly the same".
     ///
+    /// Two types are "exactly the same" when:
+    ///
+    /// * Both are either `Any` or `Unknown`, or
+    /// * If they are not tuples, generics, unions or intersections:
+    ///     * They share the same internal representation.
+    /// * If they are tuples:
+    ///     * They have the same length, and
+    ///     * Each element pair are "exactly the same".
+    /// * If they are generics:
+    ///     * The "origins" are "exactly the same".
+    ///     * The argument types are "exactly the same" when compared as tuples.
+    /// * If they are unions:
+    ///     * They have the same length, and
+    ///     * For each element of the first type,
+    ///       there exist one element of the second
+    ///       such that they are "exactly the same";
+    ///       each element must not be paired more than once.
+    /// * If they are intersections:
+    ///     * The positive parts are "exactly the same" when compared as unions.
+    ///     * The negative parts are "exactly the same" when compared as unions.
+    ///
+    /// Note: `Todo != Todo`.
+    ///
     /// This powers the `assert_type()` directive.
     pub(crate) fn is_equals_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         let equal = |(first, second): (&Type<'db>, &Type<'db>)| first.is_equals_to(db, *second);
@@ -3194,7 +3217,9 @@ impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck | Self::AssertType => None,
+            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck | Self::AssertType => {
+                None
+            }
         }
     }
 

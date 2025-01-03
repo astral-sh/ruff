@@ -1,5 +1,3 @@
-from typing import reveal_type
-
 # `assert_type`
 
 ## Basic

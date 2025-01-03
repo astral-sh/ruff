@@ -498,7 +498,7 @@ declare_lint! {
     pub(crate) static TYPE_ASSERTION_FAILURE = {
         summary: "detects failed type assertions",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
+        default_level: Level::Error,
     }
 }
 
