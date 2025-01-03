@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprAttribute};
+use ruff_python_ast::{Expr, ExprAttribute, ExprName};
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -88,10 +88,10 @@ pub(crate) fn moved_to_provider_in_3(checker: &mut Checker, expr: &Expr) {
     }
 
     match expr {
-        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => {
-            check_names_moved_to_provider(checker, expr, ranged);
+        Expr::Attribute(ExprAttribute { attr, .. }) => {
+            check_names_moved_to_provider(checker, expr, attr.range());
         }
-        ranged @ Expr::Name(_) => check_names_moved_to_provider(checker, expr, ranged),
+        Expr::Name(ExprName { range, .. }) => check_names_moved_to_provider(checker, expr, *range),
         _ => {}
     }
 }
@@ -111,7 +111,7 @@ enum Replacement {
     },
 }
 
-fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
+fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, range: TextRange) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
         return;
     };
@@ -927,6 +927,6 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: imp
             deprecated: qualified_name.to_string(),
             replacement,
         },
-        ranged.range(),
+        range,
     ));
 }
