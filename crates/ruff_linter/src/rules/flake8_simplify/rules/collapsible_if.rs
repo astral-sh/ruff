@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use anyhow::{bail, Result};
 use libcst_native::ParenthesizedNode;
-use log::error;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -118,22 +117,26 @@ pub(crate) fn nested_if_statements(
         nested_if.start(),
         nested_if.body()[0].start(),
     )) {
-        match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
-            Ok(edit) => {
-                if edit.content().map_or(true, |content| {
-                    fits(
-                        content,
-                        (&nested_if).into(),
-                        checker.locator(),
-                        checker.settings.pycodestyle.max_line_length,
-                        checker.settings.tab_size,
-                    )
-                }) {
-                    diagnostic.set_fix(Fix::unsafe_edit(edit));
+        diagnostic.try_set_optional_fix(|| {
+            match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
+                Ok(edit) => {
+                    if edit.content().map_or(true, |content| {
+                        fits(
+                            content,
+                            (&nested_if).into(),
+                            checker.locator(),
+                            checker.settings.pycodestyle.max_line_length,
+                            checker.settings.tab_size,
+                        )
+                    }) {
+                        Ok(Some(Fix::unsafe_edit(edit)))
+                    } else {
+                        Ok(None)
+                    }
                 }
+                Err(err) => bail!("Failed to collapse `if`: {err}"),
             }
-            Err(err) => error!("Failed to fix nested if: {err}"),
-        }
+        })
     }
     checker.diagnostics.push(diagnostic);
 }

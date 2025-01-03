@@ -1,4 +1,4 @@
-use log::error;
+use anyhow::{bail, Error};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -94,24 +94,29 @@ pub(crate) fn invalid_literal_comparison(
             if lazy_located.is_none() {
                 lazy_located = Some(locate_cmp_ops(expr, checker.tokens()));
             }
-            if let Some(located_op) = lazy_located.as_ref().and_then(|located| located.get(index)) {
-                assert_eq!(located_op.op, *op);
-                if let Some(content) = match located_op.op {
-                    CmpOp::Is => Some("==".to_string()),
-                    CmpOp::IsNot => Some("!=".to_string()),
-                    node => {
-                        error!("Failed to fix invalid comparison: {node:?}");
-                        None
+            diagnostic.try_set_optional_fix(|| {
+                if let Some(located_op) =
+                    lazy_located.as_ref().and_then(|located| located.get(index))
+                {
+                    assert_eq!(located_op.op, *op);
+                    if let Ok(content) = match located_op.op {
+                        CmpOp::Is => Ok::<String, Error>("==".to_string()),
+                        CmpOp::IsNot => Ok("!=".to_string()),
+                        node => {
+                            bail!("Failed to fix invalid comparison: {node:?}")
+                        }
+                    } {
+                        Ok(Some(Fix::safe_edit(Edit::range_replacement(
+                            content,
+                            located_op.range,
+                        ))))
+                    } else {
+                        Ok(None)
                     }
-                } {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        content,
-                        located_op.range,
-                    )));
+                } else {
+                    bail!("Failed to fix invalid comparison due to missing op")
                 }
-            } else {
-                error!("Failed to fix invalid comparison due to missing op");
-            }
+            });
             checker.diagnostics.push(diagnostic);
         }
         left = right;
