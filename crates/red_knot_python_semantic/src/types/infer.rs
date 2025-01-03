@@ -60,12 +60,12 @@ use crate::types::diagnostic::{
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::type_api::{
-    TypeApiArgumentsError, TypeApiPredicateError, TYPE_API_STATIC_ASSERTION_ERROR,
+    self, TypeApiArgumentsError, TypeApiPredicateError, TYPE_API_STATIC_ASSERTION_ERROR,
     TYPE_API_WRONG_ARITY,
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type, type_api,
+    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
     KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
