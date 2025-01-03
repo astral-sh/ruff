@@ -10,21 +10,12 @@ use ruff_python_ast::{
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::expression::expr_f_string::f_string_quoting;
 use crate::prelude::*;
-use crate::preview::is_f_string_formatting_enabled;
 use crate::QuoteStyle;
 
 pub(crate) mod docstring;
 pub(crate) mod implicit;
 mod normalize;
-
-#[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum Quoting {
-    #[default]
-    CanChange,
-    Preserve,
-}
 
 impl Format<PyFormatContext<'_>> for AnyStringPrefix {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
@@ -90,19 +81,10 @@ impl From<Quote> for QuoteStyle {
 
 // Extension trait that adds formatter specific helper methods to `StringLike`.
 pub(crate) trait StringLikeExtensions {
-    fn quoting(&self, source: &str) -> Quoting;
-
     fn is_multiline(&self, context: &PyFormatContext) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
-    fn quoting(&self, source: &str) -> Quoting {
-        match self {
-            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
-            Self::FString(f_string) => f_string_quoting(f_string, source),
-        }
-    }
-
     fn is_multiline(&self, context: &PyFormatContext) -> bool {
         self.parts().any(|part| match part {
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
@@ -149,15 +131,11 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                     })
                 }
 
-                if is_f_string_formatting_enabled(context) {
-                    contains_line_break_or_comments(
-                        &f_string.elements,
-                        context,
-                        f_string.flags.is_triple_quoted(),
-                    )
-                } else {
-                    context.source().contains_line_break(f_string.range())
-                }
+                contains_line_break_or_comments(
+                    &f_string.elements,
+                    context,
+                    f_string.flags.is_triple_quoted(),
+                )
             }
         })
     }
