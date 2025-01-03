@@ -34,6 +34,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
+use crate::types::type_api::TypeApiFunction;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
@@ -48,6 +49,7 @@ mod narrow;
 mod signatures;
 mod slots;
 mod string_annotation;
+mod type_api;
 mod unpacker;
 
 #[cfg(test)]
@@ -2057,6 +2059,7 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::Unknown,
             }),
+            Type::KnownInstance(KnownInstanceType::KnotExtensionsUnknown) => Ok(Type::Unknown),
             Type::Todo(_) => Ok(*self),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
@@ -2567,6 +2570,10 @@ pub enum KnownInstanceType<'db> {
     TypeGuard,
     TypeIs,
     ReadOnly,
+    KnotExtensionsUnknown,
+    KnotExtensionsNot,
+    KnotExtensionsIntersection,
+    KnotExtensionsTypeOf,
     // TODO: fill this enum out with more special forms, etc.
 }
 
@@ -2606,6 +2613,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "ChainMap",
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
+            Self::KnotExtensionsUnknown => "Unknown",
+            Self::KnotExtensionsNot => "Not",
+            Self::KnotExtensionsIntersection => "Intersection",
+            Self::KnotExtensionsTypeOf => "TypeOf",
         }
     }
 
@@ -2644,7 +2655,11 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::ReadOnly
-            | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
+            | Self::TypeAliasType(_)
+            | Self::KnotExtensionsUnknown
+            | Self::KnotExtensionsNot
+            | Self::KnotExtensionsIntersection
+            | Self::KnotExtensionsTypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2684,6 +2699,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
+            Self::KnotExtensionsUnknown => "knot_extensions.Unknown",
+            Self::KnotExtensionsNot => "knot_extensions.Not",
+            Self::KnotExtensionsIntersection => "knot_extensions.Intersection",
+            Self::KnotExtensionsTypeOf => "knot_extensions.TypeOf",
         }
     }
 
@@ -2723,6 +2742,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::KnotExtensionsTypeOf => KnownClass::SpecialForm,
+            Self::KnotExtensionsNot => KnownClass::SpecialForm,
+            Self::KnotExtensionsIntersection => KnownClass::SpecialForm,
+            Self::KnotExtensionsUnknown => KnownClass::Object,
         }
     }
 
@@ -2768,6 +2791,10 @@ impl<'db> KnownInstanceType<'db> {
             "Concatenate" => Self::Concatenate,
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
+            "Unknown" => Self::KnotExtensionsUnknown,
+            "Not" => Self::KnotExtensionsNot,
+            "Intersection" => Self::KnotExtensionsIntersection,
+            "TypeOf" => Self::KnotExtensionsTypeOf,
             _ => return None,
         };
 
@@ -2817,6 +2844,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+            Self::KnotExtensionsUnknown
+            | Self::KnotExtensionsNot
+            | Self::KnotExtensionsIntersection
+            | Self::KnotExtensionsTypeOf => module.is_knot_extensions(),
         }
     }
 
@@ -3063,13 +3094,20 @@ pub enum KnownFunction {
 
     /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+
+    /// Type API functions (`knot_extensions`)
+    TypeApiFunction(TypeApiFunction),
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck => None,
+            Self::RevealType
+            | Self::Len
+            | Self::Final
+            | Self::NoTypeCheck
+            | Self::TypeApiFunction(_) => None,
         }
     }
 

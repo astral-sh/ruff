@@ -1,0 +1,203 @@
+use crate::declare_lint;
+use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::types::{IntersectionBuilder, Type};
+use crate::Db;
+
+use std::result::Result;
+
+#[derive(Debug)]
+pub(crate) struct TypeApiArgumentsError {
+    pub(crate) expected: usize,
+    pub(crate) actual: usize,
+}
+
+fn expect_n_arguments<'db, const N: usize>(
+    mut arguments: impl Iterator<Item = Type<'db>>,
+) -> Result<[Type<'db>; N], TypeApiArgumentsError> {
+    let mut result = [Type::Unknown; N];
+    for (i, ty) in result.iter_mut().enumerate() {
+        *ty = arguments.next().ok_or(TypeApiArgumentsError {
+            expected: N,
+            actual: i,
+        })?;
+    }
+    if arguments.next().is_some() {
+        let actual = N + 1 + arguments.count();
+        return Err(TypeApiArgumentsError {
+            expected: N,
+            actual,
+        });
+    }
+    Ok(result)
+}
+
+fn expect_one_argument<'db>(
+    arguments: impl Iterator<Item = Type<'db>>,
+) -> Result<Type<'db>, TypeApiArgumentsError> {
+    expect_n_arguments::<1>(arguments).map(|[ty]| ty)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum TypeApiSpecialForm {
+    Not,
+    Intersection,
+    TypeOf,
+}
+
+pub(crate) fn resolve_special_form<'db>(
+    db: &'db dyn Db,
+    special_form: TypeApiSpecialForm,
+    arguments: impl Iterator<Item = Type<'db>>,
+) -> Result<Type<'db>, TypeApiArgumentsError> {
+    match special_form {
+        TypeApiSpecialForm::Not => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(ty.negate(db))
+        }
+        TypeApiSpecialForm::Intersection => {
+            let intersection_ty = arguments
+                .fold(IntersectionBuilder::new(db), |builder, ty| {
+                    builder.add_positive(ty)
+                })
+                .build();
+            Ok(intersection_ty)
+        }
+        TypeApiSpecialForm::TypeOf => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(ty)
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum TypeApiFunction {
+    StaticAssert,
+    IsEquivalentTo,
+    IsSubtypeOf,
+    IsAssignableTo,
+    IsDisjointFrom,
+    IsFullyStatic,
+    IsSingleton,
+    IsSingleValued,
+}
+
+impl TryFrom<&str> for TypeApiFunction {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "static_assert" => Ok(Self::StaticAssert),
+            "is_equivalent_to" => Ok(Self::IsEquivalentTo),
+            "is_subtype_of" => Ok(Self::IsSubtypeOf),
+            "is_assignable_to" => Ok(Self::IsAssignableTo),
+            "is_disjoint_from" => Ok(Self::IsDisjointFrom),
+            "is_fully_static" => Ok(Self::IsFullyStatic),
+            "is_singleton" => Ok(Self::IsSingleton),
+            "is_single_valued" => Ok(Self::IsSingleValued),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum TypeApiPredicateError<'db> {
+    /// Wrong number of arguments in a type API call
+    ArgumentsError(TypeApiArgumentsError),
+    /// Argument of `static_assert` did not have type `Literal[True]`
+    StaticAssertionError(Type<'db>),
+}
+
+pub(crate) fn resolve_predicate<'db>(
+    db: &'db dyn Db,
+    function: TypeApiFunction,
+    arguments: impl Iterator<Item = Type<'db>>,
+) -> Result<Type<'db>, TypeApiPredicateError<'db>> {
+    let expect_one_argument =
+        |arguments| expect_one_argument(arguments).map_err(TypeApiPredicateError::ArgumentsError);
+    let expect_two_arguments = |arguments| {
+        expect_n_arguments::<2>(arguments).map_err(TypeApiPredicateError::ArgumentsError)
+    };
+
+    match function {
+        // Predicates on types
+        TypeApiFunction::IsEquivalentTo => {
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Ok(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)))
+        }
+        TypeApiFunction::IsSubtypeOf => {
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Ok(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)))
+        }
+        TypeApiFunction::IsAssignableTo => {
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Ok(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)))
+        }
+        TypeApiFunction::IsDisjointFrom => {
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Ok(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)))
+        }
+        TypeApiFunction::IsFullyStatic => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(Type::BooleanLiteral(ty.is_fully_static(db)))
+        }
+        TypeApiFunction::IsSingleton => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(Type::BooleanLiteral(ty.is_singleton(db)))
+        }
+        TypeApiFunction::IsSingleValued => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(Type::BooleanLiteral(ty.is_single_valued(db)))
+        }
+
+        // Special operations
+        TypeApiFunction::StaticAssert => {
+            let ty = expect_one_argument(arguments)?;
+            if ty == Type::BooleanLiteral(true) {
+                Ok(Type::none(db))
+            } else {
+                Err(TypeApiPredicateError::StaticAssertionError(ty))
+            }
+        }
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `knot_extensions` type API calls with the wrong number of arguments.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from knot_extensions import is_equivalent_to
+    ///
+    /// is_equivalent_to(int, str, bool)  # error: wrong number of arguments
+    /// ```
+    pub(crate) static TYPE_API_WRONG_ARITY = {
+        summary: "wrong number of arguments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Makes sure that the argument of `static_assert` has a type of `Literal[True]`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from knot_extensions import static_assert
+    ///
+    /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
+    ///
+    /// static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
+    /// ```
+    pub(crate) static TYPE_API_STATIC_ASSERTION_ERROR = {
+        summary: "Failed static assertion",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
+    registry.register_lint(&TYPE_API_WRONG_ARITY);
+    registry.register_lint(&TYPE_API_STATIC_ASSERTION_ERROR);
+}

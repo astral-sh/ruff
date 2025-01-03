@@ -28,7 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
@@ -59,18 +59,22 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
+use crate::types::type_api::{
+    self, TypeApiArgumentsError, TypeApiPredicateError, TypeApiSpecialForm,
+    TYPE_API_STATIC_ASSERTION_ERROR, TYPE_API_WRONG_ARITY,
+};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
     KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeApiFunction, TypeArrayDisplay,
     TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, KnownModule};
 
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
@@ -2992,9 +2996,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
+        let function_type = self.infer_expression(func);
+
+        if let Some(result_type) = self.try_infer_type_api_predicate(function_type, arguments) {
+            return result_type;
+        }
+
         // TODO: proper typed call signature, representing keyword args etc
         let arg_types = self.infer_arguments(arguments);
-        let function_type = self.infer_expression(func);
         function_type
             .call(self.db(), arg_types.as_slice())
             .unwrap_with_diagnostic(&self.context, func.as_ref().into())
@@ -4186,6 +4195,118 @@ impl<'db> TypeInferenceBuilder<'db> {
         Ok(builder.build())
     }
 
+    fn infer_type_api_special_form(
+        &mut self,
+        special_form: TypeApiSpecialForm,
+        arguments: &ast::Expr,
+    ) -> Type<'db> {
+        let db = self.db();
+
+        let argument_types = match (special_form, arguments) {
+            (_, ast::Expr::Tuple(tuple)) => Either::Left(
+                tuple
+                    .iter()
+                    .map(|element| self.infer_type_expression(element)),
+            ),
+            (TypeApiSpecialForm::TypeOf, expr) => {
+                Either::Right(std::iter::once(self.infer_expression(expr)))
+            }
+            (_, expr) => Either::Right(std::iter::once(self.infer_type_expression(expr))),
+        };
+
+        type_api::resolve_special_form(db, special_form, argument_types).unwrap_or_else(
+            |TypeApiArgumentsError { expected, actual }| {
+                self.context.report_lint(
+                    &TYPE_API_WRONG_ARITY,
+                    arguments.into(),
+                    format_args!(
+                        "Expected {expected} type argument{}, got {actual}",
+                        if expected == 1 { "" } else { "s" },
+                    ),
+                );
+                Type::Unknown
+            },
+        )
+    }
+
+    fn try_infer_type_api_predicate(
+        &mut self,
+        function: Type<'db>,
+        arguments: &ast::Arguments,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+
+        match function.into_function_literal() {
+            Some(function)
+                if file_to_module(db, function.body_scope(db).file(db))
+                    .is_some_and(|module| module.is_known(KnownModule::KnotExtensions)) =>
+            {
+                let function = TypeApiFunction::try_from(function.name(db).as_str()).ok()?;
+
+                let argument_types = arguments.args.iter().map(|arg| {
+                    if function == TypeApiFunction::StaticAssert {
+                        self.infer_expression(arg)
+                    } else {
+                        self.infer_type_expression(arg)
+                    }
+                });
+
+                let result = type_api::resolve_predicate(db, function, argument_types);
+
+                match result {
+                    Ok(ty) => Some(ty),
+                    Err(TypeApiPredicateError::ArgumentsError(TypeApiArgumentsError {
+                        expected,
+                        actual,
+                    })) => {
+                        self.context.report_lint(
+                            &TYPE_API_WRONG_ARITY,
+                            arguments.into(),
+                            format_args!(
+                                "Expected {expected} argument{}, got {actual}",
+                                if expected == 1 { "" } else { "s" },
+                            ),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                    Err(TypeApiPredicateError::StaticAssertionError(Type::BooleanLiteral(
+                        false,
+                    ))) => {
+                        self.context.report_lint(
+                            &TYPE_API_STATIC_ASSERTION_ERROR,
+                            arguments.into(),
+                            format_args!("Static assertion error: argument evaluates to `False`"),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                    Err(TypeApiPredicateError::StaticAssertionError(Type::Instance(
+                        instance_ty,
+                    ))) if instance_ty.class.is_known(db, KnownClass::Bool) => {
+                        self.context.report_lint(
+                            &TYPE_API_STATIC_ASSERTION_ERROR,
+                            arguments.into(),
+                            format_args!("Static assertion error: argument does not have a statically known truthiness (type is `bool`)"),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                    Err(TypeApiPredicateError::StaticAssertionError(ty)) => {
+                        self.context.report_lint(
+                            &TYPE_API_STATIC_ASSERTION_ERROR,
+                            arguments.into(),
+                            format_args!("Static assertion error: expected argument type `Literal[True]`, got: `{ty}`.", ty=ty.display(db)),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
@@ -5055,6 +5176,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("Callable types")
             }
 
+            // Type API special forms
+            KnownInstanceType::KnotExtensionsNot => {
+                self.infer_type_api_special_form(TypeApiSpecialForm::Not, arguments_slice)
+            }
+            KnownInstanceType::KnotExtensionsIntersection => {
+                self.infer_type_api_special_form(TypeApiSpecialForm::Intersection, arguments_slice)
+            }
+            KnownInstanceType::KnotExtensionsTypeOf => {
+                self.infer_type_api_special_form(TypeApiSpecialForm::TypeOf, arguments_slice)
+            }
+
             // TODO: Generics
             KnownInstanceType::ChainMap => {
                 self.infer_type_expression(arguments_slice);
@@ -5140,7 +5272,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
-            KnownInstanceType::TypingSelf | KnownInstanceType::TypeAlias => {
+            KnownInstanceType::TypingSelf
+            | KnownInstanceType::TypeAlias
+            | KnownInstanceType::KnotExtensionsUnknown => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript.into(),
