@@ -1095,28 +1095,18 @@ where
             }) => {
                 let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
-
-                let after_subject = self.flow_snapshot();
-                let Some((first, remaining)) = cases.split_first() else {
+                if cases.is_empty() {
                     return;
                 };
 
-                let first_constraint_id = self.add_pattern_constraint(
-                    subject_expr,
-                    &first.pattern,
-                    first.guard.as_deref(),
-                );
-
-                self.visit_match_case(first);
-
-                let first_vis_constraint_id =
-                    self.record_visibility_constraint(first_constraint_id);
-                let mut vis_constraints = vec![first_vis_constraint_id];
-
+                let after_subject = self.flow_snapshot();
+                let mut vis_constraints = vec![];
                 let mut post_case_snapshots = vec![];
-                for case in remaining {
-                    post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
+                for (i, case) in cases.iter().enumerate() {
+                    if i != 0 {
+                        post_case_snapshots.push(self.flow_snapshot());
+                        self.flow_restore(after_subject.clone());
+                    }
                     let constraint_id = self.add_pattern_constraint(
                         subject_expr,
                         &case.pattern,
