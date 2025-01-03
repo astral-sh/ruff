@@ -2935,6 +2935,34 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
     }
 }
 
+impl FormatRule<ast::FString, PyFormatContext<'_>> for crate::other::f_string::FormatFString {
+    #[inline]
+    fn fmt(&self, node: &ast::FString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::FString>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FString {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::FString,
+        crate::other::f_string::FormatFString,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::f_string::FormatFString::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FString {
+    type Format = FormatOwnedWithRule<
+        ast::FString,
+        crate::other::f_string::FormatFString,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::f_string::FormatFString::default())
+    }
+}
+
 impl FormatRule<ast::StringLiteral, PyFormatContext<'_>>
     for crate::other::string_literal::FormatStringLiteral
 {
