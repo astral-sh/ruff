@@ -445,7 +445,7 @@ impl Ranged for Binding<'_> {
 
 /// ID uniquely identifying a [Binding] in a program.
 ///
-/// Using a `u32` to identify [Binding]s should is sufficient because Ruff only supports documents with a
+/// Using a `u32` to identify [Binding]s should be sufficient because Ruff only supports documents with a
 /// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
