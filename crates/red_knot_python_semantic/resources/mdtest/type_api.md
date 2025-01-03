@@ -1,15 +1,15 @@
 # Type API
 
-This document describes the internal `red_knot` API for manipulating types and querying their
-properties.
+This document describes the internal `red_knot` API for creating and manipulating types as well as
+testing various type system properties.
 
 ## Type extensions
 
 The Python language itself allows us to perform a variety of operations on types. For example, we
-can build a union of types like `int | None`, or we can use type constructors such as `list[int]` or
-`type[int]` to create new types. But some type level operations that we rely on in Red Knot, like
-intersections, can not be expressed in Python. The `red_knot` module provides the `Intersection` and
-`Not` type constructors which allows us to construct these types directly.
+can build a union of types like `int | None`, or we can use type constructors such as `list[int]`
+and `type[int]` to create new types. But some type level operations that we rely on in Red Knot,
+like intersections, can not be expressed in Python. The `red_knot` module provides the
+`Intersection` and `Not` type constructors which allow us to construct these types directly.
 
 ### Negation
 
@@ -205,4 +205,25 @@ assert_true(not is_subtype_of(str, type[str]))
 
 # Correct, returns True:
 assert_true(is_subtype_of(TypeOf[str], type[str]))
+```
+
+## Error handling
+
+### Failed assertions
+
+When an assertion fails, we emit a diagnostic message that includes the expression that failed, as
+
+```py
+from red_knot import assert_true
+
+assert_true(2 * 3 == 6)
+
+# error: "Static assertion error: argument type evaluates to `False`"
+assert_true(2 * 3 == 7)
+
+# error: "Static assertion error: argument does not have a statically known truthiness (type is `bool`)"
+assert_true(int(2.0 * 3.0) == 6)
+
+# error: "Static assertion error: expected argument type `Literal[True]`, got: `Literal[6]`."
+assert_true(2 * 3)
 ```

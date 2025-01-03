@@ -3,16 +3,14 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::types::{Class, IntersectionBuilder, Type};
 use crate::Db;
 
-use thiserror::Error;
-
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub(crate) enum TypeApiError<'db> {
-    #[error("Wrong number of arguments, expected {0}")]
+    /// Wrong number of arguments in a type API call
     WrongArity(usize),
-    #[error("Failed assertion")]
-    FailedAssertion(Type<'db>),
-    #[error("Unknown API expression")]
-    UnknownApiExpression,
+    /// Argument of `assert_true` did not have type `Literal[True]`
+    StaticAssertionError(Type<'db>),
+    /// Unknown type API expression
+    UnknownAttribute,
 }
 
 type Result<'db, T> = std::result::Result<T, TypeApiError<'db>>;
@@ -56,7 +54,7 @@ pub(crate) fn resolve_type_operation<'db>(
             let ty = expect_one_argument(arguments)?;
             Ok(ty)
         }
-        _ => Err(TypeApiError::UnknownApiExpression),
+        _ => Err(TypeApiError::UnknownAttribute),
     }
 }
 
@@ -102,11 +100,11 @@ pub(crate) fn resolve_type_predicate<'db>(
             if ty == Type::BooleanLiteral(true) {
                 Ok(Type::none(db))
             } else {
-                Err(TypeApiError::FailedAssertion(ty))
+                Err(TypeApiError::StaticAssertionError(ty))
             }
         }
 
-        _ => Err(TypeApiError::UnknownApiExpression),
+        _ => Err(TypeApiError::UnknownAttribute),
     }
 }
 
@@ -135,10 +133,12 @@ declare_lint! {
     /// ```python
     /// from red_knot import assert_true
     ///
-    /// assert_true(1 + 2 == 4)  # error: failed assertion
+    /// assert_true(1 + 1 == 3)  # error: evaluates to `False`
+    ///
+    /// assert_true(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
     /// ```
-    pub(crate) static TYPE_API_FAILED_ASSERTION = {
-        summary: "wrong number of arguments",
+    pub(crate) static TYPE_API_STATIC_ASSERTION_ERROR = {
+        summary: "Failed static assertion",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -146,5 +146,5 @@ declare_lint! {
 
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&TYPE_API_WRONG_ARITY);
-    registry.register_lint(&TYPE_API_FAILED_ASSERTION);
+    registry.register_lint(&TYPE_API_STATIC_ASSERTION_ERROR);
 }

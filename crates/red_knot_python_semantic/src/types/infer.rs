@@ -59,7 +59,7 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
-use crate::types::type_api::{TypeApiError, TYPE_API_FAILED_ASSERTION, TYPE_API_WRONG_ARITY};
+use crate::types::type_api::{TypeApiError, TYPE_API_STATIC_ASSERTION_ERROR, TYPE_API_WRONG_ARITY};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type, type_api,
@@ -4254,7 +4254,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 match result {
                     Ok(ty) => Some(ty),
-                    Err(TypeApiError::UnknownApiExpression) => {
+                    Err(TypeApiError::UnknownAttribute) => {
                         // Proper diagnostics (… has no attribute …) will be emitted higher up in the call stack
                         None
                     }
@@ -4272,11 +4272,33 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         Some(Type::Unknown)
                     }
-                    Err(TypeApiError::FailedAssertion(ty)) => {
+                    Err(TypeApiError::StaticAssertionError(Type::BooleanLiteral(false))) => {
                         self.context.report_lint(
-                            &TYPE_API_FAILED_ASSERTION,
+                            &TYPE_API_STATIC_ASSERTION_ERROR,
                             arguments.into(),
-                            format_args!("Failed assertion: expected argument type `Literal[True]`, but inferred: `{ty}`.", ty=ty.display(db)),
+                            format_args!(
+                                "Static assertion error: argument type evaluates to `False`"
+                            ),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                    Err(TypeApiError::StaticAssertionError(Type::Instance(class)))
+                        if class.class.is_known(db, KnownClass::Bool) =>
+                    {
+                        self.context.report_lint(
+                            &TYPE_API_STATIC_ASSERTION_ERROR,
+                            arguments.into(),
+                            format_args!("Static assertion error: argument does not have a statically known truthiness (type is `bool`)"),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                    Err(TypeApiError::StaticAssertionError(ty)) => {
+                        self.context.report_lint(
+                            &TYPE_API_STATIC_ASSERTION_ERROR,
+                            arguments.into(),
+                            format_args!("Static assertion error: expected argument type `Literal[True]`, got: `{ty}`.", ty=ty.display(db)),
                         );
 
                         Some(Type::Unknown)
