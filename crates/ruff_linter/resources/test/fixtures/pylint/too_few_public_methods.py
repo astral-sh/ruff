@@ -36,3 +36,12 @@ class A:
     
     def __init__(self):
         ...
+
+class C:
+    c: int
+    def __init__(self,d:list):...
+
+class D:
+    """This class has a docstring."""
+    # this next method is an init
+    def __init__(self,e:dict):...
