@@ -106,9 +106,14 @@ the test.
 
 ```py
 from red_knot import is_equivalent_to, static_assert
+from typing_extensions import Never, Union
 
-static_assert(is_equivalent_to(int, int))
+static_assert(is_equivalent_to(type, type[object]))
+static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(is_equivalent_to(int | str, Union[int, str]))
+
 static_assert(not is_equivalent_to(int, str))
+static_assert(not is_equivalent_to(int | str, int | str | bytes))
 ```
 
 ### Subtyping
