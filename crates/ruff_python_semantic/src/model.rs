@@ -1498,7 +1498,7 @@ impl<'a> SemanticModel<'a> {
                     source: self.node_id,
                     context: self.execution_context(),
                     exceptions: self.exceptions(),
-                    flags: BindingFlags::empty(),
+                    flags: BindingFlags::GLOBAL,
                 });
                 self.global_scope_mut().add(name, id);
             }

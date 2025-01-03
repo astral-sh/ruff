@@ -1,4 +1,4 @@
-# Correct
+##################### Correct #####################
 
 for _ in range(5):
     pass
@@ -37,6 +37,17 @@ def fun():
     _x = "reassigned global"
     return _x
 
+# (we had a false positive when a global var is used like this in 2 functions)
+_num: int
+
+def set_num():
+    global _num
+    _num = 1
+
+def print_num():
+    print(_num)
+
+
 class _ValidClass:
     pass
 
@@ -70,7 +81,7 @@ def fun(x):
         return ___
     return x
 
-# Incorrect
+##################### Incorrect #####################
 
 class Class_:
     def fun(self):
