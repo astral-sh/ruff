@@ -10,6 +10,7 @@ pub mod diagnostic;
 pub mod display;
 pub mod file_revision;
 pub mod files;
+pub mod panic;
 pub mod parsed;
 pub mod source;
 pub mod system;
