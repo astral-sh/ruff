@@ -4258,15 +4258,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         // Proper diagnostics (… has no attribute …) will be emitted higher up in the call stack
                         None
                     }
-                    Err(TypeApiError::WrongArity(expected)) => {
+                    Err(TypeApiError::WrongNumberOfArguments { expected, actual }) => {
                         self.context.report_lint(
                             &TYPE_API_WRONG_ARITY,
                             arguments.into(),
                             format_args!(
-                                "Expected {} argument{} for `{}`",
-                                expected,
+                                "Expected {expected} argument{}, got {actual}",
                                 if expected == 1 { "" } else { "s" },
-                                name
                             ),
                         );
 
@@ -4276,9 +4274,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.context.report_lint(
                             &TYPE_API_STATIC_ASSERTION_ERROR,
                             arguments.into(),
-                            format_args!(
-                                "Static assertion error: argument type evaluates to `False`"
-                            ),
+                            format_args!("Static assertion error: argument evaluates to `False`"),
                         );
 
                         Some(Type::Unknown)

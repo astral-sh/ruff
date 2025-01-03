@@ -6,7 +6,7 @@ use crate::Db;
 #[derive(Debug)]
 pub(crate) enum TypeApiError<'db> {
     /// Wrong number of arguments in a type API call
-    WrongArity(usize),
+    WrongNumberOfArguments { expected: usize, actual: usize },
     /// Argument of `assert_true` did not have type `Literal[True]`
     StaticAssertionError(Type<'db>),
     /// Unknown type API expression
@@ -20,10 +20,19 @@ fn expect_n_arguments<'db, const N: usize>(
 ) -> Result<'db, [Type<'db>; N]> {
     let mut result = [Type::Unknown; N];
     for i in 0..N {
-        result[i] = arguments.next().ok_or(TypeApiError::WrongArity(N))?;
+        result[i] = arguments
+            .next()
+            .ok_or(TypeApiError::WrongNumberOfArguments {
+                expected: N,
+                actual: i,
+            })?;
     }
     if arguments.next().is_some() {
-        return Err(TypeApiError::WrongArity(N));
+        let actual = N + 1 + arguments.count();
+        return Err(TypeApiError::WrongNumberOfArguments {
+            expected: N,
+            actual,
+        });
     }
     Ok(result)
 }

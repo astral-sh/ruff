@@ -200,8 +200,9 @@ the expression `str`:
 ```py
 from red_knot import TypeOf, is_subtype_of, assert_true
 
-# Not as intended, returns False:
-assert_true(not is_subtype_of(str, type[str]))
+# This is incorrect and therefore fails with ...
+# error: "Static assertion error: argument evaluates to `False`"
+assert_true(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
 assert_true(is_subtype_of(TypeOf[str], type[str]))
@@ -211,14 +212,14 @@ assert_true(is_subtype_of(TypeOf[str], type[str]))
 
 ### Failed assertions
 
-When an assertion fails, we emit a diagnostic message that includes the expression that failed, as
+We provide various tailored error messages for wrong argument types to `assert_true`:
 
 ```py
 from red_knot import assert_true
 
 assert_true(2 * 3 == 6)
 
-# error: "Static assertion error: argument type evaluates to `False`"
+# error: "Static assertion error: argument evaluates to `False`"
 assert_true(2 * 3 == 7)
 
 # error: "Static assertion error: argument does not have a statically known truthiness (type is `bool`)"
@@ -226,4 +227,28 @@ assert_true(int(2.0 * 3.0) == 6)
 
 # error: "Static assertion error: expected argument type `Literal[True]`, got: `Literal[6]`."
 assert_true(2 * 3)
+```
+
+### Wrong number of arguments
+
+```py
+from red_knot import is_subtype_of, is_fully_static
+
+# error: "Expected 2 arguments, got 0"
+is_subtype_of()
+
+# error: "Expected 2 arguments, got 1"
+is_subtype_of(int)
+
+# error: "Expected 2 arguments, got 3"
+is_subtype_of(int, int, int)
+
+# error: "Expected 2 arguments, got 4"
+is_subtype_of(int, int, int, int)
+
+# error: "Expected 1 argument, got 0"
+is_fully_static()
+
+# error: "Expected 1 argument, got 2"
+is_fully_static(int, int)
 ```
