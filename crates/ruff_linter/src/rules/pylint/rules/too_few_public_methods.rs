@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Classes with just an `__init__` are possibly better off
-/// being a dataclass or a namedtuple, which are more lightweight.
+/// being a dataclass or a namedtuple, which have less boilerplate.
 ///
 /// ## Example
 /// ```python
