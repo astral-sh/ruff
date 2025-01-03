@@ -193,7 +193,7 @@ pub(crate) fn multiple_with_statements(
                     }
                     Err(err) => bail!("Failed to collapse `with`: {err}"),
                 }
-            })
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

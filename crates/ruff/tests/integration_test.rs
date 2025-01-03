@@ -2128,7 +2128,7 @@ unfixable = ["RUF"]
 }
 
 #[test]
-fn verbose_show_failed_fix_errors() -> Result<()> {
+fn verbose_show_failed_fix_errors() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "UP006", "--preview", "-v"])
         .build();
@@ -2153,11 +2153,10 @@ fn verbose_show_failed_fix_errors() -> Result<()> {
     [2025-01-03][00:40:50][ruff::resolve][DEBUG] Isolated mode, not reading any pyproject.toml
     [2025-01-03][00:40:50][ruff_diagnostics::diagnostic][DEBUG] Failed to create fix for NonPEP585Annotation: Unable to insert `Callable` into scope due to name conflict
     "###);
-
-    Ok(())
 }
+
 #[test]
-fn no_verbose_hide_failed_fix_errors() -> Result<()> {
+fn no_verbose_hide_failed_fix_errors() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "UP006", "--preview"])
         .build();
@@ -2180,6 +2179,4 @@ fn no_verbose_hide_failed_fix_errors() -> Result<()> {
 
     ----- stderr -----
     "###);
-
-    Ok(())
 }

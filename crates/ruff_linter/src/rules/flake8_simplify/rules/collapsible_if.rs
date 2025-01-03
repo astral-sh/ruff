@@ -136,7 +136,7 @@ pub(crate) fn nested_if_statements(
                 }
                 Err(err) => bail!("Failed to collapse `if`: {err}"),
             }
-        })
+        });
     }
     checker.diagnostics.push(diagnostic);
 }
