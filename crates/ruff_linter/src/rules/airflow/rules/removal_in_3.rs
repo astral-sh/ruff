@@ -1,16 +1,16 @@
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{
-    name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName,
-    StmtClassDef,
+    name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName, Stmt,
+    StmtClassDef, StmtFunctionDef,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of deprecated Airflow functions and values.
@@ -87,6 +87,7 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 check_call_arguments(checker, &qualname, arguments);
             };
             check_method(checker, call_expr);
+            check_context_get(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { attr, .. }) => {
             check_name(checker, expr, attr.range());
@@ -201,6 +202,54 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
             }
         }
     };
+}
+
+/// Check whether a removed context key is access through context.get("key").
+///
+/// ```python
+/// from airflow.decorators import task
+///
+///
+/// @task
+/// def access_invalid_key_task_out_of_dag(**context):
+///     print("access invalid key", context.get("conf"))
+/// ```
+fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
+    const REMOVED_CONTEXT_KEYS: [&str; 1] = ["conf"];
+
+    if !is_taskflow(checker) {
+        return;
+    }
+
+    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
+        return;
+    };
+
+    // Ensure the method called is `context`
+    if !value
+        .as_name_expr()
+        .is_some_and(|name| matches!(name.id.as_str(), "context"))
+    {
+        return;
+    }
+
+    // Ensure the method called is `get`
+    if attr.as_str() != "get" {
+        return;
+    }
+
+    for removed_key in REMOVED_CONTEXT_KEYS {
+        if let Some(argument) = call_expr.arguments.find_argument_value(removed_key, 0) {
+            checker.diagnostics.push(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: removed_key.to_string(),
+                    replacement: Replacement::None,
+                },
+                argument.range(),
+            ));
+            return;
+        }
+    }
 }
 
 /// Check whether a removed Airflow class attribute (include property) is called.
@@ -848,4 +897,36 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
 
         _ => false,
     }
+}
+
+/// Check whether the function is decorated by @task
+///
+///
+/// Examples for the above patterns:
+/// ```python
+/// from airflow.decorators import task
+///
+///
+/// @task
+/// def access_invalid_key_task_out_of_dag(**context):
+///     print("access invalid key", context.get("conf"))
+/// ```
+fn is_taskflow(checker: &mut Checker) -> bool {
+    let mut parents = checker.semantic().current_statements();
+    if let Some(Stmt::FunctionDef(StmtFunctionDef { decorator_list, .. })) =
+        parents.find(|stmt| stmt.is_function_def_stmt())
+    {
+        for decorator in decorator_list {
+            if checker
+                .semantic()
+                .resolve_qualified_name(map_callable(&decorator.expression))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
+                })
+            {
+                return true;
+            }
+        }
+    }
+    false
 }

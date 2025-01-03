@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
 AIR302_args.py:18:39: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
    |
