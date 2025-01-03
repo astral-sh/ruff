@@ -1010,26 +1010,6 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
-        if let (
-            Type::Instance(InstanceType { class: self_class }),
-            Type::Instance(InstanceType {
-                class: target_class,
-            }),
-        ) = (self, other)
-        {
-            let self_known = self_class.known(db);
-            if matches!(
-                self_known,
-                Some(KnownClass::NoneType | KnownClass::NoDefaultType)
-            ) && self_known == target_class.known(db)
-            {
-                return true;
-            }
-        }
-
         // type[object] ≡ type
         if let (
             Type::SubclassOf(SubclassOfType {
