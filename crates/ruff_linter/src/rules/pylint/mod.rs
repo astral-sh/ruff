@@ -207,7 +207,6 @@ mod tests {
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
     #[test_case(Rule::DictIndexMissingItems, Path::new("dict_index_missing_items.py"))]
     #[test_case(Rule::DictIterMissingItems, Path::new("dict_iter_missing_items.py"))]
-    #[test_case(Rule::ClassAsDataStructure, Path::new("too_few_public_methods.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")

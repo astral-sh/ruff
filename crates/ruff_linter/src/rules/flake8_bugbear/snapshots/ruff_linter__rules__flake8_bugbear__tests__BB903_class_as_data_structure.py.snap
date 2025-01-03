@@ -1,0 +1,89 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+class_as_data_structure.py:6:1: BB903 Class could be dataclass or namedtuple
+  |
+6 | / class Point:  # PLR0903
+7 | |     def __init__(self, x: float, y: float) -> None:
+8 | |         self.x = x
+9 | |         self.y = y
+  | |__________________^ BB903
+  |
+
+class_as_data_structure.py:40:1: BB903 Class could be dataclass or namedtuple
+   |
+38 |           ...
+39 |   
+40 | / class C:
+41 | |     c: int
+42 | |     def __init__(self,d:list):...
+   | |_________________________________^ BB903
+43 |   
+44 |   class D:
+   |
+
+class_as_data_structure.py:44:1: BB903 Class could be dataclass or namedtuple
+   |
+42 |       def __init__(self,d:list):...
+43 |   
+44 | / class D:
+45 | |     """This class has a docstring."""
+46 | |     # this next method is an init
+47 | |     def __init__(self,e:dict):...
+   | |_________________________________^ BB903
+48 |   
+49 |   # <--- begin flake8-bugbear tests below
+   |
+
+class_as_data_structure.py:61:1: BB903 Class could be dataclass or namedtuple
+   |
+61 | / class NoWarningsClassAttributes:
+62 | |     spam = "ham"
+63 | | 
+64 | |     def __init__(self, foo:int, bar:list):
+65 | |         self.foo = foo
+66 | |         self.bar = bar
+   | |______________________^ BB903
+   |
+
+class_as_data_structure.py:69:1: BB903 Class could be dataclass or namedtuple
+   |
+69 | / class NoWarningsComplicatedAssignment:
+70 | |     def __init__(self, foo:int, bar:list):
+71 | |         self.foo = foo
+72 | |         self.bar = bar
+73 | |         self.spam = " - ".join([foo, bar])
+   | |__________________________________________^ BB903
+   |
+
+class_as_data_structure.py:76:1: BB903 Class could be dataclass or namedtuple
+   |
+76 | / class NoWarningsMoreStatements:
+77 | |     def __init__(self, foo:int, bar:list):
+78 | |         foo = " - ".join([foo, bar])
+79 | |         self.foo = foo
+80 | |         self.bar = bar
+   | |______________________^ BB903
+   |
+
+class_as_data_structure.py:83:1: BB903 Class could be dataclass or namedtuple
+   |
+83 | / class Warnings:
+84 | |     def __init__(self, foo:int, bar:list):
+85 | |         self.foo = foo
+86 | |         self.bar = bar
+   | |______________________^ BB903
+   |
+
+class_as_data_structure.py:89:1: BB903 Class could be dataclass or namedtuple
+   |
+89 | / class WarningsWithDocstring:
+90 | |     """A docstring should not be an impediment to a warning"""
+91 | | 
+92 | |     def __init__(self, foo:int, bar:list):
+93 | |         self.foo = foo
+94 | |         self.bar = bar
+   | |______________________^ BB903
+95 |   
+96 |   # <-- end flake8-bugbear tests
+   |

@@ -42,7 +42,7 @@ impl Violation for ClassAsDataStructure {
     }
 }
 
-/// R0903
+/// B903
 pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     // allow decorated classes
     if !class_def.decorator_list.is_empty() {

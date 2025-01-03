@@ -47,8 +47,11 @@ class D:
     def __init__(self,e:dict):...
 
 # <--- begin flake8-bugbear tests below
+# (we have modified them to have type annotations,
+# since our implementation only triggers in that
+# stricter setting.)
 class NoWarningsMoreMethods:
-    def __init__(self, foo, bar):
+    def __init__(self, foo:int, bar:list):
         self.foo = foo
         self.bar = bar
 
@@ -58,27 +61,27 @@ class NoWarningsMoreMethods:
 class NoWarningsClassAttributes:
     spam = "ham"
 
-    def __init__(self, foo, bar):
+    def __init__(self, foo:int, bar:list):
         self.foo = foo
         self.bar = bar
 
 
 class NoWarningsComplicatedAssignment:
-    def __init__(self, foo, bar):
+    def __init__(self, foo:int, bar:list):
         self.foo = foo
         self.bar = bar
         self.spam = " - ".join([foo, bar])
 
 
 class NoWarningsMoreStatements:
-    def __init__(self, foo, bar):
+    def __init__(self, foo:int, bar:list):
         foo = " - ".join([foo, bar])
         self.foo = foo
         self.bar = bar
 
 
 class Warnings:
-    def __init__(self, foo, bar):
+    def __init__(self, foo:int, bar:list):
         self.foo = foo
         self.bar = bar
 
@@ -86,7 +89,7 @@ class Warnings:
 class WarningsWithDocstring:
     """A docstring should not be an impediment to a warning"""
 
-    def __init__(self, foo, bar):
+    def __init__(self, foo:int, bar:list):
         self.foo = foo
         self.bar = bar
 
