@@ -34,8 +34,7 @@ If you define your own class named `Any`, using that in a type expression refers
 isn't a spelling of the Any type.
 
 ```py
-class Any:
-    pass
+class Any: ...
 
 x: Any
 
@@ -59,8 +58,7 @@ assignable to `int`.
 ```py
 from typing import Any
 
-class Subclass(Any):
-    pass
+class Subclass(Any): ...
 
 reveal_type(Subclass.__mro__)  # revealed: tuple[Literal[Subclass], Any, Literal[object]]
 
@@ -68,8 +66,18 @@ x: Subclass = 1  # error: [invalid-assignment]
 # TODO: no diagnostic
 y: int = Subclass()  # error: [invalid-assignment]
 
-def f() -> Subclass:
-    pass
+def _(s: Subclass):
+    reveal_type(s)  # revealed: Subclass
+```
 
-reveal_type(f())  # revealed: Subclass
+## Invalid
+
+`Any` cannot be parameterized:
+
+```py
+from typing import Any
+
+# error: [invalid-type-form] "Type `typing.Any` expected no type parameter"
+def f(x: Any[int]):
+    reveal_type(x)  # revealed: Unknown
 ```

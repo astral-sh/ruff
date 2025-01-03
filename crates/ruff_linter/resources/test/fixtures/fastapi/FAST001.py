@@ -108,3 +108,18 @@ app = None
 @app.post("/items/", response_model=Item)
 async def create_item(item: Item) -> Item:
     return item
+
+
+# Routes might be defined inside functions
+
+
+def setup_app(app_arg: FastAPI, non_app: str) -> None:
+    # Error
+    @app_arg.get("/", response_model=str)
+    async def get_root() -> str:
+        return "Hello World!"
+
+    # Ok
+    @non_app.get("/", response_model=str)
+    async def get_root() -> str:
+        return "Hello World!"

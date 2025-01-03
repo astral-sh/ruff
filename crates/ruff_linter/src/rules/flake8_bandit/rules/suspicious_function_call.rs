@@ -906,7 +906,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["six", "moves", "urllib", "request", "Request"] => {
                 // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if call.arguments.find_argument("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
+                    if call.arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
                         return None;
                     }
                 }
@@ -916,11 +916,11 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["urllib", "request", "urlopen" | "urlretrieve" ] |
             ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    match call.arguments.find_argument("url", 0) {
+                    match call.arguments.find_argument_value("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
                         Some(Expr::Call(ExprCall { func, arguments, .. })) => {
                             if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
-                                if arguments.find_argument("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
+                                if arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
                                     return None;
                                 }
                             }

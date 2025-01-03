@@ -114,7 +114,7 @@ fn extract_cryptographic_key(
                     Some((CryptographicKey::Rsa { key_size }, range))
                 }
                 "ec" => {
-                    let argument = call.arguments.find_argument("curve", 0)?;
+                    let argument = call.arguments.find_argument_value("curve", 0)?;
                     let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
                     let qualified_name = checker.semantic().resolve_qualified_name(value)?;
                     if matches!(
@@ -150,7 +150,7 @@ fn extract_cryptographic_key(
 }
 
 fn extract_int_argument(call: &ExprCall, name: &str, position: usize) -> Option<(u16, TextRange)> {
-    let argument = call.arguments.find_argument(name, position)?;
+    let argument = call.arguments.find_argument_value(name, position)?;
     let Expr::NumberLiteral(ast::ExprNumberLiteral {
         value: ast::Number::Int(i),
         ..

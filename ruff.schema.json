@@ -781,7 +781,7 @@
           }
         },
         "include-dependencies": {
-          "description": "A map from file path to the list of file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
+          "description": "A map from file path to the list of Python or non-Python file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
           "type": [
             "object",
             "null"
@@ -1399,7 +1399,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).",
+          "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get` which will work across assignments in the same module.\n\nFor example: ```python import fastapi\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\") def home() -> str: ... ```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
           "type": [
             "array",
             "null"
@@ -2561,6 +2561,13 @@
             "type": "string"
           }
         },
+        "ignore-var-parameters": {
+          "description": "If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "property-decorators": {
           "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
           "type": [
@@ -2802,8 +2809,18 @@
     "RuffOptions": {
       "type": "object",
       "properties": {
+        "allowed-markup-calls": {
+          "description": "A list of callable names, whose result may be safely passed into [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).\n\nThis setting helps you avoid false positives in code like:\n\n```python from bleach import clean from markupsafe import Markup\n\ncleaned_markup = Markup(clean(some_user_input)) ```\n\nWhere the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html) usually ensures that there's no XSS vulnerability.\n\nAlthough it is not recommended, you may also use this setting to whitelist other kinds of calls, e.g. calls to i18n translation functions, where how safe that is will depend on the implementation and how well the translations are audited.\n\nAnother common use-case is to wrap the output of functions that generate markup like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring) or template rendering engines where sanitization of potential user input is either already baked in or has to happen before rendering.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extend-markup-names": {
-          "description": "A list of additional callable names that behave like [`markupsafe.Markup`].\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).\n\n[markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup",
+          "description": "A list of additional callable names that behave like [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).",
           "type": [
             "array",
             "null"
@@ -2842,6 +2859,7 @@
         "AIR30",
         "AIR301",
         "AIR302",
+        "AIR303",
         "ALL",
         "ANN",
         "ANN0",
@@ -2935,6 +2953,8 @@
         "B904",
         "B905",
         "B909",
+        "B91",
+        "B911",
         "BLE",
         "BLE0",
         "BLE00",
@@ -3631,6 +3651,7 @@
         "PLW0",
         "PLW01",
         "PLW010",
+        "PLW0101",
         "PLW0108",
         "PLW012",
         "PLW0120",
@@ -3757,6 +3778,8 @@
         "PTH206",
         "PTH207",
         "PTH208",
+        "PTH21",
+        "PTH210",
         "PYI",
         "PYI0",
         "PYI00",
@@ -3870,6 +3893,7 @@
         "RUF022",
         "RUF023",
         "RUF024",
+        "RUF025",
         "RUF026",
         "RUF027",
         "RUF028",
@@ -3887,11 +3911,15 @@
         "RUF04",
         "RUF040",
         "RUF041",
+        "RUF043",
         "RUF046",
         "RUF048",
         "RUF05",
+        "RUF051",
         "RUF052",
         "RUF055",
+        "RUF056",
+        "RUF057",
         "RUF1",
         "RUF10",
         "RUF100",

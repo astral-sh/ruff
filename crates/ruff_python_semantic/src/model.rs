@@ -711,12 +711,43 @@ impl<'a> SemanticModel<'a> {
     /// References from within an [`ast::Comprehension`] can produce incorrect
     /// results when referring to a [`BindingKind::NamedExprAssignment`].
     pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
-        let symbol = name.id.as_str();
-        let range = name.range;
+        self.simulate_runtime_load_at_location_in_scope(name.id.as_str(), name.range, self.scope_id)
+    }
+
+    /// Simulates a runtime load of the given symbol.
+    ///
+    /// This should not be run until after all the bindings have been visited.
+    ///
+    /// The main purpose of this method and what makes this different from
+    /// [`SemanticModel::lookup_symbol_in_scope`] is that it may be used to
+    /// perform speculative name lookups.
+    ///
+    /// In most cases a load can be accurately modeled simply by calling
+    /// [`SemanticModel::lookup_symbol`] at the right time during semantic
+    /// analysis, however for speculative lookups this is not the case,
+    /// since we're aiming to change the semantic meaning of our load.
+    /// E.g. we want to check what would happen if we changed a forward
+    /// reference to an immediate load or vice versa.
+    ///
+    /// Use caution when utilizing this method, since it was primarily designed
+    /// to work for speculative lookups from within type definitions, which
+    /// happen to share some nice properties, where attaching each binding
+    /// to a range in the source code and ordering those bindings based on
+    /// that range is a good enough approximation of which bindings are
+    /// available at runtime for which reference.
+    ///
+    /// References from within an [`ast::Comprehension`] can produce incorrect
+    /// results when referring to a [`BindingKind::NamedExprAssignment`].
+    pub fn simulate_runtime_load_at_location_in_scope(
+        &self,
+        symbol: &str,
+        symbol_range: TextRange,
+        scope_id: ScopeId,
+    ) -> Option<BindingId> {
         let mut seen_function = false;
         let mut class_variables_visible = true;
         let mut source_order_sensitive_lookup = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
 
             // Only once we leave a function scope and its enclosing type scope should
@@ -776,7 +807,7 @@ impl<'a> SemanticModel<'a> {
                             _ => binding.range,
                         };
 
-                        if binding_range.ordering(range).is_lt() {
+                        if binding_range.ordering(symbol_range).is_lt() {
                             return Some(shadowed_id);
                         }
                     }
@@ -1911,6 +1942,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::ATTRIBUTE_DOCSTRING)
     }
 
+    /// Return `true` if the model is in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
+    }
+
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
@@ -2453,6 +2489,23 @@ bitflags! {
         /// ```
         const ASSERT_STATEMENT = 1 << 29;
 
+        /// The model is in a [`@no_type_check`] context.
+        ///
+        /// This is used to skip type checking when the `@no_type_check` decorator is found.
+        ///
+        /// For example (adapted from [#13824]):
+        /// ```python
+        /// from typing import no_type_check
+        ///
+        /// @no_type_check
+        /// def fn(arg: "A") -> "R":
+        ///     pass
+        /// ```
+        ///
+        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
+        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
+        const NO_TYPE_CHECK = 1 << 30;
+
         /// The model is visiting the type expression of a `typing.cast` call.
         ///
         /// For example, the model might be visiting `float` in
@@ -2461,7 +2514,7 @@ bitflags! {
         ///
         /// cast(float, 5)
         /// ```
-        const CAST_TYPE_EXPRESSION = 1 << 30;
+        const CAST_TYPE_EXPRESSION = 1 << 31;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

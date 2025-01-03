@@ -3386,6 +3386,24 @@ pub enum TypeParam {
     TypeVarTuple(TypeParamTypeVarTuple),
 }
 
+impl TypeParam {
+    pub const fn name(&self) -> &Identifier {
+        match self {
+            Self::TypeVar(x) => &x.name,
+            Self::ParamSpec(x) => &x.name,
+            Self::TypeVarTuple(x) => &x.name,
+        }
+    }
+
+    pub fn default(&self) -> Option<&Expr> {
+        match self {
+            Self::TypeVar(x) => x.default.as_deref(),
+            Self::ParamSpec(x) => x.default.as_deref(),
+            Self::TypeVarTuple(x) => x.default.as_deref(),
+        }
+    }
+}
+
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVar {
@@ -3756,10 +3774,19 @@ pub struct Arguments {
 }
 
 /// An entry in the argument list of a function call.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ArgOrKeyword<'a> {
     Arg(&'a Expr),
     Keyword(&'a Keyword),
+}
+
+impl<'a> ArgOrKeyword<'a> {
+    pub const fn value(self) -> &'a Expr {
+        match self {
+            ArgOrKeyword::Arg(argument) => argument,
+            ArgOrKeyword::Keyword(keyword) => &keyword.value,
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
@@ -3810,13 +3837,20 @@ impl Arguments {
             .nth(position)
     }
 
-    /// Return the argument with the given name or at the given position, or `None` if no such
+    /// Return the value for the argument with the given name or at the given position, or `None` if no such
+    /// argument exists. Used to retrieve argument values that can be provided _either_ as keyword or
+    /// positional arguments.
+    pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr> {
+        self.find_argument(name, position).map(ArgOrKeyword::value)
+    }
+
+    /// Return the the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {
         self.find_keyword(name)
-            .map(|keyword| &keyword.value)
-            .or_else(|| self.find_positional(position))
+            .map(ArgOrKeyword::from)
+            .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
     }
 
     /// Return the positional and keyword arguments in the order of declaration.
@@ -4061,7 +4095,7 @@ impl Ranged for Identifier {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Singleton {
     None,
     True,

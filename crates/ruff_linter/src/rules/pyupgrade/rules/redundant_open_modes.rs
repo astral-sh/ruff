@@ -71,47 +71,24 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    match call.arguments.find_argument("mode", 1) {
-        None => {
-            if !call.arguments.is_empty() {
-                if let Some(keyword) = call.arguments.find_keyword("mode") {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: mode_param_value,
-                        ..
-                    }) = &keyword.value
-                    {
-                        if let Ok(mode) = OpenMode::from_chars(mode_param_value.chars()) {
-                            let reduced = mode.reduce();
-                            if reduced != mode {
-                                checker.diagnostics.push(create_diagnostic(
-                                    call,
-                                    &keyword.value,
-                                    reduced,
-                                    checker.tokens(),
-                                    checker.stylist(),
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Some(mode_param) => {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
-                if let Ok(mode) = OpenMode::from_chars(value.chars()) {
-                    let reduced = mode.reduce();
-                    if reduced != mode {
-                        checker.diagnostics.push(create_diagnostic(
-                            call,
-                            mode_param,
-                            reduced,
-                            checker.tokens(),
-                            checker.stylist(),
-                        ));
-                    }
-                }
-            }
-        }
+    let Some(mode_param) = call.arguments.find_argument_value("mode", 1) else {
+        return;
+    };
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param else {
+        return;
+    };
+    let Ok(mode) = OpenMode::from_chars(value.chars()) else {
+        return;
+    };
+    let reduced = mode.reduce();
+    if reduced != mode {
+        checker.diagnostics.push(create_diagnostic(
+            call,
+            mode_param,
+            reduced,
+            checker.tokens(),
+            checker.stylist(),
+        ));
     }
 }
 

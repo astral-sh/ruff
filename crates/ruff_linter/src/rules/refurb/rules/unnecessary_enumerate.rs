@@ -178,7 +178,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
-                let start = arguments.find_argument("start", 1);
+                let start = arguments.find_argument_value("start", 1);
                 if start.map_or(true, |start| {
                     matches!(
                         start,

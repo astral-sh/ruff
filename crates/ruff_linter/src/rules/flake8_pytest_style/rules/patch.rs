@@ -84,7 +84,7 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
         range: _,
     } = call
         .arguments
-        .find_argument("new", index)?
+        .find_argument_value("new", index)?
         .as_lambda_expr()?;
 
     // Walk the lambda body. If the lambda uses the arguments, then it's valid.

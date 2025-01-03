@@ -1,13 +1,14 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::builder::SemanticIndexBuilder;
@@ -28,7 +29,8 @@ pub mod symbol;
 mod use_def;
 
 pub(crate) use self::use_def::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
+    DeclarationsIterator, ScopedVisibilityConstraintId,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
@@ -58,6 +60,22 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
     let index = semantic_index(db, file);
 
     index.symbol_table(scope.file_scope_id(db))
+}
+
+/// Returns the set of modules that are imported anywhere in `file`.
+///
+/// This set only considers `import` statements, not `from...import` statements, because:
+///
+///   - In `from foo import bar`, we cannot determine whether `foo.bar` is a submodule (and is
+///     therefore imported) without looking outside the content of this file.  (We could turn this
+///     into a _potentially_ imported modules set, but that would change how it's used in our type
+///     inference logic.)
+///
+///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
+///     knowing the name of the current module, and whether it's a package.
+#[salsa::tracked]
+pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
+    semantic_index(db, file).imported_modules.clone()
 }
 
 /// Returns the use-def map for a specific `scope`.
@@ -115,6 +133,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
+
+    /// The set of modules that are imported anywhere within this file.
+    imported_modules: Arc<FxHashSet<ModuleName>>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -358,14 +379,12 @@ mod tests {
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
             self.public_bindings(symbol)
-                .next()
-                .map(|constrained_binding| constrained_binding.binding)
+                .find_map(|constrained_binding| constrained_binding.binding)
         }
 
         fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
             self.bindings_at_use(use_id)
-                .next()
-                .map(|constrained_binding| constrained_binding.binding)
+                .find_map(|constrained_binding| constrained_binding.binding)
         }
     }
 
@@ -606,7 +625,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let function_table = index.symbol_table(function_scope_id);
         assert_eq!(
             names(&function_table),
-            vec!["a", "b", "c", "args", "d", "kwargs"],
+            vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
         let use_def = index.use_def_map(function_scope_id);
@@ -618,21 +637,30 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         .expect("symbol exists"),
                 )
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
-        }
-        for name in ["args", "kwargs"] {
-            let binding = use_def
-                .first_public_binding(
-                    function_table
-                        .symbol_id_by_name(name)
-                        .expect("symbol exists"),
-                )
-                .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
+        let args_binding = use_def
+            .first_public_binding(
+                function_table
+                    .symbol_id_by_name("args")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            args_binding.kind(&db),
+            DefinitionKind::VariadicPositionalParameter(_)
+        ));
+        let kwargs_binding = use_def
+            .first_public_binding(
+                function_table
+                    .symbol_id_by_name("kwargs")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            kwargs_binding.kind(&db),
+            DefinitionKind::VariadicKeywordParameter(_)
+        ));
     }
 
     #[test]
@@ -654,7 +682,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let lambda_table = index.symbol_table(lambda_scope_id);
         assert_eq!(
             names(&lambda_table),
-            vec!["a", "b", "c", "args", "d", "kwargs"],
+            vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
         let use_def = index.use_def_map(lambda_scope_id);
@@ -662,17 +690,30 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
-        }
-        for name in ["args", "kwargs"] {
-            let binding = use_def
-                .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-                .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
+        let args_binding = use_def
+            .first_public_binding(
+                lambda_table
+                    .symbol_id_by_name("args")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            args_binding.kind(&db),
+            DefinitionKind::VariadicPositionalParameter(_)
+        ));
+        let kwargs_binding = use_def
+            .first_public_binding(
+                lambda_table
+                    .symbol_id_by_name("kwargs")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            kwargs_binding.kind(&db),
+            DefinitionKind::VariadicKeywordParameter(_)
+        ));
     }
 
     /// Test case to validate that the comprehension scope is correctly identified and that the target

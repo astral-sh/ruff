@@ -2,6 +2,7 @@ from types import TracebackType
 from typing import final
 from typing_extensions import Self
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 __all__ = ("Timeout", "timeout", "timeout_at")
 
 @final

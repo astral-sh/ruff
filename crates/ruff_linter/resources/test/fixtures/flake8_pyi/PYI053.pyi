@@ -67,5 +67,16 @@ def not_a_deprecated_function() -> None: ...
 
 fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
 
+from typing import TypeAlias, Literal, Annotated
+
 # see https://github.com/astral-sh/ruff/issues/12995
 def foo(bar: typing.Literal["a", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]):...
+
+# Ok
+def f(x: int) -> "AnnotationsForClassesWithVeryLongNamesInQuotesAsReturnTypes":...
+
+# Ok
+x: TypeAlias = Literal["fooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooO"]
+
+# Ok
+y: TypeAlias = Annotated[int, "metadataaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]

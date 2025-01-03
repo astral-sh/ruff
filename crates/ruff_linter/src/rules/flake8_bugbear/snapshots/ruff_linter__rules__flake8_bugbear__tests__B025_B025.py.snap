@@ -38,3 +38,40 @@ B025.py:37:18: B025 try-except block with duplicate exception `TypeError`
    |                  ^^^^^^^^^ B025
 38 |     a = 2
    |
+
+B025.py:44:9: B025 try-except* block with duplicate exception `ValueError`
+   |
+42 | except* ValueError:
+43 |     a = 2
+44 | except* ValueError:
+   |         ^^^^^^^^^^ B025
+45 |     a = 2
+   |
+
+B025.py:53:9: B025 try-except* block with duplicate exception `pickle.PickleError`
+   |
+51 | except* ValueError:
+52 |     a = 2
+53 | except* pickle.PickleError:
+   |         ^^^^^^^^^^^^^^^^^^ B025
+54 |     a = 2
+   |
+
+B025.py:60:9: B025 try-except* block with duplicate exception `ValueError`
+   |
+58 | except* (ValueError, TypeError):
+59 |     a = 2
+60 | except* ValueError:
+   |         ^^^^^^^^^^ B025
+61 |     a = 2
+62 | except* (OSError, TypeError):
+   |
+
+B025.py:62:19: B025 try-except* block with duplicate exception `TypeError`
+   |
+60 | except* ValueError:
+61 |     a = 2
+62 | except* (OSError, TypeError):
+   |                   ^^^^^^^^^ B025
+63 |     a = 2
+   |

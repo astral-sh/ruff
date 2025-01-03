@@ -62,7 +62,8 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) = call.arguments.find_argument("name", 0)
+    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) =
+        call.arguments.find_argument_value("name", 0)
     else {
         return;
     };

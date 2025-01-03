@@ -3,7 +3,7 @@ import itertools
 import sys
 import tkinter
 from typing import Any, ClassVar, Final, Literal, TypedDict, overload
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, Unpack
 
 if sys.version_info >= (3, 9):
     __all__ = ["NORMAL", "ROMAN", "BOLD", "ITALIC", "nametofont", "Font", "families", "names"]
@@ -18,9 +18,9 @@ _FontDescription: TypeAlias = (
     | Font  # A font object constructed in Python
     | list[Any]  # ["Helvetica", 12, BOLD]
     | tuple[str]  # ("Liberation Sans",) needs wrapping in tuple/list to handle spaces
-    | tuple[str, int]  # ("Liberation Sans", 12)
-    | tuple[str, int, str]  # ("Liberation Sans", 12, "bold")
-    | tuple[str, int, list[str] | tuple[str, ...]]  # e.g. bold and italic
+    # ("Liberation Sans", 12) or ("Liberation Sans", 12, "bold", "italic", "underline")
+    | tuple[str, int, Unpack[tuple[str, ...]]]  # Any number of trailing options is permitted
+    | tuple[str, int, list[str] | tuple[str, ...]]  # Options can also be passed as list/tuple
     | _tkinter.Tcl_Obj  # A font object constructed in Tcl
 )
 
@@ -58,6 +58,7 @@ class Font:
         underline: bool = ...,
         overstrike: bool = ...,
     ) -> None: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
     def __setitem__(self, key: str, value: Any) -> None: ...
     @overload
     def cget(self, option: Literal["family"]) -> str: ...

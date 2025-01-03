@@ -36,6 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@v3
 
@@ -71,7 +72,7 @@ jobs:
       - name: Normalize Platform Pair (replace / with -)
         run: |
           platform=${{ matrix.platform }}
-          echo "PLATFORM_TUPLE=${platform//\//-}" >> $GITHUB_ENV
+          echo "PLATFORM_TUPLE=${platform//\//-}" >> "$GITHUB_ENV"
 
       # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
       - name: Build and push by digest
@@ -86,9 +87,10 @@ jobs:
           outputs: type=image,name=${{ env.RUFF_BASE_IMG }},push-by-digest=true,name-canonical=true,push=${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
 
       - name: Export digests
+        env:
+          digest: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digests
@@ -140,9 +142,10 @@ jobs:
         # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
         # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
         run: |
+          # shellcheck disable=SC2046
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.RUFF_BASE_IMG }}@sha256:%s ' *)
+            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
 
   docker-publish-extra:
     name: Publish additional Docker image based on ${{ matrix.image-mapping }}
@@ -181,7 +184,7 @@ jobs:
           # Generate Dockerfile content
           cat <<EOF > Dockerfile
           FROM ${BASE_IMAGE}
-          COPY --from=${{ env.RUFF_BASE_IMG }}:latest /ruff /usr/local/bin/ruff
+          COPY --from=${RUFF_BASE_IMG}:latest /ruff /usr/local/bin/ruff
           ENTRYPOINT []
           CMD ["/usr/local/bin/ruff"]
           EOF
@@ -201,14 +204,14 @@ jobs:
           TAG_PATTERNS="${TAG_PATTERNS%\\n}"
 
           # Export image cache name
-          echo "IMAGE_REF=${BASE_IMAGE//:/-}" >> $GITHUB_ENV
+          echo "IMAGE_REF=${BASE_IMAGE//:/-}" >> "$GITHUB_ENV"
 
           # Export tag patterns using the multiline env var syntax
           {
             echo "TAG_PATTERNS<<EOF"
             echo -e "${TAG_PATTERNS}"
             echo EOF
-          } >> $GITHUB_ENV
+          } >> "$GITHUB_ENV"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -284,7 +287,9 @@ jobs:
         # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
         run: |
           readarray -t lines <<< "$DOCKER_METADATA_OUTPUT_ANNOTATIONS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
+
+          # shellcheck disable=SC2046
           docker buildx imagetools create \
             "${annotations[@]}" \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.RUFF_BASE_IMG }}@sha256:%s ' *)
+            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)

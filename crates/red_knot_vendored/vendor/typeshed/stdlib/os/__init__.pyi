@@ -231,6 +231,7 @@ if sys.platform == "linux" and sys.version_info >= (3, 12):
         "CLONE_NEWNET",
         "CLONE_NEWNS",
         "CLONE_NEWPID",
+        "CLONE_NEWTIME",
         "CLONE_NEWUSER",
         "CLONE_NEWUTS",
         "CLONE_SIGHAND",

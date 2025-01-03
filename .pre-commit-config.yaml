@@ -2,6 +2,7 @@ fail_fast: false
 
 exclude: |
   (?x)^(
+    .github/workflows/release.yml|
     crates/red_knot_vendored/vendor/.*|
     crates/red_knot_workspace/resources/.*|
     crates/ruff_linter/resources/.*|
@@ -22,13 +23,12 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.19
+    rev: 0.7.21
     hooks:
       - id: mdformat
         additional_dependencies:
-          - mdformat-mkdocs
-          - mdformat-admon
-          - mdformat-footnote
+          - mdformat-mkdocs==4.0.0
+          - mdformat-footnote==0.1.1
         exclude: |
           (?x)^(
             docs/formatter/black\.md
@@ -59,7 +59,7 @@ repos:
           - black==24.10.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.28.1
+    rev: v1.28.4
     hooks:
       - id: typos
 
@@ -73,7 +73,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.1
+    rev: v0.8.4
     hooks:
       - id: ruff-format
       - id: ruff
@@ -83,10 +83,42 @@ repos:
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.4.1
+    rev: v3.4.2
     hooks:
       - id: prettier
         types: [yaml]
+
+  # zizmor detects security vulnerabilities in GitHub Actions workflows.
+  # Additional configuration for the tool is found in `.github/zizmor.yml`
+  - repo: https://github.com/woodruffw/zizmor-pre-commit
+    rev: v0.10.0
+    hooks:
+      - id: zizmor
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.30.0
+    hooks:
+      - id: check-github-workflows
+
+  # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
+  # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.5
+    hooks:
+      - id: actionlint
+        stages:
+          # This hook is disabled by default, since it's quite slow.
+          # To run all hooks *including* this hook, use `uvx pre-commit run -a --hook-stage=manual`.
+          # To run *just* this hook, use `uvx pre-commit run -a actionlint --hook-stage=manual`.
+          - manual
+        args:
+          - "-ignore=SC2129" # ignorable stylistic lint from shellcheck
+          - "-ignore=SC2016" # another shellcheck lint: seems to have false positives?
+        additional_dependencies:
+          # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
+          # and checks these with shellcheck. This is arguably its most useful feature,
+          # but the integration only works if shellcheck is installed
+          - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
 
 ci:
   skip: [cargo-fmt, dev-generate-all]

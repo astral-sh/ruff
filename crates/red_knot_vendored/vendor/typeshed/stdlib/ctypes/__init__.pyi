@@ -24,8 +24,9 @@ from _ctypes import (
     set_errno as set_errno,
     sizeof as sizeof,
 )
+from _typeshed import StrPath
 from ctypes._endian import BigEndianStructure as BigEndianStructure, LittleEndianStructure as LittleEndianStructure
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar, type_check_only
 from typing_extensions import Self, TypeAlias, deprecated
 
 if sys.platform == "win32":
@@ -45,15 +46,32 @@ DEFAULT_MODE: int
 
 class ArgumentError(Exception): ...
 
+# defined within CDLL.__init__
+# Runtime name is ctypes.CDLL.__init__.<locals>._FuncPtr
+@type_check_only
+class _CDLLFuncPointer(_CFuncPtr):
+    _flags_: ClassVar[int]
+    _restype_: ClassVar[type[_CDataType]]
+
+# Not a real class; _CDLLFuncPointer with a __name__ set on it.
+@type_check_only
+class _NamedFuncPointer(_CDLLFuncPointer):
+    __name__: str
+
+if sys.version_info >= (3, 12):
+    _NameTypes: TypeAlias = StrPath | None
+else:
+    _NameTypes: TypeAlias = str | None
+
 class CDLL:
     _func_flags_: ClassVar[int]
-    _func_restype_: ClassVar[_CDataType]
+    _func_restype_: ClassVar[type[_CDataType]]
     _name: str
     _handle: int
-    _FuncPtr: type[_FuncPointer]
+    _FuncPtr: type[_CDLLFuncPointer]
     def __init__(
         self,
-        name: str | None,
+        name: _NameTypes,
         mode: int = ...,
         handle: int | None = None,
         use_errno: bool = False,
@@ -84,27 +102,36 @@ if sys.platform == "win32":
 pydll: LibraryLoader[PyDLL]
 pythonapi: PyDLL
 
-class _FuncPointer(_CFuncPtr): ...
+# Class definition within CFUNCTYPE / WINFUNCTYPE / PYFUNCTYPE
+# Names at runtime are
+# ctypes.CFUNCTYPE.<locals>.CFunctionType
+# ctypes.WINFUNCTYPE.<locals>.WinFunctionType
+# ctypes.PYFUNCTYPE.<locals>.CFunctionType
+@type_check_only
+class _CFunctionType(_CFuncPtr):
+    _argtypes_: ClassVar[list[type[_CData | _CDataType]]]
+    _restype_: ClassVar[type[_CData | _CDataType] | None]
+    _flags_: ClassVar[int]
 
-class _NamedFuncPointer(_FuncPointer):
-    __name__: str
+# Alias for either function pointer type
+_FuncPointer: TypeAlias = _CDLLFuncPointer | _CFunctionType  # noqa: Y047  # not used here
 
 def CFUNCTYPE(
     restype: type[_CData | _CDataType] | None,
     *argtypes: type[_CData | _CDataType],
-    use_errno: bool = ...,
-    use_last_error: bool = ...,
-) -> type[_FuncPointer]: ...
+    use_errno: bool = False,
+    use_last_error: bool = False,
+) -> type[_CFunctionType]: ...
 
 if sys.platform == "win32":
     def WINFUNCTYPE(
         restype: type[_CData | _CDataType] | None,
         *argtypes: type[_CData | _CDataType],
-        use_errno: bool = ...,
-        use_last_error: bool = ...,
-    ) -> type[_FuncPointer]: ...
+        use_errno: bool = False,
+        use_last_error: bool = False,
+    ) -> type[_CFunctionType]: ...
 
-def PYFUNCTYPE(restype: type[_CData | _CDataType] | None, *argtypes: type[_CData | _CDataType]) -> type[_FuncPointer]: ...
+def PYFUNCTYPE(restype: type[_CData | _CDataType] | None, *argtypes: type[_CData | _CDataType]) -> type[_CFunctionType]: ...
 
 # Any type that can be implicitly converted to c_void_p when passed as a C function argument.
 # (bytes is not included here, see below.)
@@ -134,8 +161,22 @@ if sys.platform == "win32":
     def DllGetClassObject(rclsid: Any, riid: Any, ppv: Any) -> int: ...  # TODO not documented
     def GetLastError() -> int: ...
 
-def memmove(dst: _CVoidPLike, src: _CVoidConstPLike, count: int) -> int: ...
-def memset(dst: _CVoidPLike, c: int, count: int) -> int: ...
+# Actually just an instance of _CFunctionType, but we want to set a more
+# specific __call__.
+@type_check_only
+class _MemmoveFunctionType(_CFunctionType):
+    def __call__(self, dst: _CVoidPLike, src: _CVoidConstPLike, count: int) -> int: ...
+
+memmove: _MemmoveFunctionType
+
+# Actually just an instance of _CFunctionType, but we want to set a more
+# specific __call__.
+@type_check_only
+class _MemsetFunctionType(_CFunctionType):
+    def __call__(self, dst: _CVoidPLike, c: int, count: int) -> int: ...
+
+memset: _MemsetFunctionType
+
 def string_at(ptr: _CVoidConstPLike, size: int = -1) -> bytes: ...
 
 if sys.platform == "win32":
@@ -202,7 +243,10 @@ if sys.platform == "win32":
     class HRESULT(_SimpleCData[int]): ...  # TODO undocumented
 
 if sys.version_info >= (3, 12):
-    c_time_t: type[c_int32 | c_int64]  # alias for one or the other at runtime
+    # At runtime, this is an alias for either c_int32 or c_int64,
+    # which are themselves an alias for one of c_short, c_int, c_long, or c_longlong
+    # This covers all our bases.
+    c_time_t: type[c_int32 | c_int64 | c_short | c_int | c_long | c_longlong]
 
 class py_object(_CanCastTo, _SimpleCData[_T]): ...
 

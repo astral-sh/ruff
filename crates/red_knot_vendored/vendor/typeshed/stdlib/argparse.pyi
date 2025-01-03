@@ -1,8 +1,8 @@
 import sys
-from _typeshed import sentinel
+from _typeshed import SupportsWrite, sentinel
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
-from typing import IO, Any, Final, Generic, NewType, NoReturn, Protocol, TypeVar, overload
+from typing import IO, Any, ClassVar, Final, Generic, NewType, NoReturn, Protocol, TypeVar, overload
 from typing_extensions import Self, TypeAlias, deprecated
 
 __all__ = [
@@ -182,33 +182,33 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def add_subparsers(
         self: _ArgumentParserT,
         *,
-        title: str = ...,
-        description: str | None = ...,
-        prog: str = ...,
+        title: str = "subcommands",
+        description: str | None = None,
+        prog: str | None = None,
         action: type[Action] = ...,
         option_string: str = ...,
-        dest: str | None = ...,
-        required: bool = ...,
-        help: str | None = ...,
-        metavar: str | None = ...,
+        dest: str | None = None,
+        required: bool = False,
+        help: str | None = None,
+        metavar: str | None = None,
     ) -> _SubParsersAction[_ArgumentParserT]: ...
     @overload
     def add_subparsers(
         self,
         *,
-        title: str = ...,
-        description: str | None = ...,
-        prog: str = ...,
+        title: str = "subcommands",
+        description: str | None = None,
+        prog: str | None = None,
         parser_class: type[_ArgumentParserT],
         action: type[Action] = ...,
         option_string: str = ...,
-        dest: str | None = ...,
-        required: bool = ...,
-        help: str | None = ...,
-        metavar: str | None = ...,
+        dest: str | None = None,
+        required: bool = False,
+        help: str | None = None,
+        metavar: str | None = None,
     ) -> _SubParsersAction[_ArgumentParserT]: ...
-    def print_usage(self, file: IO[str] | None = None) -> None: ...
-    def print_help(self, file: IO[str] | None = None) -> None: ...
+    def print_usage(self, file: SupportsWrite[str] | None = None) -> None: ...
+    def print_help(self, file: SupportsWrite[str] | None = None) -> None: ...
     def format_usage(self) -> str: ...
     def format_help(self) -> str: ...
     @overload
@@ -237,7 +237,13 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     # undocumented
     def _get_optional_actions(self) -> list[Action]: ...
     def _get_positional_actions(self) -> list[Action]: ...
-    def _parse_known_args(self, arg_strings: list[str], namespace: Namespace) -> tuple[Namespace, list[str]]: ...
+    if sys.version_info >= (3, 12):
+        def _parse_known_args(
+            self, arg_strings: list[str], namespace: Namespace, intermixed: bool
+        ) -> tuple[Namespace, list[str]]: ...
+    else:
+        def _parse_known_args(self, arg_strings: list[str], namespace: Namespace) -> tuple[Namespace, list[str]]: ...
+
     def _read_args_from_files(self, arg_strings: list[str]) -> list[str]: ...
     def _match_argument(self, action: Action, arg_strings_pattern: str) -> int: ...
     def _match_arguments_partial(self, actions: Sequence[Action], arg_strings_pattern: str) -> list[int]: ...
@@ -248,7 +254,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def _get_value(self, action: Action, arg_string: str) -> Any: ...
     def _check_value(self, action: Action, value: Any) -> None: ...
     def _get_formatter(self) -> HelpFormatter: ...
-    def _print_message(self, message: str, file: IO[str] | None = None) -> None: ...
+    def _print_message(self, message: str, file: SupportsWrite[str] | None = None) -> None: ...
 
 class HelpFormatter:
     # undocumented
@@ -450,6 +456,7 @@ class Namespace(_AttributeHolder):
     def __setattr__(self, name: str, value: Any, /) -> None: ...
     def __contains__(self, key: str) -> bool: ...
     def __eq__(self, other: object) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class FileType:
     # undocumented

@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 
 /// ## What it does
 /// Checks for missing whitespace around all operators.
@@ -146,6 +146,7 @@ pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
+    let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
     let first_token = tokens
         .by_ref()
@@ -162,6 +163,8 @@ pub(crate) fn missing_whitespace_around_operator(
     while let Some(token) = tokens.next() {
         let kind = token.kind();
 
+        definition_state.visit_token_kind(kind);
+
         if is_non_logical_token(kind) {
             continue;
         }
@@ -174,8 +177,11 @@ pub(crate) fn missing_whitespace_around_operator(
             _ => {}
         };
 
-        let needs_space = if kind == TokenKind::Equal && (parens > 0 || fstrings > 0) {
+        let needs_space = if kind == TokenKind::Equal
+            && (parens > 0 || fstrings > 0 || definition_state.in_type_params())
+        {
             // Allow keyword args, defaults: foo(bar=None) and f-strings: f'{foo=}'
+            // Also ignore `foo[T=int]`, which is handled by E251.
             NeedsSpace::No
         } else if kind == TokenKind::Slash {
             // Tolerate the "/" operator in function definition

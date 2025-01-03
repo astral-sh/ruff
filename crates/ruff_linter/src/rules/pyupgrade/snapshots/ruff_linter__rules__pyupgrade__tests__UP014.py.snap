@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
   |
@@ -109,3 +108,24 @@ UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 21 23 | 
 22 24 | # unfixable
 23 25 | MyType = typing.NamedTuple("MyType", [("a", int)], [("b", str)])
+
+UP014.py:36:1: UP014 [*] Convert `X` from `NamedTuple` functional to class syntax
+   |
+35 |   # Unsafe fix if comments are present
+36 | / X = NamedTuple("X", [
+37 | |     ("some_config", int),  # important
+38 | | ])
+   | |__^ UP014
+   |
+   = help: Convert `X` to class syntax
+
+ℹ Unsafe fix
+33 33 | )
+34 34 | 
+35 35 | # Unsafe fix if comments are present
+36    |-X = NamedTuple("X", [
+37    |-    ("some_config", int),  # important
+38    |-])
+   36 |+class X(NamedTuple):
+   37 |+    some_config: int
+39 38 |

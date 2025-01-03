@@ -22,8 +22,8 @@ class blake2b:
     digest_size: int
     name: str
     if sys.version_info >= (3, 9):
-        def __init__(
-            self,
+        def __new__(
+            cls,
             data: ReadableBuffer = b"",
             /,
             *,
@@ -39,10 +39,10 @@ class blake2b:
             inner_size: int = 0,
             last_node: bool = False,
             usedforsecurity: bool = True,
-        ) -> None: ...
+        ) -> Self: ...
     else:
-        def __init__(
-            self,
+        def __new__(
+            cls,
             data: ReadableBuffer = b"",
             /,
             *,
@@ -57,7 +57,7 @@ class blake2b:
             node_depth: int = 0,
             inner_size: int = 0,
             last_node: bool = False,
-        ) -> None: ...
+        ) -> Self: ...
 
     def copy(self) -> Self: ...
     def digest(self) -> bytes: ...
@@ -74,8 +74,8 @@ class blake2s:
     digest_size: int
     name: str
     if sys.version_info >= (3, 9):
-        def __init__(
-            self,
+        def __new__(
+            cls,
             data: ReadableBuffer = b"",
             /,
             *,
@@ -91,10 +91,10 @@ class blake2s:
             inner_size: int = 0,
             last_node: bool = False,
             usedforsecurity: bool = True,
-        ) -> None: ...
+        ) -> Self: ...
     else:
-        def __init__(
-            self,
+        def __new__(
+            cls,
             data: ReadableBuffer = b"",
             /,
             *,
@@ -109,7 +109,7 @@ class blake2s:
             node_depth: int = 0,
             inner_size: int = 0,
             last_node: bool = False,
-        ) -> None: ...
+        ) -> Self: ...
 
     def copy(self) -> Self: ...
     def digest(self) -> bytes: ...

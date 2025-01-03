@@ -1,12 +1,16 @@
 use std::sync::LazyLock;
 
+use anyhow::bail;
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
-use ruff_text_size::{TextLen, TextSize};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
+use crate::config::MarkdownTestConfig;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
@@ -69,6 +73,10 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
         self.files.iter()
     }
+
+    pub(crate) fn configuration(&self) -> &MarkdownTestConfig {
+        &self.section.config
+    }
 }
 
 /// Iterator yielding all [`MarkdownTest`]s in a [`MarkdownTestSuite`].
@@ -117,6 +125,7 @@ struct Section<'s> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
+    config: MarkdownTestConfig,
 }
 
 #[newtype_index]
@@ -148,8 +157,14 @@ static HEADER_RE: LazyLock<Regex> =
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n?")
-        .unwrap()
+    Regex::new(
+        r"(?x)
+        ^```(?<lang>(?-u:\w)+)?(?<config>(?:\x20+\S+)*)\s*\n
+        (?<code>(?:.|\n)*?)\n?
+        (?<end>```|\z)
+        ",
+    )
+    .unwrap()
 });
 
 #[derive(Debug)]
@@ -174,7 +189,7 @@ impl SectionStack {
         popped
     }
 
-    fn parent(&mut self) -> SectionId {
+    fn top(&mut self) -> SectionId {
         *self
             .0
             .last()
@@ -194,6 +209,7 @@ struct Parser<'s> {
     /// The unparsed remainder of the Markdown source.
     cursor: Cursor<'s>,
 
+    source: &'s str,
     source_len: TextSize,
 
     /// Stack of ancestor sections.
@@ -201,6 +217,9 @@ struct Parser<'s> {
 
     /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
+
+    /// Whether or not the current section has a config block.
+    current_section_has_config: bool,
 }
 
 impl<'s> Parser<'s> {
@@ -210,14 +229,17 @@ impl<'s> Parser<'s> {
             title,
             level: 0,
             parent_id: None,
+            config: MarkdownTestConfig::default(),
         });
         Self {
             sections,
+            source,
             files: IndexVec::default(),
             cursor: Cursor::new(source),
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
+            current_section_has_config: false,
         }
     }
 
@@ -285,12 +307,13 @@ impl<'s> Parser<'s> {
 
         self.pop_sections_to_level(header_level);
 
-        let parent = self.stack.parent();
+        let parent = self.stack.top();
 
         let section = Section {
             title,
             level: header_level.try_into()?,
             parent_id: Some(parent),
+            config: self.sections[parent].config.clone(),
         };
 
         if self.current_section_files.is_some() {
@@ -305,13 +328,21 @@ impl<'s> Parser<'s> {
         self.stack.push(section_id);
 
         self.current_section_files = None;
+        self.current_section_has_config = false;
 
         Ok(())
     }
 
     fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
         // We never pop the implicit root section.
-        let parent = self.stack.parent();
+        let section = self.stack.top();
+
+        if captures.name("end").unwrap().is_empty() {
+            let code_block_start = self.cursor.token_len();
+            let line = self.source.count_lines(TextRange::up_to(code_block_start)) + 1;
+
+            return Err(anyhow::anyhow!("Unterminated code block at line {line}."));
+        }
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
@@ -333,16 +364,24 @@ impl<'s> Parser<'s> {
 
         let path = config.get("path").copied().unwrap_or("test.py");
 
+        // CODE_RE can't match without matches for 'lang' and 'code'.
+        let lang = captures
+            .name("lang")
+            .as_ref()
+            .map(Match::as_str)
+            .unwrap_or_default();
+        let code = captures.name("code").unwrap().into();
+
+        if lang == "toml" {
+            return self.parse_config(code);
+        }
+
         self.files.push(EmbeddedFile {
             path,
-            section: parent,
-            lang: captures
-                .name("lang")
-                .as_ref()
-                .map(Match::as_str)
-                .unwrap_or_default(),
-            // CODE_RE can't match without matches for 'lang' and 'code'.
-            code: captures.name("code").unwrap().into(),
+            section,
+            lang,
+
+            code,
 
             md_offset: self.offset(),
         });
@@ -354,12 +393,12 @@ impl<'s> Parser<'s> {
                         "Test `{}` has duplicate files named `{path}`. \
                                 (This is the default filename; \
                                  consider giving some files an explicit name with `path=...`.)",
-                        self.sections[parent].title
+                        self.sections[section].title
                     ));
                 }
                 return Err(anyhow::anyhow!(
                     "Test `{}` has duplicate files named `{path}`.",
-                    self.sections[parent].title
+                    self.sections[section].title
                 ));
             };
         } else {
@@ -369,8 +408,21 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
+    fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
+        if self.current_section_has_config {
+            bail!("Multiple TOML configuration blocks in the same section are not allowed.");
+        }
+
+        let current_section = &mut self.sections[self.stack.top()];
+        current_section.config = MarkdownTestConfig::from_str(code)?;
+
+        self.current_section_has_config = true;
+
+        Ok(())
+    }
+
     fn pop_sections_to_level(&mut self, level: usize) {
-        while level <= self.sections[self.stack.parent()].level.into() {
+        while level <= self.sections[self.stack.top()].level.into() {
             self.stack.pop();
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.
@@ -626,6 +678,38 @@ mod tests {
         };
 
         assert_eq!(file.code, "x = 10");
+    }
+
+    #[test]
+    fn unterminated_code_block_1() {
+        let source = dedent(
+            "
+            ```
+            x = 1
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at line 2.");
+    }
+
+    #[test]
+    fn unterminated_code_block_2() {
+        let source = dedent(
+            "
+            ## A well-fenced block
+
+            ```
+            y = 2
+            ```
+
+            ## A not-so-well-fenced block
+
+            ```
+            x = 1
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at line 10.");
     }
 
     #[test]

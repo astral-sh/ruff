@@ -19,12 +19,11 @@ reveal_type(stop())
 ## Assignment
 
 ```py
-from typing import NoReturn, Never, Any
+from typing_extensions import NoReturn, Never, Any
 
-# error: [invalid-type-parameter] "Type `typing.Never` expected no type parameter"
+# error: [invalid-type-form] "Type `typing.Never` expected no type parameter"
 x: Never[int]
 a1: NoReturn
-# TODO: Test `Never` is only available in python >= 3.11
 a2: Never
 b1: Any
 b2: int
@@ -46,17 +45,31 @@ def f():
     v6: Never = 1
 ```
 
-## Typing Extensions
+## `typing.Never`
+
+`typing.Never` is only available in Python 3.11 and later.
+
+### Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
-from typing_extensions import NoReturn, Never
+from typing import Never
 
-x: NoReturn
-y: Never
+reveal_type(Never)  # revealed: typing.Never
+```
 
-def f():
-    # revealed: Never
-    reveal_type(x)
-    # revealed: Never
-    reveal_type(y)
+### Python 3.10
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+# error: [unresolved-import]
+from typing import Never
 ```

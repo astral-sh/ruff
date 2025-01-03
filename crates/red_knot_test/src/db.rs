@@ -1,5 +1,7 @@
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+    default_lint_registry, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
+    PythonVersion, SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
@@ -7,22 +9,27 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
 #[salsa::db]
+#[derive(Clone)]
 pub(crate) struct Db {
     workspace_root: SystemPathBuf,
     storage: salsa::Storage<Self>,
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
+    rule_selection: RuleSelection,
 }
 
 impl Db {
     pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
+        let rule_selection = RuleSelection::from_registry(default_lint_registry());
+
         let db = Self {
             workspace_root,
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
             files: Files::default(),
+            rule_selection,
         };
 
         db.memory_file_system()
@@ -32,7 +39,8 @@ impl Db {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version: PythonVersion::default(),
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(db.workspace_root.clone()),
             },
         )
@@ -84,6 +92,14 @@ impl Upcast<dyn SourceDb> for Db {
 impl SemanticDb for Db {
     fn is_file_open(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
     }
 }
 

@@ -152,33 +152,37 @@ if sys.version_info >= (3, 10):
     def field(
         *,
         default: _T,
+        default_factory: Literal[_MISSING_TYPE.MISSING] = ...,
         init: bool = True,
         repr: bool = True,
         hash: bool | None = None,
         compare: bool = True,
         metadata: Mapping[Any, Any] | None = None,
-        kw_only: bool = ...,
+        kw_only: bool | Literal[_MISSING_TYPE.MISSING] = ...,
     ) -> _T: ...
     @overload
     def field(
         *,
+        default: Literal[_MISSING_TYPE.MISSING] = ...,
         default_factory: Callable[[], _T],
         init: bool = True,
         repr: bool = True,
         hash: bool | None = None,
         compare: bool = True,
         metadata: Mapping[Any, Any] | None = None,
-        kw_only: bool = ...,
+        kw_only: bool | Literal[_MISSING_TYPE.MISSING] = ...,
     ) -> _T: ...
     @overload
     def field(
         *,
+        default: Literal[_MISSING_TYPE.MISSING] = ...,
+        default_factory: Literal[_MISSING_TYPE.MISSING] = ...,
         init: bool = True,
         repr: bool = True,
         hash: bool | None = None,
         compare: bool = True,
         metadata: Mapping[Any, Any] | None = None,
-        kw_only: bool = ...,
+        kw_only: bool | Literal[_MISSING_TYPE.MISSING] = ...,
     ) -> Any: ...
 
 else:
@@ -186,6 +190,7 @@ else:
     def field(
         *,
         default: _T,
+        default_factory: Literal[_MISSING_TYPE.MISSING] = ...,
         init: bool = True,
         repr: bool = True,
         hash: bool | None = None,
@@ -195,6 +200,7 @@ else:
     @overload
     def field(
         *,
+        default: Literal[_MISSING_TYPE.MISSING] = ...,
         default_factory: Callable[[], _T],
         init: bool = True,
         repr: bool = True,
@@ -205,6 +211,8 @@ else:
     @overload
     def field(
         *,
+        default: Literal[_MISSING_TYPE.MISSING] = ...,
+        default_factory: Literal[_MISSING_TYPE.MISSING] = ...,
         init: bool = True,
         repr: bool = True,
         hash: bool | None = None,

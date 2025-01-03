@@ -8,8 +8,10 @@ use ruff_python_stdlib::typing::{
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
     is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
     is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
+    is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
+use smallvec::{smallvec, SmallVec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -34,6 +36,10 @@ pub enum SubscriptKind {
     Generic,
     /// A subscript of the form `typing.Annotated[int, "foo"]`, i.e., a PEP 593 annotation.
     PEP593Annotation,
+    /// A subscript of the form `typing.TypedDict[{"key": Type}]`, i.e., a [PEP 764] annotation.
+    ///
+    /// [PEP 764]: https://github.com/python/peps/pull/4082
+    TypedDict,
 }
 
 pub fn match_annotated_subscript<'a>(
@@ -62,6 +68,10 @@ pub fn match_annotated_subscript<'a>(
                 return Some(SubscriptKind::PEP593Annotation);
             }
 
+            if is_typed_dict(qualified_name.segments()) {
+                return Some(SubscriptKind::TypedDict);
+            }
+
             for module in typing_modules {
                 let module_qualified_name = QualifiedName::user_defined(module);
                 if qualified_name.starts_with(&module_qualified_name) {
@@ -74,6 +84,9 @@ pub fn match_annotated_subscript<'a>(
                         }
                         if is_pep_593_generic_member(member) {
                             return Some(SubscriptKind::PEP593Annotation);
+                        }
+                        if is_typed_dict_member(member) {
+                            return Some(SubscriptKind::TypedDict);
                         }
                     }
                 }
@@ -108,10 +121,7 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
         .then(|| semantic.resolve_qualified_name(expr))
         .flatten()
         .and_then(|qualified_name| {
-            let [module, member] = qualified_name.segments() else {
-                return None;
-            };
-            as_pep_585_generic(module, member).map(|(module, member)| {
+            as_pep_585_generic(qualified_name.segments()).map(|(module, member)| {
                 if module.is_empty() {
                     ModuleMember::BuiltIn(member)
                 } else {
@@ -665,6 +675,14 @@ impl BuiltinTypeChecker for IntChecker {
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Integer);
 }
 
+struct FloatChecker;
+
+impl BuiltinTypeChecker for FloatChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "float";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Float);
+}
+
 pub struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
@@ -741,6 +759,106 @@ impl TypeChecker for IoBaseChecker {
     }
 }
 
+pub struct PathlibPathChecker;
+
+impl PathlibPathChecker {
+    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "pathlib",
+                "Path"
+                    | "PosixPath"
+                    | "PurePath"
+                    | "PurePosixPath"
+                    | "PureWindowsPath"
+                    | "WindowsPath"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for PathlibPathChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_pathlib_path_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_pathlib_path_constructor(semantic, func)
+    }
+}
+
+pub struct FastApiRouteChecker;
+
+impl FastApiRouteChecker {
+    fn is_fastapi_route_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            ["fastapi", "FastAPI" | "APIRouter"]
+        )
+    }
+}
+
+impl TypeChecker for FastApiRouteChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_fastapi_route_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_fastapi_route_constructor(semantic, func)
+    }
+}
+
+pub struct TypeVarLikeChecker;
+
+impl TypeVarLikeChecker {
+    /// Returns `true` if an [`Expr`] is a `TypeVar`, `TypeVarTuple`, or `ParamSpec` call.
+    ///
+    /// See also [`ruff_linter::rules::flake8_pyi::rules::simple_defaults::is_type_var_like_call`].
+    fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+            return false;
+        };
+        let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "TypeVarTuple" | "ParamSpec"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for TypeVarLikeChecker {
+    fn match_annotation(_annotation: &Expr, _semantic: &SemanticModel) -> bool {
+        false
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_type_var_like_call(initializer, semantic)
+    }
+}
+
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -777,6 +895,11 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Test whether the given binding can be considered an integer.
 pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<IntChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `float`.
+pub fn is_float(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<FloatChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.
@@ -824,6 +947,21 @@ pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     IoBaseChecker::match_initializer(expr, semantic)
 }
 
+/// Test whether the given binding can be considered a `pathlib.PurePath`
+/// or an instance of a subclass thereof.
+pub fn is_pathlib_path(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<PathlibPathChecker>(binding, semantic)
+}
+
+pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<FastApiRouteChecker>(binding, semantic)
+}
+
+/// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
+pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<TypeVarLikeChecker>(binding, semantic)
+}
+
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
 fn find_parameter<'a>(
@@ -846,23 +984,43 @@ fn find_parameter<'a>(
 /// ```
 ///
 /// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+///
+/// This function will also automatically expand attribute accesses, so given:
+/// ```python
+/// from module import AppContainer
+///
+/// container = AppContainer()
+/// container.app.get(...)
+/// ```
+///
+/// This function will return `["module", "AppContainer", "app", "get"]` for the
+/// attribute access `container.app.get`.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
-    let name = expr.as_name_expr()?;
+    // Resolve any attribute chain.
+    let mut head_expr = expr;
+    let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
+    while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = head_expr {
+        head_expr = value;
+        reversed_tail.push(attr.as_str());
+    }
+
+    // Resolve the left-most name, e.g. `foo` in `foo.bar.baz` to a qualified name,
+    // then append the attributes.
+    let name = head_expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
     match statement {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
-        }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
+        Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
         }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
+
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
         }
         _ => None,
     }

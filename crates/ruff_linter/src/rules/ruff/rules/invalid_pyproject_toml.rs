@@ -21,8 +21,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// name = "crab"
 /// version = "1.0.0"
 /// authors = [
-///   { email = "ferris@example.org" },
-///   { name = "Ferris the Crab"}
+///   { name = "Ferris the Crab", email = "ferris@example.org" }
 /// ]
 /// ```
 ///

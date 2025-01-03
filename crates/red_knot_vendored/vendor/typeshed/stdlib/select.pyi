@@ -2,7 +2,7 @@ import sys
 from _typeshed import FileDescriptorLike
 from collections.abc import Iterable
 from types import TracebackType
-from typing import Any, final
+from typing import Any, ClassVar, final
 from typing_extensions import Self
 
 if sys.platform != "win32":
@@ -10,7 +10,8 @@ if sys.platform != "win32":
     POLLERR: int
     POLLHUP: int
     POLLIN: int
-    POLLMSG: int
+    if sys.platform == "linux":
+        POLLMSG: int
     POLLNVAL: int
     POLLOUT: int
     POLLPRI: int
@@ -21,11 +22,14 @@ if sys.platform != "win32":
     POLLWRBAND: int
     POLLWRNORM: int
 
-class poll:
-    def register(self, fd: FileDescriptorLike, eventmask: int = ...) -> None: ...
-    def modify(self, fd: FileDescriptorLike, eventmask: int) -> None: ...
-    def unregister(self, fd: FileDescriptorLike) -> None: ...
-    def poll(self, timeout: float | None = ...) -> list[tuple[int, int]]: ...
+    # This is actually a function that returns an instance of a class.
+    # The class is not accessible directly, and also calls itself select.poll.
+    class poll:
+        # default value is select.POLLIN | select.POLLPRI | select.POLLOUT
+        def register(self, fd: FileDescriptorLike, eventmask: int = 7, /) -> None: ...
+        def modify(self, fd: FileDescriptorLike, eventmask: int, /) -> None: ...
+        def unregister(self, fd: FileDescriptorLike, /) -> None: ...
+        def poll(self, timeout: float | None = None, /) -> list[tuple[int, int]]: ...
 
 def select(
     rlist: Iterable[Any], wlist: Iterable[Any], xlist: Iterable[Any], timeout: float | None = None, /
@@ -52,6 +56,7 @@ if sys.platform != "linux" and sys.platform != "win32":
             data: Any = ...,
             udata: Any = ...,
         ) -> None: ...
+        __hash__: ClassVar[None]  # type: ignore[assignment]
 
     # BSD only
     @final
@@ -77,7 +82,8 @@ if sys.platform != "linux" and sys.platform != "win32":
     KQ_EV_ONESHOT: int
     KQ_EV_SYSFLAGS: int
     KQ_FILTER_AIO: int
-    KQ_FILTER_NETDEV: int
+    if sys.platform != "darwin":
+        KQ_FILTER_NETDEV: int
     KQ_FILTER_PROC: int
     KQ_FILTER_READ: int
     KQ_FILTER_SIGNAL: int

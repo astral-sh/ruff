@@ -6,6 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
+use crate::types::class_base::ClassBase;
 use crate::types::{
     ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
     SubclassOfType, Type, UnionType,
@@ -78,13 +79,20 @@ impl Display for DisplayRepresentation<'_> {
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
             Type::Todo(todo) => write!(f, "@Todo{todo}"),
-            Type::ModuleLiteral(file) => {
-                write!(f, "<module '{:?}'>", file.path(self.db))
+            Type::ModuleLiteral(module) => {
+                write!(f, "<module '{}'>", module.module(self.db).name())
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
-            Type::SubclassOf(SubclassOfType { class }) => {
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => {
+                // Only show the bare class name here; ClassBase::display would render this as
+                // type[<class 'Foo'>] instead of type[Foo].
                 write!(f, "type[{}]", class.name(self.db))
+            }
+            Type::SubclassOf(SubclassOfType { base }) => {
+                write!(f, "type[{}]", base.display(self.db))
             }
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
@@ -132,6 +140,8 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
+            Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
+            Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
         }
     }
 }
@@ -309,6 +319,12 @@ impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
 }
 
 impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+        DisplayTypeArray { types: self, db }
+    }
+}
+
+impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
         DisplayTypeArray { types: self, db }
     }

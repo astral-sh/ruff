@@ -1,0 +1,57 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/raise_stmt_from_without_exc.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..31,
+        body: [
+            Raise(
+                StmtRaise {
+                    range: 0..14,
+                    exc: None,
+                    cause: Some(
+                        Name(
+                            ExprName {
+                                range: 11..14,
+                                id: Name("exc"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 15..30,
+                    exc: None,
+                    cause: Some(
+                        NoneLiteral(
+                            ExprNoneLiteral {
+                                range: 26..30,
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | raise from exc
+  |       ^^^^ Syntax Error: Exception missing in `raise` statement with cause
+2 | raise from None
+  |
+
+
+  |
+1 | raise from exc
+2 | raise from None
+  |       ^^^^ Syntax Error: Exception missing in `raise` statement with cause
+  |

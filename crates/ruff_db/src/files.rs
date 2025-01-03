@@ -48,7 +48,7 @@ pub fn vendored_path_to_file(
 }
 
 /// Lookup table that maps [file paths](`FilePath`) to salsa interned [`File`] instances.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Files {
     inner: Arc<FilesInner>,
 }
@@ -251,13 +251,6 @@ impl Files {
 
         for root in roots.all() {
             root.set_revision(db).to(FileRevision::now());
-        }
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
         }
     }
 }

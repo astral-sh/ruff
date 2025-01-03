@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
@@ -9,11 +9,12 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
+use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
+use crate::semantic_index::constraint::PatternConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
@@ -23,9 +24,12 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
+use crate::semantic_index::use_def::{
+    FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
+};
 use crate::semantic_index::SemanticIndex;
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackValue};
+use crate::visibility_constraints::VisibilityConstraint;
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -79,6 +83,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    imported_modules: FxHashSet<ModuleName>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -105,6 +110,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+
+            imported_modules: FxHashSet::default(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -281,11 +288,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint
     }
 
-    fn record_constraint(&mut self, constraint: Constraint<'db>) {
-        self.current_use_def_map_mut().record_constraint(constraint);
-    }
-
-    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
+    fn build_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
         let expression = self.add_standalone_expression(constraint_node);
         Constraint {
             node: ConstraintNode::Expression(expression),
@@ -293,12 +296,89 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) {
+    /// Adds a new constraint to the list of all constraints, but does not record it. Returns the
+    /// constraint ID for later recording using [`SemanticIndexBuilder::record_constraint_id`].
+    fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        self.current_use_def_map_mut().add_constraint(constraint)
+    }
+
+    /// Negates a constraint and adds it to the list of all constraints, does not record it.
+    fn add_negated_constraint(
+        &mut self,
+        constraint: Constraint<'db>,
+    ) -> (Constraint<'db>, ScopedConstraintId) {
+        let negated = Constraint {
+            node: constraint.node,
+            is_positive: false,
+        };
+        let id = self.current_use_def_map_mut().add_constraint(negated);
+        (negated, id)
+    }
+
+    /// Records a previously added constraint by adding it to all live bindings.
+    fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
         self.current_use_def_map_mut()
-            .record_constraint(Constraint {
-                node: constraint.node,
-                is_positive: false,
-            });
+            .record_constraint_id(constraint);
+    }
+
+    /// Adds and records a constraint, i.e. adds it to all live bindings.
+    fn record_constraint(&mut self, constraint: Constraint<'db>) {
+        self.current_use_def_map_mut().record_constraint(constraint);
+    }
+
+    /// Negates the given constraint and then adds it to all live bindings.
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        let (_, id) = self.add_negated_constraint(constraint);
+        self.record_constraint_id(id);
+        id
+    }
+
+    /// Adds a new visibility constraint, but does not record it. Returns the constraint ID
+    /// for later recording using [`SemanticIndexBuilder::record_visibility_constraint_id`].
+    fn add_visibility_constraint(
+        &mut self,
+        constraint: VisibilityConstraint<'db>,
+    ) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .add_visibility_constraint(constraint)
+    }
+
+    /// Records a previously added visibility constraint by applying it to all live bindings
+    /// and declarations.
+    fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint_id(constraint);
+    }
+
+    /// Negates the given visibility constraint and then adds it to all live bindings and declarations.
+    fn record_negated_visibility_constraint(
+        &mut self,
+        constraint: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
+    }
+
+    /// Records a visibility constraint by applying it to all live bindings and declarations.
+    fn record_visibility_constraint(
+        &mut self,
+        constraint: Constraint<'db>,
+    ) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
+    }
+
+    /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
+    fn record_ambiguous_visibility(&mut self) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(VisibilityConstraint::Ambiguous)
+    }
+
+    /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
+    /// not see any new definitions since the given snapshot.
+    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+        self.current_use_def_map_mut()
+            .simplify_visibility_constraints(snapshot);
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -320,30 +400,37 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn add_pattern_constraint(
         &mut self,
-        subject: &ast::Expr,
+        subject: Expression<'db>,
         pattern: &ast::Pattern,
-    ) -> PatternConstraint<'db> {
-        #[allow(unsafe_code)]
-        let (subject, pattern) = unsafe {
-            (
-                AstNodeRef::new(self.module.clone(), subject),
-                AstNodeRef::new(self.module.clone(), pattern),
-            )
+        guard: Option<&ast::Expr>,
+    ) -> Constraint<'db> {
+        let guard = guard.map(|guard| self.add_standalone_expression(guard));
+
+        let kind = match pattern {
+            ast::Pattern::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(&pattern.value);
+                PatternConstraintKind::Value(value, guard)
+            }
+            ast::Pattern::MatchSingleton(singleton) => {
+                PatternConstraintKind::Singleton(singleton.value, guard)
+            }
+            _ => PatternConstraintKind::Unsupported,
         };
+
         let pattern_constraint = PatternConstraint::new(
             self.db,
             self.file,
             self.current_scope(),
             subject,
-            pattern,
+            kind,
             countme::Count::default(),
         );
-        self.current_use_def_map_mut()
-            .record_constraint(Constraint {
-                node: ConstraintNode::Pattern(pattern_constraint),
-                is_positive: true,
-            });
-        pattern_constraint
+        let constraint = Constraint {
+            node: ConstraintNode::Pattern(pattern_constraint),
+            is_positive: true,
+        };
+        self.current_use_def_map_mut().record_constraint(constraint);
+        constraint
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -479,21 +566,35 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameter(&mut self, parameter: AnyParameterRef<'db>) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+    fn declare_parameters(&mut self, parameters: &'db ast::Parameters) {
+        for parameter in parameters.iter_non_variadic_params() {
+            self.declare_parameter(parameter);
+        }
+        if let Some(vararg) = parameters.vararg.as_ref() {
+            let symbol = self.add_symbol(vararg.name.id().clone());
+            self.add_definition(
+                symbol,
+                DefinitionNodeRef::VariadicPositionalParameter(vararg),
+            );
+        }
+        if let Some(kwarg) = parameters.kwarg.as_ref() {
+            let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
+        }
+    }
+
+    fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
+        let symbol = self.add_symbol(parameter.parameter.name.id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
-        if let AnyParameterRef::NonVariadic(with_default) = parameter {
-            // Insert a mapping from the parameter to the same definition.
-            // This ensures that calling `HasTy::ty` on the inner parameter returns
-            // a valid type (and doesn't panic)
-            let existing_definition = self.definitions_by_node.insert(
-                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
-                definition,
-            );
-            debug_assert_eq!(existing_definition, None);
-        }
+        // Insert a mapping from the inner Parameter node to the same definition.
+        // This ensures that calling `HasTy::ty` on the inner parameter returns
+        // a valid type (and doesn't panic)
+        let existing_definition = self
+            .definitions_by_node
+            .insert((&parameter.parameter).into(), definition);
+        debug_assert_eq!(existing_definition, None);
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
@@ -544,6 +645,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
+            imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
         }
     }
@@ -556,34 +658,40 @@ where
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
-                for decorator in &function_def.decorator_list {
+                let ast::StmtFunctionDef {
+                    decorator_list,
+                    parameters,
+                    type_params,
+                    name,
+                    returns,
+                    body,
+                    is_async: _,
+                    range: _,
+                } = function_def;
+                for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
 
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    function_def.type_params.as_deref(),
+                    type_params.as_deref(),
                     |builder| {
-                        builder.visit_parameters(&function_def.parameters);
-                        if let Some(expr) = &function_def.returns {
-                            builder.visit_annotation(expr);
+                        builder.visit_parameters(parameters);
+                        if let Some(returns) = returns {
+                            builder.visit_annotation(returns);
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        // Add symbols and definitions for the parameters to the function scope.
-                        for parameter in &*function_def.parameters {
-                            builder.declare_parameter(parameter);
-                        }
+                        builder.declare_parameters(parameters);
 
-                        builder.visit_body(&function_def.body);
+                        builder.visit_body(body);
                         builder.pop_scope()
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
-                for default in function_def
-                    .parameters
+                for default in parameters
                     .iter_non_variadic_params()
                     .filter_map(|param| param.default.as_deref())
                 {
@@ -592,7 +700,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(function_def.name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -641,6 +749,12 @@ where
             }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
+                    // Mark the imported module, and all of its parents, as being imported in this
+                    // file.
+                    if let Some(module_name) = ModuleName::new(&alias.name) {
+                        self.imported_modules.extend(module_name.ancestors());
+                    }
+
                     let symbol_name = if let Some(asname) = &alias.asname {
                         asname.id.clone()
                     } else {
@@ -695,7 +809,7 @@ where
                                     unsafe {
                                         AstNodeRef::new(self.module.clone(), target)
                                     },
-                                    value,
+                                    UnpackValue::Assign(value),
                                     countme::Count::default(),
                                 )),
                             })
@@ -768,6 +882,10 @@ where
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
+
+                let visibility_constraint_id = self.record_visibility_constraint(constraint);
+                let mut vis_constraints = vec![visibility_constraint_id];
+
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 let elif_else_clauses = node
                     .elif_else_clauses
@@ -794,15 +912,31 @@ where
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
-                    if let Some(elif_test) = clause_test {
+
+                    let elif_constraint = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
-                        constraints.push(self.record_expression_constraint(elif_test));
-                    }
+                        let constraint = self.record_expression_constraint(elif_test);
+                        constraints.push(constraint);
+                        Some(constraint)
+                    } else {
+                        None
+                    };
                     self.visit_body(clause_body);
+
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
+                    if let Some(elif_constraint) = elif_constraint {
+                        let id = self.record_visibility_constraint(elif_constraint);
+                        vis_constraints.push(id);
+                    }
                 }
+
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.simplify_visibility_constraints(pre_if);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -813,6 +947,7 @@ where
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
+                let constraint = self.record_expression_constraint(test);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -824,6 +959,8 @@ where
                 self.visit_body(body);
                 self.set_inside_loop(outer_loop_state);
 
+                let vis_constraint_id = self.record_visibility_constraint(constraint);
+
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
                 let break_states =
@@ -831,14 +968,21 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                self.flow_merge(pre_loop.clone());
+                self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
+                self.record_negated_visibility_constraint(vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state);
+                    let snapshot = self.flow_snapshot();
+                    self.flow_restore(break_state);
+                    self.record_visibility_constraint(constraint);
+                    self.flow_merge(snapshot);
                 }
+
+                self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -876,16 +1020,47 @@ where
                     orelse,
                 },
             ) => {
-                self.add_standalone_expression(iter);
+                debug_assert_eq!(&self.current_assignments, &[]);
+
+                let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+
+                self.record_ambiguous_visibility();
 
                 let pre_loop = self.flow_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
-                debug_assert_eq!(&self.current_assignments, &[]);
-                self.push_assignment(for_stmt.into());
+                let current_assignment = match &**target {
+                    ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(CurrentAssignment::For {
+                        node: for_stmt,
+                        first: true,
+                        unpack: Some(Unpack::new(
+                            self.db,
+                            self.file,
+                            self.current_scope(),
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), target)
+                            },
+                            UnpackValue::Iterable(iter_expr),
+                            countme::Count::default(),
+                        )),
+                    }),
+                    ast::Expr::Name(_) => Some(CurrentAssignment::For {
+                        node: for_stmt,
+                        unpack: None,
+                        first: false,
+                    }),
+                    _ => None,
+                };
+
+                if let Some(current_assignment) = current_assignment {
+                    self.push_assignment(current_assignment);
+                }
                 self.visit_expr(target);
-                self.pop_assignment();
+                if current_assignment.is_some() {
+                    self.pop_assignment();
+                }
 
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
@@ -914,32 +1089,63 @@ where
                 cases,
                 range: _,
             }) => {
-                self.add_standalone_expression(subject);
+                let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
 
                 let after_subject = self.flow_snapshot();
                 let Some((first, remaining)) = cases.split_first() else {
                     return;
                 };
-                self.add_pattern_constraint(subject, &first.pattern);
+
+                let first_constraint_id = self.add_pattern_constraint(
+                    subject_expr,
+                    &first.pattern,
+                    first.guard.as_deref(),
+                );
+
                 self.visit_match_case(first);
+
+                let first_vis_constraint_id =
+                    self.record_visibility_constraint(first_constraint_id);
+                let mut vis_constraints = vec![first_vis_constraint_id];
 
                 let mut post_case_snapshots = vec![];
                 for case in remaining {
                     post_case_snapshots.push(self.flow_snapshot());
                     self.flow_restore(after_subject.clone());
-                    self.add_pattern_constraint(subject, &case.pattern);
+                    let constraint_id = self.add_pattern_constraint(
+                        subject_expr,
+                        &case.pattern,
+                        case.guard.as_deref(),
+                    );
                     self.visit_match_case(case);
+
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
+                    let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+                    vis_constraints.push(vis_constraint_id);
                 }
-                for post_clause_state in post_case_snapshots {
-                    self.flow_merge(post_clause_state);
-                }
+
+                // If there is no final wildcard match case, pretend there is one. This is similar to how
+                // we add an implicit `else` block in if-elif chains, in case it's not present.
                 if !cases
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
-                    self.flow_merge(after_subject);
+                    post_case_snapshots.push(self.flow_snapshot());
+                    self.flow_restore(after_subject.clone());
+
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
                 }
+
+                for post_clause_state in post_case_snapshots {
+                    self.flow_merge(post_clause_state);
+                }
+
+                self.simplify_visibility_constraints(after_subject);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -949,6 +1155,8 @@ where
                 is_star,
                 range: _,
             }) => {
+                self.record_ambiguous_visibility();
+
                 // Save the state prior to visiting any of the `try` block.
                 //
                 // Potentially none of the `try` block could have been executed prior to executing
@@ -1103,12 +1311,18 @@ where
                         Some(CurrentAssignment::AugAssign(aug_assign)) => {
                             self.add_definition(symbol, aug_assign);
                         }
-                        Some(CurrentAssignment::For(node)) => {
+                        Some(CurrentAssignment::For {
+                            node,
+                            first,
+                            unpack,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 ForStmtDefinitionNodeRef {
+                                    unpack,
+                                    first,
                                     iterable: &node.iter,
-                                    target: name_node,
+                                    name: name_node,
                                     is_async: node.is_async,
                                 },
                             );
@@ -1144,7 +1358,9 @@ where
                     }
                 }
 
-                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                if let Some(
+                    CurrentAssignment::Assign { first, .. } | CurrentAssignment::For { first, .. },
+                ) = self.current_assignment_mut()
                 {
                     *first = false;
                 }
@@ -1179,10 +1395,8 @@ where
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
                 // Add symbols and definitions for the parameters to the lambda scope.
-                if let Some(parameters) = &lambda.parameters {
-                    for parameter in parameters {
-                        self.declare_parameter(parameter);
-                    }
+                if let Some(parameters) = lambda.parameters.as_ref() {
+                    self.declare_parameters(parameters);
                 }
 
                 self.visit_expr(lambda.body.as_ref());
@@ -1191,19 +1405,19 @@ where
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
             }) => {
-                // TODO detect statically known truthy or falsy test (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
                 let constraint = self.record_expression_constraint(test);
                 self.visit_expr(body);
+                let visibility_constraint = self.record_visibility_constraint(constraint);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if);
+                self.flow_restore(pre_if.clone());
 
                 self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
+                self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
+                self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -1260,27 +1474,55 @@ where
                 range: _,
                 op,
             }) => {
-                // TODO detect statically known truthy or falsy values (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
+                let pre_op = self.flow_snapshot();
+
                 let mut snapshots = vec![];
+                let mut visibility_constraints = vec![];
 
                 for (index, value) in values.iter().enumerate() {
                     self.visit_expr(value);
-                    // In the last value we don't need to take a snapshot nor add a constraint
+
+                    for vid in &visibility_constraints {
+                        self.record_visibility_constraint_id(*vid);
+                    }
+
+                    // For the last value, we don't need to model control flow. There is short-circuiting
+                    // anymore.
                     if index < values.len() - 1 {
-                        // Snapshot is taken after visiting the expression but before adding the constraint.
-                        snapshots.push(self.flow_snapshot());
                         let constraint = self.build_constraint(value);
-                        match op {
-                            BoolOp::And => self.record_constraint(constraint),
-                            BoolOp::Or => self.record_negated_constraint(constraint),
+                        let (constraint, constraint_id) = match op {
+                            ast::BoolOp::And => (constraint, self.add_constraint(constraint)),
+                            ast::BoolOp::Or => self.add_negated_constraint(constraint),
+                        };
+                        let visibility_constraint = self
+                            .add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint));
+
+                        let after_expr = self.flow_snapshot();
+
+                        // We first model the short-circuiting behavior. We take the short-circuit
+                        // path here if all of the previous short-circuit paths were not taken, so
+                        // we record all previously existing visibility constraints, and negate the
+                        // one for the current expression.
+                        for vid in &visibility_constraints {
+                            self.record_visibility_constraint_id(*vid);
                         }
+                        self.record_negated_visibility_constraint(visibility_constraint);
+                        snapshots.push(self.flow_snapshot());
+
+                        // Then we model the non-short-circuiting behavior. Here, we need to delay
+                        // the application of the visibility constraint until after the expression
+                        // has been evaluated, so we only push it onto the stack here.
+                        self.flow_restore(after_expr);
+                        self.record_constraint_id(constraint_id);
+                        visibility_constraints.push(visibility_constraint);
                     }
                 }
+
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
+
+                self.simplify_visibility_constraints(pre_op);
             }
             _ => {
                 walk_expr(self, expr);
@@ -1360,7 +1602,11 @@ enum CurrentAssignment<'a> {
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
-    For(&'a ast::StmtFor),
+    For {
+        node: &'a ast::StmtFor,
+        first: bool,
+        unpack: Option<Unpack<'a>>,
+    },
     Named(&'a ast::ExprNamed),
     Comprehension {
         node: &'a ast::Comprehension,
@@ -1381,12 +1627,6 @@ impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
     fn from(value: &'a ast::StmtAugAssign) -> Self {
         Self::AugAssign(value)
-    }
-}
-
-impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtFor) -> Self {
-        Self::For(value)
     }
 }
 

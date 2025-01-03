@@ -1,0 +1,2 @@
+# -*- coding: ascii -*-
+# -*- coding: latin -*-

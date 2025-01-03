@@ -1,16 +1,17 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Cancelled, Event};
-
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
+use crate::DEFAULT_LINT_REGISTRY;
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
+use salsa::plumbing::ZalsaDatabase;
+use salsa::{Cancelled, Event};
 
 mod changes;
 
@@ -20,11 +21,13 @@ pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
 }
 
 #[salsa::db]
+#[derive(Clone)]
 pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl RootDatabase {
@@ -32,11 +35,14 @@ impl RootDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
+        let rule_selection = RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY);
+
         let mut db = Self {
             workspace: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
             system: Arc::new(system),
+            rule_selection: Arc::new(rule_selection),
         };
 
         // Initialize the `Program` singleton
@@ -75,16 +81,6 @@ impl RootDatabase {
     {
         Cancelled::catch(|| f(self))
     }
-
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            workspace: self.workspace,
-            storage: self.storage.clone(),
-            files: self.files.snapshot(),
-            system: Arc::clone(&self.system),
-        }
-    }
 }
 
 impl Upcast<dyn SemanticDb> for RootDatabase {
@@ -115,6 +111,14 @@ impl SemanticDb for RootDatabase {
         };
 
         workspace.is_file_open(self, file)
+    }
+
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        &DEFAULT_LINT_REGISTRY
     }
 }
 
@@ -162,6 +166,7 @@ pub(crate) mod tests {
 
     use salsa::Event;
 
+    use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
     use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
@@ -170,14 +175,17 @@ pub(crate) mod tests {
 
     use crate::db::Db;
     use crate::workspace::{Workspace, WorkspaceMetadata};
+    use crate::DEFAULT_LINT_REGISTRY;
 
     #[salsa::db]
+    #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
-        events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        events: Arc<std::sync::Mutex<Vec<Event>>>,
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
+        rule_selection: RuleSelection,
         workspace: Option<Workspace>,
     }
 
@@ -189,6 +197,7 @@ pub(crate) mod tests {
                 vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
+                rule_selection: RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY),
                 workspace: None,
             };
 
@@ -258,6 +267,14 @@ pub(crate) mod tests {
     impl red_knot_python_semantic::Db for TestDb {
         fn is_file_open(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
+        }
+
+        fn rule_selection(&self) -> &RuleSelection {
+            &self.rule_selection
+        }
+
+        fn lint_registry(&self) -> &LintRegistry {
+            &DEFAULT_LINT_REGISTRY
         }
     }
 

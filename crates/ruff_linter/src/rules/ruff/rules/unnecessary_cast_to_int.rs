@@ -1,10 +1,18 @@
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprName, ExprNumberLiteral, Number};
-use ruff_python_semantic::analyze::typing;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{Arguments, Expr, ExprCall};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::rules::ruff::rules::unnecessary_round::{
+    rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
+};
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -42,61 +50,107 @@ pub(crate) struct UnnecessaryCastToInt;
 impl AlwaysFixableViolation for UnnecessaryCastToInt {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Value being casted is already an integer".to_string()
+        "Value being cast to `int` is already an integer".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove unnecessary conversion to `int`".to_string()
+        "Remove unnecessary `int` call".to_string()
     }
 }
 
 /// RUF046
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
-    let semantic = checker.semantic();
-
-    let Some(Expr::Call(inner_call)) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
         return;
     };
 
+    let applicability = if matches!(
+        ResolvedPythonType::from(argument),
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+    ) {
+        Some(Applicability::Safe)
+    } else if let Expr::Call(inner_call) = argument {
+        call_applicability(checker, inner_call)
+    } else {
+        None
+    };
+
+    let Some(applicability) = applicability else {
+        return;
+    };
+
+    let fix = unwrap_int_expression(
+        call,
+        argument,
+        applicability,
+        checker.semantic(),
+        checker.locator(),
+        checker.comment_ranges(),
+        checker.source(),
+    );
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
+
+    checker.diagnostics.push(diagnostic.with_fix(fix));
+}
+
+/// Creates a fix that replaces `int(expression)` with `expression`.
+fn unwrap_int_expression(
+    call: &ExprCall,
+    argument: &Expr,
+    applicability: Applicability,
+    semantic: &SemanticModel,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> Fix {
+    let content = if let Some(range) = parenthesized_range(
+        argument.into(),
+        (&call.arguments).into(),
+        comment_ranges,
+        source,
+    ) {
+        locator.slice(range).to_string()
+    } else {
+        let parenthesize = semantic.current_expression_parent().is_some()
+            || argument.is_named_expr()
+            || locator.count_lines(argument.range()) > 0;
+        if parenthesize && !has_own_parentheses(argument) {
+            format!("({})", locator.slice(argument.range()))
+        } else {
+            locator.slice(argument.range()).to_string()
+        }
+    };
+    let edit = Edit::range_replacement(content, call.range());
+    Fix::applicable_edit(edit, applicability)
+}
+
+/// Returns `Some` if `call` in `int(call(...))` is a method that returns an `int`
+/// and `None` otherwise.
+fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Applicability> {
     let (func, arguments) = (&inner_call.func, &inner_call.arguments);
-    let (outer_range, inner_range) = (call.range, inner_call.range);
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
+    let qualified_name = checker.semantic().resolve_qualified_name(func)?;
 
-    let fix = match qualified_name.segments() {
+    match qualified_name.segments() {
         // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
         | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
-            Fix::safe_edit(replace_with_inner(checker, outer_range, inner_range))
+            Some(Applicability::Safe)
         }
 
         // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => {
-            if let Some(fix) = replace_with_shortened_round_call(checker, outer_range, arguments) {
-                fix
-            } else {
-                return;
-            }
-        }
+        ["" | "builtins", "round"] => round_applicability(arguments, checker.semantic()),
 
         // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        ["math", "ceil" | "floor" | "trunc"] => {
-            Fix::unsafe_edit(replace_with_inner(checker, outer_range, inner_range))
-        }
+        ["math", "ceil" | "floor" | "trunc"] => Some(Applicability::Unsafe),
 
-        _ => return,
-    };
-
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UnnecessaryCastToInt, call.range).with_fix(fix));
+        _ => None,
+    }
 }
 
 fn single_argument_to_int_call<'a>(
-    semantic: &SemanticModel,
     call: &'a ExprCall,
+    semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
     let ExprCall {
         func, arguments, ..
@@ -117,67 +171,75 @@ fn single_argument_to_int_call<'a>(
     Some(argument)
 }
 
-/// Returns an [`Edit`] when the call is of any of the forms:
-/// * `round(integer)`, `round(integer, 0)`, `round(integer, None)`
-/// * `round(whatever)`, `round(whatever, None)`
-fn replace_with_shortened_round_call(
-    checker: &Checker,
-    outer_range: TextRange,
-    arguments: &Arguments,
-) -> Option<Fix> {
-    if arguments.len() > 2 {
-        return None;
+/// Determines the [`Applicability`] for a `round(..)` call.
+///
+/// The Applicability depends on the `ndigits` and the number argument.
+fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Option<Applicability> {
+    let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(arguments, semantic)?;
+
+    match (rounded_value, ndigits_value) {
+        // ```python
+        // int(round(2, 0))
+        // int(round(2))
+        // int(round(2, None))
+        // ```
+        (
+            RoundedValue::Int(InferredType::Equivalent),
+            NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGiven
+            | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Safe),
+
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::Equivalent),
+            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Safe),
+
+        // ```python
+        // a: int = 2 # or True
+        // int(round(a, 1))
+        // int(round(a))
+        // int(round(a, None))
+        // ```
+        (
+            RoundedValue::Int(InferredType::AssignableTo),
+            NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGiven
+            | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Unsafe),
+
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // int(round(x))
+        // int(round(x, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::AssignableTo) | RoundedValue::Other,
+            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Unsafe),
+
+        _ => None,
     }
+}
 
-    let number = arguments.find_argument("number", 0)?;
-    let ndigits = arguments.find_argument("ndigits", 1);
-
-    let number_is_int = match number {
-        Expr::Name(name) => is_int(checker.semantic(), name),
-        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => matches!(value, Number::Int(..)),
+/// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
+fn has_own_parentheses(expr: &Expr) -> bool {
+    match expr {
+        Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Subscript(_)
+        | Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::Call(_) => true,
+        Expr::Generator(generator) => generator.parenthesized,
+        Expr::Tuple(tuple) => tuple.parenthesized,
         _ => false,
-    };
-
-    match ndigits {
-        Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. }))
-            if is_literal_zero(value) && number_is_int => {}
-        Some(Expr::NoneLiteral(_)) | None => {}
-        _ => return None,
-    };
-
-    let number_expr = checker.locator().slice(number);
-    let new_content = format!("round({number_expr})");
-
-    let applicability = if number_is_int {
-        Applicability::Safe
-    } else {
-        Applicability::Unsafe
-    };
-
-    Some(Fix::applicable_edit(
-        Edit::range_replacement(new_content, outer_range),
-        applicability,
-    ))
-}
-
-fn is_int(semantic: &SemanticModel, name: &ExprName) -> bool {
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_int(binding, semantic)
-}
-
-fn is_literal_zero(value: &Number) -> bool {
-    let Number::Int(int) = value else {
-        return false;
-    };
-
-    matches!(int.as_u8(), Some(0))
-}
-
-fn replace_with_inner(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
-    let inner_expr = checker.locator().slice(inner_range);
-
-    Edit::range_replacement(inner_expr.to_string(), outer_range)
+    }
 }

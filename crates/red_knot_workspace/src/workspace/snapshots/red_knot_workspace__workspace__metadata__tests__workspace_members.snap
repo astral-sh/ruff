@@ -1,7 +1,6 @@
 ---
 source: crates/red_knot_workspace/src/workspace/metadata.rs
 expression: workspace
-snapshot_kind: text
 ---
 WorkspaceMetadata(
   root: "/app",
@@ -10,11 +9,11 @@ WorkspaceMetadata(
       name: Name("workspace-root"),
       root: "/app",
       configuration: Configuration(
-        target_version: None,
+        python_version: None,
         search_paths: SearchPathConfiguration(
           extra_paths: None,
           src_root: None,
-          custom_typeshed: None,
+          typeshed: None,
           site_packages: None,
         ),
       ),
@@ -23,11 +22,11 @@ WorkspaceMetadata(
       name: Name("member-a"),
       root: "/app/packages/a",
       configuration: Configuration(
-        target_version: None,
+        python_version: None,
         search_paths: SearchPathConfiguration(
           extra_paths: None,
           src_root: None,
-          custom_typeshed: None,
+          typeshed: None,
           site_packages: None,
         ),
       ),
@@ -36,11 +35,11 @@ WorkspaceMetadata(
       name: Name("member-x"),
       root: "/app/packages/x",
       configuration: Configuration(
-        target_version: None,
+        python_version: None,
         search_paths: SearchPathConfiguration(
           extra_paths: None,
           src_root: None,
-          custom_typeshed: None,
+          typeshed: None,
           site_packages: None,
         ),
       ),
@@ -48,14 +47,12 @@ WorkspaceMetadata(
   ],
   settings: WorkspaceSettings(
     program: ProgramSettings(
-      target_version: PythonVersion(
-        major: 3,
-        minor: 9,
-      ),
+      python_version: "3.9",
+      python_platform: all,
       search_paths: SearchPathSettings(
         extra_paths: [],
         src_root: "/app",
-        custom_typeshed: None,
+        typeshed: None,
         site_packages: Known([]),
       ),
     ),

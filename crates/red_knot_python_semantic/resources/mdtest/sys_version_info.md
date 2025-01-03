@@ -1,5 +1,10 @@
 # `sys.version_info`
 
+```toml
+[environment]
+python-version = "3.9"
+```
+
 ## The type of `sys.version_info`
 
 The type of `sys.version_info` is `sys._version_info`, at least according to typeshed's stubs (which

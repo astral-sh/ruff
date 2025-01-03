@@ -65,7 +65,7 @@ pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["yaml", "load"]))
     {
-        if let Some(loader_arg) = call.arguments.find_argument("Loader", 1) {
+        if let Some(loader_arg) = call.arguments.find_argument_value("Loader", 1) {
             if !checker
                 .semantic()
                 .resolve_qualified_name(loader_arg)

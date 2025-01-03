@@ -1,59 +1,50 @@
 # While loops
 
-## Basic While Loop
+## Basic `while` loop
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    x = 1
+    while flag:
+        x = 2
 
-flag = bool_instance()
-x = 1
-while flag:
-    x = 2
-
-reveal_type(x)  # revealed: Literal[1, 2]
-```
-
-## While with else (no break)
-
-```py
-def bool_instance() -> bool:
-    return True
-
-flag = bool_instance()
-x = 1
-while flag:
-    x = 2
-else:
     reveal_type(x)  # revealed: Literal[1, 2]
-    x = 3
-
-reveal_type(x)  # revealed: Literal[3]
 ```
 
-## While with Else (may break)
+## `while` with `else` (no `break`)
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    x = 1
+    while flag:
+        x = 2
+    else:
+        reveal_type(x)  # revealed: Literal[1, 2]
+        x = 3
 
-flag, flag2 = bool_instance(), bool_instance()
-x = 1
-y = 0
-while flag:
-    x = 2
-    if flag2:
-        y = 4
-        break
-else:
-    y = x
-    x = 3
-
-reveal_type(x)  # revealed: Literal[2, 3]
-reveal_type(y)  # revealed: Literal[1, 2, 4]
+    reveal_type(x)  # revealed: Literal[3]
 ```
 
-## Nested while loops
+## `while` with `else` (may `break`)
+
+```py
+def _(flag: bool, flag2: bool):
+    x = 1
+    y = 0
+    while flag:
+        x = 2
+        if flag2:
+            y = 4
+            break
+    else:
+        y = x
+        x = 3
+
+    reveal_type(x)  # revealed: Literal[2, 3]
+    reveal_type(y)  # revealed: Literal[1, 2, 4]
+```
+
+## Nested `while` loops
 
 ```py
 def flag() -> bool:
@@ -77,4 +68,51 @@ else:
     x = 5
 
 reveal_type(x)  # revealed: Literal[3, 4, 5]
+```
+
+## Boundness
+
+Make sure that the boundness information is correctly tracked in `while` loop control flow.
+
+### Basic `while` loop
+
+```py
+def _(flag: bool):
+    while flag:
+        x = 1
+
+    # error: [possibly-unresolved-reference]
+    x
+```
+
+### `while` with `else` (no `break`)
+
+```py
+def _(flag: bool):
+    while flag:
+        y = 1
+    else:
+        x = 1
+
+    # no error, `x` is always bound
+    x
+    # error: [possibly-unresolved-reference]
+    y
+```
+
+### `while` with `else` (may `break`)
+
+```py
+def _(flag: bool, flag2: bool):
+    while flag:
+        x = 1
+        if flag2:
+            break
+    else:
+        y = 1
+
+    # error: [possibly-unresolved-reference]
+    x
+    # error: [possibly-unresolved-reference]
+    y
 ```

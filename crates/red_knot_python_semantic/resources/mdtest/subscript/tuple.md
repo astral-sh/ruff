@@ -67,9 +67,57 @@ t[:4:0]  # error: [zero-stepsize-in-slice]
 t[0::0]  # error: [zero-stepsize-in-slice]
 t[::0]  # error: [zero-stepsize-in-slice]
 
-def int_instance() -> int: ...
+def _(m: int, n: int):
+    tuple_slice = t[m:n]
+    # TODO: Support overloads... Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
+    reveal_type(tuple_slice)  # revealed: @Todo(return type)
+```
 
-tuple_slice = t[int_instance() : int_instance()]
-# TODO: Support overloads... Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
-reveal_type(tuple_slice)  # revealed: @Todo(return type)
+## Inheritance
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+# TODO: `tuple[int, str]` is a valid base (generics)
+# error: [invalid-base] "Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+class A(tuple[int, str]): ...
+
+# Runtime value: `(A, tuple, object)`
+# TODO: Generics
+reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Unknown, Literal[object]]
+```
+
+## `typing.Tuple`
+
+### Correspondence with `tuple`
+
+`typing.Tuple` can be used interchangeably with `tuple`:
+
+```py
+from typing import Tuple
+
+class A: ...
+
+def _(c: Tuple, d: Tuple[int, A], e: Tuple[Any, ...]):
+    reveal_type(c)  # revealed: tuple
+    reveal_type(d)  # revealed: tuple[int, A]
+    reveal_type(e)  # revealed: @Todo(full tuple[...] support)
+```
+
+### Inheritance
+
+Inheriting from `Tuple` results in a MRO with `builtins.tuple` and `typing.Generic`. `Tuple` itself
+is not a class.
+
+```py
+from typing import Tuple
+
+class C(Tuple): ...
+
+# Runtime value: `(C, tuple, typing.Generic, object)`
+# TODO: Add `Generic` to the MRO
+reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[tuple], Unknown, Literal[object]]
 ```

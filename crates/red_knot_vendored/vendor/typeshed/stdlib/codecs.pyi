@@ -254,6 +254,8 @@ class StreamReaderWriter(TextIO):
     def writable(self) -> bool: ...
 
 class StreamRecoder(BinaryIO):
+    data_encoding: str
+    file_encoding: str
     def __init__(
         self,
         stream: _Stream,

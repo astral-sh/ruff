@@ -38,6 +38,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: tj-actions/changed-files@v45
         id: changed
@@ -99,6 +100,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - run: cargo fmt --all --check
@@ -111,6 +114,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
@@ -129,6 +134,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -173,6 +180,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -200,6 +209,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
@@ -224,6 +235,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v4
@@ -251,6 +264,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -267,13 +282,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: SebRollen/toml-action@v1.2.0
         id: msrv
         with:
           file: "Cargo.toml"
           field: "workspace.package.rust-version"
       - name: "Install Rust toolchain"
-        run: rustup default ${{ steps.msrv.outputs.value }}
+        env:
+          MSRV: ${{ steps.msrv.outputs.value }}
+        run: rustup default "${MSRV}"
       - name: "Install mold"
         uses: rui314/setup-mold@v1
       - name: "Install cargo nextest"
@@ -289,16 +308,19 @@ jobs:
         shell: bash
         env:
           NEXTEST_PROFILE: "ci"
-        run: cargo +${{ steps.msrv.outputs.value }} insta test --all-features --unreferenced reject --test-runner nextest
+          MSRV: ${{ steps.msrv.outputs.value }}
+        run: cargo "+${MSRV}" insta test --all-features --unreferenced reject --test-runner nextest
 
   cargo-fuzz-build:
     name: "cargo fuzz build"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' }}
+    if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' || needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -325,7 +347,9 @@ jobs:
       FORCE_COLOR: 1
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/download-artifact@v4
         name: Download Ruff binary to test
         id: download-cached-binary
@@ -333,16 +357,18 @@ jobs:
           name: ruff
           path: ruff-to-test
       - name: Fuzz
+        env:
+          DOWNLOAD_PATH: ${{ steps.download-cached-binary.outputs.download-path }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+          chmod +x "${DOWNLOAD_PATH}/ruff"
 
           (
             uvx \
-            --python=${{ env.PYTHON_VERSION }} \
+            --python="${PYTHON_VERSION}" \
             --from=./python/py-fuzzer \
             fuzz \
-            --test-executable=${{ steps.download-cached-binary.outputs.download-path }}/ruff \
+            --test-executable="${DOWNLOAD_PATH}/ruff" \
             --bin=ruff \
             0-500
           )
@@ -355,6 +381,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -379,6 +407,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -404,64 +434,72 @@ jobs:
 
       - name: Run `ruff check` stable ecosystem check
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
+        env:
+          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
 
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
+          ruff-ecosystem check ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
 
-          cat ecosystem-result-check-stable > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
           cat ecosystem-result-check-stable >> ecosystem-result
           echo "" >> ecosystem-result
 
       - name: Run `ruff check` preview ecosystem check
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
+        env:
+          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
 
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
+          ruff-ecosystem check ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
 
-          cat ecosystem-result-check-preview > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
           cat ecosystem-result-check-preview >> ecosystem-result
           echo "" >> ecosystem-result
 
       - name: Run `ruff format` stable ecosystem check
         if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
+        env:
+          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
 
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
+          ruff-ecosystem format ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
 
-          cat ecosystem-result-format-stable > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
           cat ecosystem-result-format-stable >> ecosystem-result
           echo "" >> ecosystem-result
 
       - name: Run `ruff format` preview ecosystem check
         if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
+        env:
+          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
 
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
+          ruff-ecosystem format ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
-          cat ecosystem-result-format-preview > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
           cat ecosystem-result-format-preview >> ecosystem-result
           echo "" >> ecosystem-result
@@ -489,6 +527,8 @@ jobs:
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear
@@ -499,6 +539,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -512,7 +554,7 @@ jobs:
           args: --out dist
       - name: "Test wheel"
         run: |
-          pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
+          pip install --force-reinstall --find-links dist "${PACKAGE_NAME}"
           ruff --help
           python -m ruff --help
       - name: "Remove wheels from cache"
@@ -524,6 +566,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -539,13 +583,14 @@ jobs:
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - name: "Run pre-commit"
         run: |
-          echo '```console' > $GITHUB_STEP_SUMMARY
+          echo '```console' > "$GITHUB_STEP_SUMMARY"
           # Enable color output for pre-commit and remove it for the summary
-          SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always | \
-            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
-          exit_code=${PIPESTATUS[0]}
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $exit_code
+          # Use --hook-stage=manual to enable slower pre-commit hooks that are skipped by default
+          SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always --hook-stage=manual | \
+            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> "$GITHUB_STEP_SUMMARY") >&1
+          exit_code="${PIPESTATUS[0]}"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$exit_code"
 
   docs:
     name: "mkdocs"
@@ -555,6 +600,8 @@ jobs:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -566,7 +613,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
       - uses: Swatinem/rust-cache@v2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
@@ -595,6 +642,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Cache rust"
@@ -602,7 +651,7 @@ jobs:
       - name: "Run checks"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
-        run: cat target/formatter-ecosystem/stats.txt > $GITHUB_STEP_SUMMARY
+        run: cat target/formatter-ecosystem/stats.txt > "$GITHUB_STEP_SUMMARY"
       - name: "Remove checkouts from cache"
         run: rm -r target/formatter-ecosystem
 
@@ -622,6 +671,7 @@ jobs:
       - uses: actions/checkout@v4
         name: "Download ruff-lsp source"
         with:
+          persist-credentials: false
           repository: "astral-sh/ruff-lsp"
 
       - uses: actions/setup-python@v5
@@ -640,11 +690,13 @@ jobs:
           just install
 
       - name: Run ruff-lsp tests
+        env:
+          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
           # Setup development binary
           pip uninstall --yes ruff
-          chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
-          export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
+          chmod +x "${DOWNLOAD_PATH}/ruff"
+          export PATH="${DOWNLOAD_PATH}:${PATH}"
           ruff version
 
           just test
@@ -657,6 +709,8 @@ jobs:
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: "Install Rust toolchain"
         run: rustup show

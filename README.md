@@ -119,6 +119,10 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
+# With uv.
+uv add --dev ruff     # to add ruff to your project
+uv tool install ruff  # to install ruff globally
+
 # With pip.
 pip install ruff
 
@@ -136,8 +140,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.8.1/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.8.1/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.8.5/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.8.5/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -170,7 +174,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.8.1
+  rev: v0.8.5
   hooks:
     # Run the linter.
     - id: ruff
@@ -192,7 +196,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
 ### Configuration<a id="configuration"></a>

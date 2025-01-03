@@ -4,7 +4,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,13 +55,14 @@ impl Violation for NonUniqueEnums {
 
 /// PIE796
 pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
+    let semantic = checker.semantic();
+
     let Stmt::ClassDef(parent) = parent else {
         return;
     };
 
     if !parent.bases().iter().any(|expr| {
-        checker
-            .semantic()
+        semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
     }) {
@@ -84,13 +85,11 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
             }
         }
 
-        let comparable = ComparableExpr::from(value);
-
-        if checker.source_type == PySourceType::Stub
-            && comparable == ComparableExpr::EllipsisLiteral
-        {
+        if checker.source_type.is_stub() && member_has_unknown_value(checker, value) {
             continue;
         }
+
+        let comparable = ComparableExpr::from(value);
 
         if !seen_targets.insert(comparable) {
             let diagnostic = Diagnostic::new(
@@ -101,5 +100,29 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
             );
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+/// Whether the value is a bare ellipsis literal (`A = ...`)
+/// or a casted one (`A = cast(SomeType, ...)`).
+fn member_has_unknown_value(checker: &Checker, expr: &Expr) -> bool {
+    match expr {
+        Expr::EllipsisLiteral(_) => true,
+
+        Expr::Call(ExprCall {
+            func, arguments, ..
+        }) => {
+            if !checker.semantic().match_typing_expr(func, "cast") {
+                return false;
+            }
+
+            if !arguments.keywords.is_empty() {
+                return false;
+            }
+
+            matches!(arguments.args.as_ref(), [_, Expr::EllipsisLiteral(_)])
+        }
+
+        _ => false,
     }
 }
