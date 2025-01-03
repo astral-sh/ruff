@@ -157,4 +157,8 @@ impl KnownModule {
     pub const fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
     }
+
+    pub const fn is_red_knot(self) -> bool {
+        matches!(self, Self::RedKnot)
+    }
 }

@@ -2872,7 +2872,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::RedKnotUnknown
             | Self::RedKnotNot
             | Self::RedKnotIntersection
-            | Self::RedKnotTypeOf => matches!(module, KnownModule::RedKnot),
+            | Self::RedKnotTypeOf => module.is_red_knot(),
         }
     }
 
