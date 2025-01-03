@@ -36,7 +36,6 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010.pyi"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]

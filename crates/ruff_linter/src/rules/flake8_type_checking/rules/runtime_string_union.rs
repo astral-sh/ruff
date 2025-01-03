@@ -85,7 +85,9 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if !checker.semantic().execution_context().is_runtime() {
+    // The union is only problematic at runtime. Even though stub files are never
+    // executed, some of the nodes still end up having a runtime execution context
+    if checker.source_type.is_stub() || !checker.semantic().execution_context().is_runtime() {
         return;
     }
 
@@ -103,8 +105,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if !checker.source_type.is_stub()
-        && quotes_are_extendable
+    if quotes_are_extendable
         && string_results
             .iter()
             .any(|result| !result.quotes_are_removable)
@@ -240,7 +241,7 @@ fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &Linter
         }) => {
             match op {
                 Operator::BitOr => {
-                    if !semantic.in_stub_file() && settings.target_version < PythonVersion::Py310 {
+                    if settings.target_version < PythonVersion::Py310 {
                         return false;
                     }
                     quotes_are_removable(semantic, left, settings)
@@ -248,8 +249,7 @@ fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &Linter
                 }
                 // for now we'll treat uses of other operators as unremovable quotes
                 // since that would make it an invalid type expression anyways. We skip
-                // walking the nested non-type expressions from `typing.Annotated`, so
-                // we don't produce false negatives in this branch.
+                // walking subscript
                 _ => false,
             }
         }
@@ -258,35 +258,10 @@ fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &Linter
             ctx: ExprContext::Load,
             ..
         }) => quotes_are_removable(semantic, value, settings),
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            // for subscripts we don't know whether it's safe to do at runtime
-            // since the operation may only be available at type checking time.
-            // E.g. stubs only generics.
-            if !semantic.in_stub_file() {
-                return false;
-            }
-            if !quotes_are_removable(semantic, value, settings) {
-                return false;
-            }
-            // for `typing.Annotated`, only analyze the first argument, since the rest may
-            // contain arbitrary expressions.
-            if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
-                if semantic.match_typing_qualified_name(&qualified_name, "Annotated") {
-                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                        return elts.is_empty()
-                            || quotes_are_removable(semantic, &elts[0], settings);
-                    }
-                }
-                return true;
-            }
-            quotes_are_removable(semantic, slice, settings)
-        }
-        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-            // for attributes we also don't know whether it's safe
-            if !semantic.in_stub_file() {
-                return false;
-            }
-            quotes_are_removable(semantic, value, settings)
+        Expr::Subscript(_) | Expr::Attribute(_) => {
+            // Subscript or attribute accesses that are valid type expressions
+            // may fail at runtime, so we have to assume that they do.
+            return false;
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
