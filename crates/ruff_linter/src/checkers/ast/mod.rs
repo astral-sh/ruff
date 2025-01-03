@@ -2324,6 +2324,7 @@ impl<'a> Checker<'a> {
                     let parsed_expr = parsed_annotation.expression();
                     self.visit_expr(parsed_expr);
                     if self.semantic.in_type_alias_value() {
+                        // stub files are covered by PYI020
                         if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
                             flake8_type_checking::rules::quoted_type_alias(
                                 self,
