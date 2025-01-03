@@ -96,7 +96,7 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
             check_name(checker, expr, *range);
             if matches!(ctx, ExprContext::Store) {
                 if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
-                    removed_airflow_plugin_extension(checker, expr, id, class_def);
+                    check_airflow_plugin_extension(checker, expr, id, class_def);
                 }
             }
         }
@@ -699,7 +699,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
 /// class CustomizePlugin(AirflowPlugin)
 ///     executors = "some.third.party.executor"
 /// ```
-fn removed_airflow_plugin_extension(
+fn check_airflow_plugin_extension(
     checker: &mut Checker,
     expr: &Expr,
     name: &str,
