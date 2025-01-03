@@ -49,6 +49,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
+use crate::types::call::{Argument, CallArguments};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
     report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
@@ -1521,7 +1522,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let target_ty = enter_ty
-                    .call(self.db(), &[context_expression_ty])
+                    .call(self.db(), &CallArguments::positional([context_expression_ty]))
                     .return_ty_result(&self.context, context_expression.into())
                     .unwrap_or_else(|err| {
                         self.context.report_lint(
@@ -1562,12 +1563,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if exit_ty
                             .call(
                                 self.db(),
-                                &[
+                                &CallArguments::positional([
                                     context_manager_ty,
                                     Type::none(self.db()),
                                     Type::none(self.db()),
                                     Type::none(self.db()),
-                                ],
+                                ]),
                             )
                             .return_ty_result(&self.context, context_expression.into())
                             .is_err()
@@ -2004,7 +2005,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db(), op.in_place_dunder())
                 {
-                    let call = class_member.call(self.db(), &[target_type, value_type]);
+                    let call = class_member.call(
+                        self.db(),
+                        &CallArguments::positional([target_type, value_type]),
+                    );
                     let augmented_return_ty = match call
                         .return_ty_result(&self.context, AnyNodeRef::StmtAugAssign(assignment))
                     {
@@ -2463,25 +2467,40 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn infer_arguments(&mut self, arguments: &ast::Arguments) -> Vec<Type<'db>> {
-        let mut types = Vec::with_capacity(
-            arguments
-                .args
-                .len()
-                .saturating_add(arguments.keywords.len()),
-        );
-
-        types.extend(arguments.args.iter().map(|arg| self.infer_expression(arg)));
-
-        types.extend(arguments.keywords.iter().map(
-            |ast::Keyword {
-                 range: _,
-                 arg: _,
-                 value,
-             }| self.infer_expression(value),
-        ));
-
-        types
+    fn infer_arguments(&mut self, arguments: &ast::Arguments) -> CallArguments<'db> {
+        CallArguments::from_arguments(arguments.arguments_source_order().map(|arg_or_keyword| {
+            match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred {
+                        value,
+                        range: _,
+                        ctx: _,
+                    }) => {
+                        let ty = self.infer_expression(value);
+                        self.store_expression_type(arg, ty);
+                        Argument::Variadic(ty)
+                    }
+                    // TODO diagnostic if after a keyword argument
+                    _ => Argument::Positional(self.infer_expression(arg)),
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword {
+                    arg,
+                    value,
+                    range: _,
+                }) => {
+                    let ty = self.infer_expression(value);
+                    if let Some(arg) = arg {
+                        Argument::Keyword {
+                            name: arg.id.clone(),
+                            ty,
+                        }
+                    } else {
+                        // TODO diagnostic if not last
+                        Argument::Keywords(ty)
+                    }
+                }
+            }
+        }))
     }
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
@@ -2992,12 +3011,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
-        // TODO: proper typed call signature, representing keyword args etc
-        let arg_types = self.infer_arguments(arguments);
+        let call_arguments = self.infer_arguments(arguments);
         let function_type = self.infer_expression(func);
         function_type
-            .call(self.db(), arg_types.as_slice())
-            .unwrap_with_diagnostic(&self.context, func.as_ref().into())
+            .call(self.db(), &call_arguments)
+            .unwrap_with_diagnostic(&self.context, call_expression.into())
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -3296,9 +3314,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if let CallDunderResult::CallOutcome(call)
-                | CallDunderResult::PossiblyUnbound(call) =
-                    operand_type.call_dunder(self.db(), unary_dunder_method, &[operand_type])
-                {
+                | CallDunderResult::PossiblyUnbound(call) = operand_type.call_dunder(
+                    self.db(),
+                    unary_dunder_method,
+                    &CallArguments::positional([operand_type]),
+                ) {
                     match call.return_ty_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {
@@ -3525,11 +3545,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left.class.class_member(self.db(), reflected_dunder)
                     {
                         return right_ty
-                            .call_dunder(self.db(), reflected_dunder, &[right_ty, left_ty])
+                            .call_dunder(
+                                self.db(),
+                                reflected_dunder,
+                                &CallArguments::positional([right_ty, left_ty]),
+                            )
                             .return_ty(self.db())
                             .or_else(|| {
                                 left_ty
-                                    .call_dunder(self.db(), op.dunder(), &[left_ty, right_ty])
+                                    .call_dunder(
+                                        self.db(),
+                                        op.dunder(),
+                                        &CallArguments::positional([left_ty, right_ty]),
+                                    )
                                     .return_ty(self.db())
                             });
                     }
@@ -3539,7 +3567,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     left.class.class_member(self.db(), op.dunder())
                 {
                     class_member
-                        .call(self.db(), &[left_ty, right_ty])
+                        .call(self.db(), &CallArguments::positional([left_ty, right_ty]))
                         .return_ty(self.db())
                 } else {
                     None
@@ -3553,7 +3581,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             right.class.class_member(self.db(), op.reflected_dunder())
                         {
                             class_member
-                                .call(self.db(), &[right_ty, left_ty])
+                                .call(self.db(), &CallArguments::positional([right_ty, left_ty]))
                                 .return_ty(self.db())
                         } else {
                             None
@@ -4348,7 +4376,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
 
                         return dunder_getitem_method
-                            .call(self.db(), &[slice_ty])
+                            .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
                             .return_ty_result(&self.context, value_node.into())
                             .unwrap_or_else(|err| {
                                 self.context.report_lint(
@@ -4393,7 +4421,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
 
                             return ty
-                                .call(self.db(), &[slice_ty])
+                                .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
                                 .return_ty_result(&self.context, value_node.into())
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(
@@ -5472,7 +5500,10 @@ fn perform_rich_comparison<'db>(
                        right: InstanceType<'db>| {
         match left.class.class_member(db, op.dunder()) {
             Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                .call(db, &[Type::Instance(left), Type::Instance(right)])
+                .call(
+                    db,
+                    &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
+                )
                 .return_ty(db),
             _ => None,
         }
@@ -5516,7 +5547,10 @@ fn perform_membership_test_comparison<'db>(
         Symbol::Type(contains_dunder, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.
             contains_dunder
-                .call(db, &[Type::Instance(right), Type::Instance(left)])
+                .call(
+                    db,
+                    &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                )
                 .return_ty(db)
         }
         _ => {
