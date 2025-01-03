@@ -710,8 +710,17 @@ impl<'a> SemanticModel<'a> {
     ///
     /// References from within an [`ast::Comprehension`] can produce incorrect
     /// results when referring to a [`BindingKind::NamedExprAssignment`].
-    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
-        self.simulate_runtime_load_at_location_in_scope(name.id.as_str(), name.range, self.scope_id)
+    pub fn simulate_runtime_load(
+        &self,
+        name: &ast::ExprName,
+        allow_typing_only_bindings: bool,
+    ) -> Option<BindingId> {
+        self.simulate_runtime_load_at_location_in_scope(
+            name.id.as_str(),
+            name.range,
+            self.scope_id,
+            allow_typing_only_bindings,
+        )
     }
 
     /// Simulates a runtime load of the given symbol.
@@ -743,6 +752,7 @@ impl<'a> SemanticModel<'a> {
         symbol: &str,
         symbol_range: TextRange,
         scope_id: ScopeId,
+        allow_typing_only_bindings: bool,
     ) -> Option<BindingId> {
         let mut seen_function = false;
         let mut class_variables_visible = true;
@@ -785,7 +795,7 @@ impl<'a> SemanticModel<'a> {
                     // runtime binding with a source-order inaccurate one
                     for shadowed_id in scope.shadowed_bindings(binding_id) {
                         let binding = &self.bindings[shadowed_id];
-                        if binding.context.is_typing() {
+                        if !allow_typing_only_bindings && binding.context.is_typing() {
                             continue;
                         }
                         if let BindingKind::Annotation
@@ -820,7 +830,9 @@ impl<'a> SemanticModel<'a> {
                         _ => binding_id,
                     };
 
-                    if self.bindings[candidate_id].context.is_typing() {
+                    if !allow_typing_only_bindings
+                        && self.bindings[candidate_id].context.is_typing()
+                    {
                         continue;
                     }
 
