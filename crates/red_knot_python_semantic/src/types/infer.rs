@@ -69,7 +69,7 @@ use crate::types::{
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
     KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeApiFunction, TypeArrayDisplay,
     TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
@@ -4239,20 +4239,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if file_to_module(db, function.body_scope(db).file(db))
                     .is_some_and(|module| module.is_known(KnownModule::KnotExtensions)) =>
             {
-                let function_name = function.name(db);
+                let function = TypeApiFunction::try_from(function.name(db).as_str()).ok()?;
 
                 let argument_types = arguments.args.iter().map(|arg| {
-                    if function_name == "static_assert" {
+                    if function == TypeApiFunction::StaticAssert {
                         self.infer_expression(arg)
                     } else {
                         self.infer_type_expression(arg)
                     }
                 });
 
-                let result = type_api::resolve_predicate(db, function_name, argument_types);
+                let result = type_api::resolve_predicate(db, function, argument_types);
 
                 match result {
-                    Ok(ty) => ty,
+                    Ok(ty) => Some(ty),
                     Err(TypeApiPredicateError::ArgumentsError(TypeApiArgumentsError {
                         expected,
                         actual,

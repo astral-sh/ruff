@@ -69,6 +69,36 @@ pub(crate) fn resolve_special_form<'db>(
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum TypeApiFunction {
+    StaticAssert,
+    IsEquivalentTo,
+    IsSubtypeOf,
+    IsAssignableTo,
+    IsDisjointFrom,
+    IsFullyStatic,
+    IsSingleton,
+    IsSingleValued,
+}
+
+impl TryFrom<&str> for TypeApiFunction {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "static_assert" => Ok(Self::StaticAssert),
+            "is_equivalent_to" => Ok(Self::IsEquivalentTo),
+            "is_subtype_of" => Ok(Self::IsSubtypeOf),
+            "is_assignable_to" => Ok(Self::IsAssignableTo),
+            "is_disjoint_from" => Ok(Self::IsDisjointFrom),
+            "is_fully_static" => Ok(Self::IsFullyStatic),
+            "is_singleton" => Ok(Self::IsSingleton),
+            "is_single_valued" => Ok(Self::IsSingleValued),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum TypeApiPredicateError<'db> {
     /// Wrong number of arguments in a type API call
@@ -79,60 +109,56 @@ pub(crate) enum TypeApiPredicateError<'db> {
 
 pub(crate) fn resolve_predicate<'db>(
     db: &'db dyn Db,
-    function: &str,
+    function: TypeApiFunction,
     arguments: impl Iterator<Item = Type<'db>>,
-) -> Result<Option<Type<'db>>, TypeApiPredicateError<'db>> {
+) -> Result<Type<'db>, TypeApiPredicateError<'db>> {
     let expect_one_argument =
         |arguments| expect_one_argument(arguments).map_err(TypeApiPredicateError::ArgumentsError);
     let expect_two_arguments = |arguments| {
         expect_n_arguments::<2>(arguments).map_err(TypeApiPredicateError::ArgumentsError)
     };
 
-    let result = match function {
+    match function {
         // Predicates on types
-        "is_equivalent_to" => {
+        TypeApiFunction::IsEquivalentTo => {
             let [ty_a, ty_b] = expect_two_arguments(arguments)?;
-            Some(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)))
+            Ok(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)))
         }
-        "is_subtype_of" => {
+        TypeApiFunction::IsSubtypeOf => {
             let [ty_a, ty_b] = expect_two_arguments(arguments)?;
-            Some(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)))
+            Ok(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)))
         }
-        "is_assignable_to" => {
+        TypeApiFunction::IsAssignableTo => {
             let [ty_a, ty_b] = expect_two_arguments(arguments)?;
-            Some(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)))
+            Ok(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)))
         }
-        "is_disjoint_from" => {
+        TypeApiFunction::IsDisjointFrom => {
             let [ty_a, ty_b] = expect_two_arguments(arguments)?;
-            Some(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)))
+            Ok(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)))
         }
-        "is_fully_static" => {
+        TypeApiFunction::IsFullyStatic => {
             let ty = expect_one_argument(arguments)?;
-            Some(Type::BooleanLiteral(ty.is_fully_static(db)))
+            Ok(Type::BooleanLiteral(ty.is_fully_static(db)))
         }
-        "is_singleton" => {
+        TypeApiFunction::IsSingleton => {
             let ty = expect_one_argument(arguments)?;
-            Some(Type::BooleanLiteral(ty.is_singleton(db)))
+            Ok(Type::BooleanLiteral(ty.is_singleton(db)))
         }
-        "is_single_valued" => {
+        TypeApiFunction::IsSingleValued => {
             let ty = expect_one_argument(arguments)?;
-            Some(Type::BooleanLiteral(ty.is_single_valued(db)))
+            Ok(Type::BooleanLiteral(ty.is_single_valued(db)))
         }
 
         // Special operations
-        "static_assert" => {
+        TypeApiFunction::StaticAssert => {
             let ty = expect_one_argument(arguments)?;
             if ty == Type::BooleanLiteral(true) {
-                Some(Type::none(db))
+                Ok(Type::none(db))
             } else {
                 return Err(TypeApiPredicateError::StaticAssertionError(ty));
             }
         }
-
-        _ => None,
-    };
-
-    Ok(result)
+    }
 }
 
 declare_lint! {

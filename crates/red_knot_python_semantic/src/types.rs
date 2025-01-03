@@ -34,6 +34,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
+use crate::types::type_api::TypeApiFunction;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
@@ -3119,13 +3120,20 @@ pub enum KnownFunction {
 
     /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+
+    /// Type API functions (`knot_extensions`)
+    TypeApiFunction(TypeApiFunction),
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck => None,
+            Self::RevealType
+            | Self::Len
+            | Self::Final
+            | Self::NoTypeCheck
+            | Self::TypeApiFunction(_) => None,
         }
     }
 
