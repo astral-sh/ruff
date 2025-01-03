@@ -1,11 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
-TC010_1.py:18:30: TC010 Invalid string member in `X | Y`-style union type
+TC010_1.py:19:30: TC010 [*] Invalid string member in `X | Y`-style union type
    |
-16 | type A = Value["int" | str]  # OK
-17 | 
-18 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
+17 | type A = Value["int" | str]  # OK
+18 | 
+19 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
    |                              ^^^^^ TC010
    |
+   = help: Remove quotes
+
+ℹ Safe fix
+16 16 | 
+17 17 | type A = Value["int" | str]  # OK
+18 18 | 
+19    |-OldS = TypeVar('OldS', int | 'str', str)  # TC010
+   19 |+OldS = TypeVar('OldS', int | str, str)  # TC010
