@@ -67,7 +67,6 @@ mod tests {
     // so we want to make sure their fixes are not going around in circles.
     #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.py"))]
-    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.pyi"))]
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_typing_execution_context.py"))]
     fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());

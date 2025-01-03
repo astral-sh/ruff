@@ -320,7 +320,7 @@ fn quotes_are_unremovable(
             // for subscripts we don't know whether it's safe to do at runtime
             // since the operation may only be available at type checking time.
             // E.g. stubs only generics.
-            if !semantic.in_stub_file() && !semantic.in_type_checking_block() {
+            if !semantic.in_type_checking_block() {
                 return true;
             }
             if quotes_are_unremovable(semantic, value, settings) {
@@ -341,7 +341,7 @@ fn quotes_are_unremovable(
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             // for attributes we also don't know whether it's safe
-            if !semantic.in_stub_file() && !semantic.in_type_checking_block() {
+            if !semantic.in_type_checking_block() {
                 return true;
             }
             quotes_are_unremovable(semantic, value, settings)
@@ -357,10 +357,7 @@ fn quotes_are_unremovable(
         Expr::Name(name) => {
             semantic.resolve_name(name).is_some()
                 && semantic
-                    .simulate_runtime_load(
-                        name,
-                        semantic.in_stub_file() || semantic.in_type_checking_block(),
-                    )
+                    .simulate_runtime_load(name, semantic.in_type_checking_block())
                     .is_none()
         }
         _ => false,
