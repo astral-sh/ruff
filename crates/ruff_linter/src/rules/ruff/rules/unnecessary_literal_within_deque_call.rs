@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -35,21 +35,19 @@ pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }
 
-impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
-
+impl AlwaysFixableViolation for UnnecessaryEmptyIterableWithinDequeCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unnecessary empty iterable within a deque call".to_string()
     }
 
-    fn fix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> String {
         let title = if self.has_maxlen {
             "Replace with `deque(maxlen=...)`"
         } else {
             "Replace with `deque()`"
         };
-        Some(title.to_string())
+        title.to_string()
     }
 }
 
