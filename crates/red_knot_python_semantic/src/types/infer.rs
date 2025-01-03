@@ -794,9 +794,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(InstanceType { class })
+            Type::Instance(instance)
                 if matches!(
-                    class.known(self.db()),
+                    instance.class(self.db()).known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return,
@@ -1947,8 +1947,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
 
         // Handle various singletons.
-        if let Type::Instance(InstanceType { class }) = annotation_ty {
-            if class.is_known(self.db(), KnownClass::SpecialForm) {
+        if let Type::Instance(instance) = annotation_ty {
+            if instance
+                .class(self.db())
+                .is_known(self.db(), KnownClass::SpecialForm)
+            {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
                         self.db(),
@@ -2000,9 +2003,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
-            Type::Instance(InstanceType { class }) => {
-                if let Symbol::Type(class_member, boundness) =
-                    class.class_member(self.db(), op.in_place_dunder())
+            Type::Instance(instance) => {
+                if let Symbol::Type(class_member, boundness) = instance
+                    .class(self.db())
+                    .class_member(self.db(), op.in_place_dunder())
                 {
                     let call = class_member.call(self.db(), &[target_type, value_type]);
                     let augmented_return_ty = match call
@@ -3520,9 +3524,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::Instance(left), Type::Instance(right), op) => {
                 if left != right && right.is_subtype_of(self.db(), left) {
                     let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right.class.class_member(self.db(), reflected_dunder);
+                    let rhs_reflected = right
+                        .class(self.db())
+                        .class_member(self.db(), reflected_dunder);
                     if !rhs_reflected.is_unbound()
-                        && rhs_reflected != left.class.class_member(self.db(), reflected_dunder)
+                        && rhs_reflected
+                            != left
+                                .class(self.db())
+                                .class_member(self.db(), reflected_dunder)
                     {
                         return right_ty
                             .call_dunder(self.db(), reflected_dunder, &[right_ty, left_ty])
@@ -3536,7 +3545,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let call_on_left_instance = if let Symbol::Type(class_member, _) =
-                    left.class.class_member(self.db(), op.dunder())
+                    left.class(self.db()).class_member(self.db(), op.dunder())
                 {
                     class_member
                         .call(self.db(), &[left_ty, right_ty])
@@ -3549,8 +3558,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if left == right {
                         None
                     } else {
-                        if let Symbol::Type(class_member, _) =
-                            right.class.class_member(self.db(), op.reflected_dunder())
+                        if let Symbol::Type(class_member, _) = right
+                            .class(self.db())
+                            .class_member(self.db(), op.reflected_dunder())
                         {
                             class_member
                                 .call(self.db(), &[right_ty, left_ty])
@@ -3989,13 +3999,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
                 KnownClass::Bytes.to_instance(self.db()),
             ),
-            (Type::Tuple(_), Type::Instance(InstanceType { class }))
-                if class.is_known(self.db(), KnownClass::VersionInfo) =>
+            (Type::Tuple(_), Type::Instance(instance))
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(left, op, Type::version_info_tuple(self.db()))
             }
-            (Type::Instance(InstanceType { class }), Type::Tuple(_))
-                if class.is_known(self.db(), KnownClass::VersionInfo) =>
+            (Type::Instance(instance), Type::Tuple(_))
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(Type::version_info_tuple(self.db()), op, right)
             }
@@ -4207,14 +4221,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
             (
-                Type::Instance(InstanceType { class }),
+                Type::Instance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if class.is_known(self.db(), KnownClass::VersionInfo) => self
-                .infer_subscript_expression_types(
+            ) if instance
+                .class(self.db())
+                .is_known(self.db(), KnownClass::VersionInfo) =>
+            {
+                self.infer_subscript_expression_types(
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
-                ),
+                )
+            }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
@@ -4458,8 +4476,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(InstanceType { class }))
-                if class.is_known(self.db(), KnownClass::NoneType) =>
+            Some(Type::Instance(instance))
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }
@@ -5470,7 +5490,7 @@ fn perform_rich_comparison<'db>(
     let call_dunder = |op: RichCompareOperator,
                        left: InstanceType<'db>,
                        right: InstanceType<'db>| {
-        match left.class.class_member(db, op.dunder()) {
+        match left.class(db).class_member(db, op.dunder()) {
             Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
                 .call(db, &[Type::Instance(left), Type::Instance(right)])
                 .return_ty(db),
@@ -5511,7 +5531,7 @@ fn perform_membership_test_comparison<'db>(
     right: InstanceType<'db>,
     op: MembershipTestCompareOperator,
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-    let contains_dunder = right.class.class_member(db, "__contains__");
+    let contains_dunder = right.class(db).class_member(db, "__contains__");
     let compare_result_opt = match contains_dunder {
         Symbol::Type(contains_dunder, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.

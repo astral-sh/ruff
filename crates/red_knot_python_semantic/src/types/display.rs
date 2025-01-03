@@ -8,8 +8,8 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
-    SubclassOfType, Type, UnionType,
+    ClassLiteralType, IntersectionType, KnownClass, StringLiteralType, SubclassOfType, Type,
+    UnionType,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -68,11 +68,11 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Instance(InstanceType { class }) => {
-                let representation = match class.known(self.db) {
+            Type::Instance(instance) => {
+                let representation = match instance.class(self.db).known(self.db) {
                     Some(KnownClass::NoneType) => "None",
                     Some(KnownClass::NoDefaultType) => "NoDefault",
-                    _ => class.name(self.db),
+                    _ => instance.class(self.db).name(self.db),
                 };
                 f.write_str(representation)
             }
