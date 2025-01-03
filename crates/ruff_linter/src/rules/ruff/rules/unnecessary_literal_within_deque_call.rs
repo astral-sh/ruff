@@ -66,15 +66,11 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque
         return;
     }
 
-    let Some(iterable) = arguments
-        .find_positional(0)
-        .or_else(|| arguments.find_keyword("iterable").map(|kw| &kw.value))
-    else {
+    let Some(iterable) = arguments.find_argument_value("iterable", 0) else {
         return;
     };
-    let maxlen = arguments
-        .find_positional(1)
-        .or_else(|| arguments.find_keyword("maxlen").map(|kw| &kw.value));
+
+    let maxlen = arguments.find_argument_value("maxlen", 1);
 
     let is_empty_literal = match iterable {
         Expr::Dict(dict) => dict.is_empty(),
