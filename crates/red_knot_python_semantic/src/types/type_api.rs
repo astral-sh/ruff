@@ -137,11 +137,11 @@ pub(crate) fn resolve_predicate<'db>(
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `red_knot` type API calls with the wrong number of arguments.
+    /// Checks for `knot_extensions` type API calls with the wrong number of arguments.
     ///
     /// ## Examples
     /// ```python
-    /// from red_knot import is_equivalent_to
+    /// from knot_extensions import is_equivalent_to
     ///
     /// is_equivalent_to(int, str, bool)  # error: wrong number of arguments
     /// ```
@@ -158,7 +158,7 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
-    /// from red_knot import static_assert
+    /// from knot_extensions import static_assert
     ///
     /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
     ///

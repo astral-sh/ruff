@@ -2085,7 +2085,7 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::Unknown,
             }),
-            Type::KnownInstance(KnownInstanceType::RedKnotUnknown) => Ok(Type::Unknown),
+            Type::KnownInstance(KnownInstanceType::KnotExtensionsUnknown) => Ok(Type::Unknown),
             Type::Todo(_) => Ok(*self),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
@@ -2595,10 +2595,10 @@ pub enum KnownInstanceType<'db> {
     TypeGuard,
     TypeIs,
     ReadOnly,
-    RedKnotUnknown,
-    RedKnotNot,
-    RedKnotIntersection,
-    RedKnotTypeOf,
+    KnotExtensionsUnknown,
+    KnotExtensionsNot,
+    KnotExtensionsIntersection,
+    KnotExtensionsTypeOf,
     // TODO: fill this enum out with more special forms, etc.
 }
 
@@ -2638,10 +2638,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "ChainMap",
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
-            Self::RedKnotUnknown => "Unknown",
-            Self::RedKnotNot => "Not",
-            Self::RedKnotIntersection => "Intersection",
-            Self::RedKnotTypeOf => "TypeOf",
+            Self::KnotExtensionsUnknown => "Unknown",
+            Self::KnotExtensionsNot => "Not",
+            Self::KnotExtensionsIntersection => "Intersection",
+            Self::KnotExtensionsTypeOf => "TypeOf",
         }
     }
 
@@ -2681,10 +2681,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::OrderedDict
             | Self::ReadOnly
             | Self::TypeAliasType(_)
-            | Self::RedKnotUnknown
-            | Self::RedKnotNot
-            | Self::RedKnotIntersection
-            | Self::RedKnotTypeOf => Truthiness::AlwaysTrue,
+            | Self::KnotExtensionsUnknown
+            | Self::KnotExtensionsNot
+            | Self::KnotExtensionsIntersection
+            | Self::KnotExtensionsTypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2724,10 +2724,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
-            Self::RedKnotUnknown => "red_knot.Unknown",
-            Self::RedKnotNot => "red_knot.Not",
-            Self::RedKnotIntersection => "red_knot.Intersection",
-            Self::RedKnotTypeOf => "red_knot.TypeOf",
+            Self::KnotExtensionsUnknown => "knot_extensions.Unknown",
+            Self::KnotExtensionsNot => "knot_extensions.Not",
+            Self::KnotExtensionsIntersection => "knot_extensions.Intersection",
+            Self::KnotExtensionsTypeOf => "knot_extensions.TypeOf",
         }
     }
 
@@ -2767,10 +2767,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
-            Self::RedKnotTypeOf => KnownClass::SpecialForm,
-            Self::RedKnotNot => KnownClass::SpecialForm,
-            Self::RedKnotIntersection => KnownClass::SpecialForm,
-            Self::RedKnotUnknown => KnownClass::Object,
+            Self::KnotExtensionsTypeOf => KnownClass::SpecialForm,
+            Self::KnotExtensionsNot => KnownClass::SpecialForm,
+            Self::KnotExtensionsIntersection => KnownClass::SpecialForm,
+            Self::KnotExtensionsUnknown => KnownClass::Object,
         }
     }
 
@@ -2816,10 +2816,10 @@ impl<'db> KnownInstanceType<'db> {
             "Concatenate" => Self::Concatenate,
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
-            "Unknown" => Self::RedKnotUnknown,
-            "Not" => Self::RedKnotNot,
-            "Intersection" => Self::RedKnotIntersection,
-            "TypeOf" => Self::RedKnotTypeOf,
+            "Unknown" => Self::KnotExtensionsUnknown,
+            "Not" => Self::KnotExtensionsNot,
+            "Intersection" => Self::KnotExtensionsIntersection,
+            "TypeOf" => Self::KnotExtensionsTypeOf,
             _ => return None,
         };
 
@@ -2869,10 +2869,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
-            Self::RedKnotUnknown
-            | Self::RedKnotNot
-            | Self::RedKnotIntersection
-            | Self::RedKnotTypeOf => module.is_red_knot(),
+            Self::KnotExtensionsUnknown
+            | Self::KnotExtensionsNot
+            | Self::KnotExtensionsIntersection
+            | Self::KnotExtensionsTypeOf => module.is_knot_extensions(),
         }
     }
 

@@ -1,21 +1,21 @@
-# Type API
+# Type API (`knot_extensions`)
 
-This document describes the internal `red_knot` API for creating and manipulating types as well as
-testing various type system properties.
+This document describes the internal `knot_extensions` API for creating and manipulating types as
+well as testing various type system properties.
 
 ## Type extensions
 
 The Python language itself allows us to perform a variety of operations on types. For example, we
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]`
 and `type[int]` to create new types. But some type-level operations that we rely on in Red Knot,
-like intersections, cannot yet be expressed in Python. The `red_knot` module provides the
+like intersections, cannot yet be expressed in Python. The `knot_extensions` module provides the
 `Intersection` and `Not` type constructors (special forms) which allow us to construct these types
 directly.
 
 ### Negation
 
 ```py
-from red_knot import Not
+from knot_extensions import Not
 
 x: Not[int]
 y: Not[Not[int]]
@@ -35,7 +35,7 @@ def _() -> None:
 ### Intersection
 
 ```py
-from red_knot import Intersection, Not, is_subtype_of, static_assert
+from knot_extensions import Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Never
 
 class S: ...
@@ -83,7 +83,7 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from red_knot import Unknown, static_assert, is_assignable_to, is_fully_static
+from knot_extensions import Unknown, static_assert, is_assignable_to, is_fully_static
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -104,14 +104,14 @@ reveal_type(C.__mro__)
 
 ## Type predicates
 
-The `red_knot` module also provides predicates to test various properties of types. These are
+The `knot_extensions` module also provides predicates to test various properties of types. These are
 implemented as functions that return `Literal[True]` or `Literal[False]` depending on the result of
 the test.
 
 ### Equivalence
 
 ```py
-from red_knot import is_equivalent_to, static_assert
+from knot_extensions import is_equivalent_to, static_assert
 from typing_extensions import Never, Union
 
 static_assert(is_equivalent_to(type, type[object]))
@@ -125,7 +125,7 @@ static_assert(not is_equivalent_to(int | str, int | str | bytes))
 ### Subtyping
 
 ```py
-from red_knot import is_subtype_of, static_assert
+from knot_extensions import is_subtype_of, static_assert
 
 static_assert(is_subtype_of(bool, int))
 static_assert(not is_subtype_of(str, int))
@@ -149,7 +149,7 @@ static_assert(not is_subtype_of(Base, Unrelated))
 ### Assignability
 
 ```py
-from red_knot import is_assignable_to, static_assert
+from knot_extensions import is_assignable_to, static_assert
 from typing import Any
 
 static_assert(is_assignable_to(int, Any))
@@ -160,7 +160,7 @@ static_assert(not is_assignable_to(int, str))
 ### Disjointness
 
 ```py
-from red_knot import is_disjoint_from, static_assert
+from knot_extensions import is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(None, int))
 static_assert(not is_disjoint_from(Literal[2] | str, int))
@@ -169,7 +169,7 @@ static_assert(not is_disjoint_from(Literal[2] | str, int))
 ### Fully static types
 
 ```py
-from red_knot import is_fully_static, static_assert
+from knot_extensions import is_fully_static, static_assert
 from typing import Any
 
 static_assert(is_fully_static(int | str))
@@ -182,7 +182,7 @@ static_assert(not is_fully_static(type[Any]))
 ### Singleton types
 
 ```py
-from red_knot import is_singleton, static_assert
+from knot_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(None))
 static_assert(is_singleton(Literal[True]))
@@ -194,7 +194,7 @@ static_assert(not is_singleton(Literal["a"]))
 ### Single-valued types
 
 ```py
-from red_knot import is_single_valued, static_assert
+from knot_extensions import is_single_valued, static_assert
 
 static_assert(is_single_valued(None))
 static_assert(is_single_valued(Literal[True]))
@@ -213,7 +213,7 @@ type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]`
 the expression `str`:
 
 ```py
-from red_knot import TypeOf, is_subtype_of, static_assert
+from knot_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
 # error: "Static assertion error: argument evaluates to `False`"
@@ -230,7 +230,7 @@ static_assert(is_subtype_of(TypeOf[str], type[str]))
 We provide various tailored error messages for wrong argument types to `static_assert`:
 
 ```py
-from red_knot import static_assert
+from knot_extensions import static_assert
 
 static_assert(2 * 3 == 6)
 
@@ -247,7 +247,7 @@ static_assert(2 * 3)
 ### Wrong number of arguments for type predicates
 
 ```py
-from red_knot import is_subtype_of, is_fully_static
+from knot_extensions import is_subtype_of, is_fully_static
 
 # error: "Expected 2 arguments, got 0"
 is_subtype_of()
@@ -271,9 +271,9 @@ is_fully_static(int, int)
 ### Wrong argument number for types and type constructors
 
 ```py
-from red_knot import Not, Unknown, TypeOf
+from knot_extensions import Not, Unknown, TypeOf
 
-# error: "Special form `red_knot.Unknown` expected no type parameter"
+# error: "Special form `knot_extensions.Unknown` expected no type parameter"
 u: Unknown[str]
 
 # error: "Expected 1 type argument, got 2"

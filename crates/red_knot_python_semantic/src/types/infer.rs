@@ -4237,7 +4237,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         match function.into_function_literal() {
             Some(function)
                 if file_to_module(db, function.body_scope(db).file(db))
-                    .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
+                    .is_some_and(|module| module.is_known(KnownModule::KnotExtensions)) =>
             {
                 let function_name = function.name(db);
 
@@ -5176,13 +5176,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Type API special forms
-            KnownInstanceType::RedKnotNot => {
+            KnownInstanceType::KnotExtensionsNot => {
                 self.infer_type_api_special_form(TypeApiSpecialForm::Not, arguments_slice)
             }
-            KnownInstanceType::RedKnotIntersection => {
+            KnownInstanceType::KnotExtensionsIntersection => {
                 self.infer_type_api_special_form(TypeApiSpecialForm::Intersection, arguments_slice)
             }
-            KnownInstanceType::RedKnotTypeOf => {
+            KnownInstanceType::KnotExtensionsTypeOf => {
                 self.infer_type_api_special_form(TypeApiSpecialForm::TypeOf, arguments_slice)
             }
 
@@ -5273,7 +5273,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::TypingSelf
             | KnownInstanceType::TypeAlias
-            | KnownInstanceType::RedKnotUnknown => {
+            | KnownInstanceType::KnotExtensionsUnknown => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript.into(),
