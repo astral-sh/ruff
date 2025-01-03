@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-class Point:  # PLR0903
+class Point:  # B903
     def __init__(self, x: float, y: float) -> None:
         self.x = x
         self.y = y
@@ -30,21 +30,23 @@ class CustomException(Exception):  # OK
     ...
 
 
-class A:
+class A:   # OK
     class B:
         ...
     
     def __init__(self):
         ...
 
-class C:
+class C:   # B903
     c: int
-    def __init__(self,d:list):...
+    def __init__(self,d:list):
+        self.d = d
 
-class D:
+class D:   # B903
     """This class has a docstring."""
     # this next method is an init
-    def __init__(self,e:dict):...
+    def __init__(self,e:dict):
+        self.e = e
 
 # <--- begin flake8-bugbear tests below
 # (we have modified them to have type annotations,

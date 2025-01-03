@@ -356,7 +356,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
         (Flake8Bugbear, "039") => (RuleGroup::Stable, rules::flake8_bugbear::rules::MutableContextvarDefault),
         (Flake8Bugbear, "901") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ReturnInGenerator),
-        (Flake8Bugbear, "B903") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ClassAsDataStructure),
+        (Flake8Bugbear, "903") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ClassAsDataStructure),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
