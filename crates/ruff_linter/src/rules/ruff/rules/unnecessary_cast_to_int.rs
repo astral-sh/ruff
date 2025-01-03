@@ -179,37 +179,40 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
 
     match (rounded_value, ndigits_value) {
         // ```python
+        // int(round(2, -1))
         // int(round(2, 0))
         // int(round(2))
         // int(round(2, None))
         // ```
         (
             RoundedValue::Int(InferredType::Equivalent),
-            NdigitsValue::Int(InferredType::Equivalent)
-            | NdigitsValue::NotGiven
-            | NdigitsValue::LiteralNone,
+            NdigitsValue::LiteralNegativeInt
+            | NdigitsValue::LiteralNonNegativeInt
+            | NdigitsValue::NonLiteralInt(InferredType::Equivalent)
+            | NdigitsValue::NotGivenOrNone,
         ) => Some(Applicability::Safe),
 
         // ```python
         // int(round(2.0))
         // int(round(2.0, None))
         // ```
-        (
-            RoundedValue::Float(InferredType::Equivalent),
-            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
-        ) => Some(Applicability::Safe),
+        (RoundedValue::Float(InferredType::Equivalent), NdigitsValue::NotGivenOrNone) => {
+            Some(Applicability::Safe)
+        }
 
         // ```python
         // a: int = 2 # or True
+        // int(round(a, -2))
         // int(round(a, 1))
         // int(round(a))
         // int(round(a, None))
         // ```
         (
             RoundedValue::Int(InferredType::AssignableTo),
-            NdigitsValue::Int(InferredType::Equivalent)
-            | NdigitsValue::NotGiven
-            | NdigitsValue::LiteralNone,
+            NdigitsValue::LiteralNonNegativeInt
+            | NdigitsValue::LiteralNegativeInt
+            | NdigitsValue::NonLiteralInt(InferredType::Equivalent)
+            | NdigitsValue::NotGivenOrNone,
         ) => Some(Applicability::Unsafe),
 
         // ```python
@@ -220,7 +223,7 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
         // ```
         (
             RoundedValue::Float(InferredType::AssignableTo) | RoundedValue::Other,
-            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
+            NdigitsValue::NotGivenOrNone,
         ) => Some(Applicability::Unsafe),
 
         _ => None,

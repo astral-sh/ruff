@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::Locator;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall};
+use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
@@ -52,14 +52,14 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let applicability = match (rounded_value, ndigits_value) {
-        // ```python
-        // rounded(1, unknown)
-        // ```
-        (RoundedValue::Int(InferredType::Equivalent), NdigitsValue::Other) => Applicability::Unsafe,
+    if !matches!(
+        ndigits_value,
+        NdigitsValue::NotGivenOrNone | NdigitsValue::LiteralNonNegativeInt
+    ) {
+        return;
+    }
 
-        (_, NdigitsValue::Other) => return,
-
+    let applicability = match rounded_value {
         // ```python
         // some_int: int
         //
@@ -69,7 +69,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         // rounded(1, 4 + 2)
         // rounded(1, some_int)
         // ```
-        (RoundedValue::Int(InferredType::Equivalent), _) => Applicability::Safe,
+        RoundedValue::Int(InferredType::Equivalent) => Applicability::Safe,
 
         // ```python
         // some_int: int
@@ -81,7 +81,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         // rounded(some_int, 4 + 2)
         // rounded(some_int, some_other_int)
         // ```
-        (RoundedValue::Int(InferredType::AssignableTo), _) => Applicability::Unsafe,
+        RoundedValue::Int(InferredType::AssignableTo) => Applicability::Unsafe,
 
         _ => return,
     };
@@ -113,9 +113,10 @@ pub(super) enum RoundedValue {
 /// The type of the second argument to `round()`
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum NdigitsValue {
-    NotGiven,
-    LiteralNone,
-    Int(InferredType),
+    NotGivenOrNone,
+    LiteralNegativeInt,
+    LiteralNonNegativeInt,
+    NonLiteralInt(InferredType),
     Other,
 }
 
@@ -157,21 +158,34 @@ pub(super) fn rounded_and_ndigits<'a>(
     };
 
     let ndigits_kind = match ndigits {
-        None => NdigitsValue::NotGiven,
-        Some(Expr::NoneLiteral(_)) => NdigitsValue::LiteralNone,
+        None | Some(Expr::NoneLiteral(_)) => NdigitsValue::NotGivenOrNone,
 
         Some(Expr::Name(name)) => {
             match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
-                    NdigitsValue::Int(InferredType::AssignableTo)
+                    NdigitsValue::NonLiteralInt(InferredType::AssignableTo)
                 }
                 _ => NdigitsValue::Other,
             }
         }
 
+        Some(Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(int),
+            ..
+        })) => match int.as_i64() {
+            None => NdigitsValue::NonLiteralInt(InferredType::Equivalent),
+            Some(value) => {
+                if value < 0 {
+                    NdigitsValue::LiteralNegativeInt
+                } else {
+                    NdigitsValue::LiteralNonNegativeInt
+                }
+            }
+        },
+
         Some(ndigits) => match ResolvedPythonType::from(ndigits) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {
-                NdigitsValue::Int(InferredType::Equivalent)
+                NdigitsValue::NonLiteralInt(InferredType::Equivalent)
             }
             _ => NdigitsValue::Other,
         },
