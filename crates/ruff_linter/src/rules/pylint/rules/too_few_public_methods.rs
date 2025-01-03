@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
@@ -32,13 +32,13 @@ use crate::checkers::ast::Checker;
 ///     x: float
 ///     y: float
 /// ```
-#[violation]
-pub struct TooFewPublicMethods;
+#[derive(ViolationMetadata)]
+pub(crate) struct TooFewPublicMethods;
 
 impl Violation for TooFewPublicMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class could be dataclass or namedtuple")
+        "Class could be dataclass or namedtuple".to_string()
     }
 }
 
