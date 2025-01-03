@@ -2132,9 +2132,18 @@ fn verbose_show_failed_fix_errors() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "UP006", "--preview", "-v"])
         .build();
+
+    insta::with_settings!(
+            {
+                // the logs have timestamps we need to remove
+                filters => vec![(
+                    r"\[[\d:-]+]",
+                    ""
+                )]
+            },{
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import typing\nCallable = 'abc'\ndef g() -> typing.Callable: ..."),
-            @r###"
+            .pass_stdin("import typing\nCallable = 'abc'\ndef g() -> typing.Callable: ..."),
+                @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2150,9 +2159,10 @@ fn verbose_show_failed_fix_errors() {
     Found 1 error.
 
     ----- stderr -----
-    [2025-01-03][00:40:50][ruff::resolve][DEBUG] Isolated mode, not reading any pyproject.toml
-    [2025-01-03][00:40:50][ruff_diagnostics::diagnostic][DEBUG] Failed to create fix for NonPEP585Annotation: Unable to insert `Callable` into scope due to name conflict
-    "###);
+    [ruff::resolve][DEBUG] Isolated mode, not reading any pyproject.toml
+    [ruff_diagnostics::diagnostic][DEBUG] Failed to create fix for NonPEP585Annotation: Unable to insert `Callable` into scope due to name conflict
+    "###);        }
+        );
 }
 
 #[test]
