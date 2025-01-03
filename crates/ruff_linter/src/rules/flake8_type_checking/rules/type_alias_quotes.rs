@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailab
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
-use ruff_python_semantic::{Binding, SemanticModel};
+use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_literal};
 use ruff_text_size::Ranged;
 
@@ -219,7 +219,11 @@ fn collect_typing_references<'a>(
             let Some(binding_id) = checker.semantic().resolve_name(name) else {
                 return;
             };
-            if checker.semantic().simulate_runtime_load(name).is_some() {
+            if checker
+                .semantic()
+                .simulate_runtime_load(name, TypingOnlyBindingsStatus::Disallowed)
+                .is_some()
+            {
                 return;
             }
 
@@ -291,11 +295,22 @@ fn quotes_are_unremovable(semantic: &SemanticModel, expr: &Expr) -> bool {
             ctx: ExprContext::Load,
             ..
         }) => quotes_are_unremovable(semantic, value),
-        // for subscripts and attributes we don't know whether it's safe
-        // to do at runtime, since the operation may only be available at
-        // type checking time. E.g. stubs only generics. Or stubs only
-        // type aliases.
-        Expr::Subscript(_) | Expr::Attribute(_) => true,
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            // for subscripts we don't know whether it's safe to do at runtime
+            // since the operation may only be available at type checking time.
+            // E.g. stubs only generics.
+            if !semantic.in_type_checking_block() {
+                return true;
+            }
+            quotes_are_unremovable(semantic, value) || quotes_are_unremovable(semantic, slice)
+        }
+        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+            // for attributes we also don't know whether it's safe
+            if !semantic.in_type_checking_block() {
+                return true;
+            }
+            quotes_are_unremovable(semantic, value)
+        }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
                 if quotes_are_unremovable(semantic, elt) {
@@ -305,7 +320,10 @@ fn quotes_are_unremovable(semantic: &SemanticModel, expr: &Expr) -> bool {
             false
         }
         Expr::Name(name) => {
-            semantic.resolve_name(name).is_some() && semantic.simulate_runtime_load(name).is_none()
+            semantic.resolve_name(name).is_some()
+                && semantic
+                    .simulate_runtime_load(name, semantic.in_type_checking_block().into())
+                    .is_none()
         }
         _ => false,
     }
