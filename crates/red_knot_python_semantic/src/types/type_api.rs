@@ -155,7 +155,7 @@ pub(crate) fn resolve_predicate<'db>(
             if ty == Type::BooleanLiteral(true) {
                 Ok(Type::none(db))
             } else {
-                return Err(TypeApiPredicateError::StaticAssertionError(ty));
+                Err(TypeApiPredicateError::StaticAssertionError(ty))
             }
         }
     }
