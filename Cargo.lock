@@ -3198,7 +3198,7 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=3c7f1694c9efba751dbeeacfbc93b227586e316a#3c7f1694c9efba751dbeeacfbc93b227586e316a"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=88a1d7774d78f048fbd77d40abca9ebd729fd1f0#88a1d7774d78f048fbd77d40abca9ebd729fd1f0"
 dependencies = [
  "append-only-vec",
  "arc-swap",
@@ -3206,7 +3206,6 @@ dependencies = [
  "dashmap 6.1.0",
  "hashlink",
  "indexmap",
- "lazy_static",
  "parking_lot",
  "rayon",
  "rustc-hash 2.1.0",
@@ -3219,12 +3218,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=3c7f1694c9efba751dbeeacfbc93b227586e316a#3c7f1694c9efba751dbeeacfbc93b227586e316a"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=88a1d7774d78f048fbd77d40abca9ebd729fd1f0#88a1d7774d78f048fbd77d40abca9ebd729fd1f0"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=3c7f1694c9efba751dbeeacfbc93b227586e316a#3c7f1694c9efba751dbeeacfbc93b227586e316a"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=88a1d7774d78f048fbd77d40abca9ebd729fd1f0#88a1d7774d78f048fbd77d40abca9ebd729fd1f0"
 dependencies = [
  "heck",
  "proc-macro2",
