@@ -91,7 +91,7 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
-/// # TODO(charlie): this comment has an issue code of (up to) 6 characters, then digits
+/// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
 /// ```
 #[derive(ViolationMetadata)]
@@ -226,9 +226,9 @@ impl Violation for MissingSpaceAfterTodoColon {
 
 static ISSUE_LINK_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
-        r"^#\s*(http|https)://.*",  // issue link
-        r"^#\s*\d+$",               // issue code - like "003"
-        r"^#\s*[A-Z]{1,12}\-?\d+$", // issue code - like "TD003"
+        r"^#\s*(http|https)://.*", // issue link
+        r"^#\s*\d+$",              // issue code - like "003"
+        r"^#\s*[A-Z]+\-?\d+$",     // issue code - like "TD003"
     ])
     .unwrap()
 });

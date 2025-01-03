@@ -8,8 +8,8 @@
 # TODO: the link has an issue code of the minimum length
 # T-001
 
-# TODO: the link has an issue code of the maximum length
-# ABCDEFGHIJKL-001
+# TODO: the issue code can be arbitrarily long
+# ABCDEFGHIJKLMNOPQRSTUVWXYZ-001
 
 # TDO003 - errors
 # TODO: this comment has no
@@ -35,6 +35,3 @@ def foo(x):
 # foo # TODO: no link!
 
 # TODO: here's a TODO on the last line with no link
-
-# TODO: the link has an issue code beyond the maximum length
-# ABCDEFGHIJKLM-001

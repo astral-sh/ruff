@@ -46,15 +46,4 @@ TD003.py:37:3: TD003 Missing issue link on the line following this TODO
 36 | 
 37 | # TODO: here's a TODO on the last line with no link
    |   ^^^^ TD003
-38 | 
-39 | # TODO: the link has an issue code beyond the maximum length
-   |
-
-TD003.py:39:3: TD003 Missing issue link on the line following this TODO
-   |
-37 | # TODO: here's a TODO on the last line with no link
-38 | 
-39 | # TODO: the link has an issue code beyond the maximum length
-   |   ^^^^ TD003
-40 | # ABCDEFGHIJKLM-001
    |
