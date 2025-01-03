@@ -258,11 +258,9 @@ fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &Linter
             ctx: ExprContext::Load,
             ..
         }) => quotes_are_removable(semantic, value, settings),
-        Expr::Subscript(_) | Expr::Attribute(_) => {
-            // Subscript or attribute accesses that are valid type expressions
-            // may fail at runtime, so we have to assume that they do.
-            return false;
-        }
+        // Subscript or attribute accesses that are valid type expressions may fail
+        // at runtime, so we have to assume that they do, to keep code working.
+        Expr::Subscript(_) | Expr::Attribute(_) => false,
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
                 if !quotes_are_removable(semantic, elt, settings) {
