@@ -59,7 +59,10 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
-use crate::types::type_api::{TypeApiError, TYPE_API_STATIC_ASSERTION_ERROR, TYPE_API_WRONG_ARITY};
+use crate::types::type_api::{
+    TypeApiArgumentsError, TypeApiPredicateError, TYPE_API_STATIC_ASSERTION_ERROR,
+    TYPE_API_WRONG_ARITY,
+};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type, type_api,
@@ -4216,7 +4219,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.infer_type_expression(expr)
                     })),
                 };
-                Some(type_api::resolve_type_operation(db, class.class, argument_types).unwrap())
+
+                let result = type_api::resolve_type_operation(db, class.class, argument_types);
+
+                match result {
+                    Ok(ty) => ty,
+                    Err(TypeApiArgumentsError { expected, actual }) => {
+                        self.context.report_lint(
+                            &TYPE_API_WRONG_ARITY,
+                            arguments.into(),
+                            format_args!(
+                                "Expected {expected} type argument{}, got {actual}",
+                                if expected == 1 { "" } else { "s" },
+                            ),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                }
             }
             _ => None,
         }
@@ -4253,12 +4273,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
 
                 match result {
-                    Ok(ty) => Some(ty),
-                    Err(TypeApiError::UnknownAttribute) => {
-                        // Proper diagnostics (… has no attribute …) will be emitted higher up in the call stack
-                        None
-                    }
-                    Err(TypeApiError::WrongNumberOfArguments { expected, actual }) => {
+                    Ok(ty) => ty,
+                    Err(TypeApiPredicateError::ArgumentsError(TypeApiArgumentsError {
+                        expected,
+                        actual,
+                    })) => {
                         self.context.report_lint(
                             &TYPE_API_WRONG_ARITY,
                             arguments.into(),
@@ -4270,7 +4289,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         Some(Type::Unknown)
                     }
-                    Err(TypeApiError::StaticAssertionError(Type::BooleanLiteral(false))) => {
+                    Err(TypeApiPredicateError::StaticAssertionError(Type::BooleanLiteral(
+                        false,
+                    ))) => {
                         self.context.report_lint(
                             &TYPE_API_STATIC_ASSERTION_ERROR,
                             arguments.into(),
@@ -4279,7 +4300,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         Some(Type::Unknown)
                     }
-                    Err(TypeApiError::StaticAssertionError(Type::Instance(class)))
+                    Err(TypeApiPredicateError::StaticAssertionError(Type::Instance(class)))
                         if class.class.is_known(db, KnownClass::Bool) =>
                     {
                         self.context.report_lint(
@@ -4290,7 +4311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         Some(Type::Unknown)
                     }
-                    Err(TypeApiError::StaticAssertionError(ty)) => {
+                    Err(TypeApiPredicateError::StaticAssertionError(ty)) => {
                         self.context.report_lint(
                             &TYPE_API_STATIC_ASSERTION_ERROR,
                             arguments.into(),

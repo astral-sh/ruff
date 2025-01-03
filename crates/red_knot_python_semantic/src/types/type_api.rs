@@ -3,33 +3,27 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::types::{Class, IntersectionBuilder, Type};
 use crate::Db;
 
-#[derive(Debug)]
-pub(crate) enum TypeApiError<'db> {
-    /// Wrong number of arguments in a type API call
-    WrongNumberOfArguments { expected: usize, actual: usize },
-    /// Argument of `assert_true` did not have type `Literal[True]`
-    StaticAssertionError(Type<'db>),
-    /// Unknown type API expression
-    UnknownAttribute,
-}
+use std::result::Result;
 
-type Result<'db, T> = std::result::Result<T, TypeApiError<'db>>;
+#[derive(Debug)]
+pub(crate) struct TypeApiArgumentsError {
+    pub(crate) expected: usize,
+    pub(crate) actual: usize,
+}
 
 fn expect_n_arguments<'db, const N: usize>(
     mut arguments: impl Iterator<Item = Type<'db>>,
-) -> Result<'db, [Type<'db>; N]> {
+) -> Result<[Type<'db>; N], TypeApiArgumentsError> {
     let mut result = [Type::Unknown; N];
     for i in 0..N {
-        result[i] = arguments
-            .next()
-            .ok_or(TypeApiError::WrongNumberOfArguments {
-                expected: N,
-                actual: i,
-            })?;
+        result[i] = arguments.next().ok_or(TypeApiArgumentsError {
+            expected: N,
+            actual: i,
+        })?;
     }
     if arguments.next().is_some() {
         let actual = N + 1 + arguments.count();
-        return Err(TypeApiError::WrongNumberOfArguments {
+        return Err(TypeApiArgumentsError {
             expected: N,
             actual,
         });
@@ -37,7 +31,9 @@ fn expect_n_arguments<'db, const N: usize>(
     Ok(result)
 }
 
-fn expect_one_argument<'db>(arguments: impl Iterator<Item = Type<'db>>) -> Result<'db, Type<'db>> {
+fn expect_one_argument<'db>(
+    arguments: impl Iterator<Item = Type<'db>>,
+) -> Result<Type<'db>, TypeApiArgumentsError> {
     expect_n_arguments::<1>(arguments).map(|[ty]| ty)
 }
 
@@ -45,11 +41,11 @@ pub(crate) fn resolve_type_operation<'db>(
     db: &'db dyn Db,
     class: Class<'db>,
     arguments: impl Iterator<Item = Type<'db>>,
-) -> Result<'db, Type<'db>> {
-    match class.name(db).as_str() {
+) -> Result<Option<Type<'db>>, TypeApiArgumentsError> {
+    let result = match class.name(db).as_str() {
         "Not" => {
             let ty = expect_one_argument(arguments)?;
-            Ok(ty.negate(db))
+            Some(ty.negate(db))
         }
         "Intersection" => {
             let intersection_ty = arguments
@@ -57,64 +53,82 @@ pub(crate) fn resolve_type_operation<'db>(
                     builder.add_positive(ty)
                 })
                 .build();
-            Ok(intersection_ty)
+            Some(intersection_ty)
         }
         "TypeOf" => {
             let ty = expect_one_argument(arguments)?;
-            Ok(ty)
+            Some(ty)
         }
-        _ => Err(TypeApiError::UnknownAttribute),
-    }
+        _ => None,
+    };
+
+    Ok(result)
+}
+
+#[derive(Debug)]
+pub(crate) enum TypeApiPredicateError<'db> {
+    /// Wrong number of arguments in a type API call
+    ArgumentsError(TypeApiArgumentsError),
+    /// Argument of `assert_true` did not have type `Literal[True]`
+    StaticAssertionError(Type<'db>),
 }
 
 pub(crate) fn resolve_type_predicate<'db>(
     db: &'db dyn Db,
     function: &str,
     arguments: impl Iterator<Item = Type<'db>>,
-) -> Result<'db, Type<'db>> {
-    match function {
+) -> Result<Option<Type<'db>>, TypeApiPredicateError<'db>> {
+    let expect_one_argument =
+        |arguments| expect_one_argument(arguments).map_err(TypeApiPredicateError::ArgumentsError);
+    let expect_two_arguments = |arguments| {
+        expect_n_arguments::<2>(arguments).map_err(TypeApiPredicateError::ArgumentsError)
+    };
+
+    let result = match function {
         // Predicates on types
         "is_equivalent_to" => {
-            let [ty_a, ty_b] = expect_n_arguments::<2>(arguments)?;
-            Ok(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)))
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Some(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)))
         }
         "is_subtype_of" => {
-            let [ty_a, ty_b] = expect_n_arguments::<2>(arguments)?;
-            Ok(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)))
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Some(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)))
         }
         "is_assignable_to" => {
-            let [ty_a, ty_b] = expect_n_arguments::<2>(arguments)?;
-            Ok(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)))
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Some(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)))
         }
         "is_disjoint_from" => {
-            let [ty_a, ty_b] = expect_n_arguments::<2>(arguments)?;
-            Ok(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)))
+            let [ty_a, ty_b] = expect_two_arguments(arguments)?;
+            Some(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)))
         }
         "is_fully_static" => {
             let ty = expect_one_argument(arguments)?;
-            Ok(Type::BooleanLiteral(ty.is_fully_static(db)))
+            Some(Type::BooleanLiteral(ty.is_fully_static(db)))
         }
         "is_singleton" => {
             let ty = expect_one_argument(arguments)?;
-            Ok(Type::BooleanLiteral(ty.is_singleton(db)))
+            Some(Type::BooleanLiteral(ty.is_singleton(db)))
         }
         "is_single_valued" => {
             let ty = expect_one_argument(arguments)?;
-            Ok(Type::BooleanLiteral(ty.is_single_valued(db)))
+            Some(Type::BooleanLiteral(ty.is_single_valued(db)))
         }
 
         // Special operations
         "assert_true" => {
             let ty = expect_one_argument(arguments)?;
             if ty == Type::BooleanLiteral(true) {
-                Ok(Type::none(db))
+                Some(Type::none(db))
             } else {
-                Err(TypeApiError::StaticAssertionError(ty))
+                return Err(TypeApiPredicateError::StaticAssertionError(ty));
             }
         }
 
-        _ => Err(TypeApiError::UnknownAttribute),
-    }
+        _ => None,
+    };
+
+    Ok(result)
 }
 
 declare_lint! {

@@ -229,7 +229,7 @@ assert_true(int(2.0 * 3.0) == 6)
 assert_true(2 * 3)
 ```
 
-### Wrong number of arguments
+### Wrong number of arguments for type predicates
 
 ```py
 from red_knot import is_subtype_of, is_fully_static
@@ -251,4 +251,16 @@ is_fully_static()
 
 # error: "Expected 1 argument, got 2"
 is_fully_static(int, int)
+```
+
+### Wrong argument number for types and type constructors
+
+```py
+from red_knot import Not, Unknown
+
+# error: "Special form `red_knot.Unknown` expected no type parameter"
+x: Unknown[str]
+
+# error: "Expected 1 type argument, got 2"
+y: Not[int, str]
 ```
