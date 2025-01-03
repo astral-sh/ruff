@@ -3,31 +3,31 @@ import collections
 
 
 def f():
-    queue = collections.deque([])  # C421
+    queue = collections.deque([])  # RUF025
 
 
 def f():
-    queue = collections.deque([], maxlen=10)  # C421
+    queue = collections.deque([], maxlen=10)  # RUF025
 
 
 def f():
-    queue = deque([])  # C421
+    queue = deque([])  # RUF025
 
 
 def f():
-    queue = deque(())  # C421
+    queue = deque(())  # RUF025
 
 
 def f():
-    queue = deque({})  # C421
+    queue = deque({})  # RUF025
 
 
 def f():
-    queue = deque(set())  # C421
+    queue = deque(set())  # RUF025
 
 
 def f():
-    queue = collections.deque([], maxlen=10)  # C421
+    queue = collections.deque([], maxlen=10)  # RUF025
 
 
 def f():

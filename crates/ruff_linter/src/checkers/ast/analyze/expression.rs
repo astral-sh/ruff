@@ -1118,7 +1118,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::unnecessary_round(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryEmptyIterableWithinDequeCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_deque_call(checker, call);
+                ruff::rules::unnecessary_literal_within_deque_call(checker, call);
             }
         }
         Expr::Dict(dict) => {

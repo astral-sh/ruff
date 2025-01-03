@@ -53,7 +53,7 @@ impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
     }
 }
 
-/// C421
+/// RUF025
 pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque: &ast::ExprCall) {
     let ast::ExprCall {
         func, arguments, ..
