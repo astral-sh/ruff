@@ -202,6 +202,23 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
     f"""aaaa{
     10}aaaaa""" fr"""bbbbbbbbbbbbbbbbbbbb"""
 )
+
+# In docstring positions
+def docstring():
+    (
+        r"aaaaaaaaa"
+        "bbbbbbbbbbbbbbbbbbbb"
+    )
+
+def docstring_flat():
+    (
+        r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+    )
+
+def docstring_flat_overlong():
+    (
+        r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
 ```
 
 ## Outputs
@@ -429,6 +446,22 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
     10}aaaaa"""
     rf"""bbbbbbbbbbbbbbbbbbbb"""
 )
+
+
+# In docstring positions
+def docstring():
+    r"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb"
+
+
+def docstring_flat():
+    r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+
+
+def docstring_flat_overlong():
+    (
+        r"aaaaaaaaa"
+        r"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
 ```
 
 
@@ -495,7 +528,7 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
      ...
  
  
-@@ -193,16 +205,8 @@
+@@ -193,24 +205,19 @@
  
  r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
  
@@ -514,6 +547,18 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
 -    rf"""bbbbbbbbbbbbbbbbbbbb"""
 -)
 +(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+ 
+ # In docstring positions
+ def docstring():
+-    r"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb"
++    (
++        r"aaaaaaaaa"
++        "bbbbbbbbbbbbbbbbbbbb"
++    )
+ 
+ 
+ def docstring_flat():
 ```
 
 
@@ -741,6 +786,22 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
     10}aaaaa"""
     rf"""bbbbbbbbbbbbbbbbbbbb"""
 )
+
+
+# In docstring positions
+def docstring():
+    r'aaaaaaaaa' 'bbbbbbbbbbbbbbbbbbbb'
+
+
+def docstring_flat():
+    r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
+
+
+def docstring_flat_overlong():
+    (
+        r'aaaaaaaaa'
+        r'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    )
 ```
 
 
@@ -807,7 +868,7 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
      ...
  
  
-@@ -193,16 +205,8 @@
+@@ -193,24 +205,19 @@
  
  r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
  
@@ -826,4 +887,16 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
 -    rf"""bbbbbbbbbbbbbbbbbbbb"""
 -)
 +(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+ 
+ # In docstring positions
+ def docstring():
+-    r'aaaaaaaaa' 'bbbbbbbbbbbbbbbbbbbb'
++    (
++        r'aaaaaaaaa'
++        'bbbbbbbbbbbbbbbbbbbb'
++    )
+ 
+ 
+ def docstring_flat():
 ```

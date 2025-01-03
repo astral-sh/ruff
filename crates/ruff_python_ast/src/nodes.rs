@@ -3774,14 +3774,14 @@ pub struct Arguments {
 }
 
 /// An entry in the argument list of a function call.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ArgOrKeyword<'a> {
     Arg(&'a Expr),
     Keyword(&'a Keyword),
 }
 
 impl<'a> ArgOrKeyword<'a> {
-    pub const fn value(&self) -> &'a Expr {
+    pub const fn value(self) -> &'a Expr {
         match self {
             ArgOrKeyword::Arg(argument) => argument,
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
@@ -3841,9 +3841,7 @@ impl Arguments {
     /// argument exists. Used to retrieve argument values that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr> {
-        self.find_keyword(name)
-            .map(|keyword| &keyword.value)
-            .or_else(|| self.find_positional(position))
+        self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
     /// Return the the argument with the given name or at the given position, or `None` if no such

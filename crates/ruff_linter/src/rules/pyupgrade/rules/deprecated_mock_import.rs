@@ -3,7 +3,7 @@ use libcst_native::{
     AsName, AssignTargetExpression, Attribute, Dot, Expression, Import, ImportAlias, ImportFrom,
     ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
-use log::error;
+use log::debug;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -286,7 +286,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                         Ok(content) => Some(content),
                         Err(e) => {
-                            error!("Failed to rewrite `mock` import: {e}");
+                            debug!("Failed to rewrite `mock` import: {e}");
                             None
                         }
                     }

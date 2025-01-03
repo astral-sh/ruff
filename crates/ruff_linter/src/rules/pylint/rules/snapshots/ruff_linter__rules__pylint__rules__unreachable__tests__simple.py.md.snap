@@ -1,0 +1,188 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    pass
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["pass\n"]
+
+  start --> block0
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    pass
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["pass\n"]
+
+  start --> block0
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func():
+    return
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return\n"]
+
+  start --> block0
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func():
+    return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 1\n"]
+
+  start --> block0
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func():
+    return 1
+    return "unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable#quot;\n"]
+  block1["return 1\n"]
+
+  start --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func():
+    i = 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 0\n"]
+
+  start --> block0
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func():
+    i = 0
+    i += 2
+    return i
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 0\ni += 2\nreturn i\n"]
+
+  start --> block0
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func():
+    with x:
+        i = 0
+    i = 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 1\n"]
+  block1["i = 0\n"]
+  block2["with x:
+        i = 0\n"]
+
+  start --> block2
+  block2 -- "Exception raised" --> block0
+  block2 -- "else" --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func():
+    with x:
+        i = 0
+        return 1
+    i = 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 1\n"]
+  block1["i = 0\nreturn 1\n"]
+  block2["with x:
+        i = 0
+        return 1\n"]
+
+  start --> block2
+  block2 -- "Exception raised" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```

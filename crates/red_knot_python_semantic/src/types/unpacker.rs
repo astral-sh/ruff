@@ -96,7 +96,7 @@ impl<'db> Unpacker<'db> {
                             // with each individual character, instead of just an array of
                             // `LiteralString`, but there would be a cost and it's not clear that
                             // it's worth it.
-                            Type::tuple(
+                            TupleType::from_elements(
                                 self.db(),
                                 std::iter::repeat(Type::LiteralString)
                                     .take(string_literal_ty.python_len(self.db())),

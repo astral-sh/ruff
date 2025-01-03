@@ -1,0 +1,590 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    for i in range(5):
+        print(i)
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["print(i)\n"]
+  block3["for i in range(5):
+        print(i)\n"]
+
+  start --> block3
+  block3 -- "range(5)" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    for i in range(20):
+        print(i)
+    else:
+        return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2[["Loop continue"]]
+  block3["print(i)\n"]
+  block4["for i in range(20):
+        print(i)
+    else:
+        return 0\n"]
+
+  start --> block4
+  block4 -- "range(20)" --> block3
+  block4 -- "else" --> block1
+  block3 --> block2
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func():
+    for i in range(10):
+        if i == 5:
+            return 1
+    return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1[["Loop continue"]]
+  block2["return 1\n"]
+  block3["if i == 5:
+            return 1\n"]
+  block4["for i in range(10):
+        if i == 5:
+            return 1\n"]
+
+  start --> block4
+  block4 -- "range(10)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "i == 5" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func():
+    for i in range(111):
+        if i == 5:
+            return 1
+    else:
+        return 0
+    return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 2\n"]
+  block1["return 0\n"]
+  block2[["Loop continue"]]
+  block3["return 1\n"]
+  block4["if i == 5:
+            return 1\n"]
+  block5["for i in range(111):
+        if i == 5:
+            return 1
+    else:
+        return 0\n"]
+
+  start --> block5
+  block5 -- "range(111)" --> block4
+  block5 -- "else" --> block1
+  block4 -- "i == 5" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 --> block5
+  block1 --> return
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func():
+    for i in range(12):
+        continue
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["for i in range(12):
+        continue\n"]
+
+  start --> block3
+  block3 -- "range(12)" --> block2
+  block3 -- "else" --> block0
+  block2 --> block3
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func():
+    for i in range(1110):
+        if True:
+            continue
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["if True:
+            continue\n"]
+  block4["for i in range(1110):
+        if True:
+            continue\n"]
+
+  start --> block4
+  block4 -- "range(1110)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> block4
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func():
+    for i in range(13):
+        break
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["for i in range(13):
+        break\n"]
+
+  start --> block3
+  block3 -- "range(13)" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func():
+    for i in range(1110):
+        if True:
+            break
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["if True:
+            break\n"]
+  block4["for i in range(1110):
+        if True:
+            break\n"]
+
+  start --> block4
+  block4 -- "range(1110)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func():
+    for i in range(5):
+        pass
+    else:
+        return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2[["Loop continue"]]
+  block3["pass\n"]
+  block4["for i in range(5):
+        pass
+    else:
+        return 1\n"]
+
+  start --> block4
+  block4 -- "range(5)" --> block3
+  block4 -- "else" --> block1
+  block3 --> block2
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 9
+### Source
+```python
+def func():
+    for i in range(5):
+        pass
+    else:
+        return 1
+    x = 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 1\n"]
+  block1["return 1\n"]
+  block2[["Loop continue"]]
+  block3["pass\n"]
+  block4["for i in range(5):
+        pass
+    else:
+        return 1\n"]
+
+  start --> block4
+  block4 -- "range(5)" --> block3
+  block4 -- "else" --> block1
+  block3 --> block2
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 10
+### Source
+```python
+def func():
+    for i in range(5):
+        pass
+    else:
+        pass
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["pass\n"]
+  block2[["Loop continue"]]
+  block3["pass\n"]
+  block4["for i in range(5):
+        pass
+    else:
+        pass\n"]
+
+  start --> block4
+  block4 -- "range(5)" --> block3
+  block4 -- "else" --> block1
+  block3 --> block2
+  block2 --> block4
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 11
+### Source
+```python
+def func():
+    for i in range(3):
+        if i == 2:
+            assert i is not None
+            break
+    else:
+        raise Exception()
+    x = 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 0\n"]
+  block1[["Exception raised"]]
+  block2["raise Exception()\n"]
+  block3[["Loop continue"]]
+  block4["break\n"]
+  block5[["Exception raised"]]
+  block6["assert i is not None\n"]
+  block7["if i == 2:
+            assert i is not None
+            break\n"]
+  block8["for i in range(3):
+        if i == 2:
+            assert i is not None
+            break
+    else:
+        raise Exception()\n"]
+
+  start --> block8
+  block8 -- "range(3)" --> block7
+  block8 -- "else" --> block2
+  block7 -- "i == 2" --> block6
+  block7 -- "else" --> block3
+  block6 -- "i is not None" --> block4
+  block6 -- "else" --> block5
+  block5 --> return
+  block4 --> block0
+  block3 --> block8
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 12
+### Source
+```python
+def func():
+    for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                break
+
+        x = 3
+        if True:
+            break
+
+    print('hello')
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["print('hello')\n"]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["x = 3\nif True:
+            break\n"]
+  block4[["Loop continue"]]
+  block5["break\n"]
+  block6["x = 2\nif True:
+                break\n"]
+  block7["for i in range(12):
+            x = 2
+            if True:
+                break\n"]
+  block8["for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                break
+
+        x = 3
+        if True:
+            break\n"]
+
+  start --> block8
+  block8 -- "range(13)" --> block7
+  block8 -- "else" --> block0
+  block7 -- "range(12)" --> block6
+  block7 -- "else" --> block3
+  block6 -- "True" --> block5
+  block6 -- "else" --> block4
+  block5 --> block3
+  block4 --> block7
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> block0
+  block1 --> block8
+  block0 --> return
+```
+
+## Function 13
+### Source
+```python
+def func():
+    for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                continue
+
+        x = 3
+        if True:
+            break
+
+    print('hello')
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["print('hello')\n"]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["x = 3\nif True:
+            break\n"]
+  block4[["Loop continue"]]
+  block5["continue\n"]
+  block6["x = 2\nif True:
+                continue\n"]
+  block7["for i in range(12):
+            x = 2
+            if True:
+                continue\n"]
+  block8["for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                continue
+
+        x = 3
+        if True:
+            break\n"]
+
+  start --> block8
+  block8 -- "range(13)" --> block7
+  block8 -- "else" --> block0
+  block7 -- "range(12)" --> block6
+  block7 -- "else" --> block3
+  block6 -- "True" --> block5
+  block6 -- "else" --> block4
+  block5 --> block7
+  block4 --> block7
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> block0
+  block1 --> block8
+  block0 --> return
+```
+
+## Function 14
+### Source
+```python
+def func():
+    for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                break
+
+        x = 3
+        if True:
+            continue
+
+    print('hello')
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["print('hello')\n"]
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["x = 3\nif True:
+            continue\n"]
+  block4[["Loop continue"]]
+  block5["break\n"]
+  block6["x = 2\nif True:
+                break\n"]
+  block7["for i in range(12):
+            x = 2
+            if True:
+                break\n"]
+  block8["for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                break
+
+        x = 3
+        if True:
+            continue\n"]
+
+  start --> block8
+  block8 -- "range(13)" --> block7
+  block8 -- "else" --> block0
+  block7 -- "range(12)" --> block6
+  block7 -- "else" --> block3
+  block6 -- "True" --> block5
+  block6 -- "else" --> block4
+  block5 --> block3
+  block4 --> block7
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> block8
+  block1 --> block8
+  block0 --> return
+```
