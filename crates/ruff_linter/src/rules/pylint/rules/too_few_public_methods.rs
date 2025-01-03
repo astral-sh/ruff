@@ -63,11 +63,19 @@ pub(crate) fn too_few_public_methods(checker: &mut Checker, class_def: &ast::Stm
             break;
         }
         match stmt {
-            ast::Stmt::FunctionDef(node) => {
-                if !has_dunder_init && node.name.to_string() == "__init__" {
+            ast::Stmt::FunctionDef(func_def) => {
+                if !has_dunder_init
+                    && func_def.name.to_string() == "__init__"
+                    && func_def
+                        .parameters
+                        .iter()
+                        // skip `self`
+                        .skip(1)
+                        .all(|param| param.annotation().is_some() && !param.is_variadic())
+                {
                     has_dunder_init = true;
                 }
-                if matches!(visibility::method_visibility(node), Public) {
+                if matches!(visibility::method_visibility(func_def), Public) {
                     public_methods += 1;
                 }
             }
