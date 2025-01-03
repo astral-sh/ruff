@@ -330,8 +330,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`avoidable-escaped-quote`](rules/avoidable-escaped-quote.md) (`Q003`)
 - [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`)
 - [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
-- [`single-line-implicit-string-concatenation`](rules/single-line-implicit-string-concatenation.md) (`ISC001`)
-- [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`)
+- [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`) if used without `ISC001` and `flake8-implicit-str-concat.allow-multiline = false`
 
 While the [`line-too-long`](rules/line-too-long.md) (`E501`) rule _can_ be used alongside the
 formatter, the formatter only makes a best-effort attempt to wrap lines at the configured

@@ -233,7 +233,7 @@ pub(crate) fn format(
 }
 
 /// Format the file at the given [`Path`].
-#[tracing::instrument(level="debug", skip_all, fields(path = %path.display()))]
+#[tracing::instrument(level = "debug", skip_all, fields(path = %path.display()))]
 pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,
@@ -788,8 +788,6 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     let mut incompatible_rules = FxHashSet::default();
     for setting in resolver.settings() {
         for rule in [
-            // The formatter might collapse implicit string concatenation on a single line.
-            Rule::SingleLineImplicitStringConcatenation,
             // Flags missing trailing commas when all arguments are on its own line:
             // ```python
             // def args(
@@ -827,6 +825,19 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
+        }
+
+        if !setting
+            .linter
+            .rules
+            .enabled(Rule::SingleLineImplicitStringConcatenation)
+            && setting
+                .linter
+                .rules
+                .enabled(Rule::MultiLineImplicitStringConcatenation)
+            && !setting.linter.flake8_implicit_str_concat.allow_multiline
+        {
+            warn_user_once!("The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.");
         }
 
         // Validate all rules that rely on tab styles.
