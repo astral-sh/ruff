@@ -7,8 +7,8 @@ testing various type system properties.
 
 The Python language itself allows us to perform a variety of operations on types. For example, we
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]`
-and `type[int]` to create new types. But some type level operations that we rely on in Red Knot,
-like intersections, can not be expressed in Python. The `red_knot` module provides the
+and `type[int]` to create new types. But some type-level operations that we rely on in Red Knot,
+like intersections, cannot yet be expressed in Python. The `red_knot` module provides the
 `Intersection` and `Not` type constructors which allow us to construct these types directly.
 
 ### Negation
@@ -37,12 +37,15 @@ def _() -> None:
 from red_knot import Intersection, Not, is_subtype_of, assert_true
 from typing_extensions import Never
 
-x1: Intersection[int, str]
-x2: Intersection[int, Not[str]]
+class S: ...
+class T: ...
+
+x1: Intersection[S, T]
+x2: Intersection[S, Not[T]]
 
 def x() -> None:
-    reveal_type(x1)  # revealed: int & str
-    reveal_type(x2)  # revealed: int & ~str
+    reveal_type(x1)  # revealed: S & T
+    reveal_type(x2)  # revealed: S & ~T
 
 y1: Intersection[int, object]
 y2: Intersection[int, bool]
