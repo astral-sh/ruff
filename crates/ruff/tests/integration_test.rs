@@ -2126,3 +2126,60 @@ unfixable = ["RUF"]
 
     Ok(())
 }
+
+#[test]
+fn verbose_show_failed_fix_errors() -> Result<()> {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "UP006", "--preview", "-v"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("import typing\nCallable = 'abc'\ndef g() -> typing.Callable: ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:12: UP006 Use `collections.abc.Callable` instead of `typing.Callable` for type annotation
+      |
+    1 | import typing
+    2 | Callable = 'abc'
+    3 | def g() -> typing.Callable: ...
+      |            ^^^^^^^^^^^^^^^ UP006
+      |
+      = help: Replace with `collections.abc.Callable`
+
+    Found 1 error.
+
+    ----- stderr -----
+    [2025-01-03][00:40:50][ruff::resolve][DEBUG] Isolated mode, not reading any pyproject.toml
+    [2025-01-03][00:40:50][ruff_diagnostics::diagnostic][DEBUG] Failed to create fix for NonPEP585Annotation: Unable to insert `Callable` into scope due to name conflict
+    "###);
+
+    Ok(())
+}
+#[test]
+fn no_verbose_hide_failed_fix_errors() -> Result<()> {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "UP006", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("import typing\nCallable = 'abc'\ndef g() -> typing.Callable: ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:12: UP006 Use `collections.abc.Callable` instead of `typing.Callable` for type annotation
+      |
+    1 | import typing
+    2 | Callable = 'abc'
+    3 | def g() -> typing.Callable: ...
+      |            ^^^^^^^^^^^^^^^ UP006
+      |
+      = help: Replace with `collections.abc.Callable`
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
