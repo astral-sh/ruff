@@ -9,7 +9,8 @@ The Python language itself allows us to perform a variety of operations on types
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]`
 and `type[int]` to create new types. But some type-level operations that we rely on in Red Knot,
 like intersections, cannot yet be expressed in Python. The `red_knot` module provides the
-`Intersection` and `Not` type constructors which allow us to construct these types directly.
+`Intersection` and `Not` type constructors (special forms) which allow us to construct these types
+directly.
 
 ### Negation
 
@@ -192,7 +193,7 @@ static_assert(not is_single_valued(int))
 static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
-## Special operations
+## `TypeOf`
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
@@ -259,11 +260,14 @@ is_fully_static(int, int)
 ### Wrong argument number for types and type constructors
 
 ```py
-from red_knot import Not, Unknown
+from red_knot import Not, Unknown, TypeOf
 
-# error: "Special form `red_knot.Unknown` expected no type parameter"
-x: Unknown[str]
+# error: [non-subscriptable]
+u: Unknown[str]
 
 # error: "Expected 1 type argument, got 2"
-y: Not[int, str]
+n: Not[int, str]
+
+# error: "Expected 1 type argument, got 3"
+t: TypeOf[int, str, bytes]
 ```

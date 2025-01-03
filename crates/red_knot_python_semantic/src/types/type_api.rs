@@ -1,6 +1,6 @@
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::types::{Class, IntersectionBuilder, Type};
+use crate::types::{IntersectionBuilder, Type};
 use crate::Db;
 
 use std::result::Result;
@@ -37,32 +37,36 @@ fn expect_one_argument<'db>(
     expect_n_arguments::<1>(arguments).map(|[ty]| ty)
 }
 
-pub(crate) fn resolve_type_operation<'db>(
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum TypeApiSpecialForm {
+    Not,
+    Intersection,
+    TypeOf,
+}
+
+pub(crate) fn resolve_special_form<'db>(
     db: &'db dyn Db,
-    class: Class<'db>,
+    special_form: TypeApiSpecialForm,
     arguments: impl Iterator<Item = Type<'db>>,
-) -> Result<Option<Type<'db>>, TypeApiArgumentsError> {
-    let result = match class.name(db).as_str() {
-        "Not" => {
+) -> Result<Type<'db>, TypeApiArgumentsError> {
+    match special_form {
+        TypeApiSpecialForm::Not => {
             let ty = expect_one_argument(arguments)?;
-            Some(ty.negate(db))
+            Ok(ty.negate(db))
         }
-        "Intersection" => {
+        TypeApiSpecialForm::Intersection => {
             let intersection_ty = arguments
                 .fold(IntersectionBuilder::new(db), |builder, ty| {
                     builder.add_positive(ty)
                 })
                 .build();
-            Some(intersection_ty)
+            Ok(intersection_ty)
         }
-        "TypeOf" => {
+        TypeApiSpecialForm::TypeOf => {
             let ty = expect_one_argument(arguments)?;
-            Some(ty)
+            Ok(ty)
         }
-        _ => None,
-    };
-
-    Ok(result)
+    }
 }
 
 #[derive(Debug)]
@@ -73,7 +77,7 @@ pub(crate) enum TypeApiPredicateError<'db> {
     StaticAssertionError(Type<'db>),
 }
 
-pub(crate) fn resolve_type_predicate<'db>(
+pub(crate) fn resolve_predicate<'db>(
     db: &'db dyn Db,
     function: &str,
     arguments: impl Iterator<Item = Type<'db>>,

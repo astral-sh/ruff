@@ -2596,6 +2596,9 @@ pub enum KnownInstanceType<'db> {
     TypeIs,
     ReadOnly,
     RedKnotUnknown,
+    RedKnotNot,
+    RedKnotIntersection,
+    RedKnotTypeOf,
     // TODO: fill this enum out with more special forms, etc.
 }
 
@@ -2636,6 +2639,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
             Self::RedKnotUnknown => "Unknown",
+            Self::RedKnotNot => "Not",
+            Self::RedKnotIntersection => "Intersection",
+            Self::RedKnotTypeOf => "TypeOf",
         }
     }
 
@@ -2675,7 +2681,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::OrderedDict
             | Self::ReadOnly
             | Self::TypeAliasType(_)
-            | Self::RedKnotUnknown => Truthiness::AlwaysTrue,
+            | Self::RedKnotUnknown
+            | Self::RedKnotNot
+            | Self::RedKnotIntersection
+            | Self::RedKnotTypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2716,6 +2725,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
             Self::RedKnotUnknown => "red_knot.Unknown",
+            Self::RedKnotNot => "red_knot.Not",
+            Self::RedKnotIntersection => "red_knot.Intersection",
+            Self::RedKnotTypeOf => "red_knot.TypeOf",
         }
     }
 
@@ -2755,6 +2767,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::RedKnotTypeOf => KnownClass::SpecialForm,
+            Self::RedKnotNot => KnownClass::SpecialForm,
+            Self::RedKnotIntersection => KnownClass::SpecialForm,
             Self::RedKnotUnknown => KnownClass::Object,
         }
     }
@@ -2802,6 +2817,9 @@ impl<'db> KnownInstanceType<'db> {
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
             "Unknown" => Self::RedKnotUnknown,
+            "Not" => Self::RedKnotNot,
+            "Intersection" => Self::RedKnotIntersection,
+            "TypeOf" => Self::RedKnotTypeOf,
             _ => return None,
         };
 
@@ -2851,7 +2869,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
-            Self::RedKnotUnknown => matches!(module, KnownModule::RedKnot),
+            Self::RedKnotUnknown
+            | Self::RedKnotNot
+            | Self::RedKnotIntersection
+            | Self::RedKnotTypeOf => matches!(module, KnownModule::RedKnot),
         }
     }
 

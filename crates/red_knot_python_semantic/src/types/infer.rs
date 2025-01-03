@@ -60,8 +60,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::type_api::{
-    self, TypeApiArgumentsError, TypeApiPredicateError, TYPE_API_STATIC_ASSERTION_ERROR,
-    TYPE_API_WRONG_ARITY,
+    self, TypeApiArgumentsError, TypeApiPredicateError, TypeApiSpecialForm,
+    TYPE_API_STATIC_ASSERTION_ERROR, TYPE_API_WRONG_ARITY,
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -4193,53 +4193,38 @@ impl<'db> TypeInferenceBuilder<'db> {
         Ok(builder.build())
     }
 
-    fn try_infer_type_api_operation(
+    fn infer_type_api_special_form(
         &mut self,
-        api_type: Type<'db>,
+        special_form: TypeApiSpecialForm,
         arguments: &ast::Expr,
-    ) -> Option<Type<'db>> {
-        match api_type {
-            Type::ClassLiteral(ClassLiteralType { class })
-                if file_to_module(self.db(), class.file(self.db()))
-                    .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
-            {
-                let db = self.db();
+    ) -> Type<'db> {
+        let db = self.db();
 
-                let is_type_of = class.name(db) == "TypeOf";
-
-                let argument_types = match arguments {
-                    ast::Expr::Tuple(tuple) => Either::Left(
-                        tuple
-                            .iter()
-                            .map(|element| self.infer_type_expression(element)),
-                    ),
-                    expr => Either::Right(std::iter::once(if is_type_of {
-                        self.infer_expression(expr)
-                    } else {
-                        self.infer_type_expression(expr)
-                    })),
-                };
-
-                let result = type_api::resolve_type_operation(db, class, argument_types);
-
-                match result {
-                    Ok(ty) => ty,
-                    Err(TypeApiArgumentsError { expected, actual }) => {
-                        self.context.report_lint(
-                            &TYPE_API_WRONG_ARITY,
-                            arguments.into(),
-                            format_args!(
-                                "Expected {expected} type argument{}, got {actual}",
-                                if expected == 1 { "" } else { "s" },
-                            ),
-                        );
-
-                        Some(Type::Unknown)
-                    }
-                }
+        let argument_types = match (special_form, arguments) {
+            (TypeApiSpecialForm::TypeOf, expr) => {
+                Either::Right(std::iter::once(self.infer_expression(expr)))
             }
-            _ => None,
-        }
+            (_, ast::Expr::Tuple(tuple)) => Either::Left(
+                tuple
+                    .iter()
+                    .map(|element| self.infer_type_expression(element)),
+            ),
+            (_, expr) => Either::Right(std::iter::once(self.infer_type_expression(expr))),
+        };
+
+        type_api::resolve_special_form(db, special_form, argument_types).unwrap_or_else(
+            |TypeApiArgumentsError { expected, actual }| {
+                self.context.report_lint(
+                    &TYPE_API_WRONG_ARITY,
+                    arguments.into(),
+                    format_args!(
+                        "Expected {expected} type argument{}, got {actual}",
+                        if expected == 1 { "" } else { "s" },
+                    ),
+                );
+                Type::Unknown
+            },
+        )
     }
 
     fn try_infer_type_api_predicate(
@@ -4264,7 +4249,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 });
 
-                let result = type_api::resolve_type_predicate(db, function_name, argument_types);
+                let result = type_api::resolve_predicate(db, function_name, argument_types);
 
                 match result {
                     Ok(ty) => ty,
@@ -5080,10 +5065,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = subscript;
 
-        if let Some(result) = self.try_infer_type_api_operation(value_ty, slice) {
-            return result;
-        }
-
         match value_ty {
             Type::KnownInstance(known_instance) => {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
@@ -5192,6 +5173,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::Callable => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("Callable types")
+            }
+
+            // Type API special forms
+            KnownInstanceType::RedKnotNot => {
+                self.infer_type_api_special_form(TypeApiSpecialForm::Not, arguments_slice)
+            }
+            KnownInstanceType::RedKnotIntersection => {
+                self.infer_type_api_special_form(TypeApiSpecialForm::Intersection, arguments_slice)
+            }
+            KnownInstanceType::RedKnotTypeOf => {
+                self.infer_type_api_special_form(TypeApiSpecialForm::TypeOf, arguments_slice)
             }
 
             // TODO: Generics

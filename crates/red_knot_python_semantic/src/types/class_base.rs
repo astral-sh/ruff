@@ -94,7 +94,10 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::TypeAlias
                 | KnownInstanceType::ReadOnly
                 | KnownInstanceType::Optional
-                | KnownInstanceType::RedKnotUnknown => None,
+                | KnownInstanceType::RedKnotUnknown
+                | KnownInstanceType::RedKnotNot
+                | KnownInstanceType::RedKnotIntersection
+                | KnownInstanceType::RedKnotTypeOf => None,
                 KnownInstanceType::Any => Some(Self::Any),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {

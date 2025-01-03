@@ -1,18 +1,15 @@
 from typing import _SpecialForm
 
-
 # Special operations
-class TypeOf[T]: ...
-
 def static_assert(x: object) -> None: ...
 
-
-# Type extensions
-class Not[T]: ...
-class Intersection[*Ts]: ...
-
+# Types
 Unknown = object()
 
+# Special forms
+Not: _SpecialForm
+Intersection: _SpecialForm
+TypeOf: _SpecialForm
 
 # Predicates on types
 class _IsEquivalentTo[S, T]: ...
