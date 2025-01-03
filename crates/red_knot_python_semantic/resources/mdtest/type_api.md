@@ -94,6 +94,12 @@ x: Unknown = 1
 
 def _() -> None:
     reveal_type(x)  # revealed: Unknown
+
+# Unknown can be subclassed, just like Any
+class C(Unknown): ...
+
+# revealed: tuple[Literal[C], Unknown, Literal[object]]
+reveal_type(C.__mro__)
 ```
 
 ## Type predicates
