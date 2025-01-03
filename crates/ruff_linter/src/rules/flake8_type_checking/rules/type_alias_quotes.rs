@@ -298,7 +298,7 @@ fn quotes_are_unremovable(
         }) => {
             match op {
                 Operator::BitOr => {
-                    if !semantic.in_stub_file() && settings.target_version < PythonVersion::Py310 {
+                    if settings.target_version < PythonVersion::Py310 {
                         return true;
                     }
                     quotes_are_unremovable(semantic, left, settings)

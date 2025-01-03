@@ -82,7 +82,6 @@ mod tests {
     }
 
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.py"))]
-    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.pyi"))]
     fn type_alias_rules_pre_py310(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "pre_py310_{}_{}",
