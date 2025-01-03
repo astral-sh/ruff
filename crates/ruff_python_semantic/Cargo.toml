@@ -24,6 +24,7 @@ is-macro = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+smallvec = { workspace = true }
 
 [dev-dependencies]
 ruff_python_parser = { workspace = true }

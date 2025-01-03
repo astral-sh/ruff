@@ -321,7 +321,7 @@ impl LintRegistryBuilder {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct LintRegistry {
     lints: Vec<LintId>,
     by_name: FxHashMap<&'static str, LintEntry>,
@@ -374,7 +374,7 @@ impl LintRegistry {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
     #[error("lint {0} has been removed")]
@@ -385,7 +385,7 @@ pub enum GetLintError {
     Unknown(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LintEntry {
     /// An existing lint rule. Can be in preview, stable or deprecated.
     Lint(LintId),
@@ -442,6 +442,11 @@ impl RuleSelection {
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
     pub fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).copied()
+    }
+
+    /// Returns `true` if the `lint` is enabled.
+    pub fn is_enabled(&self, lint: LintId) -> bool {
+        self.severity(lint).is_some()
     }
 
     /// Enables `lint` and configures with the given `severity`.

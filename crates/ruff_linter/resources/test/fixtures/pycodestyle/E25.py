@@ -75,3 +75,7 @@ def pep_696_good[A = int, B: object = str, C:object = memoryview]():
 class PEP696Good[A = int, B: object = str, C:object = memoryview]:
     def pep_696_good_method[A = int, B: object = str, C:object = memoryview](self):
         pass
+
+
+# https://github.com/astral-sh/ruff/issues/15202
+type Coro[T: object = Any] = Coroutine[None, None, T]

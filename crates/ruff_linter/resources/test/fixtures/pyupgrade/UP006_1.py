@@ -8,3 +8,19 @@ if typing.TYPE_CHECKING:
 
 def f(x: typing.DefaultDict[str, str]) -> None:
     ...
+
+
+from collections.abc import Set
+from typing_extensions import Awaitable
+
+
+def f(x: typing.AbstractSet[str]) -> None:
+    ...
+
+
+def f(x: Set) -> None:
+    ...
+
+
+def f(x: Awaitable) -> None:
+    ...

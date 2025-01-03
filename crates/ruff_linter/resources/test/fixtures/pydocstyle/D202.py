@@ -1,4 +1,4 @@
-"""Test: no-blank-line-after-function special-cases around comment handling."""
+"""Test: blank-line-after-function special-cases around comment handling."""
 
 # OK
 def outer():

@@ -27,6 +27,7 @@ use crate::semantic_index::{
     DeclarationsIterator,
 };
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
+use crate::suppression::check_suppressions;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
@@ -45,6 +46,7 @@ mod infer;
 mod mro;
 mod narrow;
 mod signatures;
+mod slots;
 mod string_annotation;
 mod unpacker;
 
@@ -64,6 +66,8 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         let result = infer_scope_types(db, scope_id);
         diagnostics.extend(result.diagnostics());
     }
+
+    check_suppressions(db, file, &mut diagnostics);
 
     diagnostics
 }
@@ -701,13 +705,6 @@ impl<'db> Type<'db> {
         Self::BytesLiteral(BytesLiteralType::new(db, bytes))
     }
 
-    pub fn tuple<T: Into<Type<'db>>>(
-        db: &'db dyn Db,
-        elements: impl IntoIterator<Item = T>,
-    ) -> Self {
-        TupleType::from_elements(db, elements)
-    }
-
     #[must_use]
     pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         IntersectionBuilder::new(db).add_negative(*self).build()
@@ -1206,14 +1203,6 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
 
-            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
-                // TODO: Once we have support for final classes, we can determine disjointness in some cases
-                // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
-                // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
-                // final classes inside `Type::SubclassOf` everywhere.
-                false
-            }
-
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
@@ -1222,6 +1211,14 @@ impl<'db> Type<'db> {
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
                 matches!(ty.bool(db), Truthiness::AlwaysTrue)
+            }
+
+            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
+                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
+                // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
+                // final classes inside `Type::SubclassOf` everywhere.
+                false
             }
 
             (Type::KnownInstance(left), right) => {
@@ -1678,15 +1675,13 @@ impl<'db> Type<'db> {
             Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
-            Type::ClassLiteral(_) => {
-                // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
-                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                Truthiness::Ambiguous
+            Type::ClassLiteral(ClassLiteralType { class }) => {
+                class.metaclass(db).to_instance(db).bool(db)
             }
-            Type::SubclassOf(_) => {
-                // TODO: see above
-                Truthiness::Ambiguous
-            }
+            Type::SubclassOf(SubclassOfType { base }) => base
+                .into_class()
+                .map(|class| Type::class_literal(class).bool(db))
+                .unwrap_or(Truthiness::Ambiguous),
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
             instance_ty @ Type::Instance(InstanceType { class }) => {
@@ -2116,15 +2111,16 @@ impl<'db> Type<'db> {
             Type::Union(UnionType::new(db, elements))
         };
 
-        let version_info_elements = &[
-            Type::IntLiteral(python_version.major.into()),
-            Type::IntLiteral(python_version.minor.into()),
-            int_instance_ty,
-            release_level_ty,
-            int_instance_ty,
-        ];
-
-        Self::tuple(db, version_info_elements)
+        TupleType::from_elements(
+            db,
+            [
+                Type::IntLiteral(python_version.major.into()),
+                Type::IntLiteral(python_version.minor.into()),
+                int_instance_ty,
+                release_level_ty,
+                int_instance_ty,
+            ],
+        )
     }
 
     /// Given a type that is assumed to represent an instance of a class,
@@ -3084,13 +3080,16 @@ pub enum KnownFunction {
     Len,
     /// `typing(_extensions).final`
     Final,
+
+    /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
+    NoTypeCheck,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final => None,
+            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck => None,
         }
     }
 
@@ -3109,6 +3108,9 @@ impl KnownFunction {
             ),
             "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
             "final" if definition.is_typing_definition(db) => Some(KnownFunction::Final),
+            "no_type_check" if definition.is_typing_definition(db) => {
+                Some(KnownFunction::NoTypeCheck)
+            }
             _ => None,
         }
     }
@@ -3427,8 +3429,8 @@ impl<'db> Class<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
-            let tuple_elements: Vec<Type<'db>> = self.iter_mro(db).map(Type::from).collect();
-            return Type::tuple(db, &tuple_elements).into();
+            let tuple_elements = self.iter_mro(db).map(Type::from);
+            return TupleType::from_elements(db, tuple_elements).into();
         }
 
         for superclass in self.iter_mro(db) {
@@ -3838,7 +3840,7 @@ pub(crate) mod tests {
                 }
                 Ty::Tuple(tys) => {
                     let elements = tys.into_iter().map(|ty| ty.into_type(db));
-                    Type::tuple(db, elements)
+                    TupleType::from_elements(db, elements)
                 }
                 Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
                 Ty::SubclassOfUnknown => Type::subclass_of_base(ClassBase::Unknown),

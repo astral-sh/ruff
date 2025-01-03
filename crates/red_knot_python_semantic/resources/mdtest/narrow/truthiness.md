@@ -219,3 +219,97 @@ else:
 # TODO: It should be A. We should improve UnionBuilder or IntersectionBuilder. (issue #15023)
 reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
 ```
+
+## Truthiness of classes
+
+```py
+class MetaAmbiguous(type):
+    def __bool__(self) -> bool: ...
+
+class MetaFalsy(type):
+    def __bool__(self) -> Literal[False]: ...
+
+class MetaTruthy(type):
+    def __bool__(self) -> Literal[True]: ...
+
+class MetaDeferred(type):
+    def __bool__(self) -> MetaAmbiguous: ...
+
+class AmbiguousClass(metaclass=MetaAmbiguous): ...
+class FalsyClass(metaclass=MetaFalsy): ...
+class TruthyClass(metaclass=MetaTruthy): ...
+class DeferredClass(metaclass=MetaDeferred): ...
+
+def _(
+    a: type[AmbiguousClass],
+    t: type[TruthyClass],
+    f: type[FalsyClass],
+    d: type[DeferredClass],
+    ta: type[TruthyClass | AmbiguousClass],
+    af: type[AmbiguousClass] | type[FalsyClass],
+    flag: bool,
+):
+    reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
+    if ta:
+        reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass] & ~AlwaysFalsy
+
+    reveal_type(af)  # revealed: type[AmbiguousClass] | type[FalsyClass]
+    if af:
+        reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
+
+    # TODO: Emit a diagnostic (`d` is not valid in boolean context)
+    if d:
+        # TODO: Should be `Unknown`
+        reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
+
+    tf = TruthyClass if flag else FalsyClass
+    reveal_type(tf)  # revealed: Literal[TruthyClass, FalsyClass]
+
+    if tf:
+        reveal_type(tf)  # revealed: Literal[TruthyClass]
+    else:
+        reveal_type(tf)  # revealed: Literal[FalsyClass]
+```
+
+## Narrowing in chained boolean expressions
+
+```py
+from typing import Literal
+
+class A: ...
+
+def _(x: Literal[0, 1]):
+    reveal_type(x or A())  # revealed: Literal[1] | A
+    reveal_type(x and A())  # revealed: Literal[0] | A
+
+def _(x: str):
+    reveal_type(x or A())  # revealed: str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: str & ~AlwaysTruthy | A
+
+def _(x: bool | str):
+    reveal_type(x or A())  # revealed: Literal[True] | str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: Literal[False] | str & ~AlwaysTruthy | A
+
+class Falsy:
+    def __bool__(self) -> Literal[False]: ...
+
+class Truthy:
+    def __bool__(self) -> Literal[True]: ...
+
+def _(x: Falsy | Truthy):
+    reveal_type(x or A())  # revealed: Truthy | A
+    reveal_type(x and A())  # revealed: Falsy | A
+
+class MetaFalsy(type):
+    def __bool__(self) -> Literal[False]: ...
+
+class MetaTruthy(type):
+    def __bool__(self) -> Literal[True]: ...
+
+class FalsyClass(metaclass=MetaFalsy): ...
+class TruthyClass(metaclass=MetaTruthy): ...
+
+def _(x: type[FalsyClass] | type[TruthyClass]):
+    reveal_type(x or A())  # revealed: type[TruthyClass] | A
+    reveal_type(x and A())  # revealed: type[FalsyClass] | A
+```

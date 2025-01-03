@@ -8,13 +8,15 @@ use ruff_db::{
 use ruff_python_ast::AnyNodeRef;
 use ruff_text_size::Ranged;
 
+use super::{binding_ty, KnownFunction, TypeCheckDiagnostic, TypeCheckDiagnostics};
+
+use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::ScopeId;
 use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
     Db,
 };
-
-use super::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 
 /// Context for inferring the types of a single file.
 ///
@@ -30,17 +32,21 @@ use super::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 /// on the current [`TypeInference`](super::infer::TypeInference) result.
 pub(crate) struct InferContext<'db> {
     db: &'db dyn Db,
+    scope: ScopeId<'db>,
     file: File,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
+    no_type_check: InNoTypeCheck,
     bomb: DebugDropBomb,
 }
 
 impl<'db> InferContext<'db> {
-    pub(crate) fn new(db: &'db dyn Db, file: File) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self {
             db,
-            file,
+            scope,
+            file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
+            no_type_check: InNoTypeCheck::default(),
             bomb: DebugDropBomb::new("`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics."),
         }
     }
@@ -58,9 +64,7 @@ impl<'db> InferContext<'db> {
     where
         T: WithDiagnostics,
     {
-        self.diagnostics
-            .get_mut()
-            .extend(other.diagnostics().iter().cloned());
+        self.diagnostics.get_mut().extend(other.diagnostics());
     }
 
     /// Reports a lint located at `node`.
@@ -68,19 +72,25 @@ impl<'db> InferContext<'db> {
         &self,
         lint: &'static LintMetadata,
         node: AnyNodeRef,
-        message: std::fmt::Arguments,
+        message: fmt::Arguments,
     ) {
+        if !self.db.is_file_open(self.file) {
+            return;
+        }
+
         // Skip over diagnostics if the rule is disabled.
         let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
             return;
         };
 
+        if self.is_in_no_type_check() {
+            return;
+        }
+
         let suppressions = suppressions(self.db, self.file);
 
-        if suppressions
-            .find_suppression(node.range(), LintId::of(lint))
-            .is_some()
-        {
+        if let Some(suppression) = suppressions.find_suppression(node.range(), LintId::of(lint)) {
+            self.diagnostics.borrow_mut().mark_used(suppression.id());
             return;
         }
 
@@ -95,7 +105,7 @@ impl<'db> InferContext<'db> {
         node: AnyNodeRef,
         id: DiagnosticId,
         severity: Severity,
-        message: std::fmt::Arguments,
+        message: fmt::Arguments,
     ) {
         if !self.db.is_file_open(self.file) {
             return;
@@ -106,7 +116,6 @@ impl<'db> InferContext<'db> {
         // * The rule is disabled for this file. We probably want to introduce a new query that
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
-        // * Check for suppression comments, bump a counter if the diagnostic is suppressed.
 
         self.diagnostics.borrow_mut().push(TypeCheckDiagnostic {
             file: self.file,
@@ -115,6 +124,42 @@ impl<'db> InferContext<'db> {
             range: node.range(),
             severity,
         });
+    }
+
+    pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {
+        self.no_type_check = no_type_check;
+    }
+
+    fn is_in_no_type_check(&self) -> bool {
+        match self.no_type_check {
+            InNoTypeCheck::Possibly => {
+                // Accessing the semantic index here is fine because
+                // the index belongs to the same file as for which we emit the diagnostic.
+                let index = semantic_index(self.db, self.file);
+
+                let scope_id = self.scope.file_scope_id(self.db);
+
+                // Inspect all ancestor function scopes by walking bottom up and infer the function's type.
+                let mut function_scope_tys = index
+                    .ancestor_scopes(scope_id)
+                    .filter_map(|(_, scope)| scope.node().as_function())
+                    .filter_map(|function| {
+                        binding_ty(self.db, index.definition(function)).into_function_literal()
+                    });
+
+                // Iterate over all functions and test if any is decorated with `@no_type_check`.
+                function_scope_tys.any(|function_ty| {
+                    function_ty
+                        .decorators(self.db)
+                        .iter()
+                        .filter_map(|decorator| decorator.into_function_literal())
+                        .any(|decorator_ty| {
+                            decorator_ty.is_known(self.db, KnownFunction::NoTypeCheck)
+                        })
+                })
+            }
+            InNoTypeCheck::Yes => true,
+        }
     }
 
     #[must_use]
@@ -134,6 +179,17 @@ impl fmt::Debug for InferContext<'_> {
             .field("defused", &self.bomb)
             .finish()
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub(crate) enum InNoTypeCheck {
+    /// The inference might be in a `no_type_check` block but only if any
+    /// ancestor function is decorated with `@no_type_check`.
+    #[default]
+    Possibly,
+
+    /// The inference is known to be in an `@no_type_check` decorated function.
+    Yes,
 }
 
 pub(crate) trait WithDiagnostics {

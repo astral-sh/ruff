@@ -279,6 +279,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
+                    if checker.enabled(Rule::Airflow3Removal) {
+                        airflow::rules::removed_in_3(checker, expr);
+                    }
                     if checker.enabled(Rule::MixedCaseVariableInGlobalScope) {
                         if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             pep8_naming::rules::mixed_case_variable_in_global_scope(
@@ -983,7 +986,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
             if checker.enabled(Rule::PathConstructorCurrentDirectory) {
-                flake8_use_pathlib::rules::path_constructor_current_directory(checker, expr, func);
+                flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
             }
             if checker.enabled(Rule::OsSepSplit) {
                 flake8_use_pathlib::rules::os_sep_split(checker, call);
@@ -1107,6 +1110,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
                 ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
+            }
+            if checker.enabled(Rule::FalsyDictGetFallback) {
+                ruff::rules::falsy_dict_get_fallback(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryRound) {
+                ruff::rules::unnecessary_round(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryEmptyIterableWithinDequeCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_deque_call(checker, call);

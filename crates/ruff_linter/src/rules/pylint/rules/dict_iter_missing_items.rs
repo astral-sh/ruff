@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 ///
 /// for city, population in data.items():
 ///     print(f"{city} has population {population}.")
+/// ```
 ///
 /// ## Known problems
 /// If the dictionary key is a tuple, e.g.:

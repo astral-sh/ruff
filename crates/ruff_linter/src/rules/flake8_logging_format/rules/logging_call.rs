@@ -181,7 +181,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
 
     // G001 - G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
-    if let Some(format_arg) = call.arguments.find_argument("msg", msg_pos) {
+    if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
         check_msg(checker, format_arg);
     }
 

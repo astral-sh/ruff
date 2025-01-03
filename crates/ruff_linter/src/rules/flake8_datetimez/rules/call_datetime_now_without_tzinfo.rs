@@ -86,7 +86,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast
         return;
     }
 
-    let antipattern = match call.arguments.find_argument("tz", 0) {
+    let antipattern = match call.arguments.find_argument_value("tz", 0) {
         Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,

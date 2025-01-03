@@ -44,9 +44,9 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-pub(crate) struct EndsInPunctuation;
+pub(crate) struct MissingTerminalPunctuation;
 
-impl Violation for EndsInPunctuation {
+impl Violation for MissingTerminalPunctuation {
     /// `None` in the case a fix is never available or otherwise Some
     /// [`FixAvailability`] describing the available fix.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -105,7 +105,7 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
         }
 
         if !trimmed.ends_with(['.', '!', '?']) {
-            let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());
+            let mut diagnostic = Diagnostic::new(MissingTerminalPunctuation, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

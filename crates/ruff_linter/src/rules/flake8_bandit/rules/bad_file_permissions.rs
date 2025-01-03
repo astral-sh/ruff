@@ -71,7 +71,7 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
     {
-        if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
+        if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
             match parse_mask(mode_arg, checker.semantic()) {
                 // The mask couldn't be determined (e.g., it's dynamic).
                 Ok(None) => {}

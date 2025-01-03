@@ -1,14 +1,17 @@
+from datetime import timedelta
+
 from airflow import DAG, dag
-from airflow.timetables.simple import NullTimetable
-
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.providers.standard.operators import trigger_dagrun
-
 from airflow.operators.datetime import BranchDateTimeOperator
-from airflow.providers.standard.operators import datetime
-
-from airflow.sensors.weekday import DayOfWeekSensor, BranchDayOfWeekOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.providers.amazon.aws.log.s3_task_handler import S3TaskHandler
+from airflow.providers.apache.hdfs.log.hdfs_task_handler import HdfsTaskHandler
+from airflow.providers.elasticsearch.log.es_task_handler import ElasticsearchTaskHandler
+from airflow.providers.fab.auth_manager.fab_auth_manager import FabAuthManager
+from airflow.providers.google.cloud.log.gcs_task_handler import GCSTaskHandler
+from airflow.providers.standard.operators import datetime, trigger_dagrun
 from airflow.providers.standard.sensors import weekday
+from airflow.sensors.weekday import BranchDayOfWeekOperator, DayOfWeekSensor
+from airflow.timetables.simple import NullTimetable
 
 DAG(dag_id="class_schedule", schedule="@hourly")
 
@@ -54,10 +57,12 @@ def decorator_deprecated_operator_args():
     )
 
     branch_dt_op = datetime.BranchDateTimeOperator(
-        task_id="branch_dt_op", use_task_execution_day=True
+        task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
     )
     branch_dt_op2 = BranchDateTimeOperator(
-        task_id="branch_dt_op2", use_task_execution_day=True
+        task_id="branch_dt_op2",
+        use_task_execution_day=True,
+        sla=timedelta(seconds=10),
     )
 
     dof_task_sensor = weekday.DayOfWeekSensor(
@@ -76,3 +81,12 @@ def decorator_deprecated_operator_args():
     branch_dt_op >> branch_dt_op2
     dof_task_sensor >> dof_task_sensor2
     bdow_op >> bdow_op2
+
+
+# deprecated filename_template arugment in FileTaskHandler
+S3TaskHandler(filename_template="/tmp/test")
+HdfsTaskHandler(filename_template="/tmp/test")
+ElasticsearchTaskHandler(filename_template="/tmp/test")
+GCSTaskHandler(filename_template="/tmp/test")
+
+FabAuthManager(None)

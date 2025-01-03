@@ -102,7 +102,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 /// line breaks.
 ///
 /// ## Examples
-/// This expression forms one logical line because because the array elements are parenthesized.
+/// This expression forms one logical line because the array elements are parenthesized.
 ///
 /// ```python
 /// a = [
@@ -480,7 +480,8 @@ struct Line {
 enum DefinitionState {
     InClass(TypeParamsState),
     InFunction(TypeParamsState),
-    NotInClassOrFunction,
+    InTypeAlias(TypeParamsState),
+    NotInDefinition,
 }
 
 impl DefinitionState {
@@ -494,11 +495,12 @@ impl DefinitionState {
                 TokenKind::Async if matches!(token_kinds.next(), Some(TokenKind::Def)) => {
                     Self::InFunction(TypeParamsState::default())
                 }
-                _ => Self::NotInClassOrFunction,
+                TokenKind::Type => Self::InTypeAlias(TypeParamsState::default()),
+                _ => Self::NotInDefinition,
             };
             return state;
         }
-        Self::NotInClassOrFunction
+        Self::NotInDefinition
     }
 
     const fn in_function_definition(self) -> bool {
@@ -507,8 +509,10 @@ impl DefinitionState {
 
     const fn type_params_state(self) -> Option<TypeParamsState> {
         match self {
-            Self::InClass(state) | Self::InFunction(state) => Some(state),
-            Self::NotInClassOrFunction => None,
+            Self::InClass(state) | Self::InFunction(state) | Self::InTypeAlias(state) => {
+                Some(state)
+            }
+            Self::NotInDefinition => None,
         }
     }
 
@@ -521,10 +525,10 @@ impl DefinitionState {
 
     fn visit_token_kind(&mut self, token_kind: TokenKind) {
         let type_params_state_mut = match self {
-            Self::InClass(type_params_state) | Self::InFunction(type_params_state) => {
-                type_params_state
-            }
-            Self::NotInClassOrFunction => return,
+            Self::InClass(type_params_state)
+            | Self::InFunction(type_params_state)
+            | Self::InTypeAlias(type_params_state) => type_params_state,
+            Self::NotInDefinition => return,
         };
         match token_kind {
             TokenKind::Lpar if type_params_state_mut.before_type_params() => {

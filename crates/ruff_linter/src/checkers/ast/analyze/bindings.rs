@@ -77,7 +77,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker.enabled(Rule::UnquotedTypeAlias) {
+        if !checker.source_type.is_stub() && checker.enabled(Rule::UnquotedTypeAlias) {
             if let Some(diagnostics) =
                 flake8_type_checking::rules::unquoted_type_alias(checker, binding)
             {

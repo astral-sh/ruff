@@ -1935,6 +1935,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::ATTRIBUTE_DOCSTRING)
     }
 
+    /// Return `true` if the model is in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
+    }
+
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
@@ -2476,6 +2481,23 @@ bitflags! {
         /// assert (y := x**2) > 42, y
         /// ```
         const ASSERT_STATEMENT = 1 << 29;
+
+        /// The model is in a [`@no_type_check`] context.
+        ///
+        /// This is used to skip type checking when the `@no_type_check` decorator is found.
+        ///
+        /// For example (adapted from [#13824]):
+        /// ```python
+        /// from typing import no_type_check
+        ///
+        /// @no_type_check
+        /// def fn(arg: "A") -> "R":
+        ///     pass
+        /// ```
+        ///
+        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
+        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
+        const NO_TYPE_CHECK = 1 << 30;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

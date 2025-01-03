@@ -43,6 +43,8 @@ from typing import cast
 
 y = (
     cast(int, "test" +
+            # TODO: Remove the expected error after implementing `invalid-operator` for binary expressions
+            # error: [unused-ignore-comment]
             2 # type: ignore
     )
     + "other"  # TODO: expected-error[invalid-operator]
@@ -95,12 +97,8 @@ a = test  # type: ignore[name-defined]
 
 ## Nested comments
 
-TODO: We should support this for better interopability with other suppression comments.
-
 ```py
 # fmt: off
-# TODO this error should be suppressed
-# error: [unresolved-reference]
 a = test \
   + 2  # fmt: skip # type: ignore
 
@@ -112,6 +110,7 @@ a = test \
 
 ```py
 # error: [unresolved-reference]
+# error: [invalid-ignore-comment]
 a = test + 2  # type: ignoree
 ```
 
@@ -122,7 +121,42 @@ in Pyright. Neither Ruff, nor mypy support this and neither does Red Knot.
 
 ```py
 # fmt: off
+# error: [unused-ignore-comment]
 a = (  # type: ignore
     test + 4  # error: [unresolved-reference]
 )
+```
+
+## File level suppression
+
+```py
+# type: ignore
+
+a = 10 / 0
+b = a / 0
+```
+
+## File level suppression with leading shebang
+
+```py
+#!/usr/bin/env/python
+# type: ignore
+
+a = 10 / 0
+b = a / 0
+```
+
+## Invalid own-line suppression
+
+```py
+"""
+File level suppressions must come before any non-trivia token,
+including module docstrings. 
+"""
+
+# error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"
+# type: ignore
+
+a = 10 / 0  # error: [division-by-zero]
+b = a / 0  # error: [division-by-zero]
 ```

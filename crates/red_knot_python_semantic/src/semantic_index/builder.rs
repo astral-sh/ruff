@@ -6,10 +6,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast, Pattern};
-use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
@@ -29,7 +28,7 @@ use crate::semantic_index::use_def::{
     FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
 };
 use crate::semantic_index::SemanticIndex;
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackValue};
 use crate::visibility_constraints::VisibilityConstraint;
 use crate::Db;
 
@@ -289,7 +288,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint
     }
 
-    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
+    fn build_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
         let expression = self.add_standalone_expression(constraint_node);
         Constraint {
             node: ConstraintNode::Expression(expression),
@@ -408,11 +407,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
 
         let kind = match pattern {
-            Pattern::MatchValue(pattern) => {
+            ast::Pattern::MatchValue(pattern) => {
                 let value = self.add_standalone_expression(&pattern.value);
                 PatternConstraintKind::Value(value, guard)
             }
-            Pattern::MatchSingleton(singleton) => {
+            ast::Pattern::MatchSingleton(singleton) => {
                 PatternConstraintKind::Singleton(singleton.value, guard)
             }
             _ => PatternConstraintKind::Unsupported,
@@ -810,7 +809,7 @@ where
                                     unsafe {
                                         AstNodeRef::new(self.module.clone(), target)
                                     },
-                                    value,
+                                    UnpackValue::Assign(value),
                                     countme::Count::default(),
                                 )),
                             })
@@ -1021,7 +1020,9 @@ where
                     orelse,
                 },
             ) => {
-                self.add_standalone_expression(iter);
+                debug_assert_eq!(&self.current_assignments, &[]);
+
+                let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
                 self.record_ambiguous_visibility();
@@ -1029,10 +1030,37 @@ where
                 let pre_loop = self.flow_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
-                debug_assert_eq!(&self.current_assignments, &[]);
-                self.push_assignment(for_stmt.into());
+                let current_assignment = match &**target {
+                    ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(CurrentAssignment::For {
+                        node: for_stmt,
+                        first: true,
+                        unpack: Some(Unpack::new(
+                            self.db,
+                            self.file,
+                            self.current_scope(),
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), target)
+                            },
+                            UnpackValue::Iterable(iter_expr),
+                            countme::Count::default(),
+                        )),
+                    }),
+                    ast::Expr::Name(_) => Some(CurrentAssignment::For {
+                        node: for_stmt,
+                        unpack: None,
+                        first: false,
+                    }),
+                    _ => None,
+                };
+
+                if let Some(current_assignment) = current_assignment {
+                    self.push_assignment(current_assignment);
+                }
                 self.visit_expr(target);
-                self.pop_assignment();
+                if current_assignment.is_some() {
+                    self.pop_assignment();
+                }
 
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
@@ -1283,12 +1311,18 @@ where
                         Some(CurrentAssignment::AugAssign(aug_assign)) => {
                             self.add_definition(symbol, aug_assign);
                         }
-                        Some(CurrentAssignment::For(node)) => {
+                        Some(CurrentAssignment::For {
+                            node,
+                            first,
+                            unpack,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 ForStmtDefinitionNodeRef {
+                                    unpack,
+                                    first,
                                     iterable: &node.iter,
-                                    target: name_node,
+                                    name: name_node,
                                     is_async: node.is_async,
                                 },
                             );
@@ -1324,7 +1358,9 @@ where
                     }
                 }
 
-                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                if let Some(
+                    CurrentAssignment::Assign { first, .. } | CurrentAssignment::For { first, .. },
+                ) = self.current_assignment_mut()
                 {
                     *first = false;
                 }
@@ -1455,8 +1491,8 @@ where
                     if index < values.len() - 1 {
                         let constraint = self.build_constraint(value);
                         let (constraint, constraint_id) = match op {
-                            BoolOp::And => (constraint, self.add_constraint(constraint)),
-                            BoolOp::Or => self.add_negated_constraint(constraint),
+                            ast::BoolOp::And => (constraint, self.add_constraint(constraint)),
+                            ast::BoolOp::Or => self.add_negated_constraint(constraint),
                         };
                         let visibility_constraint = self
                             .add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint));
@@ -1566,7 +1602,11 @@ enum CurrentAssignment<'a> {
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
-    For(&'a ast::StmtFor),
+    For {
+        node: &'a ast::StmtFor,
+        first: bool,
+        unpack: Option<Unpack<'a>>,
+    },
     Named(&'a ast::ExprNamed),
     Comprehension {
         node: &'a ast::Comprehension,
@@ -1587,12 +1627,6 @@ impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
     fn from(value: &'a ast::StmtAugAssign) -> Self {
         Self::AugAssign(value)
-    }
-}
-
-impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtFor) -> Self {
-        Self::For(value)
     }
 }
 

@@ -38,14 +38,14 @@ use crate::registry::Rule;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-pub(crate) struct NoBlankLineBeforeFunction {
+pub(crate) struct BlankLineBeforeFunction {
     num_lines: usize,
 }
 
-impl AlwaysFixableViolation for NoBlankLineBeforeFunction {
+impl AlwaysFixableViolation for BlankLineBeforeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLineBeforeFunction { num_lines } = self;
+        let BlankLineBeforeFunction { num_lines } = self;
         format!("No blank lines allowed before function docstring (found {num_lines})")
     }
 
@@ -82,14 +82,14 @@ impl AlwaysFixableViolation for NoBlankLineBeforeFunction {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-pub(crate) struct NoBlankLineAfterFunction {
+pub(crate) struct BlankLineAfterFunction {
     num_lines: usize,
 }
 
-impl AlwaysFixableViolation for NoBlankLineAfterFunction {
+impl AlwaysFixableViolation for BlankLineAfterFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLineAfterFunction { num_lines } = self;
+        let BlankLineAfterFunction { num_lines } = self;
         format!("No blank lines allowed after function docstring (found {num_lines})")
     }
 
@@ -107,7 +107,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         return;
     };
 
-    if checker.enabled(Rule::NoBlankLineBeforeFunction) {
+    if checker.enabled(Rule::BlankLineBeforeFunction) {
         let before = checker
             .locator()
             .slice(TextRange::new(function.start(), docstring.start()));
@@ -127,7 +127,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
         if blank_lines_before != 0 {
             let mut diagnostic = Diagnostic::new(
-                NoBlankLineBeforeFunction {
+                BlankLineBeforeFunction {
                     num_lines: blank_lines_before,
                 },
                 docstring.range(),
@@ -141,7 +141,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         }
     }
 
-    if checker.enabled(Rule::NoBlankLineAfterFunction) {
+    if checker.enabled(Rule::BlankLineAfterFunction) {
         let after = checker
             .locator()
             .slice(TextRange::new(docstring.end(), function.end()));
@@ -181,7 +181,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
         if blank_lines_after != 0 {
             let mut diagnostic = Diagnostic::new(
-                NoBlankLineAfterFunction {
+                BlankLineAfterFunction {
                     num_lines: blank_lines_after,
                 },
                 docstring.range(),

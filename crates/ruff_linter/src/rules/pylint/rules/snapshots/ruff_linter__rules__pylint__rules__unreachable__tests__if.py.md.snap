@@ -1,0 +1,720 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    if False:
+        return 0
+    return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 1\n"]
+  block1["return 0\n"]
+  block2["if False:
+        return 0\n"]
+
+  start --> block2
+  block2 -- "False" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    if True:
+        return 1
+    return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1["return 1\n"]
+  block2["if True:
+        return 1\n"]
+
+  start --> block2
+  block2 -- "True" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func():
+    if False:
+        return 0
+    else:
+        return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2["return 1\n"]
+  block3["if False:
+        return 0
+    else:
+        return 1\n"]
+
+  start --> block3
+  block3 -- "False" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func():
+    if True:
+        return 1
+    else:
+        return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["if True:
+        return 1
+    else:
+        return 0\n"]
+
+  start --> block3
+  block3 -- "True" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func():
+    if False:
+        return 0
+    else:
+        return 1
+    return "unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable#quot;\n"]
+  block1["return 0\n"]
+  block2["return 1\n"]
+  block3["if False:
+        return 0
+    else:
+        return 1\n"]
+
+  start --> block3
+  block3 -- "False" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func():
+    if True:
+        return 1
+    else:
+        return 0
+    return "unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable#quot;\n"]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["if True:
+        return 1
+    else:
+        return 0\n"]
+
+  start --> block3
+  block3 -- "True" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func():
+    if True:
+        if True:
+            return 1
+        return 2
+    else:
+        return 3
+    return "unreachable2"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable2#quot;\n"]
+  block1["return 2\n"]
+  block2["return 1\n"]
+  block3["if True:
+            return 1\n"]
+  block4["return 3\n"]
+  block5["if True:
+        if True:
+            return 1
+        return 2
+    else:
+        return 3\n"]
+
+  start --> block5
+  block5 -- "True" --> block3
+  block5 -- "else" --> block4
+  block4 --> return
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func():
+    if False:
+        return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2["if False:
+        return 0\n"]
+
+  start --> block2
+  block2 -- "False" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func():
+    if True:
+        return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["if True:
+        return 1\n"]
+
+  start --> block2
+  block2 -- "True" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 9
+### Source
+```python
+def func():
+    if True:
+        return 1
+    elif False:
+        return 2
+    else:
+        return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["return 2\n"]
+  block4["if True:
+        return 1
+    elif False:
+        return 2
+    else:
+        return 0\n"]
+  block5["if True:
+        return 1
+    elif False:
+        return 2
+    else:
+        return 0\n"]
+
+  start --> block5
+  block5 -- "True" --> block1
+  block5 -- "else" --> block4
+  block4 -- "False" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 10
+### Source
+```python
+def func():
+    if False:
+        return 1
+    elif True:
+        return 2
+    else:
+        return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["return 2\n"]
+  block4["if False:
+        return 1
+    elif True:
+        return 2
+    else:
+        return 0\n"]
+  block5["if False:
+        return 1
+    elif True:
+        return 2
+    else:
+        return 0\n"]
+
+  start --> block5
+  block5 -- "False" --> block1
+  block5 -- "else" --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 11
+### Source
+```python
+def func():
+    if True:
+        if False:
+            return 0
+        elif True:
+            return 1
+        else:
+            return 2
+        return 3
+    elif True:
+        return 4
+    else:
+        return 5
+    return 6
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 6\n"]
+  block1["return 3\n"]
+  block2["return 0\n"]
+  block3["return 2\n"]
+  block4["return 1\n"]
+  block5["if False:
+            return 0
+        elif True:
+            return 1
+        else:
+            return 2\n"]
+  block6["if False:
+            return 0
+        elif True:
+            return 1
+        else:
+            return 2\n"]
+  block7["return 5\n"]
+  block8["return 4\n"]
+  block9["if True:
+        if False:
+            return 0
+        elif True:
+            return 1
+        else:
+            return 2
+        return 3
+    elif True:
+        return 4
+    else:
+        return 5\n"]
+  block10["if True:
+        if False:
+            return 0
+        elif True:
+            return 1
+        else:
+            return 2
+        return 3
+    elif True:
+        return 4
+    else:
+        return 5\n"]
+
+  start --> block10
+  block10 -- "True" --> block6
+  block10 -- "else" --> block9
+  block9 -- "True" --> block8
+  block9 -- "else" --> block7
+  block8 --> return
+  block7 --> return
+  block6 -- "False" --> block2
+  block6 -- "else" --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block3
+  block4 --> return
+  block3 --> return
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 12
+### Source
+```python
+def func():
+    if False:
+        return "unreached"
+    elif False:
+        return "also unreached"
+    return "reached"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;reached#quot;\n"]
+  block1["return #quot;unreached#quot;\n"]
+  block2["return #quot;also unreached#quot;\n"]
+  block3["if False:
+        return #quot;unreached#quot;
+    elif False:
+        return #quot;also unreached#quot;\n"]
+  block4["if False:
+        return #quot;unreached#quot;
+    elif False:
+        return #quot;also unreached#quot;\n"]
+
+  start --> block4
+  block4 -- "False" --> block1
+  block4 -- "else" --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 13
+### Source
+```python
+def func(self, obj: BytesRep) -> bytes:
+    data = obj["data"]
+
+    if isinstance(data, str):
+        return base64.b64decode(data)
+    elif isinstance(data, Buffer):
+        buffer = data
+    else:
+        id = data["id"]
+
+        if id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f"can't resolve buffer '{id}'")
+
+    return buffer.data
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return buffer.data\n"]
+  block1["return base64.b64decode(data)\n"]
+  block2["buffer = self._buffers[id]\n"]
+  block3["self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+  block4["id = data[#quot;id#quot;]\nif id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+  block5["buffer = data\n"]
+  block6["if isinstance(data, str):
+        return base64.b64decode(data)
+    elif isinstance(data, Buffer):
+        buffer = data
+    else:
+        id = data[#quot;id#quot;]
+
+        if id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+  block7["data = obj[#quot;data#quot;]\nif isinstance(data, str):
+        return base64.b64decode(data)
+    elif isinstance(data, Buffer):
+        buffer = data
+    else:
+        id = data[#quot;id#quot;]
+
+        if id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+
+  start --> block7
+  block7 -- "isinstance(data, str)" --> block1
+  block7 -- "else" --> block6
+  block6 -- "isinstance(data, Buffer)" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "id in self._buffers" --> block2
+  block4 -- "else" --> block3
+  block3 --> block0
+  block2 --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 14
+### Source
+```python
+def func(x):
+    if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 6\n"]
+  block3["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block4["return 5\n"]
+  block5["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block6["return 4\n"]
+  block7["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block8["return 3\n"]
+  block9["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block10["return 2\n"]
+  block11["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block12["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+
+  start --> block12
+  block12 -- "x == 1" --> block1
+  block12 -- "else" --> block11
+  block11 -- "False" --> block10
+  block11 -- "else" --> block9
+  block10 --> return
+  block9 -- "x == 3" --> block8
+  block9 -- "else" --> block7
+  block8 --> return
+  block7 -- "True" --> block6
+  block7 -- "else" --> block5
+  block6 --> return
+  block5 -- "x == 5" --> block4
+  block5 -- "else" --> block3
+  block4 --> return
+  block3 -- "x == 6" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 15
+### Source
+```python
+def func():
+    if x:
+        return
+    else:
+        assert x
+
+    print('pop')
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["print('pop')\n"]
+  block1["return\n"]
+  block2[["Exception raised"]]
+  block3["assert x\n"]
+  block4["if x:
+        return
+    else:
+        assert x\n"]
+
+  start --> block4
+  block4 -- "x" --> block1
+  block4 -- "else" --> block3
+  block3 -- "x" --> block0
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```

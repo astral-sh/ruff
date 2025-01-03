@@ -2,7 +2,7 @@ use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
@@ -1819,6 +1819,21 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Common examples include Pydantic's `@pydantic.validate_call` decorator
     /// (for functions) and attrs' `@attrs.define` decorator (for classes).
+    ///
+    /// This also supports framework decorators like FastAPI's `fastapi.FastAPI.get`
+    /// which will work across assignments in the same module.
+    ///
+    /// For example:
+    /// ```python
+    /// import fastapi
+    ///
+    /// app = FastAPI("app")
+    ///
+    /// @app.get("/home")
+    /// def home() -> str: ...
+    /// ```
+    ///
+    /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -2836,6 +2851,16 @@ pub struct PydocstyleOptions {
         "#
     )]
     pub property_decorators: Option<Vec<String>>,
+
+    /// If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            ignore_var_parameters = true
+        "#
+    )]
+    pub ignore_var_parameters: Option<bool>,
 }
 
 impl PydocstyleOptions {
@@ -2844,12 +2869,14 @@ impl PydocstyleOptions {
             convention,
             ignore_decorators,
             property_decorators,
+            ignore_var_parameters: ignore_variadics,
         } = self;
-        pydocstyle::settings::Settings::new(
+        pydocstyle::settings::Settings {
             convention,
-            ignore_decorators.unwrap_or_default(),
-            property_decorators.unwrap_or_default(),
-        )
+            ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
+            ignore_var_parameters: ignore_variadics.unwrap_or_default(),
+        }
     }
 }
 
@@ -3494,15 +3521,15 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub detect_string_imports: Option<bool>,
-    /// A map from file path to the list of file paths or globs that should be considered
-    /// dependencies of that file, regardless of whether relevant imports are detected.
+    /// A map from file path to the list of Python or non-Python file paths or globs that should be
+    /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
         default = "{}",
+        scope = "include-dependencies",
         value_type = "dict[str, list[str]]",
         example = r#"
-            include-dependencies = {
-                "foo/bar.py": ["foo/baz/*.py"],
-            }
+            "foo/bar.py" = ["foo/baz/*.py"]
+            "foo/baz/reader.py" = ["configs/bar.json"]
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,

@@ -50,8 +50,10 @@ if sys.platform == "linux":
     class EpollSelector(_PollLikeSelector):
         def fileno(self) -> int: ...
 
-class DevpollSelector(_PollLikeSelector):
-    def fileno(self) -> int: ...
+if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win32":
+    # Solaris only
+    class DevpollSelector(_PollLikeSelector):
+        def fileno(self) -> int: ...
 
 if sys.platform != "win32" and sys.platform != "linux":
     class KqueueSelector(_BaseSelectorImpl):

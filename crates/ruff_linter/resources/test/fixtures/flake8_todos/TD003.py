@@ -5,6 +5,12 @@
 # TODO: this comment has an issue
 # TDO-3870
 
+# TODO: the link has an issue code of the minimum length
+# T-001
+
+# TODO: the issue code can be arbitrarily long
+# ABCDEFGHIJKLMNOPQRSTUVWXYZ-001
+
 # TDO003 - errors
 # TODO: this comment has no
 # link after it

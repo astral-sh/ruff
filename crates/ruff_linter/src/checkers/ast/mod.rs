@@ -449,6 +449,13 @@ impl<'a> Checker<'a> {
             match_fn(expr)
         }
     }
+
+    /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
+    pub(crate) fn push_type_diagnostic(&mut self, diagnostic: Diagnostic) {
+        if !self.semantic.in_no_type_check() {
+            self.diagnostics.push(diagnostic);
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -724,6 +731,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // deferred.
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
+
+                    if self
+                        .semantic
+                        .match_typing_expr(&decorator.expression, "no_type_check")
+                    {
+                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
+                    }
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
@@ -1282,7 +1296,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
 
-                            if self.enabled(Rule::RuntimeCastValue) {
+                            if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
                                 flake8_type_checking::rules::runtime_cast_value(self, arg);
                             }
                         }
@@ -1503,6 +1517,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 self.visit_expr_context(ctx);
                             } else {
                                 debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                            }
+                        }
+                        Some(typing::SubscriptKind::TypedDict) => {
+                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = slice.as_ref() {
+                                for item in items {
+                                    if let Some(key) = &item.key {
+                                        self.visit_non_type_definition(key);
+                                        self.visit_type_definition(&item.value);
+                                    } else {
+                                        self.visit_non_type_definition(&item.value);
+                                    }
+                                }
+                            } else {
+                                self.visit_non_type_definition(slice);
                             }
                         }
                         None => {
@@ -2334,8 +2362,10 @@ impl<'a> Checker<'a> {
                     }
                     self.parsed_type_annotation = None;
                 } else {
+                    self.semantic.restore(snapshot);
+
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                        self.diagnostics.push(Diagnostic::new(
+                        self.push_type_diagnostic(Diagnostic::new(
                             pyflakes::rules::ForwardAnnotationSyntaxError {
                                 body: string_expr.value.to_string(),
                             },

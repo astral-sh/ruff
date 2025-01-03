@@ -325,6 +325,10 @@ class _ASN1Object(_ASN1ObjectBase):
     def fromname(cls, name: str) -> Self: ...
 
 class Purpose(_ASN1Object, enum.Enum):
+    # Normally this class would inherit __new__ from _ASN1Object, but
+    # because this is an enum, the inherited __new__ is replaced at runtime with
+    # Enum.__new__.
+    def __new__(cls, value: object) -> Self: ...
     SERVER_AUTH = (129, "serverAuth", "TLS Web Server Authentication", "1.3.6.1.5.5.7.3.2")  # pyright: ignore[reportCallIssue]
     CLIENT_AUTH = (130, "clientAuth", "TLS Web Client Authentication", "1.3.6.1.5.5.7.3.1")  # pyright: ignore[reportCallIssue]
 

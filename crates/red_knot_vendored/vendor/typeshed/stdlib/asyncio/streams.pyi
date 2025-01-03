@@ -9,6 +9,7 @@ from typing_extensions import Self, TypeAlias
 from . import events, protocols, transports
 from .base_events import Server
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.platform == "win32":
     __all__ = ("StreamReader", "StreamWriter", "StreamReaderProtocol", "open_connection", "start_server")
 else:

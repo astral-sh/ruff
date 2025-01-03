@@ -3,6 +3,7 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
+use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, KnownModule, Module};
@@ -33,14 +34,21 @@ mod visibility_constraints;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 
-/// Creates a new registry with all known semantic lints.
-pub fn default_lint_registry() -> LintRegistry {
-    let mut registry = LintRegistryBuilder::default();
-    register_lints(&mut registry);
-    registry.build()
+/// Returns the default registry with all known semantic lints.
+pub fn default_lint_registry() -> &'static LintRegistry {
+    static REGISTRY: std::sync::LazyLock<LintRegistry> = std::sync::LazyLock::new(|| {
+        let mut registry = LintRegistryBuilder::default();
+        register_lints(&mut registry);
+        registry.build()
+    });
+
+    &REGISTRY
 }
 
 /// Register all known semantic lints.
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
+    registry.register_lint(&UNUSED_IGNORE_COMMENT);
+    registry.register_lint(&UNKNOWN_RULE);
+    registry.register_lint(&INVALID_IGNORE_COMMENT);
 }

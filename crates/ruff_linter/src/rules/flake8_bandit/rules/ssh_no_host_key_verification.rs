@@ -53,7 +53,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    let Some(policy_argument) = call.arguments.find_argument("policy", 0) else {
+    let Some(policy_argument) = call.arguments.find_argument_value("policy", 0) else {
         return;
     };
 
