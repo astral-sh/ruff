@@ -4279,9 +4279,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         Some(Type::Unknown)
                     }
-                    Err(TypeApiPredicateError::StaticAssertionError(Type::Instance(class)))
-                        if class.class.is_known(db, KnownClass::Bool) =>
-                    {
+                    Err(TypeApiPredicateError::StaticAssertionError(Type::Instance(
+                        instance_ty,
+                    ))) if instance_ty.class.is_known(db, KnownClass::Bool) => {
                         self.context.report_lint(
                             &TYPE_API_STATIC_ASSERTION_ERROR,
                             arguments.into(),
