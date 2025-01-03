@@ -713,13 +713,13 @@ impl<'a> SemanticModel<'a> {
     pub fn simulate_runtime_load(
         &self,
         name: &ast::ExprName,
-        allow_typing_only_bindings: bool,
+        typing_only_bindings_status: TypingOnlyBindingsStatus,
     ) -> Option<BindingId> {
         self.simulate_runtime_load_at_location_in_scope(
             name.id.as_str(),
             name.range,
             self.scope_id,
-            allow_typing_only_bindings,
+            typing_only_bindings_status,
         )
     }
 
@@ -752,7 +752,7 @@ impl<'a> SemanticModel<'a> {
         symbol: &str,
         symbol_range: TextRange,
         scope_id: ScopeId,
-        allow_typing_only_bindings: bool,
+        typing_only_bindings_status: TypingOnlyBindingsStatus,
     ) -> Option<BindingId> {
         let mut seen_function = false;
         let mut class_variables_visible = true;
@@ -795,7 +795,9 @@ impl<'a> SemanticModel<'a> {
                     // runtime binding with a source-order inaccurate one
                     for shadowed_id in scope.shadowed_bindings(binding_id) {
                         let binding = &self.bindings[shadowed_id];
-                        if !allow_typing_only_bindings && binding.context.is_typing() {
+                        if typing_only_bindings_status.is_disallowed()
+                            && binding.context.is_typing()
+                        {
                             continue;
                         }
                         if let BindingKind::Annotation
@@ -830,7 +832,7 @@ impl<'a> SemanticModel<'a> {
                         _ => binding_id,
                     };
 
-                    if !allow_typing_only_bindings
+                    if typing_only_bindings_status.is_disallowed()
                         && self.bindings[candidate_id].context.is_typing()
                     {
                         continue;
@@ -2062,6 +2064,32 @@ impl ShadowedBinding {
 
     pub const fn same_scope(&self) -> bool {
         self.same_scope
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypingOnlyBindingsStatus {
+    Allowed,
+    Disallowed,
+}
+
+impl TypingOnlyBindingsStatus {
+    pub const fn is_allowed(self) -> bool {
+        matches!(self, TypingOnlyBindingsStatus::Allowed)
+    }
+
+    pub const fn is_disallowed(self) -> bool {
+        matches!(self, TypingOnlyBindingsStatus::Disallowed)
+    }
+}
+
+impl From<bool> for TypingOnlyBindingsStatus {
+    fn from(value: bool) -> Self {
+        if value {
+            TypingOnlyBindingsStatus::Allowed
+        } else {
+            TypingOnlyBindingsStatus::Disallowed
+        }
     }
 }
 

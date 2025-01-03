@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailab
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
-use ruff_python_semantic::{Binding, SemanticModel};
+use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_literal};
 use ruff_text_size::Ranged;
 
@@ -221,7 +221,7 @@ fn collect_typing_references<'a>(
             };
             if checker
                 .semantic()
-                .simulate_runtime_load(name, false)
+                .simulate_runtime_load(name, TypingOnlyBindingsStatus::Disallowed)
                 .is_some()
             {
                 return;
@@ -322,7 +322,7 @@ fn quotes_are_unremovable(semantic: &SemanticModel, expr: &Expr) -> bool {
         Expr::Name(name) => {
             semantic.resolve_name(name).is_some()
                 && semantic
-                    .simulate_runtime_load(name, semantic.in_type_checking_block())
+                    .simulate_runtime_load(name, semantic.in_type_checking_block().into())
                     .is_none()
         }
         _ => false,

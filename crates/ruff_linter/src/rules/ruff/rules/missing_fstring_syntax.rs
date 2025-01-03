@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
-use ruff_python_semantic::{Modules, SemanticModel};
+use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -216,7 +216,7 @@ fn should_be_fstring(
                         id,
                         literal.range(),
                         semantic.scope_id,
-                        false,
+                        TypingOnlyBindingsStatus::Disallowed,
                     )
                     .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
