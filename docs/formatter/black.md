@@ -215,6 +215,8 @@ c = "\U0001f977"
 d = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
 ```
 
+Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
+
 ### Module docstrings
 
 Ruff formats module docstrings similar to class or function docstrings, whereas Black does not.
@@ -234,32 +236,133 @@ Ruff formats module docstrings similar to class or function docstrings, whereas 
 """Module docstring"""
 
 ```
+Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
 
+### F-strings
 
-### Walruses in slice expressions
-
-Black avoids inserting space around `:=` operators within slices. For example, the following adheres
-to Black stable style:
+Ruff formats expression parts in f-strings whereas Black does not:
 
 ```python
 # Input
-x[y:=1]
+f'test{inner   + "nested_string"} including math {5 ** 3 + 10}'
 
 # Black
-x[y:=1]
+f'test{inner   + "nested_string"} including math {5 ** 3 + 10}'
+
+# Ruff
+f"test{inner + 'nested_string'} including math {5**3 + 10}"
 ```
 
-Ruff will instead add space around the `:=` operator:
+### Implicit concatenated strings
+
+Ruff merges implicitly concatenated strings if the entire string fits on a single line:
 
 ```python
 # Input
-x[y:=1]
+def test(max_history):
+    raise argparse.ArgumentTypeError(
+        f"The value of `--max-history {max_history}` " f"is not a positive integer."
+    )
+
+# Black
+def test(max_history):
+    raise argparse.ArgumentTypeError(
+        f"The value of `--max-history {max_history}` " f"is not a positive integer."
+    )
 
 # Ruff
-x[y := 1]
+def test(max_history):
+    raise argparse.ArgumentTypeError(
+        f"The value of `--max-history {max_history}` is not a positive integer."
+    )
 ```
 
-This will likely be incorporated into Black's preview style ([#3823](https://github.com/psf/black/pull/3823)).
+Black's unstable style applies the same formatting.
+
+There are few rare cases where Ruff can't merge the implicitly concatenated strings automatically.
+In those cases, Ruff preserves if the implicit concatenated strings are formatted over multiple lines:
+
+```python
+# Input
+a = (
+    r"aaaaaaa"
+    "bbbbbbbbbbbb"
+)
+
+# Black
+a = r"aaaaaaa" "bbbbbbbbbbbb"
+
+# Ruff
+a = (
+    r"aaaaaaa"
+    "bbbbbbbbbbbb"
+)
+```
+
+This ensures compatibility with `ISC001` ([#8272](https://github.com/astral-sh/ruff/issues/8272)).
+
+### `assert` statements
+
+Unlike Black, Ruff prefers breaking the message over breaking the assertion, similar to how both Ruff and Black prefer breaking the assignment value over breaking the assignment target:
+
+```python
+# Input
+assert (
+    len(policy_types) >= priority + num_duplicates
+), f"This tests needs at least {priority+num_duplicates} many types."
+
+
+# Black
+assert (
+    len(policy_types) >= priority + num_duplicates
+), f"This tests needs at least {priority+num_duplicates} many types."
+
+# Ruff
+assert len(policy_types) >= priority + num_duplicates, (
+    f"This tests needs at least {priority + num_duplicates} many types."
+)
+```
+
+### Parentheses around `if`-guards in `match` statements
+Ruff automatically parenthesizes overlong `if` guards and it also removes parentheses if they're no longer required.
+
+```python
+# Input
+match some_variable:
+    case "short-guard" if (
+        other_condition
+    ):
+        pass
+
+    case "long-guard" if other_condition or some_long_call_expression(with_may, arguments) or last_condition:
+        pass
+
+
+# Black
+match some_variable:
+    case "short-guard" if (other_condition):
+        pass
+
+    case "long-guard" if other_condition or some_long_call_expression(
+        with_may, arguments
+    ) or last_condition:
+        pass
+
+    
+# Ruff
+match some_variable:
+    case "short-guard" if other_condition:
+        pass
+
+    case "long-guard" if (
+        other_condition
+        or some_long_call_expression(with_may, arguments)
+        or last_condition
+    ):
+        pass
+```
+
+Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
 
 ### `global` and `nonlocal` names are broken across multiple lines by continuations
 
@@ -308,6 +411,8 @@ class IntFromGeom(GEOSFuncFactory):
     restype = c_int
     errcheck = staticmethod(check_minus_one)
 ```
+
+Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
 
 ### Trailing own-line comments on imports are not moved to the next line
 
@@ -385,9 +490,7 @@ would instead format the above as:
 
 ```python
 print(
-    "aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(
-        bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb
-    )
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb)
 )
 ```
 
@@ -528,6 +631,8 @@ def func(
 
 Ruff will instead insert a trailing comma in all such cases for consistency.
 
+Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
+
 ### Parentheses around call-chain assignment values are not preserved
 
 Given:
@@ -649,6 +754,65 @@ assert AAAAAAAAAAAAAAAAAAAAAA.bbbbbb.fooo(
 ).ccccc() == (len(aaaaaaaaaa) + 1) * fooooooooooo * (
     foooooo + 1
 ) * foooooo * len(list(foo(bar(4, foo), foo)))
+```
+
+### Single `with` item targeting Python 3.8 or older
+
+Unlike Black, Ruff uses the same layout for `with` statements with a single context manager as it does for `while`, `if` and other compound statements:
+
+```python
+# Input
+def run(data_path, model_uri):
+    with pyspark.sql.SparkSession.builder.config(
+        key="spark.python.worker.reuse", value=True
+    ).config(key="spark.ui.enabled", value=False).master(
+        "local-cluster[2, 1, 1024]"
+    ).getOrCreate():
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+
+# Black
+def run(data_path, model_uri):
+    with pyspark.sql.SparkSession.builder.config(
+        key="spark.python.worker.reuse", value=True
+    ).config(key="spark.ui.enabled", value=False).master(
+        "local-cluster[2, 1, 1024]"
+    ).getOrCreate():
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+
+# Ruff
+def run(data_path, model_uri):
+    with (
+        pyspark.sql.SparkSession.builder.config(
+            key="spark.python.worker.reuse", value=True
+        )
+        .config(key="spark.ui.enabled", value=False)
+        .master("local-cluster[2, 1, 1024]")
+        .getOrCreate()
+    ):
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+```
+
+Ruff's formatting matches the formatting of other compound statements:
+
+```python
+def test():
+    if (
+        pyspark.sql.SparkSession.builder.config(
+            key="spark.python.worker.reuse", value=True
+        )
+        .config(key="spark.ui.enabled", value=False)
+        .master("local-cluster[2, 1, 1024]")
+        .getOrCreate()
+    ):
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
 ```
 
 ### The last context manager in a `with` statement may be collapsed onto a single line
