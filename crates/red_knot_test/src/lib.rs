@@ -6,10 +6,11 @@ use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::Program;
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
+use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
-use ruff_source_file::LineIndex;
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextSize;
 use salsa::Setter;
 
@@ -136,7 +137,20 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 })
                 .collect();
 
-            let type_diagnostics = check_types(db, test_file.file);
+            let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
+                Ok(type_diagnostics) => type_diagnostics,
+                Err(info) => {
+                    let mut by_line = matcher::FailuresByLine::default();
+                    by_line.push(
+                        OneIndexed::from_zero_indexed(0),
+                        info.info.split('\n').map(String::from).collect(),
+                    );
+                    return Some(FileFailures {
+                        backtick_offset: test_file.backtick_offset,
+                        by_line,
+                    });
+                }
+            };
             diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
                 let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
                 diagnostic

@@ -15,6 +15,7 @@ use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
 
+use ruff_db::panic::{catch_unwind, PanicError};
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::{DisplayParseError, LogLevel};
@@ -32,7 +33,6 @@ use ruff_workspace::FormatterSettings;
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
-use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
 

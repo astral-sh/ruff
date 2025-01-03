@@ -27,7 +27,7 @@ impl FailuresByLine {
         })
     }
 
-    fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
+    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
         let start = self.failures.len();
         self.failures.extend(messages);
         self.lines.push(LineFailures {
