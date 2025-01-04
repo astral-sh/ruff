@@ -56,6 +56,7 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_3.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
