@@ -816,8 +816,8 @@ impl<'db> Type<'db> {
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (left, Type::AlwaysFalsy) => matches!(left.bool(db), Truthiness::AlwaysFalse),
-            (left, Type::AlwaysTruthy) => matches!(left.bool(db), Truthiness::AlwaysTrue),
+            (left, Type::AlwaysFalsy) => left.bool(db).is_always_false(),
+            (left, Type::AlwaysTruthy) => left.bool(db).is_always_true(),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
                 target.is_equivalent_to(db, KnownClass::Object.to_instance(db))
@@ -1157,7 +1157,7 @@ impl<'db> Type<'db> {
                 // multiply-inherit `type` or a subclass of it, and thus not be disjoint with
                 // `type[...]`.) Until we support finality, hardcode None, which is known to be
                 // final.
-                matches!(instance.class.known(db), Some(KnownClass::NoneType))
+                instance.class.is_known(db, KnownClass::NoneType)
             }
 
             (
@@ -1186,11 +1186,11 @@ impl<'db> Type<'db> {
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
-                matches!(ty.bool(db), Truthiness::AlwaysFalse)
+                ty.bool(db).is_always_false()
             }
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
-                matches!(ty.bool(db), Truthiness::AlwaysTrue)
+                ty.bool(db).is_always_true()
             }
 
             (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
