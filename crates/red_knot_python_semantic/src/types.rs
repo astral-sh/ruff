@@ -1194,12 +1194,12 @@ impl<'db> Type<'db> {
                 ty.bool(db).is_always_true()
             }
 
-            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
-                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+            (Type::SubclassOf(_), other) | (other, Type::SubclassOf(_)) => {
+                // TODO: Once we have support for final classes, we can determine disjointness in more cases
                 // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
                 // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
                 // final classes inside `Type::SubclassOf` everywhere.
-                false
+                other.is_disjoint_from(db, KnownClass::Type.to_instance(db))
             }
 
             (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))
@@ -4180,6 +4180,7 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::LiteralString)]
     #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     #[test_case(Ty::Tuple(vec![]), Ty::TypingLiteral)]
+    #[test_case(Ty::TypingLiteral, Ty::SubclassOfBuiltinClass("object"))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
