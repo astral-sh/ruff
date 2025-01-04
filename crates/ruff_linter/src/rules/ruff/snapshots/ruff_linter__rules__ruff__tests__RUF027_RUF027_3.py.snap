@@ -122,7 +122,7 @@ RUF027_3.py:12:7: RUF027 [*] Possible f-string without an `f` prefix
    12 |+print(f"{foo[lorem].ipsum()}")
 13 13 | print("{foo.dolor[sit]().amet}")
 14 14 | 
-15 15 | 
+15 15 | print("{id(foo)}")
 
 RUF027_3.py:13:7: RUF027 [*] Possible f-string without an `f` prefix
    |
@@ -130,6 +130,8 @@ RUF027_3.py:13:7: RUF027 [*] Possible f-string without an `f` prefix
 12 | print("{foo[lorem].ipsum()}")
 13 | print("{foo.dolor[sit]().amet}")
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+14 | 
+15 | print("{id(foo)}")
    |
    = help: Add `f` prefix
 
@@ -140,5 +142,43 @@ RUF027_3.py:13:7: RUF027 [*] Possible f-string without an `f` prefix
 13    |-print("{foo.dolor[sit]().amet}")
    13 |+print(f"{foo.dolor[sit]().amet}")
 14 14 | 
-15 15 | 
-16 16 | ## No errors
+15 15 | print("{id(foo)}")
+16 16 | print("{__path__}")
+
+RUF027_3.py:15:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+13 | print("{foo.dolor[sit]().amet}")
+14 | 
+15 | print("{id(foo)}")
+   |       ^^^^^^^^^^^ RUF027
+16 | print("{__path__}")
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+12 12 | print("{foo[lorem].ipsum()}")
+13 13 | print("{foo.dolor[sit]().amet}")
+14 14 | 
+15    |-print("{id(foo)}")
+   15 |+print(f"{id(foo)}")
+16 16 | print("{__path__}")
+17 17 | 
+18 18 | 
+
+RUF027_3.py:16:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+15 | print("{id(foo)}")
+16 | print("{__path__}")
+   |       ^^^^^^^^^^^^ RUF027
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+13 13 | print("{foo.dolor[sit]().amet}")
+14 14 | 
+15 15 | print("{id(foo)}")
+16    |-print("{__path__}")
+   16 |+print(f"{__path__}")
+17 17 | 
+18 18 | 
+19 19 | ## No errors

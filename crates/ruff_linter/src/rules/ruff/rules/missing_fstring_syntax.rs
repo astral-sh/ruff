@@ -4,6 +4,7 @@ use rustc_hash::FxHashSet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
@@ -204,20 +205,23 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.expressions() {
-            if let Some(id) = left_most_name(element.expression.as_ref()) {
+            let expr = element.expression.as_ref();
+            if let Some(id) = left_most_name(expr) {
                 if arg_names.contains(id) {
                     return false;
                 }
-                if semantic
-                    // the parsed expression nodes have incorrect ranges
-                    // so we need to use the range of the literal for the
-                    // lookup in order to get reasonable results.
-                    .simulate_runtime_load_at_location_in_scope(
-                        id,
-                        literal.range(),
-                        semantic.scope_id,
-                    )
-                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
+                if !matches!(expr, ast::Expr::Call(_))
+                    && !is_dunder(id)
+                    && semantic
+                        // the parsed expression nodes have incorrect ranges
+                        // so we need to use the range of the literal for the
+                        // lookup in order to get reasonable results.
+                        .simulate_runtime_load_at_location_in_scope(
+                            id,
+                            literal.range(),
+                            semantic.scope_id,
+                        )
+                        .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
                 }
