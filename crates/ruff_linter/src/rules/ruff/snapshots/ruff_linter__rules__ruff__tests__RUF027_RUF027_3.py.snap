@@ -1,0 +1,144 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF027_3.py:6:7: RUF027 [*] Possible f-string without an `f` prefix
+  |
+4 | ## Errors
+5 | 
+6 | print("{foo()}")
+  |       ^^^^^^^^^ RUF027
+7 | print("{foo(non_existent)}")
+8 | print("{foo.baz}")
+  |
+  = help: Add `f` prefix
+
+ℹ Unsafe fix
+3 3 | 
+4 4 | ## Errors
+5 5 | 
+6   |-print("{foo()}")
+  6 |+print(f"{foo()}")
+7 7 | print("{foo(non_existent)}")
+8 8 | print("{foo.baz}")
+9 9 | print("{foo['bar']}")
+
+RUF027_3.py:7:7: RUF027 [*] Possible f-string without an `f` prefix
+  |
+6 | print("{foo()}")
+7 | print("{foo(non_existent)}")
+  |       ^^^^^^^^^^^^^^^^^^^^^ RUF027
+8 | print("{foo.baz}")
+9 | print("{foo['bar']}")
+  |
+  = help: Add `f` prefix
+
+ℹ Unsafe fix
+4 4 | ## Errors
+5 5 | 
+6 6 | print("{foo()}")
+7   |-print("{foo(non_existent)}")
+  7 |+print(f"{foo(non_existent)}")
+8 8 | print("{foo.baz}")
+9 9 | print("{foo['bar']}")
+10 10 | 
+
+RUF027_3.py:8:7: RUF027 [*] Possible f-string without an `f` prefix
+  |
+6 | print("{foo()}")
+7 | print("{foo(non_existent)}")
+8 | print("{foo.baz}")
+  |       ^^^^^^^^^^^ RUF027
+9 | print("{foo['bar']}")
+  |
+  = help: Add `f` prefix
+
+ℹ Unsafe fix
+5 5 | 
+6 6 | print("{foo()}")
+7 7 | print("{foo(non_existent)}")
+8   |-print("{foo.baz}")
+  8 |+print(f"{foo.baz}")
+9 9 | print("{foo['bar']}")
+10 10 | 
+11 11 | print("{foo().qux}")
+
+RUF027_3.py:9:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+ 7 | print("{foo(non_existent)}")
+ 8 | print("{foo.baz}")
+ 9 | print("{foo['bar']}")
+   |       ^^^^^^^^^^^^^^ RUF027
+10 | 
+11 | print("{foo().qux}")
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+6  6  | print("{foo()}")
+7  7  | print("{foo(non_existent)}")
+8  8  | print("{foo.baz}")
+9     |-print("{foo['bar']}")
+   9  |+print(f"{foo['bar']}")
+10 10 | 
+11 11 | print("{foo().qux}")
+12 12 | print("{foo[lorem].ipsum()}")
+
+RUF027_3.py:11:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+ 9 | print("{foo['bar']}")
+10 | 
+11 | print("{foo().qux}")
+   |       ^^^^^^^^^^^^^ RUF027
+12 | print("{foo[lorem].ipsum()}")
+13 | print("{foo.dolor[sit]().amet}")
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+8  8  | print("{foo.baz}")
+9  9  | print("{foo['bar']}")
+10 10 | 
+11    |-print("{foo().qux}")
+   11 |+print(f"{foo().qux}")
+12 12 | print("{foo[lorem].ipsum()}")
+13 13 | print("{foo.dolor[sit]().amet}")
+14 14 | 
+
+RUF027_3.py:12:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+11 | print("{foo().qux}")
+12 | print("{foo[lorem].ipsum()}")
+   |       ^^^^^^^^^^^^^^^^^^^^^^ RUF027
+13 | print("{foo.dolor[sit]().amet}")
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+9  9  | print("{foo['bar']}")
+10 10 | 
+11 11 | print("{foo().qux}")
+12    |-print("{foo[lorem].ipsum()}")
+   12 |+print(f"{foo[lorem].ipsum()}")
+13 13 | print("{foo.dolor[sit]().amet}")
+14 14 | 
+15 15 | 
+
+RUF027_3.py:13:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+11 | print("{foo().qux}")
+12 | print("{foo[lorem].ipsum()}")
+13 | print("{foo.dolor[sit]().amet}")
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+10 10 | 
+11 11 | print("{foo().qux}")
+12 12 | print("{foo[lorem].ipsum()}")
+13    |-print("{foo.dolor[sit]().amet}")
+   13 |+print(f"{foo.dolor[sit]().amet}")
+14 14 | 
+15 15 | 
+16 16 | ## No errors

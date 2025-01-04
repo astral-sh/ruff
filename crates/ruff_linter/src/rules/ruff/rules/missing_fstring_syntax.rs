@@ -204,7 +204,7 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.expressions() {
-            if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
+            if let Some(id) = left_most_name(element.expression.as_ref()) {
                 if arg_names.contains(id) {
                     return false;
                 }
@@ -236,6 +236,17 @@ fn should_be_fstring(
     }
 
     true
+}
+
+#[inline]
+fn left_most_name(expr: &ast::Expr) -> Option<&ast::name::Name> {
+    match expr {
+        ast::Expr::Name(ast::ExprName { id, .. }) => Some(id),
+        ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => left_most_name(value),
+        ast::Expr::Call(ast::ExprCall { func, .. }) => left_most_name(func),
+        ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => left_most_name(value),
+        _ => None,
+    }
 }
 
 // fast check to disqualify any string literal without brackets
