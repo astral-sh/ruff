@@ -1202,12 +1202,18 @@ impl<'db> Type<'db> {
                 false
             }
 
-            (Type::KnownInstance(left), right) => {
-                left.instance_fallback(db).is_disjoint_from(db, right)
+            (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::KnownInstance(known_instance)) => {
+                !known_instance.is_instance_of(db, class)
             }
-            (left, Type::KnownInstance(right)) => {
-                left.is_disjoint_from(db, right.instance_fallback(db))
-            }
+
+            (Type::KnownInstance(known_instance), Type::Tuple(_))
+            | (Type::Tuple(_), Type::KnownInstance(known_instance)) => KnownClass::Tuple
+                .to_class_literal(db)
+                .into_class_literal()
+                .is_some_and(|ClassLiteralType { class: tuple_class }| {
+                    !known_instance.class().is_subclass_of(db, tuple_class)
+                }),
 
             (
                 Type::Instance(InstanceType { class: class_none }),
@@ -2352,6 +2358,15 @@ impl<'db> KnownClass {
             .unwrap_or(Type::subclass_of_base(ClassBase::Unknown))
     }
 
+    /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
+    /// *and* `class` is a subclass of `other`.
+    pub fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+        known_module_symbol(db, self.canonical_module(db), self.as_str())
+            .ignore_possibly_unbound()
+            .and_then(Type::into_class_literal)
+            .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
+    }
+
     /// Return the module in which we should look up the definition for this class
     pub(crate) fn canonical_module(self, db: &'db dyn Db) -> KnownModule {
         match self {
@@ -2736,6 +2751,10 @@ impl<'db> KnownInstanceType<'db> {
     /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
     pub fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
+    }
+
+    pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
+        self.class().is_subclass_of(db, class)
     }
 
     pub fn try_from_file_and_name(db: &'db dyn Db, file: File, symbol_name: &str) -> Option<Self> {
@@ -4160,6 +4179,7 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::None)]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::LiteralString)]
     #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
+    #[test_case(Ty::Tuple(vec![]), Ty::TypingLiteral)]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
