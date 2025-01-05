@@ -45,6 +45,15 @@ impl<'db> Unpacker<'db> {
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
+        if value.is_assign()
+            && self.context.in_stub()
+            && value
+                .expression()
+                .node_ref(self.db())
+                .is_ellipsis_literal_expr()
+        {
+            value_ty = Type::Unknown;
+        }
         if value.is_iterable() {
             // If the value is an iterable, then the type that needs to be unpacked is the iterator
             // type.
