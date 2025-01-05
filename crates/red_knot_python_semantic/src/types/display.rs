@@ -177,7 +177,7 @@ impl Display for DisplayUnionType<'_> {
 
         for element in elements {
             if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
-                let Some(mut condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
+                let Some(condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
                     continue;
                 };
                 join.entry(&DisplayLiteralGroup {
