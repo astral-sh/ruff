@@ -991,13 +991,13 @@ Possible choices:
 
 {prefixed_subkeys}"
                     ));
-                } else {
-                    tip.push_str(&format!(
-                        "\n\n{}:\n\n{underlying_error}",
-                        config_parse_error.description()
-                    ));
                 }
-            };
+            } else {
+                tip.push_str(&format!(
+                    "\n\n{}:\n\n{underlying_error}",
+                    config_parse_error.description()
+                ));
+            }
         }
         let tip = tip.trim_end().to_owned().into();
 
