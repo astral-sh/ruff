@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
@@ -24,6 +24,11 @@ use crate::fix::edits::pad;
 /// ```python
 /// 1 == 1
 /// ```
+///
+/// ## Fix safety
+///
+/// When the right-hand side is a string, the fix is marked as unsafe.
+/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -76,7 +81,8 @@ pub(crate) fn single_item_membership_test(
 
     let mut diagnostic =
         Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+
+    let edit = Edit::range_replacement(
         pad(
             generate_comparison(
                 left,
@@ -90,7 +96,16 @@ pub(crate) fn single_item_membership_test(
             checker.locator(),
         ),
         expr.range(),
-    )));
+    );
+
+    let applicability = if right.is_string_literal_expr() {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
+
     checker.diagnostics.push(diagnostic);
 }
 
