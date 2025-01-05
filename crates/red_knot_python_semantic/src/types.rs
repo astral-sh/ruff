@@ -1952,10 +1952,12 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
-            Type::SubclassOf(SubclassOfType {
-                base: ClassBase::Class(class),
-            }) => Type::instance(*class),
-            Type::SubclassOf(_) => Type::Any,
+            Type::SubclassOf(SubclassOfType { base }) => match base {
+                ClassBase::Class(class) => Type::instance(*class),
+                ClassBase::Any => Type::Any,
+                ClassBase::Unknown => Type::Unknown,
+                ClassBase::Todo(todo) => Type::Todo(*todo),
+            },
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             Type::Intersection(_) => todo_type!("Type::Intersection.to_instance()"),
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
