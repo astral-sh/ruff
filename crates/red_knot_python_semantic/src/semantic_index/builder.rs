@@ -912,7 +912,7 @@ where
 
                     let elif_constraint = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
-                        // test expression is evaluated whether we take the branch or not
+                        // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
                         let constraint = self.record_expression_constraint(elif_test);
                         Some(constraint)
