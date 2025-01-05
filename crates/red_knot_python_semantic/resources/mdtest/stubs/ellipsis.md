@@ -32,6 +32,9 @@ reveal_type(Foo.y)  # revealed: int
 
 ## Unpacking ellipsis literal in assignment
 
+No diagnostic is emitted if an ellipsis literal is "unpacked" in a stub file as part of an
+assignment statement:
+
 ```py path=test.pyi
 x, y = ...
 reveal_type(x)  # revealed: Unknown
