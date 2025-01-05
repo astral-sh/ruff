@@ -64,7 +64,7 @@ reveal_type(b)  # revealed: ellipsis
 
 ## Use of `Ellipsis` symbol
 
-There is no special treatment of the builtin name `Ellipsis`, only of `...` literals.
+There is no special treatment of the builtin name `Ellipsis` in stubs, only of `...` literals.
 
 ```py path=test.pyi
 # error: 7 [invalid-parameter-default] "Default value of type `ellipsis` is not assignable to annotated parameter type `int`"
