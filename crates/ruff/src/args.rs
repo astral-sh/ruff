@@ -9,6 +9,7 @@ use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser, Subcommand};
 use colored::Colorize;
+use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use ruff_graph::Direction;
@@ -24,6 +25,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
+use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
@@ -967,7 +969,28 @@ It looks like you were trying to pass a path to a configuration file.
 The path `{value}` does not point to a configuration file"
                 ));
             }
-        } else if value.contains('=') {
+        } else if let Some((key, value)) = value.split_once('=') {
+            let key = key.trim_ascii();
+            let value = value.trim_ascii_start();
+
+            if let Some(OptionEntry::Set(set)) = Options::metadata().find(key) {
+                if !value.starts_with('{') {
+                    let prefixed_subkeys = format!("{set}")
+                        .trim_ascii()
+                        .split('\n')
+                        .map(|child| format!("{key}.{child}"))
+                        .join("\n");
+
+                    tip.push_str(&format!(
+                        "
+
+`{key}` is a table.
+Did you mean to use one of its subkeys instead? Possible choices:
+{prefixed_subkeys}"
+                    ));
+                }
+            };
+
             tip.push_str(&format!(
                 "\n\n{}:\n\n{underlying_error}",
                 config_parse_error.description()
