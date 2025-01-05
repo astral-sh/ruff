@@ -43,10 +43,7 @@ impl<'db> Unpacker<'db> {
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
-        let is_in_stub_file = value
-            .expression()
-            .file(self.db())
-            .is_stub(self.db().upcast());
+        let is_in_stub_file = self.context.in_stub();
         let value_is_ellipsis_literal = value
             .expression()
             .node_ref(self.db())
