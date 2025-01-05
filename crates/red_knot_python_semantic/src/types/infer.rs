@@ -435,6 +435,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         matches!(self.region, InferenceRegion::Deferred(_)) || self.deferred_state.is_deferred()
     }
 
+    fn in_stub(&self) -> bool {
+        self.context.in_stub()
+    }
+
     /// Get the already-inferred type of an expression node.
     ///
     /// ## Panics
@@ -1174,7 +1178,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
                     UnionType::from_elements(self.db(), [declared_ty, default_ty])
-                } else if self.context.in_stub()
+                } else if self.in_stub()
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
@@ -1903,7 +1907,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
             TargetKind::Name => {
-                if self.context.in_stub() && value.is_ellipsis_literal_expr() {
+                if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::Unknown
                 } else {
                     value_ty
@@ -1975,7 +1979,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(value) = value.as_deref() {
             let value_ty = self.infer_expression(value);
-            let value_ty = if self.context.in_stub() && value.is_ellipsis_literal_expr() {
+            let value_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
                 annotation_ty
             } else {
                 value_ty
