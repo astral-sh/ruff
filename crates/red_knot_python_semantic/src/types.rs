@@ -1219,10 +1219,9 @@ impl<'db> Type<'db> {
             | (
                 Type::Instance(InstanceType { class: class_other }),
                 Type::Instance(InstanceType { class: class_none }),
-            ) if class_none.is_known(db, KnownClass::NoneType) => !matches!(
-                class_other.known(db),
-                Some(KnownClass::NoneType | KnownClass::Object)
-            ),
+            ) if class_none.is_known(db, KnownClass::NoneType) => {
+                !class_none.is_subclass_of(db, class_other)
+            }
 
             (Type::Instance(InstanceType { class: class_none }), _)
             | (_, Type::Instance(InstanceType { class: class_none }))
@@ -1232,43 +1231,55 @@ impl<'db> Type<'db> {
             }
 
             (Type::BooleanLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::BooleanLiteral(..)) => !matches!(
-                class.known(db),
-                Some(KnownClass::Bool | KnownClass::Int | KnownClass::Object)
-            ),
+            | (Type::Instance(InstanceType { class }), Type::BooleanLiteral(..)) => {
+                // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
+                // (it cannot be an instance of a `bool` subclass)
+                !KnownClass::Bool.is_subclass_of(db, class)
+            }
+
             (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
 
             (Type::IntLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::IntLiteral(..)) => {
-                !matches!(class.known(db), Some(KnownClass::Int | KnownClass::Object))
+                // A `Type::IntLiteral()` must be an instance of exactly `int`
+                // (it cannot be an instance of an `int` subclass)
+                !KnownClass::Int.is_subclass_of(db, class)
             }
+
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
 
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => false,
-            (Type::StringLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::StringLiteral(..)) => {
-                !matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object))
+
+            (
+                Type::StringLiteral(..) | Type::LiteralString,
+                Type::Instance(InstanceType { class }),
+            )
+            | (
+                Type::Instance(InstanceType { class }),
+                Type::StringLiteral(..) | Type::LiteralString,
+            ) => {
+                // A `Type::StringLiteral()` or a `Type::LiteralString` must be an instance of exactly `str`
+                // (it cannot be an instance of a `str` subclass)
+                !KnownClass::Str.is_subclass_of(db, class)
             }
 
             (Type::LiteralString, Type::LiteralString) => false,
-            (Type::LiteralString, Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::LiteralString) => {
-                !matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object))
-            }
             (Type::LiteralString, _) | (_, Type::LiteralString) => true,
 
             (Type::BytesLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::BytesLiteral(..)) => !matches!(
-                class.known(db),
-                Some(KnownClass::Bytes | KnownClass::Object)
-            ),
+            | (Type::Instance(InstanceType { class }), Type::BytesLiteral(..)) => {
+                // A `Type::BytesLiteral()` must be an instance of exactly `bytes`
+                // (it cannot be an instance of a `bytes` subclass)
+                !KnownClass::Bytes.is_subclass_of(db, class)
+            }
 
             (Type::SliceLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::SliceLiteral(..)) => !matches!(
-                class.known(db),
-                Some(KnownClass::Slice | KnownClass::Object)
-            ),
+            | (Type::Instance(InstanceType { class }), Type::SliceLiteral(..)) => {
+                // A `Type::SliceLiteral` must be an instance of exactly `slice`
+                // (it cannot be an instance of a `slice` subclass)
+                !KnownClass::Slice.is_subclass_of(db, class)
+            }
 
             (
                 Type::ClassLiteral(ClassLiteralType { class: class_a }),
@@ -1280,15 +1291,17 @@ impl<'db> Type<'db> {
             ) => !class_a.is_instance_of(db, class_b),
 
             (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => !matches!(
-                class.known(db),
-                Some(KnownClass::FunctionType | KnownClass::Object)
-            ),
-            (Type::ModuleLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::ModuleLiteral(..)) => !matches!(
-                class.known(db),
-                Some(KnownClass::ModuleType | KnownClass::Object)
-            ),
+            | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => {
+                // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
+                // (it cannot be an instance of a `types.FunctionType` subclass)
+                !KnownClass::FunctionType.is_subclass_of(db, class)
+            }
+
+            (Type::ModuleLiteral(..), other @ Type::Instance(..))
+            | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
+                // Modules *can* actually be instances of `ModuleType` subclasses
+                other.is_disjoint_from(db, KnownClass::ModuleType.to_instance(db))
+            }
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
