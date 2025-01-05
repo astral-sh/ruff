@@ -123,7 +123,7 @@ x = Foo()
 reveal_type(x)  # revealed: Foo
 ```
 
-## Annotations in stub files are inferred correctly
+## Annotated assignments in stub files are inferred correctly
 
 ```pyi path=main.pyi
 x: int = 1
