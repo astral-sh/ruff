@@ -1005,6 +1005,8 @@ RUF046.py:161:1: RUF046 [*] Value being cast to `int` is already an integer
 161 | / int(round(1,
 162 | |           0))
     | |_____________^ RUF046
+163 |   
+164 |   # function calls may need to retain parentheses
     |
     = help: Remove unnecessary `int` call
 
@@ -1016,3 +1018,99 @@ RUF046.py:161:1: RUF046 [*] Value being cast to `int` is already an integer
 162     |-          0))
     161 |+round(1,
     162 |+          0)
+163 163 | 
+164 164 | # function calls may need to retain parentheses
+165 165 | # if the parentheses for the call itself
+
+RUF046.py:168:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+166 |   # lie on the next line.
+167 |   # See https://github.com/astral-sh/ruff/issues/15263
+168 | / int(round
+169 | | (1))
+    | |____^ RUF046
+170 |   
+171 |   int(round # a comment
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+165 165 | # if the parentheses for the call itself
+166 166 | # lie on the next line.
+167 167 | # See https://github.com/astral-sh/ruff/issues/15263
+168     |-int(round
+    168 |+(round
+169 169 | (1))
+170 170 | 
+171 171 | int(round # a comment
+
+RUF046.py:171:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+169 |   (1))
+170 |   
+171 | / int(round # a comment
+172 | | # and another comment
+173 | | (10)
+174 | | )
+    | |_^ RUF046
+175 |   
+176 |   int(round (17)) # this is safe without parens
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+168 168 | int(round
+169 169 | (1))
+170 170 | 
+171     |-int(round # a comment
+    171 |+(round # a comment
+172 172 | # and another comment
+173     |-(10)
+174     |-)
+    173 |+(10))
+175 174 | 
+176 175 | int(round (17)) # this is safe without parens
+177 176 | 
+
+RUF046.py:176:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+174 | )
+175 | 
+176 | int(round (17)) # this is safe without parens
+    | ^^^^^^^^^^^^^^^ RUF046
+177 | 
+178 | int( round (
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+173 173 | (10)
+174 174 | )
+175 175 | 
+176     |-int(round (17)) # this is safe without parens
+    176 |+round (17) # this is safe without parens
+177 177 | 
+178 178 | int( round (
+179 179 |                 17
+
+RUF046.py:178:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+176 |   int(round (17)) # this is safe without parens
+177 |   
+178 | / int( round (
+179 | |                 17
+180 | |             )) # this is also safe without parens
+    | |______________^ RUF046
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+175 175 | 
+176 176 | int(round (17)) # this is safe without parens
+177 177 | 
+178     |-int( round (
+    178 |+round (
+179 179 |                 17
+180     |-            )) # this is also safe without parens
+    180 |+            ) # this is also safe without parens
+181 181 |
