@@ -180,9 +180,6 @@ impl Display for DisplayUnionType<'_> {
                 let Some(mut condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
                     continue;
                 };
-                if kind == CondensedDisplayTypeKind::Int {
-                    condensed_kind.sort_unstable_by_key(|ty| ty.expect_int_literal());
-                }
                 join.entry(&DisplayLiteralGroup {
                     literals: condensed_kind,
                     db: self.db,
@@ -223,7 +220,7 @@ impl Display for DisplayLiteralGroup<'_> {
 
 /// Enumeration of literal types that are displayed in a "condensed way" inside `Literal` slices.
 ///
-/// For example, `Literal[1] | Literal[2]` is displayed as `"Literal[1, 2]"`.
+/// For example, `Literal[1] | Literal[2] | Literal["s"]` is displayed as `"Literal[1, 2, "s"]"`.
 /// Not all `Literal` types are displayed using `Literal` slices
 /// (e.g. it would be inappropriate to display `LiteralString`
 /// as `Literal[LiteralString]`).
@@ -231,10 +228,7 @@ impl Display for DisplayLiteralGroup<'_> {
 enum CondensedDisplayTypeKind {
     Class,
     Function,
-    Int,
-    String,
-    Bytes,
-    Literal,
+    LiteralExpression,
 }
 
 impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
@@ -247,7 +241,7 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
             Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
-            | Type::BooleanLiteral(_) => Ok(Self::Literal),
+            | Type::BooleanLiteral(_) => Ok(Self::LiteralExpression),
             _ => Err(()),
         }
     }
