@@ -239,3 +239,11 @@ t = int if flag() else str
 if issubclass(t, int, foo="bar"):
     reveal_type(t)  # revealed: Literal[int, str]
 ```
+
+### `type[]` types are narrowed as well as class-literal types
+
+```py
+def _(x: type, y: type[int]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[int]
+```

@@ -174,3 +174,11 @@ def _(flag: bool):
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1] | Literal["a"]
 ```
+
+## `type[]` types are narrowed as well as class-literal types
+
+```py
+def _(x: object, y: type[int]):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: int
+```
