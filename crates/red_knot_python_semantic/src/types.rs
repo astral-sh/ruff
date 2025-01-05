@@ -3051,6 +3051,15 @@ pub enum KnownConstraintFunction {
     IsSubclass,
 }
 
+impl KnownConstraintFunction {
+    fn apply_constraint(self, class: Class) -> Type {
+        match self {
+            Self::IsInstance => Type::instance(class),
+            Self::IsSubclass => Type::subclass_of(class),
+        }
+    }
+}
+
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

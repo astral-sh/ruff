@@ -87,23 +87,22 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
 ///
 /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
 /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
-fn generate_classinfo_constraint<'db, F>(
+fn generate_classinfo_constraint<'db>(
     db: &'db dyn Db,
     classinfo: &Type<'db>,
-    to_constraint: F,
-) -> Option<Type<'db>>
-where
-    F: Fn(ClassLiteralType<'db>) -> Type<'db> + Copy,
-{
+    constraint_fn: KnownConstraintFunction,
+) -> Option<Type<'db>> {
     match classinfo {
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
-                builder = builder.add(generate_classinfo_constraint(db, element, to_constraint)?);
+                builder = builder.add(generate_classinfo_constraint(db, element, constraint_fn)?);
             }
             Some(builder.build())
         }
-        Type::ClassLiteral(class_literal_type) => Some(to_constraint(*class_literal_type)),
+        Type::ClassLiteral(ClassLiteralType { class }) => {
+            Some(constraint_fn.apply_constraint(*class))
+        }
         _ => None,
     }
 }
@@ -429,24 +428,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 let class_info_ty =
                     inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
 
-                let to_constraint = match function {
-                    KnownConstraintFunction::IsInstance => {
-                        |class_literal: ClassLiteralType<'db>| Type::instance(class_literal.class)
-                    }
-                    KnownConstraintFunction::IsSubclass => {
-                        |class_literal: ClassLiteralType<'db>| {
-                            Type::subclass_of(class_literal.class)
-                        }
-                    }
-                };
-
-                generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
-                    |constraint| {
-                        let mut constraints = NarrowingConstraints::default();
-                        constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
-                        constraints
-                    },
-                )
+                generate_classinfo_constraint(self.db, &class_info_ty, function).map(|constraint| {
+                    let mut constraints = NarrowingConstraints::default();
+                    constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                    constraints
+                })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
             Type::ClassLiteral(class_type)
