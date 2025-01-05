@@ -973,8 +973,8 @@ The path `{value}` does not point to a configuration file"
             let key = key.trim_ascii();
             let value = value.trim_ascii_start();
 
-            if let Some(OptionEntry::Set(set)) = Options::metadata().find(key) {
-                if !value.starts_with('{') {
+            match Options::metadata().find(key) {
+                Some(OptionEntry::Set(set)) if !value.starts_with('{') => {
                     let prefixed_subkeys = format!("{set}")
                         .trim_ascii()
                         .split('\n')
@@ -992,11 +992,12 @@ Possible choices:
 {prefixed_subkeys}"
                     ));
                 }
-            } else {
-                tip.push_str(&format!(
-                    "\n\n{}:\n\n{underlying_error}",
-                    config_parse_error.description()
-                ));
+                _ => {
+                    tip.push_str(&format!(
+                        "\n\n{}:\n\n{underlying_error}",
+                        config_parse_error.description()
+                    ));
+                }
             }
         }
         let tip = tip.trim_end().to_owned().into();
