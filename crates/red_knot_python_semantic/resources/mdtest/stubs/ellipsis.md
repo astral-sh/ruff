@@ -62,7 +62,7 @@ b = ...
 reveal_type(b)  # revealed: ellipsis
 ```
 
-## Use of ellipsis symbol
+## Use of `Ellipsis` symbol
 
 There is no special treatment of the builtin name `Ellipsis`, only of `...` literals.
 
