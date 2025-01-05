@@ -15,6 +15,7 @@ pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
+pub use self::narrow::KnownConstraintFunction;
 pub(crate) use self::signatures::Signature;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
@@ -3040,23 +3041,6 @@ impl<'db> FunctionType<'db> {
 
     pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KnownConstraintFunction {
-    /// `builtins.isinstance`
-    IsInstance,
-    /// `builtins.issubclass`
-    IsSubclass,
-}
-
-impl KnownConstraintFunction {
-    fn apply_constraint(self, class: Class) -> Type {
-        match self {
-            Self::IsInstance => Type::instance(class),
-            Self::IsSubclass => Type::subclass_of(class),
-        }
     }
 }
 
