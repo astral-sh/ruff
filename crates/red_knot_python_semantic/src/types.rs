@@ -1241,7 +1241,7 @@ impl<'db> Type<'db> {
 
             (Type::IntLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::IntLiteral(..)) => {
-                // A `Type::IntLiteral()` must be an instance of exactly `int
+                // A `Type::IntLiteral()` must be an instance of exactly `int`
                 // (it cannot be an instance of an `int` subclass)
                 !KnownClass::Int.is_subclass_of(db, class)
             }
