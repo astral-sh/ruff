@@ -38,7 +38,7 @@ impl<'db> Unpacker<'db> {
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         debug_assert!(
             matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
-            "Unpacking target must be a list or tuple"
+            "Unpacking target must be a list or tuple expression"
         );
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
