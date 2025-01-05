@@ -40,6 +40,9 @@ reveal_type(y)  # revealed: Unknown
 
 ## Unpacking ellipsis literal in for loops
 
+Iterating over an ellipsis literal as part of a `for` loop in a stub is invalid, however, and
+results in a diagnostic:
+
 ```py path=test.pyi
 # error: [not-iterable] "Object of type `ellipsis` is not iterable"
 for a, b in ...:
