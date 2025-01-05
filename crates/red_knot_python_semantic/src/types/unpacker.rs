@@ -45,12 +45,13 @@ impl<'db> Unpacker<'db> {
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
-        let is_in_stub_file = self.context.in_stub();
-        let value_is_ellipsis_literal = value
-            .expression()
-            .node_ref(self.db())
-            .is_ellipsis_literal_expr();
-        if value.is_assign() && is_in_stub_file && value_is_ellipsis_literal {
+        if value.is_assign()
+            && self.context.in_stub()
+            && value
+                .expression()
+                .node_ref(self.db())
+                .is_ellipsis_literal_expr()
+        {
             value_ty = Type::Unknown;
         }
         if value.is_iterable() {
