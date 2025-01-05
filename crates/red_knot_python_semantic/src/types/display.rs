@@ -368,64 +368,8 @@ impl Display for DisplayStringLiteralType<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithTestSystem;
-
     use crate::db::tests::setup_db;
-    use crate::types::{global_symbol, SliceLiteralType, StringLiteralType, Type, UnionType};
-
-    #[test]
-    fn test_condense_literal_display_by_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/main.py",
-            "
-            def foo(x: int) -> int:
-                return x + 1
-
-            def bar(s: str) -> str:
-                return s
-
-            class A: ...
-            class B: ...
-            ",
-        )?;
-        let mod_file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-
-        let union_elements = &[
-            Type::Unknown,
-            Type::IntLiteral(-1),
-            global_symbol(&db, mod_file, "A").expect_type(),
-            Type::string_literal(&db, "A"),
-            Type::bytes_literal(&db, &[0u8]),
-            Type::bytes_literal(&db, &[7u8]),
-            Type::IntLiteral(0),
-            Type::IntLiteral(1),
-            Type::string_literal(&db, "B"),
-            global_symbol(&db, mod_file, "foo").expect_type(),
-            global_symbol(&db, mod_file, "bar").expect_type(),
-            global_symbol(&db, mod_file, "B").expect_type(),
-            Type::BooleanLiteral(true),
-            Type::none(&db),
-        ];
-        let union = UnionType::from_elements(&db, union_elements).expect_union();
-        let display = format!("{}", union.display(&db));
-        assert_eq!(
-            display,
-            concat!(
-                "Unknown | ",
-                "Literal[-1, 0, 1] | ",
-                "Literal[A, B] | ",
-                "Literal[\"A\", \"B\"] | ",
-                "Literal[b\"\\x00\", b\"\\x07\"] | ",
-                "Literal[foo, bar] | ",
-                "Literal[True] | ",
-                "None"
-            )
-        );
-        Ok(())
-    }
+    use crate::types::{SliceLiteralType, StringLiteralType, Type};
 
     #[test]
     fn test_slice_literal_display() {

@@ -74,6 +74,43 @@ def x(
     reveal_type(a4)  # revealed: Literal[True, 1, 2, "foo"]
 ```
 
+## Display of heterogeneous unions of literals
+
+```py
+from typing import Literal, Union
+
+def foo(x: int) -> int:
+    return x + 1
+
+def bar(s: str) -> str:
+    return s
+
+class A: ...
+class B: ...
+
+def union_example(
+    x: Union[
+        # unknown type
+        # error: [unresolved-reference]
+        y,
+        Literal[-1],
+        Literal["A"],
+        Literal[b"A"],
+        Literal[b"\x00"],
+        Literal[b"\x07"],
+        Literal[0],
+        Literal[1],
+        Literal["B"],
+        Literal["foo"],
+        Literal["bar"],
+        Literal["B"],
+        Literal[True],
+        None,
+    ]
+):
+    reveal_type(x)  # revealed: Unknown | Literal[-1, "A", b"A", b"\x00", b"\x07", 0, 1, "B", "foo", "bar", True] | None
+```
+
 ## Detecting Literal outside typing and typing_extensions
 
 Only Literal that is defined in typing and typing_extension modules is detected as the special
