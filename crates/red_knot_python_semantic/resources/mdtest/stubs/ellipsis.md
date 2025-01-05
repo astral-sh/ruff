@@ -13,10 +13,10 @@ def f2(x: str = ...) -> None:
     reveal_type(x)  # revealed: str
 ```
 
-## Class and module level attributes
+## Class and module symbols
 
-The ellipsis literal can be assigned to a class or module attribute, regardless of its type, in a
-stub file only.
+The ellipsis literal can be assigned to a class or module symbol, regardless of its declared type,
+in a stub file only.
 
 ```py path=test.pyi
 y: bytes = ...
