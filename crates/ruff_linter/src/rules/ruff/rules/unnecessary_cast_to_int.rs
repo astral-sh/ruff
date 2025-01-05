@@ -4,7 +4,7 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{lines_after_ignoring_trivia, CommentRanges};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
@@ -114,7 +114,7 @@ fn unwrap_int_expression(
         let parenthesize = semantic.current_expression_parent().is_some()
             || argument.is_named_expr()
             || locator.count_lines(argument.range()) > 0;
-        if parenthesize && !has_own_parentheses(argument) {
+        if parenthesize && !has_own_parentheses(argument, source) {
             format!("({})", locator.slice(argument.range()))
         } else {
             locator.slice(argument.range()).to_string()
@@ -229,16 +229,33 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
 }
 
 /// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
-fn has_own_parentheses(expr: &Expr) -> bool {
+fn has_own_parentheses(expr: &Expr, source: &str) -> bool {
     match expr {
         Expr::ListComp(_)
         | Expr::SetComp(_)
         | Expr::DictComp(_)
-        | Expr::Subscript(_)
         | Expr::List(_)
         | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::Call(_) => true,
+        | Expr::Dict(_) => true,
+        Expr::Call(call_expr) => {
+            // A call where the function and parenthesized
+            // argument(s) appear on separate lines
+            // requires outer parentheses. That is:
+            // ```
+            // (f
+            // (10))
+            // ```
+            // is different than
+            // ```
+            // f
+            // (10)
+            // ```
+            lines_after_ignoring_trivia(call_expr.func.end(), source) == 0
+        }
+        Expr::Subscript(subscript_expr) => {
+            // Same as above
+            lines_after_ignoring_trivia(subscript_expr.value.end(), source) == 0
+        }
         Expr::Generator(generator) => generator.parenthesized,
         Expr::Tuple(tuple) => tuple.parenthesized,
         _ => false,
