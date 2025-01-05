@@ -18,6 +18,13 @@ pub enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
+    pub const fn is_dynamic(self) -> bool {
+        match self {
+            ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => true,
+            ClassBase::Class(_) => false,
+        }
+    }
+
     pub fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,

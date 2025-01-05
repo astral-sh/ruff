@@ -7,8 +7,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, ClassBase, ClassLiteralType, IntersectionBuilder, KnownClass,
-    KnownFunction, SubclassOfType, Truthiness, Type, UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
+    SubclassOfType, Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -97,6 +97,11 @@ impl KnownConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        let constraint_fn = |class| match self {
+            KnownConstraintFunction::IsInstance => Type::instance(class),
+            KnownConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
+        };
+
         match classinfo {
             Type::Tuple(tuple) => {
                 let mut builder = UnionBuilder::new(db);
@@ -105,13 +110,10 @@ impl KnownConstraintFunction {
                 }
                 Some(builder.build())
             }
-            Type::ClassLiteral(ClassLiteralType { class })
-            | Type::SubclassOf(SubclassOfType {
-                base: ClassBase::Class(class),
-            }) => Some(match self {
-                KnownConstraintFunction::IsInstance => Type::instance(class),
-                KnownConstraintFunction::IsSubclass => Type::subclass_of(class),
-            }),
+            Type::ClassLiteral(ClassLiteralType { class }) => Some(constraint_fn(class)),
+            Type::SubclassOf(subclass_of_ty) => {
+                subclass_of_ty.subclass_of().into_class().map(constraint_fn)
+            }
             _ => None,
         }
     }

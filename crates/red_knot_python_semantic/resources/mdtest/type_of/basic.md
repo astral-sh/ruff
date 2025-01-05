@@ -142,3 +142,25 @@ class Foo(type[int]): ...
 # TODO: should be `tuple[Literal[Foo], Literal[type], Literal[object]]
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 ```
+
+## `@final` classes
+
+`type[]` types are eagerly converted to class-literal types if a class decorated with `@final` is
+used as the type argument. This applies to standard-library classes and user-defined classes:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from types import EllipsisType
+from typing import final
+
+@final
+class Foo: ...
+
+def _(x: type[Foo], y: type[EllipsisType]):
+    reveal_type(x)  # revealed: Literal[Foo]
+    reveal_type(y)  # revealed: Literal[EllipsisType]
+```
