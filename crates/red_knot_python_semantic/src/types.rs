@@ -1207,13 +1207,10 @@ impl<'db> Type<'db> {
                 !known_instance.is_instance_of(db, class)
             }
 
-            (Type::KnownInstance(known_instance), Type::Tuple(_))
-            | (Type::Tuple(_), Type::KnownInstance(known_instance)) => KnownClass::Tuple
-                .to_class_literal(db)
-                .into_class_literal()
-                .is_some_and(|ClassLiteralType { class: tuple_class }| {
-                    !known_instance.class().is_subclass_of(db, tuple_class)
-                }),
+            (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(_))
+            | (Type::Tuple(_), known_instance_ty @ Type::KnownInstance(_)) => {
+                known_instance_ty.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
+            }
 
             (
                 Type::Instance(InstanceType { class: class_none }),
