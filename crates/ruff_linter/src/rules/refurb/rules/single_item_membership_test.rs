@@ -28,7 +28,8 @@ use crate::fix::edits::pad;
 /// ## Fix safety
 ///
 /// When the right-hand side is a string, the fix is marked as unsafe.
-/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string.
+/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
+/// so the fix can change the behavior of your program in these cases.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -79,8 +80,7 @@ pub(crate) fn single_item_membership_test(
         return;
     };
 
-    let mut diagnostic =
-        Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
+    let diagnostic = Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
 
     let edit = Edit::range_replacement(
         pad(
@@ -104,9 +104,9 @@ pub(crate) fn single_item_membership_test(
         Applicability::Safe
     };
 
-    diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
+    let fix = Fix::applicable_edit(edit, applicability);
 
-    checker.diagnostics.push(diagnostic);
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// Return the single item wrapped in `Some` if the expression contains a single
