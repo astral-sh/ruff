@@ -978,23 +978,26 @@ The path `{value}` does not point to a configuration file"
                     let prefixed_subkeys = format!("{set}")
                         .trim_ascii()
                         .split('\n')
-                        .map(|child| format!("{key}.{child}"))
+                        .map(|child| format!("- `{key}.{child}`"))
                         .join("\n");
 
                     tip.push_str(&format!(
                         "
 
-`{key}` is a table.
-Did you mean to use one of its subkeys instead? Possible choices:
+`{key}` is a table of configuration options.
+Did you want to override one of the table's subkeys?
+
+Possible choices:
+
 {prefixed_subkeys}"
+                    ));
+                } else {
+                    tip.push_str(&format!(
+                        "\n\n{}:\n\n{underlying_error}",
+                        config_parse_error.description()
                     ));
                 }
             };
-
-            tip.push_str(&format!(
-                "\n\n{}:\n\n{underlying_error}",
-                config_parse_error.description()
-            ));
         }
         let tip = tip.trim_end().to_owned().into();
 

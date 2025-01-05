@@ -800,20 +800,18 @@ fn value_given_to_table_key_is_not_inline_table() {
            or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
            option
 
-    `lint.flake8-pytest-style` is a table.
-    Did you mean to use one of its subkeys instead? Possible choices:
-    lint.flake8-pytest-style.fixture-parentheses
-    lint.flake8-pytest-style.parametrize-names-type
-    lint.flake8-pytest-style.parametrize-values-type
-    lint.flake8-pytest-style.parametrize-values-row-type
-    lint.flake8-pytest-style.raises-require-match-for
-    lint.flake8-pytest-style.raises-extend-require-match-for
-    lint.flake8-pytest-style.mark-parentheses
+    `lint.flake8-pytest-style` is a table of configuration options.
+    Did you want to override one of the table's subkeys?
 
-    Could not parse the supplied argument as a `ruff.toml` configuration option:
+    Possible choices:
 
-    invalid type: string "csv", expected struct Flake8PytestStyleOptions
-    in `lint`
+    - `lint.flake8-pytest-style.fixture-parentheses`
+    - `lint.flake8-pytest-style.parametrize-names-type`
+    - `lint.flake8-pytest-style.parametrize-values-type`
+    - `lint.flake8-pytest-style.parametrize-values-row-type`
+    - `lint.flake8-pytest-style.raises-require-match-for`
+    - `lint.flake8-pytest-style.raises-extend-require-match-for`
+    - `lint.flake8-pytest-style.mark-parentheses`
 
     For more information, try '--help'.
     "#);
