@@ -878,12 +878,11 @@ where
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
-                let pre_if = self.flow_snapshot();
-                let constraint = self.record_expression_constraint(&node.test);
-                let mut constraints = vec![constraint];
+                let mut no_branch_taken = self.flow_snapshot();
+                let mut last_constraint = self.record_expression_constraint(&node.test);
                 self.visit_body(&node.body);
 
-                let visibility_constraint_id = self.record_visibility_constraint(constraint);
+                let visibility_constraint_id = self.record_visibility_constraint(last_constraint);
                 let mut vis_constraints = vec![visibility_constraint_id];
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -907,26 +906,27 @@ where
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
-                    // taken, so the block entry state is always `pre_if`
-                    self.flow_restore(pre_if.clone());
-                    for constraint in &constraints {
-                        self.record_negated_constraint(*constraint);
-                    }
+                    // taken
+                    self.flow_restore(no_branch_taken.clone());
+                    self.record_negated_constraint(last_constraint);
 
                     let elif_constraint = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
+                        // A test expression is evaluated whether the branch is taken or not
+                        no_branch_taken = self.flow_snapshot();
                         let constraint = self.record_expression_constraint(elif_test);
-                        constraints.push(constraint);
                         Some(constraint)
                     } else {
                         None
                     };
+
                     self.visit_body(clause_body);
 
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
                     if let Some(elif_constraint) = elif_constraint {
+                        last_constraint = elif_constraint;
                         let id = self.record_visibility_constraint(elif_constraint);
                         vis_constraints.push(id);
                     }
@@ -936,7 +936,7 @@ where
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(pre_if);
+                self.simplify_visibility_constraints(no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,

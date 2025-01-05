@@ -115,3 +115,35 @@ def _(flag: bool, flag2: bool):
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
+
+## if-elif with assignment expressions in tests
+
+```py
+def check(x: int) -> bool:
+    return bool(x)
+
+if check(x := 1):
+    x = 2
+elif check(x := 3):
+    x = 4
+
+reveal_type(x)  # revealed: Literal[2, 3, 4]
+```
+
+## constraints apply to later test expressions
+
+```py
+def check(x) -> bool:
+    return bool(x)
+
+def _(flag: bool):
+    x = 1 if flag else None
+    y = 0
+
+    if x is None:
+        pass
+    elif check(y := x):
+        pass
+
+    reveal_type(y)  # revealed: Literal[0, 1]
+```
