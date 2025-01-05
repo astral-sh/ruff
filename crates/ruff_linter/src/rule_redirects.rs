@@ -137,11 +137,13 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
     ])
 });
 
+#[cfg(test)]
 mod tests {
     use crate::codes::{Rule, RuleGroup};
     use crate::rule_redirects::REDIRECTS;
     use strum::IntoEnumIterator;
 
+    /// Tests for rule codes that overlap with a redirect.
     #[test]
     fn overshadowing_redirects() {
         for rule in Rule::iter() {
@@ -153,8 +155,7 @@ mod tests {
 
             if let Some(redirect_target) = REDIRECTS.get(&*code.to_string()) {
                 panic!(
-                    "Rule {code} is overshadowed by a redirect, \
-                    which points to {redirect_target}."
+                    "Rule {code} is overshadowed by a redirect, which points to {redirect_target}."
                 );
             }
         }
