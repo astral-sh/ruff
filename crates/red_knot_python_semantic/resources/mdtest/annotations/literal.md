@@ -68,7 +68,7 @@ def x(
     a3: Literal[Literal["w"], Literal["r"], Literal[Literal["w+"]]],
     a4: Literal[True] | Literal[1, 2] | Literal["foo"],
 ):
-    # reveal_type(a1)  # revealed: Literal[1, 2, 3, "foo", 5] | None
+    reveal_type(a1)  # revealed: Literal[1, 2, 3, "foo", 5] | None
     reveal_type(a2)  # revealed: Literal["w", "r"]
     reveal_type(a3)  # revealed: Literal["w", "r", "w+"]
     reveal_type(a4)  # revealed: Literal[True, 1, 2, "foo"]
