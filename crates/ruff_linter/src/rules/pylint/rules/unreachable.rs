@@ -418,7 +418,6 @@ fn loop_block<'stmt>(
         after,
         after,
     );
-
     NextBlock::If {
         condition,
         next: last_statement_index,
@@ -438,14 +437,12 @@ fn post_process_loop(
     clause_exit: Option<BlockIndex>,
 ) {
     let mut idx = start_index;
-
     loop {
         if Some(idx) == clause_exit || idx == loop_start {
             return;
         }
 
         let block = &mut blocks.blocks[idx];
-
         if block.is_loop_continue() {
             return;
         }
@@ -462,6 +459,7 @@ fn post_process_loop(
                     Some(Stmt::Continue(_)) => {
                         block.next = NextBlock::Always(loop_start);
                     }
+                    Some(Stmt::Return(_)) => return,
                     _ => {}
                 };
                 idx = next;
@@ -603,6 +601,7 @@ fn post_process_try(
             NextBlock::Always(next) => {
                 next_index = *next;
                 match block.stmts.last() {
+                    Some(Stmt::Break(_)) => return,
                     Some(Stmt::Continue(_)) => return,
                     Some(Stmt::Raise(_)) => {
                         // re-route to except if not already re-routed

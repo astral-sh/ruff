@@ -95,7 +95,6 @@ pub(crate) use unnecessary_direct_lambda_call::*;
 pub(crate) use unnecessary_dunder_call::*;
 pub(crate) use unnecessary_lambda::*;
 pub(crate) use unnecessary_list_index_lookup::*;
-#[cfg(any(feature = "test-rules", test))]
 pub(crate) use unreachable::*;
 pub(crate) use unspecified_encoding::*;
 pub(crate) use useless_else_on_loop::*;
@@ -203,7 +202,6 @@ mod unnecessary_direct_lambda_call;
 mod unnecessary_dunder_call;
 mod unnecessary_lambda;
 mod unnecessary_list_index_lookup;
-#[cfg(any(feature = "test-rules", test))]
 mod unreachable;
 mod unspecified_encoding;
 mod useless_else_on_loop;
