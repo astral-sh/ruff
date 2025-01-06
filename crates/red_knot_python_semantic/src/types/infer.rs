@@ -1780,12 +1780,29 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
+        // We need to create a standalone expression for each arm of a match statement, since they
+        // can introduce constraints on the match subject. (Or more accurately, for the match arm's
+        // pattern, since its the pattern that introduces any constraints, not the body.) Ideally,
+        // that standalone expression would wrap the match arm's pattern as a whole. But a
+        // standalone expression can currently only wrap an ast::Expr, which patterns are not. So,
+        // we need to choose an Expr that can “stand in” for the pattern, which we can wrap in a
+        // standalone expression.
+        //
+        // Standalone expressions also define an “inference scope”, where inferring the types of
+        // any expression within that scope requires doing so via the standalone expression.
+        // Typically, that inference scope follows the AST structure: all AST subexpressions of the
+        // standalone expression are part of the inference scope. Here we diverge from that, since
+        // it is the overall match arm pattern that defines the inference scope, and we are
+        // choosing precisely one of the subexpressions to represent it as the wrapped standalone
+        // expression.
+        //
+        // This function is only called for the top-level pattern of a match arm, and is
+        // responsible for inferring the standalone expression for each supported pattern type. It
+        // then hands off to `infer_nested_match_pattern` for any subexpressions and subpatterns,
+        // where we do NOT have any additional standalone expressions to infer through.
+        //
         // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
         // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
-        // TODO(dcreager): We're currently creating standalone expressions for top-level value and
-        // class patterns, but not for nested ones.  Consider always creating standalone
-        // expressions for these forms, even if they appear as subpatterns, to eliminate the
-        // difference here between `infer_match_pattern` and `infer_nested_match_pattern`.
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value);

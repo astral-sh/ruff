@@ -404,6 +404,17 @@ impl<'db> SemanticIndexBuilder<'db> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
     ) -> Constraint<'db> {
+        // This is called for the top-level pattern of each match arm. We need to create a
+        // standalone expression for each arm of a match statement, since they can introduce
+        // constraints on the match subject. (Or more accurately, for the match arm's pattern,
+        // since its the pattern that introduces any constraints, not the body.) Ideally, that
+        // standalone expression would wrap the match arm's pattern as a whole. But a standalone
+        // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
+        // choose an Expr that can “stand in” for the pattern, which we can wrap in a standalone
+        // expression.
+        //
+        // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
+
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
 
         let kind = match pattern {
