@@ -33,6 +33,7 @@ match x:
     case A():
         reveal_type(x)  # revealed: A
     case B():
+        # TODO could be `B & ~A`
         reveal_type(x)  # revealed: B
 
 reveal_type(x)  # revealed: object
