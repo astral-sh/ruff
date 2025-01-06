@@ -785,8 +785,6 @@ fn value_given_to_table_key_is_not_inline_table_1() {
     // https://github.com/astral-sh/ruff/issues/13995
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        // spaces *also* can't be used to delimit different config overrides;
-        // you need a new --config flag for each override
         .args([".", "--config", r#"lint.flake8-pytest-style="csv""#]),
         @r#"
     success: false
@@ -822,8 +820,6 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     // https://github.com/astral-sh/ruff/issues/13995
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        // spaces *also* can't be used to delimit different config overrides;
-        // you need a new --config flag for each override
         .args([".", "--config", r#"lint=123"#]),
         @r"
     success: false
