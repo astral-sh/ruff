@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use regex::Regex;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
@@ -55,8 +55,8 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     """
 ///     return distance / time
 /// ```
-#[violation]
-pub struct DocstringMissingParameter {
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingParameter {
     ids: Vec<String>,
 }
 
@@ -121,8 +121,8 @@ impl Violation for DocstringMissingParameter {
 ///     """
 ///     return distance / time
 /// ```
-#[violation]
-pub struct DocstringExtraneousParameter {
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousParameter {
     ids: Vec<String>,
 }
 
