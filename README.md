@@ -118,30 +118,30 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
-```shell
-# With uv.
-uv add --dev ruff     # to add ruff to your project
-uv tool install ruff  # to install ruff globally
+```console
+$ # With uv.
+$ uv tool install ruff  # Install Ruff globally.
+$ uv add --dev ruff     # Or add Ruff to your project.
 
-# With pip.
-pip install ruff
+$ # With pip.
+$ pip install ruff
 
-# With pipx.
-pipx install ruff
+$ # With pipx.
+$ pipx install ruff
 ```
 
 Starting with version `0.5.0`, Ruff can be installed with our standalone installers:
 
-```shell
-# On macOS and Linux.
-curl -LsSf https://astral.sh/ruff/install.sh | sh
+```console
+$ # On macOS and Linux.
+$ curl -LsSf https://astral.sh/ruff/install.sh | sh
 
-# On Windows.
-powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
+$ # On Windows.
+$ powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
-# For a specific version.
-curl -LsSf https://astral.sh/ruff/0.8.6/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.8.6/install.ps1 | iex"
+$ # For a specific version.
+$ curl -LsSf https://astral.sh/ruff/0.8.6/install.sh | sh
+$ powershell -c "irm https://astral.sh/ruff/0.8.6/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -151,22 +151,22 @@ and with [a variety of other package managers](https://docs.astral.sh/ruff/insta
 
 To run Ruff as a linter, try any of the following:
 
-```shell
-ruff check                          # Lint all files in the current directory (and any subdirectories).
-ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories).
-ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`.
-ruff check path/to/code/to/file.py  # Lint `file.py`.
-ruff check @arguments.txt           # Lint using an input file, treating its contents as newline-delimited command-line arguments.
+```console
+$ ruff check                          # Lint all files in the current directory (and any subdirectories).
+$ ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories).
+$ ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`.
+$ ruff check path/to/code/to/file.py  # Lint `file.py`.
+$ ruff check @arguments.txt           # Lint using an input file, treating its contents as newline-delimited command-line arguments.
 ```
 
 Or, to run Ruff as a formatter:
 
-```shell
-ruff format                          # Format all files in the current directory (and any subdirectories).
-ruff format path/to/code/            # Format all files in `/path/to/code` (and any subdirectories).
-ruff format path/to/code/*.py        # Format all `.py` files in `/path/to/code`.
-ruff format path/to/code/to/file.py  # Format `file.py`.
-ruff format @arguments.txt           # Format using an input file, treating its contents as newline-delimited command-line arguments.
+```console
+$ ruff format                          # Format all files in the current directory (and any subdirectories).
+$ ruff format path/to/code/            # Format all files in `/path/to/code` (and any subdirectories).
+$ ruff format path/to/code/*.py        # Format all `.py` files in `/path/to/code`.
+$ ruff format path/to/code/to/file.py  # Format `file.py`.
+$ ruff format @arguments.txt           # Format using an input file, treating its contents as newline-delimited command-line arguments.
 ```
 
 Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
@@ -277,14 +277,14 @@ example, `[lint]` should be replaced with `[tool.ruff.lint]`.
 Some configuration options can be provided via dedicated command-line arguments, such as those
 related to rule enablement and disablement, file discovery, and logging level:
 
-```shell
-ruff check --select F401 --select F403 --quiet
+```console
+$ ruff check --select F401 --select F403 --quiet
 ```
 
 The remaining configuration options can be provided through a catch-all `--config` argument:
 
-```shell
-ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```console
+$ ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 To opt in to the latest lint rules, formatter style changes, interface updates, and more, enable

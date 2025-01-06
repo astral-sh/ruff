@@ -5,10 +5,18 @@ your project. For a more detailed overview, see [_Configuring Ruff_](configurati
 
 ## Getting Started
 
-To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
+To start, we'll install Ruff from PyPI. You can install Ruff with [uv](https://docs.astral.sh/uv/), or
+your [preferred package manager](installation.md):
 
 ```console
+$ # With uv.
+$ uv tool install ruff
+
+$ # With pip.
 $ pip install ruff
+
+$ # With pipx.
+$ pipx install ruff
 ```
 
 Let's then assume that our project structure looks like:
