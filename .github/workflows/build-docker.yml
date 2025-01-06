@@ -48,11 +48,13 @@ jobs:
 
       - name: Check tag consistency
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+        env:
+          TAG: ${{ inputs.plan != '' && fromJson(inputs.plan).announcement_tag || 'dry-run' }}
         run: |
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ fromJson(inputs.plan).announcement_tag }}" != "${version}" ]; then
+          if [ "${TAG}" != "${version}" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ fromJson(inputs.plan).announcement_tag }}" >&2
+            echo "${TAG}" >&2
             echo "${version}" >&2
             exit 1
           else
@@ -175,6 +177,8 @@ jobs:
 
       - name: Generate Dynamic Dockerfile Tags
         shell: bash
+        env:
+          TAG_VALUE: ${{ fromJson(inputs.plan).announcement_tag }}
         run: |
           set -euo pipefail
 
@@ -195,8 +199,8 @@ jobs:
           # Loop through all base tags and append its docker metadata pattern to the list
           # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
           IFS=','; for TAG in ${BASE_TAGS}; do
-            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ version }},suffix=-${TAG},value=${{ fromJson(inputs.plan).announcement_tag }}\n"
-            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ major }}.{{ minor }},suffix=-${TAG},value=${{ fromJson(inputs.plan).announcement_tag }}\n"
+            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ version }},suffix=-${TAG},value=${TAG_VALUE}\n"
+            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ major }}.{{ minor }},suffix=-${TAG},value=${TAG_VALUE}}\n"
             TAG_PATTERNS="${TAG_PATTERNS}type=raw,value=${TAG}\n"
           done
 
