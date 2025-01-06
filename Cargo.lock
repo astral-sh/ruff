@@ -470,7 +470,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1463,6 +1463,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2293,7 +2302,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "indexmap",
  "insta",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "memchr",
  "ordermap",
  "quickcheck",
@@ -2540,7 +2549,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "log",
  "mimalloc",
  "notify",
@@ -2606,7 +2615,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "regex",
  "ruff_macros",
  "seahash",
@@ -2655,7 +2664,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "libcst",
  "pretty_assertions",
  "rayon",
@@ -2755,7 +2764,7 @@ dependencies = [
  "insta",
  "is-macro",
  "is-wsl",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "libcst",
  "log",
  "memchr",
@@ -2803,7 +2812,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
@@ -2815,7 +2824,7 @@ name = "ruff_notebook"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "rand",
  "ruff_diagnostics",
  "ruff_source_file",
@@ -2836,7 +2845,7 @@ dependencies = [
  "bitflags 2.6.0",
  "compact_str",
  "is-macro",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "memchr",
  "ruff_cache",
  "ruff_macros",
@@ -2878,7 +2887,7 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "memchr",
  "regex",
  "ruff_cache",
@@ -2916,7 +2925,7 @@ name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.6.0",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "ruff_python_ast",
  "unic-ucd-category",
 ]
@@ -2985,7 +2994,7 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "ruff_source_file",
  "ruff_text_size",
  "unicode-ident",
@@ -3090,7 +3099,7 @@ dependencies = [
  "globset",
  "ignore",
  "is-macro",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "log",
  "matchit",
  "path-absolutize",
