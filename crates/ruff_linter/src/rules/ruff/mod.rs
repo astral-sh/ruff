@@ -421,6 +421,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
+    #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
