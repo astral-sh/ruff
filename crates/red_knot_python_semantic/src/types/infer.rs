@@ -1782,13 +1782,42 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
         // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
         // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
+        // TODO(dcreager): We're currently creating standalone expressions for top-level value and
+        // class patterns, but not for nested ones.  Consider always creating standalone
+        // expressions for these forms, even if they appear as subpatterns, to eliminate the
+        // difference here between `infer_match_pattern` and `infer_nested_match_pattern`.
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value);
             }
+            ast::Pattern::MatchClass(match_class) => {
+                let ast::PatternMatchClass {
+                    range: _,
+                    cls,
+                    arguments,
+                } = match_class;
+                for pattern in &arguments.patterns {
+                    self.infer_nested_match_pattern(pattern);
+                }
+                for keyword in &arguments.keywords {
+                    self.infer_nested_match_pattern(&keyword.pattern);
+                }
+                self.infer_standalone_expression(cls);
+            }
+            _ => {
+                self.infer_nested_match_pattern(pattern);
+            }
+        }
+    }
+
+    fn infer_nested_match_pattern(&mut self, pattern: &ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchValue(match_value) => {
+                self.infer_expression(&match_value.value);
+            }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
@@ -1802,7 +1831,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(key);
                 }
                 for pattern in patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -1812,21 +1841,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     arguments,
                 } = match_class;
                 for pattern in &arguments.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.infer_match_pattern(&keyword.pattern);
+                    self.infer_nested_match_pattern(&keyword.pattern);
                 }
-                self.infer_standalone_expression(cls);
+                self.infer_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
-                    self.infer_match_pattern(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
