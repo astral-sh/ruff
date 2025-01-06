@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for DataclassEnum {
 pub(crate) fn dataclass_enum(checker: &mut Checker, class_def: &StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some(DataclassKind::Stdlib { decorator }) = dataclass_kind(class_def, semantic) else {
+    let Some((DataclassKind::Stdlib, decorator)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 

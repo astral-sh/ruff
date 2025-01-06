@@ -93,7 +93,7 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
         ScopeKind::Class(class_def) => {
             if !matches!(
                 dataclass_kind(class_def, checker.semantic()),
-                Some(DataclassKind::Stdlib { .. })
+                Some((DataclassKind::Stdlib, _))
             ) {
                 return;
             }
