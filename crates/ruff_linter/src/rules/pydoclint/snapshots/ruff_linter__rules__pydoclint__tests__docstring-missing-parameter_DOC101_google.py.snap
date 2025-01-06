@@ -1,31 +1,23 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC101_google.py:203:1: DOC101 Parameter `b` missing from the docstring
+DOC101_google.py:203:5: DOC101 Parameter `b` missing from the docstring
     |
-201 |       Adds two numbers and returns the result.
-202 |   
-203 | /     Args:
-204 | |         a (int): The first number to add.
-205 | | 
-206 | |     Returns:
-    | |_^ DOC101
-207 |           int: The sum of the two numbers.
-208 |       """
+201 |     Adds two numbers and returns the result.
+202 | 
+203 |     Args:
+    |     ^^^^ DOC101
+204 |         a (int): The first number to add.
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_google.py:217:1: DOC101 Parameter `multiplier` missing from the docstring
+DOC101_google.py:217:5: DOC101 Parameter `multiplier` missing from the docstring
     |
-215 |       Multiplies each element in a list by a given multiplier.
-216 |   
-217 | /     Args:
-218 | |         lst (list of int): A list of integers.
-219 | | 
-220 | |     Returns:
-    | |_^ DOC101
-221 |           list of int: A new list with each element multiplied.
-222 |       """
+215 |     Multiplies each element in a list by a given multiplier.
+216 | 
+217 |     Args:
+    |     ^^^^ DOC101
+218 |         lst (list of int): A list of integers.
     |
     = help: Add the missing parameter to the docstring
 
@@ -45,76 +37,55 @@ DOC101_google.py:228:5: DOC101 Parameter `numbers` missing from the docstring
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_google.py:242:1: DOC101 These parameters are missing from the docstring: `name`, `age`
+DOC101_google.py:242:5: DOC101 These parameters are missing from the docstring: `name`, `age`
     |
-240 |       Creates a user profile with basic information.
-241 |   
-242 | /     Args:
-243 | |         email (str): The user's email address.
-244 | |         location (str): The location of the user.
-245 | | 
-246 | |     Returns:
-    | |_^ DOC101
-247 |           dict: A dictionary containing the user's profile.
-248 |       """
+240 |     Creates a user profile with basic information.
+241 | 
+242 |     Args:
+    |     ^^^^ DOC101
+243 |         email (str): The user's email address.
+244 |         location (str): The location of the user.
     |
     = help: Add the missing parameters to the docstring
 
-DOC101_google.py:262:1: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
+DOC101_google.py:262:5: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
     |
-260 |       Calculates the total price after applying tax and a discount.
-261 |   
-262 | /     Args:
-263 | |         item_prices (list of float): A list of prices for each item.
-264 | | 
-265 | |     Returns:
-    | |_^ DOC101
-266 |           float: The final total price after tax and discount.
-267 |       """
+260 |     Calculates the total price after applying tax and a discount.
+261 | 
+262 |     Args:
+    |     ^^^^ DOC101
+263 |         item_prices (list of float): A list of prices for each item.
     |
     = help: Add the missing parameters to the docstring
 
-DOC101_google.py:279:1: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
+DOC101_google.py:279:5: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
     |
-277 |       Sends an email to the specified recipients.
-278 |   
-279 | /     Args:
-280 | |         subject (str): The subject of the email.
-281 | |         body (str): The content of the email.
-282 | |         to_address (str): The recipient's email address.
-283 | | 
-284 | |     Returns:
-    | |_^ DOC101
-285 |           bool: True if the email was sent successfully, False otherwise.
-286 |       """
+277 |     Sends an email to the specified recipients.
+278 | 
+279 |     Args:
+    |     ^^^^ DOC101
+280 |         subject (str): The subject of the email.
+281 |         body (str): The content of the email.
     |
     = help: Add the missing parameters to the docstring
 
-DOC101_google.py:295:1: DOC101 Parameter `args` missing from the docstring
+DOC101_google.py:295:5: DOC101 Parameter `args` missing from the docstring
     |
-293 |       Concatenates multiple strings with a specified separator.
-294 |   
-295 | /     Args:
-296 | |         separator (str): The separator to use between strings.
-297 | | 
-298 | |     Returns:
-    | |_^ DOC101
-299 |           str: A single concatenated string.
-300 |       """
+293 |     Concatenates multiple strings with a specified separator.
+294 | 
+295 |     Args:
+    |     ^^^^ DOC101
+296 |         separator (str): The separator to use between strings.
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_google.py:309:1: DOC101 These parameters are missing from the docstring: `items`, `details`
+DOC101_google.py:309:5: DOC101 These parameters are missing from the docstring: `items`, `details`
     |
-307 |       Processes an order with a list of items and optional order details.
-308 |   
-309 | /     Args:
-310 | |         order_id (int): The unique identifier for the order.
-311 | | 
-312 | |     Returns:
-    | |_^ DOC101
-313 |           dict: A dictionary containing the order summary.
-314 |       """
+307 |     Processes an order with a list of items and optional order details.
+308 | 
+309 |     Args:
+    |     ^^^^ DOC101
+310 |         order_id (int): The unique identifier for the order.
     |
     = help: Add the missing parameters to the docstring
 
@@ -134,17 +105,13 @@ DOC101_google.py:329:9: DOC101 Parameter `value` missing from the docstring
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_google.py:342:1: DOC101 Parameter `number2` missing from the docstring
+DOC101_google.py:342:9: DOC101 Parameter `number2` missing from the docstring
     |
-340 |           Adds a number to the current value.
-341 |   
-342 | /         Args:
-343 | |             number (int or float): The number to add to the current value.
-344 | | 
-345 | |         Returns:
-    | |_^ DOC101
-346 |               int or float: The updated value after addition.
-347 |           """
+340 |         Adds a number to the current value.
+341 | 
+342 |         Args:
+    |         ^^^^ DOC101
+343 |             number (int or float): The number to add to the current value.
     |
     = help: Add the missing parameter to the docstring
 

@@ -1,35 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC101_numpy.py:265:1: DOC101 Parameter `b` missing from the docstring
+DOC101_numpy.py:265:5: DOC101 Parameter `b` missing from the docstring
     |
-263 |       Adds two numbers and returns the result.
-264 |   
-265 | /     Parameters
-266 | |     ----------
-267 | |     a : int
-268 | |         The first number to add.
-269 | | 
-270 | |     Returns
-    | |_^ DOC101
-271 |       -------
-272 |       int
+263 |     Adds two numbers and returns the result.
+264 | 
+265 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+266 |     ----------
+267 |     a : int
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_numpy.py:283:1: DOC101 Parameter `multiplier` missing from the docstring
+DOC101_numpy.py:283:5: DOC101 Parameter `multiplier` missing from the docstring
     |
-281 |       Multiplies each element in a list by a given multiplier.
-282 |   
-283 | /     Parameters
-284 | |     ----------
-285 | |     lst : list of int
-286 | |         A list of integers.
-287 | | 
-288 | |     Returns
-    | |_^ DOC101
-289 |       -------
-290 |       list of int
+281 |     Multiplies each element in a list by a given multiplier.
+282 | 
+283 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+284 |     ----------
+285 |     lst : list of int
     |
     = help: Add the missing parameter to the docstring
 
@@ -51,89 +41,58 @@ DOC101_numpy.py:298:5: DOC101 Parameter `numbers` missing from the docstring
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_numpy.py:314:1: DOC101 These parameters are missing from the docstring: `name`, `age`
+DOC101_numpy.py:314:5: DOC101 These parameters are missing from the docstring: `name`, `age`
     |
-312 |       Creates a user profile with basic information.
-313 |   
-314 | /     Parameters
-315 | |     ----------
-316 | |     email : str
-317 | |         The user's email address.
-318 | |     location : str, optional
-319 | |         The location of the user, by default "here".
-320 | | 
-321 | |     Returns
-    | |_^ DOC101
-322 |       -------
-323 |       dict
+312 |     Creates a user profile with basic information.
+313 | 
+314 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+315 |     ----------
+316 |     email : str
     |
     = help: Add the missing parameters to the docstring
 
-DOC101_numpy.py:339:1: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
+DOC101_numpy.py:339:5: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
     |
-337 |       Calculates the total price after applying tax and a discount.
-338 |   
-339 | /     Parameters
-340 | |     ----------
-341 | |     item_prices : list of float
-342 | |         A list of prices for each item.
-343 | | 
-344 | |     Returns
-    | |_^ DOC101
-345 |       -------
-346 |       float
+337 |     Calculates the total price after applying tax and a discount.
+338 | 
+339 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+340 |     ----------
+341 |     item_prices : list of float
     |
     = help: Add the missing parameters to the docstring
 
-DOC101_numpy.py:360:1: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
+DOC101_numpy.py:360:5: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
     |
-358 |       Sends an email to the specified recipients.
-359 |   
-360 | /     Parameters
-361 | |     ----------
-362 | |     subject : str
-363 | |         The subject of the email.
-364 | |     body : str
-365 | |         The content of the email.
-366 | |     to_address : str
-367 | |         The recipient's email address.
-368 | | 
-369 | |     Returns
-    | |_^ DOC101
-370 |       -------
-371 |       bool
+358 |     Sends an email to the specified recipients.
+359 | 
+360 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+361 |     ----------
+362 |     subject : str
     |
     = help: Add the missing parameters to the docstring
 
-DOC101_numpy.py:382:1: DOC101 Parameter `args` missing from the docstring
+DOC101_numpy.py:382:5: DOC101 Parameter `args` missing from the docstring
     |
-380 |       Concatenates multiple strings with a specified separator.
-381 |   
-382 | /     Parameters
-383 | |     ----------
-384 | |     separator : str
-385 | |         The separator to use between strings.
-386 | | 
-387 | |     Returns
-    | |_^ DOC101
-388 |       -------
-389 |       str
+380 |     Concatenates multiple strings with a specified separator.
+381 | 
+382 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+383 |     ----------
+384 |     separator : str
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_numpy.py:400:1: DOC101 These parameters are missing from the docstring: `items`, `details`
+DOC101_numpy.py:400:5: DOC101 These parameters are missing from the docstring: `items`, `details`
     |
-398 |       Processes an order with a list of items and optional order details.
-399 |   
-400 | /     Parameters
-401 | |     ----------
-402 | |     order_id : int
-403 | |         The unique identifier for the order.
-404 | | 
-405 | |     Returns
-    | |_^ DOC101
-406 |       -------
-407 |       dict
+398 |     Processes an order with a list of items and optional order details.
+399 | 
+400 |     Parameters
+    |     ^^^^^^^^^^ DOC101
+401 |     ----------
+402 |     order_id : int
     |
     = help: Add the missing parameters to the docstring
 
@@ -151,19 +110,14 @@ DOC101_numpy.py:424:9: DOC101 Parameter `value` missing from the docstring
     |
     = help: Add the missing parameter to the docstring
 
-DOC101_numpy.py:435:1: DOC101 Parameter `number2` missing from the docstring
+DOC101_numpy.py:435:9: DOC101 Parameter `number2` missing from the docstring
     |
-433 |           Adds two numbers to the current value.
-434 |   
-435 | /         Parameters
-436 | |         ----------
-437 | |         number : int or float
-438 | |             The first number to add.
-439 | | 
-440 | |         Returns
-    | |_^ DOC101
-441 |           -------
-442 |           int or float
+433 |         Adds two numbers to the current value.
+434 | 
+435 |         Parameters
+    |         ^^^^^^^^^^ DOC101
+436 |         ----------
+437 |         number : int or float
     |
     = help: Add the missing parameter to the docstring
 

@@ -1,182 +1,130 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC102_google.py:6:1: DOC102 Documented parameter `a` is not in the function's signature
+DOC102_google.py:6:5: DOC102 Documented parameter `a` is not in the function's signature
+  |
+4 |     Adds two numbers and returns the result.
+5 | 
+6 |     Args:
+  |     ^^^^ DOC102
+7 |         a (int): The first number to add.
+8 |         b (int): The second number to add.
+  |
+  = help: Remove the extraneous parameter from the docstring
+
+DOC102_google.py:21:5: DOC102 Documented parameter `multiplier` is not in the function's signature
    |
- 4 |       Adds two numbers and returns the result.
- 5 |   
- 6 | /     Args:
- 7 | |         a (int): The first number to add.
- 8 | |         b (int): The second number to add.
- 9 | | 
-10 | |     Returns:
-   | |_^ DOC102
-11 |           int: The sum of the two numbers.
-12 |       """
+19 |     Multiplies each element in a list by a given multiplier.
+20 | 
+21 |     Args:
+   |     ^^^^ DOC102
+22 |         lst (list of int): A list of integers.
+23 |         multiplier (int): The multiplier for each element in the list.
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:21:1: DOC102 Documented parameter `multiplier` is not in the function's signature
+DOC102_google.py:36:5: DOC102 Documented parameter `numbers` is not in the function's signature
    |
-19 |       Multiplies each element in a list by a given multiplier.
-20 |   
-21 | /     Args:
-22 | |         lst (list of int): A list of integers.
-23 | |         multiplier (int): The multiplier for each element in the list.
-24 | | 
-25 | |     Returns:
-   | |_^ DOC102
-26 |           list of int: A new list with each element multiplied.
-27 |       """
+34 |     Finds the maximum value in a list of numbers.
+35 | 
+36 |     Args:
+   |     ^^^^ DOC102
+37 |         numbers (list of int): A list of integers to search through.
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:36:1: DOC102 Documented parameter `numbers` is not in the function's signature
+DOC102_google.py:50:5: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
    |
-34 |       Finds the maximum value in a list of numbers.
-35 |   
-36 | /     Args:
-37 | |         numbers (list of int): A list of integers to search through.
-38 | | 
-39 | |     Returns:
-   | |_^ DOC102
-40 |           int: The maximum value found in the list.
-41 |       """
-   |
-   = help: Remove the extraneous parameter from the docstring
-
-DOC102_google.py:50:1: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
-   |
-48 |       Creates a user profile with basic information.
-49 |   
-50 | /     Args:
-51 | |         name (str): The name of the user.
-52 | |         age (int): The age of the user.
-53 | |         email (str): The user's email address.
-54 | |         location (str): The location of the user.
-55 | | 
-56 | |     Returns:
-   | |_^ DOC102
-57 |           dict: A dictionary containing the user's profile.
-58 |       """
+48 |     Creates a user profile with basic information.
+49 | 
+50 |     Args:
+   |     ^^^^ DOC102
+51 |         name (str): The name of the user.
+52 |         age (int): The age of the user.
    |
    = help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:72:1: DOC102 Documented parameter `tax_rate` is not in the function's signature
+DOC102_google.py:72:5: DOC102 Documented parameter `tax_rate` is not in the function's signature
    |
-70 |       Calculates the total price after applying tax and a discount.
-71 |   
-72 | /     Args:
-73 | |         item_prices (list of float): A list of prices for each item.
-74 | |         tax_rate (float): The tax rate to apply.
-75 | |         discount (float): The discount to subtract from the total.
-76 | | 
-77 | |     Returns:
-   | |_^ DOC102
-78 |           float: The final total price after tax and discount.
-79 |       """
+70 |     Calculates the total price after applying tax and a discount.
+71 | 
+72 |     Args:
+   |     ^^^^ DOC102
+73 |         item_prices (list of float): A list of prices for each item.
+74 |         tax_rate (float): The tax rate to apply.
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:91:1: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
+DOC102_google.py:91:5: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
+   |
+89 |     Sends an email to the specified recipients.
+90 | 
+91 |     Args:
+   |     ^^^^ DOC102
+92 |         subject (str): The subject of the email.
+93 |         body (str): The content of the email.
+   |
+   = help: Remove the extraneous parameters from the docstring
+
+DOC102_google.py:109:5: DOC102 Documented parameter `separator` is not in the function's signature
     |
- 89 |       Sends an email to the specified recipients.
- 90 |   
- 91 | /     Args:
- 92 | |         subject (str): The subject of the email.
- 93 | |         body (str): The content of the email.
- 94 | |         to_address (str): The recipient's email address.
- 95 | |         cc_address (str, optional): The email address for CC. Defaults to None.
- 96 | |         bcc_address (str, optional): The email address for BCC. Defaults to None.
- 97 | | 
- 98 | |     Returns:
-    | |_^ DOC102
- 99 |           bool: True if the email was sent successfully, False otherwise.
-100 |       """
+107 |     Concatenates multiple strings with a specified separator.
+108 | 
+109 |     Args:
+    |     ^^^^ DOC102
+110 |         separator (str): The separator to use between strings.
+111 |         *args (str): Variable length argument list of strings to concatenate.
+    |
+    = help: Remove the extraneous parameter from the docstring
+
+DOC102_google.py:124:5: DOC102 These documented parameters are not in the function's signature: `items`, `details`
+    |
+122 |     Processes an order with a list of items and optional order details.
+123 | 
+124 |     Args:
+    |     ^^^^ DOC102
+125 |         order_id (int): The unique identifier for the order.
+126 |         *items (str): Variable length argument list of items in the order.
     |
     = help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:109:1: DOC102 Documented parameter `separator` is not in the function's signature
+DOC102_google.py:149:9: DOC102 Documented parameter `value` is not in the function's signature
     |
-107 |       Concatenates multiple strings with a specified separator.
-108 |   
-109 | /     Args:
-110 | |         separator (str): The separator to use between strings.
-111 | |         *args (str): Variable length argument list of strings to concatenate.
-112 | | 
-113 | |     Returns:
-    | |_^ DOC102
-114 |           str: A single concatenated string.
-115 |       """
+147 |         Initializes the calculator with an initial value.
+148 | 
+149 |         Args:
+    |         ^^^^ DOC102
+150 |             value (int, optional): The initial value of the calculator. Defaults to 0.
+151 |         """
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:124:1: DOC102 These documented parameters are not in the function's signature: `items`, `details`
+DOC102_google.py:159:9: DOC102 Documented parameter `number` is not in the function's signature
     |
-122 |       Processes an order with a list of items and optional order details.
-123 |   
-124 | /     Args:
-125 | |         order_id (int): The unique identifier for the order.
-126 | |         *items (str): Variable length argument list of items in the order.
-127 | |         **details (dict): Additional details such as shipping method and address.
-128 | | 
-129 | |     Returns:
-    | |_^ DOC102
-130 |           dict: A dictionary containing the order summary.
-131 |       """
-    |
-    = help: Remove the extraneous parameters from the docstring
-
-DOC102_google.py:149:1: DOC102 Documented parameter `value` is not in the function's signature
-    |
-147 |           Initializes the calculator with an initial value.
-148 |   
-149 | /         Args:
-150 | |             value (int, optional): The initial value of the calculator. Defaults to 0.
-151 | |         """
-    | |________^ DOC102
-152 |           self.value = value
+157 |         Adds a number to the current value.
+158 | 
+159 |         Args:
+    |         ^^^^ DOC102
+160 |             number (int or float): The number to add to the current value.
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:159:1: DOC102 Documented parameter `number` is not in the function's signature
+DOC102_google.py:174:9: DOC102 Documented parameter `value_str` is not in the function's signature
     |
-157 |           Adds a number to the current value.
-158 |   
-159 | /         Args:
-160 | |             number (int or float): The number to add to the current value.
-161 | | 
-162 | |         Returns:
-    | |_^ DOC102
-163 |               int or float: The updated value after addition.
-164 |           """
+172 |         Creates a Calculator instance from a string representation of a number.
+173 | 
+174 |         Args:
+    |         ^^^^ DOC102
+175 |             value_str (str): The string representing the initial value.
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:174:1: DOC102 Documented parameter `value_str` is not in the function's signature
+DOC102_google.py:189:9: DOC102 Documented parameter `number` is not in the function's signature
     |
-172 |           Creates a Calculator instance from a string representation of a number.
-173 |   
-174 | /         Args:
-175 | |             value_str (str): The string representing the initial value.
-176 | | 
-177 | |         Returns:
-    | |_^ DOC102
-178 |               Calculator: A new instance of Calculator initialized with the value from the string.
-179 |           """
-    |
-    = help: Remove the extraneous parameter from the docstring
-
-DOC102_google.py:189:1: DOC102 Documented parameter `number` is not in the function's signature
-    |
-187 |           Checks if a given number is valid (int or float).
-188 |   
-189 | /         Args:
-190 | |             number (any): The value to check.
-191 | | 
-192 | |         Returns:
-    | |_^ DOC102
-193 |               bool: True if the number is valid, False otherwise.
-194 |           """
+187 |         Checks if a given number is valid (int or float).
+188 | 
+189 |         Args:
+    |         ^^^^ DOC102
+190 |             number (any): The value to check.
     |
     = help: Remove the extraneous parameter from the docstring

@@ -555,7 +555,7 @@ impl<'a> ParametersSection<'a> {
     fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
             parameters: parse_parameters(section.following_lines_str(), style),
-            range: section.range(),
+            range: section.section_name_range(),
         }
     }
 }
