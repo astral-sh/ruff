@@ -3,6 +3,7 @@ use super::{ClassBase, ClassLiteralType, Db, KnownClass, Symbol, Type};
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
+    // Keep this field private, so that the only way of constructing the struct is through the `from` method.
     subclass_of: ClassBase<'db>,
 }
 

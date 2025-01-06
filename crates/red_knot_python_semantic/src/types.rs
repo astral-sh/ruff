@@ -878,26 +878,30 @@ impl<'db> Type<'db> {
             // as that type is equivalent to `type[Any, ...]` (and therefore not a fully static type).
             (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
 
-            // `Type::ClassLiteral` always delegates to its nearest proper supertype.
-            //
-            // Whether the nearest proper supertype is a `Type::SubclassOf` variant or a
-            // `Type::Instance` variant depends on the eager simplifications made by the `SubclassOfType`
-            // constructor, which can e.g. return a `Type::ClassLiteral` variant if the class is `@final`.
-            // This would be the same type as `self`, so we'd have infinite recursion if we naively
-            // delegated to `SubclassOfType::from(db, class)` here.
-            (Type::ClassLiteral(ClassLiteralType { class }), _) => {
-                let subclass_of_supertype = SubclassOfType::from(db, class);
-                if subclass_of_supertype == self {
-                    KnownClass::Type.to_instance(db).is_subtype_of(db, target)
-                } else {
-                    subclass_of_supertype.is_subtype_of(db, target)
-                }
-            }
+            // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
+            // since `type[B]` describes all possible runtime subclasses of the class object `B`.
+            (
+                Type::ClassLiteral(ClassLiteralType { class }),
+                Type::SubclassOf(target_subclass_ty),
+            ) => target_subclass_ty
+                .subclass_of()
+                .into_class()
+                .is_some_and(|target_class| class.is_subclass_of(db, target_class)),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
+
+            // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
+            // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
+            // is an instance of its metaclass `abc.ABCMeta`.
+            (
+                Type::ClassLiteral(ClassLiteralType { class: self_class }),
+                Type::Instance(InstanceType {
+                    class: target_class,
+                }),
+            ) => self_class.is_instance_of(db, target_class),
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
@@ -910,15 +914,15 @@ impl<'db> Type<'db> {
                 Type::Instance(InstanceType {
                     class: target_class,
                 }),
-            ) => match subclass_of_ty.subclass_of() {
-                ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown => {
-                    unreachable!("Non-fully-static types do not participate in subtyping")
-                }
-                ClassBase::Class(subclass_class) => subclass_class.is_instance_of(db, target_class),
-            },
+            ) => subclass_of_ty
+                .subclass_of()
+                .into_class()
+                .is_some_and(|subclass_class| subclass_class.is_instance_of(db, target_class)),
 
-            // Other than the cases enumerated above, `type[]` just delegates to `Instance("type")`
-            (Type::SubclassOf(_), _) => KnownClass::Type.to_instance(db).is_subtype_of(db, target),
+            // Other than the cases enumerated above, `type[]` and class-literal types just delegate to `Instance("type")`
+            (Type::SubclassOf(_) | Type::ClassLiteral(_), _) => {
+                KnownClass::Type.to_instance(db).is_subtype_of(db, target)
+            }
 
             // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::Instance(_SpecialForm)`,
             // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
@@ -3953,6 +3957,7 @@ pub(crate) mod tests {
     #[test_case(Ty::AlwaysFalsy, Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Never, Ty::AlwaysTruthy)]
     #[test_case(Ty::Never, Ty::AlwaysFalsy)]
+    #[test_case(Ty::BuiltinClassLiteral("bool"), Ty::SubclassOfBuiltinClass("int"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
