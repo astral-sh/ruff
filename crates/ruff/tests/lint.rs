@@ -781,7 +781,7 @@ fn each_toml_option_requires_a_new_flag_2() {
 }
 
 #[test]
-fn value_given_to_table_key_is_not_inline_table() {
+fn value_given_to_table_key_is_not_inline_table_1() {
     // https://github.com/astral-sh/ruff/issues/13995
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -815,6 +815,57 @@ fn value_given_to_table_key_is_not_inline_table() {
 
     For more information, try '--help'.
     "#);
+}
+
+#[test]
+fn value_given_to_table_key_is_not_inline_table_2() {
+    // https://github.com/astral-sh/ruff/issues/13995
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        // spaces *also* can't be used to delimit different config overrides;
+        // you need a new --config flag for each override
+        .args([".", "--config", r#"lint=123"#]),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'lint=123' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    `lint` is a table of configuration options.
+    Did you want to override one of the table's subkeys?
+
+    Possible choices:
+
+    - `lint.allowed-confusables`
+    - `lint.dummy-variable-rgx`
+    - `lint.extend-ignore`
+    - `lint.extend-select`
+    - `lint.extend-fixable`
+    - `lint.external`
+    - `lint.fixable`
+    - `lint.ignore`
+    - `lint.extend-safe-fixes`
+    - `lint.extend-unsafe-fixes`
+    - `lint.ignore-init-module-imports`
+    - `lint.logger-objects`
+    - `lint.select`
+    - `lint.explicit-preview-rules`
+    - `lint.task-tags`
+    - `lint.typing-modules`
+    - `lint.unfixable`
+    - `lint.per-file-ignores`
+    - `lint.extend-per-file-ignores`
+    - `lint.exclude`
+    - `lint.preview`
+
+    For more information, try '--help'.
+    ");
 }
 
 #[test]

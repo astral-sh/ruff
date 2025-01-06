@@ -975,10 +975,12 @@ The path `{value}` does not point to a configuration file"
 
             match Options::metadata().find(key) {
                 Some(OptionEntry::Set(set)) if !value.starts_with('{') => {
-                    let prefixed_subkeys = format!("{set}")
-                        .trim_ascii()
-                        .split('\n')
-                        .map(|child| format!("- `{key}.{child}`"))
+                    let prefixed_subfields = set
+                        .collect_entries()
+                        .iter()
+                        .filter_map(|(name, entry)| {
+                            entry.is_field().then(|| format!("- `{key}.{name}`"))
+                        })
                         .join("\n");
 
                     tip.push_str(&format!(
@@ -989,7 +991,7 @@ Did you want to override one of the table's subkeys?
 
 Possible choices:
 
-{prefixed_subkeys}"
+{prefixed_subfields}"
                     ));
                 }
                 _ => {
