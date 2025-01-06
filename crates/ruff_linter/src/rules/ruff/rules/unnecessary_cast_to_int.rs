@@ -114,7 +114,7 @@ fn unwrap_int_expression(
         let parenthesize = semantic.current_expression_parent().is_some()
             || argument.is_named_expr()
             || locator.count_lines(argument.range()) > 0;
-        if parenthesize && !has_own_parentheses(argument, source) {
+        if parenthesize && !has_own_parentheses(argument, comment_ranges, source) {
             format!("({})", locator.slice(argument.range()))
         } else {
             locator.slice(argument.range()).to_string()
@@ -229,7 +229,7 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
 }
 
 /// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
-fn has_own_parentheses(expr: &Expr, source: &str) -> bool {
+fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str) -> bool {
     match expr {
         Expr::ListComp(_)
         | Expr::SetComp(_)
@@ -250,11 +250,27 @@ fn has_own_parentheses(expr: &Expr, source: &str) -> bool {
             // f
             // (10)
             // ```
-            lines_after_ignoring_trivia(call_expr.func.end(), source) == 0
+            let func_end = parenthesized_range(
+                call_expr.func.as_ref().into(),
+                call_expr.into(),
+                comment_ranges,
+                source,
+            )
+            .unwrap_or(call_expr.func.range())
+            .end();
+            lines_after_ignoring_trivia(func_end, source) == 0
         }
         Expr::Subscript(subscript_expr) => {
             // Same as above
-            lines_after_ignoring_trivia(subscript_expr.value.end(), source) == 0
+            let subscript_end = parenthesized_range(
+                subscript_expr.value.as_ref().into(),
+                subscript_expr.into(),
+                comment_ranges,
+                source,
+            )
+            .unwrap_or(subscript_expr.value.range())
+            .end();
+            lines_after_ignoring_trivia(subscript_end, source) == 0
         }
         Expr::Generator(generator) => generator.parenthesized,
         Expr::Tuple(tuple) => tuple.parenthesized,
