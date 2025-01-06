@@ -556,6 +556,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::SubclassBuiltin) {
                 refurb::rules::subclass_builtin(checker, class_def);
             }
+            if checker.enabled(Rule::DataclassEnum) {
+                ruff::rules::dataclass_enum(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {

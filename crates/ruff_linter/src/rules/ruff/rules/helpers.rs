@@ -49,8 +49,8 @@ pub(super) fn is_dataclass_field(
     dataclass_kind: DataclassKind,
 ) -> bool {
     match dataclass_kind {
-        DataclassKind::Attrs(..) => is_attrs_field(func, semantic),
-        DataclassKind::Stdlib => is_stdlib_dataclass_field(func, semantic),
+        DataclassKind::Attrs { .. } => is_attrs_field(func, semantic),
+        DataclassKind::Stdlib { .. } => is_stdlib_dataclass_field(func, semantic),
     }
 }
 
@@ -93,30 +93,32 @@ pub(super) enum AttrsAutoAttribs {
 }
 
 /// Enumeration of various kinds of dataclasses recognised by Ruff
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum DataclassKind {
+#[derive(Debug, Copy, Clone, PartialEq, is_macro::Is)]
+pub(super) enum DataclassKind<'a> {
     /// dataclasses created by the stdlib `dataclasses` module
-    Stdlib,
+    Stdlib { decorator: &'a ast::Decorator },
     /// dataclasses created by the third-party `attrs` library
-    Attrs(AttrsAutoAttribs),
+    Attrs {
+        auto_attribs: AttrsAutoAttribs,
+        decorator: &'a ast::Decorator,
+    },
 }
 
-impl DataclassKind {
-    pub(super) const fn is_stdlib(self) -> bool {
-        matches!(self, DataclassKind::Stdlib)
-    }
-
-    pub(super) const fn is_attrs(self) -> bool {
-        matches!(self, DataclassKind::Attrs(..))
+impl<'a> DataclassKind<'a> {
+    pub(crate) fn decorator(&self) -> &'a ast::Decorator {
+        match self {
+            Self::Stdlib { decorator } => decorator,
+            Self::Attrs { decorator, .. } => decorator,
+        }
     }
 }
 
 /// Return the kind of dataclass this class definition is (stdlib or `attrs`),
 /// or `None` if the class is not a dataclass.
-pub(super) fn dataclass_kind(
-    class_def: &ast::StmtClassDef,
+pub(super) fn dataclass_kind<'a>(
+    class_def: &'a ast::StmtClassDef,
     semantic: &SemanticModel,
-) -> Option<DataclassKind> {
+) -> Option<DataclassKind<'a>> {
     if !(semantic.seen_module(Modules::DATACLASSES) || semantic.seen_module(Modules::ATTRS)) {
         return None;
     }
@@ -141,11 +143,17 @@ pub(super) fn dataclass_kind(
                         AttrsAutoAttribs::None
                     };
 
-                    return Some(DataclassKind::Attrs(auto_attribs));
+                    return Some(DataclassKind::Attrs {
+                        auto_attribs,
+                        decorator,
+                    });
                 };
 
                 let Some(auto_attribs) = arguments.find_keyword("auto_attribs") else {
-                    return Some(DataclassKind::Attrs(AttrsAutoAttribs::None));
+                    return Some(DataclassKind::Attrs {
+                        auto_attribs: AttrsAutoAttribs::None,
+                        decorator,
+                    });
                 };
 
                 let auto_attribs = match Truthiness::from_expr(&auto_attribs.value, |id| {
@@ -163,9 +171,12 @@ pub(super) fn dataclass_kind(
                     Truthiness::Unknown => AttrsAutoAttribs::Unknown,
                 };
 
-                return Some(DataclassKind::Attrs(auto_attribs));
+                return Some(DataclassKind::Attrs {
+                    auto_attribs,
+                    decorator,
+                });
             }
-            ["dataclasses", "dataclass"] => return Some(DataclassKind::Stdlib),
+            ["dataclasses", "dataclass"] => return Some(DataclassKind::Stdlib { decorator }),
             _ => continue,
         }
     }
