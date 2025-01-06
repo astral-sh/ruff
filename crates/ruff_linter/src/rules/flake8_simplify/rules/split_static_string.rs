@@ -41,7 +41,6 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
-/// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct SplitStaticString;
 

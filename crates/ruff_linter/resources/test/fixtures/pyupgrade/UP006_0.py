@@ -64,22 +64,3 @@ def f(x: typing.Deque[str]) -> None:
 
 def f(x: typing.DefaultDict[str, str]) -> None:
     ...
-
-
-def f(x: typing.AbstractSet[str]) -> None:
-    ...
-
-
-def f(x: typing.Pattern[str]) -> None:
-    ...
-
-
-def f(x: typing.Sequence[str]) -> None:
-    ...
-
-
-from typing import Collection
-
-
-def f(x: typing.Collection[str]) -> None:
-    ...

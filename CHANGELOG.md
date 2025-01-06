@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.6
+
+### Preview features
+
+- \[`format`\]: Preserve multiline implicit concatenated strings in docstring positions ([#15126](https://github.com/astral-sh/ruff/pull/15126))
+- \[`ruff`\] Add rule to detect empty literal in deque call (`RUF025`) ([#15104](https://github.com/astral-sh/ruff/pull/15104))
+- \[`ruff`\] Avoid reporting when `ndigits` is possibly negative (`RUF057`) ([#15234](https://github.com/astral-sh/ruff/pull/15234))
+
+### Rule changes
+
+- \[`flake8-todos`\] remove issue code length restriction (`TD003`) ([#15175](https://github.com/astral-sh/ruff/pull/15175))
+- \[`pyflakes`\] Ignore errors in `@no_type_check` string annotations (`F722`, `F821`) ([#15215](https://github.com/astral-sh/ruff/pull/15215))
+
+### CLI
+
+- Show errors for attempted fixes only when passed `--verbose` ([#15237](https://github.com/astral-sh/ruff/pull/15237))
+
+### Bug fixes
+
+- \[`ruff`\] Avoid syntax error when removing int over multiple lines (`RUF046`) ([#15230](https://github.com/astral-sh/ruff/pull/15230))
+- \[`pyupgrade`\] Revert "Add all PEP-585 names to `UP006` rule" ([#15250](https://github.com/astral-sh/ruff/pull/15250))
+
 ## 0.8.5
 
 ### Preview features

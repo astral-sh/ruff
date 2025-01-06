@@ -162,6 +162,11 @@ impl<'db> InferContext<'db> {
         }
     }
 
+    /// Are we currently inferring types in a stub file?
+    pub(crate) fn in_stub(&self) -> bool {
+        self.file.is_stub(self.db().upcast())
+    }
+
     #[must_use]
     pub(crate) fn finish(mut self) -> TypeCheckDiagnostics {
         self.bomb.defuse();
