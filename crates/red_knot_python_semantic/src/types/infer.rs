@@ -1786,20 +1786,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value);
             }
-            _ => {
-                self.infer_match_pattern_impl(pattern);
-            }
-        }
-    }
-
-    fn infer_match_pattern_impl(&mut self, pattern: &ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchValue(match_value) => {
-                self.infer_expression(&match_value.value);
-            }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
@@ -1813,7 +1802,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(key);
                 }
                 for pattern in patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -1823,21 +1812,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     arguments,
                 } = match_class;
                 for pattern in &arguments.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_match_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.infer_match_pattern_impl(&keyword.pattern);
+                    self.infer_match_pattern(&keyword.pattern);
                 }
                 self.infer_standalone_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}

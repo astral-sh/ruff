@@ -406,6 +406,12 @@ impl<'db> SemanticIndexBuilder<'db> {
     ) -> Constraint<'db> {
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
 
+        // NOTE: For any form that contains subpatterns, recurse into them and create pattern
+        // constraints for those subpatterns.  We aren't currently going to do anything with those
+        // yet, but as a side effect, that ensures that we always e.g. create standalone
+        // expressions for class and value patterns, no matter how deeply they appear.  (And that,
+        // in turn, means we don't need different logic in `infer_match_pattern` for whether a
+        // pattern is top-level or nested.)
         let kind = match pattern {
             ast::Pattern::MatchValue(pattern) => {
                 let value = self.add_standalone_expression(&pattern.value);
@@ -416,9 +422,40 @@ impl<'db> SemanticIndexBuilder<'db> {
             }
             ast::Pattern::MatchClass(pattern) => {
                 let cls = self.add_standalone_expression(&pattern.cls);
+                for pattern in &pattern.arguments.patterns {
+                    self.add_pattern_constraint(subject, pattern, None);
+                }
+                for keyword in &pattern.arguments.keywords {
+                    self.add_pattern_constraint(subject, &keyword.pattern, None);
+                }
                 PatternConstraintKind::Class(cls, guard)
             }
-            _ => PatternConstraintKind::Unsupported,
+
+            ast::Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                for pattern in patterns {
+                    self.add_pattern_constraint(subject, pattern, None);
+                }
+                PatternConstraintKind::Unsupported
+            }
+            ast::Pattern::MatchMapping(ast::PatternMatchMapping { patterns, .. }) => {
+                for pattern in patterns {
+                    self.add_pattern_constraint(subject, pattern, None);
+                }
+                PatternConstraintKind::Unsupported
+            }
+            ast::Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => {
+                if let Some(pattern) = pattern {
+                    self.add_pattern_constraint(subject, pattern, None);
+                }
+                PatternConstraintKind::Unsupported
+            }
+            ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+                for pattern in patterns {
+                    self.add_pattern_constraint(subject, pattern, None);
+                }
+                PatternConstraintKind::Unsupported
+            }
+            ast::Pattern::MatchStar(_) => PatternConstraintKind::Unsupported,
         };
 
         let pattern_constraint = PatternConstraint::new(
