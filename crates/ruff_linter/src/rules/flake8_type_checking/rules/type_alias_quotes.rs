@@ -98,6 +98,10 @@ impl Violation for UnquotedTypeAlias {
 /// type OptInt = int | None
 /// ```
 ///
+/// To achieve the same thing in stub files you should instead take a look at
+/// [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md), which gets rid
+/// of all the unnecessary quotes in stub files.
+///
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
