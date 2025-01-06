@@ -1118,14 +1118,14 @@ where
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
-                    let vis_constraint_id = self.record_visibility_constraint(constraint_id);
                     if let Some(expr) = &case.guard {
                         self.visit_expr(expr);
                     }
                     self.visit_body(&case.body);
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
+                    let vis_constraint_id = self.record_visibility_constraint(constraint_id);
                     vis_constraints.push(vis_constraint_id);
                 }
 
