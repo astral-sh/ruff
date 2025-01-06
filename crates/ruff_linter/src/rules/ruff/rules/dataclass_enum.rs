@@ -29,9 +29,9 @@ use ruff_text_size::Ranged;
 /// from dataclasses import dataclass
 /// from enum import Enum
 ///
+///
 /// @dataclass
-/// class E(Enum):
-///     ...
+/// class E(Enum): ...
 /// ```
 ///
 /// Use instead:
@@ -39,8 +39,8 @@ use ruff_text_size::Ranged;
 /// ```python
 /// from enum import Enum
 ///
-/// class E(Enum):
-///     ...
+///
+/// class E(Enum): ...
 /// ```
 ///
 /// ## References

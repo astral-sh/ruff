@@ -105,7 +105,7 @@ pub(super) enum DataclassKind<'a> {
 }
 
 impl<'a> DataclassKind<'a> {
-    pub(crate) fn decorator(&self) -> &'a ast::Decorator {
+    pub(crate) fn decorator(self) -> &'a ast::Decorator {
         match self {
             Self::Stdlib { decorator } => decorator,
             Self::Attrs { decorator, .. } => decorator,
