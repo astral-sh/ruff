@@ -42,7 +42,7 @@ where
 }
 
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, is_macro::Is)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
 #[serde(untagged)]
 pub enum OptionEntry {
     /// A single option.
@@ -286,20 +286,18 @@ impl OptionSet {
         }
     }
 
-    pub fn collect_entries(&self) -> Vec<(String, OptionEntry)> {
-        struct EntryCollector(pub Vec<(String, OptionEntry)>);
+    pub fn collect_fields(&self) -> Vec<(String, OptionField)> {
+        struct FieldsCollector(Vec<(String, OptionField)>);
 
-        impl Visit for EntryCollector {
+        impl Visit for FieldsCollector {
             fn record_field(&mut self, name: &str, field: OptionField) {
-                self.0.push((name.to_string(), OptionEntry::Field(field)));
+                self.0.push((name.to_string(), field));
             }
 
-            fn record_set(&mut self, name: &str, group: OptionSet) {
-                self.0.push((name.to_string(), OptionEntry::Set(group)));
-            }
+            fn record_set(&mut self, _name: &str, _group: OptionSet) {}
         }
 
-        let mut visitor = EntryCollector(vec![]);
+        let mut visitor = FieldsCollector(vec![]);
         self.record(&mut visitor);
         visitor.0
     }
