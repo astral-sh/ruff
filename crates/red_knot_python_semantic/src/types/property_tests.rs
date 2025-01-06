@@ -123,14 +123,61 @@ impl Arbitrary for Ty {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        // This is incredibly naive. We can do much better here by
-        // trying various subsets of the elements in unions, tuples,
-        // and intersections. For now, we only try to shrink by
-        // reducing unions/tuples/intersections to a single element.
         match self.clone() {
-            Ty::Union(types) => Box::new(types.into_iter()),
-            Ty::Tuple(types) => Box::new(types.into_iter()),
-            Ty::Intersection { pos, neg } => Box::new(pos.into_iter().chain(neg)),
+            Ty::Union(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
+                0 => None,
+                1 => Some(elts.into_iter().next().unwrap()),
+                _ => Some(Ty::Union(elts)),
+            })),
+            Ty::Tuple(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
+                0 => None,
+                1 => Some(elts.into_iter().next().unwrap()),
+                _ => Some(Ty::Tuple(elts)),
+            })),
+            Ty::Intersection { pos, neg } => {
+                // Shrinking on intersections is not exhaustive!
+                //
+                // We try to shrink the positive side or the negative side,
+                // but we aren't shrinking both at the same time.
+                //
+                // This should remove positive or negative constraints but
+                // won't shrink (A & B & ~C & ~D) to (A & ~C) in one shrink
+                // iteration.
+                //
+                // Instead, it hopes that (A & B & ~C) or (A & ~C & ~D) fails
+                // so that shrinking can happen there.
+                let pos_orig = pos.clone();
+                let neg_orig = neg.clone();
+                Box::new(
+                    // we shrink negative constraints first, as
+                    // intersections with only negative constraints are
+                    // more confusing
+                    neg.shrink()
+                        .map(move |shrunk_neg| Ty::Intersection {
+                            pos: pos_orig.clone(),
+                            neg: shrunk_neg,
+                        })
+                        .chain(pos.shrink().map(move |shrunk_pos| Ty::Intersection {
+                            pos: shrunk_pos,
+                            neg: neg_orig.clone(),
+                        }))
+                        .filter_map(|ty| {
+                            if let Ty::Intersection { pos, neg } = &ty {
+                                match (pos.len(), neg.len()) {
+                                    // an empty intersection does not mean
+                                    // anything
+                                    (0, 0) => None,
+                                    // a single positive element should be
+                                    // unwrapped
+                                    (1, 0) => Some(pos[0].clone()),
+                                    _ => Some(ty),
+                                }
+                            } else {
+                                unreachable!()
+                            }
+                        }),
+                )
+            }
             _ => Box::new(std::iter::empty()),
         }
     }
