@@ -1101,6 +1101,8 @@ RUF046.py:178:1: RUF046 [*] Value being cast to `int` is already an integer
 179 | |                 17
 180 | |             )) # this is also safe without parens
     | |______________^ RUF046
+181 |   
+182 |   int((round)  # Comment
     |
     = help: Remove unnecessary `int` call
 
@@ -1113,4 +1115,83 @@ RUF046.py:178:1: RUF046 [*] Value being cast to `int` is already an integer
 179 179 |                 17
 180     |-            )) # this is also safe without parens
     180 |+            ) # this is also safe without parens
-181 181 |
+181 181 | 
+182 182 | int((round)  # Comment
+183 183 | (42)
+
+RUF046.py:182:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+180 |               )) # this is also safe without parens
+181 |   
+182 | / int((round)  # Comment
+183 | | (42)
+184 | | )
+    | |_^ RUF046
+185 |   
+186 |   int((round  # Comment
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+179 179 |                 17
+180 180 |             )) # this is also safe without parens
+181 181 | 
+182     |-int((round)  # Comment
+183     |-(42)
+184     |-)
+    182 |+((round)  # Comment
+    183 |+(42))
+185 184 | 
+186 185 | int((round  # Comment
+187 186 | )(42)
+
+RUF046.py:186:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+184 |   )
+185 |   
+186 | / int((round  # Comment
+187 | | )(42)
+188 | | )
+    | |_^ RUF046
+189 |   
+190 |   int(  # Comment
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+183 183 | (42)
+184 184 | )
+185 185 | 
+186     |-int((round  # Comment
+    186 |+(round  # Comment
+187 187 | )(42)
+188     |-)
+189 188 | 
+190 189 | int(  # Comment
+191 190 | (  # Comment
+
+RUF046.py:190:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+188 |   )
+189 |   
+190 | / int(  # Comment
+191 | | (  # Comment
+192 | |     (round
+193 | | )  # Comment
+194 | | )(42)
+195 | | )
+    | |_^ RUF046
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Safe fix
+187 187 | )(42)
+188 188 | )
+189 189 | 
+190     |-int(  # Comment
+191 190 | (  # Comment
+192 191 |     (round
+193 192 | )  # Comment
+194 193 | )(42)
+195     |-)
+196 194 |
