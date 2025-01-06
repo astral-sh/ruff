@@ -1,10 +1,8 @@
 use itertools::Itertools;
 use regex::Regex;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
