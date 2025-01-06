@@ -179,3 +179,18 @@ int( round (
                 17
             )) # this is also safe without parens
 
+int((round)  # Comment
+(42)
+)
+
+int((round  # Comment
+)(42)
+)
+
+int(  # Comment
+(  # Comment
+    (round
+)  # Comment
+)(42)
+)
+
