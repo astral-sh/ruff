@@ -370,3 +370,19 @@ class Calculator:
             bool: True if the number is valid, False otherwise.
         """
         return isinstance(number, (int, float))
+
+    # OK
+    @classmethod
+    def from_bytes(cls, value_bytes):
+        """
+        Creates a Calculator instance from a bytes representation of a number.
+
+        Args:
+            value_bytes (bytes): Bytes.
+
+        Returns:
+            Calculator: A new instance of Calculator initialized with the value from the string.
+        """
+        value = float(value_bytes)
+        return cls(value)
+

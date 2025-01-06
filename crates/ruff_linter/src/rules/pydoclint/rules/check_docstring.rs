@@ -1091,6 +1091,9 @@ fn parameters_from_signature<'a>(
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
+    // Here we check if the function is a method (and not a staticmethod)
+    // in which case we skip the first argument which should be `self` or
+    // `cls`.
     for param in function.parameters.iter().skip(usize::from(
         docstring.definition.is_method() && !is_staticmethod(&function.decorator_list, semantic),
     )) {
