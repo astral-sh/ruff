@@ -331,17 +331,19 @@ def end_of_file():
 
 
 # function return type annotation NoReturn
+def bar() -> NoReturn:
+    abort()
+
 def foo(x: int) -> int:
-    def bar() -> NoReturn:
-        abort()
     if x == 5:
         return 5
     bar()
 
 
+def raises(value: str) -> NoReturn:
+    raise RuntimeError("something went wrong")
+
 def foo(string: str) -> str:
-    def raises(value: str) -> NoReturn:
-        raise RuntimeError("something went wrong")
 
     match string:
         case "a":
@@ -353,17 +355,52 @@ def foo(string: str) -> str:
         case _:
             raises(string)
 
+def bar() -> NoReturn:
+    a = 1 + 2
+    raise AssertionError("Very bad")
 
 def foo() -> int:
     def baz() -> int:
         return 1
 
+    if baz() > 3:
+        return 1
+    bar()
 
-    def bar() -> NoReturn:
-        a = 1 + 2
-        raise AssertionError("Very bad")
 
 
+# function return type annotation typing_extensions.Never
+def bar() -> typing_extensions.Never:
+    abort()
+
+def foo(x: int) -> int:
+    if x == 5:
+        return 5
+    bar()
+
+
+def raises(value: str) -> typing_extensions.Never:
+    raise RuntimeError("something went wrong")
+
+def foo(string: str) -> str:
+
+    match string:
+        case "a":
+            return "first"
+        case "b":
+            return "second"
+        case "c":
+            return "third"
+        case _:
+            raises(string)
+
+def bar() -> typing_extensions.Never:
+    a = 1 + 2
+    raise AssertionError("Very bad")
+
+def foo() -> int:
+    def baz() -> int:
+        return 1
 
     if baz() > 3:
         return 1

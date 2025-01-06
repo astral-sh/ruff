@@ -403,71 +403,17 @@ RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function abl
 332 333 | 
 333 334 | # function return type annotation NoReturn
 
-RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:415:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-337 |     if x == 5:
-338 |         return 5
-339 |     bar()
-    |     ^^^^^ RET503
-    |
-    = help: Add explicit `return` statement
-
-ℹ Unsafe fix
-337 337 |     if x == 5:
-338 338 |         return 5
-339 339 |     bar()
-    340 |+    return None
-340 341 | 
-341 342 | 
-342 343 | def foo(string: str) -> str:
-
-RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-    |
-352 |             return "third"
-353 |         case _:
-354 |             raises(string)
-    |             ^^^^^^^^^^^^^^ RET503
-    |
-    = help: Add explicit `return` statement
-
-ℹ Unsafe fix
-352 352 |             return "third"
-353 353 |         case _:
-354 354 |             raises(string)
-    355 |+            return None
-355 356 | 
-356 357 | 
-357 358 | def foo() -> int:
-
-RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-    |
-368 |     if baz() > 3:
-369 |         return 1
-370 |     bar()
-    |     ^^^^^ RET503
-    |
-    = help: Add explicit `return` statement
-
-ℹ Unsafe fix
-368 368 |     if baz() > 3:
-369 369 |         return 1
-370 370 |     bar()
-    371 |+    return None
-371 372 | 
-372 373 | 
-373 374 | def f():
-
-RET503.py:378:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-    |
-376 |     else:
-377 |         with c:
-378 |             d
+413 |     else:
+414 |         with c:
+415 |             d
     |             ^ RET503
     |
     = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-376 376 |     else:
-377 377 |         with c:
-378 378 |             d
-    379 |+            return None
+413 413 |     else:
+414 414 |         with c:
+415 415 |             d
+    416 |+            return None

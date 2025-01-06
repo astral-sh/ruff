@@ -52,4 +52,15 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test]
+    #[ignore = "Non-returning nested functions are not handled correctly"]
+    fn noreturn_nested_functions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_return/RET503_nested_functions.py"),
+            &LinterSettings::for_rule(Rule::ImplicitReturn),
+        )?;
+        assert!(diagnostics.is_empty());
+        Ok(())
+    }
 }
