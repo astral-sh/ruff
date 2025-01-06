@@ -56,7 +56,6 @@ use crate::rules::pydocstyle::settings::Convention;
 ///         Speed as distance divided by time.
 ///     """
 ///     return distance / time
-/// ``` raise FasterThanLightError from exc
 /// ```
 #[violation]
 pub struct DocstringMissingParameter {
