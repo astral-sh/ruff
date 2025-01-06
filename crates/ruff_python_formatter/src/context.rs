@@ -1,14 +1,14 @@
-use crate::comments::Comments;
-use crate::other::f_string_element::FStringExpressionElementContext;
-use crate::PyFormatOptions;
-use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
-use ruff_python_ast::str::Quote;
-use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Clone)]
+use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::str::Quote;
+use ruff_python_parser::Tokens;
+
+use crate::comments::Comments;
+use crate::other::f_string_element::FStringExpressionElementContext;
+use crate::PyFormatOptions;
+
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
@@ -50,11 +50,6 @@ impl<'a> PyFormatContext<'a> {
 
     pub(crate) fn source(&self) -> &'a str {
         self.contents
-    }
-
-    #[allow(unused)]
-    pub(crate) fn locator(&self) -> Locator<'a> {
-        Locator::new(self.contents)
     }
 
     pub(crate) fn set_node_level(&mut self, level: NodeLevel) {
@@ -226,7 +221,7 @@ where
     }
 }
 
-impl<'ast, 'buf, B> Deref for WithNodeLevel<'ast, 'buf, B>
+impl<'ast, B> Deref for WithNodeLevel<'ast, '_, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
 {
@@ -237,7 +232,7 @@ where
     }
 }
 
-impl<'ast, 'buf, B> DerefMut for WithNodeLevel<'ast, 'buf, B>
+impl<'ast, B> DerefMut for WithNodeLevel<'ast, '_, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
 {

@@ -20,6 +20,7 @@ use tempfile::NamedTempFile;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_linter::message::{DiagnosticMessage, Message};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
@@ -111,7 +112,7 @@ impl Cache {
                 return Cache::empty(path, package_root);
             }
             Err(err) => {
-                warn_user!("Failed to open cache file '{}': {err}", path.display());
+                warn_user!("Failed to open cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
@@ -119,7 +120,7 @@ impl Cache {
         let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
             Ok(package) => package,
             Err(err) => {
-                warn_user!("Failed parse cache file '{}': {err}", path.display());
+                warn_user!("Failed parse cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
@@ -127,7 +128,7 @@ impl Cache {
         // Sanity check.
         if package.package_root != package_root {
             warn_user!(
-                "Different package root in cache: expected '{}', got '{}'",
+                "Different package root in cache: expected `{}`, got `{}`",
                 package_root.display(),
                 package.package_root.display(),
             );
@@ -185,7 +186,7 @@ impl Cache {
             // the user is running Ruff from multiple processes over the same directory).
             if cfg!(windows) && err.error.kind() == io::ErrorKind::PermissionDenied {
                 warn_user!(
-                    "Failed to write cache file '{}': {}",
+                    "Failed to write cache file `{}`: {}",
                     self.path.display(),
                     err.error
                 );
@@ -497,7 +498,7 @@ pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
 
 impl<'a> PackageCacheMap<'a> {
     pub(crate) fn init(
-        package_roots: &FxHashMap<&'a Path, Option<&'a Path>>,
+        package_roots: &FxHashMap<&'a Path, Option<PackageRoot<'a>>>,
         resolver: &Resolver,
     ) -> Self {
         fn init_cache(path: &Path) {
@@ -513,7 +514,9 @@ impl<'a> PackageCacheMap<'a> {
         Self(
             package_roots
                 .iter()
-                .map(|(package, package_root)| package_root.unwrap_or(package))
+                .map(|(package, package_root)| {
+                    package_root.map(PackageRoot::path).unwrap_or(package)
+                })
                 .unique()
                 .par_bridge()
                 .map(|cache_root| {
@@ -587,6 +590,7 @@ mod tests {
 
     use ruff_cache::CACHE_DIR_NAME;
     use ruff_linter::message::Message;
+    use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::PySourceType;
@@ -641,7 +645,7 @@ mod tests {
 
                 let diagnostics = lint_path(
                     &path,
-                    Some(&package_root),
+                    Some(PackageRoot::root(&package_root)),
                     &settings.linter,
                     Some(&cache),
                     flags::Noqa::Enabled,
@@ -674,7 +678,7 @@ mod tests {
 
             assert!(
                 cache.package.files.contains_key(relative_path),
-                "missing file from cache: '{}'",
+                "missing file from cache: `{}`",
                 relative_path.display()
             );
         }
@@ -683,7 +687,7 @@ mod tests {
         for path in paths {
             got_diagnostics += lint_path(
                 &path,
-                Some(&package_root),
+                Some(PackageRoot::root(&package_root)),
                 &settings.linter,
                 Some(&cache),
                 flags::Noqa::Enabled,
@@ -1056,7 +1060,7 @@ mod tests {
         ) -> Result<Diagnostics, anyhow::Error> {
             lint_path(
                 &self.package_root.join(path),
-                Some(&self.package_root),
+                Some(PackageRoot::root(&self.package_root)),
                 &self.settings.linter,
                 Some(cache),
                 flags::Noqa::Enabled,

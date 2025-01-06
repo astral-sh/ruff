@@ -1,10 +1,16 @@
 //! Access to the Ruff linting API for the LSP
 
-use ruff_python_parser::ParseError;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    edit::{NotebookRange, ToRangeExt},
+    resolve::is_document_excluded,
+    session::DocumentQuery,
+    PositionEncoding, DIAGNOSTIC_NAME,
+};
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
@@ -13,19 +19,14 @@ use ruff_linter::{
     registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
+    Locator,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::{LineIndex, Locator};
+use ruff_python_parser::ParseError;
+use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::{
-    edit::{NotebookRange, ToRangeExt},
-    resolve::is_document_excluded,
-    session::DocumentQuery,
-    PositionEncoding, DIAGNOSTIC_NAME,
-};
 
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -77,6 +78,7 @@ pub(crate) fn check(
             file_resolver_settings,
             Some(linter_settings),
             None,
+            query.text_document_language_id(),
         ) {
             return DiagnosticsMap::default();
         }
@@ -87,6 +89,7 @@ pub(crate) fn check(
                 .expect("a path to a document should have a parent path"),
             &linter_settings.namespace_packages,
         )
+        .map(PackageRoot::root)
     } else {
         None
     };
@@ -96,16 +99,14 @@ pub(crate) fn check(
     // Parse once.
     let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
-    let index = LineIndex::from_source_text(source_kind.source_code());
-
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::with_index(source_kind.source_code(), index.clone());
+    let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
@@ -153,14 +154,25 @@ pub(crate) fn check(
         .into_iter()
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
-            to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
+            to_lsp_diagnostic(
+                diagnostic,
+                noqa_edit,
+                &source_kind,
+                locator.to_index(),
+                encoding,
+            )
         });
 
     let lsp_diagnostics = lsp_diagnostics.chain(
         show_syntax_errors
             .then(|| {
                 parsed.errors().iter().map(|parse_error| {
-                    parse_error_to_lsp_diagnostic(parse_error, &source_kind, &index, encoding)
+                    parse_error_to_lsp_diagnostic(
+                        parse_error,
+                        &source_kind,
+                        locator.to_index(),
+                        encoding,
+                    )
                 })
             })
             .into_iter()
@@ -222,7 +234,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
     diagnostic: Diagnostic,
-    noqa_edit: &Option<Edit>,
+    noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -249,9 +261,9 @@ fn to_lsp_diagnostic(
                     new_text: edit.content().unwrap_or_default().to_string(),
                 })
                 .collect();
-            let noqa_edit = noqa_edit.as_ref().map(|noqa_edit| lsp_types::TextEdit {
+            let noqa_edit = noqa_edit.map(|noqa_edit| lsp_types::TextEdit {
                 range: diagnostic_edit_range(noqa_edit.range(), source_kind, index, encoding),
-                new_text: noqa_edit.content().unwrap_or_default().to_string(),
+                new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
                 kind: kind.clone(),

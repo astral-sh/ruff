@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
+---
+this_this_from.py:1:20: PLC0414 Required import does not rename original package.
+  |
+1 | from module import this as this
+  |                    ^^^^^^^^^^^^ PLC0414
+  |
+  = help: Change required import or disable rule.

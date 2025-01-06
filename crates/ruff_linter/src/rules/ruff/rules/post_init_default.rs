@@ -1,15 +1,16 @@
 use anyhow::Context;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
-use super::helpers::is_dataclass;
+use super::helpers::{dataclass_kind, DataclassKind};
 
 /// ## What it does
 /// Checks for `__post_init__` dataclass methods with parameter defaults.
@@ -65,19 +66,19 @@ use super::helpers::is_dataclass;
 /// - [Python documentation: Init-only variables](https://docs.python.org/3/library/dataclasses.html#init-only-variables)
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
-#[violation]
-pub struct PostInitDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__post_init__` method with argument defaults")
+        "`__post_init__` method with argument defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Use `dataclasses.InitVar` instead"))
+        Some("Use `dataclasses.InitVar` instead".to_string())
     }
 }
 
@@ -90,7 +91,10 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
     let current_scope = checker.semantic().current_scope();
     match current_scope.kind {
         ScopeKind::Class(class_def) => {
-            if !is_dataclass(class_def, checker.semantic()) {
+            if !matches!(
+                dataclass_kind(class_def, checker.semantic()),
+                Some((DataclassKind::Stdlib, _))
+            ) {
                 return;
             }
         }
@@ -175,7 +179,7 @@ fn use_initvar(
         }
     };
 
-    let indentation = indentation_at_offset(post_init_def.start(), checker.locator())
+    let indentation = indentation_at_offset(post_init_def.start(), checker.source())
         .context("Failed to calculate leading indentation of `__post_init__` method")?;
     let content = textwrap::indent(&content, indentation);
 

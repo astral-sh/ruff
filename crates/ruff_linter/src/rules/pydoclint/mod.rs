@@ -39,7 +39,10 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Google), [], []),
+                pydocstyle: pydocstyle::settings::Settings {
+                    convention: Some(Convention::Google),
+                    ..pydocstyle::settings::Settings::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -60,7 +63,10 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Numpy), [], []),
+                pydocstyle: pydocstyle::settings::Settings {
+                    convention: Some(Convention::Numpy),
+                    ..pydocstyle::settings::Settings::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

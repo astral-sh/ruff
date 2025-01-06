@@ -11,8 +11,10 @@ use log::{debug, error, warn};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
+use ruff_db::panic::catch_unwind;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
+use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
@@ -26,7 +28,6 @@ use ruff_workspace::resolver::{
 use crate::args::ConfigArguments;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
-use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
 #[allow(clippy::too_many_arguments)]
@@ -87,7 +88,9 @@ pub(crate) fn check(
                     return None;
                 }
 
-                let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                let cache_root = package
+                    .map(PackageRoot::path)
+                    .unwrap_or_else(|| path.parent().unwrap_or(path));
                 let cache = caches.get(cache_root);
 
                 lint_path(
@@ -181,7 +184,7 @@ pub(crate) fn check(
 #[allow(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,

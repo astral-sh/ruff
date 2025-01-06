@@ -4,11 +4,11 @@ use std::slice;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
+use crate::Locator;
 
 /// A block of imports within a Python module.
 #[derive(Debug, Default)]

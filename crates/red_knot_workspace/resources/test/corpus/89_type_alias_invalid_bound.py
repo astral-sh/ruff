@@ -1,0 +1,1 @@
+../../../../ruff_python_parser/resources/inline/err/type_param_invalid_bound_expr.py

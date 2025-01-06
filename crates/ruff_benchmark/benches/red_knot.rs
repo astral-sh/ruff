@@ -2,38 +2,48 @@
 
 use rayon::ThreadPoolBuilder;
 use red_knot_python_semantic::PythonVersion;
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
-use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
+use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use rustc_hash::FxHashSet;
 
 struct Case {
     db: RootDatabase,
     fs: MemoryFileSystem,
     re: File,
-    re_path: &'static SystemPath,
+    re_path: SystemPathBuf,
 }
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
-// The failed import from 'collections.abc' is due to lack of support for 'import *'.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
-    "/src/tomllib/_parser.py:5:24: Module '__future__' has no member 'annotations'",
-    "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
-    "Line 69 is too long (89 characters)",
-    "Use double quotes for strings",
-    "Use double quotes for strings",
-    "Use double quotes for strings",
-    "Use double quotes for strings",
-    "Use double quotes for strings",
-    "Use double quotes for strings",
-    "Use double quotes for strings",
-    "/src/tomllib/_parser.py:628:75: Name 'e' used when not defined.",
+    // We don't support `*` imports yet:
+    "error[lint:unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
+    // We don't support terminal statements in control flow yet:
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:455:9 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:482:16 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:566:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
+    "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive"
 ];
 
 fn get_test_file(name: &str) -> TestFile {
@@ -42,43 +52,44 @@ fn get_test_file(name: &str) -> TestFile {
     TestFile::try_download(&path, &url).unwrap()
 }
 
+fn tomllib_path(filename: &str) -> SystemPathBuf {
+    SystemPathBuf::from(format!("/src/tomllib/{filename}").as_str())
+}
+
 fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
-    let parser_path = SystemPath::new("/src/tomllib/_parser.py");
-    let re_path = SystemPath::new("/src/tomllib/_re.py");
-    fs.write_files([
+
+    let tomllib_filenames = ["__init__.py", "_parser.py", "_re.py", "_types.py"];
+    fs.write_files(tomllib_filenames.iter().map(|filename| {
         (
-            SystemPath::new("/src/tomllib/__init__.py"),
-            get_test_file("__init__.py").code(),
-        ),
-        (parser_path, get_test_file("_parser.py").code()),
-        (re_path, get_test_file("_re.py").code()),
-        (
-            SystemPath::new("/src/tomllib/_types.py"),
-            get_test_file("_types.py").code(),
-        ),
-    ])
+            tomllib_path(filename),
+            get_test_file(filename).code().to_string(),
+        )
+    }))
     .unwrap();
 
     let src_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(
+    let metadata = WorkspaceMetadata::discover(
         src_root,
         &system,
-        Some(Configuration {
-            target_version: Some(PythonVersion::PY312),
+        Some(&Configuration {
+            python_version: Some(PythonVersion::PY312),
             ..Configuration::default()
         }),
     )
     .unwrap();
 
     let mut db = RootDatabase::new(metadata, system).unwrap();
-    let parser = system_path_to_file(&db, parser_path).unwrap();
 
-    db.workspace().open_file(&mut db, parser);
+    let tomllib_files: FxHashSet<File> = tomllib_filenames
+        .iter()
+        .map(|filename| system_path_to_file(&db, tomllib_path(filename)).unwrap())
+        .collect();
+    db.workspace().set_open_files(&mut db, tomllib_files);
 
-    let re = system_path_to_file(&db, re_path).unwrap();
-
+    let re_path = tomllib_path("_re.py");
+    let re = system_path_to_file(&db, &re_path).unwrap();
     Case {
         db,
         fs,
@@ -104,40 +115,43 @@ fn setup_rayon() {
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
+    fn setup() -> Case {
+        let case = setup_case();
+
+        let result: Vec<_> = case.db.check().unwrap();
+
+        assert_diagnostics(&case.db, result);
+
+        case.fs
+            .write_file(
+                &case.re_path,
+                format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
+            )
+            .unwrap();
+
+        case
+    }
+
+    fn incremental(case: &mut Case) {
+        let Case { db, .. } = case;
+
+        db.apply_changes(
+            vec![ChangeEvent::Changed {
+                path: case.re_path.clone(),
+                kind: ChangedKind::FileContent,
+            }],
+            None,
+        );
+
+        let result = db.check().unwrap();
+
+        assert_eq!(result.len(), EXPECTED_DIAGNOSTICS.len());
+    }
+
     setup_rayon();
 
     criterion.bench_function("red_knot_check_file[incremental]", |b| {
-        b.iter_batched_ref(
-            || {
-                let case = setup_case();
-                case.db.check().unwrap();
-
-                case.fs
-                    .write_file(
-                        case.re_path,
-                        format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
-                    )
-                    .unwrap();
-
-                case
-            },
-            |case| {
-                let Case { db, .. } = case;
-
-                db.apply_changes(
-                    vec![ChangeEvent::Changed {
-                        path: case.re_path.to_path_buf(),
-                        kind: ChangedKind::FileContent,
-                    }],
-                    None,
-                );
-
-                let result = db.check().unwrap();
-
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
-            },
-            BatchSize::SmallInput,
-        );
+        b.iter_batched_ref(setup, incremental, BatchSize::SmallInput);
     });
 }
 
@@ -149,13 +163,28 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_case,
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check().unwrap();
+                let result: Vec<_> = db.check().unwrap();
 
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
+                assert_diagnostics(db, result);
             },
             BatchSize::SmallInput,
         );
     });
+}
+
+#[track_caller]
+fn assert_diagnostics(db: &dyn Db, diagnostics: Vec<Box<dyn Diagnostic>>) {
+    let normalized: Vec<_> = diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            diagnostic
+                .display(db.upcast())
+                .to_string()
+                .replace('\\', "/")
+        })
+        .collect();
+
+    assert_eq!(&normalized, EXPECTED_DIAGNOSTICS);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);

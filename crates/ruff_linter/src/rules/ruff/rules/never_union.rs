@@ -1,6 +1,7 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
+use ruff_python_semantic::{analyze::typing::traverse_union, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -33,13 +34,15 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
-#[violation]
-pub struct NeverUnion {
+#[derive(ViolationMetadata)]
+pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
 }
 
-impl AlwaysFixableViolation for NeverUnion {
+impl Violation for NeverUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
@@ -47,7 +50,7 @@ impl AlwaysFixableViolation for NeverUnion {
             union_like,
         } = self;
         match union_like {
-            UnionLike::BinOp => {
+            UnionLike::PEP604 => {
                 format!("`{never_like} | T` is equivalent to `T`")
             }
             UnionLike::TypingUnion => {
@@ -56,9 +59,9 @@ impl AlwaysFixableViolation for NeverUnion {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let Self { never_like, .. } = self;
-        format!("Remove `{never_like}`")
+        Some(format!("Remove `{never_like}`"))
     }
 }
 
@@ -77,14 +80,21 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                 let mut diagnostic = Diagnostic::new(
                     NeverUnion {
                         never_like,
-                        union_like: UnionLike::BinOp,
+                        union_like: UnionLike::PEP604,
                     },
                     left.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(right.as_ref()).to_string(),
-                    expr.range(),
-                )));
+                // Avoid producing code that would raise an exception when
+                // `Never | None` would be fixed to `None | None`.
+                // Instead do not provide a fix. No action needed for `typing.Union`,
+                // as `Union[None, None]` is valid Python.
+                // See https://github.com/astral-sh/ruff/issues/14567.
+                if !is_pep604_union_with_bare_none(checker.semantic()) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        checker.locator().slice(right.as_ref()).to_string(),
+                        expr.range(),
+                    )));
+                }
                 checker.diagnostics.push(diagnostic);
             }
 
@@ -93,14 +103,16 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                 let mut diagnostic = Diagnostic::new(
                     NeverUnion {
                         never_like,
-                        union_like: UnionLike::BinOp,
+                        union_like: UnionLike::PEP604,
                     },
                     right.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(left.as_ref()).to_string(),
-                    expr.range(),
-                )));
+                if !is_pep604_union_with_bare_none(checker.semantic()) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        checker.locator().slice(left.as_ref()).to_string(),
+                        expr.range(),
+                    )));
+                }
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -174,7 +186,7 @@ enum UnionLike {
     /// E.g., `typing.Union[int, str]`
     TypingUnion,
     /// E.g., `int | str`
-    BinOp,
+    PEP604,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,4 +217,45 @@ impl std::fmt::Display for NeverLike {
             NeverLike::Never => f.write_str("Never"),
         }
     }
+}
+
+/// Return `true` if this union is a [PEP 604 union] that contains `None`,
+/// e.g. `int | Never | None`.
+///
+/// Autofixing these unions can be dangerous,
+/// as `None | None` results in a runtime exception in Python.
+///
+/// [PEP 604 union]: https://docs.python.org/3/library/stdtypes.html#types-union
+fn is_pep604_union_with_bare_none(semantic: &SemanticModel) -> bool {
+    let enclosing_pep604_union = semantic
+        .current_expressions()
+        .skip(1)
+        .take_while(|expr| {
+            matches!(
+                expr,
+                Expr::BinOp(ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        })
+        .last();
+
+    let Some(enclosing_pep604_union) = enclosing_pep604_union else {
+        return false;
+    };
+
+    let mut union_contains_bare_none = false;
+
+    traverse_union(
+        &mut |expr, _| {
+            if matches!(expr, Expr::NoneLiteral(_)) {
+                union_contains_bare_none = true;
+            }
+        },
+        semantic,
+        enclosing_pep604_union,
+    );
+
+    union_contains_bare_none
 }

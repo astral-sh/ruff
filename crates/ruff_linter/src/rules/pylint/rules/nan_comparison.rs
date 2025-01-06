@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -31,25 +31,24 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 ///
-#[violation]
-pub struct NanComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct NanComparison {
     nan: Nan,
 }
 
 impl Violation for NanComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NanComparison { nan } = self;
-        match nan {
-            Nan::Math => format!("Comparing against a NaN value; use `math.isnan` instead"),
-            Nan::NumPy => format!("Comparing against a NaN value; use `np.isnan` instead"),
+        match self.nan {
+            Nan::Math => "Comparing against a NaN value; use `math.isnan` instead".to_string(),
+            Nan::NumPy => "Comparing against a NaN value; use `np.isnan` instead".to_string(),
         }
     }
 }
 
 /// PLW0177
 pub(crate) fn nan_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
-    for expr in std::iter::once(left).chain(comparators.iter()) {
+    for expr in std::iter::once(left).chain(comparators) {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
                 ["numpy", "nan" | "NAN" | "NaN"] => {

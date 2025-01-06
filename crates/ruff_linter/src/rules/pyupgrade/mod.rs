@@ -77,13 +77,24 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_8.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_9.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_10.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_other_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_other_utf8.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_utf8.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_utf8_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_code_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_code_utf8_utf8.py"))]
+    #[test_case(
+        Rule::UTF8EncodingDeclaration,
+        Path::new("UP009_hashbang_utf8_other.py")
+    )]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_many_empty_lines.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010.py"))]
-    #[test_case(Rule::UnpackedListComprehension, Path::new("UP027.py"))]
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"))]
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
@@ -97,19 +108,6 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
-    fn preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade").join(path),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -230,6 +228,20 @@ mod tests {
             &settings::LinterSettings {
                 target_version: PythonVersion::Py311,
                 ..settings::LinterSettings::for_rule(Rule::DatetimeTimezoneUTC)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unpack_pep_646_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP044.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                target_version: PythonVersion::Py311,
+                ..settings::LinterSettings::for_rule(Rule::NonPEP646Unpack)
             },
         )?;
         assert_messages!(diagnostics);

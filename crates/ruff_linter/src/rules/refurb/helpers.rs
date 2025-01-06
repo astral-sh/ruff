@@ -106,7 +106,7 @@ pub(super) struct FileOpen<'a> {
     pub(super) reference: &'a ResolvedReference,
 }
 
-impl<'a> FileOpen<'a> {
+impl FileOpen<'_> {
     /// Determine whether an expression is a reference to the file handle, by comparing
     /// their ranges. If two expressions have the same range, they must be the same expression.
     pub(super) fn is_ref(&self, expr: &Expr) -> bool {

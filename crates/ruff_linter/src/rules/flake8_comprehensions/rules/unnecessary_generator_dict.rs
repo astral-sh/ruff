@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
@@ -10,11 +10,11 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary generators that can be rewritten as `dict`
+/// Checks for unnecessary generators that can be rewritten as dict
 /// comprehensions.
 ///
 /// ## Why is this bad?
-/// It is unnecessary to use `dict` around a generator expression, since
+/// It is unnecessary to use `dict()` around a generator expression, since
 /// there are equivalent comprehensions for these types. Using a
 /// comprehension is clearer and more idiomatic.
 ///
@@ -31,17 +31,17 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryGeneratorDict;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryGeneratorDict;
 
 impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary generator (rewrite as a `dict` comprehension)")
+        "Unnecessary generator (rewrite as a dict comprehension)".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Rewrite as a `dict` comprehension".to_string()
+        "Rewrite as a dict comprehension".to_string()
     }
 }
 

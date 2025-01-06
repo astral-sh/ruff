@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -8,14 +8,14 @@ use serde::{Deserialize, Serialize};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed};
-pub use crate::locator::Locator;
+pub use crate::line_ranges::LineRanges;
 pub use crate::newlines::{
     find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
     UniversalNewlines,
 };
 
 mod line_index;
-mod locator;
+mod line_ranges;
 mod newlines;
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
@@ -134,9 +134,9 @@ impl SourceFileBuilder {
     /// Consumes `self` and returns the [`SourceFile`].
     pub fn finish(self) -> SourceFile {
         let index = if let Some(index) = self.index {
-            once_cell::sync::OnceCell::with_value(index)
+            OnceLock::from(index)
         } else {
-            once_cell::sync::OnceCell::new()
+            OnceLock::new()
         };
 
         SourceFile {
@@ -218,7 +218,7 @@ impl Ord for SourceFile {
 struct SourceFileInner {
     name: Box<str>,
     code: Box<str>,
-    line_index: once_cell::sync::OnceCell<LineIndex>,
+    line_index: OnceLock<LineIndex>,
 }
 
 impl PartialEq for SourceFileInner {

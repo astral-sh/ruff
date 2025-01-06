@@ -1,40 +1,24 @@
-use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
-
+use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
-use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
+use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation};
+use crate::string::implicit::{
+    FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
+    ImplicitConcatenatedLayout,
+};
+use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
+use ruff_formatter::FormatRuleWithOptions;
+use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
-    kind: ExprStringLiteralKind,
-}
-
-#[derive(Default, Copy, Clone, Debug)]
-pub enum ExprStringLiteralKind {
-    #[default]
-    String,
-    Docstring,
-}
-
-impl ExprStringLiteralKind {
-    const fn string_literal_kind(self) -> StringLiteralKind {
-        match self {
-            ExprStringLiteralKind::String => StringLiteralKind::String,
-            ExprStringLiteralKind::Docstring => StringLiteralKind::Docstring,
-        }
-    }
-
-    const fn is_docstring(self) -> bool {
-        matches!(self, ExprStringLiteralKind::Docstring)
-    }
+    kind: StringLiteralKind,
 }
 
 impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
-    type Options = ExprStringLiteralKind;
+    type Options = StringLiteralKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
         self.kind = options;
@@ -46,18 +30,37 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprStringLiteral { value, .. } = item;
 
-        match value.as_slice() {
-            [string_literal] => {
-                FormatStringLiteral::new(string_literal, self.kind.string_literal_kind()).fmt(f)
-            }
-            _ => {
-                // This is just a sanity check because [`DocstringStmt::try_from_statement`]
-                // ensures that the docstring is a *single* string literal.
-                assert!(!self.kind.is_docstring());
+        if let [string_literal] = value.as_slice() {
+            string_literal.format().with_options(self.kind).fmt(f)
+        } else {
+            // Always join strings that aren't parenthesized and thus, always on a single line.
+            if !f.context().node_level().is_parenthesized() {
+                if let Some(mut format_flat) =
+                    FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
+                {
+                    format_flat.set_docstring(self.kind.is_docstring());
+                    return format_flat.fmt(f);
+                }
 
-                in_parentheses_only_group(&FormatStringContinuation::new(&AnyString::String(item)))
+                // ```py
+                // def test():
+                // (
+                //      r"a"
+                //      "b"
+                // )
+                // ```
+                if self.kind.is_docstring() {
+                    return parenthesize_if_expands(
+                        &FormatImplicitConcatenatedStringExpanded::new(
+                            item.into(),
+                            ImplicitConcatenatedLayout::Multipart,
+                        ),
+                    )
+                    .fmt(f);
+                }
             }
-            .fmt(f),
+
+            in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
         }
     }
 }
@@ -70,7 +73,7 @@ impl NeedsParentheses for ExprStringLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if AnyString::String(self).is_multiline(context.source()) {
+        } else if StringLike::String(self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

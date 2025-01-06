@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assignment_split_value_first.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -253,7 +254,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/string.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -144,6 +145,80 @@ a = f"""\x1F"""
 a = """\x1F"""
 a = """\\x1F"""
 a = """\\\x1F"""
+
+
+##############################################################################
+# Implicit concatenated strings
+##############################################################################
+
+# In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+# and that are multiline in the source.
+
+(
+    r"aaaaaaaaa"
+    r"bbbbbbbbbbbbbbbbbbbb"
+)
+
+(
+    r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccc"
+)
+
+(
+    """aaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbb"""
+)
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    fr"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+if (
+       r"aaaaaaaaa"
+       r"bbbbbbbbbbbbbbbbbbbb"
+   ) + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]: ...
+
+
+
+# In preview, keep implicit concatenated strings on a single line if they fit and are not separate by line breaks in the source
+(
+    r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+)
+
+r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+
+(
+    f"aaaa{
+    10}aaaaa" fr"bbbbbbbbbbbbbbbbbbbb"
+)
+
+(
+    r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+(
+    f"""aaaa{
+    10}aaaaa""" fr"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+# In docstring positions
+def docstring():
+    (
+        r"aaaaaaaaa"
+        "bbbbbbbbbbbbbbbbbbbb"
+    )
+
+def docstring_flat():
+    (
+        r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+    )
+
+def docstring_flat_overlong():
+    (
+        r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
 ```
 
 ## Outputs
@@ -158,7 +233,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -328,6 +403,162 @@ a = f"""\x1f"""
 a = """\x1f"""
 a = """\\x1F"""
 a = """\\\x1f"""
+
+
+##############################################################################
+# Implicit concatenated strings
+##############################################################################
+
+# In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+# and that are multiline in the source.
+
+(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
+
+(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb" "cccccccccccccccccccccc")
+
+("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
+    ...
+
+
+# In preview, keep implicit concatenated strings on a single line if they fit and are not separate by line breaks in the source
+(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
+
+r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+
+(
+    f"aaaa{
+    10}aaaaa"
+    rf"bbbbbbbbbbbbbbbbbbbb"
+)
+
+(r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+
+# In docstring positions
+def docstring():
+    r"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb"
+
+
+def docstring_flat():
+    r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+
+
+def docstring_flat_overlong():
+    (
+        r"aaaaaaaaa"
+        r"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -70,9 +70,9 @@
+ 
+ # String continuation
+ 
+-"Let's" "start" "with" "a" "simple" "example"
++"Let'sstartwithasimpleexample"
+ 
+-"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
++"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     "Let's"
+@@ -139,7 +139,7 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{"key": ([], "a" "b" "c")}
++{"key": ([], "abc")}
+ 
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/5893
+@@ -172,19 +172,31 @@
+ # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+ # and that are multiline in the source.
+ 
+-(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
++(
++    r"aaaaaaaaa"
++    r"bbbbbbbbbbbbbbbbbbbb"
++)
+ 
+-(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb" "cccccccccccccccccccccc")
++(
++    r"aaaaaaaaa"
++    r"bbbbbbbbbbbbbbbbbbbb"
++    "cccccccccccccccccccccc"
++)
+ 
+-("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
++(
++    """aaaaaaaaa"""
++    """bbbbbbbbbbbbbbbbbbbb"""
++)
+ 
+ (
+-    f"""aaaa{
+-    10}aaaaa"""
++    f"""aaaa{10}aaaaa"""
+     rf"""bbbbbbbbbbbbbbbbbbbb"""
+ )
+ 
+-if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
++if (
++    r"aaaaaaaaa"
++    r"bbbbbbbbbbbbbbbbbbbb"
++) + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
+     ...
+ 
+ 
+@@ -193,24 +205,19 @@
+ 
+ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+ 
+-(
+-    f"aaaa{
+-    10}aaaaa"
+-    rf"bbbbbbbbbbbbbbbbbbbb"
+-)
++(f"aaaa{10}aaaaa" rf"bbbbbbbbbbbbbbbbbbbb")
+ 
+ (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+-(
+-    f"""aaaa{
+-    10}aaaaa"""
+-    rf"""bbbbbbbbbbbbbbbbbbbb"""
+-)
++(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+ 
+ # In docstring positions
+ def docstring():
+-    r"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb"
++    (
++        r"aaaaaaaaa"
++        "bbbbbbbbbbbbbbbbbbbb"
++    )
+ 
+ 
+ def docstring_flat():
 ```
 
 
@@ -342,7 +573,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -512,7 +743,160 @@ a = f"""\x1f"""
 a = """\x1f"""
 a = """\\x1F"""
 a = """\\\x1f"""
+
+
+##############################################################################
+# Implicit concatenated strings
+##############################################################################
+
+# In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+# and that are multiline in the source.
+
+(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
+
+(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb' 'cccccccccccccccccccccc')
+
+("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
+    ...
+
+
+# In preview, keep implicit concatenated strings on a single line if they fit and are not separate by line breaks in the source
+(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
+
+r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
+
+(
+    f'aaaa{
+    10}aaaaa'
+    rf'bbbbbbbbbbbbbbbbbbbb'
+)
+
+(r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+
+# In docstring positions
+def docstring():
+    r'aaaaaaaaa' 'bbbbbbbbbbbbbbbbbbbb'
+
+
+def docstring_flat():
+    r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
+
+
+def docstring_flat_overlong():
+    (
+        r'aaaaaaaaa'
+        r'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    )
 ```
 
 
-
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -70,9 +70,9 @@
+ 
+ # String continuation
+ 
+-"Let's" 'start' 'with' 'a' 'simple' 'example'
++"Let'sstartwithasimpleexample"
+ 
+-"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
++"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     "Let's"
+@@ -139,7 +139,7 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{'key': ([], 'a' 'b' 'c')}
++{'key': ([], 'abc')}
+ 
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/5893
+@@ -172,19 +172,31 @@
+ # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+ # and that are multiline in the source.
+ 
+-(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
++(
++    r'aaaaaaaaa'
++    r'bbbbbbbbbbbbbbbbbbbb'
++)
+ 
+-(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb' 'cccccccccccccccccccccc')
++(
++    r'aaaaaaaaa'
++    r'bbbbbbbbbbbbbbbbbbbb'
++    'cccccccccccccccccccccc'
++)
+ 
+-("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
++(
++    """aaaaaaaaa"""
++    """bbbbbbbbbbbbbbbbbbbb"""
++)
+ 
+ (
+-    f"""aaaa{
+-    10}aaaaa"""
++    f"""aaaa{10}aaaaa"""
+     rf"""bbbbbbbbbbbbbbbbbbbb"""
+ )
+ 
+-if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
++if (
++    r'aaaaaaaaa'
++    r'bbbbbbbbbbbbbbbbbbbb'
++) + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
+     ...
+ 
+ 
+@@ -193,24 +205,19 @@
+ 
+ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
+ 
+-(
+-    f'aaaa{
+-    10}aaaaa'
+-    rf'bbbbbbbbbbbbbbbbbbbb'
+-)
++(f'aaaa{10}aaaaa' rf'bbbbbbbbbbbbbbbbbbbb')
+ 
+ (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+-(
+-    f"""aaaa{
+-    10}aaaaa"""
+-    rf"""bbbbbbbbbbbbbbbbbbbb"""
+-)
++(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+ 
+ # In docstring positions
+ def docstring():
+-    r'aaaaaaaaa' 'bbbbbbbbbbbbbbbbbbbb'
++    (
++        r'aaaaaaaaa'
++        'bbbbbbbbbbbbbbbbbbbb'
++    )
+ 
+ 
+ def docstring_flat():
+```

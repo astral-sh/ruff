@@ -4,21 +4,22 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_python_parser::{TokenKind, Tokens};
-use ruff_python_trivia::CommentRanges;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_index::Indexer;
-use ruff_source_file::Locator;
+use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::noqa::NoqaMapping;
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 bitflags! {
     #[derive(Debug, Copy, Clone)]
     pub struct Flags: u8 {
-        const NOQA  = 0b0000_0001;
-        const ISORT = 0b0000_0010;
+        const NOQA  = 1 << 0;
+        const ISORT = 1 << 1;
     }
 }
 
@@ -287,19 +288,23 @@ impl<'a> TodoDirective<'a> {
     pub(crate) fn from_comment(comment: &'a str, comment_range: TextRange) -> Option<Self> {
         // The directive's offset from the start of the comment.
         let mut relative_offset = TextSize::new(0);
-        let mut subset_opt = Some(comment);
+        let mut subset = comment;
 
         // Loop over `#`-delimited sections of the comment to check for directives. This will
         // correctly handle cases like `# foo # TODO`.
-        while let Some(subset) = subset_opt {
+        loop {
             let trimmed = subset.trim_start_matches('#').trim_start();
 
             let offset = subset.text_len() - trimmed.text_len();
             relative_offset += offset;
 
+            // Find the first word. Don't use split by whitespace because that would include the `:` character
+            // in `TODO:`
+            let first_word = trimmed.split(|c: char| !c.is_alphanumeric()).next()?;
+
             // If we detect a TodoDirectiveKind variant substring in the comment, construct and
             // return the appropriate TodoDirective
-            if let Ok(directive_kind) = trimmed.parse::<TodoDirectiveKind>() {
+            if let Ok(directive_kind) = first_word.parse::<TodoDirectiveKind>() {
                 let len = directive_kind.len();
 
                 return Some(Self {
@@ -310,11 +315,11 @@ impl<'a> TodoDirective<'a> {
             }
 
             // Shrink the subset to check for the next phrase starting with "#".
-            subset_opt = if let Some(new_offset) = trimmed.find('#') {
+            if let Some(new_offset) = trimmed.find('#') {
                 relative_offset += TextSize::try_from(new_offset).unwrap();
-                subset.get(relative_offset.to_usize()..)
+                subset = &comment[relative_offset.to_usize()..];
             } else {
-                None
+                break;
             };
         }
 
@@ -334,30 +339,13 @@ impl FromStr for TodoDirectiveKind {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // The lengths of the respective variant strings: TODO, FIXME, HACK, XXX
-        for length in [3, 4, 5] {
-            let Some(substr) = s.get(..length) else {
-                break;
-            };
-
-            match substr.to_lowercase().as_str() {
-                "fixme" => {
-                    return Ok(TodoDirectiveKind::Fixme);
-                }
-                "hack" => {
-                    return Ok(TodoDirectiveKind::Hack);
-                }
-                "todo" => {
-                    return Ok(TodoDirectiveKind::Todo);
-                }
-                "xxx" => {
-                    return Ok(TodoDirectiveKind::Xxx);
-                }
-                _ => continue,
-            }
+        match s.to_lowercase().as_str() {
+            "fixme" => Ok(TodoDirectiveKind::Fixme),
+            "hack" => Ok(TodoDirectiveKind::Hack),
+            "todo" => Ok(TodoDirectiveKind::Todo),
+            "xxx" => Ok(TodoDirectiveKind::Xxx),
+            _ => Err(()),
         }
-
-        Err(())
     }
 }
 
@@ -373,24 +361,23 @@ impl TodoDirectiveKind {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-
-    use ruff_python_index::Indexer;
-    use ruff_source_file::Locator;
 
     use crate::directives::{
         extract_isort_directives, extract_noqa_line_for, TodoDirective, TodoDirectiveKind,
     };
     use crate::noqa::NoqaMapping;
+    use crate::Locator;
 
     use super::IsortDirectives;
 
     fn noqa_mappings(contents: &str) -> NoqaMapping {
         let parsed = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
 
         extract_noqa_line_for(parsed.tokens(), &locator, &indexer)
     }

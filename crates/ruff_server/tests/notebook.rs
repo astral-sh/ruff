@@ -8,7 +8,7 @@ use lsp_types::{
     Position, Range, TextDocumentContentChangeEvent, VersionedTextDocumentIdentifier,
 };
 use ruff_notebook::SourceValue;
-use ruff_server::ClientSettings;
+use ruff_server::{ClientSettings, Workspace, Workspaces};
 
 const SUPER_RESOLUTION_OVERVIEW_PATH: &str =
     "./resources/test/fixtures/tensorflow_test_notebook.ipynb";
@@ -32,10 +32,10 @@ fn super_resolution_overview() {
         &ClientCapabilities::default(),
         ruff_server::PositionEncoding::UTF16,
         ClientSettings::default(),
-        vec![(
+        &Workspaces::new(vec![Workspace::new(
             lsp_types::Url::from_file_path(file_path.parent().unwrap()).unwrap(),
-            ClientSettings::default(),
-        )],
+        )
+        .with_settings(ClientSettings::default())]),
     )
     .unwrap();
 
@@ -298,7 +298,7 @@ fn super_resolution_overview() {
             .unwrap();
     }
 
-    let snapshot = session.take_snapshot(file_url.clone()).unwrap();
+    let snapshot = session.take_snapshot(file_url).unwrap();
 
     insta::assert_snapshot!(
         "changed_notebook",

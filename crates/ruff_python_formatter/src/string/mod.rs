@@ -1,21 +1,22 @@
-pub(crate) use any::AnyString;
+use memchr::memchr2;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
-use ruff_formatter::format_args;
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::StringLikePart;
 use ruff_python_ast::{
     self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
     AnyStringFlags, StringFlags,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
 
-use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
+use crate::expression::expr_f_string::f_string_quoting;
 use crate::prelude::*;
+use crate::preview::is_f_string_formatting_enabled;
 use crate::QuoteStyle;
 
-mod any;
 pub(crate) mod docstring;
+pub(crate) mod implicit;
 mod normalize;
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -23,38 +24,6 @@ pub(crate) enum Quoting {
     #[default]
     CanChange,
     Preserve,
-}
-
-/// Formats any implicitly concatenated string. This could be any valid combination
-/// of string, bytes or f-string literals.
-pub(crate) struct FormatStringContinuation<'a> {
-    string: &'a AnyString<'a>,
-}
-
-impl<'a> FormatStringContinuation<'a> {
-    pub(crate) fn new(string: &'a AnyString<'a>) -> Self {
-        Self { string }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-        let quoting = self.string.quoting(&f.context().locator());
-
-        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
-
-        for part in self.string.parts(quoting) {
-            joiner.entry(&format_args![
-                line_suffix_boundary(),
-                leading_comments(comments.leading(&part)),
-                part,
-                trailing_comments(comments.trailing(&part))
-            ]);
-        }
-
-        joiner.finish()
-    }
 }
 
 impl Format<PyFormatContext<'_>> for AnyStringPrefix {
@@ -119,57 +88,77 @@ impl From<Quote> for QuoteStyle {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct StringPart {
-    flags: AnyStringFlags,
-    range: TextRange,
+// Extension trait that adds formatter specific helper methods to `StringLike`.
+pub(crate) trait StringLikeExtensions {
+    fn quoting(&self, source: &str) -> Quoting;
+
+    fn is_multiline(&self, context: &PyFormatContext) -> bool;
 }
 
-impl Ranged for StringPart {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl StringPart {
-    /// Use the `kind()` method to retrieve information about the
-    fn flags(self) -> AnyStringFlags {
-        self.flags
-    }
-
-    /// Returns the range of the string's content in the source (minus prefix and quotes).
-    fn content_range(self) -> TextRange {
-        let kind = self.flags();
-        TextRange::new(
-            self.start() + kind.opener_len(),
-            self.end() - kind.closer_len(),
-        )
-    }
-}
-
-impl From<&ast::StringLiteral> for StringPart {
-    fn from(value: &ast::StringLiteral) -> Self {
-        Self {
-            range: value.range,
-            flags: value.flags.into(),
+impl StringLikeExtensions for ast::StringLike<'_> {
+    fn quoting(&self, source: &str) -> Quoting {
+        match self {
+            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
+            Self::FString(f_string) => f_string_quoting(f_string, source),
         }
     }
-}
 
-impl From<&ast::BytesLiteral> for StringPart {
-    fn from(value: &ast::BytesLiteral) -> Self {
-        Self {
-            range: value.range,
-            flags: value.flags.into(),
-        }
-    }
-}
+    fn is_multiline(&self, context: &PyFormatContext) -> bool {
+        self.parts().any(|part| match part {
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                part.flags().is_triple_quoted()
+                    && context.source().contains_line_break(part.range())
+            }
+            StringLikePart::FString(f_string) => {
+                fn contains_line_break_or_comments(
+                    elements: &ast::FStringElements,
+                    context: &PyFormatContext,
+                    is_triple_quoted: bool,
+                ) -> bool {
+                    elements.iter().any(|element| match element {
+                        ast::FStringElement::Literal(literal) => {
+                            is_triple_quoted
+                                && context.source().contains_line_break(literal.range())
+                        }
+                        ast::FStringElement::Expression(expression) => {
+                            // Expressions containing comments can't be joined.
+                            //
+                            // Format specifiers needs to be checked as well. For example, the
+                            // following should be considered multiline because the literal
+                            // part of the format specifier contains a newline at the end
+                            // (`.3f\n`):
+                            //
+                            // ```py
+                            // x = f"hello {a + b + c + d:.3f
+                            // } world"
+                            // ```
+                            context.comments().contains_comments(expression.into())
+                                || expression.format_spec.as_deref().is_some_and(|spec| {
+                                    contains_line_break_or_comments(
+                                        &spec.elements,
+                                        context,
+                                        is_triple_quoted,
+                                    )
+                                })
+                                || expression.debug_text.as_ref().is_some_and(|debug_text| {
+                                    memchr2(b'\n', b'\r', debug_text.leading.as_bytes()).is_some()
+                                        || memchr2(b'\n', b'\r', debug_text.trailing.as_bytes())
+                                            .is_some()
+                                })
+                        }
+                    })
+                }
 
-impl From<&ast::FString> for StringPart {
-    fn from(value: &ast::FString) -> Self {
-        Self {
-            range: value.range,
-            flags: value.flags.into(),
-        }
+                if is_f_string_formatting_enabled(context) {
+                    contains_line_break_or_comments(
+                        &f_string.elements,
+                        context,
+                        f_string.flags.is_triple_quoted(),
+                    )
+                } else {
+                    context.source().contains_line_break(f_string.range())
+                }
+            }
+        })
     }
 }

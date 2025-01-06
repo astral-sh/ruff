@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -21,17 +21,17 @@ use super::{LogicalLine, Whitespace};
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct MultipleSpacesAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleSpacesAfterKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple spaces after keyword")
+        "Multiple spaces after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -50,17 +50,17 @@ impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct MultipleSpacesBeforeKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleSpacesBeforeKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple spaces before keyword")
+        "Multiple spaces before keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -79,17 +79,17 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct TabAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct TabAfterKeyword;
 
 impl AlwaysFixableViolation for TabAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Tab after keyword")
+        "Tab after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -108,17 +108,17 @@ impl AlwaysFixableViolation for TabAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct TabBeforeKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct TabBeforeKeyword;
 
 impl AlwaysFixableViolation for TabBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Tab before keyword")
+        "Tab before keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 

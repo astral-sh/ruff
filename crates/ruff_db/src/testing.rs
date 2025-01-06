@@ -158,7 +158,7 @@ impl LoggingBuilder {
                         .parse()
                         .expect("Hardcoded directive to be valid"),
                 ),
-            hierarchical: true,
+            hierarchical: false,
         }
     }
 
@@ -167,7 +167,7 @@ impl LoggingBuilder {
 
         Some(Self {
             filter,
-            hierarchical: true,
+            hierarchical: false,
         })
     }
 
@@ -213,6 +213,7 @@ impl Default for LoggingBuilder {
     }
 }
 
+#[must_use = "Dropping the guard unregisters the tracing subscriber."]
 pub struct LoggingGuard {
     _guard: tracing::subscriber::DefaultGuard,
 }

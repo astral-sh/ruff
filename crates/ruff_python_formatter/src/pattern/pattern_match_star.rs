@@ -18,9 +18,10 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
 
         write!(f, [token("*"), dangling_comments(dangling)])?;
 
-        match name {
-            Some(name) => write!(f, [name.format()]),
-            None => write!(f, [token("_")]),
+        if let Some(name) = name {
+            write!(f, [name.format()])
+        } else {
+            write!(f, [token("_")])
         }
     }
 }
@@ -31,6 +32,8 @@ impl NeedsParentheses for PatternMatchStar {
         _parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
+        // Doesn't matter what we return here because starred patterns can never be used
+        // outside a sequence pattern.
         OptionalParentheses::Never
     }
 }

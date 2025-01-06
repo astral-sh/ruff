@@ -1,14 +1,14 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace;
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.
@@ -30,7 +30,7 @@ use crate::registry::Rule;
 /// ```console
 /// Traceback (most recent call last):
 ///   File "tmp.py", line 2, in <module>
-///     raise RuntimeError("Some value is incorrect")
+///     raise RuntimeError("'Some value' is incorrect")
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 ///
@@ -47,15 +47,15 @@ use crate::registry::Rule;
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-#[violation]
-pub struct RawStringInException;
+#[derive(ViolationMetadata)]
+pub(crate) struct RawStringInException;
 
 impl Violation for RawStringInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Exception must not use a string literal, assign to variable first")
+        "Exception must not use a string literal, assign to variable first".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -102,15 +102,15 @@ impl Violation for RawStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-#[violation]
-pub struct FStringInException;
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringInException;
 
 impl Violation for FStringInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Exception must not use an f-string literal, assign to variable first")
+        "Exception must not use an f-string literal, assign to variable first".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -158,15 +158,15 @@ impl Violation for FStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-#[violation]
-pub struct DotFormatInException;
+#[derive(ViolationMetadata)]
+pub(crate) struct DotFormatInException;
 
 impl Violation for DotFormatInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Exception must not use a `.format()` string directly, assign to variable first")
+        "Exception must not use a `.format()` string directly, assign to variable first".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -190,7 +190,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             let mut diagnostic =
                                 Diagnostic::new(RawStringInException, first.range());
                             if let Some(indentation) =
-                                whitespace::indentation(checker.locator(), stmt)
+                                whitespace::indentation(checker.source(), stmt)
                             {
                                 diagnostic.set_fix(generate_fix(
                                     stmt,
@@ -208,8 +208,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                 Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
                         let mut diagnostic = Diagnostic::new(FStringInException, first.range());
-                        if let Some(indentation) = whitespace::indentation(checker.locator(), stmt)
-                        {
+                        if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
                                 first,
@@ -231,7 +230,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                 let mut diagnostic =
                                     Diagnostic::new(DotFormatInException, first.range());
                                 if let Some(indentation) =
-                                    whitespace::indentation(checker.locator(), stmt)
+                                    whitespace::indentation(checker.source(), stmt)
                                 {
                                     diagnostic.set_fix(generate_fix(
                                         stmt,

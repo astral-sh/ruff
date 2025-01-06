@@ -1,12 +1,15 @@
-use once_cell::sync::Lazy;
+use std::iter::FusedIterator;
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary UTF-8 encoding declarations.
@@ -27,13 +30,13 @@ use ruff_text_size::{Ranged, TextRange};
 /// ```
 ///
 /// [PEP 3120]: https://peps.python.org/pep-3120/
-#[violation]
-pub struct UTF8EncodingDeclaration;
+#[derive(ViolationMetadata)]
+pub(crate) struct UTF8EncodingDeclaration;
 
 impl AlwaysFixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("UTF-8 encoding declaration is unnecessary")
+        "UTF-8 encoding declaration is unnecessary".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -42,58 +45,135 @@ impl AlwaysFixableViolation for UTF8EncodingDeclaration {
 }
 
 // Regex from PEP263.
-static CODING_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
+static CODING_COMMENT_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-_.a-zA-Z0-9]+)").unwrap());
+
+#[derive(Debug)]
+enum CodingComment {
+    /// A UTF-8 encoding declaration.
+    UTF8(CodingCommentRange),
+    /// A declaration for any non utf8 encoding
+    OtherEncoding,
+    /// Any other comment
+    NoEncoding,
+}
+
+#[derive(Debug)]
+struct CodingCommentRange {
+    comment: TextRange,
+    line: TextRange,
+}
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
-    indexer: &Indexer,
     comment_ranges: &CommentRanges,
 ) {
-    // The coding comment must be on one of the first two lines. Since each comment spans at least
-    // one line, we only need to check the first two comments at most.
-    for comment_range in comment_ranges.iter().take(2) {
-        // If leading content is not whitespace then it's not a valid coding comment e.g.
-        // ```
-        // print(x) # coding=utf8
-        // ```
-        let line_range = locator.full_line_range(comment_range.start());
-        if !locator
-            .slice(TextRange::new(line_range.start(), comment_range.start()))
-            .trim()
-            .is_empty()
-        {
-            continue;
-        }
+    let mut iter = CodingCommentIterator::new(locator, comment_ranges)
+        .skip_while(|comment| matches!(comment, CodingComment::NoEncoding));
 
-        // If the line is after a continuation then it's not a valid coding comment e.g.
-        // ```
-        // x = 1 \
-        //    # coding=utf8
-        // x = 2
-        // ```
-        if indexer
-            .preceded_by_continuations(line_range.start(), locator)
-            .is_some()
-        {
-            continue;
-        }
+    let Some(CodingComment::UTF8(range)) = iter.next() else {
+        return;
+    };
 
-        if CODING_COMMENT_REGEX.is_match(locator.slice(line_range)) {
-            #[allow(deprecated)]
-            let index = locator.compute_line_index(line_range.start());
-            if index.to_zero_indexed() > 1 {
-                continue;
-            }
+    let line_index = locator.count_lines(TextRange::up_to(range.comment.start()));
 
-            let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *comment_range);
-            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                line_range.start(),
-                line_range.end(),
-            )));
-            diagnostics.push(diagnostic);
+    // Comment must be on the first or second line
+    if line_index > 1 {
+        return;
+    }
+
+    // ```python
+    // # -*- coding: utf-8 -*-
+    // # -*- coding: latin-1 -*-
+    // ```
+    // or
+    // ```python
+    // # -*- coding: utf-8 -*-
+    // # comment
+    // # -*- coding: latin-1 -*-
+    // ```
+    if matches!(
+        (iter.next(), iter.next()),
+        (Some(CodingComment::OtherEncoding), _)
+            | (
+                Some(CodingComment::NoEncoding),
+                Some(CodingComment::OtherEncoding)
+            )
+    ) {
+        return;
+    }
+
+    let fix = Fix::safe_edit(Edit::range_deletion(range.line));
+    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, range.comment);
+
+    diagnostics.push(diagnostic.with_fix(fix));
+}
+
+struct CodingCommentIterator<'a> {
+    /// End offset of the last comment trivia or `None` if there
+    /// was any non-comment comment since the iterator started (e.g. a print statement)
+    last_trivia_end: Option<TextSize>,
+    locator: &'a Locator<'a>,
+    comments: std::slice::Iter<'a, TextRange>,
+}
+
+impl<'a> CodingCommentIterator<'a> {
+    fn new(locator: &'a Locator<'a>, comments: &'a CommentRanges) -> Self {
+        Self {
+            last_trivia_end: Some(locator.bom_start_offset()),
+            locator,
+            comments: comments.iter(),
         }
     }
 }
+
+impl Iterator for CodingCommentIterator<'_> {
+    type Item = CodingComment;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let comment = self.comments.next()?;
+        let line_range = self.locator.full_line_range(comment.start());
+
+        // If leading content is not whitespace then it's not a valid coding comment e.g.
+        // ```py
+        // print(x) # coding=utf8
+        // ```
+        // or
+        // ```python
+        // print(test)
+        // # -*- coding: utf-8 -*-
+        // ```
+        let last_trivia_end = self.last_trivia_end.take()?;
+        let before_hash_sign = self
+            .locator
+            .slice(TextRange::new(last_trivia_end, comment.start()));
+
+        if !before_hash_sign.trim().is_empty() {
+            return None;
+        }
+
+        self.last_trivia_end = Some(comment.end());
+
+        let result = if let Some(parts_of_interest) =
+            CODING_COMMENT_REGEX.captures(self.locator.slice(line_range))
+        {
+            let coding_name = parts_of_interest.name("name").unwrap();
+
+            match coding_name.as_str() {
+                "utf8" | "utf-8" => CodingComment::UTF8(CodingCommentRange {
+                    comment: comment.range(),
+                    line: line_range,
+                }),
+                _ => CodingComment::OtherEncoding,
+            }
+        } else {
+            CodingComment::NoEncoding
+        };
+
+        Some(result)
+    }
+}
+
+impl FusedIterator for CodingCommentIterator<'_> {}

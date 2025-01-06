@@ -1,27 +1,30 @@
-use anyhow::Result;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::rules::flake8_type_checking::settings::Settings;
+use crate::Locator;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
 pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
     reference.in_type_checking_block()
-        || reference.in_typing_only_annotation()
-        || reference.in_complex_string_type_definition()
-        || reference.in_simple_string_type_definition()
-        || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())
+        // if we're not in a type checking block, we necessarily need to be within a
+        // type definition to be considered a typing reference
+        || (reference.in_type_definition()
+            && (reference.in_typing_only_annotation()
+                || reference.in_string_type_definition()
+                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
@@ -95,12 +98,31 @@ fn runtime_required_decorators(
     }
 
     decorator_list.iter().any(|decorator| {
+        let expression = map_callable(&decorator.expression);
         semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            // First try to resolve the qualified name normally for cases like:
+            // ```python
+            // from mymodule import app
+            //
+            // @app.get(...)
+            // def test(): ...
+            //  ```
+            .resolve_qualified_name(expression)
+            // If we can't resolve the name, then try resolving the assignment
+            // in order to support cases like:
+            // ```python
+            // from fastapi import FastAPI
+            //
+            // app = FastAPI()
+            //
+            // @app.get(...)
+            // def test(): ...
+            // ```
+            .or_else(|| analyze::typing::resolve_assignment(expression, semantic))
             .is_some_and(|qualified_name| {
                 decorators
                     .iter()
-                    .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
+                    .any(|decorator| QualifiedName::from_dotted_name(decorator) == qualified_name)
             })
     })
 }
@@ -140,7 +162,7 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
     false
 }
 
-/// Returns `true` if a function is registered as a `singledispatch` interface.
+/// Returns `true` if a function is registered as a `singledispatch` or `singledispatchmethod` interface.
 ///
 /// For example, `fun` below is a `singledispatch` interface:
 /// ```python
@@ -159,15 +181,17 @@ pub(crate) fn is_singledispatch_interface(
         semantic
             .resolve_qualified_name(&decorator.expression)
             .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["functools", "singledispatch"])
+                matches!(
+                    qualified_name.segments(),
+                    ["functools", "singledispatch" | "singledispatchmethod"]
+                )
             })
     })
 }
 
-/// Returns `true` if a function is registered as a `singledispatch` implementation.
+/// Returns `true` if a function is registered as a `singledispatch` or `singledispatchmethod` implementation.
 ///
 /// For example, `_` below is a `singledispatch` implementation:
-/// For example:
 /// ```python
 /// from functools import singledispatch
 ///
@@ -216,17 +240,16 @@ pub(crate) fn is_singledispatch_implementation(
 /// This requires more than just wrapping the reference itself in quotes. For example:
 /// - When quoting `Series` in `Series[pd.Timestamp]`, we want `"Series[pd.Timestamp]"`.
 /// - When quoting `kubernetes` in `kubernetes.SecurityContext`, we want `"kubernetes.SecurityContext"`.
-/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`. (This is currently unsupported.)
-/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`. (This is currently unsupported.)
+/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`.
+/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
 ///
 /// In general, when expanding a component of a call chain, we want to quote the entire call chain.
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
-    locator: &Locator,
     stylist: &Stylist,
-    generator: Generator,
-) -> Result<Edit> {
+    locator: &Locator,
+) -> Edit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
         match semantic.expression(parent_id) {
@@ -235,7 +258,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, locator);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -243,7 +266,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, locator);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -251,7 +274,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, locator);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -259,32 +282,34 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, locator);
                 }
             }
             _ => {}
         }
     }
 
-    // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
-    // ```python
-    // from typing import Literal
-    //
-    // Set[Literal["Foo"]]
-    // ```
-    let text = locator.slice(expr);
-    if text.contains('\'') || text.contains('"') {
-        return Err(anyhow::anyhow!("Annotation already contains a quote"));
-    }
+    quote_type_expression(expr, semantic, stylist, locator)
+}
 
+/// Wrap a type expression in quotes.
+///
+/// This function assumes that the callee already expanded expression components
+/// to the minimum acceptable range for quoting, i.e. the parent node may not be
+/// a [`Expr::Subscript`], [`Expr::Attribute`], `[Expr::Call]` or `[Expr::BinOp]`.
+///
+/// In most cases you want to call [`quote_annotation`] instead, which provides
+/// that guarantee by expanding the expression before calling into this function.
+pub(crate) fn quote_type_expression(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    stylist: &Stylist,
+    locator: &Locator,
+) -> Edit {
     // Quote the entire expression.
-    let quote = stylist.quote();
-    let annotation = generator.expr(expr);
+    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator);
 
-    Ok(Edit::range_replacement(
-        format!("{quote}{annotation}{quote}"),
-        expr.range(),
-    ))
+    Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
@@ -305,4 +330,93 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
         }
     }
     filtered
+}
+
+pub(crate) struct QuoteAnnotator<'a> {
+    semantic: &'a SemanticModel<'a>,
+    stylist: &'a Stylist<'a>,
+    locator: &'a Locator<'a>,
+}
+
+impl<'a> QuoteAnnotator<'a> {
+    fn new(
+        semantic: &'a SemanticModel<'a>,
+        stylist: &'a Stylist<'a>,
+        locator: &'a Locator<'a>,
+    ) -> Self {
+        Self {
+            semantic,
+            stylist,
+            locator,
+        }
+    }
+
+    fn into_annotation(self, expr: &Expr) -> String {
+        let mut expr_without_forward_references = expr.clone();
+        self.visit_expr(&mut expr_without_forward_references);
+        let generator = Generator::from(self.stylist);
+        // we first generate the annotation with the inverse quote, so we can
+        // generate the string literal with the preferred quote
+        let subgenerator = Generator::new(
+            self.stylist.indentation(),
+            self.stylist.quote().opposite(),
+            self.stylist.line_ending(),
+        );
+        let annotation = subgenerator.expr(&expr_without_forward_references);
+        generator.expr(&Expr::from(ast::StringLiteral {
+            range: TextRange::default(),
+            value: annotation.into_boxed_str(),
+            flags: ast::StringLiteralFlags::default(),
+        }))
+    }
+
+    fn visit_annotated_slice(&self, slice: &mut Expr) {
+        // we only want to walk the first tuple element if it exists,
+        // anything else should not be transformed
+        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice {
+            if !elts.is_empty() {
+                self.visit_expr(&mut elts[0]);
+            }
+        }
+    }
+}
+
+impl Transformer for QuoteAnnotator<'_> {
+    fn visit_expr(&self, expr: &mut Expr) {
+        match expr {
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                if let Some(qualified_name) = self.semantic.resolve_qualified_name(value) {
+                    if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "Literal")
+                    {
+                        // we don't want to modify anything inside `Literal`
+                        // so skip visiting this subscripts' slice
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "Annotated")
+                    {
+                        self.visit_annotated_slice(slice);
+                    } else {
+                        self.visit_expr(slice);
+                    }
+                }
+            }
+            Expr::StringLiteral(literal) => {
+                // try to parse the forward reference and replace the string
+                // literal node with the parsed expression, if we fail to
+                // parse the forward reference, we just keep treating this
+                // like a regular string literal
+                if let Ok(annotation) = parse_type_annotation(literal, self.locator.contents()) {
+                    *expr = annotation.expression().clone();
+                    // we need to visit the parsed expression too
+                    // since it may contain forward references itself
+                    self.visit_expr(expr);
+                }
+            }
+            _ => {
+                walk_expr(self, expr);
+            }
+        }
+    }
 }

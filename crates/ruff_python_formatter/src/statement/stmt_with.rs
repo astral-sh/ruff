@@ -71,7 +71,10 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 
                         match layout {
                             WithItemsLayout::SingleWithTarget(single) => {
-                                optional_parentheses(&single.format()).fmt(f)
+                                optional_parentheses(&single.format().with_options(
+                                    WithItemLayout::ParenthesizedContextManagers { single: true },
+                                ))
+                                .fmt(f)
                             }
 
                             WithItemsLayout::SingleWithoutTarget(single) => single
@@ -93,7 +96,11 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                     for item in &with_stmt.items {
                                         joiner.entry_with_line_separator(
                                             item,
-                                            &item.format(),
+                                            &item.format().with_options(
+                                                WithItemLayout::ParenthesizedContextManagers {
+                                                    single: with_stmt.items.len() == 1,
+                                                },
+                                            ),
                                             soft_line_break_or_space(),
                                         );
                                     }
@@ -114,9 +121,22 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             WithItemsLayout::Parenthesized => parenthesized(
                                 "(",
                                 &format_with(|f: &mut PyFormatter| {
-                                    f.join_comma_separated(with_stmt.body.first().unwrap().start())
-                                        .nodes(&with_stmt.items)
-                                        .finish()
+                                    let mut joiner = f.join_comma_separated(
+                                        with_stmt.body.first().unwrap().start(),
+                                    );
+
+                                    for item in &with_stmt.items {
+                                        joiner.entry(
+                                            item,
+                                            &item.format().with_options(
+                                                WithItemLayout::ParenthesizedContextManagers {
+                                                    single: with_stmt.items.len() == 1,
+                                                },
+                                            ),
+                                        );
+                                    }
+
+                                    joiner.finish()
                                 }),
                                 ")",
                             )

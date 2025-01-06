@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+snapshot_kind: text
 ---
 ignore_variadic_names.py:1:7: ARG001 Unused function argument: `a`
   |
@@ -94,5 +95,3 @@ ignore_variadic_names.py:13:32: ARG002 Unused method argument: `kwargs`
    |                                ^^^^^^ ARG002
 14 |         print("Hello, world!")
    |
-
-

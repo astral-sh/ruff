@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E22.py:28:8: E222 [*] Multiple spaces after operator
    |
@@ -105,4 +106,22 @@ E22.py:36:7: E222 [*] Multiple spaces after operator
 38 38 | #:
 39 39 | 
 
+E22.py:184:9: E222 [*] Multiple spaces after operator
+    |
+182 | #:
+183 | 
+184 | if a  ==  1:
+    |         ^^ E222
+185 |     print(a)
+    |
+    = help: Replace with single space
 
+ℹ Safe fix
+181 181 |     pass
+182 182 | #:
+183 183 | 
+184     |-if a  ==  1:
+    184 |+if a  == 1:
+185 185 |     print(a)
+186 186 | 
+187 187 |

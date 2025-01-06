@@ -21,6 +21,8 @@ safe = password = "s3cr3t"
 password = safe = "s3cr3t"
 PASSWORD = "s3cr3t"
 PassWord = "s3cr3t"
+password: str = "s3cr3t"
+password: Final = "s3cr3t"
 
 d["password"] = "s3cr3t"
 d["pass"] = "s3cr3t"

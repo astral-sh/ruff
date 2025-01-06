@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, whitespace::indentation, AnyStringFlags, Expr, StringFlags};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
@@ -10,12 +10,12 @@ use ruff_python_literal::cformat::{
 };
 use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::pyupgrade::helpers::curly_escape;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `printf`-style string formatting, and offers to replace it with
@@ -73,15 +73,15 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct PrintfStringFormatting;
+#[derive(ViolationMetadata)]
+pub(crate) struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use format specifiers instead of percent format")
+        "Use format specifiers instead of percent format".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -235,38 +235,35 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
         for ast::DictItem { key, value } in items {
-            match key {
-                Some(key) => {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: key_string, ..
-                    }) = key
-                    {
-                        // If the dictionary key is not a valid variable name, abort.
-                        if !is_identifier(key_string.to_str()) {
-                            return None;
-                        }
-                        // If there are multiple entries of the same key, abort.
-                        if seen.contains(&key_string.to_str()) {
-                            return None;
-                        }
-                        seen.push(key_string.to_str());
-                        if is_multi_line {
-                            if indent.is_none() {
-                                indent = indentation(locator, key);
-                            }
-                        }
-
-                        let value_string = locator.slice(value);
-                        arguments.push(format!("{key_string}={value_string}"));
-                    } else {
-                        // If there are any non-string keys, abort.
+            if let Some(key) = key {
+                if let Expr::StringLiteral(ast::ExprStringLiteral {
+                    value: key_string, ..
+                }) = key
+                {
+                    // If the dictionary key is not a valid variable name, abort.
+                    if !is_identifier(key_string.to_str()) {
                         return None;
                     }
-                }
-                None => {
+                    // If there are multiple entries of the same key, abort.
+                    if seen.contains(&key_string.to_str()) {
+                        return None;
+                    }
+                    seen.push(key_string.to_str());
+                    if is_multi_line {
+                        if indent.is_none() {
+                            indent = indentation(locator.contents(), key);
+                        }
+                    }
+
                     let value_string = locator.slice(value);
-                    arguments.push(format!("**{value_string}"));
+                    arguments.push(format!("{key_string}={value_string}"));
+                } else {
+                    // If there are any non-string keys, abort.
+                    return None;
                 }
+            } else {
+                let value_string = locator.slice(value);
+                arguments.push(format!("**{value_string}"));
             }
         }
         // If we couldn't parse out key values, abort.
@@ -387,11 +384,9 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            if checker.settings.preview.is_enabled() {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
-            }
+            checker
+                .diagnostics
+                .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
             return;
         }
 
@@ -450,11 +445,9 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
-                if checker.settings.preview.is_enabled() {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
-                }
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
                 return;
             };
             Cow::Owned(params_string)

@@ -1,7 +1,7 @@
 use ruff_python_ast::{Decorator, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
@@ -42,8 +42,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
-#[violation]
-pub struct InvalidFunctionName {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidFunctionName {
     name: String,
 }
 

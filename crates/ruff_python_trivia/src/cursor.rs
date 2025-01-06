@@ -26,6 +26,16 @@ impl<'a> Cursor<'a> {
         self.chars.clone()
     }
 
+    /// Returns the remaining input as byte slice.
+    pub fn as_bytes(&self) -> &'a [u8] {
+        self.as_str().as_bytes()
+    }
+
+    /// Returns the remaining input as string slice.
+    pub fn as_str(&self) -> &'a str {
+        self.chars.as_str()
+    }
+
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the file is at the end of the file.
     pub fn first(&self) -> char {
@@ -46,10 +56,8 @@ impl<'a> Cursor<'a> {
         self.chars.clone().next_back().unwrap_or(EOF_CHAR)
     }
 
-    // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
-    #[allow(clippy::cast_possible_truncation)]
     pub fn text_len(&self) -> TextSize {
-        TextSize::new(self.chars.as_str().len() as u32)
+        self.chars.as_str().text_len()
     }
 
     pub fn token_len(&self) -> TextSize {
@@ -93,6 +101,16 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Eats the next character if `predicate` returns `true`.
+    pub fn eat_if(&mut self, mut predicate: impl FnMut(char) -> bool) -> bool {
+        if predicate(self.first()) && !self.is_eof() {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
     /// Eats symbols while predicate returns true or until the end of file is reached.
     pub fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         // It was tried making optimized version of this for eg. line comments, but
@@ -109,5 +127,14 @@ impl<'a> Cursor<'a> {
         while predicate(self.last()) && !self.is_eof() {
             self.bump_back();
         }
+    }
+
+    /// Skips the next `count` bytes.
+    ///
+    /// ## Panics
+    ///  - If `count` is larger than the remaining bytes in the input stream.
+    ///  - If `count` indexes into a multi-byte character.
+    pub fn skip_bytes(&mut self, count: usize) {
+        self.chars = self.chars.as_str()[count..].chars();
     }
 }

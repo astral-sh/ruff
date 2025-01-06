@@ -27,11 +27,11 @@ bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
     pub(crate) struct Flags: u8 {
         /// Whether to show violations when emitting diagnostics.
-        const SHOW_VIOLATIONS = 0b0000_0001;
+        const SHOW_VIOLATIONS = 1 << 0;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
-        const SHOW_FIX_SUMMARY = 0b0000_0100;
+        const SHOW_FIX_SUMMARY = 1 << 1;
         /// Whether to show a diff of each fixed violation when emitting diagnostics.
-        const SHOW_FIX_DIFF = 0b0000_1000;
+        const SHOW_FIX_DIFF = 1 << 2;
     }
 }
 
@@ -244,10 +244,7 @@ impl Printer {
             #[allow(deprecated)]
             if matches!(
                 self.format,
-                OutputFormat::Text
-                    | OutputFormat::Full
-                    | OutputFormat::Concise
-                    | OutputFormat::Grouped
+                OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
             ) {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -325,8 +322,6 @@ impl Printer {
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            #[allow(deprecated)]
-            OutputFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
         writer.flush()?;
@@ -368,8 +363,7 @@ impl Printer {
         }
 
         match self.format {
-            #[allow(deprecated)]
-            OutputFormat::Text | OutputFormat::Full | OutputFormat::Concise => {
+            OutputFormat::Full | OutputFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
                 let count_width = num_digits(
@@ -416,6 +410,10 @@ impl Printer {
                         },
                         statistic.name,
                     )?;
+                }
+
+                if any_fixable {
+                    writeln!(writer, "[*] fixable with `ruff check --fix`",)?;
                 }
                 return Ok(());
             }

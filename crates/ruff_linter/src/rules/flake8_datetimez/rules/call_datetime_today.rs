@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
@@ -42,13 +42,13 @@ use super::helpers;
 ///
 /// datetime.datetime.now(tz=datetime.UTC)
 /// ```
-#[violation]
-pub struct CallDatetimeToday;
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeToday;
 
 impl Violation for CallDatetimeToday {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`datetime.datetime.today()` used")
+        "`datetime.datetime.today()` used".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

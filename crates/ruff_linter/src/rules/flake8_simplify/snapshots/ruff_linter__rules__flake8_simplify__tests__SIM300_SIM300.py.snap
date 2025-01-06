@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM300.py:2:1: SIM300 [*] Yoda condition detected
   |
@@ -268,7 +269,7 @@ SIM300.py:14:1: SIM300 [*] Yoda condition detected
    14 |+(number - 100) > 0  # SIM300
 15 15 | B<A[0][0]or B
 16 16 | B or(B)<A[0][0]
-17 17 | 
+17 17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
 
 SIM300.py:15:1: SIM300 [*] Yoda condition detected
    |
@@ -277,6 +278,7 @@ SIM300.py:15:1: SIM300 [*] Yoda condition detected
 15 | B<A[0][0]or B
    | ^^^^^^^^^ SIM300
 16 | B or(B)<A[0][0]
+17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
    |
    = help: Rewrite as `A[0][0] > B`
 
@@ -287,8 +289,8 @@ SIM300.py:15:1: SIM300 [*] Yoda condition detected
 15    |-B<A[0][0]or B
    15 |+A[0][0] > B or B
 16 16 | B or(B)<A[0][0]
-17 17 | 
-18 18 | # Errors in preview
+17 17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
+18 18 | 
 
 SIM300.py:16:5: SIM300 [*] Yoda condition detected
    |
@@ -296,8 +298,7 @@ SIM300.py:16:5: SIM300 [*] Yoda condition detected
 15 | B<A[0][0]or B
 16 | B or(B)<A[0][0]
    |     ^^^^^^^^^^^ SIM300
-17 | 
-18 | # Errors in preview
+17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
    |
    = help: Rewrite as `A[0][0] > (B)`
 
@@ -307,46 +308,67 @@ SIM300.py:16:5: SIM300 [*] Yoda condition detected
 15 15 | B<A[0][0]or B
 16    |-B or(B)<A[0][0]
    16 |+B or A[0][0] > (B)
-17 17 | 
-18 18 | # Errors in preview
-19 19 | ['upper'] == UPPER_LIST
+17 17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
+18 18 | 
+19 19 | # Errors in preview
 
-SIM300.py:19:1: SIM300 [*] Yoda condition detected
+SIM300.py:17:1: SIM300 [*] Yoda condition detected
    |
-18 | # Errors in preview
-19 | ['upper'] == UPPER_LIST
+15 | B<A[0][0]or B
+16 | B or(B)<A[0][0]
+17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
+18 | 
+19 | # Errors in preview
+   |
+   = help: Rewrite as `DummyHandler.CONFIG == {"non-empty-dict": "is-ok"}`
+
+ℹ Safe fix
+14 14 | 0 < (number - 100)  # SIM300
+15 15 | B<A[0][0]or B
+16 16 | B or(B)<A[0][0]
+17    |-{"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
+   17 |+DummyHandler.CONFIG == {"non-empty-dict": "is-ok"}
+18 18 | 
+19 19 | # Errors in preview
+20 20 | ['upper'] == UPPER_LIST
+
+SIM300.py:20:1: SIM300 [*] Yoda condition detected
+   |
+19 | # Errors in preview
+20 | ['upper'] == UPPER_LIST
    | ^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-20 | {} == DummyHandler.CONFIG
+21 | {} == DummyHandler.CONFIG
    |
    = help: Rewrite as `UPPER_LIST == ['upper']`
 
 ℹ Safe fix
-16 16 | B or(B)<A[0][0]
-17 17 | 
-18 18 | # Errors in preview
-19    |-['upper'] == UPPER_LIST
-   19 |+UPPER_LIST == ['upper']
-20 20 | {} == DummyHandler.CONFIG
-21 21 | 
-22 22 | # Errors in stable
+17 17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
+18 18 | 
+19 19 | # Errors in preview
+20    |-['upper'] == UPPER_LIST
+   20 |+UPPER_LIST == ['upper']
+21 21 | {} == DummyHandler.CONFIG
+22 22 | 
+23 23 | # Errors in stable
 
-SIM300.py:20:1: SIM300 [*] Yoda condition detected
+SIM300.py:21:1: SIM300 [*] Yoda condition detected
    |
-18 | # Errors in preview
-19 | ['upper'] == UPPER_LIST
-20 | {} == DummyHandler.CONFIG
+19 | # Errors in preview
+20 | ['upper'] == UPPER_LIST
+21 | {} == DummyHandler.CONFIG
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-21 | 
-22 | # Errors in stable
+22 | 
+23 | # Errors in stable
    |
    = help: Rewrite as `DummyHandler.CONFIG == {}`
 
 ℹ Safe fix
-17 17 | 
-18 18 | # Errors in preview
-19 19 | ['upper'] == UPPER_LIST
-20    |-{} == DummyHandler.CONFIG
-   20 |+DummyHandler.CONFIG == {}
-21 21 | 
-22 22 | # Errors in stable
-23 23 | UPPER_LIST == ['upper']
+18 18 | 
+19 19 | # Errors in preview
+20 20 | ['upper'] == UPPER_LIST
+21    |-{} == DummyHandler.CONFIG
+   21 |+DummyHandler.CONFIG == {}
+22 22 | 
+23 23 | # Errors in stable
+24 24 | UPPER_LIST == ['upper']

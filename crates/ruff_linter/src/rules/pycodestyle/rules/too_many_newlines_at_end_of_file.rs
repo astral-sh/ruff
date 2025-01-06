@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -20,36 +20,30 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 /// ```python
 /// spam(1)\n
 /// ```
-#[violation]
-pub struct TooManyNewlinesAtEndOfFile {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyNewlinesAtEndOfFile {
     num_trailing_newlines: u32,
 }
 
 impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyNewlinesAtEndOfFile {
-            num_trailing_newlines,
-        } = self;
-
         // We expect a single trailing newline; so two trailing newlines is one too many, three
         // trailing newlines is two too many, etc.
-        if *num_trailing_newlines > 2 {
-            format!("Too many newlines at end of file")
+        if self.num_trailing_newlines > 2 {
+            "Too many newlines at end of file".to_string()
         } else {
-            format!("Extra newline at end of file")
+            "Extra newline at end of file".to_string()
         }
     }
 
     fn fix_title(&self) -> String {
-        let TooManyNewlinesAtEndOfFile {
-            num_trailing_newlines,
-        } = self;
-        if *num_trailing_newlines > 2 {
-            "Remove trailing newlines".to_string()
+        let title = if self.num_trailing_newlines > 2 {
+            "Remove trailing newlines"
         } else {
-            "Remove trailing newline".to_string()
-        }
+            "Remove trailing newline"
+        };
+        title.to_string()
     }
 }
 

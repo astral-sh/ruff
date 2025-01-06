@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -27,14 +27,14 @@ use crate::fix;
 /// ```
 ///
 /// ## References
-/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
-#[violation]
-pub struct UselessMetaclassType;
+/// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessMetaclassType;
 
 impl AlwaysFixableViolation for UselessMetaclassType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__metaclass__ = type` is implied")
+        "`__metaclass__ = type` is implied".to_string()
     }
 
     fn fix_title(&self) -> String {

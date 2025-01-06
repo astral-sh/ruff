@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/form_feeds.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -128,7 +129,7 @@ a = [
 ```diff
 --- Black
 +++ Ruff
-@@ -5,62 +5,62 @@
+@@ -5,63 +5,62 @@
  
  # Comment and statement processing is different enough that we'll test variations of both
  # contexts here
@@ -167,8 +168,9 @@ a = [
 +
  #
 -
-+
- #
+-#
+ 
++#
  
  #
  pass
@@ -211,7 +213,7 @@ a = [
  pass
  
  
-@@ -68,25 +68,23 @@
+@@ -69,25 +68,23 @@
  def foo():
      pass
  
@@ -384,6 +386,7 @@ a = []
 #
 
 #
+
 
 #
 pass

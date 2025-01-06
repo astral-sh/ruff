@@ -1,3 +1,4 @@
+use anyhow::Context;
 use lsp_types::{self as types, request as req, Range};
 
 use crate::edit::{RangeExt, ToRangeExt};
@@ -32,7 +33,8 @@ fn format_document_range(
     let text_document = snapshot
         .query()
         .as_single_document()
-        .expect("format should only be called on text documents or notebook cells");
+        .context("Failed to get text document for the format range request")
+        .unwrap();
     let query = snapshot.query();
     format_text_document_range(text_document, range, query, snapshot.encoding())
 }
@@ -54,6 +56,7 @@ fn format_text_document_range(
             file_resolver_settings,
             None,
             Some(formatter_settings),
+            text_document.language_id(),
         ) {
             return Ok(None);
         }

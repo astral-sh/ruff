@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_return_type_hash.py:6:16: PLE0309 `__hash__` does not return an integer
   |

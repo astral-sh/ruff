@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
@@ -39,8 +39,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## References
 /// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
-#[violation]
-pub struct CheckAndRemoveFromSet {
+#[derive(ViolationMetadata)]
+pub(crate) struct CheckAndRemoveFromSet {
     element: SourceCodeSnippet,
     set: String,
 }

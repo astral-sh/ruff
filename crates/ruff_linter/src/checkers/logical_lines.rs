@@ -1,11 +1,11 @@
-use crate::line_width::IndentWidth;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::line_width::IndentWidth;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
@@ -14,6 +14,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {

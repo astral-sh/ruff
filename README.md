@@ -119,6 +119,10 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
+# With uv.
+uv add --dev ruff     # to add ruff to your project
+uv tool install ruff  # to install ruff globally
+
 # With pip.
 pip install ruff
 
@@ -136,8 +140,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.6.4/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.6.4/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.8.6/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.8.6/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -170,7 +174,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -182,7 +186,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or with [various other editors](https://docs.astral.sh/ruff/editors/setup).
 
 Ruff can also be used as a [GitHub Action](https://github.com/features/actions) via
-[`ruff-action`](https://github.com/chartboost/ruff-action):
+[`ruff-action`](https://github.com/astral-sh/ruff-action):
 
 ```yaml
 name: Ruff
@@ -192,7 +196,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: chartboost/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
 ### Configuration<a id="configuration"></a>
@@ -238,8 +242,8 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.8
-target-version = "py38"
+# Assume Python 3.9
+target-version = "py39"
 
 [lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -417,6 +421,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Babel](https://github.com/python-babel/babel)
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
+- CrowdCent ([NumerBlox](https://github.com/crowdcent/numerblox)) <!-- typos: ignore -->
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - CERN ([Indico](https://getindico.io/))
 - [DVC](https://github.com/iterative/dvc)

@@ -1,7 +1,7 @@
 use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
@@ -31,13 +31,13 @@ use crate::checkers::ast::Checker;
 ///         async with session.get("https://example.com/foo/bar") as resp:
 ///             ...
 /// ```
-#[violation]
-pub struct BlockingHttpCallInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlockingHttpCallInAsyncFunction;
 
 impl Violation for BlockingHttpCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not call blocking HTTP methods")
+        "Async functions should not call blocking HTTP methods".to_string()
     }
 }
 

@@ -1,10 +1,11 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Binding, BindingKind};
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the use of non-ASCII characters in variable names.
@@ -24,8 +25,8 @@ use ruff_text_size::Ranged;
 /// ```
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
-#[violation]
-pub struct NonAsciiName {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonAsciiName {
     name: String,
     kind: Kind,
 }
@@ -44,7 +45,7 @@ impl Violation for NonAsciiName {
 
 /// PLC2401
 pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Diagnostic> {
-    let name = binding.name(locator);
+    let name = binding.name(locator.contents());
     if name.is_ascii() {
         return None;
     }

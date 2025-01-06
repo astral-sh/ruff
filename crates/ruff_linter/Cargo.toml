@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.6.4"
+version = "0.8.6"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -15,6 +15,7 @@ license = { workspace = true }
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
+ruff_index = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
@@ -46,13 +47,12 @@ libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
-once_cell = { workspace = true }
 path-absolutize = { workspace = true, features = [
-  "once_cell_cache",
-  "use_unix_paths_on_wasm",
+    "once_cell_cache",
+    "use_unix_paths_on_wasm",
 ] }
 pathdiff = { workspace = true }
-pep440_rs = { workspace = true, features = ["serde"] }
+pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
 quick-junit = { workspace = true }
 regex = { workspace = true }
@@ -73,7 +73,7 @@ unicode-normalization = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }

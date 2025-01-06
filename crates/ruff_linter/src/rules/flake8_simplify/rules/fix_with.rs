@@ -5,11 +5,12 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement, match_with};
 use crate::fix::codemods::CodegenStylist;
+use crate::Locator;
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(
@@ -18,12 +19,12 @@ pub(crate) fn fix_multiple_with_statements(
     with_stmt: &ast::StmtWith,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, with_stmt) else {
+    let Some(outer_indent) = whitespace::indentation(locator.contents(), with_stmt) else {
         bail!("Unable to fix multiline statement");
     };
 
     // Extract the module text.
-    let contents = locator.lines(with_stmt.range());
+    let contents = locator.lines_str(with_stmt.range());
 
     // If the block is indented, "embed" it in a function definition, to preserve
     // indentation while retaining valid source code. (We'll strip the prefix later

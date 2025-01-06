@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
@@ -40,19 +40,19 @@ use crate::docstrings::Docstring;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct BlankLineAfterSummary {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingBlankLineAfterSummary {
     num_lines: usize,
 }
 
-impl Violation for BlankLineAfterSummary {
+impl Violation for MissingBlankLineAfterSummary {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineAfterSummary { num_lines } = self;
+        let MissingBlankLineAfterSummary { num_lines } = self;
         if *num_lines == 0 {
-            format!("1 blank line required between summary line and description")
+            "1 blank line required between summary line and description".to_string()
         } else {
             format!(
                 "1 blank line required between summary line and description (found {num_lines})"
@@ -85,7 +85,7 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut diagnostic = Diagnostic::new(
-            BlankLineAfterSummary {
+            MissingBlankLineAfterSummary {
                 num_lines: blanks_count,
             },
             docstring.range(),

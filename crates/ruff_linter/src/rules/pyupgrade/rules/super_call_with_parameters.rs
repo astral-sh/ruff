@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -43,13 +43,13 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
-#[violation]
-pub struct SuperCallWithParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperCallWithParameters;
 
 impl AlwaysFixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `super()` instead of `super(__class__, self)`")
+        "Use `super()` instead of `super(__class__, self)`".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -8,7 +8,7 @@ use libcst_native::{
 };
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
@@ -17,7 +17,7 @@ use ruff_python_ast::{
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -26,6 +26,7 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
+use crate::Locator;
 
 use super::unittest_assert::UnittestAssert;
 
@@ -57,15 +58,15 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something
 ///     assert not something_else
 /// ```
-#[violation]
-pub struct PytestCompositeAssertion;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion should be broken down into multiple parts")
+        "Assertion should be broken down into multiple parts".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -104,8 +105,8 @@ impl Violation for PytestCompositeAssertion {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestAssertInExcept {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestAssertInExcept {
     name: String,
 }
 
@@ -143,15 +144,15 @@ impl Violation for PytestAssertInExcept {
 ///     ...
 /// ```
 ///
-/// References
+/// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
-#[violation]
-pub struct PytestAssertAlwaysFalse;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestAssertAlwaysFalse;
 
 impl Violation for PytestAssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion always fails, replace with `pytest.fail()`")
+        "Assertion always fails, replace with `pytest.fail()`".to_string()
     }
 }
 
@@ -185,8 +186,8 @@ impl Violation for PytestAssertAlwaysFalse {
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 
-#[violation]
-pub struct PytestUnittestAssertion {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUnittestAssertion {
     assertion: String,
 }
 
@@ -342,8 +343,8 @@ pub(crate) fn unittest_assertion(
 ///
 /// ## References
 /// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
-#[violation]
-pub struct PytestUnittestRaisesAssertion {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUnittestRaisesAssertion {
     assertion: String,
 }
 
@@ -386,7 +387,7 @@ pub(crate) fn unittest_raises_assertion(
     );
     if !checker
         .comment_ranges()
-        .has_comments(call, checker.locator())
+        .has_comments(call, checker.source())
     {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
@@ -492,7 +493,7 @@ fn to_pytest_raises_args<'a>(
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
-    if matches!(truthiness, Truthiness::False | Truthiness::Falsey) {
+    if truthiness.into_bool() == Some(false) {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
@@ -622,11 +623,11 @@ fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Exp
 /// `assert a == "hello"` and `assert b == "world"`.
 fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let outer_indent =
-        whitespace::indentation(locator, stmt).context("Unable to fix multiline statement")?;
+    let outer_indent = whitespace::indentation(locator.contents(), stmt)
+        .context("Unable to fix multiline statement")?;
 
     // Extract the module text.
-    let contents = locator.lines(stmt.range());
+    let contents = locator.lines_str(stmt.range());
 
     // If the block is indented, "embed" it in a function definition, to preserve
     // indentation while retaining valid source code. (We'll strip the prefix later
@@ -747,7 +748,7 @@ pub(crate) fn composite_condition(
             && !checker.comment_ranges().intersects(stmt.range())
             && !checker
                 .indexer()
-                .in_multi_statement_line(stmt, checker.locator())
+                .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
                 fix_composite_condition(stmt, checker.locator(), checker.stylist())

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
@@ -28,17 +28,15 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 257](https://peps.python.org/pep-0257/)
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
-#[violation]
-pub struct FStringDocstring;
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringDocstring;
 
 impl Violation for FStringDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring."
-        )
+        "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.".to_string()
     }
 }
 

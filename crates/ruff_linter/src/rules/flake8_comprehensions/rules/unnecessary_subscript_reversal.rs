@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, UnaryOp};
 use ruff_text_size::Ranged;
 
@@ -26,8 +26,8 @@ use crate::checkers::ast::Checker;
 /// set(iterable)
 /// iterable
 /// ```
-#[violation]
-pub struct UnnecessarySubscriptReversal {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessarySubscriptReversal {
     func: String,
 }
 

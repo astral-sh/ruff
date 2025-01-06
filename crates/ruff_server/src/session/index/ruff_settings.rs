@@ -100,13 +100,33 @@ impl RuffSettings {
 }
 
 impl RuffSettingsIndex {
-    pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
+    /// Create the settings index for the given workspace root.
+    ///
+    /// This will create the index in the following order:
+    /// 1. Resolve any settings from above the workspace root
+    /// 2. Resolve any settings from the workspace root itself
+    /// 3. Resolve any settings from within the workspace directory tree
+    ///
+    /// If this is the default workspace i.e., the client did not specify any workspace and so the
+    /// server will be running in a single file mode, then only (1) and (2) will be resolved,
+    /// skipping (3).
+    pub(super) fn new(
+        root: &Path,
+        editor_settings: &ResolvedEditorSettings,
+        is_default_workspace: bool,
+    ) -> Self {
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
 
-        // Add any settings from above the workspace root, excluding the workspace root itself.
-        for directory in root.ancestors().skip(1) {
+        // If this is *not* the default workspace, then we should skip the workspace root itself
+        // because it will be resolved when walking the workspace directory tree. This is done by
+        // the `WalkBuilder` below.
+        let should_skip_workspace = usize::from(!is_default_workspace);
+
+        // Add any settings from above the workspace root, skipping the workspace root itself if
+        // this is *not* the default workspace.
+        for directory in root.ancestors().skip(should_skip_workspace) {
             match settings_toml(directory) {
                 Ok(Some(pyproject)) => {
                     match ruff_workspace::resolver::resolve_root_settings(
@@ -155,6 +175,26 @@ impl RuffSettingsIndex {
         }
 
         let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
+
+        // If this is the default workspace, the server is running in single-file mode. What this
+        // means is that the user opened a file directly (not the folder) in the editor and the
+        // server didn't receive a workspace folder during initialization. In this case, we default
+        // to the current working directory and skip walking the workspace directory tree for any
+        // settings.
+        //
+        // Refer to https://github.com/astral-sh/ruff/pull/13770 to understand what this behavior
+        // means for different editors.
+        if is_default_workspace {
+            if has_error {
+                let root = root.display();
+                show_err_msg!(
+                    "Error while resolving settings from workspace {root}. \
+                    Please refer to the logs for more details.",
+                );
+            }
+
+            return RuffSettingsIndex { index, fallback };
+        }
 
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
@@ -266,7 +306,7 @@ impl RuffSettingsIndex {
             );
         }
 
-        Self {
+        RuffSettingsIndex {
             index: index.into_inner().unwrap(),
             fallback,
         }
@@ -294,7 +334,7 @@ impl RuffSettingsIndex {
 
 struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 
-impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
+impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let ResolvedEditorSettings {
             configuration,
@@ -340,7 +380,11 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 
         // Merge in the editor-specified configuration file, if it exists.
         let editor_configuration = if let Some(config_file_path) = configuration {
-            match open_configuration_file(&config_file_path, project_root) {
+            tracing::debug!(
+                "Combining settings from editor-specified configuration file at: {}",
+                config_file_path.display()
+            );
+            match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
                 Err(err) => {
                     tracing::error!("Unable to find editor-specified configuration file: {err}");
@@ -363,11 +407,18 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
     }
 }
 
-fn open_configuration_file(
-    config_path: &Path,
-    project_root: &Path,
-) -> crate::Result<Configuration> {
-    let options = ruff_workspace::pyproject::load_options(config_path)?;
+fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
+    ruff_workspace::resolver::resolve_configuration(
+        config_path,
+        Relativity::Cwd,
+        &IdentityTransformer,
+    )
+}
 
-    Configuration::from_options(options, Some(config_path), project_root)
+struct IdentityTransformer;
+
+impl ConfigurationTransformer for IdentityTransformer {
+    fn transform(&self, config: Configuration) -> Configuration {
+        config
+    }
 }

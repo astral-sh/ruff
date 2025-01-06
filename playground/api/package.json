@@ -5,7 +5,7 @@
     "@cloudflare/workers-types": "^4.20230801.0",
     "miniflare": "^3.20230801.1",
     "typescript": "^5.1.6",
-    "wrangler": "3.73.0"
+    "wrangler": "3.99.0"
   },
   "private": true,
   "scripts": {
@@ -15,6 +15,6 @@
   "dependencies": {
     "@miniflare/kv": "^2.14.0",
     "@miniflare/storage-memory": "^2.14.0",
-    "uuid": "^10.0.0"
+    "uuid": "^11.0.0"
   }
 }

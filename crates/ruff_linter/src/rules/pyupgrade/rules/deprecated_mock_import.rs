@@ -3,21 +3,21 @@ use libcst_native::{
     AsName, AssignTargetExpression, Attribute, Dot, Expression, Import, ImportAlias, ImportFrom,
     ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
-use log::error;
+use log::debug;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Modules;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
+use crate::Locator;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -47,15 +47,15 @@ pub(crate) enum MockReference {
 /// ## References
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)
-#[violation]
-pub struct DeprecatedMockImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedMockImport {
     reference_type: MockReference,
 }
 
 impl AlwaysFixableViolation for DeprecatedMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`mock` is deprecated, use `unittest.mock`")
+        "`mock` is deprecated, use `unittest.mock`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -282,11 +282,11 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if let Some(indent) = indentation(checker.locator(), stmt) {
+                let content = if let Some(indent) = indentation(checker.source(), stmt) {
                     match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                         Ok(content) => Some(content),
                         Err(e) => {
-                            error!("Failed to rewrite `mock` import: {e}");
+                            debug!("Failed to rewrite `mock` import: {e}");
                             None
                         }
                     }
@@ -330,7 +330,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     },
                     stmt.range(),
                 );
-                if let Some(indent) = indentation(checker.locator(), stmt) {
+                if let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())
                             .map(|content| Edit::range_replacement(content, stmt.range()))

@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -25,13 +25,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Lambdas](https://docs.python.org/3/reference/expressions.html#lambda)
-#[violation]
-pub struct UnnecessaryDirectLambdaCall;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDirectLambdaCall;
 
 impl Violation for UnnecessaryDirectLambdaCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Lambda expression called directly. Execute the expression inline instead.")
+        "Lambda expression called directly. Execute the expression inline instead.".to_string()
     }
 }
 

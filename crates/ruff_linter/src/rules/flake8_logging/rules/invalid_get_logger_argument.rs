@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -40,19 +40,19 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
-#[violation]
-pub struct InvalidGetLoggerArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidGetLoggerArgument;
 
 impl Violation for InvalidGetLoggerArgument {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `__name__` with `logging.getLogger()`")
+        "Use `__name__` with `logging.getLogger()`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `__name__`"))
+        Some("Replace with `__name__`".to_string())
     }
 }
 
@@ -62,7 +62,8 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) = call.arguments.find_argument("name", 0)
+    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) =
+        call.arguments.find_argument_value("name", 0)
     else {
         return;
     };

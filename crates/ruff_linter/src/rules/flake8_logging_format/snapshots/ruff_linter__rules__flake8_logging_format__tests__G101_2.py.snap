@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+snapshot_kind: text
 ---
 G101_2.py:6:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
   |
@@ -20,5 +21,3 @@ G101_2.py:15:9: G101 Logging statement uses an `extra` field that clashes with a
 16 |     ),
 17 | )
    |
-
-

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -41,9 +41,9 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 483 – The Theory of Type Hints: Covariance and Contravariance](https://peps.python.org/pep-0483/#covariance-and-contravariance)
 /// - [PEP 484 – Type Hints: Covariance and contravariance](https://peps.python.org/pep-0484/#covariance-and-contravariance)
 ///
-/// [PEP 484]: https://www.python.org/dev/peps/pep-0484/
-#[violation]
-pub struct TypeNameIncorrectVariance {
+/// [PEP 484]: https://peps.python.org/pep-0484/
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeNameIncorrectVariance {
     kind: VarKind,
     param_name: String,
     variance: VarVariance,

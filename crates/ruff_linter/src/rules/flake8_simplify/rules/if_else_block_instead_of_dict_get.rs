@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
@@ -48,8 +48,8 @@ use crate::fix::edits::fits;
 ///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
-#[violation]
-pub struct IfElseBlockInsteadOfDictGet {
+#[derive(ViolationMetadata)]
+pub(crate) struct IfElseBlockInsteadOfDictGet {
     contents: String,
 }
 
@@ -211,7 +211,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt_if, checker.locator())
+        .has_comments(stmt_if, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
@@ -300,7 +300,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
     );
     if !checker
         .comment_ranges()
-        .has_comments(expr, checker.locator())
+        .has_comments(expr, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,

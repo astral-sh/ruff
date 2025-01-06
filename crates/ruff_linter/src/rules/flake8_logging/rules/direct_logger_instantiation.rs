@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -37,19 +37,19 @@ use crate::importer::ImportRequest;
 /// ```
 ///
 /// [Logger Objects]: https://docs.python.org/3/library/logging.html#logger-objects
-#[violation]
-pub struct DirectLoggerInstantiation;
+#[derive(ViolationMetadata)]
+pub(crate) struct DirectLoggerInstantiation;
 
 impl Violation for DirectLoggerInstantiation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `logging.getLogger()` to instantiate loggers")
+        "Use `logging.getLogger()` to instantiate loggers".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `logging.getLogger()`"))
+        Some("Replace with `logging.getLogger()`".to_string())
     }
 }
 

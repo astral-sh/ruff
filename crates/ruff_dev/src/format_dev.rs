@@ -194,6 +194,10 @@ pub(crate) struct Args {
     /// Format the files. Without this flag, the python files are not modified
     #[arg(long)]
     pub(crate) write: bool,
+
+    #[arg(long)]
+    pub(crate) preview: bool,
+
     /// Control the verbosity of the output
     #[arg(long, default_value_t, value_enum)]
     pub(crate) format: Format,
@@ -235,7 +239,8 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
         format_dev_multi_project(args, error_file)?
     } else {
-        let result = format_dev_project(&args.files, args.stability_check, args.write)?;
+        let result =
+            format_dev_project(&args.files, args.stability_check, args.write, args.preview)?;
         let error_count = result.error_count();
 
         if result.error_count() > 0 {
@@ -246,8 +251,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         }
         info!(
             parent: None,
-            "Done: {} stability errors, {} files, similarity index {:.5}), files with differences: {} took {:.2}s, {} input files contained syntax errors ",
-            error_count,
+            "Done: {error_count} stability/syntax errors, {} files, similarity index {:.5}), files with differences: {} took {:.2}s, {} input files contained syntax errors ",
             result.file_count,
             result.statistics.similarity_index(),
             result.statistics.files_with_differences,
@@ -344,7 +348,12 @@ fn format_dev_multi_project(
     for project_path in project_paths {
         debug!(parent: None, "Starting {}", project_path.display());
 
-        match format_dev_project(&[project_path.clone()], args.stability_check, args.write) {
+        match format_dev_project(
+            &[project_path.clone()],
+            args.stability_check,
+            args.write,
+            args.preview,
+        ) {
             Ok(result) => {
                 total_errors += result.error_count();
                 total_files += result.file_count;
@@ -442,6 +451,7 @@ fn format_dev_project(
     files: &[PathBuf],
     stability_check: bool,
     write: bool,
+    preview: bool,
 ) -> anyhow::Result<CheckRepoResult> {
     let start = Instant::now();
 
@@ -477,7 +487,14 @@ fn format_dev_project(
         #[cfg(feature = "singlethreaded")]
         let iter = { paths.into_iter() };
         iter.map(|path| {
-            let result = format_dir_entry(path, stability_check, write, &black_options, &resolver);
+            let result = format_dir_entry(
+                path,
+                stability_check,
+                write,
+                preview,
+                &black_options,
+                &resolver,
+            );
             pb_span.pb_inc(1);
             result
         })
@@ -532,6 +549,7 @@ fn format_dir_entry(
     resolved_file: Result<ResolvedFile, ignore::Error>,
     stability_check: bool,
     write: bool,
+    preview: bool,
     options: &BlackOptions,
     resolver: &Resolver,
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
@@ -544,6 +562,10 @@ fn format_dir_entry(
     let path = resolved_file.into_path();
     let mut options = options.to_py_format_options(&path);
 
+    if preview {
+        options = options.with_preview(PreviewMode::Enabled);
+    }
+
     let settings = resolver.resolve(&path);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
     if settings.formatter.line_width != LineWidth::default() {
@@ -551,9 +573,8 @@ fn format_dir_entry(
     }
 
     // Handle panics (mostly in `debug_assert!`)
-    let result = match catch_unwind(|| format_dev_file(&path, stability_check, write, options)) {
-        Ok(result) => result,
-        Err(panic) => {
+    let result = catch_unwind(|| format_dev_file(&path, stability_check, write, options))
+        .unwrap_or_else(|panic| {
             if let Some(message) = panic.downcast_ref::<String>() {
                 Err(CheckFileError::Panic {
                     message: message.clone(),
@@ -568,8 +589,7 @@ fn format_dir_entry(
                     message: "(Panic didn't set a string message)".to_string(),
                 })
             }
-        }
-    };
+        });
     Ok((result, path))
 }
 
@@ -775,7 +795,7 @@ impl CheckFileError {
             | CheckFileError::PrintError(_)
             | CheckFileError::Panic { .. } => false,
             #[cfg(not(debug_assertions))]
-            CheckFileError::Slow(_) => false,
+            CheckFileError::Slow(_) => true,
         }
     }
 }

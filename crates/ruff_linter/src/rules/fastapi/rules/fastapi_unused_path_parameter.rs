@@ -4,9 +4,10 @@ use std::str::CharIndices;
 
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_semantic::Modules;
+use ruff_python_ast::{Expr, Parameter, ParameterWithDefault};
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -61,8 +62,8 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
-#[violation]
-pub struct FastApiUnusedPathParameter {
+#[derive(ViolationMetadata)]
+pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
     is_positional: bool,
@@ -140,8 +141,11 @@ pub(crate) fn fastapi_unused_path_parameter(
         .parameters
         .args
         .iter()
-        .chain(function_def.parameters.kwonlyargs.iter())
-        .map(|arg| arg.parameter.name.as_str())
+        .chain(&function_def.parameters.kwonlyargs)
+        .map(|ParameterWithDefault { parameter, .. }| {
+            parameter_alias(parameter, checker.semantic())
+                .unwrap_or_else(|| parameter.name.as_str())
+        })
         .collect();
 
     // Check if any of the path parameters are not in the function signature.
@@ -190,6 +194,52 @@ pub(crate) fn fastapi_unused_path_parameter(
     checker.diagnostics.extend(diagnostics);
 }
 
+/// Extract the expected in-route name for a given parameter, if it has an alias.
+/// For example, given `document_id: Annotated[str, Path(alias="documentId")]`, returns `"documentId"`.
+fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Option<&'a str> {
+    let Some(annotation) = &parameter.annotation else {
+        return None;
+    };
+
+    let Expr::Subscript(subscript) = annotation.as_ref() else {
+        return None;
+    };
+
+    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
+        return None;
+    };
+
+    let Some(Expr::Call(path)) = tuple.elts.get(1) else {
+        return None;
+    };
+
+    // Find the `alias` keyword argument.
+    let alias = path
+        .arguments
+        .find_keyword("alias")
+        .map(|alias| &alias.value)?;
+
+    // Ensure that it's a literal string.
+    let Expr::StringLiteral(alias) = alias else {
+        return None;
+    };
+
+    // Verify that the subscript was a `typing.Annotated`.
+    if !semantic.match_typing_expr(&subscript.value, "Annotated") {
+        return None;
+    }
+
+    // Verify that the call was a `fastapi.Path`.
+    if !semantic
+        .resolve_qualified_name(&path.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
+    {
+        return None;
+    }
+
+    Some(alias.value.to_str())
+}
+
 /// An iterator to extract parameters from FastAPI route paths.
 ///
 /// The iterator yields tuples of the parameter name and the range of the parameter in the input,
@@ -217,7 +267,7 @@ impl<'a> Iterator for PathParamIterator<'a> {
             if c == '{' {
                 if let Some((end, _)) = self.chars.by_ref().find(|&(_, ch)| ch == '}') {
                     let param_content = &self.input[start + 1..end];
-                    // We ignore text after a colon, since those are path convertors
+                    // We ignore text after a colon, since those are path converters
                     // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
                     let param_name = &param_content[..param_name_end].trim();

@@ -1,12 +1,8 @@
-// TODO support untitled files for the LSP use case. Wrap a `str` and `String`
-//    The main question is how `as_std_path` would work for untitled files, that can only exist in the LSP case
-//    but there's no compile time guarantee that a [`OsSystem`] never gets an untitled file path.
-
 use camino::{Utf8Path, Utf8PathBuf};
 use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
-use std::path::{Path, StripPrefixError};
+use std::path::{Path, PathBuf, StripPrefixError};
 
 /// A slice of a path on [`System`](super::System) (akin to [`str`]).
 ///
@@ -21,6 +17,32 @@ impl SystemPath {
         // SAFETY: FsPath is marked as #[repr(transparent)] so the conversion from a
         // *const Utf8Path to a *const FsPath is valid.
         unsafe { &*(path as *const Utf8Path as *const SystemPath) }
+    }
+
+    /// Takes any path, and when possible, converts Windows UNC paths to regular paths.
+    /// If the path can't be converted, it's returned unmodified.
+    ///
+    /// On non-Windows this is no-op.
+    ///
+    /// `\\?\C:\Windows` will be converted to `C:\Windows`,
+    /// but `\\?\C:\COM` will be left as-is (due to a reserved filename).
+    ///
+    /// Use this to pass arbitrary paths to programs that may not be UNC-aware.
+    ///
+    /// It's generally safe to pass UNC paths to legacy programs, because
+    /// these paths contain a reserved prefix, so will gracefully fail
+    /// if used with legacy APIs that don't support UNC.
+    ///
+    /// This function does not perform any I/O.
+    ///
+    /// Currently paths with unpaired surrogates aren't converted even if they
+    /// could be, due to limitations of Rust's `OsStr` API.
+    ///
+    /// To check if a path remained as UNC, use `path.as_os_str().as_encoded_bytes().starts_with(b"\\\\")`.
+    #[inline]
+    pub fn simplified(&self) -> &SystemPath {
+        // SAFETY: simplified only trims the path, that means the returned path must be a valid UTF-8 path.
+        SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
     }
 
     /// Extracts the file extension, if possible.
@@ -121,6 +143,39 @@ impl SystemPath {
     #[must_use]
     pub fn parent(&self) -> Option<&SystemPath> {
         self.0.parent().map(SystemPath::new)
+    }
+
+    /// Produces an iterator over `SystemPath` and its ancestors.
+    ///
+    /// The iterator will yield the `SystemPath` that is returned if the [`parent`] method is used zero
+    /// or more times. That means, the iterator will yield `&self`, `&self.parent().unwrap()`,
+    /// `&self.parent().unwrap().parent().unwrap()` and so on. If the [`parent`] method returns
+    /// [`None`], the iterator will do likewise. The iterator will always yield at least one value,
+    /// namely `&self`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let mut ancestors = SystemPath::new("/foo/bar").ancestors();
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/foo/bar")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/foo")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/")));
+    /// assert_eq!(ancestors.next(), None);
+    ///
+    /// let mut ancestors = SystemPath::new("../foo/bar").ancestors();
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("../foo/bar")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("../foo")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("..")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("")));
+    /// assert_eq!(ancestors.next(), None);
+    /// ```
+    ///
+    /// [`parent`]: SystemPath::parent
+    #[inline]
+    pub fn ancestors(&self) -> impl Iterator<Item = &SystemPath> {
+        self.0.ancestors().map(SystemPath::new)
     }
 
     /// Produces an iterator over the [`camino::Utf8Component`]s of the path.
@@ -473,6 +528,10 @@ impl SystemPathBuf {
         self.0
     }
 
+    pub fn into_std_path_buf(self) -> PathBuf {
+        self.0.into_std_path_buf()
+    }
+
     #[inline]
     pub fn as_path(&self) -> &SystemPath {
         SystemPath::new(&self.0)
@@ -487,6 +546,12 @@ impl Borrow<SystemPath> for SystemPathBuf {
 
 impl From<&str> for SystemPathBuf {
     fn from(value: &str) -> Self {
+        SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
+    }
+}
+
+impl From<String> for SystemPathBuf {
+    fn from(value: String) -> Self {
         SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
     }
 }
@@ -590,6 +655,27 @@ impl ruff_cache::CacheKey for SystemPath {
 impl ruff_cache::CacheKey for SystemPathBuf {
     fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
         self.as_path().cache_key(hasher);
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for SystemPath {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for SystemPathBuf {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SystemPathBuf {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Utf8PathBuf::deserialize(deserializer).map(SystemPathBuf)
     }
 }
 

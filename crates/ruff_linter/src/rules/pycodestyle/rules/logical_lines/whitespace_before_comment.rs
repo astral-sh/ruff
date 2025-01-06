@@ -1,12 +1,13 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::Locator;
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -29,17 +30,17 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct TooFewSpacesBeforeInlineComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct TooFewSpacesBeforeInlineComment;
 
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Insert at least two spaces before an inline comment")
+        "Insert at least two spaces before an inline comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Insert spaces")
+        "Insert spaces".to_string()
     }
 }
 
@@ -65,17 +66,17 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct NoSpaceAfterInlineComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSpaceAfterInlineComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Inline comment should start with `# `")
+        "Inline comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -102,17 +103,17 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct NoSpaceAfterBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSpaceAfterBlockComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Block comment should start with `# `")
+        "Block comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -148,17 +149,17 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct MultipleLeadingHashesForBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleLeadingHashesForBlockComment;
 
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many leading `#` before block comment")
+        "Too many leading `#` before block comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove leading `#`")
+        "Remove leading `#`".to_string()
     }
 }
 

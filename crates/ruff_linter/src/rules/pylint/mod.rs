@@ -15,10 +15,10 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pylint;
 
-    use crate::assert_messages;
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(
@@ -27,6 +27,7 @@ mod tests {
     )]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.ipynb"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
     #[test_case(
         Rule::BadStringFormatCharacter,
@@ -36,6 +37,10 @@ mod tests {
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"))]
+    #[test_case(
+        Rule::BooleanChainedComparison,
+        Path::new("boolean_chained_comparison.py")
+    )]
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
@@ -100,6 +105,7 @@ mod tests {
         Rule::InvalidCharacterBackspace,
         Path::new("invalid_characters_syntax_error.py")
     )]
+    #[test_case(Rule::ShallowCopyEnviron, Path::new("shallow_copy_environ.py"))]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
     #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
@@ -155,6 +161,7 @@ mod tests {
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
     #[test_case(Rule::UselessWithLock, Path::new("useless_with_lock.py"))]
+    #[test_case(Rule::UnreachableCode, Path::new("unreachable.py"))]
     #[test_case(
         Rule::YieldFromInAsyncFunction,
         Path::new("yield_from_in_async_function.py")
@@ -214,6 +221,7 @@ mod tests {
         Rule::BadStaticmethodArgument,
         Path::new("bad_staticmethod_argument.py")
     )]
+    #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -397,6 +405,28 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::RepeatedEqualityComparison,
+        Path::new("repeated_equality_comparison.py")
+    )]
+    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pylint").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

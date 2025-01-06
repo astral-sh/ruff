@@ -59,3 +59,23 @@ f"normal {f"{a=}"} normal"
 print(f"{foo = }")
 # ...but then it creates false negatives for now
 print(f"{foo(a = 1)}")
+
+# There should be at least one E251 diagnostic for each type parameter here:
+def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+    pass
+
+class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+    pass
+
+# The last of these should cause us to emit E231,
+# but E231 isn't tested by this fixture:
+def pep_696_good[A = int, B: object = str, C:object = memoryview]():
+    pass
+
+class PEP696Good[A = int, B: object = str, C:object = memoryview]:
+    def pep_696_good_method[A = int, B: object = str, C:object = memoryview](self):
+        pass
+
+
+# https://github.com/astral-sh/ruff/issues/15202
+type Coro[T: object = Any] = Coroutine[None, None, T]

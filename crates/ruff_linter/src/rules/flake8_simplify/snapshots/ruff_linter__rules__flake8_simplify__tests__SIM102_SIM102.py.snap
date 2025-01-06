@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM102.py:2:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
   |
@@ -353,5 +354,3 @@ SIM102.py:165:5: SIM102 [*] Use a single `if` statement instead of nested `if` s
 167     |-            d
     165 |+    elif b and c:
     166 |+        d
-
-

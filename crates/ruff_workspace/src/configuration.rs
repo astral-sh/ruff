@@ -3,6 +3,7 @@
 //! the various parameters.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::env::VarError;
 use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
+use ruff_graph::{AnalyzeSettings, Direction};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -40,11 +42,11 @@ use ruff_python_formatter::{
 };
 
 use crate::options::{
-    Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions, Flake8BugbearOptions,
-    Flake8BuiltinsOptions, Flake8ComprehensionsOptions, Flake8CopyrightOptions,
-    Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
-    Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
-    Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
+    AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
+    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
+    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
+    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
@@ -142,6 +144,7 @@ pub struct Configuration {
 
     pub lint: LintConfiguration,
     pub format: FormatConfiguration,
+    pub analyze: AnalyzeConfiguration,
 }
 
 impl Configuration {
@@ -205,6 +208,23 @@ impl Configuration {
             docstring_code_line_width: format
                 .docstring_code_line_width
                 .unwrap_or(format_defaults.docstring_code_line_width),
+        };
+
+        let analyze = self.analyze;
+        let analyze_preview = analyze.preview.unwrap_or(global_preview);
+        let analyze_defaults = AnalyzeSettings::default();
+
+        let analyze = AnalyzeSettings {
+            exclude: FilePatternSet::try_from_iter(analyze.exclude.unwrap_or_default())?,
+            preview: analyze_preview,
+            target_version,
+            extension: self.extension.clone().unwrap_or_default(),
+            detect_string_imports: analyze
+                .detect_string_imports
+                .unwrap_or(analyze_defaults.detect_string_imports),
+            include_dependencies: analyze
+                .include_dependencies
+                .unwrap_or(analyze_defaults.include_dependencies),
         };
 
         let lint = self.lint;
@@ -327,9 +347,7 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_pytest_style: lint
                     .flake8_pytest_style
-                    .map(|options| {
-                        Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
-                    })
+                    .map(Flake8PytestStyleOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
                 flake8_quotes: lint
@@ -401,6 +419,7 @@ impl Configuration {
             },
 
             formatter,
+            analyze,
         })
     }
 
@@ -423,26 +442,6 @@ impl Configuration {
                 ..LintOptions::default()
             }
         };
-
-        #[allow(deprecated)]
-        if options.tab_size.is_some() {
-            let config_to_update = path.map_or_else(
-                || String::from("your `--config` CLI arguments"),
-                |path| format!("`{}`", fs::relativize_path(path)),
-            );
-            return Err(anyhow!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update {config_to_update} to use `indent-width = <value>` instead."));
-        }
-
-        #[allow(deprecated)]
-        if options.output_format == Some(OutputFormat::Text) {
-            let config_to_update = path.map_or_else(
-                || String::from("your `--config` CLI arguments"),
-                |path| format!("`{}`", fs::relativize_path(path)),
-            );
-            return Err(anyhow!(
-                r#"The option `output_format=text` is no longer supported. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
-            ));
-        }
 
         Ok(Self {
             builtins: options.builtins,
@@ -534,6 +533,10 @@ impl Configuration {
                 options.format.unwrap_or_default(),
                 project_root,
             )?,
+            analyze: AnalyzeConfiguration::from_options(
+                options.analyze.unwrap_or_default(),
+                project_root,
+            )?,
         })
     }
 
@@ -573,6 +576,7 @@ impl Configuration {
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
+            analyze: self.analyze.combine(config.analyze),
         }
     }
 }
@@ -712,6 +716,7 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
+
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
             flake8_bandit: options.common.flake8_bandit,
@@ -770,6 +775,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
+        let mut removed_ignored_rules = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
         // Track which docstring rules are specifically enabled
@@ -798,7 +804,7 @@ impl LintConfiguration {
                     .select
                     .iter()
                     .flatten()
-                    .chain(selection.extend_select.iter())
+                    .chain(&selection.extend_select)
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector.rules(&preview) {
@@ -825,7 +831,7 @@ impl LintConfiguration {
                     .fixable
                     .iter()
                     .flatten()
-                    .chain(selection.extend_fixable.iter())
+                    .chain(&selection.extend_fixable)
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector.all_rules() {
@@ -921,7 +927,11 @@ impl LintConfiguration {
                 // Removed rules
                 if selector.is_exact() {
                     if selector.all_rules().all(|rule| rule.is_removed()) {
-                        removed_selectors.insert(selector);
+                        if kind.is_disable() {
+                            removed_ignored_rules.insert(selector);
+                        } else {
+                            removed_selectors.insert(selector);
+                        }
                     }
                 }
 
@@ -963,6 +973,20 @@ impl LintConfiguration {
             }
         }
 
+        if !removed_ignored_rules.is_empty() {
+            let mut rules = String::new();
+            for selection in removed_ignored_rules.iter().sorted() {
+                let (prefix, code) = selection.prefix_and_code();
+                rules.push_str("\n    - ");
+                rules.push_str(prefix);
+                rules.push_str(code);
+            }
+            rules.push('\n');
+            warn_user_once_by_message!(
+                "The following rules have been removed and ignoring them has no effect:{rules}"
+            );
+        }
+
         for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
             // TODO(martin): This belongs into the ruff crate.
             warn_user_once_by_id!(
@@ -976,13 +1000,9 @@ impl LintConfiguration {
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                let rule = format!("{prefix}{code}");
-                let mut message =
-                    format!("Rule `{rule}` is deprecated and will be removed in a future release.");
-                if matches!(rule.as_str(), "E999") {
-                    message.push_str(" Syntax errors will always be shown regardless of whether this rule is selected or not.");
-                }
-                warn_user_once_by_message!("{message}");
+                warn_user_once_by_message!(
+                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release."
+                );
             }
         } else {
             let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
@@ -1080,6 +1100,7 @@ impl LintConfiguration {
                 .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
+
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
@@ -1191,6 +1212,57 @@ impl FormatConfiguration {
         }
     }
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct AnalyzeConfiguration {
+    pub exclude: Option<Vec<FilePattern>>,
+    pub preview: Option<PreviewMode>,
+
+    pub direction: Option<Direction>,
+    pub detect_string_imports: Option<bool>,
+    pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
+}
+
+impl AnalyzeConfiguration {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
+        Ok(Self {
+            exclude: options.exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            preview: options.preview.map(PreviewMode::from),
+            direction: options.direction,
+            detect_string_imports: options.detect_string_imports,
+            include_dependencies: options.include_dependencies.map(|dependencies| {
+                dependencies
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (project_root.join(key), (project_root.to_path_buf(), value))
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            }),
+        })
+    }
+
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn combine(self, config: Self) -> Self {
+        Self {
+            exclude: self.exclude.or(config.exclude),
+            preview: self.preview.or(config.preview),
+            direction: self.direction.or(config.direction),
+            detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
+            include_dependencies: self.include_dependencies.or(config.include_dependencies),
+        }
+    }
+}
+
 pub(crate) trait CombinePluginOptions {
     #[must_use]
     fn combine(self, other: Self) -> Self;
@@ -1556,7 +1628,6 @@ mod tests {
             Rule::AmbiguousClassName,
             Rule::AmbiguousFunctionName,
             Rule::IOError,
-            Rule::SyntaxError,
             Rule::TabIndentation,
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,
@@ -1972,11 +2043,11 @@ mod tests {
         assert_override(
             vec![
                 RuleSelection {
-                    select: Some(vec![d417.clone()]),
+                    select: Some(vec![d417]),
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    extend_select: vec![d41.clone()],
+                    extend_select: vec![d41],
                     ..RuleSelection::default()
                 },
             ],

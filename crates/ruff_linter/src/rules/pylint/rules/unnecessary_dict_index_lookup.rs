@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_text_size::Ranged;
@@ -30,17 +30,17 @@ use crate::rules::pylint::helpers::SequenceIndexVisitor;
 /// for fruit_name, fruit_count in FRUITS.items():
 ///     print(fruit_count)
 /// ```
-#[violation]
-pub struct UnnecessaryDictIndexLookup;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDictIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary lookup of dictionary value by key")
+        "Unnecessary lookup of dictionary value by key".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Use existing variable")
+        "Use existing variable".to_string()
     }
 }
 

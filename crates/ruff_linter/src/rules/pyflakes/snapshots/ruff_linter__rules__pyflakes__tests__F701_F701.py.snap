@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F701.py:4:5: F701 `break` outside loop
   |
@@ -31,5 +32,3 @@ F701.py:23:1: F701 `break` outside loop
 23 | break
    | ^^^^^ F701
    |
-
-

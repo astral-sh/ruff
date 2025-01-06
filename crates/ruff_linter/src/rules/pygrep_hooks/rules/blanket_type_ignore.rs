@@ -1,13 +1,15 @@
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Result};
 use memchr::memchr_iter;
-use once_cell::sync::Lazy;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
+
+use crate::Locator;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -38,13 +40,13 @@ use ruff_text_size::TextSize;
 /// [tool.mypy]
 /// enable_error_code = ["ignore-without-code"]
 /// ```
-#[violation]
-pub struct BlanketTypeIgnore;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlanketTypeIgnore;
 
 impl Violation for BlanketTypeIgnore {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use specific rule codes when ignoring type issues")
+        "Use specific rule codes when ignoring type issues".to_string()
     }
 }
 
@@ -55,7 +57,7 @@ pub(crate) fn blanket_type_ignore(
     locator: &Locator,
 ) {
     for range in comment_ranges {
-        let line = locator.slice(*range);
+        let line = locator.slice(range);
 
         // Match, e.g., `# type: ignore` or `# type: ignore[attr-defined]`.
         // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L248
@@ -102,8 +104,8 @@ pub(crate) fn blanket_type_ignore(
 
 // Match, e.g., `[attr-defined]` or `[attr-defined, misc]`.
 // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L327
-static TYPE_IGNORE_TAG_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*\[(?P<codes>[^]#]*)]\s*(#.*)?$").unwrap());
+static TYPE_IGNORE_TAG_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*\[(?P<codes>[^]#]*)]\s*(#.*)?$").unwrap());
 
 /// Parse the optional `[...]` tag in a `# type: ignore[...]` comment.
 ///

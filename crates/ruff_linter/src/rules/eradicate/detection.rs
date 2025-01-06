@@ -1,29 +1,63 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use aho_corasick::AhoCorasick;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::{Regex, RegexSet};
-
 use ruff_python_parser::parse_module;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextSize;
+use std::sync::LazyLock;
 
-static CODE_INDICATORS: Lazy<AhoCorasick> = Lazy::new(|| {
+static CODE_INDICATORS: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::new([
         "(", ")", "[", "]", "{", "}", ":", "=", "%", "return", "break", "continue", "import",
     ])
     .unwrap()
 });
 
-static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
+static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:|(?:en)?coding[:=][ \t]*([-_.a-zA-Z0-9]+))",
-    ).unwrap()
+        r"(?x)
+        ^
+        (?:
+            # Case-sensitive
+            pyright
+        |   mypy:
+        |   type:\s*ignore
+        |   SPDX-License-Identifier:
+        |   fmt:\s*(on|off|skip)
+        |   region|endregion
+
+            # Case-insensitive
+        |   (?i:
+                noqa
+            )
+
+            # Unknown case sensitivity
+        |   (?i:
+                pylint
+            |   nosec
+            |   isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)
+            |   (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
+            )
+
+            # IntelliJ language injection comments:
+            # * `language` must be lowercase.
+            # * No spaces around `=`.
+            # * Language IDs as used in comments must have no spaces,
+            #   though to IntelliJ they can be anything.
+            # * May optionally contain `prefix=` and/or `suffix=`,
+            #   not declared here since we use `.is_match()`.
+        |   language=[-_.a-zA-Z0-9]+
+
+        )
+        ",
+    )
+    .unwrap()
 });
 
-static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
+static HASH_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#\d").unwrap());
 
-static POSITIVE_CASES: Lazy<RegexSet> = Lazy::new(|| {
+static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         // Keywords
         r"^(?:elif\s+.*\s*:.*|else\s*:.*|try\s*:.*|finally\s*:.*|except.*:.*|case\s+.*\s*:.*)$",
@@ -116,7 +150,7 @@ mod tests {
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]
-        ),);
+        ));
         assert!(!comment_contains_code(
             "# Issue #999: This is not code",
             &[]
@@ -190,11 +224,11 @@ mod tests {
         assert!(comment_contains_code(
             "# user_content_type, _ = TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]
-        ),);
+        ));
         assert!(comment_contains_code(
             "# (user_content_type, _) = TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]
-        ),);
+        ));
         assert!(comment_contains_code(
             "# ( user_content_type , _ )= TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]
@@ -295,6 +329,48 @@ mod tests {
         assert!(!comment_contains_code(
             "# XXX: What ever",
             &["XXX".to_string()]
+        ));
+    }
+
+    #[test]
+    fn comment_contains_language_injection() {
+        // `language` with bad casing
+        assert!(comment_contains_code("# Language=C#", &[]));
+        assert!(comment_contains_code("# lAngUAgE=inI", &[]));
+
+        // Unreasonable language IDs, possibly literals
+        assert!(comment_contains_code("# language=\"pt\"", &[]));
+        assert!(comment_contains_code("# language='en'", &[]));
+
+        // Spaces around equal sign
+        assert!(comment_contains_code("# language =xml", &[]));
+        assert!(comment_contains_code("# language= html", &[]));
+        assert!(comment_contains_code("# language = RegExp", &[]));
+
+        // Leading whitespace
+        assert!(!comment_contains_code("#language=CSS", &[]));
+        assert!(!comment_contains_code("#   \t language=C++", &[]));
+
+        // Human language false negatives
+        assert!(!comment_contains_code("# language=en", &[]));
+        assert!(!comment_contains_code("# language=en-US", &[]));
+
+        // Casing (fine because such IDs cannot be validated)
+        assert!(!comment_contains_code("# language=PytHoN", &[]));
+        assert!(!comment_contains_code("# language=jaVaScrIpt", &[]));
+
+        // Space within ID (fine because `Shell` is considered the ID)
+        assert!(!comment_contains_code("#    language=Shell Script", &[]));
+
+        // With prefix and/or suffix
+        assert!(!comment_contains_code("# language=HTML prefix=<body>", &[]));
+        assert!(!comment_contains_code(
+            r"# language=Requirements suffix=\n",
+            &[]
+        ));
+        assert!(!comment_contains_code(
+            "language=javascript prefix=(function(){ suffix=})()",
+            &[]
         ));
     }
 

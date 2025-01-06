@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+snapshot_kind: text
 ---
 TD004.py:4:3: TD004 Missing colon in TODO
   |
@@ -47,5 +48,3 @@ TD004.py:8:3: TD004 Missing colon in TODO
 8 | # TODO this has a colon but it doesn't terminate the tag, so this should throw. https://www.google.com
   |   ^^^^ TD004
   |
-
-

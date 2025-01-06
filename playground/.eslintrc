@@ -14,7 +14,7 @@
   "rules": {
     // Disable some recommended rules that we don't want to enforce.
     "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/no-empty-function": "off"
+    "eqeqeq": ["error","always", { "null":  "never"}]
   },
   "settings": {
     "react": {

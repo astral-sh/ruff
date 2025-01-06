@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S606.py:4:1: S606 Starting a process without a shell
   |
@@ -166,5 +167,3 @@ S606.py:20:1: S606 Starting a process without a shell
 20 | os.startfile("true")
    | ^^^^^^^^^^^^ S606
    |
-
-

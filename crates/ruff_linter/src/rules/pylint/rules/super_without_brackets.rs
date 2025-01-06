@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{analyze::function_type, ScopeKind};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,13 +46,13 @@ use crate::checkers::ast::Checker;
 ///         original_speak = super().speak()  # Correct: `super().speak()`
 ///         return f"{original_speak} But as a dog, it barks!"
 /// ```
-#[violation]
-pub struct SuperWithoutBrackets;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperWithoutBrackets;
 
 impl AlwaysFixableViolation for SuperWithoutBrackets {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`super` call is missing parentheses")
+        "`super` call is missing parentheses".to_string()
     }
 
     fn fix_title(&self) -> String {

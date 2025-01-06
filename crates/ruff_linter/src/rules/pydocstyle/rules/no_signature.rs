@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
@@ -40,13 +40,13 @@ use crate::docstrings::Docstring;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct NoSignature;
+#[derive(ViolationMetadata)]
+pub(crate) struct SignatureInDocstring;
 
-impl Violation for NoSignature {
+impl Violation for SignatureInDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First line should not be the function's signature")
+        "First line should not be the function's signature".to_string()
     }
 }
 
@@ -66,10 +66,28 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     // a function named `foo`).
     if first_line
         .match_indices(function.name.as_str())
-        .any(|(index, _)| first_line[index + function.name.len()..].starts_with('('))
+        .any(|(index, _)| {
+            // The function name must be preceded by a word boundary.
+            let preceded_by_word_boundary = first_line[..index]
+                .chars()
+                .next_back()
+                .map_or(true, |c| matches!(c, ' ' | '\t' | ';' | ','));
+            if !preceded_by_word_boundary {
+                return false;
+            }
+
+            // The function name must be followed by an open parenthesis.
+            let followed_by_open_parenthesis =
+                first_line[index + function.name.len()..].starts_with('(');
+            if !followed_by_open_parenthesis {
+                return false;
+            }
+
+            true
+        })
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(NoSignature, docstring.range()));
+            .push(Diagnostic::new(SignatureInDocstring, docstring.range()));
     }
 }

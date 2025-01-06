@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -33,17 +33,17 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-22](https://cwe.mitre.org/data/definitions/22.html)
-/// - [Python Documentation: `TarFile.extractall`](https://docs.python.org/3/library/tarfile.html#tarfile.TarFile.extractall)
-/// - [Python Documentation: Extraction filters](https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter)
+/// - [Python documentation: `TarFile.extractall`](https://docs.python.org/3/library/tarfile.html#tarfile.TarFile.extractall)
+/// - [Python documentation: Extraction filters](https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter)
 ///
 /// [PEP 706]: https://peps.python.org/pep-0706/#backporting-forward-compatibility
-#[violation]
-pub struct TarfileUnsafeMembers;
+#[derive(ViolationMetadata)]
+pub(crate) struct TarfileUnsafeMembers;
 
 impl Violation for TarfileUnsafeMembers {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Uses of `tarfile.extractall()`")
+        "Uses of `tarfile.extractall()`".to_string()
     }
 }
 

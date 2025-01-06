@@ -43,7 +43,7 @@ impl<T> AstNodeRef<T> {
     }
 
     /// Returns a reference to the wrapped node.
-    pub fn node(&self) -> &T {
+    pub const fn node(&self) -> &T {
         // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still
         // alive and not moved.
         unsafe { self.node.as_ref() }
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn inequality() {
         let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
-        let parsed = ParsedModule::new(parsed_raw.clone());
+        let parsed = ParsedModule::new(parsed_raw);
 
         let stmt = &parsed.syntax().body[0];
         let node = unsafe { AstNodeRef::new(parsed.clone(), stmt) };
@@ -150,7 +150,7 @@ mod tests {
     #[allow(unsafe_code)]
     fn debug() {
         let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
-        let parsed = ParsedModule::new(parsed_raw.clone());
+        let parsed = ParsedModule::new(parsed_raw);
 
         let stmt = &parsed.syntax().body[0];
 

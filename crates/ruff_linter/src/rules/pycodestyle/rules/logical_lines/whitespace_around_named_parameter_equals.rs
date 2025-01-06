@@ -1,10 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
+use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 
 /// ## What it does
 /// Checks for missing whitespace around the equals sign in an unannotated
@@ -31,17 +31,17 @@ use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineTo
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
-#[violation]
-pub struct UnexpectedSpacesAroundKeywordParameterEquals;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnexpectedSpacesAroundKeywordParameterEquals;
 
 impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected spaces around keyword / parameter equals")
+        "Unexpected spaces around keyword / parameter equals".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove whitespace")
+        "Remove whitespace".to_string()
     }
 }
 
@@ -70,30 +70,18 @@ impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
-#[violation]
-pub struct MissingWhitespaceAroundParameterEquals;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundParameterEquals;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around parameter equals")
+        "Missing whitespace around parameter equals".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
-}
-
-fn is_in_def(tokens: &[LogicalLineToken]) -> bool {
-    for token in tokens {
-        match token.kind() {
-            TokenKind::Async | TokenKind::Indent | TokenKind::Dedent => continue,
-            TokenKind::Def => return true,
-            _ => return false,
-        }
-    }
-
-    false
 }
 
 /// E251, E252
@@ -106,17 +94,14 @@ pub(crate) fn whitespace_around_named_parameter_equals(
     let mut annotated_func_arg = false;
     let mut prev_end = TextSize::default();
 
-    let in_def = is_in_def(line.tokens());
+    let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();
-
-        if kind == TokenKind::NonLogicalNewline {
-            continue;
-        }
-
+        definition_state.visit_token_kind(kind);
         match kind {
+            TokenKind::NonLogicalNewline => continue,
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lpar | TokenKind::Lsqb => {
@@ -128,15 +113,16 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                     annotated_func_arg = false;
                 }
             }
-
-            TokenKind::Colon if parens == 1 && in_def => {
+            TokenKind::Colon if parens == 1 && definition_state.in_function_definition() => {
                 annotated_func_arg = true;
             }
             TokenKind::Comma if parens == 1 => {
                 annotated_func_arg = false;
             }
-            TokenKind::Equal if parens > 0 && fstrings == 0 => {
-                if annotated_func_arg && parens == 1 {
+            TokenKind::Equal
+                if definition_state.in_type_params() || (parens > 0 && fstrings == 0) =>
+            {
+                if definition_state.in_type_params() || (annotated_func_arg && parens == 1) {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
                         let mut diagnostic =

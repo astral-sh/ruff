@@ -6,9 +6,9 @@ use tracing::info;
 use red_knot_python_semantic::system_module_search_paths;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_db::Upcast;
+use ruff_db::{Db as _, Upcast};
 
-use crate::db::RootDatabase;
+use crate::db::{Db, RootDatabase};
 use crate::watch::Watcher;
 
 /// Wrapper around a [`Watcher`] that watches the relevant paths of a workspace.
@@ -62,16 +62,15 @@ impl WorkspaceWatcher {
         // ```
         for path in self.watched_paths.drain(..) {
             if let Err(error) = self.watcher.unwatch(&path) {
-                info!("Failed to remove the file watcher for the path '{path}: {error}.");
+                info!("Failed to remove the file watcher for path `{path}`: {error}");
             }
         }
 
         self.has_errored_paths = false;
 
-        let workspace_path = workspace_path
-            .as_utf8_path()
-            .canonicalize_utf8()
-            .map(SystemPathBuf::from_utf8_path_buf)
+        let workspace_path = db
+            .system()
+            .canonicalize_path(&workspace_path)
             .unwrap_or(workspace_path);
 
         // Find the non-overlapping module search paths and filter out paths that are already covered by the workspace.
@@ -90,7 +89,7 @@ impl WorkspaceWatcher {
             // Ruff otherwise stills works as expected.
             if let Err(error) = self.watcher.watch(&path) {
                 // TODO: Log a user-facing warning.
-                tracing::warn!("Failed to setup watcher for path '{path}': {error}. You have to restart Ruff after making changes to files under this path or you might see stale results.");
+                tracing::warn!("Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results.");
                 self.has_errored_paths = true;
             } else {
                 self.watched_paths.push(path);

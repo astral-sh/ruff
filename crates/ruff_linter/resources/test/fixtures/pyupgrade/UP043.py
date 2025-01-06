@@ -1,4 +1,4 @@
-from typing import Generator, AsyncGenerator
+from collections.abc import Generator, AsyncGenerator
 
 
 def func() -> Generator[int, None, None]:
@@ -39,3 +39,21 @@ async def func() -> AsyncGenerator[int]:
 async def func() -> AsyncGenerator[int, int]:
     foo = yield 42
     return foo
+
+
+from typing import Generator, AsyncGenerator
+
+
+def func() -> Generator[str, None, None]:
+    yield "hello"
+
+
+async def func() -> AsyncGenerator[str, None]:
+    yield "hello"
+
+
+async def func() -> AsyncGenerator[  # type: ignore
+    str,
+    None
+]:
+    yield "hello"

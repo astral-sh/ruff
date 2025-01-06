@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -39,19 +39,19 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
-#[violation]
-pub struct UnnecessaryDictKwargs;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDictKwargs;
 
 impl Violation for UnnecessaryDictKwargs {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary `dict` kwargs")
+        "Unnecessary `dict` kwargs".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unnecessary kwargs"))
+        Some("Remove unnecessary kwargs".to_string())
     }
 }
 

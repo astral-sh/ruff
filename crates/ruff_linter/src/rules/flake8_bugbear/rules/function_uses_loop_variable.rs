@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -40,9 +40,9 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
-/// - [Python documentation: functools.partial](https://docs.python.org/3/library/functools.html#functools.partial)
-#[violation]
-pub struct FunctionUsesLoopVariable {
+/// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
+#[derive(ViolationMetadata)]
+pub(crate) struct FunctionUsesLoopVariable {
     name: String,
 }
 

@@ -17,16 +17,26 @@ on:
     paths:
       - .github/workflows/build-docker.yml
 
+env:
+  RUFF_BASE_IMG: ghcr.io/${{ github.repository_owner }}/ruff
+
 jobs:
-  docker-publish:
-    name: Build Docker image (ghcr.io/astral-sh/ruff)
+  docker-build:
+    name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
     runs-on: ubuntu-latest
     environment:
       name: release
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@v3
 
@@ -36,33 +46,254 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/astral-sh/ruff
-
       - name: Check tag consistency
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+        env:
+          TAG: ${{ inputs.plan != '' && fromJson(inputs.plan).announcement_tag || 'dry-run' }}
         run: |
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ fromJson(inputs.plan).announcement_tag }}" != "${version}" ]; then
+          if [ "${TAG}" != "${version}" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ fromJson(inputs.plan).announcement_tag }}" >&2
+            echo "${TAG}" >&2
             echo "${version}" >&2
             exit 1
           else
             echo "Releasing ${version}"
           fi
 
-      - name: "Build and push Docker image"
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.RUFF_BASE_IMG }}
+          # Defining this makes sure the org.opencontainers.image.version OCI label becomes the actual release version and not the branch name
+          tags: |
+            type=raw,value=dry-run,enable=${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
+            type=pep440,pattern={{ version }},value=${{ inputs.plan != '' && fromJson(inputs.plan).announcement_tag || 'dry-run' }},enable=${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+
+      - name: Normalize Platform Pair (replace / with -)
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_TUPLE=${platform//\//-}" >> "$GITHUB_ENV"
+
+      # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=ruff-${{ env.PLATFORM_TUPLE }}
+          cache-to: type=gha,mode=min,scope=ruff-${{ env.PLATFORM_TUPLE }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.RUFF_BASE_IMG }},push-by-digest=true,name-canonical=true,push=${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+
+      - name: Export digests
+        env:
+          digest: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_TUPLE }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-publish:
+    name: Publish Docker image (ghcr.io/astral-sh/ruff)
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    needs:
+      - docker-build
+    if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.RUFF_BASE_IMG }}
+          # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
+          tags: |
+            type=pep440,pattern={{ version }},value=${{ fromJson(inputs.plan).announcement_tag }}
+            type=pep440,pattern={{ major }}.{{ minor }},value=${{ fromJson(inputs.plan).announcement_tag }}
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
+        # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
+        # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
+
+  docker-publish-extra:
+    name: Publish additional Docker image based on ${{ matrix.image-mapping }}
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    needs:
+      - docker-publish
+    if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Mapping of base image followed by a comma followed by one or more base tags (comma separated)
+        # Note, org.opencontainers.image.version label will use the first base tag (use the most specific tag first)
+        image-mapping:
+          - alpine:3.20,alpine3.20,alpine
+          - debian:bookworm-slim,bookworm-slim,debian-slim
+          - buildpack-deps:bookworm,bookworm,debian
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Dynamic Dockerfile Tags
+        shell: bash
+        env:
+          TAG_VALUE: ${{ fromJson(inputs.plan).announcement_tag }}
+        run: |
+          set -euo pipefail
+
+          # Extract the image and tags from the matrix variable
+          IFS=',' read -r BASE_IMAGE BASE_TAGS <<< "${{ matrix.image-mapping }}"
+
+          # Generate Dockerfile content
+          cat <<EOF > Dockerfile
+          FROM ${BASE_IMAGE}
+          COPY --from=${RUFF_BASE_IMG}:latest /ruff /usr/local/bin/ruff
+          ENTRYPOINT []
+          CMD ["/usr/local/bin/ruff"]
+          EOF
+
+          # Initialize a variable to store all tag docker metadata patterns
+          TAG_PATTERNS=""
+
+          # Loop through all base tags and append its docker metadata pattern to the list
+          # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
+          IFS=','; for TAG in ${BASE_TAGS}; do
+            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ version }},suffix=-${TAG},value=${TAG_VALUE}\n"
+            TAG_PATTERNS="${TAG_PATTERNS}type=pep440,pattern={{ major }}.{{ minor }},suffix=-${TAG},value=${TAG_VALUE}}\n"
+            TAG_PATTERNS="${TAG_PATTERNS}type=raw,value=${TAG}\n"
+          done
+
+          # Remove the trailing newline from the pattern list
+          TAG_PATTERNS="${TAG_PATTERNS%\\n}"
+
+          # Export image cache name
+          echo "IMAGE_REF=${BASE_IMAGE//:/-}" >> "$GITHUB_ENV"
+
+          # Export tag patterns using the multiline env var syntax
+          {
+            echo "TAG_PATTERNS<<EOF"
+            echo -e "${TAG_PATTERNS}"
+            echo EOF
+          } >> "$GITHUB_ENV"
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        # ghcr.io prefers index level annotations
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+        with:
+          images: ${{ env.RUFF_BASE_IMG }}
+          flavor: |
+            latest=false
+          tags: |
+            ${{ env.TAG_PATTERNS }}
+
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          # Reuse the builder
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-          tags: ghcr.io/astral-sh/ruff:latest,ghcr.io/astral-sh/ruff:${{ (inputs.plan != '' && fromJson(inputs.plan).announcement_tag) || 'dry-run' }}
+          # We do not really need to cache here as the Dockerfile is tiny
+          #cache-from: type=gha,scope=ruff-${{ env.IMAGE_REF }}
+          #cache-to: type=gha,mode=min,scope=ruff-${{ env.IMAGE_REF }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+
+  # This is effectively a duplicate of `docker-publish` to make https://github.com/astral-sh/ruff/pkgs/container/ruff
+  # show the ruff base image first since GitHub always shows the last updated image digests
+  # This works by annotating the original digests (previously non-annotated) which triggers an update to ghcr.io
+  docker-republish:
+    name: Annotate Docker image (ghcr.io/astral-sh/ruff)
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    needs:
+      - docker-publish-extra
+    if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+        with:
+          images: ${{ env.RUFF_BASE_IMG }}
+          # Order is on purpose such that the label org.opencontainers.image.version has the first pattern with the full version
+          tags: |
+            type=pep440,pattern={{ version }},value=${{ fromJson(inputs.plan).announcement_tag }}
+            type=pep440,pattern={{ major }}.{{ minor }},value=${{ fromJson(inputs.plan).announcement_tag }}
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        # The readarray part is used to make sure the quoting and special characters are preserved on expansion (e.g. spaces)
+        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
+        # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
+        # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
+        run: |
+          readarray -t lines <<< "$DOCKER_METADATA_OUTPUT_ANNOTATIONS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
+
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            "${annotations[@]}" \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)

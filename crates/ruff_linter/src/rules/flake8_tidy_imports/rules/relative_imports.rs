@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -45,8 +45,8 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct RelativeImports {
+#[derive(ViolationMetadata)]
+pub(crate) struct RelativeImports {
     strictness: Strictness,
 }
 
@@ -57,9 +57,9 @@ impl Violation for RelativeImports {
     fn message(&self) -> String {
         match self.strictness {
             Strictness::Parents => {
-                format!("Prefer absolute imports over relative imports from parent modules")
+                "Prefer absolute imports over relative imports from parent modules".to_string()
             }
-            Strictness::All => format!("Prefer absolute imports over relative imports"),
+            Strictness::All => "Prefer absolute imports over relative imports".to_string(),
         }
     }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
@@ -45,8 +45,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
-#[violation]
-pub struct CallDatetimeNowWithoutTzinfo(DatetimeModuleAntipattern);
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeNowWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeNowWithoutTzinfo {
     #[derive_message_formats]
@@ -54,10 +54,10 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
         let CallDatetimeNowWithoutTzinfo(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime.now()` called without a `tz` argument")
+                "`datetime.datetime.now()` called without a `tz` argument".to_string()
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`tz=None` passed to `datetime.datetime.now()`")
+                "`tz=None` passed to `datetime.datetime.now()`".to_string()
             }
         }
     }
@@ -86,7 +86,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast
         return;
     }
 
-    let antipattern = match call.arguments.find_argument("tz", 0) {
+    let antipattern = match call.arguments.find_argument_value("tz", 0) {
         Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,

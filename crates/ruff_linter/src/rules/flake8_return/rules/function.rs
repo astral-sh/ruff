@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
@@ -15,7 +15,7 @@ use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -23,6 +23,7 @@ use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::Locator;
 
 use super::super::branch::Branch;
 use super::super::helpers::result_exists;
@@ -53,15 +54,14 @@ use super::super::visitor::{ReturnVisitor, Stack};
 ///         return
 ///     return
 /// ```
-#[violation]
-pub struct UnnecessaryReturnNone;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryReturnNone;
 
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Do not explicitly `return None` in function if it is the only possible return value"
-        )
+        "Do not explicitly `return None` in function if it is the only possible return value"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -95,13 +95,13 @@ impl AlwaysFixableViolation for UnnecessaryReturnNone {
 ///         return None
 ///     return 1
 /// ```
-#[violation]
-pub struct ImplicitReturnValue;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitReturnValue;
 
 impl AlwaysFixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not implicitly `return None` in function able to return non-`None` value")
+        "Do not implicitly `return None` in function able to return non-`None` value".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -133,13 +133,14 @@ impl AlwaysFixableViolation for ImplicitReturnValue {
 ///         return 1
 ///     return None
 /// ```
-#[violation]
-pub struct ImplicitReturn;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitReturn;
 
 impl AlwaysFixableViolation for ImplicitReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing explicit `return` at the end of function able to return non-`None` value")
+        "Missing explicit `return` at the end of function able to return non-`None` value"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -167,8 +168,8 @@ impl AlwaysFixableViolation for ImplicitReturn {
 /// def foo():
 ///     return 1
 /// ```
-#[violation]
-pub struct UnnecessaryAssign {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryAssign {
     name: String,
 }
 
@@ -209,8 +210,8 @@ impl AlwaysFixableViolation for UnnecessaryAssign {
 ///         return 1
 ///     return baz
 /// ```
-#[violation]
-pub struct SuperfluousElseReturn {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseReturn {
     branch: Branch,
 }
 
@@ -253,8 +254,8 @@ impl Violation for SuperfluousElseReturn {
 ///         raise Exception(bar)
 ///     raise Exception(baz)
 /// ```
-#[violation]
-pub struct SuperfluousElseRaise {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseRaise {
     branch: Branch,
 }
 
@@ -299,8 +300,8 @@ impl Violation for SuperfluousElseRaise {
 ///             continue
 ///         x = 0
 /// ```
-#[violation]
-pub struct SuperfluousElseContinue {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseContinue {
     branch: Branch,
 }
 
@@ -345,8 +346,8 @@ impl Violation for SuperfluousElseContinue {
 ///             break
 ///         x = 0
 /// ```
-#[violation]
-pub struct SuperfluousElseBreak {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseBreak {
     branch: Branch,
 }
 
@@ -453,7 +454,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 
 fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
     let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
-    if let Some(indent) = indentation(checker.locator(), stmt) {
+    if let Some(indent) = indentation(checker.source(), stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
         content.push_str(indent);
@@ -851,14 +852,14 @@ fn remove_else(
         };
 
         // get the indentation of the `else`, since that is the indent level we want to end with
-        let Some(desired_indentation) = indentation(locator, elif_else) else {
+        let Some(desired_indentation) = indentation(locator.contents(), elif_else) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
         // If the statement is on the same line as the `else`, just remove the `else: `.
         // Ex) `else: return True` -> `return True`
         if let Some(first) = elif_else.body.first() {
-            if indexer.preceded_by_multi_statement_line(first, locator) {
+            if indexer.preceded_by_multi_statement_line(first, locator.contents()) {
                 return Ok(Fix::safe_edit(Edit::deletion(
                     elif_else.start(),
                     first.start(),

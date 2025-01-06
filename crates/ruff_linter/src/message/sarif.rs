@@ -1,9 +1,9 @@
+use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
-use strum::IntoEnumIterator;
 
 use ruff_source_file::OneIndexed;
 
@@ -27,6 +27,10 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
+        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.rule).collect();
+        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
+        rules.sort_by(|a, b| a.code.cmp(&b.code));
+
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
             "version": "2.1.0",
@@ -35,7 +39,7 @@ impl Emitter for SarifEmitter {
                     "driver": {
                         "name": "ruff",
                         "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": Rule::iter().map(SarifRule::from).collect::<Vec<_>>(),
+                        "rules": rules,
                         "version": VERSION.to_string(),
                     }
                 },
@@ -182,7 +186,6 @@ impl Serialize for SarifResult {
 
 #[cfg(test)]
 mod tests {
-
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
@@ -209,16 +212,11 @@ mod tests {
     #[test]
     fn test_results() {
         let content = get_output();
-        let sarif = serde_json::from_str::<serde_json::Value>(content.as_str()).unwrap();
-        let rules = sarif["runs"][0]["tool"]["driver"]["rules"]
-            .as_array()
-            .unwrap();
-        let results = sarif["runs"][0]["results"].as_array().unwrap();
-        assert_eq!(results.len(), 3);
-        assert_eq!(
-            results[0]["message"]["text"].as_str().unwrap(),
-            "`os` imported but unused"
-        );
-        assert!(rules.len() > 3);
+        let value = serde_json::from_str::<serde_json::Value>(&content).unwrap();
+
+        insta::assert_json_snapshot!(value, {
+            ".runs[0].tool.driver.version" => "[VERSION]",
+            ".runs[0].results[].locations[].physicalLocation.artifactLocation.uri" => "[URI]",
+        });
     }
 }

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/hug.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -88,30 +89,6 @@ func([1, 2, 3,], bar)
 
 func([(x, y,) for (x, y) in z], bar)
 
-# Ensure that return type annotations (which use `parenthesize_if_expands`) are also hugged.
-def func() -> [1, 2, 3,]:
-    pass
-
-def func() -> ([1, 2, 3,]):
-    pass
-
-def func() -> ([1, 2, 3,]):
-    pass
-
-def func() -> (  # comment
-    [1, 2, 3,]):
-    pass
-
-def func() -> (
-    [1, 2, 3,]  # comment
-):
-    pass
-
-def func() -> (
-    [1, 2, 3,]
-    # comment
-):
-    pass
 
 # Ensure that nested lists are hugged.
 func([
@@ -327,68 +304,6 @@ func(
     ],
     bar,
 )
-
-
-# Ensure that return type annotations (which use `parenthesize_if_expands`) are also hugged.
-def func() -> (
-    [
-        1,
-        2,
-        3,
-    ]
-):
-    pass
-
-
-def func() -> (
-    [
-        1,
-        2,
-        3,
-    ]
-):
-    pass
-
-
-def func() -> (
-    [
-        1,
-        2,
-        3,
-    ]
-):
-    pass
-
-
-def func() -> (  # comment
-    [
-        1,
-        2,
-        3,
-    ]
-):
-    pass
-
-
-def func() -> (
-    [
-        1,
-        2,
-        3,
-    ]  # comment
-):
-    pass
-
-
-def func() -> (
-    [
-        1,
-        2,
-        3,
-    ]
-    # comment
-):
-    pass
 
 
 # Ensure that nested lists are hugged.
@@ -611,56 +526,7 @@ func(
  
  foo(
      # comment
-@@ -167,33 +145,27 @@
- 
- 
- # Ensure that return type annotations (which use `parenthesize_if_expands`) are also hugged.
--def func() -> (
--    [
--        1,
--        2,
--        3,
--    ]
--):
-+def func() -> ([
-+    1,
-+    2,
-+    3,
-+]):
-     pass
- 
- 
--def func() -> (
--    [
--        1,
--        2,
--        3,
--    ]
--):
-+def func() -> ([
-+    1,
-+    2,
-+    3,
-+]):
-     pass
- 
- 
--def func() -> (
--    [
--        1,
--        2,
--        3,
--    ]
--):
-+def func() -> ([
-+    1,
-+    2,
-+    3,
-+]):
-     pass
- 
- 
-@@ -229,56 +201,46 @@
+@@ -167,56 +145,46 @@
  
  
  # Ensure that nested lists are hugged.
@@ -747,6 +613,3 @@ func(
 -)
 +])
 ```
-
-
-

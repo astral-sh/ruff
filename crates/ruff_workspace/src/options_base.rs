@@ -285,6 +285,22 @@ impl OptionSet {
             None
         }
     }
+
+    pub fn collect_fields(&self) -> Vec<(String, OptionField)> {
+        struct FieldsCollector(Vec<(String, OptionField)>);
+
+        impl Visit for FieldsCollector {
+            fn record_field(&mut self, name: &str, field: OptionField) {
+                self.0.push((name.to_string(), field));
+            }
+
+            fn record_set(&mut self, _name: &str, _group: OptionSet) {}
+        }
+
+        let mut visitor = FieldsCollector(vec![]);
+        self.record(&mut visitor);
+        visitor.0
+    }
 }
 
 /// Visitor that writes out the names of all fields and sets.
@@ -333,7 +349,7 @@ struct SerializeVisitor<'a> {
     entries: &'a mut BTreeMap<String, OptionField>,
 }
 
-impl<'a> Visit for SerializeVisitor<'a> {
+impl Visit for SerializeVisitor<'_> {
     fn record_set(&mut self, name: &str, set: OptionSet) {
         // Collect the entries of the set.
         let mut entries = BTreeMap::new();

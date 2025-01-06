@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins;
@@ -33,19 +33,19 @@ use crate::settings::types::PythonVersion;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as converting a useless exception
 /// statement to a `raise` statement will change the program's behavior.
-#[violation]
-pub struct UselessExceptionStatement;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessExceptionStatement;
 
 impl Violation for UselessExceptionStatement {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing `raise` statement on exception")
+        "Missing `raise` statement on exception".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add `raise` keyword"))
+        Some("Add `raise` keyword".to_string())
     }
 }
 

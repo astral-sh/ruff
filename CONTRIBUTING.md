@@ -29,16 +29,14 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-And you'll need pre-commit to run some validation checks:
-
-```shell
-pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
-```
+You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
+run Python utility commands.
 
 You can optionally install pre-commit hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
+uv tool install pre-commit
 pre-commit install
 ```
 
@@ -66,7 +64,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -141,7 +139,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[violation]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -267,26 +265,20 @@ To preview any changes to the documentation locally:
 
 1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
 
-1. Install MkDocs and Material for MkDocs with:
-
-    ```shell
-    pip install -r docs/requirements.txt
-    ```
-
 1. Generate the MkDocs site with:
 
     ```shell
-    python scripts/generate_mkdocs.py
+    uv run --no-project --isolated --with-requirements docs/requirements.txt scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
     ```shell
     # For contributors.
-    mkdocs serve -f mkdocs.public.yml
+    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.public.yml
 
     # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    mkdocs serve -f mkdocs.insiders.yml
+    uvx --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
     ```
 
 The documentation should then be available locally at
@@ -368,9 +360,8 @@ GitHub Actions will run your changes against a number of real-world projects fro
 report on any linter or formatter differences. You can also run those checks locally via:
 
 ```shell
-pip install -e ./python/ruff-ecosystem
-ruff-ecosystem check ruff "./target/debug/ruff"
-ruff-ecosystem format ruff "./target/debug/ruff"
+uvx --from ./python/ruff-ecosystem ruff-ecosystem check ruff "./target/debug/ruff"
+uvx --from ./python/ruff-ecosystem ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
 See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
@@ -476,7 +467,7 @@ cargo build --release && hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
-You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
+You can run `uv venv --project ./scripts/benchmarks`, activate the venv and then run `uv sync --project ./scripts/benchmarks` to create a working environment for the
 above. All reported benchmarks were computed using the versions specified by
 `./scripts/benchmarks/pyproject.toml` on Python 3.11.
 
@@ -872,7 +863,7 @@ each configuration file.
 
 The package root is used to determine a file's "module path". Consider, again, `baz.py`. In that
 case, `./my_project/src/foo` was identified as the package root, so the module path for `baz.py`
-would resolve to  `foo.bar.baz` — as computed by taking the relative path from the package root
+would resolve to `foo.bar.baz` — as computed by taking the relative path from the package root
 (inclusive of the root itself). The module path can be thought of as "the path you would use to
 import the module" (e.g., `import foo.bar.baz`).
 

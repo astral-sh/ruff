@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -26,9 +26,9 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ```
 ///
 /// ## References
-/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
-#[violation]
-pub struct UselessObjectInheritance {
+/// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessObjectInheritance {
     name: String,
 }
 

@@ -2,14 +2,12 @@
 
 use std::path::Path;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-
-use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
@@ -20,6 +18,7 @@ use crate::rules::{
     flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
@@ -63,7 +62,7 @@ pub(crate) fn check_tokens(
             ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
-                *range,
+                range,
                 settings,
             );
         }
@@ -74,12 +73,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(
-            &mut diagnostics,
-            locator,
-            indexer,
-            comment_ranges,
-        );
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, comment_ranges);
     }
 
     if settings.rules.enabled(Rule::TabIndentation) {
@@ -154,7 +148,13 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, comment_ranges);
+        flake8_executable::rules::from_tokens(
+            &mut diagnostics,
+            path,
+            locator,
+            comment_ranges,
+            settings,
+        );
     }
 
     if settings.rules.any_enabled(&[

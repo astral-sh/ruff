@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, ExceptHandlerExceptHandler, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -28,17 +28,17 @@ use crate::checkers::ast::Checker;
 /// def foo():
 ///     bar()
 /// ```
-#[violation]
-pub struct UselessTryExcept;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessTryExcept;
 
 impl Violation for UselessTryExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove exception handler; error is immediately re-raised")
+        "Remove exception handler; error is immediately re-raised".to_string()
     }
 }
 
-/// TRY302
+/// TRY203 (previously TRY302)
 pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[ExceptHandler]) {
     if let Some(diagnostics) = handlers
         .iter()

@@ -18,18 +18,19 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::dedent;
-use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
-use crate::directives;
 use crate::fix::{fix_file, FixResult};
 use crate::linter::check_path;
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
+use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
+use crate::{directives, Locator};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -111,8 +112,8 @@ pub(crate) fn test_contents<'a>(
     let source_type = PySourceType::from(path);
     let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
     let locator = Locator::new(source_kind.source_code());
-    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
-    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+    let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
     let directives = directives::extract_directives(
         parsed.tokens(),
         directives::Flags::from_settings(settings),
@@ -122,7 +123,8 @@ pub(crate) fn test_contents<'a>(
     let diagnostics = check_path(
         path,
         path.parent()
-            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
+            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages))
+            .map(|path| PackageRoot::Root { path }),
         &locator,
         &stylist,
         &indexer,
@@ -174,8 +176,8 @@ pub(crate) fn test_contents<'a>(
             let parsed =
                 ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
             let locator = Locator::new(transformed.source_code());
-            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
-            let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+            let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
             let directives = directives::extract_directives(
                 parsed.tokens(),
                 directives::Flags::from_settings(settings),

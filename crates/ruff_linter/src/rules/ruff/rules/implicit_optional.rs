@@ -3,7 +3,7 @@ use std::fmt;
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
@@ -74,8 +74,8 @@ use super::super::typing::type_hint_explicitly_allows_none;
 /// - `target-version`
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
-#[violation]
-pub struct ImplicitOptional {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitOptional {
     conversion_type: ConversionType,
 }
 
@@ -84,7 +84,7 @@ impl Violation for ImplicitOptional {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("PEP 484 prohibits implicit `Optional`")
+        "PEP 484 prohibits implicit `Optional`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

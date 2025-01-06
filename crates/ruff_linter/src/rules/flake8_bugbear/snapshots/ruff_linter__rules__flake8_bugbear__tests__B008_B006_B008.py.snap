@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B006_B008.py:102:61: B008 Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
     |
@@ -79,5 +80,3 @@ B006_B008.py:250:37: B008 Do not perform function call `dt.datetime.now` in argu
     |                                     ^^^^^^^^^^^^^^^^^ B008
 251 |     pass
     |
-
-

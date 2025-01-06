@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE796.py:8:5: PIE796 Enum contains duplicate value: `"B"`
   |
@@ -74,4 +75,19 @@ PIE796.py:72:5: PIE796 Enum contains duplicate value: `...`
    |     ^^^^^^^ PIE796
    |
 
+PIE796.py:79:5: PIE796 Enum contains duplicate value: `cast(SomeType, ...)`
+   |
+77 | class FakeEnum11(enum.Enum):
+78 |     A = cast(SomeType, ...)
+79 |     B = cast(SomeType, ...)  # PIE796
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ PIE796
+80 |     C = cast(SomeType, ...)  # PIE796
+   |
 
+PIE796.py:80:5: PIE796 Enum contains duplicate value: `cast(SomeType, ...)`
+   |
+78 |     A = cast(SomeType, ...)
+79 |     B = cast(SomeType, ...)  # PIE796
+80 |     C = cast(SomeType, ...)  # PIE796
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ PIE796
+   |

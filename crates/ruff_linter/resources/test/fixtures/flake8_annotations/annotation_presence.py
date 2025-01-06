@@ -71,7 +71,7 @@ class Foo:
     def foo(self: "Foo", a: int, b: int) -> int:
         pass
 
-    # ANN101
+    # OK
     def foo(self, a: int, b: int) -> int:
         pass
 
@@ -125,12 +125,12 @@ class Foo:
     def foo(cls: Type["Foo"], a: int, b: int) -> int:
         pass
 
-    # ANN102
+    # OK
     @classmethod
     def foo(cls, a: int, b: int) -> int:
         pass
 
-    # ANN101
+    # OK
     def foo(self, /, a: int, b: int) -> int:
         pass
 

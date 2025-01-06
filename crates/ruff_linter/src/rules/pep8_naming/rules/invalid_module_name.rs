@@ -1,13 +1,14 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
+use crate::package::PackageRoot;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_text_size::TextRange;
-
-use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for module names that do not follow the `snake_case` naming
@@ -34,8 +35,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// - Instead of `ExampleModule`, use `example_module`.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
-#[violation]
-pub struct InvalidModuleName {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidModuleName {
     name: String,
 }
 
@@ -50,19 +51,16 @@ impl Violation for InvalidModuleName {
 /// N999
 pub(crate) fn invalid_module_name(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    if !path
-        .extension()
-        .is_some_and(|ext| ext == "py" || ext == "pyi")
-    {
+    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
     }
 
     if let Some(package) = package {
         let module_name = if is_module_file(path) {
-            package.file_name().unwrap().to_string_lossy()
+            package.path().file_name().unwrap().to_string_lossy()
         } else {
             path.file_stem().unwrap().to_string_lossy()
         };

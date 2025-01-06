@@ -1,6 +1,6 @@
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 
 use super::LogicalLine;
@@ -23,7 +23,6 @@ use super::LogicalLine;
 ///     a = 1
 /// ```
 ///
-///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
@@ -36,8 +35,8 @@ use super::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct IndentationWithInvalidMultiple {
+#[derive(ViolationMetadata)]
+pub(crate) struct IndentationWithInvalidMultiple {
     indent_width: usize,
 }
 
@@ -79,8 +78,8 @@ impl Violation for IndentationWithInvalidMultiple {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct IndentationWithInvalidMultipleComment {
+#[derive(ViolationMetadata)]
+pub(crate) struct IndentationWithInvalidMultipleComment {
     indent_width: usize,
 }
 
@@ -112,13 +111,13 @@ impl Violation for IndentationWithInvalidMultipleComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
-#[violation]
-pub struct NoIndentedBlock;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoIndentedBlock;
 
 impl Violation for NoIndentedBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected an indented block")
+        "Expected an indented block".to_string()
     }
 }
 
@@ -144,13 +143,13 @@ impl Violation for NoIndentedBlock {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
-#[violation]
-pub struct NoIndentedBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoIndentedBlockComment;
 
 impl Violation for NoIndentedBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected an indented block (comment)")
+        "Expected an indented block (comment)".to_string()
     }
 }
 
@@ -173,13 +172,13 @@ impl Violation for NoIndentedBlockComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
-#[violation]
-pub struct UnexpectedIndentation;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnexpectedIndentation;
 
 impl Violation for UnexpectedIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected indentation")
+        "Unexpected indentation".to_string()
     }
 }
 
@@ -202,13 +201,13 @@ impl Violation for UnexpectedIndentation {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
-#[violation]
-pub struct UnexpectedIndentationComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnexpectedIndentationComment;
 
 impl Violation for UnexpectedIndentationComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected indentation (comment)")
+        "Unexpected indentation (comment)".to_string()
     }
 }
 
@@ -232,20 +231,24 @@ impl Violation for UnexpectedIndentationComment {
 ///     pass
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
-#[violation]
-pub struct OverIndented {
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
+#[derive(ViolationMetadata)]
+pub(crate) struct OverIndented {
     is_comment: bool,
 }
 
 impl Violation for OverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OverIndented { is_comment } = self;
-        if *is_comment {
-            format!("Over-indented (comment)")
+        if self.is_comment {
+            "Over-indented (comment)".to_string()
         } else {
-            format!("Over-indented")
+            "Over-indented".to_string()
         }
     }
 }

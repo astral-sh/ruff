@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -30,8 +30,8 @@ use crate::rules::flynt::helpers;
 ///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
-#[violation]
-pub struct StaticJoinToFString {
+#[derive(ViolationMetadata)]
+pub(crate) struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }
 
@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for StaticJoinToFString {
         if let Some(expression) = expression.full_display() {
             format!("Consider `{expression}` instead of string join")
         } else {
-            format!("Consider f-string instead of string join")
+            "Consider f-string instead of string join".to_string()
         }
     }
 
@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for StaticJoinToFString {
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
         } else {
-            format!("Replace with f-string")
+            "Replace with f-string".to_string()
         }
     }
 }

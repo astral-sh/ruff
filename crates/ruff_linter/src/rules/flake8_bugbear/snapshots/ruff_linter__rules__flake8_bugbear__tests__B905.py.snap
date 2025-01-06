@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
@@ -9,7 +10,7 @@ B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
 5 | zip(range(3))
 6 | zip("a", "b")
   |
-  = help: Add explicit `strict=False`
+  = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 1 1 | from itertools import count, cycle, repeat
@@ -30,7 +31,7 @@ B905.py:5:1: B905 [*] `zip()` without an explicit `strict=` parameter
 6 | zip("a", "b")
 7 | zip("a", "b", *zip("c"))
   |
-  = help: Add explicit `strict=False`
+  = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 2 2 | 
@@ -51,7 +52,7 @@ B905.py:6:1: B905 [*] `zip()` without an explicit `strict=` parameter
 7 | zip("a", "b", *zip("c"))
 8 | zip(zip("a"), strict=False)
   |
-  = help: Add explicit `strict=False`
+  = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 3 3 | # Errors
@@ -72,7 +73,7 @@ B905.py:7:1: B905 [*] `zip()` without an explicit `strict=` parameter
 8 | zip(zip("a"), strict=False)
 9 | zip(zip("a", strict=True))
   |
-  = help: Add explicit `strict=False`
+  = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 4 4 | zip()
@@ -93,7 +94,7 @@ B905.py:7:16: B905 [*] `zip()` without an explicit `strict=` parameter
 8 | zip(zip("a"), strict=False)
 9 | zip(zip("a", strict=True))
   |
-  = help: Add explicit `strict=False`
+  = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 4 4 | zip()
@@ -113,7 +114,7 @@ B905.py:8:5: B905 [*] `zip()` without an explicit `strict=` parameter
   |     ^^^^^^^^ B905
 9 | zip(zip("a", strict=True))
   |
-  = help: Add explicit `strict=False`
+  = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 5 5 | zip(range(3))
@@ -134,7 +135,7 @@ B905.py:9:1: B905 [*] `zip()` without an explicit `strict=` parameter
 10 | 
 11 | # OK
    |
-   = help: Add explicit `strict=False`
+   = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 6  6  | zip("a", "b")
@@ -153,7 +154,7 @@ B905.py:24:1: B905 [*] `zip()` without an explicit `strict=` parameter
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
 25 | zip([1, 2, 3], repeat(1, times=4))
    |
-   = help: Add explicit `strict=False`
+   = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 21 21 | zip([1, 2, 3], repeat(1, times=None))
@@ -174,7 +175,7 @@ B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
 26 | 
 27 | import builtins
    |
-   = help: Add explicit `strict=False`
+   = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 22 22 | 
@@ -193,7 +194,7 @@ B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
 29 | builtins.zip([1, 2, 3])
    | ^^^^^^^^^^^^^^^^^^^^^^^ B905
    |
-   = help: Add explicit `strict=False`
+   = help: Add explicit value for parameter `strict=`
 
 ℹ Safe fix
 26 26 | 

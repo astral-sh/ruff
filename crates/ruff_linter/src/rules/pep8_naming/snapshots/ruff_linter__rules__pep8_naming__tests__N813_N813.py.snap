@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N813.py:1:8: N813 Camelcase `Camel` imported as lowercase `camel`
   |
@@ -24,5 +25,3 @@ N813.py:3:17: N813 Camelcase `AnotherCamelCase` imported as lowercase `another_c
 3 | from mod import AnotherCamelCase as another_camelcase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N813
   |
-
-

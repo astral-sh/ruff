@@ -1,23 +1,64 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
-B028.py:8:1: B028 No explicit `stacklevel` keyword argument found
+B028.py:8:1: B028 [*] No explicit `stacklevel` keyword argument found
    |
  6 | """
  7 | 
- 8 | warnings.warn(DeprecationWarning("test"))
+ 8 | warnings.warn("test", DeprecationWarning)
    | ^^^^^^^^^^^^^ B028
- 9 | warnings.warn(DeprecationWarning("test"), source=None)
-10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
+ 9 | warnings.warn("test", DeprecationWarning, source=None)
+10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
    |
+   = help: Set `stacklevel=2`
 
-B028.py:9:1: B028 No explicit `stacklevel` keyword argument found
+ℹ Unsafe fix
+5 5 | B028 - on lines 8 and 9
+6 6 | """
+7 7 | 
+8   |-warnings.warn("test", DeprecationWarning)
+  8 |+warnings.warn("test", DeprecationWarning, stacklevel=2)
+9 9 | warnings.warn("test", DeprecationWarning, source=None)
+10 10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
+11 11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
+
+B028.py:9:1: B028 [*] No explicit `stacklevel` keyword argument found
    |
- 8 | warnings.warn(DeprecationWarning("test"))
- 9 | warnings.warn(DeprecationWarning("test"), source=None)
+ 8 | warnings.warn("test", DeprecationWarning)
+ 9 | warnings.warn("test", DeprecationWarning, source=None)
    | ^^^^^^^^^^^^^ B028
-10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
-11 | warnings.warn(DeprecationWarning("test"), stacklevel=1)
+10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
+11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
    |
+   = help: Set `stacklevel=2`
 
+ℹ Unsafe fix
+6  6  | """
+7  7  | 
+8  8  | warnings.warn("test", DeprecationWarning)
+9     |-warnings.warn("test", DeprecationWarning, source=None)
+10 9  | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
+   10 |+warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
+11 11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
+12 12 | warnings.warn("test", DeprecationWarning, 1)
+13 13 | warnings.warn("test", category=DeprecationWarning, stacklevel=1)
 
+B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
+   |
+20 | warnings.warn(*args, **kwargs)
+21 | 
+22 | warnings.warn(
+   | ^^^^^^^^^^^^^ B028
+23 |         "test",
+24 |         DeprecationWarning,
+   |
+   = help: Set `stacklevel=2`
+
+ℹ Unsafe fix
+23 23 |         "test",
+24 24 |         DeprecationWarning,
+25 25 |         # some comments here
+26    |-        source = None # no trailing comma
+   26 |+        source = None, stacklevel=2 # no trailing comma
+27 27 |     )

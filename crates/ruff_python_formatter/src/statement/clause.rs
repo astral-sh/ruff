@@ -36,7 +36,7 @@ pub(crate) enum ClauseHeader<'a> {
     OrElse(ElseClause<'a>),
 }
 
-impl<'a> ClauseHeader<'a> {
+impl ClauseHeader<'_> {
     /// The range from the clause keyword up to and including the final colon.
     pub(crate) fn range(self, source: &str) -> FormatResult<TextRange> {
         let keyword_range = self.first_keyword_range(source)?;

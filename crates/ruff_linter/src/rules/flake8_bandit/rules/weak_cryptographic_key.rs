@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [CSRC: Transitioning the Use of Cryptographic Algorithms and Key Lengths](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final)
-#[violation]
-pub struct WeakCryptographicKey {
+#[derive(ViolationMetadata)]
+pub(crate) struct WeakCryptographicKey {
     cryptographic_key: CryptographicKey,
 }
 
@@ -114,7 +114,7 @@ fn extract_cryptographic_key(
                     Some((CryptographicKey::Rsa { key_size }, range))
                 }
                 "ec" => {
-                    let argument = call.arguments.find_argument("curve", 0)?;
+                    let argument = call.arguments.find_argument_value("curve", 0)?;
                     let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
                     let qualified_name = checker.semantic().resolve_qualified_name(value)?;
                     if matches!(
@@ -150,7 +150,7 @@ fn extract_cryptographic_key(
 }
 
 fn extract_int_argument(call: &ExprCall, name: &str, position: usize) -> Option<(u16, TextRange)> {
-    let argument = call.arguments.find_argument(name, position)?;
+    let argument = call.arguments.find_argument_value(name, position)?;
     let Expr::NumberLiteral(ast::ExprNumberLiteral {
         value: ast::Number::Int(i),
         ..

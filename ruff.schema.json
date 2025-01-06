@@ -16,6 +16,17 @@
         "minLength": 1
       }
     },
+    "analyze": {
+      "description": "Options to configure import map generation.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AnalyzeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "builtins": {
       "description": "A list of builtins to treat as defined references, in addition to the system builtins.",
       "type": [
@@ -671,7 +682,7 @@
       ]
     },
     "src": {
-      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nWhen omitted, the `src` directory will typically default to including both:\n\n1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"). 2. The `\"src\"` subdirectory of the project root.\n\nThese defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box. (If a configuration file is explicitly provided (e.g., via the `--config` command-line flag), the current working directory will be considered the project root.)\n\nAs an example, consider an alternative project structure, like:\n\n```text my_project ├── pyproject.toml └── lib └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nIn this case, the `./lib` directory should be included in the `src` option (e.g., `src = [\"lib\"]`), such that when resolving imports, `my_package.foo` is considered first-party.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nWhen omitted, the `src` directory will typically default to including both:\n\n1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"). 2. The `\"src\"` subdirectory of the project root.\n\nThese defaults ensure that Ruff supports both flat layouts and `src` layouts out-of-the-box. (If a configuration file is explicitly provided (e.g., via the `--config` command-line flag), the current working directory will be considered the project root.)\n\nAs an example, consider an alternative project structure, like:\n\n```text my_project ├── pyproject.toml └── lib └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nIn this case, the `./lib` directory should be included in the `src` option (e.g., `src = [\"lib\"]`), such that when resolving imports, `my_package.foo` is considered first-party.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -679,18 +690,6 @@
       "items": {
         "type": "string"
       }
-    },
-    "tab-size": {
-      "description": "The number of spaces a tab is equal to when enforcing long-line violations (like `E501`) or formatting code with the formatter.\n\nThis option changes the number of spaces inserted by the formatter when using soft-tabs (`indent-style = space`).",
-      "deprecated": true,
-      "anyOf": [
-        {
-          "$ref": "#/definitions/IndentWidth"
-        },
-        {
-          "type": "null"
-        }
-      ]
     },
     "target-version": {
       "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it's based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = \"py38\"`:\n\n```toml [project] requires-python = \">=3.8\" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax) before it is available at runtime, as long as the stub does not make use of new *syntax*. For example, a type checker will understand `int | str` in a stub as being a `Union` type annotation, even if the type checker is run using Python 3.9, despite the fact that the `|` operator can only be used to create union types at runtime on Python 3.10+. As such, Ruff will often recommend newer features in a stub file than it would for an equivalent runtime file with the same target version.",
@@ -746,6 +745,64 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "Alias": {
+      "type": "string"
+    },
+    "AnalyzeOptions": {
+      "description": "Configures Ruff's `analyze` command.",
+      "type": "object",
+      "properties": {
+        "detect-string-imports": {
+          "description": "Whether to detect imports from string literals. When enabled, Ruff will search for string literals that \"look like\" import paths, and include them in the import map, if they resolve to valid Python modules.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "direction": {
+          "description": "Whether to generate a map from file to files that it depends on (dependencies) or files that depend on it (dependents).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exclude": {
+          "description": "A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include-dependencies": {
+          "description": "A map from file path to the list of Python or non-Python file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "preview": {
+          "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable commands.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "ApiBan": {
       "type": "object",
       "required": [
@@ -796,6 +853,24 @@
           "type": "string",
           "enum": [
             "pep257"
+          ]
+        }
+      ]
+    },
+    "Direction": {
+      "oneOf": [
+        {
+          "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
+          "type": "string",
+          "enum": [
+            "Dependencies"
+          ]
+        },
+        {
+          "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
+          "type": "string",
+          "enum": [
+            "Dependents"
           ]
         }
       ]
@@ -876,7 +951,7 @@
           ]
         },
         "hardcoded-tmp-directory": {
-          "description": "A list of directories to consider temporary.",
+          "description": "A list of directories to consider temporary (see `S108`).",
           "type": [
             "array",
             "null"
@@ -886,7 +961,7 @@
           }
         },
         "hardcoded-tmp-directory-extend": {
-          "description": "A list of directories to consider temporary, in addition to those specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory).",
+          "description": "A list of directories to consider temporary, in addition to those specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).",
           "type": [
             "array",
             "null"
@@ -1062,7 +1137,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/definitions/Alias"
           }
         },
         "banned-aliases": {
@@ -1093,7 +1168,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/definitions/Alias"
           }
         }
       },
@@ -1312,7 +1387,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).",
+          "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get` which will work across assignments in the same module.\n\nFor example: ```python import fastapi\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\") def home() -> str: ... ```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
           "type": [
             "array",
             "null"
@@ -1628,7 +1703,7 @@
           ]
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [
             "integer",
             "null"
@@ -2318,31 +2393,20 @@
       "type": "string"
     },
     "OutputFormat": {
-      "oneOf": [
-        {
-          "type": "string",
-          "enum": [
-            "concise",
-            "full",
-            "json",
-            "json-lines",
-            "junit",
-            "grouped",
-            "github",
-            "gitlab",
-            "pylint",
-            "rdjson",
-            "azure",
-            "sarif"
-          ]
-        },
-        {
-          "deprecated": true,
-          "type": "string",
-          "enum": [
-            "text"
-          ]
-        }
+      "type": "string",
+      "enum": [
+        "concise",
+        "full",
+        "json",
+        "json-lines",
+        "junit",
+        "grouped",
+        "github",
+        "gitlab",
+        "pylint",
+        "rdjson",
+        "azure",
+        "sarif"
       ]
     },
     "ParametrizeNameType": {
@@ -2485,6 +2549,13 @@
             "type": "string"
           }
         },
+        "ignore-var-parameters": {
+          "description": "If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "property-decorators": {
           "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
           "type": [
@@ -2501,6 +2572,16 @@
     "PyflakesOptions": {
       "type": "object",
       "properties": {
+        "allowed-unused-imports": {
+          "description": "A list of modules to ignore when considering unused imports.\n\nUsed to prevent violations for specific modules that are known to have side effects on import (e.g., `hvplot.pandas`).\n\nModules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas` will also be ignored).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extend-generics": {
           "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.\n\nExpects to receive a list of fully-qualified names (e.g., `django.db.models.ForeignKey`, rather than `ForeignKey`).",
           "type": [
@@ -2684,6 +2765,26 @@
     "RuffOptions": {
       "type": "object",
       "properties": {
+        "allowed-markup-calls": {
+          "description": "A list of callable names, whose result may be safely passed into [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).\n\nThis setting helps you avoid false positives in code like:\n\n```python from bleach import clean from markupsafe import Markup\n\ncleaned_markup = Markup(clean(some_user_input)) ```\n\nWhere the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html) usually ensures that there's no XSS vulnerability.\n\nAlthough it is not recommended, you may also use this setting to whitelist other kinds of calls, e.g. calls to i18n translation functions, where how safe that is will depend on the implementation and how well the translations are audited.\n\nAnother common use-case is to wrap the output of functions that generate markup like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring) or template rendering engines where sanitization of potential user input is either already baked in or has to happen before rendering.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "extend-markup-names": {
+          "description": "A list of additional callable names that behave like [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "parenthesize-tuple-in-subscript": {
           "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
           "type": [
@@ -2710,6 +2811,11 @@
         "AIR0",
         "AIR00",
         "AIR001",
+        "AIR3",
+        "AIR30",
+        "AIR301",
+        "AIR302",
+        "AIR303",
         "ALL",
         "ANN",
         "ANN0",
@@ -2717,10 +2823,6 @@
         "ANN001",
         "ANN002",
         "ANN003",
-        "ANN1",
-        "ANN10",
-        "ANN101",
-        "ANN102",
         "ANN2",
         "ANN20",
         "ANN201",
@@ -2807,6 +2909,8 @@
         "B904",
         "B905",
         "B909",
+        "B91",
+        "B911",
         "BLE",
         "BLE0",
         "BLE00",
@@ -2946,6 +3050,9 @@
         "DTZ01",
         "DTZ011",
         "DTZ012",
+        "DTZ9",
+        "DTZ90",
+        "DTZ901",
         "E",
         "E1",
         "E10",
@@ -3032,8 +3139,6 @@
         "E9",
         "E90",
         "E902",
-        "E99",
-        "E999",
         "EM",
         "EM1",
         "EM10",
@@ -3168,6 +3273,7 @@
         "FURB15",
         "FURB152",
         "FURB154",
+        "FURB156",
         "FURB157",
         "FURB16",
         "FURB161",
@@ -3184,6 +3290,8 @@
         "FURB180",
         "FURB181",
         "FURB187",
+        "FURB188",
+        "FURB189",
         "FURB19",
         "FURB192",
         "G",
@@ -3236,6 +3344,8 @@
         "LOG002",
         "LOG007",
         "LOG009",
+        "LOG01",
+        "LOG015",
         "N",
         "N8",
         "N80",
@@ -3340,6 +3450,9 @@
         "PLC0414",
         "PLC0415",
         "PLC1",
+        "PLC18",
+        "PLC180",
+        "PLC1802",
         "PLC19",
         "PLC190",
         "PLC1901",
@@ -3467,6 +3580,7 @@
         "PLR171",
         "PLR1711",
         "PLR1714",
+        "PLR1716",
         "PLR172",
         "PLR1722",
         "PLR173",
@@ -3497,6 +3611,7 @@
         "PLW0",
         "PLW01",
         "PLW010",
+        "PLW0101",
         "PLW0108",
         "PLW012",
         "PLW0120",
@@ -3530,6 +3645,7 @@
         "PLW15",
         "PLW150",
         "PLW1501",
+        "PLW1507",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3558,8 +3674,6 @@
         "PT001",
         "PT002",
         "PT003",
-        "PT004",
-        "PT005",
         "PT006",
         "PT007",
         "PT008",
@@ -3623,6 +3737,9 @@
         "PTH205",
         "PTH206",
         "PTH207",
+        "PTH208",
+        "PTH21",
+        "PTH210",
         "PYI",
         "PYI0",
         "PYI00",
@@ -3682,6 +3799,7 @@
         "PYI058",
         "PYI059",
         "PYI06",
+        "PYI061",
         "PYI062",
         "PYI063",
         "PYI064",
@@ -3745,6 +3863,24 @@
         "RUF032",
         "RUF033",
         "RUF034",
+        "RUF035",
+        "RUF036",
+        "RUF037",
+        "RUF038",
+        "RUF039",
+        "RUF04",
+        "RUF040",
+        "RUF041",
+        "RUF043",
+        "RUF046",
+        "RUF048",
+        "RUF049",
+        "RUF05",
+        "RUF051",
+        "RUF052",
+        "RUF055",
+        "RUF056",
+        "RUF057",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3883,6 +4019,8 @@
         "SIM40",
         "SIM401",
         "SIM9",
+        "SIM90",
+        "SIM905",
         "SIM91",
         "SIM910",
         "SIM911",
@@ -3904,16 +4042,19 @@
         "T20",
         "T201",
         "T203",
-        "TCH",
-        "TCH0",
-        "TCH00",
-        "TCH001",
-        "TCH002",
-        "TCH003",
-        "TCH004",
-        "TCH005",
-        "TCH01",
-        "TCH010",
+        "TC",
+        "TC0",
+        "TC00",
+        "TC001",
+        "TC002",
+        "TC003",
+        "TC004",
+        "TC005",
+        "TC006",
+        "TC007",
+        "TC008",
+        "TC01",
+        "TC010",
         "TD",
         "TD0",
         "TD00",
@@ -3939,11 +4080,11 @@
         "TRY2",
         "TRY20",
         "TRY201",
+        "TRY203",
         "TRY3",
         "TRY30",
         "TRY300",
         "TRY301",
-        "TRY302",
         "TRY4",
         "TRY40",
         "TRY400",
@@ -3977,7 +4118,6 @@
         "UP024",
         "UP025",
         "UP026",
-        "UP027",
         "UP028",
         "UP029",
         "UP03",
@@ -3996,6 +4136,7 @@
         "UP041",
         "UP042",
         "UP043",
+        "UP044",
         "W",
         "W1",
         "W19",

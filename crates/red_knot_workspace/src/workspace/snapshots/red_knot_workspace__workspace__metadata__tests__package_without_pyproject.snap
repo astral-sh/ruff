@@ -1,0 +1,34 @@
+---
+source: crates/red_knot_workspace/src/workspace/metadata.rs
+expression: workspace
+---
+WorkspaceMetadata(
+  root: "/app",
+  packages: [
+    PackageMetadata(
+      name: Name("app"),
+      root: "/app",
+      configuration: Configuration(
+        python_version: None,
+        search_paths: SearchPathConfiguration(
+          extra_paths: None,
+          src_root: None,
+          typeshed: None,
+          site_packages: None,
+        ),
+      ),
+    ),
+  ],
+  settings: WorkspaceSettings(
+    program: ProgramSettings(
+      python_version: "3.9",
+      python_platform: all,
+      search_paths: SearchPathSettings(
+        extra_paths: [],
+        src_root: "/app",
+        typeshed: None,
+        site_packages: Known([]),
+      ),
+    ),
+  ),
+)

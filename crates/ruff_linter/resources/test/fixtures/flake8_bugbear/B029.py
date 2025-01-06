@@ -1,6 +1,6 @@
 """
 Should emit:
-B029 - on lines 8 and 13
+B029 - on lines 8, 13, 18 and 23
 """
 
 try:
@@ -11,4 +11,14 @@ except ():
 try:
     pass
 except () as e:
+    pass
+
+try:
+    pass
+except* ():
+    pass
+
+try:
+    pass
+except* () as e:
     pass

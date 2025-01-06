@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::{self as ast, Expr, Operator};
 
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,15 +30,15 @@ use crate::rules::refurb::helpers::generate_none_identity_comparison;
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
-#[violation]
-pub struct IsinstanceTypeNone;
+#[derive(ViolationMetadata)]
+pub(crate) struct IsinstanceTypeNone;
 
 impl Violation for IsinstanceTypeNone {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `is` operator over `isinstance` to check if an object is `None`")
+        "Prefer `is` operator over `isinstance` to check if an object is `None`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

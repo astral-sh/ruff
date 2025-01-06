@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
@@ -47,13 +47,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-#[violation]
-pub struct SingleStringSlots;
+#[derive(ViolationMetadata)]
+pub(crate) struct SingleStringSlots;
 
 impl Violation for SingleStringSlots {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class `__slots__` should be a non-string iterable")
+        "Class `__slots__` should be a non-string iterable".to_string()
     }
 }
 

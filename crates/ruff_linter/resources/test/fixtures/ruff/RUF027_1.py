@@ -68,3 +68,9 @@ def negative_cases():
     @app.get("/items/{item_id}")
     async def read_item(item_id):
         return {"item_id": item_id}
+
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from datetime import date
+
+    t = "foo/{date}"

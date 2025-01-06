@@ -1,10 +1,10 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct UnusedCodes {
+pub(crate) struct UnusedCodes {
     pub disabled: Vec<String>,
     pub duplicated: Vec<String>,
     pub unknown: Vec<String>,
@@ -41,16 +41,15 @@ pub struct UnusedCodes {
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
-#[violation]
-pub struct UnusedNOQA {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,
 }
 
 impl AlwaysFixableViolation for UnusedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedNOQA { codes } = self;
-        match codes {
+        match &self.codes {
             Some(codes) => {
                 let mut codes_by_reason = vec![];
                 if !codes.unmatched.is_empty() {
@@ -94,12 +93,12 @@ impl AlwaysFixableViolation for UnusedNOQA {
                     ));
                 }
                 if codes_by_reason.is_empty() {
-                    format!("Unused `noqa` directive")
+                    "Unused `noqa` directive".to_string()
                 } else {
                     format!("Unused `noqa` directive ({})", codes_by_reason.join("; "))
                 }
             }
-            None => format!("Unused blanket `noqa` directive"),
+            None => "Unused blanket `noqa` directive".to_string(),
         }
     }
 

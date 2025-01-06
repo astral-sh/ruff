@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the absence of copyright notices within Python files.
@@ -13,13 +13,13 @@ use crate::settings::LinterSettings;
 /// ## Why is this bad?
 /// In some codebases, it's common to have a license header at the top of every
 /// file. This rule ensures that the license header is present.
-#[violation]
-pub struct MissingCopyrightNotice;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingCopyrightNotice;
 
 impl Violation for MissingCopyrightNotice {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing copyright notice at top of file")
+        "Missing copyright notice at top of file".to_string()
     }
 }
 

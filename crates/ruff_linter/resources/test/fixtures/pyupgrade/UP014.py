@@ -31,3 +31,9 @@ S3File = NamedTuple(
         ("dataHPK",* str),
     ],
 )
+
+# Unsafe fix if comments are present
+X = NamedTuple("X", [
+    ("some_config", int),  # important
+])
+

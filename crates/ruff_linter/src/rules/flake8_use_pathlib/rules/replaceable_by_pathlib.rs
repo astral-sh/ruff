@@ -1,5 +1,7 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::{Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -8,10 +10,10 @@ use crate::rules::flake8_use_pathlib::rules::{
     Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
 };
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
-    OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
-    OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove, OsRename,
-    OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
+    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathAbspath,
+    OsPathBasename, OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir,
+    OsPathIsfile, OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove,
+    OsRename, OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
 };
 use crate::settings::types::PythonVersion;
 
@@ -113,7 +115,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                 // ```
                 if call
                     .arguments
-                    .find_argument("closefd", 6)
+                    .find_argument_value("closefd", 6)
                     .is_some_and(|expr| {
                         !matches!(
                             expr,
@@ -122,8 +124,12 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                     })
                     || call
                         .arguments
-                        .find_argument("opener", 7)
+                        .find_argument_value("opener", 7)
                         .is_some_and(|expr| !expr.is_none_literal_expr())
+                    || call
+                        .arguments
+                        .find_positional(0)
+                        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
                 {
                     return None;
                 }
@@ -149,6 +155,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
                 Some(OsReadlink.into())
             }
+            // PTH208,
+            ["os", "listdir"] => Some(OsListdir.into()),
             _ => None,
         })
     {
@@ -158,4 +166,27 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+/// Returns `true` if the given expression looks like a file descriptor, i.e., if it is an integer.
+fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(
+        expr,
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(_),
+            ..
+        })
+    ) {
+        return true;
+    };
+
+    let Some(name) = expr.as_name_expr() else {
+        return false;
+    };
+
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    typing::is_int(binding, semantic)
 }

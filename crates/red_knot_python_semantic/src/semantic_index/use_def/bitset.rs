@@ -35,14 +35,18 @@ impl<const B: usize> BitSet<B> {
     /// Convert from Inline to Heap, if needed, and resize the Heap vector, if needed.
     fn resize(&mut self, value: u32) {
         let num_blocks_needed = (value / 64) + 1;
+        self.resize_blocks(num_blocks_needed as usize);
+    }
+
+    fn resize_blocks(&mut self, num_blocks_needed: usize) {
         match self {
             Self::Inline(blocks) => {
                 let mut vec = blocks.to_vec();
-                vec.resize(num_blocks_needed as usize, 0);
+                vec.resize(num_blocks_needed, 0);
                 *self = Self::Heap(vec);
             }
             Self::Heap(vec) => {
-                vec.resize(num_blocks_needed as usize, 0);
+                vec.resize(num_blocks_needed, 0);
             }
         }
     }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+snapshot_kind: text
 ---
 PGH004_0.py:1:8: PGH004 Use specific rule codes when using `noqa`
   |

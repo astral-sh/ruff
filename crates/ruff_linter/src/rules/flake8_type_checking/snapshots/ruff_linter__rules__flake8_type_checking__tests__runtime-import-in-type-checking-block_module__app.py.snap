@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+app.py:9:12: TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+   |
+ 8 | if TYPE_CHECKING:
+ 9 |     import datetime  # TC004
+   |            ^^^^^^^^ TC004
+10 |     from array import array  # TC004
+   |
+   = help: Move out of type-checking block
+
+ℹ Unsafe fix
+4  4  | 
+5  5  | import fastapi
+6  6  | from fastapi import FastAPI as Api
+   7  |+import datetime
+7  8  | 
+8  9  | if TYPE_CHECKING:
+9     |-    import datetime  # TC004
+10 10 |     from array import array  # TC004
+11 11 | 
+12 12 | app = fastapi.FastAPI("First application")
+
+app.py:10:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+   |
+ 8 | if TYPE_CHECKING:
+ 9 |     import datetime  # TC004
+10 |     from array import array  # TC004
+   |                       ^^^^^ TC004
+11 | 
+12 | app = fastapi.FastAPI("First application")
+   |
+   = help: Move out of type-checking block
+
+ℹ Unsafe fix
+4  4  | 
+5  5  | import fastapi
+6  6  | from fastapi import FastAPI as Api
+   7  |+from array import array
+7  8  | 
+8  9  | if TYPE_CHECKING:
+9  10 |     import datetime  # TC004
+10    |-    from array import array  # TC004
+11 11 | 
+12 12 | app = fastapi.FastAPI("First application")
+13 13 |

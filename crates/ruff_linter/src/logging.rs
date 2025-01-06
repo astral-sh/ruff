@@ -1,12 +1,11 @@
 use std::fmt::{Display, Formatter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
-use once_cell::sync::Lazy;
 use ruff_python_parser::{ParseError, ParseErrorType};
 use rustc_hash::FxHashSet;
 
@@ -16,7 +15,7 @@ use crate::fs;
 use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
 
-pub static IDENTIFIERS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
+pub static IDENTIFIERS: LazyLock<Mutex<Vec<&'static str>>> = LazyLock::new(Mutex::default);
 
 /// Warn a user once, with uniqueness determined by the given ID.
 #[macro_export]
@@ -35,7 +34,7 @@ macro_rules! warn_user_once_by_id {
     };
 }
 
-pub static MESSAGES: Lazy<Mutex<FxHashSet<String>>> = Lazy::new(Mutex::default);
+pub static MESSAGES: LazyLock<Mutex<FxHashSet<String>>> = LazyLock::new(Mutex::default);
 
 /// Warn a user once, if warnings are enabled, with uniqueness determined by the content of the
 /// message.
@@ -152,6 +151,8 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
         })
         .level(level.level_filter())
         .level_for("globset", log::LevelFilter::Warn)
+        .level_for("red_knot_python_semantic", log::LevelFilter::Warn)
+        .level_for("salsa", log::LevelFilter::Warn)
         .chain(std::io::stderr())
         .apply()?;
     Ok(())

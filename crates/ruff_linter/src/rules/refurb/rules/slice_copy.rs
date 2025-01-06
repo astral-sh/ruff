@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_list;
@@ -36,15 +36,15 @@ use crate::rules::refurb::helpers::generate_method_call;
 ///
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#mutable-sequence-types)
-#[violation]
-pub struct SliceCopy;
+#[derive(ViolationMetadata)]
+pub(crate) struct SliceCopy;
 
 impl Violation for SliceCopy {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `copy` method over slicing")
+        "Prefer `copy` method over slicing".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

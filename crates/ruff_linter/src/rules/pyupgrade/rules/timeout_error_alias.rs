@@ -3,7 +3,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
@@ -37,15 +37,15 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
-#[violation]
-pub struct TimeoutErrorAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct TimeoutErrorAlias {
     name: Option<String>,
 }
 
 impl AlwaysFixableViolation for TimeoutErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace aliased errors with `TimeoutError`")
+        "Replace aliased errors with `TimeoutError`".to_string()
     }
 
     fn fix_title(&self) -> String {

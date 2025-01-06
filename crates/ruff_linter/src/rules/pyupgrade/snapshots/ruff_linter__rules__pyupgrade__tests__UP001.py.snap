@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
   |
@@ -35,5 +36,3 @@ UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
 7 6 | 
 8 7 |     def __init__(self) -> None:
 9 8 |         pass
-
-

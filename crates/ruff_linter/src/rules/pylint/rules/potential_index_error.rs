@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -18,13 +18,13 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// print([0, 1, 2][3])
 /// ```
-#[violation]
-pub struct PotentialIndexError;
+#[derive(ViolationMetadata)]
+pub(crate) struct PotentialIndexError;
 
 impl Violation for PotentialIndexError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expression is likely to raise `IndexError`")
+        "Expression is likely to raise `IndexError`".to_string()
     }
 }
 

@@ -1,10 +1,11 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::Locator;
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -138,13 +139,19 @@ impl Context {
 ///     "baz": 2,
 /// }
 /// ```
-#[violation]
-pub struct MissingTrailingComma;
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent use of trailing commas, making the rule redundant.
+///
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTrailingComma;
 
 impl AlwaysFixableViolation for MissingTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing comma missing")
+        "Trailing comma missing".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -183,13 +190,13 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 ///
 /// foo = (json.dumps({"bar": 1}),)
 /// ```
-#[violation]
-pub struct TrailingCommaOnBareTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct TrailingCommaOnBareTuple;
 
 impl Violation for TrailingCommaOnBareTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing comma on bare tuple prohibited")
+        "Trailing comma on bare tuple prohibited".to_string()
     }
 }
 
@@ -209,13 +216,19 @@ impl Violation for TrailingCommaOnBareTuple {
 /// ```python
 /// foo = (1, 2, 3)
 /// ```
-#[violation]
-pub struct ProhibitedTrailingComma;
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent use of trailing commas, making the rule redundant.
+///
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
+#[derive(ViolationMetadata)]
+pub(crate) struct ProhibitedTrailingComma;
 
 impl AlwaysFixableViolation for ProhibitedTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing comma prohibited")
+        "Trailing comma prohibited".to_string()
     }
 
     fn fix_title(&self) -> String {

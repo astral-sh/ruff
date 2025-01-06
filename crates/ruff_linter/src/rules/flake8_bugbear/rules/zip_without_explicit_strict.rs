@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -16,9 +16,9 @@ use crate::fix::edits::add_argument;
 /// resulting iterator will be silently truncated to the length of the shortest
 /// iterable. This can lead to subtle bugs.
 ///
-/// Use the `strict` parameter to raise a `ValueError` if the iterables are of
-/// non-uniform length. If the iterables are intentionally different lengths, the
-/// parameter should be explicitly set to `False`.
+/// Pass `strict=True` to raise a `ValueError` if the iterables are of
+/// non-uniform length. Alternatively, if the iterables are deliberately of
+/// different lengths, pass `strict=False` to make the intention explicit.
 ///
 /// ## Example
 /// ```python
@@ -37,17 +37,17 @@ use crate::fix::edits::add_argument;
 ///
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
-#[violation]
-pub struct ZipWithoutExplicitStrict;
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`zip()` without an explicit `strict=` parameter")
+        "`zip()` without an explicit `strict=` parameter".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Add explicit `strict=False`".to_string()
+        "Add explicit value for parameter `strict=`".to_string()
     }
 }
 
@@ -61,7 +61,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
             .arguments
             .args
             .iter()
-            .any(|arg| is_infinite_iterator(arg, semantic))
+            .any(|arg| is_infinite_iterable(arg, semantic))
     {
         checker.diagnostics.push(
             Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
@@ -89,7 +89,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
 
 /// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
 /// `itertools.cycle` or similar).
-fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
@@ -116,7 +116,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
                     }
 
                     // Ex) `iterools.repeat(1, times=None)`
-                    for keyword in &**keywords {
+                    for keyword in keywords {
                         if keyword.arg.as_ref().is_some_and(|name| name == "times") {
                             if keyword.value.is_none_literal_expr() {
                                 return true;

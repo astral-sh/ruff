@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -21,13 +21,13 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
-#[violation]
-pub struct ExecBuiltin;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExecBuiltin;
 
 impl Violation for ExecBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `exec` detected")
+        "Use of `exec` detected".to_string()
     }
 }
 

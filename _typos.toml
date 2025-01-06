@@ -1,6 +1,11 @@
 [files]
 # https://github.com/crate-ci/typos/issues/868
-extend-exclude = ["crates/red_knot_python_semantic/vendor/**/*", "**/resources/**/*", "**/snapshots/**/*"]
+extend-exclude = [
+  "crates/red_knot_vendored/vendor/**/*",
+  "**/resources/**/*",
+  "**/snapshots/**/*",
+  "crates/red_knot_workspace/src/workspace/pyproject/package_name.rs"
+]
 
 [default.extend-words]
 "arange" = "arange"  # e.g. `numpy.arange`
@@ -8,10 +13,11 @@ hel = "hel"
 whos = "whos"
 spawnve = "spawnve"
 ned = "ned"
-pn = "pn"  # `import panel as pd` is a thing
+pn = "pn"  # `import panel as pn` is a thing
 poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
+Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
 
 [default]
 extend-ignore-re = [

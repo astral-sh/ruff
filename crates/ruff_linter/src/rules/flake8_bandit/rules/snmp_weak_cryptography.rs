@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -28,15 +28,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
-#[violation]
-pub struct SnmpWeakCryptography;
+#[derive(ViolationMetadata)]
+pub(crate) struct SnmpWeakCryptography;
 
 impl Violation for SnmpWeakCryptography {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
-        )
+        "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+            .to_string()
     }
 }
 

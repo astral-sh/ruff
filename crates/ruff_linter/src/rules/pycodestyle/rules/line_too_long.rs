@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
@@ -12,8 +12,8 @@ use crate::settings::LinterSettings;
 /// ## Why is this bad?
 /// Overlong lines can hurt readability. [PEP 8], for example, recommends
 /// limiting lines to 79 characters. By default, this rule enforces a limit
-/// of 88 characters for compatibility with Black, though that limit is
-/// configurable via the [`line-length`] setting.
+/// of 88 characters for compatibility with Black and the Ruff formatter,
+/// though that limit is configurable via the [`line-length`] setting.
 ///
 /// In the interest of pragmatism, this rule makes a few exceptions when
 /// determining whether a line is overlong. Namely, it:
@@ -68,8 +68,8 @@ use crate::settings::LinterSettings;
 /// - `lint.pycodestyle.max-line-length`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-#[violation]
-pub struct LineTooLong(usize, usize);
+#[derive(ViolationMetadata)]
+pub(crate) struct LineTooLong(usize, usize);
 
 impl Violation for LineTooLong {
     #[derive_message_formats]

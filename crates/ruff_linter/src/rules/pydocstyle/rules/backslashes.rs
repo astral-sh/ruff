@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,19 +41,19 @@ use crate::docstrings::Docstring;
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
-#[violation]
-pub struct EscapeSequenceInDocstring;
+#[derive(ViolationMetadata)]
+pub(crate) struct EscapeSequenceInDocstring;
 
 impl Violation for EscapeSequenceInDocstring {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Use `r"""` if any backslashes in a docstring"#)
+        r#"Use `r"""` if any backslashes in a docstring"#.to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(r#"Add `r` prefix"#))
+        Some(r#"Add `r` prefix"#.to_string())
     }
 }
 

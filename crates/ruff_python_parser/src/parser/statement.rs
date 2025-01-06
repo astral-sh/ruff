@@ -411,31 +411,44 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Raise);
 
-        let exc = if self.at(TokenKind::Newline) {
-            None
-        } else {
-            // test_err raise_stmt_invalid_exc
-            // raise *x
-            // raise yield x
-            // raise x := 1
-            let exc = self.parse_expression_list(ExpressionContext::default());
-
-            if let Some(ast::ExprTuple {
-                parenthesized: false,
-                ..
-            }) = exc.as_tuple_expr()
-            {
-                // test_err raise_stmt_unparenthesized_tuple_exc
-                // raise x,
-                // raise x, y
-                // raise x, y from z
-                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &exc);
+        let exc = match self.current_token_kind() {
+            TokenKind::Newline => None,
+            TokenKind::From => {
+                // test_err raise_stmt_from_without_exc
+                // raise from exc
+                // raise from None
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Exception missing in `raise` statement with cause".to_string(),
+                    ),
+                    self.current_token_range(),
+                );
+                None
             }
+            _ => {
+                // test_err raise_stmt_invalid_exc
+                // raise *x
+                // raise yield x
+                // raise x := 1
+                let exc = self.parse_expression_list(ExpressionContext::default());
 
-            Some(Box::new(exc.expr))
+                if let Some(ast::ExprTuple {
+                    parenthesized: false,
+                    ..
+                }) = exc.as_tuple_expr()
+                {
+                    // test_err raise_stmt_unparenthesized_tuple_exc
+                    // raise x,
+                    // raise x, y
+                    // raise x, y from z
+                    self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &exc);
+                }
+
+                Some(Box::new(exc.expr))
+            }
         };
 
-        let cause = (exc.is_some() && self.eat(TokenKind::From)).then(|| {
+        let cause = self.eat(TokenKind::From).then(|| {
             // test_err raise_stmt_invalid_cause
             // raise x from *y
             // raise x from yield y
@@ -1332,14 +1345,12 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Try);
         self.expect(TokenKind::Colon);
 
-        let mut is_star = false;
+        let mut is_star: Option<bool> = None;
 
         let try_body = self.parse_body(Clause::Try);
 
         let has_except = self.at(TokenKind::Except);
 
-        // TODO(dhruvmanila): Raise syntax error if there are both 'except' and 'except*'
-        // on the same 'try'
         // test_err try_stmt_mixed_except_kind
         // try:
         //     pass
@@ -1353,11 +1364,36 @@ impl<'src> Parser<'src> {
         //     pass
         // except:
         //     pass
+        // try:
+        //     pass
+        // except:
+        //     pass
+        // except:
+        //     pass
+        // except* ExceptionGroup:
+        //     pass
+        // except* ExceptionGroup:
+        //     pass
+        let mut mixed_except_ranges = Vec::new();
         let handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
-            is_star |= kind.is_star();
+            if is_star.is_none() {
+                is_star = Some(kind.is_star());
+            } else if is_star != Some(kind.is_star()) {
+                mixed_except_ranges.push(handler.range());
+            }
             handler
         });
+        // Empty handler has `is_star` false.
+        let is_star = is_star.unwrap_or_default();
+        for handler_err_range in mixed_except_ranges {
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Cannot have both 'except' and 'except*' on the same 'try'".to_string(),
+                ),
+                handler_err_range,
+            );
+        }
 
         // test_err try_stmt_misspelled_except
         // try:
@@ -2140,7 +2176,7 @@ impl<'src> Parser<'src> {
     /// it's used in the context of a subscript expression or as a list expression:
     ///
     /// ```python
-    /// # Subcript expression; `match` is an identifier
+    /// # Subscript expression; `match` is an identifier
     /// match[x]
     ///
     /// # List expression; `match` is a keyword

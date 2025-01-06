@@ -1082,4 +1082,38 @@ unnecessary_dunder_call.py:92:16: PLC2801 Unnecessary dunder call to `__getattri
    |
    = help: Access attribute directly or use getattr built-in function
 
+unnecessary_dunder_call.py:104:1: PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
+    |
+102 | blah = dict[{"a": 1}.__delitem__("a")]  # OK
+103 | 
+104 | "abc".__contains__("a")
+    | ^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+105 | 
+106 | # https://github.com/astral-sh/ruff/issues/14597
+    |
+    = help: Use `in` operator
 
+ℹ Unsafe fix
+101 101 | 
+102 102 | blah = dict[{"a": 1}.__delitem__("a")]  # OK
+103 103 | 
+104     |-"abc".__contains__("a")
+    104 |+"a" in "abc"
+105 105 | 
+106 106 | # https://github.com/astral-sh/ruff/issues/14597
+107 107 | assert "abc".__str__() == "abc"
+
+unnecessary_dunder_call.py:107:8: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
+    |
+106 | # https://github.com/astral-sh/ruff/issues/14597
+107 | assert "abc".__str__() == "abc"
+    |        ^^^^^^^^^^^^^^^ PLC2801
+    |
+    = help: Use `str()` builtin
+
+ℹ Unsafe fix
+104 104 | "abc".__contains__("a")
+105 105 | 
+106 106 | # https://github.com/astral-sh/ruff/issues/14597
+107     |-assert "abc".__str__() == "abc"
+    107 |+assert str("abc") == "abc"

@@ -14,17 +14,17 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-pub use sarif::SarifEmitter;
-pub use text::TextEmitter;
-
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
-use ruff_source_file::{Locator, SourceFile, SourceLocation};
+use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+pub use sarif::SarifEmitter;
+pub use text::TextEmitter;
 
 use crate::logging::DisplayParseErrorType;
 use crate::registry::{AsRule, Rule};
+use crate::Locator;
 
 mod azure;
 mod diff;
@@ -310,10 +310,11 @@ mod tests {
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{parse_unchecked, Mode};
-    use ruff_source_file::{Locator, OneIndexed, SourceFileBuilder};
+    use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::message::{Emitter, EmitterContext, Message};
+    use crate::Locator;
 
     pub(super) fn create_syntax_error_messages() -> Vec<Message> {
         let source = r"from os import

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -34,15 +34,15 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
 /// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
-#[violation]
-pub struct RaiseNotImplemented;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseNotImplemented;
 
 impl Violation for RaiseNotImplemented {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`raise NotImplemented` should be `raise NotImplementedError`")
+        "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

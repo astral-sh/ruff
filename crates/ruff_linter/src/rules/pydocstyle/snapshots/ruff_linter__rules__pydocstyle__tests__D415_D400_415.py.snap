@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
+---
+D400_415.py:11:5: D415 First line should end with a period, question mark, or exclamation point
+   |
+10 | def f():
+11 |     """Here's a line ending in a colon:"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D415
+12 |     ...
+   |
+   = help: Add closing punctuation
+
+D400_415.py:15:5: D415 First line should end with a period, question mark, or exclamation point
+   |
+14 | def f():
+15 |     """Here's a line ending in a semi colon;"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D415
+16 |     ...
+   |
+   = help: Add closing punctuation
+
+D400_415.py:19:5: D415 [*] First line should end with a period, question mark, or exclamation point
+   |
+18 | def f():
+19 |     """Here's a line ending with a whitespace  """
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D415
+20 |     ...
+   |
+   = help: Add closing punctuation
+
+ℹ Unsafe fix
+16 16 |     ...
+17 17 | 
+18 18 | def f():
+19    |-    """Here's a line ending with a whitespace  """
+   19 |+    """Here's a line ending with a whitespace.  """
+20 20 |     ...

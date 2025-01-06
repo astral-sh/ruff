@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
@@ -7,6 +7,7 @@ use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
 };
 use ruff_python_codegen::Generator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -36,8 +37,8 @@ use crate::line_width::LineWidthBuilder;
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
-#[violation]
-pub struct ReimplementedBuiltin {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }
 
@@ -72,8 +73,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
     // - `for` loop followed by `return True` or `return False`.
     let Some(terminal) = match_else_return(stmt).or_else(|| {
         let parent = checker.semantic().current_statement_parent()?;
-        let suite = traversal::suite(stmt, parent)?;
-        let sibling = traversal::next_sibling(stmt, suite)?;
+        let sibling = traversal::suite(stmt, parent)?.next_sibling()?;
         match_sibling_return(stmt, sibling)
     }) else {
         return;

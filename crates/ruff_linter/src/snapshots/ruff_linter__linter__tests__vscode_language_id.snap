@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/linter.rs
+snapshot_kind: text
 ---
 vscode_language_id.ipynb:cell 3:1:8: F401 [*] `os` imported but unused
   |

@@ -2,6 +2,13 @@ use std::borrow::Cow;
 
 use rustc_hash::FxHashMap;
 
+use crate::{
+    edit::{Replacement, ToRangeExt},
+    resolve::is_document_excluded,
+    session::DocumentQuery,
+    PositionEncoding,
+};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
     packaging::detect_package_root,
@@ -9,13 +16,6 @@ use ruff_linter::{
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-
-use crate::{
-    edit::{Replacement, ToRangeExt},
-    resolve::is_document_excluded,
-    session::DocumentQuery,
-    PositionEncoding,
-};
 
 /// A simultaneous fix made across a single text document or among an arbitrary
 /// number of notebook cells.
@@ -38,6 +38,7 @@ pub(crate) fn fix_all(
             file_resolver_settings,
             Some(linter_settings),
             None,
+            query.text_document_language_id(),
         ) {
             return Ok(Fixes::default());
         }
@@ -48,6 +49,7 @@ pub(crate) fn fix_all(
                 .expect("a path to a document should have a parent path"),
             &linter_settings.namespace_packages,
         )
+        .map(PackageRoot::root)
     } else {
         None
     };

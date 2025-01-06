@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
   |
@@ -99,5 +100,3 @@ F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, te
 15    |-  'test1': '',16    |-  'test2': '',
    15 |+  
 17 16 | }
-
-

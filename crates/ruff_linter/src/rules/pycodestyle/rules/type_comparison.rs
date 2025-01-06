@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -48,24 +48,23 @@ use crate::checkers::ast::Checker;
 /// if isinstance(obj, int):
 ///     pass
 /// ```
-#[violation]
-pub struct TypeComparison;
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeComparison;
 
 impl Violation for TypeComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks"
-        )
+        "Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks"
+            .to_string()
     }
 }
 
 /// E721
 pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
-    for (left, right) in std::iter::once(compare.left.as_ref())
-        .chain(compare.comparators.iter())
+    for (left, right) in std::iter::once(&*compare.left)
+        .chain(&compare.comparators)
         .tuple_windows()
-        .zip(compare.ops.iter())
+        .zip(&compare.ops)
         .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
         .map(|((left, right), _)| (left, right))
     {

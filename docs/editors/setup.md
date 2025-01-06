@@ -8,11 +8,13 @@ regardless of editor, there are several settings which have changed or are no lo
 the [migration guide](./migration.md) for more.
 
 !!! note
+
     The setup instructions provided below are on a best-effort basis. If you encounter any issues
     while setting up the Ruff in an editor, please [open an issue](https://github.com/astral-sh/ruff/issues/new)
     for assistance and help in improving this documentation.
 
 !!! tip
+
     Regardless of the editor, it is recommended to disable the older language server
     ([`ruff-lsp`](https://github.com/astral-sh/ruff-lsp)) to prevent any conflicts.
 
@@ -45,6 +47,7 @@ require('lspconfig').ruff.setup({
 ```
 
 !!! note
+
     If the installed version of `nvim-lspconfig` includes the changes from
     [neovim/nvim-lspconfig@`70d1c2c`](https://github.com/neovim/nvim-lspconfig/commit/70d1c2c31a88af4b36019dc1551be16bffb8f9db),
     you will need to use Ruff version `0.5.3` or later.
@@ -150,11 +153,14 @@ extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
 <summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Vim or Neovim.</summary>
 
 ```vim
-" Linter
+" Linters
 let g:ale_linters = { "python": ["ruff"] }
-" Formatter
-let g:ale_fixers = { "python": ["ruff-format"] }
+" Fixers
+let g:ale_fixers = { "python": ["ruff", "ruff_format"] }
 ```
+
+For the fixers, `ruff` will run `ruff check --fix` (to fix all auto-fixable problems) whereas
+`ruff_format` will run `ruff format`.
 
 </details>
 
@@ -239,6 +245,7 @@ language-servers = ["ruff", "pylsp"]
 ```
 
 !!! note
+
     Support for multiple language servers for a language is only available in Helix version
     [`23.10`](https://github.com/helix-editor/helix/blob/master/CHANGELOG.md#2310-2023-10-24) and later.
 
@@ -284,6 +291,7 @@ logLevel = "debug"
 You can also divert Ruff's logs to a separate file with the [`logFile`](./settings.md#logfile) setting.
 
 !!! note
+
     Setting `RUFF_TRACE=verbose` does not enable Helix's verbose mode by itself. You'll need to run
     Helix with `-v` for verbose logging.
 
@@ -310,6 +318,7 @@ See [LSP Client documentation](https://docs.kde.org/stable5/en/kate/kate/kate-ap
 on how to configure the server from there.
 
 !!! important
+
     Kate's LSP Client plugin does not support multiple servers for the same language. As a
     workaround, you can use the [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server)
     along with the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff) plugin to
@@ -330,7 +339,7 @@ Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycha
 in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
 add a new tool with the following configuration:
 
-![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
+![Install Ruff as an External Tool](https://github.com/user-attachments/assets/2b7af3e4-8196-4c64-a721-5bc3d7564a72)
 
 Ruff should then appear as a runnable action:
 
@@ -428,6 +437,7 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
 ```
 
 !!! note
+
     Support for multiple formatters for a given language is only available in Zed version
     `0.146.0` and later.
 
@@ -435,6 +445,7 @@ You can configure Ruff to format Python code on-save by registering the Ruff for
 and enabling the [`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) setting:
 
 === "Zed 0.146.0+"
+
     ```json
     {
       "languages": {
@@ -457,6 +468,7 @@ You can configure Ruff to fix lint violations and/or organize imports on-save by
 `source.fixAll.ruff` and `source.organizeImports.ruff` code actions respectively:
 
 === "Zed 0.146.0+"
+
     ```json
     {
       "languages": {
@@ -482,12 +494,14 @@ Taken together, you can configure Ruff to format, fix, and organize imports on-s
 following `settings.json`:
 
 !!! note
+
     For this configuration, it is important to use the correct order of the code action and
     formatter language server settings. The code actions should be defined before the formatter to
     ensure that the formatter takes care of any remaining style issues after the code actions have
     been applied.
 
 === "Zed 0.146.0+"
+
     ```json
     {
       "languages": {

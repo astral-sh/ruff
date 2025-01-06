@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -29,13 +29,14 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// def foo(arg: int = ...) -> None: ...
 /// ```
-#[violation]
-pub struct NumericLiteralTooLong;
+#[derive(ViolationMetadata)]
+pub(crate) struct NumericLiteralTooLong;
 
 impl AlwaysFixableViolation for NumericLiteralTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Numeric literals with a string representation longer than ten characters are not permitted")
+        "Numeric literals with a string representation longer than ten characters are not permitted"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {

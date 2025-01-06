@@ -5,6 +5,7 @@ info:
   args:
     - rule
     - F401
+snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -85,6 +86,7 @@ else:
 
 ## Options
 - `lint.ignore-init-module-imports`
+- `lint.pyflakes.allowed-unused-imports`
 
 ## References
 - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)

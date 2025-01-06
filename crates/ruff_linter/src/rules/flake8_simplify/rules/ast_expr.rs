@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::Modules;
 
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
-#[violation]
-pub struct UncapitalizedEnvironmentVariables {
+#[derive(ViolationMetadata)]
+pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }
@@ -51,7 +51,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use capitalized environment variable `{expected}` instead of `{actual}`")
         } else {
-            format!("Use capitalized environment variable")
+            "Use capitalized environment variable".to_string()
         }
     }
 
@@ -86,8 +86,8 @@ impl Violation for UncapitalizedEnvironmentVariables {
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
-#[violation]
-pub struct DictGetWithNoneDefault {
+#[derive(ViolationMetadata)]
+pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }
@@ -99,7 +99,7 @@ impl AlwaysFixableViolation for DictGetWithNoneDefault {
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
-            format!("Use `dict.get()` without default value")
+            "Use `dict.get()` without default value".to_string()
         }
     }
 

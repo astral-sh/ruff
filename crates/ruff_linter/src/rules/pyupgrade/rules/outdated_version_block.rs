@@ -3,11 +3,12 @@ use std::cmp::Ordering;
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -45,8 +46,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct OutdatedVersionBlock {
+#[derive(ViolationMetadata)]
+pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
 }
 
@@ -55,18 +56,16 @@ impl Violation for OutdatedVersionBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
+        match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
-                format!("Version block is outdated for minimum Python version")
+                "Version block is outdated for minimum Python version".to_string()
             }
-            Reason::Invalid => format!("Version specifier is invalid"),
+            Reason::Invalid => "Version specifier is invalid".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
+        match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
                 Some("Remove outdated version block".to_string())
             }
@@ -299,7 +298,7 @@ fn fix_always_false_branch(
             }) => {
                 let start = body.first()?;
                 let end = body.last()?;
-                if indentation(checker.locator(), start).is_none() {
+                if indentation(checker.source(), start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
                     Some(Fix::unsafe_edit(Edit::range_replacement(
                         checker
@@ -309,7 +308,7 @@ fn fix_always_false_branch(
                         stmt_if.range(),
                     )))
                 } else {
-                    indentation(checker.locator(), stmt_if)
+                    indentation(checker.source(), stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
                                 TextRange::new(
@@ -377,7 +376,7 @@ fn fix_always_true_branch(
             // the rest.
             let start = branch.body.first()?;
             let end = branch.body.last()?;
-            if indentation(checker.locator(), start).is_none() {
+            if indentation(checker.source(), start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::unsafe_edit(Edit::range_replacement(
                     checker
@@ -387,7 +386,7 @@ fn fix_always_true_branch(
                     stmt_if.range,
                 )))
             } else {
-                indentation(checker.locator(), &stmt_if)
+                indentation(checker.source(), &stmt_if)
                     .and_then(|indentation| {
                         adjust_indentation(
                             TextRange::new(checker.locator().line_start(start.start()), end.end()),

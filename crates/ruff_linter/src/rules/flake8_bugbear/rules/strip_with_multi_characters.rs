@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -44,13 +44,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
-#[violation]
-pub struct StripWithMultiCharacters;
+#[derive(ViolationMetadata)]
+pub(crate) struct StripWithMultiCharacters;
 
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `.strip()` with multi-character strings is misleading")
+        "Using `.strip()` with multi-character strings is misleading".to_string()
     }
 }
 

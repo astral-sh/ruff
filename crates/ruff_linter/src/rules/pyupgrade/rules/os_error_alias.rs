@@ -3,7 +3,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
@@ -34,15 +34,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
-#[violation]
-pub struct OSErrorAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct OSErrorAlias {
     name: Option<String>,
 }
 
 impl AlwaysFixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace aliased errors with `OSError`")
+        "Replace aliased errors with `OSError`".to_string()
     }
 
     fn fix_title(&self) -> String {

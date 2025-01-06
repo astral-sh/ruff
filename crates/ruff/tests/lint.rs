@@ -8,6 +8,7 @@ use std::process::Command;
 use std::str;
 
 use anyhow::Result;
+use assert_fs::fixture::{ChildPath, FileTouch, PathChild};
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
@@ -41,7 +42,7 @@ inline-quotes = "single"
             .arg(&ruff_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -55,7 +56,7 @@ inline-quotes = "single"
         warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
           - 'extend-select' -> 'lint.extend-select'
           - 'flake8-quotes' -> 'lint.flake8-quotes'
-        "###);
+        ");
     });
 
     Ok(())
@@ -84,7 +85,7 @@ inline-quotes = "single"
         .arg("--config")
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -95,7 +96,7 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     });
 
     Ok(())
@@ -124,7 +125,7 @@ inline-quotes = "single"
         .arg("--config")
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -137,7 +138,7 @@ inline-quotes = "single"
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-    "###);
+    ");
     });
 
     Ok(())
@@ -170,7 +171,7 @@ inline-quotes = "single"
         .arg("--config")
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -183,7 +184,7 @@ inline-quotes = "single"
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'flake8-quotes' -> 'lint.flake8-quotes'
-    "###);
+    ");
     });
 
     Ok(())
@@ -251,7 +252,7 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
         .arg(test_path.file_name().unwrap())
         // Lint all other files in the directory, should respect the `exclude` and `lint.exclude` options
-        .arg("."), @r###"
+        .arg("."), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -264,7 +265,7 @@ OTHER = "OTHER"
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-    "###);
+    ");
     });
 
     Ok(())
@@ -301,7 +302,7 @@ from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -313,7 +314,7 @@ if __name__ == "__main__":
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-    "###);
+    ");
     });
 
     Ok(())
@@ -348,7 +349,7 @@ max-line-length = 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
 # longer than 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -359,7 +360,7 @@ _ = "---------------------------------------------------------------------------
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'select' -> 'lint.select'
       - 'pycodestyle' -> 'lint.pycodestyle'
-    "###);
+    ");
     });
 
     Ok(())
@@ -396,7 +397,7 @@ from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -407,7 +408,7 @@ if __name__ == "__main__":
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-    "###);
+    ");
     });
 
     Ok(())
@@ -444,7 +445,7 @@ from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -455,7 +456,7 @@ if __name__ == "__main__":
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-    "###);
+    ");
     });
 
     Ok(())
@@ -492,7 +493,7 @@ ignore = ["D203", "D212"]
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(sub_dir)
         .args(STDIN_BASE_OPTIONS)
-        , @r###"
+        , @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -500,7 +501,7 @@ ignore = ["D203", "D212"]
 
     ----- stderr -----
     warning: No Python files found under the given path(s)
-    "###);
+    ");
     });
 
     Ok(())
@@ -510,7 +511,7 @@ ignore = ["D203", "D212"]
 fn nonexistent_config_file() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo.toml", "."]), @r###"
+        .args(["--config", "foo.toml", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -526,14 +527,14 @@ fn nonexistent_config_file() {
     The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo = bar", "."]), @r###"
+        .args(["--config", "foo = bar", "."]), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -555,7 +556,7 @@ fn config_override_rejected_if_invalid_toml() {
     expected `"`, `'`
 
     For more information, try '--help'.
-    "###);
+    "#);
 }
 
 #[test]
@@ -574,19 +575,18 @@ fn too_many_config_files() -> Result<()> {
         .arg(&ruff_dot_toml)
         .arg("--config")
         .arg(&ruff2_dot_toml)
-        .arg("."), @r###"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+        .arg("."), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: You cannot specify more than one configuration file on the command line.
+    ----- stderr -----
+    ruff failed
+      Cause: You cannot specify more than one configuration file on the command line.
 
-          tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
-               For more information, try `--help`.
-
-        "###);
+      tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+           For more information, try `--help`.
+    ");
     });
     Ok(())
 }
@@ -595,7 +595,7 @@ fn too_many_config_files() -> Result<()> {
 fn extend_passed_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "extend = 'foo.toml'", "."]), @r###"
+        .args(["--config", "extend = 'foo.toml'", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -606,7 +606,7 @@ fn extend_passed_via_config_argument() {
       tip: Cannot include `extend` in a --config flag value
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -622,20 +622,19 @@ fn config_file_and_isolated() -> Result<()> {
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--isolated")
-        .arg("."), @r###"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+        .arg("."), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+    ----- stderr -----
+    ruff failed
+      Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
 
-          tip: You cannot specify a configuration file and also specify `--isolated`,
-               as `--isolated` causes ruff to ignore all configuration files.
-               For more information, try `--help`.
-
-        "###);
+      tip: You cannot specify a configuration file and also specify `--isolated`,
+           as `--isolated` causes ruff to ignore all configuration files.
+           For more information, try `--help`.
+    ");
     });
     Ok(())
 }
@@ -680,7 +679,7 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
         .args(["--config", "lint.extend-select=['E501', 'F841']"])
         .args(["--config", "lint.isort.combine-as-imports = false"])
         .arg("-")
-        .pass_stdin(fixture), @r###"
+        .pass_stdin(fixture), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -690,7 +689,7 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -699,7 +698,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
-        @r###"
+        @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -716,7 +715,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     Unknown rule selector: `F481`
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -726,7 +725,7 @@ fn each_toml_option_requires_a_new_flag_1() {
         // commas can't be used to delimit different config overrides;
         // you need a new --config flag for each override
         .args([".", "--config", "extend-select=['F841'], line-length=90"]),
-        @r###"
+        @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -747,7 +746,7 @@ fn each_toml_option_requires_a_new_flag_1() {
     expected newline, `#`
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -757,7 +756,7 @@ fn each_toml_option_requires_a_new_flag_2() {
         // spaces *also* can't be used to delimit different config overrides;
         // you need a new --config flag for each override
         .args([".", "--config", "extend-select=['F841'] line-length=90"]),
-        @r###"
+        @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -778,7 +777,91 @@ fn each_toml_option_requires_a_new_flag_2() {
     expected newline, `#`
 
     For more information, try '--help'.
-    "###);
+    ");
+}
+
+#[test]
+fn value_given_to_table_key_is_not_inline_table_1() {
+    // https://github.com/astral-sh/ruff/issues/13995
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args([".", "--config", r#"lint.flake8-pytest-style="csv""#]),
+        @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'lint.flake8-pytest-style="csv"' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    `lint.flake8-pytest-style` is a table of configuration options.
+    Did you want to override one of the table's subkeys?
+
+    Possible choices:
+
+    - `lint.flake8-pytest-style.fixture-parentheses`
+    - `lint.flake8-pytest-style.parametrize-names-type`
+    - `lint.flake8-pytest-style.parametrize-values-type`
+    - `lint.flake8-pytest-style.parametrize-values-row-type`
+    - `lint.flake8-pytest-style.raises-require-match-for`
+    - `lint.flake8-pytest-style.raises-extend-require-match-for`
+    - `lint.flake8-pytest-style.mark-parentheses`
+
+    For more information, try '--help'.
+    "#);
+}
+
+#[test]
+fn value_given_to_table_key_is_not_inline_table_2() {
+    // https://github.com/astral-sh/ruff/issues/13995
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args([".", "--config", r#"lint=123"#]),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'lint=123' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    `lint` is a table of configuration options.
+    Did you want to override one of the table's subkeys?
+
+    Possible choices:
+
+    - `lint.allowed-confusables`
+    - `lint.dummy-variable-rgx`
+    - `lint.extend-ignore`
+    - `lint.extend-select`
+    - `lint.extend-fixable`
+    - `lint.external`
+    - `lint.fixable`
+    - `lint.ignore`
+    - `lint.extend-safe-fixes`
+    - `lint.extend-unsafe-fixes`
+    - `lint.ignore-init-module-imports`
+    - `lint.logger-objects`
+    - `lint.select`
+    - `lint.explicit-preview-rules`
+    - `lint.task-tags`
+    - `lint.typing-modules`
+    - `lint.unfixable`
+    - `lint.per-file-ignores`
+    - `lint.extend-per-file-ignores`
+    - `lint.exclude`
+    - `lint.preview`
+
+    For more information, try '--help'.
+    ");
 }
 
 #[test]
@@ -805,7 +888,7 @@ select=["E501"]
         .arg(&ruff_toml)
         .args(["--config", "line-length=110"])
         .arg("-")
-        .pass_stdin(fixture), @r###"
+        .pass_stdin(fixture), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -813,7 +896,7 @@ select=["E501"]
     Found 1 error.
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -830,14 +913,14 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
         .args(["--config", "lint.per-file-ignores = {'generated.py' = ['N801']}"])
         .args(["--stdin-filename", "generated.py"])
         .arg("-")
-        .pass_stdin(fixture), @r###"
+        .pass_stdin(fixture), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -847,7 +930,7 @@ fn deprecated_config_option_overridden_via_cli() {
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -857,7 +940,7 @@ fn deprecated_config_option_overridden_via_cli() {
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
       - 'select' -> 'lint.select'
-    "###);
+    ");
 }
 
 #[test]
@@ -921,7 +1004,7 @@ include = ["*.ipy"]
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--extension", "ipy:ipynb"])
-        .arg("."), @r###"
+        .arg("."), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -930,7 +1013,7 @@ include = ["*.ipy"]
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     });
 
     Ok(())
@@ -959,7 +1042,7 @@ external = ["AAA"]
         .pass_stdin(r#"
 # flake8: noqa: AAA101, BBB102
 import os
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -969,7 +1052,7 @@ import os
 
     ----- stderr -----
     warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
-    "###);
+    ");
     });
 
     Ok(())
@@ -998,7 +1081,7 @@ required-version = "0.1.0"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1006,7 +1089,7 @@ import os
     ----- stderr -----
     ruff failed
       Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
-    "###);
+    ");
     });
 
     Ok(())
@@ -1037,7 +1120,7 @@ required-version = "{version}"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1046,7 +1129,7 @@ import os
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     });
 
     Ok(())
@@ -1077,7 +1160,7 @@ required-version = ">{version}"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1085,7 +1168,7 @@ import os
     ----- stderr -----
     ruff failed
       Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
-    "###);
+    ");
     });
 
     Ok(())
@@ -1114,7 +1197,7 @@ required-version = ">=0.1.0"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1123,7 +1206,7 @@ import os
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     });
 
     Ok(())
@@ -1155,7 +1238,7 @@ import os
 
 def func():
     x = 1
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1164,7 +1247,7 @@ def func():
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -1193,7 +1276,7 @@ fn negated_per_file_ignores() -> Result<()> {
         .arg("--select")
         .arg("RUF901")
         .current_dir(&tempdir)
-        , @r###"
+        , @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1202,7 +1285,7 @@ fn negated_per_file_ignores() -> Result<()> {
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -1224,10 +1307,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
     let ignored = tempdir.path().join("ignored.py");
     fs::write(ignored, "")?;
 
-    insta::with_settings!({filters => vec![
-        // Replace windows paths
-        (r"\\", "/"),
-    ]}, {
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
@@ -1235,7 +1315,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
             .arg("--select")
             .arg("RUF901")
             .current_dir(&tempdir)
-            , @r###"
+            , @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1244,7 +1324,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
     Ok(())
 }
@@ -1274,14 +1354,14 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
         .arg("--select")
         .arg("RUF901")
         .current_dir(&tempdir)
-        , @r###"
+        , @r"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -1313,7 +1393,7 @@ import os  # F401
 def function():
     import os  # F811
     print(os.name)
-"#), @r###"
+"#), @r"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -1325,7 +1405,7 @@ def function():
 
         ----- stderr -----
         Found 1 error (1 fixed, 0 remaining).
-        "###);
+        ");
     });
 
     Ok(())
@@ -1365,22 +1445,22 @@ def first_square():
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r###"
+"#), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Added 1 noqa directive.
-    "###);
+    ");
     });
 
     let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r###"
+    insta::assert_snapshot!(test_code, @r"
     def first_square():
         return [x * x for x in range(20)][0]  # noqa: RUF015
-    "###);
+    ");
 
     Ok(())
 }
@@ -1420,23 +1500,22 @@ def unused(x):
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r###"
+"#), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Added 1 noqa directive.
-    "###);
+    ");
     });
 
     let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r###"
-
+    insta::assert_snapshot!(test_code, @r"
     def unused(x):  # noqa: ANN001, ANN201, D103
         pass
-    "###);
+    ");
 
     Ok(())
 }
@@ -1476,24 +1555,23 @@ import a
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r###"
+"#), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Added 1 noqa directive.
-    "###);
+    ");
     });
 
     let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r###"
-
+    insta::assert_snapshot!(test_code, @r"
     import z  # noqa: I001
     import c
     import a
-    "###);
+    ");
 
     Ok(())
 }
@@ -1533,23 +1611,22 @@ def unused(x):  # noqa: ANN001, ARG001, D103
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r###"
+"#), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Added 1 noqa directive.
-    "###);
+    ");
     });
 
     let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r###"
-
+    insta::assert_snapshot!(test_code, @r"
     def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
         pass
-    "###);
+    ");
 
     Ok(())
 }
@@ -1594,19 +1671,19 @@ print(
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r###"
+"#), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     Added 1 noqa directive.
-    "###);
+    ");
     });
 
     let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r###"
+    insta::assert_snapshot!(test_code, @r#"
     print(
         """First line
         second line
@@ -1614,7 +1691,59 @@ print(
           %s"""  # noqa: UP031
         % name
     )
-    "###);
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_exclude() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+exclude = ["excluded.py"]
+select = ["RUF015"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    let exclude_path = tempdir.path().join("excluded.py");
+
+    fs::write(
+        &exclude_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(tempdir.path())
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--add-noqa"]), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 noqa directive.
+        ");
+    });
 
     Ok(())
 }
@@ -1643,7 +1772,7 @@ select = ["UP006"]
             .arg(&ruff_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1652,7 +1781,7 @@ select = ["UP006"]
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
 
     let pyproject_toml = tempdir.path().join("pyproject.toml");
@@ -1675,14 +1804,14 @@ select = ["UP006"]
             .arg(&pyproject_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
         success: true
         exit_code: 0
         ----- stdout -----
         All checks passed!
 
         ----- stderr -----
-        "###);
+        ");
     });
 
     Ok(())
@@ -1712,7 +1841,7 @@ select = ["UP006"]
             .arg(&pyproject_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1721,7 +1850,7 @@ select = ["UP006"]
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
 
     Ok(())
@@ -1751,7 +1880,7 @@ select = ["UP006"]
             .arg(&pyproject_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1760,7 +1889,7 @@ select = ["UP006"]
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
 
     Ok(())
@@ -1790,7 +1919,7 @@ select = ["UP006"]
             .arg(&pyproject_toml)
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1799,7 +1928,7 @@ select = ["UP006"]
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
 
     Ok(())
@@ -1854,7 +1983,7 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
         .arg("--select")
         .arg("F401")
         .current_dir(&tempdir)
-        , @r###"
+        , @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1863,6 +1992,169 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
+    Ok(())
+}
+
+/// Verify that implicit namespace packages are detected even when they are nested.
+///
+/// See: <https://github.com/astral-sh/ruff/issues/13519>
+#[test]
+fn nested_implicit_namespace_package() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("foo").child("__init__.py").touch()?;
+    root.child("foo")
+        .child("bar")
+        .child("baz")
+        .child("__init__.py")
+        .touch()?;
+    root.child("foo")
+        .child("bar")
+        .child("baz")
+        .child("bop.py")
+        .touch()?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select")
+        .arg("INP")
+        .current_dir(&tempdir)
+        , @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--select")
+            .arg("INP")
+            .arg("--preview")
+            .current_dir(&tempdir)
+            , @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+        Found 1 error.
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"module.name" = "invalid.alias"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.aliases]
+          |  ^^^^
+        invalid value: string "invalid.alias", expected a Python identifier
+        "###);});
+    Ok(())
+}
+
+#[test]
+fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.extend-aliases]
+"module.name" = "__debug__"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.extend-aliases]
+          |  ^^^^
+        invalid value: string "__debug__", expected an assignable Python identifier
+        "###);});
+    Ok(())
+}
+
+#[test]
+fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"module..invalid" = "alias"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.aliases]
+          |  ^^^^
+        invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
+        "###);});
     Ok(())
 }

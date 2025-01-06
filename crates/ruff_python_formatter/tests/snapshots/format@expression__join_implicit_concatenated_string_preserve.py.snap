@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_preserve.py
+snapshot_kind: text
+---
+## Input
+```python
+a = "different '" 'quote "are fine"'  # join
+
+# More single quotes
+"one single'" "two 'single'" ' two "double"'
+
+# More double quotes
+'one double"' 'two "double"' " two 'single'"
+
+# Equal number of single and double quotes
+'two "double"' " two 'single'"
+
+# Already invalid Pre Python 312
+f"{'Hy "User"'}" f'{"Hy 'User'"}'
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Preserve
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = Py39
+source_type                = Python
+```
+
+```python
+a = "different 'quote \"are fine\""  # join
+
+# More single quotes
+"one single'two 'single' two \"double\""
+
+# More double quotes
+'one double"two "double" two \'single\''
+
+# Equal number of single and double quotes
+'two "double" two \'single\''
+
+# Already invalid Pre Python 312
+f"{'Hy "User"'}{"Hy 'User'"}"
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Preserve
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = Py312
+source_type                = Python
+```
+
+```python
+a = "different 'quote \"are fine\""  # join
+
+# More single quotes
+"one single'two 'single' two \"double\""
+
+# More double quotes
+'one double"two "double" two \'single\''
+
+# Equal number of single and double quotes
+'two "double" two \'single\''
+
+# Already invalid Pre Python 312
+f"{'Hy "User"'}{"Hy 'User'"}"
+```

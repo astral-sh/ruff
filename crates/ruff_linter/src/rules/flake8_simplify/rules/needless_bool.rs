@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
@@ -44,8 +44,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
-#[violation]
-pub struct NeedlessBool {
+#[derive(ViolationMetadata)]
+pub(crate) struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,
     negate: bool,
 }
@@ -56,24 +56,24 @@ impl Violation for NeedlessBool {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NeedlessBool { condition, negate } = self;
-
         if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Return the condition `{condition}` directly")
         } else if *negate {
-            format!("Return the negated condition directly")
+            "Return the negated condition directly".to_string()
         } else {
-            format!("Return the condition directly")
+            "Return the condition directly".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let NeedlessBool { condition, .. } = self;
-
-        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
-            Some(format!("Replace with `return {condition}`"))
-        } else {
-            Some(format!("Inline condition"))
-        }
+        Some(
+            if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
+                format!("Replace with `return {condition}`")
+            } else {
+                "Inline condition".to_string()
+            },
+        )
     }
 }
 
@@ -144,7 +144,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 .semantic()
                 .current_statement_parent()
                 .and_then(|parent| traversal::suite(stmt, parent))
-                .and_then(|suite| traversal::next_sibling(stmt, suite))
+                .and_then(|suite| suite.next_sibling())
             else {
                 return;
             };
@@ -200,7 +200,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     // Generate the replacement condition.
     let condition = if checker
         .comment_ranges()
-        .has_comments(&range, checker.locator())
+        .has_comments(&range, checker.source())
     {
         None
     } else {

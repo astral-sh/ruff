@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -27,13 +27,13 @@ use crate::checkers::ast::Checker;
 ///     async for number in [1, 2, 3, 4, 5]:
 ///         yield number
 /// ```
-#[violation]
-pub struct YieldFromInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct YieldFromInAsyncFunction;
 
 impl Violation for YieldFromInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`yield from` statement in async function; use `async for` instead")
+        "`yield from` statement in async function; use `async for` instead".to_string()
     }
 }
 

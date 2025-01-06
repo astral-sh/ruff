@@ -21,15 +21,18 @@ impl super::SyncNotificationHandler for DidOpen {
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {
-                    uri, text, version, ..
+                    uri,
+                    text,
+                    version,
+                    language_id,
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let document = TextDocument::new(text, version);
+        let document = TextDocument::new(text, version).with_language_id(&language_id);
 
         session.open_text_document(uri.clone(), document);
 
-        // Publish diagnostics if the client doesnt support pull diagnostics
+        // Publish diagnostics if the client doesn't support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
             let snapshot = session
                 .take_snapshot(uri.clone())

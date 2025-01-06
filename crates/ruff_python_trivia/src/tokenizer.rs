@@ -4,14 +4,12 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::{is_python_whitespace, Cursor};
 
-/// Searches for the first non-trivia character in `range`.
+/// Searches for the first non-trivia character after `offset`.
 ///
 /// The search skips over any whitespace and comments.
 ///
-/// Returns `Some` if the range contains any non-trivia character. The first item is the absolute offset
-/// of the character, the second item the non-trivia character.
-///
-/// Returns `None` if the range is empty or only contains trivia (whitespace or comments).
+/// Returns `Some` if the source code after `offset` contains any non-trivia character.///
+/// Returns `None` if the text after `offset` is empty or only contains trivia (whitespace or comments).
 pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<SimpleToken> {
     SimpleTokenizer::starts_at(offset, code)
         .skip_trivia()
@@ -32,7 +30,10 @@ pub fn find_only_token_in_range(
     let token = tokens.next().expect("Expected a token");
     debug_assert_eq!(token.kind(), token_kind);
     let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
-    debug_assert_eq!(tokens.next(), None);
+    #[allow(clippy::debug_assert_with_mut_call)]
+    {
+        debug_assert_eq!(tokens.next(), None);
+    }
     token
 }
 
@@ -248,13 +249,13 @@ pub enum SimpleTokenKind {
     /// `;`
     Semi,
 
-    /// '/'
+    /// `/`
     Slash,
 
-    /// '*'
+    /// `*`
     Star,
 
-    /// `.`.
+    /// `.`
     Dot,
 
     /// `+`

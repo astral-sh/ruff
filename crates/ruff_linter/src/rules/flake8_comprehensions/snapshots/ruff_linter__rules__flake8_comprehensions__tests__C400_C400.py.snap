@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a list comprehension)
   |
 1 | # Cannot combine with C416. Should use list comprehension here.
 2 | even_nums = list(2 * x for x in range(3))
@@ -9,7 +9,7 @@ C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 3 | odd_nums = list(
 4 |     2 * x + 1 for x in range(3)
   |
-  = help: Rewrite as a `list` comprehension
+  = help: Rewrite as a list comprehension
 
 ℹ Unsafe fix
 1 1 | # Cannot combine with C416. Should use list comprehension here.
@@ -19,7 +19,7 @@ C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 4 4 |     2 * x + 1 for x in range(3)
 5 5 | )
 
-C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a list comprehension)
   |
 1 |   # Cannot combine with C416. Should use list comprehension here.
 2 |   even_nums = list(2 * x for x in range(3))
@@ -29,7 +29,7 @@ C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 5 | | )
   | |_^ C400
   |
-  = help: Rewrite as a `list` comprehension
+  = help: Rewrite as a list comprehension
 
 ℹ Unsafe fix
 1 1 | # Cannot combine with C416. Should use list comprehension here.
@@ -89,7 +89,7 @@ C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
 14 12 | # Strip parentheses from inner generators.
 15 13 | list((2 * x for x in range(3)))
 
-C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
    |
 14 | # Strip parentheses from inner generators.
 15 | list((2 * x for x in range(3)))
@@ -97,7 +97,7 @@ C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 16 | list(((2 * x for x in range(3))))
 17 | list((((2 * x for x in range(3)))))
    |
-   = help: Rewrite as a `list` comprehension
+   = help: Rewrite as a list comprehension
 
 ℹ Unsafe fix
 12 12 | )
@@ -109,7 +109,7 @@ C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 17 17 | list((((2 * x for x in range(3)))))
 18 18 | 
 
-C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
    |
 14 | # Strip parentheses from inner generators.
 15 | list((2 * x for x in range(3)))
@@ -117,7 +117,7 @@ C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C400
 17 | list((((2 * x for x in range(3)))))
    |
-   = help: Rewrite as a `list` comprehension
+   = help: Rewrite as a list comprehension
 
 ℹ Unsafe fix
 13 13 | 
@@ -129,7 +129,7 @@ C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 18 18 | 
 19 19 | # Not built-in list.
 
-C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
    |
 15 | list((2 * x for x in range(3)))
 16 | list(((2 * x for x in range(3))))
@@ -138,7 +138,7 @@ C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 18 | 
 19 | # Not built-in list.
    |
-   = help: Rewrite as a `list` comprehension
+   = help: Rewrite as a list comprehension
 
 ℹ Unsafe fix
 14 14 | # Strip parentheses from inner generators.

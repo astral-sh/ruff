@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -32,8 +32,8 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// async def func():
 ///     await trio.lowlevel.checkpoint()
 /// ```
-#[violation]
-pub struct AsyncZeroSleep {
+#[derive(ViolationMetadata)]
+pub(crate) struct AsyncZeroSleep {
     module: AsyncModule,
 }
 
@@ -62,7 +62,7 @@ pub(crate) fn async_zero_sleep(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument("seconds", 0) else {
+    let Some(arg) = call.arguments.find_argument_value("seconds", 0) else {
         return;
     };
 

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_strings.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -667,21 +668,21 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      "Arg #2",
      "Arg #3",
      "Arg #4",
-@@ -315,80 +232,72 @@
- 
+@@ -316,79 +233,75 @@
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
--assert some_type_of_boolean_expression, (
+ assert some_type_of_boolean_expression, (
 -    "Followed by a really really really long string that is used to provide context to"
 -    " the AssertionError exception."
--)
-+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
++    "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+ )
  
--assert some_type_of_boolean_expression, (
+ assert some_type_of_boolean_expression, (
 -    "Followed by a really really really long string that is used to provide context to"
 -    " the AssertionError exception, which uses dynamic string {}.".format("formatting")
-+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
-+    "formatting"
++    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
++        "formatting"
++    )
  )
  
  assert some_type_of_boolean_expression, (
@@ -772,7 +773,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      x,
      y,
      z,
-@@ -397,7 +306,7 @@
+@@ -397,7 +310,7 @@
  func_with_bad_parens(
      x,
      y,
@@ -781,7 +782,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      z,
  )
  
-@@ -408,50 +317,27 @@
+@@ -408,50 +321,27 @@
      + CONCATENATED
      + "using the '+' operator."
  )
@@ -813,11 +814,10 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 +backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
 +backslashes = "This is a really 'long' string with \"embedded double quotes\" and 'single' quotes that also handles checking for an odd number of backslashes \\\", like this...\\\\\\"
  
--short_string = "Hi there."
-+short_string = "Hi" " there."
+ short_string = "Hi there."
  
 -func_call(short_string="Hi there.")
-+func_call(short_string=("Hi" " there."))
++func_call(short_string=("Hi there."))
  
  raw_strings = r"Don't" " get" r" merged" " unless they are all raw."
  
@@ -841,7 +841,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
-@@ -468,51 +354,24 @@
+@@ -468,51 +358,24 @@
      " of it."
  )
  
@@ -902,7 +902,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  dict_with_lambda_values = {
-@@ -524,61 +383,54 @@
+@@ -524,65 +387,58 @@
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -941,7 +941,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  log.info(
 -    "Skipping:"
 -    f" {desc['db_id']} {foo('bar',x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
-+    f'Skipping: {desc["db_id"]} {foo("bar",x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
++    f"Skipping: {desc['db_id']} {foo('bar', x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
  )
  
  log.info(
@@ -965,7 +965,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  log.info(
 -    "Skipping:"
 -    f" {'a' == 'b' == 'c' == 'd'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"
-+    f'Skipping: {"a" == "b" == "c" == "d"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
++    f"Skipping: {'a' == 'b' == 'c' == 'd'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"
  )
  
  log.info(
@@ -981,6 +981,18 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  log.info(
+-    f"""Skipping: {"a" == 'b'} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
++    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+ )
+ 
+ log.info(
+@@ -590,5 +446,5 @@
+ )
+ 
+ log.info(
+-    f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"""
++    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+ )
 ```
 
 ## Ruff Output
@@ -1220,10 +1232,14 @@ pragma_comment_string2 = "Lines which end with an inline pragma comment of the f
 
 triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
 
-assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+)
 
-assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
-    "formatting"
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+        "formatting"
+    )
 )
 
 assert some_type_of_boolean_expression, (
@@ -1314,9 +1330,9 @@ backslashes = "This is a really long string with \"embedded\" double quotes and 
 backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
 backslashes = "This is a really 'long' string with \"embedded double quotes\" and 'single' quotes that also handles checking for an odd number of backslashes \\\", like this...\\\\\\"
 
-short_string = "Hi" " there."
+short_string = "Hi there."
 
-func_call(short_string=("Hi" " there."))
+func_call(short_string=("Hi there."))
 
 raw_strings = r"Don't" " get" r" merged" " unless they are all raw."
 
@@ -1394,7 +1410,7 @@ log.info(
 )
 
 log.info(
-    f'Skipping: {desc["db_id"]} {foo("bar",x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
+    f"Skipping: {desc['db_id']} {foo('bar', x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
 )
 
 log.info(
@@ -1410,7 +1426,7 @@ log.info(
 )
 
 log.info(
-    f'Skipping: {"a" == "b" == "c" == "d"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
+    f"Skipping: {'a' == 'b' == 'c' == 'd'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"
 )
 
 log.info(
@@ -1422,7 +1438,7 @@ log.info(
 )
 
 log.info(
-    f"""Skipping: {"a" == 'b'} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
 )
 
 log.info(
@@ -1430,7 +1446,7 @@ log.info(
 )
 
 log.info(
-    f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"""
+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
 )
 ```
 

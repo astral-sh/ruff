@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Scope, SemanticModel};
@@ -23,8 +23,8 @@ use crate::checkers::ast::Checker;
 /// _T = typing.TypeVar("_T")
 /// _Ts = typing_extensions.TypeVarTuple("_Ts")
 /// ```
-#[violation]
-pub struct UnusedPrivateTypeVar {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedPrivateTypeVar {
     type_var_like_name: String,
     type_var_like_kind: String,
 }
@@ -67,8 +67,8 @@ impl Violation for UnusedPrivateTypeVar {
 ///
 /// def func(arg: _PrivateProtocol) -> None: ...
 /// ```
-#[violation]
-pub struct UnusedPrivateProtocol {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedPrivateProtocol {
     name: String,
 }
 
@@ -105,8 +105,8 @@ impl Violation for UnusedPrivateProtocol {
 ///
 /// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias: ...
 /// ```
-#[violation]
-pub struct UnusedPrivateTypeAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedPrivateTypeAlias {
     name: String,
 }
 
@@ -145,8 +145,8 @@ impl Violation for UnusedPrivateTypeAlias {
 ///
 /// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict: ...
 /// ```
-#[violation]
-pub struct UnusedPrivateTypedDict {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedPrivateTypedDict {
     name: String,
 }
 

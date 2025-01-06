@@ -1,0 +1,1 @@
+../../../../ruff_python_parser/resources/inline/err/ann_assign_stmt_invalid_target.py

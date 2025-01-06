@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 /// Returns the redirect target for the given code.
 pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
@@ -13,7 +12,7 @@ pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
     REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
 }
 
-static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     HashMap::from_iter([
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
@@ -88,8 +87,8 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("PDV90", "PD90"),
         ("PDV901", "PD901"),
         // TODO(charlie): Remove by 2023-04-01.
-        ("TYP", "TCH"),
-        ("TYP001", "TCH001"),
+        ("TYP", "TC"),
+        ("TYP001", "TC001"),
         // TODO(charlie): Remove by 2023-06-01.
         ("RUF004", "B026"),
         ("PIE802", "C419"),
@@ -99,7 +98,6 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("T003", "FIX003"),
         ("T004", "FIX004"),
         ("RUF011", "B035"),
-        ("TCH006", "TCH010"),
         ("TRY200", "B904"),
         ("PGH001", "S307"),
         ("PGH002", "G010"),
@@ -125,5 +123,41 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("PLW0117", "PLW0177"),
         // See: https://github.com/astral-sh/ruff/issues/12110
         ("RUF025", "C420"),
+        // See: https://github.com/astral-sh/ruff/issues/13492
+        ("TRY302", "TRY203"),
+        // TCH renamed to TC to harmonize with flake8 plugin
+        ("TCH", "TC"),
+        ("TCH001", "TC001"),
+        ("TCH002", "TC002"),
+        ("TCH003", "TC003"),
+        ("TCH004", "TC004"),
+        ("TCH005", "TC005"),
+        ("TCH006", "TC010"),
+        ("TCH010", "TC010"),
     ])
 });
+
+#[cfg(test)]
+mod tests {
+    use crate::codes::{Rule, RuleGroup};
+    use crate::rule_redirects::REDIRECTS;
+    use strum::IntoEnumIterator;
+
+    /// Tests for rule codes that overlap with a redirect.
+    #[test]
+    fn overshadowing_redirects() {
+        for rule in Rule::iter() {
+            let (code, group) = (rule.noqa_code(), rule.group());
+
+            if matches!(group, RuleGroup::Removed) {
+                continue;
+            }
+
+            if let Some(redirect_target) = REDIRECTS.get(&*code.to_string()) {
+                panic!(
+                    "Rule {code} is overshadowed by a redirect, which points to {redirect_target}."
+                );
+            }
+        }
+    }
+}

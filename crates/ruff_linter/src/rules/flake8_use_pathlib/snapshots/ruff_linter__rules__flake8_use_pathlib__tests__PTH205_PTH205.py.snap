@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+snapshot_kind: text
 ---
 PTH205.py:6:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
   |
@@ -52,5 +53,3 @@ PTH205.py:12:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_
 12 | getctime(Path("filename"))
    | ^^^^^^^^ PTH205
    |
-
-

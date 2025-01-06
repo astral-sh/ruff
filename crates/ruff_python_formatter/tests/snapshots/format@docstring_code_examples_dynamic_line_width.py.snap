@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_dynamic_line_width.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -225,6 +226,75 @@ def doctest_extra_indent3():
     ...     df1, df2, df3, on="dt"
     ... )  # doctest: +IGNORE_RESULT
     """
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_doctest():
+    """Get the length of the given list of numbers.
+
+    Args:
+        numbers: List of numbers.
+
+    Returns:
+        Integer length of the list of numbers.
+
+    Example:
+        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        20
+    """
+
+
+def length_doctest_underindent():
+    """Get the length of the given list of numbers.
+
+        Args:
+            numbers: List of numbers.
+
+        Returns:
+            Integer length of the list of numbers.
+
+    Example:
+        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        20
+    """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_markdown():
+    """Get the length of the given list of numbers.
+
+    Args:
+        numbers: List of numbers.
+
+    Returns:
+        Integer length of the list of numbers.
+
+    Example:
+
+        ```
+        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+        ```
+    """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst():
+    """
+    Do cool stuff::
+
+        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    """
+    pass
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst_in_section():
+    """
+    Examples:
+        Do cool stuff::
+
+            length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    """
+    pass
 ```
 
 ## Outputs
@@ -239,7 +309,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -533,6 +603,76 @@ def doctest_extra_indent3():
     ...     df1, df2, df3, on="dt"
     ... )  # doctest: +IGNORE_RESULT
     """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_doctest():
+    """Get the length of the given list of numbers.
+
+    Args:
+        numbers: List of numbers.
+
+    Returns:
+        Integer length of the list of numbers.
+
+    Example:
+        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        20
+    """
+
+
+def length_doctest_underindent():
+    """Get the length of the given list of numbers.
+
+        Args:
+            numbers: List of numbers.
+
+        Returns:
+            Integer length of the list of numbers.
+
+    Example:
+        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        20
+    """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_markdown():
+    """Get the length of the given list of numbers.
+
+    Args:
+        numbers: List of numbers.
+
+    Returns:
+        Integer length of the list of numbers.
+
+    Example:
+
+        ```
+        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+        ```
+    """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst():
+    """
+    Do cool stuff::
+
+        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    """
+    pass
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst_in_section():
+    """
+    Examples:
+        Do cool stuff::
+
+            length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    """
+    pass
 ```
 
 
@@ -555,6 +695,157 @@ def doctest_extra_indent3():
          """
  
  
+@@ -300,7 +302,28 @@
+         Integer length of the list of numbers.
+ 
+     Example:
+-        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++        >>> length([
++        ...     1,
++        ...     2,
++        ...     3,
++        ...     4,
++        ...     5,
++        ...     6,
++        ...     7,
++        ...     8,
++        ...     9,
++        ...     10,
++        ...     11,
++        ...     12,
++        ...     13,
++        ...     14,
++        ...     15,
++        ...     16,
++        ...     17,
++        ...     18,
++        ...     19,
++        ...     20,
++        ... ])
+         20
+     """
+ 
+@@ -315,7 +338,28 @@
+             Integer length of the list of numbers.
+ 
+     Example:
+-        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++        >>> length([
++        ...     1,
++        ...     2,
++        ...     3,
++        ...     4,
++        ...     5,
++        ...     6,
++        ...     7,
++        ...     8,
++        ...     9,
++        ...     10,
++        ...     11,
++        ...     12,
++        ...     13,
++        ...     14,
++        ...     15,
++        ...     16,
++        ...     17,
++        ...     18,
++        ...     19,
++        ...     20,
++        ... ])
+         20
+     """
+ 
+@@ -333,7 +377,29 @@
+     Example:
+ 
+         ```
+-        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
++        length([
++            1,
++            2,
++            3,
++            4,
++            5,
++            6,
++            7,
++            8,
++            9,
++            10,
++            11,
++            12,
++            13,
++            14,
++            15,
++            16,
++            17,
++            18,
++            19,
++            20,
++            21,
++        ])
+         ```
+     """
+ 
+@@ -343,7 +409,29 @@
+     """
+     Do cool stuff::
+ 
+-        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
++        length([
++            1,
++            2,
++            3,
++            4,
++            5,
++            6,
++            7,
++            8,
++            9,
++            10,
++            11,
++            12,
++            13,
++            14,
++            15,
++            16,
++            17,
++            18,
++            19,
++            20,
++            21,
++        ])
+     """
+     pass
+ 
+@@ -354,6 +442,27 @@
+     Examples:
+         Do cool stuff::
+ 
+-            length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++            length([
++                1,
++                2,
++                3,
++                4,
++                5,
++                6,
++                7,
++                8,
++                9,
++                10,
++                11,
++                12,
++                13,
++                14,
++                15,
++                16,
++                17,
++                18,
++                19,
++                20,
++            ])
+     """
+     pass
 ```
 
 
@@ -569,7 +860,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -853,6 +1144,234 @@ def doctest_extra_indent3():
   --------
   >>> af1, af2, af3 = pl.align_frames(df1, df2, df3, on="dt")  # doctest: +IGNORE_RESULT
   """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_doctest():
+  """Get the length of the given list of numbers.
+
+  Args:
+      numbers: List of numbers.
+
+  Returns:
+      Integer length of the list of numbers.
+
+  Example:
+      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+      20
+  """
+
+
+def length_doctest_underindent():
+  """Get the length of the given list of numbers.
+
+      Args:
+          numbers: List of numbers.
+
+      Returns:
+          Integer length of the list of numbers.
+
+  Example:
+      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+      20
+  """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_markdown():
+  """Get the length of the given list of numbers.
+
+  Args:
+      numbers: List of numbers.
+
+  Returns:
+      Integer length of the list of numbers.
+
+  Example:
+
+      ```
+      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+      ```
+  """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst():
+  """
+  Do cool stuff::
+
+      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+  """
+  pass
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst_in_section():
+  """
+  Examples:
+      Do cool stuff::
+
+          length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+  """
+  pass
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -290,7 +290,28 @@
+       Integer length of the list of numbers.
+ 
+   Example:
+-      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++      >>> length([
++      ...   1,
++      ...   2,
++      ...   3,
++      ...   4,
++      ...   5,
++      ...   6,
++      ...   7,
++      ...   8,
++      ...   9,
++      ...   10,
++      ...   11,
++      ...   12,
++      ...   13,
++      ...   14,
++      ...   15,
++      ...   16,
++      ...   17,
++      ...   18,
++      ...   19,
++      ...   20,
++      ... ])
+       20
+   """
+ 
+@@ -305,7 +326,28 @@
+           Integer length of the list of numbers.
+ 
+   Example:
+-      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++      >>> length([
++      ...   1,
++      ...   2,
++      ...   3,
++      ...   4,
++      ...   5,
++      ...   6,
++      ...   7,
++      ...   8,
++      ...   9,
++      ...   10,
++      ...   11,
++      ...   12,
++      ...   13,
++      ...   14,
++      ...   15,
++      ...   16,
++      ...   17,
++      ...   18,
++      ...   19,
++      ...   20,
++      ... ])
+       20
+   """
+ 
+@@ -323,7 +365,29 @@
+   Example:
+ 
+       ```
+-      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
++      length([
++        1,
++        2,
++        3,
++        4,
++        5,
++        6,
++        7,
++        8,
++        9,
++        10,
++        11,
++        12,
++        13,
++        14,
++        15,
++        16,
++        17,
++        18,
++        19,
++        20,
++        21,
++      ])
+       ```
+   """
+ 
+@@ -333,7 +397,29 @@
+   """
+   Do cool stuff::
+ 
+-      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
++      length([
++        1,
++        2,
++        3,
++        4,
++        5,
++        6,
++        7,
++        8,
++        9,
++        10,
++        11,
++        12,
++        13,
++        14,
++        15,
++        16,
++        17,
++        18,
++        19,
++        20,
++        21,
++      ])
+   """
+   pass
+ 
+@@ -344,6 +430,27 @@
+   Examples:
+       Do cool stuff::
+ 
+-          length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++          length([
++            1,
++            2,
++            3,
++            4,
++            5,
++            6,
++            7,
++            8,
++            9,
++            10,
++            11,
++            12,
++            13,
++            14,
++            15,
++            16,
++            17,
++            18,
++            19,
++            20,
++          ])
+   """
+   pass
 ```
 
 
@@ -867,7 +1386,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -1161,6 +1680,76 @@ def doctest_extra_indent3():
 	...     df1, df2, df3, on="dt"
 	... )  # doctest: +IGNORE_RESULT
 	"""
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_doctest():
+	"""Get the length of the given list of numbers.
+
+	Args:
+	    numbers: List of numbers.
+
+	Returns:
+	    Integer length of the list of numbers.
+
+	Example:
+	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	    20
+	"""
+
+
+def length_doctest_underindent():
+	"""Get the length of the given list of numbers.
+
+	    Args:
+	        numbers: List of numbers.
+
+	    Returns:
+	        Integer length of the list of numbers.
+
+	Example:
+	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	    20
+	"""
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_markdown():
+	"""Get the length of the given list of numbers.
+
+	Args:
+	    numbers: List of numbers.
+
+	Returns:
+	    Integer length of the list of numbers.
+
+	Example:
+
+	    ```
+	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+	    ```
+	"""
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst():
+	"""
+	Do cool stuff::
+
+	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+	"""
+	pass
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst_in_section():
+	"""
+	Examples:
+	    Do cool stuff::
+
+	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	"""
+	pass
 ```
 
 
@@ -1183,6 +1772,157 @@ def doctest_extra_indent3():
  		"""
  
  
+@@ -300,7 +302,28 @@
+ 	    Integer length of the list of numbers.
+ 
+ 	Example:
+-	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++	    >>> length([
++	    ...     1,
++	    ...     2,
++	    ...     3,
++	    ...     4,
++	    ...     5,
++	    ...     6,
++	    ...     7,
++	    ...     8,
++	    ...     9,
++	    ...     10,
++	    ...     11,
++	    ...     12,
++	    ...     13,
++	    ...     14,
++	    ...     15,
++	    ...     16,
++	    ...     17,
++	    ...     18,
++	    ...     19,
++	    ...     20,
++	    ... ])
+ 	    20
+ 	"""
+ 
+@@ -315,7 +338,28 @@
+ 	        Integer length of the list of numbers.
+ 
+ 	Example:
+-	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++	    >>> length([
++	    ...     1,
++	    ...     2,
++	    ...     3,
++	    ...     4,
++	    ...     5,
++	    ...     6,
++	    ...     7,
++	    ...     8,
++	    ...     9,
++	    ...     10,
++	    ...     11,
++	    ...     12,
++	    ...     13,
++	    ...     14,
++	    ...     15,
++	    ...     16,
++	    ...     17,
++	    ...     18,
++	    ...     19,
++	    ...     20,
++	    ... ])
+ 	    20
+ 	"""
+ 
+@@ -333,7 +377,29 @@
+ 	Example:
+ 
+ 	    ```
+-	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
++	    length([
++	        1,
++	        2,
++	        3,
++	        4,
++	        5,
++	        6,
++	        7,
++	        8,
++	        9,
++	        10,
++	        11,
++	        12,
++	        13,
++	        14,
++	        15,
++	        16,
++	        17,
++	        18,
++	        19,
++	        20,
++	        21,
++	    ])
+ 	    ```
+ 	"""
+ 
+@@ -343,7 +409,29 @@
+ 	"""
+ 	Do cool stuff::
+ 
+-	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
++	    length([
++	        1,
++	        2,
++	        3,
++	        4,
++	        5,
++	        6,
++	        7,
++	        8,
++	        9,
++	        10,
++	        11,
++	        12,
++	        13,
++	        14,
++	        15,
++	        16,
++	        17,
++	        18,
++	        19,
++	        20,
++	        21,
++	    ])
+ 	"""
+ 	pass
+ 
+@@ -354,6 +442,27 @@
+ 	Examples:
+ 	    Do cool stuff::
+ 
+-	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++	        length([
++	            1,
++	            2,
++	            3,
++	            4,
++	            5,
++	            6,
++	            7,
++	            8,
++	            9,
++	            10,
++	            11,
++	            12,
++	            13,
++	            14,
++	            15,
++	            16,
++	            17,
++	            18,
++	            19,
++	            20,
++	        ])
+ 	"""
+ 	pass
 ```
 
 
@@ -1197,7 +1937,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -1921,6 +2661,170 @@ def doctest_extra_indent3():
 	...         df1, df2, df3, on="dt"
 	... )  # doctest: +IGNORE_RESULT
 	"""
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_doctest():
+	"""Get the length of the given list of numbers.
+
+	Args:
+	    numbers: List of numbers.
+
+	Returns:
+	    Integer length of the list of numbers.
+
+	Example:
+	    >>> length(
+	    ...         [
+	    ...                 1,
+	    ...                 2,
+	    ...                 3,
+	    ...                 4,
+	    ...                 5,
+	    ...                 6,
+	    ...                 7,
+	    ...                 8,
+	    ...                 9,
+	    ...                 10,
+	    ...                 11,
+	    ...                 12,
+	    ...                 13,
+	    ...                 14,
+	    ...                 15,
+	    ...                 16,
+	    ...                 17,
+	    ...                 18,
+	    ...                 19,
+	    ...                 20,
+	    ...         ]
+	    ... )
+	    20
+	"""
+
+
+def length_doctest_underindent():
+	"""Get the length of the given list of numbers.
+
+	    Args:
+	        numbers: List of numbers.
+
+	    Returns:
+	        Integer length of the list of numbers.
+
+	Example:
+	    >>> length(
+	    ...         [
+	    ...                 1,
+	    ...                 2,
+	    ...                 3,
+	    ...                 4,
+	    ...                 5,
+	    ...                 6,
+	    ...                 7,
+	    ...                 8,
+	    ...                 9,
+	    ...                 10,
+	    ...                 11,
+	    ...                 12,
+	    ...                 13,
+	    ...                 14,
+	    ...                 15,
+	    ...                 16,
+	    ...                 17,
+	    ...                 18,
+	    ...                 19,
+	    ...                 20,
+	    ...         ]
+	    ... )
+	    20
+	"""
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_markdown():
+	"""Get the length of the given list of numbers.
+
+	Args:
+	    numbers: List of numbers.
+
+	Returns:
+	    Integer length of the list of numbers.
+
+	Example:
+
+	    ```
+	    length(
+	            [
+	                    1,
+	                    2,
+	                    3,
+	                    4,
+	                    5,
+	                    6,
+	                    7,
+	                    8,
+	                    9,
+	                    10,
+	                    11,
+	                    12,
+	                    13,
+	                    14,
+	                    15,
+	                    16,
+	                    17,
+	                    18,
+	                    19,
+	                    20,
+	                    21,
+	            ]
+	    )
+	    ```
+	"""
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst():
+	"""
+	Do cool stuff::
+
+	    length(
+	            [
+	                    1,
+	                    2,
+	                    3,
+	                    4,
+	                    5,
+	                    6,
+	                    7,
+	                    8,
+	                    9,
+	                    10,
+	                    11,
+	                    12,
+	                    13,
+	                    14,
+	                    15,
+	                    16,
+	                    17,
+	                    18,
+	                    19,
+	                    20,
+	                    21,
+	            ]
+	    )
+	"""
+	pass
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst_in_section():
+	"""
+	Examples:
+	    Do cool stuff::
+
+	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	"""
+	pass
 ```
 
 
@@ -1943,7 +2847,249 @@ def doctest_extra_indent3():
  		"""
  
  
+@@ -730,30 +732,28 @@
+ 	    Integer length of the list of numbers.
+ 
+ 	Example:
+-	    >>> length(
+-	    ...         [
+-	    ...                 1,
+-	    ...                 2,
+-	    ...                 3,
+-	    ...                 4,
+-	    ...                 5,
+-	    ...                 6,
+-	    ...                 7,
+-	    ...                 8,
+-	    ...                 9,
+-	    ...                 10,
+-	    ...                 11,
+-	    ...                 12,
+-	    ...                 13,
+-	    ...                 14,
+-	    ...                 15,
+-	    ...                 16,
+-	    ...                 17,
+-	    ...                 18,
+-	    ...                 19,
+-	    ...                 20,
+-	    ...         ]
+-	    ... )
++	    >>> length([
++	    ...         1,
++	    ...         2,
++	    ...         3,
++	    ...         4,
++	    ...         5,
++	    ...         6,
++	    ...         7,
++	    ...         8,
++	    ...         9,
++	    ...         10,
++	    ...         11,
++	    ...         12,
++	    ...         13,
++	    ...         14,
++	    ...         15,
++	    ...         16,
++	    ...         17,
++	    ...         18,
++	    ...         19,
++	    ...         20,
++	    ... ])
+ 	    20
+ 	"""
+ 
+@@ -768,30 +768,28 @@
+ 	        Integer length of the list of numbers.
+ 
+ 	Example:
+-	    >>> length(
+-	    ...         [
+-	    ...                 1,
+-	    ...                 2,
+-	    ...                 3,
+-	    ...                 4,
+-	    ...                 5,
+-	    ...                 6,
+-	    ...                 7,
+-	    ...                 8,
+-	    ...                 9,
+-	    ...                 10,
+-	    ...                 11,
+-	    ...                 12,
+-	    ...                 13,
+-	    ...                 14,
+-	    ...                 15,
+-	    ...                 16,
+-	    ...                 17,
+-	    ...                 18,
+-	    ...                 19,
+-	    ...                 20,
+-	    ...         ]
+-	    ... )
++	    >>> length([
++	    ...         1,
++	    ...         2,
++	    ...         3,
++	    ...         4,
++	    ...         5,
++	    ...         6,
++	    ...         7,
++	    ...         8,
++	    ...         9,
++	    ...         10,
++	    ...         11,
++	    ...         12,
++	    ...         13,
++	    ...         14,
++	    ...         15,
++	    ...         16,
++	    ...         17,
++	    ...         18,
++	    ...         19,
++	    ...         20,
++	    ... ])
+ 	    20
+ 	"""
+ 
+@@ -809,31 +807,29 @@
+ 	Example:
+ 
+ 	    ```
+-	    length(
+-	            [
+-	                    1,
+-	                    2,
+-	                    3,
+-	                    4,
+-	                    5,
+-	                    6,
+-	                    7,
+-	                    8,
+-	                    9,
+-	                    10,
+-	                    11,
+-	                    12,
+-	                    13,
+-	                    14,
+-	                    15,
+-	                    16,
+-	                    17,
+-	                    18,
+-	                    19,
+-	                    20,
+-	                    21,
+-	            ]
+-	    )
++	    length([
++	            1,
++	            2,
++	            3,
++	            4,
++	            5,
++	            6,
++	            7,
++	            8,
++	            9,
++	            10,
++	            11,
++	            12,
++	            13,
++	            14,
++	            15,
++	            16,
++	            17,
++	            18,
++	            19,
++	            20,
++	            21,
++	    ])
+ 	    ```
+ 	"""
+ 
+@@ -843,31 +839,29 @@
+ 	"""
+ 	Do cool stuff::
+ 
+-	    length(
+-	            [
+-	                    1,
+-	                    2,
+-	                    3,
+-	                    4,
+-	                    5,
+-	                    6,
+-	                    7,
+-	                    8,
+-	                    9,
+-	                    10,
+-	                    11,
+-	                    12,
+-	                    13,
+-	                    14,
+-	                    15,
+-	                    16,
+-	                    17,
+-	                    18,
+-	                    19,
+-	                    20,
+-	                    21,
+-	            ]
+-	    )
++	    length([
++	            1,
++	            2,
++	            3,
++	            4,
++	            5,
++	            6,
++	            7,
++	            8,
++	            9,
++	            10,
++	            11,
++	            12,
++	            13,
++	            14,
++	            15,
++	            16,
++	            17,
++	            18,
++	            19,
++	            20,
++	            21,
++	    ])
+ 	"""
+ 	pass
+ 
+@@ -878,6 +872,27 @@
+ 	Examples:
+ 	    Do cool stuff::
+ 
+-	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
++	        length([
++	                1,
++	                2,
++	                3,
++	                4,
++	                5,
++	                6,
++	                7,
++	                8,
++	                9,
++	                10,
++	                11,
++	                12,
++	                13,
++	                14,
++	                15,
++	                16,
++	                17,
++	                18,
++	                19,
++	                20,
++	        ])
+ 	"""
+ 	pass
 ```
-
-
-

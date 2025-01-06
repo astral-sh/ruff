@@ -192,7 +192,7 @@ impl VirtualEnvironment {
             } else {
                 tracing::warn!(
                     "Failed to resolve `sys.prefix` of the system Python installation \
-from the `home` value in the `pyvenv.cfg` file at '{}'. \
+from the `home` value in the `pyvenv.cfg` file at `{}`. \
 System site-packages will not be used for module resolution.",
                     venv_path.join("pyvenv.cfg")
                 );
@@ -321,7 +321,7 @@ fn site_packages_directory_from_sys_prefix(
     // the parsed version
     //
     // Note: the `python3.x` part of the `site-packages` path can't be computed from
-    // the `--target-version` the user has passed, as they might be running Python 3.12 locally
+    // the `--python-version` the user has passed, as they might be running Python 3.12 locally
     // even if they've requested that we type check their code "as if" they're running 3.8.
     for entry_result in system
         .read_directory(&sys_prefix_path.join("lib"))
@@ -426,7 +426,7 @@ impl Deref for SysPrefixPath {
 
 impl fmt::Display for SysPrefixPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`sys.prefix` path '{}'", self.0)
+        write!(f, "`sys.prefix` path `{}`", self.0)
     }
 }
 
@@ -483,7 +483,7 @@ impl Deref for PythonHomePath {
 
 impl fmt::Display for PythonHomePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`home` location '{}'", self.0)
+        write!(f, "`home` location `{}`", self.0)
     }
 }
 
@@ -732,7 +732,20 @@ mod tests {
         let system = TestSystem::default();
         assert!(matches!(
             VirtualEnvironment::new("/.venv", &system),
-            Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(_))
+            Err(SitePackagesDiscoveryError::VenvDirCanonicalizationError(..))
+        ));
+    }
+
+    #[test]
+    fn reject_venv_that_is_not_a_directory() {
+        let system = TestSystem::default();
+        system
+            .memory_file_system()
+            .write_file("/.venv", "")
+            .unwrap();
+        assert!(matches!(
+            VirtualEnvironment::new("/.venv", &system),
+            Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(..))
         ));
     }
 

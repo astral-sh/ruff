@@ -143,9 +143,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             all_codes.push(quote! {
                 #attrs Self::#linter(#linter::#prefix_ident)
@@ -161,9 +162,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             });
             let prefix_ident = get_prefix_ident(&prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             prefix_into_iter_match_arms.extend(quote! {
                 #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
@@ -418,8 +420,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_fixable_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
         );
-        rule_explanation_match_arms
-            .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
+        rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
 
         // Enable conversion from `DiagnosticKind` to `Rule`.
         from_impls_for_diagnostic_kind
@@ -455,6 +456,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             /// Returns the documentation for this rule.
             pub fn explanation(&self) -> Option<&'static str> {
+                use ruff_diagnostics::ViolationMetadata;
                 match self { #rule_explanation_match_arms }
             }
 
@@ -463,6 +465,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
         }
+
 
         impl AsRule for ruff_diagnostics::DiagnosticKind {
             fn rule(&self) -> Rule {

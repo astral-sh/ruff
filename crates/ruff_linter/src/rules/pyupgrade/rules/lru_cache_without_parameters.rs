@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -38,13 +38,13 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `@functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Let lru_cache be used as a decorator with no arguments](https://github.com/python/cpython/issues/80953)
-#[violation]
-pub struct LRUCacheWithoutParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct LRUCacheWithoutParameters;
 
 impl AlwaysFixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses to `functools.lru_cache`")
+        "Unnecessary parentheses to `functools.lru_cache`".to_string()
     }
 
     fn fix_title(&self) -> String {

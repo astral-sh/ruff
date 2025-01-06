@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 ///
 /// ## References
 /// - [Python documentation:`int.bit_count`](https://docs.python.org/3/library/stdtypes.html#int.bit_count)
-#[violation]
-pub struct BitCount {
+#[derive(ViolationMetadata)]
+pub(crate) struct BitCount {
     existing: SourceCodeSnippet,
     replacement: SourceCodeSnippet,
 }
@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for BitCount {
         if let Some(replacement) = replacement.full_display() {
             format!("Replace with `{replacement}`")
         } else {
-            format!("Replace with `.bit_count()`")
+            "Replace with `.bit_count()`".to_string()
         }
     }
 }

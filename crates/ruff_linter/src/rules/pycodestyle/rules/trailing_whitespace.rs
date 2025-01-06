@@ -1,11 +1,12 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_index::Indexer;
-use ruff_source_file::{Line, Locator};
+use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::registry::Rule;
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.
@@ -25,13 +26,13 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
-#[violation]
-pub struct TrailingWhitespace;
+#[derive(ViolationMetadata)]
+pub(crate) struct TrailingWhitespace;
 
 impl AlwaysFixableViolation for TrailingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing whitespace")
+        "Trailing whitespace".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -57,13 +58,13 @@ impl AlwaysFixableViolation for TrailingWhitespace {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
-#[violation]
-pub struct BlankLineWithWhitespace;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineWithWhitespace;
 
 impl AlwaysFixableViolation for BlankLineWithWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Blank line contains whitespace")
+        "Blank line contains whitespace".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -100,7 +101,7 @@ pub(crate) fn trailing_whitespace(
                 diagnostic.set_fix(Fix::applicable_edit(
                     Edit::range_deletion(TextRange::new(
                         indexer
-                            .preceded_by_continuations(line.start(), locator)
+                            .preceded_by_continuations(line.start(), locator.contents())
                             .unwrap_or(range.start()),
                         range.end(),
                     )),

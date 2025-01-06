@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
    |
@@ -73,18 +74,19 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 52 52 | def not_ok1_with_comments():
 53 53 |     if 1:
 54 54 |         pass
-   55 |+    elif 2:
-   56 |+        pass
-55 57 |     else:
+   55 |+    # inner comment
+   56 |+    elif 2:
+   57 |+        pass
+55 58 |     else:
 56    |-        # inner comment
 57    |-        if 2:
 58    |-            pass
 59    |-        else:
 60    |-            pass  # final pass comment
-   58 |+        pass  # final pass comment
-61 59 | 
-62 60 | 
-63 61 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
+   59 |+        pass  # final pass comment
+61 60 | 
+62 61 | 
+63 62 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
 
 collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
    |
@@ -181,15 +183,150 @@ collapsible_else_if.py:96:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    = help: Convert to `elif`
 
 ℹ Safe fix
-93 93 | def not_ok5():
-94 94 |     if 1:
-95 95 |         pass
-96    |-    else:
-97    |-        if 2:
-98    |-            pass
-99    |-        else: pass
-   96 |+    elif 2:
-   97 |+        pass
-   98 |+    else: pass
+93  93  | def not_ok5():
+94  94  |     if 1:
+95  95  |         pass
+96      |-    else:
+97      |-        if 2:
+98      |-            pass
+99      |-        else: pass
+    96  |+    elif 2:
+    97  |+        pass
+    98  |+    else: pass
+100 99  | 
+101 100 | 
+102 101 | def not_ok1_with_multiline_comments():
 
+collapsible_else_if.py:105:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+    |
+103 |       if 1:
+104 |           pass
+105 |       else:
+    |  _____^
+106 | |         # inner comment which happens
+107 | |         # to be longer than one line
+108 | |         if 2:
+    | |________^ PLR5501
+109 |               pass
+110 |           else:
+    |
+    = help: Convert to `elif`
 
+ℹ Safe fix
+102 102 | def not_ok1_with_multiline_comments():
+103 103 |     if 1:
+104 104 |         pass
+    105 |+    # inner comment which happens
+    106 |+    # to be longer than one line
+    107 |+    elif 2:
+    108 |+        pass
+105 109 |     else:
+106     |-        # inner comment which happens
+107     |-        # to be longer than one line
+108     |-        if 2:
+109     |-            pass
+110     |-        else:
+111     |-            pass  # final pass comment
+    110 |+        pass  # final pass comment
+112 111 | 
+113 112 | 
+114 113 | def not_ok1_with_deep_indented_comments():
+
+collapsible_else_if.py:117:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+    |
+115 |       if 1:
+116 |           pass
+117 |       else:
+    |  _____^
+118 | |             # inner comment which happens to be overly indented
+119 | |         if 2:
+    | |________^ PLR5501
+120 |               pass
+121 |           else:
+    |
+    = help: Convert to `elif`
+
+ℹ Safe fix
+114 114 | def not_ok1_with_deep_indented_comments():
+115 115 |     if 1:
+116 116 |         pass
+    117 |+    # inner comment which happens to be overly indented
+    118 |+    elif 2:
+    119 |+        pass
+117 120 |     else:
+118     |-            # inner comment which happens to be overly indented
+119     |-        if 2:
+120     |-            pass
+121     |-        else:
+122     |-            pass  # final pass comment
+    121 |+        pass  # final pass comment
+123 122 | 
+124 123 | 
+125 124 | def not_ok1_with_shallow_indented_comments():
+
+collapsible_else_if.py:128:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+    |
+126 |       if 1:
+127 |           pass
+128 |       else:
+    |  _____^
+129 | |     # inner comment which happens to be under indented
+130 | |         if 2:
+    | |________^ PLR5501
+131 |               pass
+132 |           else:
+    |
+    = help: Convert to `elif`
+
+ℹ Safe fix
+125 125 | def not_ok1_with_shallow_indented_comments():
+126 126 |     if 1:
+127 127 |         pass
+128     |-    else:
+129 128 |     # inner comment which happens to be under indented
+130     |-        if 2:
+131     |-            pass
+132     |-        else:
+133     |-            pass  # final pass comment
+    129 |+    elif 2:
+    130 |+        pass
+    131 |+    else:
+    132 |+        pass  # final pass comment
+134 133 | 
+135 134 | 
+136 135 | def not_ok1_with_mixed_indented_comments():
+
+collapsible_else_if.py:139:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+    |
+137 |       if 1:
+138 |           pass
+139 |       else:
+    |  _____^
+140 | |             # inner comment which has mixed
+141 | |         # indentation levels
+142 | |                 # which is pretty weird
+143 | |         if 2:
+    | |________^ PLR5501
+144 |               pass
+145 |           else:
+    |
+    = help: Convert to `elif`
+
+ℹ Safe fix
+136 136 | def not_ok1_with_mixed_indented_comments():
+137 137 |     if 1:
+138 138 |         pass
+    139 |+        # inner comment which has mixed
+    140 |+    # indentation levels
+    141 |+            # which is pretty weird
+    142 |+    elif 2:
+    143 |+        pass
+139 144 |     else:
+140     |-            # inner comment which has mixed
+141     |-        # indentation levels
+142     |-                # which is pretty weird
+143     |-        if 2:
+144     |-            pass
+145     |-        else:
+146     |-            pass  # final pass comment
+    145 |+        pass  # final pass comment

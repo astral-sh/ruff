@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
@@ -298,5 +299,102 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 82    |-    ):
 83    |-        yield h
    82 |+    )
+84 83 | 
+85 84 | 
+86 85 | # UP028: The later loop variable is not a reference to the earlier loop variable
 
+UP028_0.py:97:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+    |
+ 95 |   # UP028: The exception binding is not a reference to the loop variable
+ 96 |   def f():
+ 97 |       for x in (1, 2, 3):
+    |  _____^
+ 98 | |         yield x
+    | |_______________^ UP028
+ 99 |       # Shadowing with an `except`
+100 |       try:
+    |
+    = help: Replace with `yield from`
 
+ℹ Unsafe fix
+94 94 | 
+95 95 | # UP028: The exception binding is not a reference to the loop variable
+96 96 | def f():
+97    |-    for x in (1, 2, 3):
+98    |-        yield x
+   97 |+    yield from (1, 2, 3)
+99 98 |     # Shadowing with an `except`
+100 99 |     try:
+101 100 |         pass
+
+UP028_0.py:108:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+    |
+106 |   # UP028: The context binding is not a reference to the loop variable
+107 |   def f():
+108 |       for x in (1, 2, 3):
+    |  _____^
+109 | |         yield x
+    | |_______________^ UP028
+110 |       # Shadowing with `with`
+111 |       with contextlib.nullcontext() as x:
+    |
+    = help: Replace with `yield from`
+
+ℹ Unsafe fix
+105 105 | 
+106 106 | # UP028: The context binding is not a reference to the loop variable
+107 107 | def f():
+108     |-    for x in (1, 2, 3):
+109     |-        yield x
+    108 |+    yield from (1, 2, 3)
+110 109 |     # Shadowing with `with`
+111 110 |     with contextlib.nullcontext() as x:
+112 111 |         pass
+
+UP028_0.py:118:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+    |
+116 |   # UP028: The type annotation binding is not a reference to the loop variable
+117 |   def f():
+118 |       for x in (1, 2, 3):
+    |  _____^
+119 | |         yield x
+    | |_______________^ UP028
+120 |       # Shadowing with a type annotation
+121 |       x: int
+    |
+    = help: Replace with `yield from`
+
+ℹ Unsafe fix
+115 115 | 
+116 116 | # UP028: The type annotation binding is not a reference to the loop variable
+117 117 | def f():
+118     |-    for x in (1, 2, 3):
+119     |-        yield x
+    118 |+    yield from (1, 2, 3)
+120 119 |     # Shadowing with a type annotation
+121 120 |     x: int
+122 121 | 
+
+UP028_0.py:134:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+    |
+132 |   # UP028: The exception bindings are not a reference to the loop variable
+133 |   def f():
+134 |       for x in (1, 2, 3):
+    |  _____^
+135 | |         yield x
+    | |_______________^ UP028
+136 |       # Shadowing with multiple `except` blocks
+137 |       try:
+    |
+    = help: Replace with `yield from`
+
+ℹ Unsafe fix
+131 131 | 
+132 132 | # UP028: The exception bindings are not a reference to the loop variable
+133 133 | def f():
+134     |-    for x in (1, 2, 3):
+135     |-        yield x
+    134 |+    yield from (1, 2, 3)
+136 135 |     # Shadowing with multiple `except` blocks
+137 136 |     try:
+138 137 |         pass

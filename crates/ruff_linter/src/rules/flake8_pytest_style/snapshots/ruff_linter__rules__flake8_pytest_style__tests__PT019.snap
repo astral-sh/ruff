@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT019.py:9:14: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
    |
@@ -14,5 +15,3 @@ PT019.py:13:17: PT019 Fixture `_fixture` without value is injected as parameter,
    |                 ^^^^^^^^ PT019
 14 |     pass
    |
-
-

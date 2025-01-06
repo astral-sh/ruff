@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/same_line_body.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -19,10 +20,10 @@ print("after"  )
 # The if header and the print statement together are longer than 100 characters.
 # The print statement should either be wrapped to fit at the end of the if statement, or be converted to a
 # suite body
-if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:   <RANGE_START>print("aaaa long body, should wrap or be intented"  )<RANGE_END>
+if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:   <RANGE_START>print("aaaa long body, should wrap or be indented"  )<RANGE_END>
 
-# This print statement is too-long even when intented. It should be wrapped
-if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd: <RANGE_START>print("aaaa long body, should wrap or be intented", "more content to make it exceed the 88 chars limit")<RANGE_END>
+# This print statement is too long even when indented. It should be wrapped
+if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd: <RANGE_START>print("aaaa long body, should wrap or be indented", "more content to make it exceed the 88 chars limit")<RANGE_END>
 ```
 
 ## Output
@@ -47,15 +48,12 @@ print("after"  )
 # The print statement should either be wrapped to fit at the end of the if statement, or be converted to a
 # suite body
 if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:
-    print("aaaa long body, should wrap or be intented")
+    print("aaaa long body, should wrap or be indented")
 
-# This print statement is too-long even when intented. It should be wrapped
+# This print statement is too long even when indented. It should be wrapped
 if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:
     print(
-        "aaaa long body, should wrap or be intented",
+        "aaaa long body, should wrap or be indented",
         "more content to make it exceed the 88 chars limit",
     )
 ```
-
-
-

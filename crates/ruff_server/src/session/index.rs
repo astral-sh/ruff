@@ -6,9 +6,12 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 use anyhow::anyhow;
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
+use thiserror::Error;
 
 pub(crate) use ruff_settings::RuffSettings;
 
+use crate::edit::LanguageId;
+use crate::server::{Workspace, Workspaces};
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
@@ -66,12 +69,12 @@ pub enum DocumentQuery {
 
 impl Index {
     pub(super) fn new(
-        workspace_folders: Vec<(Url, ClientSettings)>,
+        workspaces: &Workspaces,
         global_settings: &ClientSettings,
     ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
-        for (url, workspace_settings) in workspace_folders {
-            settings.register_workspace(&url, Some(workspace_settings), global_settings)?;
+        for workspace in &**workspaces {
+            settings.register_workspace(workspace, global_settings)?;
         }
 
         Ok(Self {
@@ -166,11 +169,12 @@ impl Index {
 
     pub(super) fn open_workspace_folder(
         &mut self,
-        url: &Url,
+        url: Url,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
-        self.settings.register_workspace(url, None, global_settings)
+        self.settings
+            .register_workspace(&Workspace::new(url), global_settings)
     }
 
     pub(super) fn num_documents(&self) -> usize {
@@ -283,6 +287,7 @@ impl Index {
             settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
                 root,
                 settings.client_settings.editor_settings(),
+                false,
             );
         }
     }
@@ -397,10 +402,10 @@ impl WorkspaceSettingsIndex {
     /// workspace. Otherwise, the global settings are used exclusively.
     fn register_workspace(
         &mut self,
-        workspace_url: &Url,
-        workspace_settings: Option<ClientSettings>,
+        workspace: &Workspace,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
+        let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
             tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
             show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
@@ -410,8 +415,8 @@ impl WorkspaceSettingsIndex {
             anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
         })?;
 
-        let client_settings = if let Some(workspace_settings) = workspace_settings {
-            ResolvedClientSettings::with_workspace(&workspace_settings, global_settings)
+        let client_settings = if let Some(workspace_settings) = workspace.settings() {
+            ResolvedClientSettings::with_workspace(workspace_settings, global_settings)
         } else {
             ResolvedClientSettings::global(global_settings)
         };
@@ -419,8 +424,10 @@ impl WorkspaceSettingsIndex {
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
             &workspace_path,
             client_settings.editor_settings(),
+            workspace.is_default(),
         );
 
+        tracing::info!("Registering workspace: {}", workspace_path.display());
         self.insert(
             workspace_path,
             WorkspaceSettings {
@@ -591,16 +598,40 @@ impl DocumentQuery {
 
     /// Attempt to access the single inner text document selected by the query.
     /// If this query is selecting an entire notebook document, this will return `None`.
-    pub(crate) fn as_single_document(&self) -> Option<&TextDocument> {
+    pub(crate) fn as_single_document(&self) -> Result<&TextDocument, SingleDocumentError> {
         match self {
-            Self::Text { document, .. } => Some(document),
+            Self::Text { document, .. } => Ok(document),
             Self::Notebook {
                 notebook,
+                file_url,
                 cell_url: cell_uri,
                 ..
-            } => cell_uri
-                .as_ref()
-                .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),
+            } => {
+                if let Some(cell_uri) = cell_uri {
+                    let cell = notebook
+                        .cell_document_by_uri(cell_uri)
+                        .ok_or_else(|| SingleDocumentError::CellDoesNotExist(cell_uri.clone()))?;
+                    Ok(cell)
+                } else {
+                    Err(SingleDocumentError::Notebook(file_url.clone()))
+                }
+            }
         }
     }
+
+    pub(crate) fn text_document_language_id(&self) -> Option<LanguageId> {
+        if let DocumentQuery::Text { document, .. } = self {
+            document.language_id()
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum SingleDocumentError {
+    #[error("Expected a single text document, but found a notebook document: {0}")]
+    Notebook(Url),
+    #[error("Cell with URL {0} does not exist in the internal notebook document")]
+    CellDoesNotExist(Url),
 }

@@ -1,7 +1,7 @@
 use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_text_size::Ranged;
 
@@ -9,7 +9,8 @@ use ruff_text_size::Ranged;
 /// Checks for import statements that import the current module.
 ///
 /// ## Why is this bad?
-/// Importing a module from itself is a circular dependency.
+/// Importing a module from itself is a circular dependency and results
+/// in an `ImportError` exception.
 ///
 /// ## Example
 ///
@@ -20,8 +21,8 @@ use ruff_text_size::Ranged;
 ///
 /// def foo(): ...
 /// ```
-#[violation]
-pub struct ImportSelf {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportSelf {
     name: String,
 }
 

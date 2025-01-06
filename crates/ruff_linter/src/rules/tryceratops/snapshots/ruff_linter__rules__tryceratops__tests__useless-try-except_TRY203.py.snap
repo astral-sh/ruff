@@ -1,0 +1,149 @@
+---
+source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
+---
+TRY203.py:12:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+10 |       try:
+11 |           process()
+12 |       except Exception:
+   |  _____^
+13 | |         raise
+   | |_____________^ TRY203
+14 |   
+15 |   def bad():
+   |
+
+TRY203.py:18:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+16 |       try:
+17 |           process()
+18 |       except Exception:
+   |  _____^
+19 | |         raise
+20 | |         print("this code is pointless!")
+   | |________________________________________^ TRY203
+21 |   
+22 |   def bad():
+   |
+
+TRY203.py:25:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+23 |       try:
+24 |           process()
+25 |       except:
+   |  _____^
+26 | |         # I am a comment, not a statement!
+27 | |         raise
+   | |_____________^ TRY203
+28 |   
+29 |   def bad():
+   |
+
+TRY203.py:32:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+30 |       try:
+31 |           process()
+32 |       except Exception:
+   |  _____^
+33 | |         raise
+   | |_____________^ TRY203
+34 |   
+35 |   def bad():
+   |
+
+TRY203.py:38:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+36 |       try:
+37 |           process()
+38 |       except Exception as e:
+   |  _____^
+39 | |         raise
+   | |_____________^ TRY203
+40 |   
+41 |   def bad():
+   |
+
+TRY203.py:44:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+42 |       try:
+43 |           process()
+44 |       except Exception as e:
+   |  _____^
+45 | |         raise e
+   | |_______________^ TRY203
+46 |   
+47 |   def bad():
+   |
+
+TRY203.py:50:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+48 |       try:
+49 |           process()
+50 |       except MyException:
+   |  _____^
+51 | |         raise
+   | |_____________^ TRY203
+52 |       except Exception:
+53 |           raise
+   |
+
+TRY203.py:52:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+50 |       except MyException:
+51 |           raise
+52 |       except Exception:
+   |  _____^
+53 | |         raise
+   | |_____________^ TRY203
+54 |   
+55 |   def bad():
+   |
+
+TRY203.py:58:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+56 |       try:
+57 |           process()
+58 |       except MyException as e:
+   |  _____^
+59 | |         raise e
+   | |_______________^ TRY203
+60 |       except Exception as e:
+61 |           raise e
+   |
+
+TRY203.py:60:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+58 |       except MyException as e:
+59 |           raise e
+60 |       except Exception as e:
+   |  _____^
+61 | |         raise e
+   | |_______________^ TRY203
+62 |   
+63 |   def bad():
+   |
+
+TRY203.py:66:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+64 |       try:
+65 |           process()
+66 |       except MyException as ex:
+   |  _____^
+67 | |         raise ex
+   | |________________^ TRY203
+68 |       except Exception as e:
+69 |           raise e
+   |
+
+TRY203.py:68:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+66 |       except MyException as ex:
+67 |           raise ex
+68 |       except Exception as e:
+   |  _____^
+69 | |         raise e
+   | |_______________^ TRY203
+70 |   
+71 |   def fine():
+   |

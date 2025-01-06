@@ -2,8 +2,8 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
 use itertools::Itertools;
-use ruff_source_file::Locator;
 
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{has_leading_content, has_trailing_content, is_python_whitespace};
@@ -50,19 +50,19 @@ impl CommentRanges {
     }
 
     /// Returns `true` if a statement or expression includes at least one comment.
-    pub fn has_comments<T>(&self, node: &T, locator: &Locator) -> bool
+    pub fn has_comments<T>(&self, node: &T, source: &str) -> bool
     where
         T: Ranged,
     {
-        let start = if has_leading_content(node.start(), locator) {
+        let start = if has_leading_content(node.start(), source) {
             node.start()
         } else {
-            locator.line_start(node.start())
+            source.line_start(node.start())
         };
-        let end = if has_trailing_content(node.end(), locator) {
+        let end = if has_trailing_content(node.end(), source) {
             node.end()
         } else {
-            locator.line_end(node.end())
+            source.line_end(node.end())
         };
 
         self.intersects(TextRange::new(start, end))
@@ -98,7 +98,7 @@ impl CommentRanges {
     /// # contained within a multi-line string/comment
     /// """
     /// ```
-    pub fn block_comments(&self, locator: &Locator) -> Vec<TextSize> {
+    pub fn block_comments(&self, source: &str) -> Vec<TextSize> {
         let mut block_comments: Vec<TextSize> = Vec::new();
 
         let mut current_block: Vec<TextSize> = Vec::new();
@@ -109,12 +109,12 @@ impl CommentRanges {
 
         for comment_range in &self.raw {
             let offset = comment_range.start();
-            let line_start = locator.line_start(offset);
-            let line_end = locator.full_line_end(offset);
+            let line_start = source.line_start(offset);
+            let line_end = source.full_line_end(offset);
             let column = offset - line_start;
 
             // If this is an end-of-line comment, reset the current block.
-            if !Self::is_own_line(offset, locator) {
+            if !Self::is_own_line(offset, source) {
                 // Push the current block, and reset.
                 if current_block.len() > 1 && current_block_non_empty {
                     block_comments.extend(current_block);
@@ -129,7 +129,7 @@ impl CommentRanges {
             // If there's a blank line between this comment and the previous
             // comment, reset the current block.
             if prev_line_end.is_some_and(|prev_line_end| {
-                locator.contains_line_break(TextRange::new(prev_line_end, line_start))
+                source.contains_line_break(TextRange::new(prev_line_end, line_start))
             }) {
                 // Push the current block.
                 if current_block.len() > 1 && current_block_non_empty {
@@ -139,7 +139,7 @@ impl CommentRanges {
                 // Reset the block state.
                 current_block = vec![offset];
                 current_block_column = Some(column);
-                current_block_non_empty = !Self::is_empty(*comment_range, locator);
+                current_block_non_empty = !Self::is_empty(*comment_range, source);
                 prev_line_end = Some(line_end);
                 continue;
             }
@@ -148,7 +148,7 @@ impl CommentRanges {
                 if column == current_column {
                     // Add the comment to the current block.
                     current_block.push(offset);
-                    current_block_non_empty |= !Self::is_empty(*comment_range, locator);
+                    current_block_non_empty |= !Self::is_empty(*comment_range, source);
                     prev_line_end = Some(line_end);
                 } else {
                     // Push the current block.
@@ -159,7 +159,7 @@ impl CommentRanges {
                     // Reset the block state.
                     current_block = vec![offset];
                     current_block_column = Some(column);
-                    current_block_non_empty = !Self::is_empty(*comment_range, locator);
+                    current_block_non_empty = !Self::is_empty(*comment_range, source);
                     prev_line_end = Some(line_end);
                 }
             } else {
@@ -171,7 +171,7 @@ impl CommentRanges {
                 // Reset the block state.
                 current_block = vec![offset];
                 current_block_column = Some(column);
-                current_block_non_empty = !Self::is_empty(*comment_range, locator);
+                current_block_non_empty = !Self::is_empty(*comment_range, source);
                 prev_line_end = Some(line_end);
             }
         }
@@ -185,18 +185,14 @@ impl CommentRanges {
     }
 
     /// Returns `true` if the given range is an empty comment.
-    fn is_empty(range: TextRange, locator: &Locator) -> bool {
-        locator
-            .slice(range)
-            .chars()
-            .skip(1)
-            .all(is_python_whitespace)
+    fn is_empty(range: TextRange, source: &str) -> bool {
+        source[range].chars().skip(1).all(is_python_whitespace)
     }
 
     /// Returns `true` if a comment is an own-line comment (as opposed to an end-of-line comment).
-    fn is_own_line(offset: TextSize, locator: &Locator) -> bool {
-        let range = TextRange::new(locator.line_start(offset), offset);
-        locator.slice(range).chars().all(is_python_whitespace)
+    pub fn is_own_line(offset: TextSize, source: &str) -> bool {
+        let range = TextRange::new(source.line_start(offset), offset);
+        source[range].chars().all(is_python_whitespace)
     }
 }
 
@@ -215,10 +211,10 @@ impl Debug for CommentRanges {
 }
 
 impl<'a> IntoIterator for &'a CommentRanges {
-    type Item = &'a TextRange;
-    type IntoIter = std::slice::Iter<'a, TextRange>;
+    type Item = TextRange;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'a, TextRange>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.raw.iter()
+        self.raw.iter().copied()
     }
 }

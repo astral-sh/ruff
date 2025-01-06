@@ -25,7 +25,7 @@ jobs:
         run: ruff check --output-format=github .
 ```
 
-Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
+Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/astral-sh/ruff-action).
 
 By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
 any lint rule violations as per its [configuration](configuration.md).
@@ -46,13 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: chartboost/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
-      - uses: chartboost/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
@@ -61,14 +61,42 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
 - `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
 
-For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
+For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ```yaml
-- uses: chartboost/ruff-action@v1
+- uses: astral-sh/ruff-action@v3
   with:
-    version: 0.0.259
+    version: 0.8.0
     args: check --select B
     src: "./src"
+```
+
+## GitLab CI/CD
+
+You can add the following configuration to `.gitlab-ci.yml` to run a `ruff format` in parallel with a `ruff check` compatible with GitLab's codequality report.
+
+```yaml
+.base_ruff:
+  stage: build
+  interruptible: true
+  image:
+    name: ghcr.io/astral-sh/ruff:0.8.6-alpine
+  before_script:
+    - cd $CI_PROJECT_DIR
+    - ruff --version
+
+Ruff Check:
+  extends: .base_ruff
+  script:
+    - ruff check --output-format=gitlab > code-quality-report.json
+  artifacts:
+    reports:
+      codequality: $CI_PROJECT_DIR/code-quality-report.json
+
+Ruff Format:
+  extends: .base_ruff
+  script:
+    - ruff format --diff
 ```
 
 ## pre-commit
@@ -78,7 +106,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -91,7 +119,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -105,7 +133,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -131,3 +159,29 @@ When running without `--fix`, Ruff's formatter hook can be placed before or afte
 [mdformat](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins) is
 capable of formatting code blocks within Markdown. The [`mdformat-ruff`](https://github.com/Freed-Wu/mdformat-ruff)
 plugin enables mdformat to format Python code blocks with Ruff.
+
+
+## Docker
+
+Ruff provides a distroless Docker image including the `ruff` binary. The following tags are published:
+
+- `ruff:latest`
+- `ruff:{major}.{minor}.{patch}`, e.g., `ruff:0.6.6`
+- `ruff:{major}.{minor}`, e.g., `ruff:0.6` (the latest patch version)
+
+In addition, ruff publishes the following images:
+
+<!-- prettier-ignore -->
+- Based on `alpine:3.20`:
+  - `ruff:alpine`
+  - `ruff:alpine3.20`
+- Based on `debian:bookworm-slim`:
+  - `ruff:debian-slim`
+  - `ruff:bookworm-slim`
+- Based on `buildpack-deps:bookworm`:
+  - `ruff:debian`
+  - `ruff:bookworm`
+
+As with the distroless image, each image is published with ruff version tags as
+`ruff:{major}.{minor}.{patch}-{base}` and `ruff:{major}.{minor}-{base}`, e.g., `ruff:0.6.6-alpine`.
+

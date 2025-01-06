@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+snapshot_kind: text
 ---
 full_name.py:7:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
   |
@@ -317,5 +318,3 @@ full_name.py:47:1: PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^ PTH123
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
-
-

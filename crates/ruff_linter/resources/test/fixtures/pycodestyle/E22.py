@@ -180,3 +180,11 @@ x[~y]
 if i == -1:
     pass
 #:
+
+if a  ==  1:
+    print(a)
+
+
+# No E225: `=` is not an operator in this case
+def _[T: str=None](): ...
+def _(t: str=None): ...

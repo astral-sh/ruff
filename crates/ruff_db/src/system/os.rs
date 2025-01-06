@@ -6,8 +6,8 @@ use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
-    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 
 use super::walk_directory::{
@@ -16,7 +16,7 @@ use super::walk_directory::{
 };
 
 /// A system implementation that uses the OS file system.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }
@@ -64,9 +64,11 @@ impl System for OsSystem {
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
-        path.as_utf8_path()
-            .canonicalize_utf8()
-            .map(SystemPathBuf::from_utf8_path_buf)
+        path.as_utf8_path().canonicalize_utf8().map(|path| {
+            SystemPathBuf::from_utf8_path_buf(path)
+                .simplified()
+                .to_path_buf()
+        })
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -102,6 +104,30 @@ impl System for OsSystem {
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+    }
+
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        glob::PatternError,
+    > {
+        glob::glob(pattern).map(|inner| {
+            let iterator = inner.map(|result| {
+                let path = result?;
+
+                let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| GlobError {
+                    path,
+                    error: GlobErrorKind::NonUtf8Path,
+                })?;
+
+                Ok(system_path)
+            });
+
+            let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
+            boxed
+        })
     }
 
     fn as_any(&self) -> &dyn Any {

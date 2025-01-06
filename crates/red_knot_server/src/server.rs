@@ -1,6 +1,8 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+// The new PanicInfoHook name requires MSRV >= 1.82
+#[allow(deprecated)]
 use std::panic::PanicInfo;
 
 use lsp_server::Message;
@@ -119,6 +121,8 @@ impl Server {
     }
 
     pub(crate) fn run(self) -> crate::Result<()> {
+        // The new PanicInfoHook name requires MSRV >= 1.82
+        #[allow(deprecated)]
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,

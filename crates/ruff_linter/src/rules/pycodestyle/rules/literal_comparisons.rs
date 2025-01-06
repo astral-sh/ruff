@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -57,25 +57,26 @@ impl EqCmpOp {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
-#[violation]
-pub struct NoneComparison(EqCmpOp);
+#[derive(ViolationMetadata)]
+pub(crate) struct NoneComparison(EqCmpOp);
 
 impl AlwaysFixableViolation for NoneComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoneComparison(op) = self;
         match op {
-            EqCmpOp::Eq => format!("Comparison to `None` should be `cond is None`"),
-            EqCmpOp::NotEq => format!("Comparison to `None` should be `cond is not None`"),
+            EqCmpOp::Eq => "Comparison to `None` should be `cond is None`".to_string(),
+            EqCmpOp::NotEq => "Comparison to `None` should be `cond is not None`".to_string(),
         }
     }
 
     fn fix_title(&self) -> String {
         let NoneComparison(op) = self;
-        match op {
-            EqCmpOp::Eq => "Replace with `cond is None`".to_string(),
-            EqCmpOp::NotEq => "Replace with `cond is not None`".to_string(),
-        }
+        let title = match op {
+            EqCmpOp::Eq => "Replace with `cond is None`",
+            EqCmpOp::NotEq => "Replace with `cond is not None`",
+        };
+        title.to_string()
     }
 }
 
@@ -118,8 +119,8 @@ impl AlwaysFixableViolation for NoneComparison {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
-#[violation]
-pub struct TrueFalseComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct TrueFalseComparison {
     value: bool,
     op: EqCmpOp,
     cond: Option<SourceCodeSnippet>,
@@ -248,12 +249,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare
-        .ops
-        .iter()
-        .zip(compare.comparators.iter())
-        .enumerate()
-    {
+    for (index, (op, next)) in compare.ops.iter().zip(&compare.comparators).enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
@@ -341,7 +337,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             &compare.comparators,
             compare.into(),
             checker.comment_ranges(),
-            checker.locator(),
+            checker.source(),
         );
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

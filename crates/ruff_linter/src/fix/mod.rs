@@ -1,15 +1,15 @@
-use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
-use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 use crate::settings::types::UnsafeFixes;
+use crate::Locator;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -142,9 +142,11 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
     // Break ties in the event of overlapping rules, for some specific combinations.
     .then_with(|| match (&rule1, &rule2) {
-        // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-        (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
-        (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+        // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+        (Rule::MissingTrailingPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+        (Rule::NewLineAfterLastParagraph, Rule::MissingTrailingPeriod) => {
+            std::cmp::Ordering::Greater
+        }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
         (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
             std::cmp::Ordering::Less
@@ -158,13 +160,12 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::{Ranged, TextSize};
-
     use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
-    use ruff_source_file::Locator;
+    use ruff_text_size::{Ranged, TextSize};
 
     use crate::fix::{apply_fixes, FixResult};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
+    use crate::Locator;
 
     #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
@@ -226,8 +227,8 @@ print("hello world")
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker::new(10.into(), 10.into(),),
-                SourceMarker::new(10.into(), 21.into(),),
+                SourceMarker::new(10.into(), 10.into()),
+                SourceMarker::new(10.into(), 21.into()),
             ]
         );
     }
@@ -263,8 +264,8 @@ class A(Bar):
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker::new(8.into(), 8.into(),),
-                SourceMarker::new(14.into(), 11.into(),),
+                SourceMarker::new(8.into(), 8.into()),
+                SourceMarker::new(14.into(), 11.into()),
             ]
         );
     }
@@ -335,8 +336,8 @@ class A(object):
             &[
                 SourceMarker::new(8.into(), 8.into()),
                 SourceMarker::new(16.into(), 8.into()),
-                SourceMarker::new(22.into(), 14.into(),),
-                SourceMarker::new(30.into(), 14.into(),),
+                SourceMarker::new(22.into(), 14.into()),
+                SourceMarker::new(30.into(), 14.into()),
             ]
         );
     }
@@ -371,8 +372,8 @@ class A:
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker::new(7.into(), 7.into(),),
-                SourceMarker::new(15.into(), 7.into(),),
+                SourceMarker::new(7.into(), 7.into()),
+                SourceMarker::new(15.into(), 7.into()),
             ]
         );
     }

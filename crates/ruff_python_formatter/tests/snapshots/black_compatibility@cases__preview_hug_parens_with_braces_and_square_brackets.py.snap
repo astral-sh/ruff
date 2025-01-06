@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_hug_parens_with_braces_and_square_brackets.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -177,94 +178,7 @@ for foo in ["a", "b"]:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,43 +1,55 @@
- def foo_brackets(request):
--    return JsonResponse({
--        "var_1": foo,
--        "var_2": bar,
--    })
-+    return JsonResponse(
-+        {
-+            "var_1": foo,
-+            "var_2": bar,
-+        }
-+    )
- 
- 
- def foo_square_brackets(request):
--    return JsonResponse([
--        "var_1",
--        "var_2",
--    ])
-+    return JsonResponse(
-+        [
-+            "var_1",
-+            "var_2",
-+        ]
-+    )
- 
- 
--func({
--    "a": 37,
--    "b": 42,
--    "c": 927,
--    "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
--})
-+func(
-+    {
-+        "a": 37,
-+        "b": 42,
-+        "c": 927,
-+        "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
-+    }
-+)
- 
--func([
--    "random_string_number_one",
--    "random_string_number_two",
--    "random_string_number_three",
--    "random_string_number_four",
--])
-+func(
-+    [
-+        "random_string_number_one",
-+        "random_string_number_two",
-+        "random_string_number_three",
-+        "random_string_number_four",
-+    ]
-+)
- 
--func({
--    # expand me
--    "a": 37,
--    "b": 42,
--    "c": 927,
--})
-+func(
-+    {
-+        # expand me
-+        "a": 37,
-+        "b": 42,
-+        "c": 927,
-+    }
-+)
- 
--func([
--    "a",
--    "b",
--    "c",
--])
-+func(
-+    [
-+        "a",
-+        "b",
-+        "c",
-+    ]
-+)
- 
- func(
-     [
-@@ -47,17 +59,21 @@
+@@ -47,17 +47,21 @@
      ],
  )
  
@@ -296,67 +210,9 @@ for foo in ["a", "b"]:
  
  func(
      # preserve me
-@@ -68,38 +84,48 @@
-     ]
- )
- 
--func([  # preserve me but hug brackets
--    "c",
--    "d",
--    "e",
--])
-+func(
-+    [  # preserve me but hug brackets
-+        "c",
-+        "d",
-+        "e",
-+    ]
-+)
- 
--func([
--    # preserve me but hug brackets
--    "c",
--    "d",
--    "e",
--])
-+func(
-+    [
-+        # preserve me but hug brackets
-+        "c",
-+        "d",
-+        "e",
-+    ]
-+)
- 
--func([
--    "c",
--    # preserve me but hug brackets
--    "d",
--    "e",
--])
-+func(
-+    [
-+        "c",
-+        # preserve me but hug brackets
-+        "d",
-+        "e",
-+    ]
-+)
- 
--func([
--    "c",
--    "d",
--    "e",
--    # preserve me but hug brackets
--])
-+func(
-+    [
-+        "c",
-+        "d",
-+        "e",
-+        # preserve me but hug brackets
-+    ]
-+)
+@@ -95,11 +99,13 @@
+     # preserve me but hug brackets
+ ])
  
 -func([
 -    "c",
@@ -373,28 +229,21 @@ for foo in ["a", "b"]:
  
  func(
      [
-@@ -114,13 +140,15 @@
- func(
-     [x for x in "long line long line long line long line long line long line long line"]
+@@ -111,10 +117,10 @@
  )
--func([
--    x
--    for x in [
-+func(
-+    [
-         x
--        for x in "long line long line long line long line long line long line long line"
-+        for x in [
-+            x
-+            for x in "long line long line long line long line long line long line long line"
-+        ]
-     ]
--])
-+)
  
- foooooooooooooooooooo(
-     [{c: n + 1 for c in range(256)} for n in range(100)] + [{}], {size}
-@@ -131,10 +159,12 @@
+ func([x for x in "short line"])
+-func(
+-    [x for x in "long line long line long line long line long line long line long line"]
+-)
+ func([
++    x for x in "long line long line long line long line long line long line long line"
++])
++func([
+     x
+     for x in [
+         x
+@@ -131,10 +137,12 @@
  )
  
  nested_mapping = {
@@ -411,135 +260,64 @@ for foo in ["a", "b"]:
  }
  explicit_exploding = [
      [
-@@ -144,24 +174,34 @@
-         ],
-     ],
- ]
--single_item_do_not_explode = Context({
--    "version": get_docs_version(),
--})
-+single_item_do_not_explode = Context(
-+    {
-+        "version": get_docs_version(),
-+    }
-+)
- 
--foo(*[
--    str(i) for i in range(100000000000000000000000000000000000000000000000000000000000)
--])
-+foo(
-+    *[
-+        str(i)
-+        for i in range(100000000000000000000000000000000000000000000000000000000000)
-+    ]
-+)
- 
--foo(**{
--    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
--    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
--    "ccccccccccccccccccccccccccccccccc": 3,
--    **other,
--})
-+foo(
-+    **{
-+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
-+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
-+        "ccccccccccccccccccccccccccccccccc": 3,
-+        **other,
-+    }
-+)
- 
--foo(**{
--    x: y for x, y in enumerate(["long long long long line", "long long long long line"])
--})
-+foo(
-+    **{
-+        x: y
-+        for x, y in enumerate(["long long long long line", "long long long long line"])
-+    }
-+)
+@@ -164,9 +172,9 @@
+ })
  
  # Edge case when deciding whether to hug the brackets without inner content.
- very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
-@@ -169,11 +209,13 @@
- )
+-very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
+-    [[]]
+-)
++very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName([
++    []
++])
  
  for foo in ["a", "b"]:
--    output.extend([
--        individual
--        for
--        # Foobar
--        container in xs_by_y[foo]
--        # Foobar
--        for individual in container["nested"]
--    ])
-+    output.extend(
-+        [
-+            individual
-+            for
-+            # Foobar
-+            container in xs_by_y[foo]
-+            # Foobar
-+            for individual in container["nested"]
-+        ]
-+    )
+     output.extend([
 ```
 
 ## Ruff Output
 
 ```python
 def foo_brackets(request):
-    return JsonResponse(
-        {
-            "var_1": foo,
-            "var_2": bar,
-        }
-    )
+    return JsonResponse({
+        "var_1": foo,
+        "var_2": bar,
+    })
 
 
 def foo_square_brackets(request):
-    return JsonResponse(
-        [
-            "var_1",
-            "var_2",
-        ]
-    )
+    return JsonResponse([
+        "var_1",
+        "var_2",
+    ])
 
 
-func(
-    {
-        "a": 37,
-        "b": 42,
-        "c": 927,
-        "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
-    }
-)
+func({
+    "a": 37,
+    "b": 42,
+    "c": 927,
+    "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
+})
 
-func(
-    [
-        "random_string_number_one",
-        "random_string_number_two",
-        "random_string_number_three",
-        "random_string_number_four",
-    ]
-)
+func([
+    "random_string_number_one",
+    "random_string_number_two",
+    "random_string_number_three",
+    "random_string_number_four",
+])
 
-func(
-    {
-        # expand me
-        "a": 37,
-        "b": 42,
-        "c": 927,
-    }
-)
+func({
+    # expand me
+    "a": 37,
+    "b": 42,
+    "c": 927,
+})
 
-func(
-    [
-        "a",
-        "b",
-        "c",
-    ]
-)
+func([
+    "a",
+    "b",
+    "c",
+])
 
 func(
     [
@@ -574,40 +352,32 @@ func(
     ]
 )
 
-func(
-    [  # preserve me but hug brackets
-        "c",
-        "d",
-        "e",
-    ]
-)
+func([  # preserve me but hug brackets
+    "c",
+    "d",
+    "e",
+])
 
-func(
-    [
-        # preserve me but hug brackets
-        "c",
-        "d",
-        "e",
-    ]
-)
+func([
+    # preserve me but hug brackets
+    "c",
+    "d",
+    "e",
+])
 
-func(
-    [
-        "c",
-        # preserve me but hug brackets
-        "d",
-        "e",
-    ]
-)
+func([
+    "c",
+    # preserve me but hug brackets
+    "d",
+    "e",
+])
 
-func(
-    [
-        "c",
-        "d",
-        "e",
-        # preserve me but hug brackets
-    ]
-)
+func([
+    "c",
+    "d",
+    "e",
+    # preserve me but hug brackets
+])
 
 func(
     [
@@ -627,18 +397,16 @@ func(
 )
 
 func([x for x in "short line"])
-func(
-    [x for x in "long line long line long line long line long line long line long line"]
-)
-func(
-    [
+func([
+    x for x in "long line long line long line long line long line long line long line"
+])
+func([
+    x
+    for x in [
         x
-        for x in [
-            x
-            for x in "long line long line long line long line long line long line long line"
-        ]
+        for x in "long line long line long line long line long line long line long line"
     ]
-)
+])
 
 foooooooooooooooooooo(
     [{c: n + 1 for c in range(256)} for n in range(100)] + [{}], {size}
@@ -664,51 +432,39 @@ explicit_exploding = [
         ],
     ],
 ]
-single_item_do_not_explode = Context(
-    {
-        "version": get_docs_version(),
-    }
-)
+single_item_do_not_explode = Context({
+    "version": get_docs_version(),
+})
 
-foo(
-    *[
-        str(i)
-        for i in range(100000000000000000000000000000000000000000000000000000000000)
-    ]
-)
+foo(*[
+    str(i) for i in range(100000000000000000000000000000000000000000000000000000000000)
+])
 
-foo(
-    **{
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
-        "ccccccccccccccccccccccccccccccccc": 3,
-        **other,
-    }
-)
+foo(**{
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
+    "ccccccccccccccccccccccccccccccccc": 3,
+    **other,
+})
 
-foo(
-    **{
-        x: y
-        for x, y in enumerate(["long long long long line", "long long long long line"])
-    }
-)
+foo(**{
+    x: y for x, y in enumerate(["long long long long line", "long long long long line"])
+})
 
 # Edge case when deciding whether to hug the brackets without inner content.
-very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
-    [[]]
-)
+very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName([
+    []
+])
 
 for foo in ["a", "b"]:
-    output.extend(
-        [
-            individual
-            for
-            # Foobar
-            container in xs_by_y[foo]
-            # Foobar
-            for individual in container["nested"]
-        ]
-    )
+    output.extend([
+        individual
+        for
+        # Foobar
+        container in xs_by_y[foo]
+        # Foobar
+        for individual in container["nested"]
+    ])
 ```
 
 ## Black Output

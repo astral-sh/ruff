@@ -1,9 +1,9 @@
+use anyhow::bail;
 use ast::Expr;
-use log::error;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -47,18 +47,17 @@ use super::fix_with;
 ///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
-#[violation]
-pub struct MultipleWithStatements;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use a single `with` statement with multiple contexts instead of nested `with` \
-             statements"
-        )
+        "Use a single `with` statement with multiple contexts instead of nested `with` \
+            statements"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -171,26 +170,30 @@ pub(crate) fn multiple_with_statements(
             .comment_ranges()
             .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
         {
-            match fix_with::fix_multiple_with_statements(
-                checker.locator(),
-                checker.stylist(),
-                with_stmt,
-            ) {
-                Ok(edit) => {
-                    if edit.content().map_or(true, |content| {
-                        fits(
-                            content,
-                            with_stmt.into(),
-                            checker.locator(),
-                            checker.settings.pycodestyle.max_line_length,
-                            checker.settings.tab_size,
-                        )
-                    }) {
-                        diagnostic.set_fix(Fix::unsafe_edit(edit));
+            diagnostic.try_set_optional_fix(|| {
+                match fix_with::fix_multiple_with_statements(
+                    checker.locator(),
+                    checker.stylist(),
+                    with_stmt,
+                ) {
+                    Ok(edit) => {
+                        if edit.content().map_or(true, |content| {
+                            fits(
+                                content,
+                                with_stmt.into(),
+                                checker.locator(),
+                                checker.settings.pycodestyle.max_line_length,
+                                checker.settings.tab_size,
+                            )
+                        }) {
+                            Ok(Some(Fix::unsafe_edit(edit)))
+                        } else {
+                            Ok(None)
+                        }
                     }
+                    Err(err) => bail!("Failed to collapse `with`: {err}"),
                 }
-                Err(err) => error!("Failed to fix nested with: {err}"),
-            }
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

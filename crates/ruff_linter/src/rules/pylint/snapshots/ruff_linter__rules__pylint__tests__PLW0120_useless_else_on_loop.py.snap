@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 useless_else_on_loop.py:9:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
@@ -183,5 +184,3 @@ useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `brea
     145 |+    print("fat chance")
     146 |+    for j in range(10):
     147 |+        break
-
-

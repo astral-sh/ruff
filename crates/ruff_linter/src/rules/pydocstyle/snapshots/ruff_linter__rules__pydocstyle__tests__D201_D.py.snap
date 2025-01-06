@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
@@ -84,5 +85,3 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
 568 567 |     """Trailing and leading space.
 569 568 | 
 570 569 |     More content.
-
-

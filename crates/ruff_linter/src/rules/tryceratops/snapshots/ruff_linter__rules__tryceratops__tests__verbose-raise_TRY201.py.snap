@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
 ---
 TRY201.py:20:15: TRY201 [*] Use `raise` without specifying exception name
    |
@@ -53,5 +54,3 @@ TRY201.py:74:23: TRY201 [*] Use `raise` without specifying exception name
 73 73 |             def foo():
 74    |-                raise e
    74 |+                raise
-
-

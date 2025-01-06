@@ -3,20 +3,27 @@ source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
 AIR001.py:11:1: AIR001 Task variable name should match the `task_id`: "my_task"
    |
- 9 | my_task_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
-10 | 
-11 | incorrect_name = PythonOperator(task_id="my_task")
+10 | my_task = PythonOperator(task_id="my_task", callable=my_callable)
+11 | incorrect_name = PythonOperator(task_id="my_task")  # AIR001
    | ^^^^^^^^^^^^^^ AIR001
-12 | incorrect_name_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
+12 | 
+13 | my_task = AirbyteTriggerSyncOperator(task_id="my_task", callable=my_callable)
    |
 
-AIR001.py:12:1: AIR001 Task variable name should match the `task_id`: "my_task_2"
+AIR001.py:14:1: AIR001 Task variable name should match the `task_id`: "my_task"
    |
-11 | incorrect_name = PythonOperator(task_id="my_task")
-12 | incorrect_name_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
-   | ^^^^^^^^^^^^^^^^ AIR001
-13 | 
-14 | from my_module import MyClass
+13 | my_task = AirbyteTriggerSyncOperator(task_id="my_task", callable=my_callable)
+14 | incorrect_name = AirbyteTriggerSyncOperator(task_id="my_task")  # AIR001
+   | ^^^^^^^^^^^^^^ AIR001
+15 | 
+16 | my_task = AppflowFlowRunOperator(task_id="my_task", callable=my_callable)
    |
 
-
+AIR001.py:17:1: AIR001 Task variable name should match the `task_id`: "my_task"
+   |
+16 | my_task = AppflowFlowRunOperator(task_id="my_task", callable=my_callable)
+17 | incorrect_name = AppflowFlowRunOperator(task_id="my_task")  # AIR001
+   | ^^^^^^^^^^^^^^ AIR001
+18 | 
+19 | # Consider only from the `airflow.operators` (or providers operators) module
+   |

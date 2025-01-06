@@ -7,13 +7,12 @@ import json
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 import mdformat
 import yaml
-
-from _mdformat_utils import add_no_escape_text_plugin
 
 
 class Section(NamedTuple):
@@ -103,6 +102,72 @@ def clean_file_content(content: str, title: str) -> str:
     return f"# {title}\n\n" + content
 
 
+def generate_rule_metadata(rule_doc: Path) -> None:
+    """Add frontmatter metadata containing a rule's code and description.
+
+    For example:
+    ```yaml
+    ---
+    description: Checks for abstract classes without abstract methods or properties.
+    tags:
+    - B024
+    ---
+    ```
+    """
+    # Read the rule doc into lines.
+    with rule_doc.open("r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # Get the description and rule code from the rule doc lines.
+    rule_code = None
+    description = None
+    what_it_does_found = False
+    for line in lines:
+        if line == "\n":
+            continue
+
+        # Assume that the only first-level heading is the rule title and code.
+        #
+        # For example: given `# abstract-base-class-without-abstract-method (B024)`,
+        # extract the rule code (`B024`).
+        if line.startswith("# "):
+            rule_code = line.strip().rsplit("(", 1)
+            rule_code = rule_code[1][:-1]
+
+        if line.startswith("## What it does"):
+            what_it_does_found = True
+            continue  # Skip the '## What it does' line
+
+        if what_it_does_found and not description:
+            description = line.removesuffix("\n")
+
+        if all([rule_code, description]):
+            break
+    else:
+        if not rule_code:
+            raise ValueError("Missing title line")
+
+        if not what_it_does_found:
+            raise ValueError(f"Missing '## What it does' in {rule_doc}")
+
+    with rule_doc.open("w", encoding="utf-8") as f:
+        f.writelines(
+            "\n".join(
+                [
+                    "---",
+                    "description: |-",
+                    f"  {description}",
+                    "tags:",
+                    f"- {rule_code}",
+                    "---",
+                    "",
+                    "",
+                ]
+            )
+        )
+        f.writelines(lines)
+
+
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
     subprocess.run(["cargo", "dev", "generate-docs"], check=True)
@@ -162,10 +227,13 @@ def main() -> None:
 
             f.write(clean_file_content(file_content, title))
 
-    # Format rules docs
-    add_no_escape_text_plugin()
     for rule_doc in Path("docs/rules").glob("*.md"):
-        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
+        # Format rules docs. This has to be completed before adding the meta description
+        # otherwise the meta description will be formatted in a way that mkdocs does not
+        # support.
+        mdformat.file(rule_doc, extensions=["mkdocs"])
+
+        generate_rule_metadata(rule_doc)
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)

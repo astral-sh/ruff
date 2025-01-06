@@ -1,33 +1,40 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, comparable::ComparableExpr};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for redundant `Final[Literal[...]]` annotations.
 ///
 /// ## Why is this bad?
-/// A `Final[Literal[...]]` annotation can be replaced with `Final`; the literal
-/// use is unnecessary.
+/// All constant variables annotated as `Final` are understood as implicitly
+/// having `Literal` types by a type checker. As such, a `Final[Literal[...]]`
+/// annotation can often be replaced with a bare `Final`, annotation, which
+/// will have the same meaning to the type checker while being more concise and
+/// more readable.
 ///
 /// ## Example
 ///
 /// ```pyi
+/// from typing import Final, Literal
+///
 /// x: Final[Literal[42]]
 /// y: Final[Literal[42]] = 42
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// from typing import Final, Literal
+///
 /// x: Final = 42
 /// y: Final = 42
 /// ```
-#[violation]
-pub struct RedundantFinalLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantFinalLiteral {
     literal: SourceCodeSnippet,
 }
 

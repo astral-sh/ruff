@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, ExprLambda, Parameter, ParameterWithDefault};
 use ruff_text_size::Ranged;
@@ -43,13 +43,13 @@ use crate::checkers::ast::Checker;
 /// breaking change for callers that execute the lambda by passing arguments by
 /// name, as in: `foo(x=1, y=2)`. Since `func` does not define the arguments
 /// `x` and `y`, unlike the lambda, the call would raise a `TypeError`.
-#[violation]
-pub struct UnnecessaryLambda;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryLambda;
 
 impl AlwaysFixableViolation for UnnecessaryLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Lambda may be unnecessary; consider inlining inner function")
+        "Lambda may be unnecessary; consider inlining inner function".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -179,7 +179,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
             if call_posargs.len() != lambda_posargs.len() {
                 return;
             }
-            for (param, arg) in lambda_posargs.iter().zip(call_posargs.iter()) {
+            for (param, arg) in lambda_posargs.iter().zip(call_posargs) {
                 let Expr::Name(ast::ExprName { id, .. }) = arg else {
                     return;
                 };

@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -31,15 +31,13 @@ use ruff_text_size::Ranged;
 /// - [Mako documentation](https://www.makotemplates.org/)
 /// - [OpenStack security: Cross site scripting XSS](https://security.openstack.org/guidelines/dg_cross-site-scripting-xss.html)
 /// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
-#[violation]
-pub struct MakoTemplates;
+#[derive(ViolationMetadata)]
+pub(crate) struct MakoTemplates;
 
 impl Violation for MakoTemplates {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks"
-        )
+        "Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks".to_string()
     }
 }
 

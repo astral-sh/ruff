@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -35,8 +35,8 @@ use crate::settings::types::PythonVersion;
 ///     return x > 2
 /// ```
 ///
-#[violation]
-pub struct UnnecessaryDunderCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDunderCall {
     method: String,
     replacement: Option<String>,
 }
@@ -166,15 +166,21 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     );
 
     if let Some(mut fixed) = fixed {
-        // by the looks of it, we don't need to wrap the expression in parens if
-        // it's the only argument to a call expression.
-        // being in any other kind of expression though, we *will* add parens.
-        // e.g. `print(a.__add__(3))` -> `print(a + 3)` instead of `print((a + 3))`
-        // a multiplication expression example: `x = 2 * a.__add__(3)` -> `x = 2 * (a + 3)`
-        let wrap_in_paren = checker
-            .semantic()
-            .current_expression_parent()
-            .is_some_and(|parent| !can_be_represented_without_parentheses(parent));
+        let dunder = DunderReplacement::from_method(attr);
+
+        // We never need to wrap builtin functions in extra parens
+        // since function calls have high precedence
+        let wrap_in_paren = (!matches!(dunder, Some(DunderReplacement::Builtin(_,_))))
+        // By the looks of it, we don't need to wrap the expression in 
+        // parens if it's the only argument to a call expression.
+        // Being in any other kind of expression though, we *will* 
+        // add parens. e.g. `print(a.__add__(3))` -> `print(a + 3)`
+        //  instead of `print((a + 3))`
+        // and  `x = 2 * a.__add__(3)` -> `x = 2 * (a + 3)`
+            && checker
+                .semantic()
+                .current_expression_parent()
+                .is_some_and(|parent| !can_be_represented_without_parentheses(parent));
 
         if wrap_in_paren {
             fixed = format!("({fixed})");
@@ -248,7 +254,7 @@ impl DunderReplacement {
         match dunder_method {
             "__add__" => Some(Self::Operator("+", "Use `+` operator")),
             "__and__" => Some(Self::Operator("&", "Use `&` operator")),
-            "__contains__" => Some(Self::Operator("in", "Use `in` operator")),
+            "__contains__" => Some(Self::ROperator("in", "Use `in` operator")),
             "__eq__" => Some(Self::Operator("==", "Use `==` operator")),
             "__floordiv__" => Some(Self::Operator("//", "Use `//` operator")),
             "__ge__" => Some(Self::Operator(">=", "Use `>=` operator")),

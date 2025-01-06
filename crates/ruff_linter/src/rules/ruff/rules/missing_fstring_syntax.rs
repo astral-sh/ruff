@@ -1,18 +1,18 @@
+use memchr::memchr2_iter;
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
-
-use memchr::memchr2_iter;
-use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
+use crate::Locator;
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
@@ -35,7 +35,7 @@ use crate::rules::fastapi::rules::is_fastapi_route_call;
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
 /// 7. The string is part of a function call that is known to expect a template string rather than an
-///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [`fastAPI` path].
+///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [fastAPI path].
 ///
 /// ## Example
 ///
@@ -52,16 +52,16 @@ use crate::rules::fastapi::rules::is_fastapi_route_call;
 /// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
 ///
-/// [`logging`]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
-/// [`gettext`]: https://docs.python.org/3/library/gettext.html
-/// [`fastAPI` path]: https://fastapi.tiangolo.com/tutorial/path-params/
-#[violation]
-pub struct MissingFStringSyntax;
+/// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
+/// [gettext]: https://docs.python.org/3/library/gettext.html
+/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingFStringSyntax;
 
 impl AlwaysFixableViolation for MissingFStringSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Possible f-string without an `f` prefix"#)
+        r"Possible f-string without an `f` prefix".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -189,12 +189,12 @@ fn should_be_fstring(
         .filter_map(ast::Expr::as_call_expr)
     {
         let ast::Arguments { keywords, args, .. } = &expr.arguments;
-        for keyword in &**keywords {
+        for keyword in keywords {
             if let Some(ident) = keyword.arg.as_ref() {
                 arg_names.insert(&ident.id);
             }
         }
-        for arg in &**args {
+        for arg in args {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
                 arg_names.insert(id);
             }
@@ -209,7 +209,14 @@ fn should_be_fstring(
                     return false;
                 }
                 if semantic
-                    .lookup_symbol(id)
+                    // the parsed expression nodes have incorrect ranges
+                    // so we need to use the range of the literal for the
+                    // lookup in order to get reasonable results.
+                    .simulate_runtime_load_at_location_in_scope(
+                        id,
+                        literal.range(),
+                        semantic.scope_id,
+                    )
                     .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;

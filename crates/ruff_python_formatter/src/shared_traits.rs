@@ -18,7 +18,10 @@ impl<T, C> AsFormat<C> for &T
 where
     T: AsFormat<C>,
 {
-    type Format<'a> = T::Format<'a> where Self: 'a;
+    type Format<'a>
+        = T::Format<'a>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         AsFormat::format(&**self)

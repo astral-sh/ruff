@@ -1,14 +1,14 @@
+use glob::PatternError;
+use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_trivia::textwrap;
 use std::any::Any;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use ruff_notebook::{Notebook, NotebookError};
-use ruff_python_trivia::textwrap;
-
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 use crate::Db;
 
@@ -21,7 +21,7 @@ use super::walk_directory::WalkDirectoryBuilder;
 ///
 /// ## Warning
 /// Don't use this system for production code. It's intended for testing only.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct TestSystem {
     inner: TestSystemInner,
 }
@@ -121,6 +121,22 @@ impl System for TestSystem {
         }
     }
 
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        PatternError,
+    > {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => {
+                let iterator = fs.glob(pattern)?;
+                Ok(Box::new(iterator))
+            }
+            TestSystemInner::System(system) => system.glob(pattern),
+        }
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -142,7 +158,7 @@ impl System for TestSystem {
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         match &self.inner {
             TestSystemInner::System(fs) => fs.canonicalize_path(path),
-            TestSystemInner::Stub(fs) => Ok(fs.canonicalize(path)),
+            TestSystemInner::Stub(fs) => fs.canonicalize(path),
         }
     }
 }
@@ -159,19 +175,26 @@ pub trait DbWithTestSystem: Db + Sized {
     ///
     /// # Panics
     /// If the system isn't using the memory file system.
-    fn write_file(
-        &mut self,
-        path: impl AsRef<SystemPath>,
-        content: impl ToString,
-    ) -> crate::system::Result<()> {
+    fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
         let path = path.as_ref();
-        let result = self
-            .test_system()
-            .memory_file_system()
-            .write_file(path, content);
+
+        let memory_fs = self.test_system().memory_file_system();
+
+        let sync_ancestors = path
+            .parent()
+            .is_some_and(|parent| !memory_fs.exists(parent));
+        let result = memory_fs.write_file(path, content);
 
         if result.is_ok() {
             File::sync_path(self, path);
+
+            // Sync the ancestor paths if the path's parent
+            // directory didn't exist before.
+            if sync_ancestors {
+                for ancestor in path.ancestors() {
+                    File::sync_path(self, ancestor);
+                }
+            }
         }
 
         result
@@ -229,7 +252,7 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum TestSystemInner {
     Stub(MemoryFileSystem),
     System(Arc<dyn System + RefUnwindSafe + Send + Sync>),

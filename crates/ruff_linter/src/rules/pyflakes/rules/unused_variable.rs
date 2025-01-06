@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Stmt};
@@ -43,8 +43,8 @@ use crate::fix::edits::delete_stmt;
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
-#[violation]
-pub struct UnusedVariable {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedVariable {
     pub name: String,
 }
 
@@ -183,7 +183,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 };
             }
         } else {
-            let name = binding.name(checker.locator());
+            let name = binding.name(checker.source());
             let renamed = format!("_{name}");
             if checker.settings.dummy_variable_rgx.is_match(&renamed) {
                 let edit = Edit::range_replacement(renamed, binding.range());

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+snapshot_kind: text
 ---
 A006.py:1:8: A006 Lambda argument `print` is shadowing a Python builtin
   |
@@ -61,4 +62,6 @@ A006.py:5:8: A006 Lambda argument `dir` is shadowing a Python builtin
 4 | lambda id: id
 5 | lambda dir: dir
   |        ^^^ A006
+6 | 
+7 | # Ok for A006 - should trigger A002 instead
   |

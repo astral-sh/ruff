@@ -34,7 +34,10 @@ pub(crate) struct AstIds {
 
 impl AstIds {
     fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
-        self.expressions_map[&key.into()]
+        let key = &key.into();
+        *self.expressions_map.get(key).unwrap_or_else(|| {
+            panic!("Could not find expression ID for {key:?}");
+        })
     }
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
@@ -46,56 +49,50 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
-pub trait HasScopedUseId {
-    /// The type of the ID uniquely identifying the use.
-    type Id: Copy;
-
-    /// Returns the ID that uniquely identifies the use in `scope`.
-    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
-}
-
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
 pub struct ScopedUseId;
 
-impl HasScopedUseId for ast::ExprName {
-    type Id = ScopedUseId;
+pub trait HasScopedUseId {
+    /// Returns the ID that uniquely identifies the use in `scope`.
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId;
+}
 
-    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+impl HasScopedUseId for ast::ExprName {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let expression_ref = ExpressionRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
 }
 
 impl HasScopedUseId for ast::ExpressionRef<'_> {
-    type Id = ScopedUseId;
-
-    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(*self)
     }
-}
-
-pub trait HasScopedAstId {
-    /// The type of the ID uniquely identifying the node.
-    type Id: Copy;
-
-    /// Returns the ID that uniquely identifies the node in `scope`.
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
 }
 
 /// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
 pub struct ScopedExpressionId;
 
+pub trait HasScopedExpressionId {
+    /// Returns the ID that uniquely identifies the node in `scope`.
+    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId;
+}
+
+impl<T: HasScopedExpressionId> HasScopedExpressionId for Box<T> {
+    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
+        self.as_ref().scoped_expression_id(db, scope)
+    }
+}
+
 macro_rules! impl_has_scoped_expression_id {
     ($ty: ty) => {
-        impl HasScopedAstId for $ty {
-            type Id = ScopedExpressionId;
-
-            fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+        impl HasScopedExpressionId for $ty {
+            fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
                 let expression_ref = ExpressionRef::from(self);
-                expression_ref.scoped_ast_id(db, scope)
+                expression_ref.scoped_expression_id(db, scope)
             }
         }
     };
@@ -135,29 +132,20 @@ impl_has_scoped_expression_id!(ast::ExprSlice);
 impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand);
 impl_has_scoped_expression_id!(ast::Expr);
 
-impl HasScopedAstId for ast::ExpressionRef<'_> {
-    type Id = ScopedExpressionId;
-
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+impl HasScopedExpressionId for ast::ExpressionRef<'_> {
+    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.expression_id(*self)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
-    pub(super) fn new() -> Self {
-        Self {
-            expressions_map: FxHashMap::default(),
-            uses_map: FxHashMap::default(),
-        }
-    }
-
     /// Adds `expr` to the expression ids map and returns its id.
     pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
         let expression_id = self.expressions_map.len().into();

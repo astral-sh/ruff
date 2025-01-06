@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -24,13 +24,13 @@ use crate::checkers::ast::Checker;
 /// class Foo:
 ///     ...
 /// ```
-#[violation]
-pub struct UnnecessaryClassParentheses;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryClassParentheses;
 
 impl AlwaysFixableViolation for UnnecessaryClassParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses after class definition")
+        "Unnecessary parentheses after class definition".to_string()
     }
 
     fn fix_title(&self) -> String {

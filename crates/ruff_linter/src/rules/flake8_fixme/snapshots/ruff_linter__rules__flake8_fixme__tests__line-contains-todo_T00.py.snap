@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_fixme/mod.rs
+snapshot_kind: text
 ---
 T00.py:1:3: FIX002 Line contains TODO, consider resolving the issue
   |
@@ -18,4 +19,10 @@ T00.py:2:3: FIX002 Line contains TODO, consider resolving the issue
 4 | # xxx: xxx
   |
 
-
+T00.py:10:10: FIX002 Line contains TODO, consider resolving the issue
+   |
+ 8 | # fixme: fixme
+ 9 | 
+10 | # test # TODO: todo
+   |          ^^^^ FIX002
+   |

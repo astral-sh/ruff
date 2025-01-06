@@ -1,9 +1,9 @@
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::except;
-use ruff_source_file::Locator;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last
@@ -43,13 +43,13 @@ use ruff_source_file::Locator;
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-#[violation]
-pub struct DefaultExceptNotLast;
+#[derive(ViolationMetadata)]
+pub(crate) struct DefaultExceptNotLast;
 
 impl Violation for DefaultExceptNotLast {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("An `except` block as not the last exception handler")
+        "An `except` block as not the last exception handler".to_string()
     }
 }
 

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -33,13 +33,13 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// except ValueError:
 ///     logger.exception("Found an error")
 /// ```
-#[violation]
-pub struct VerboseLogMessage;
+#[derive(ViolationMetadata)]
+pub(crate) struct VerboseLogMessage;
 
 impl Violation for VerboseLogMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Redundant exception object included in `logging.exception` call")
+        "Redundant exception object included in `logging.exception` call".to_string()
     }
 }
 

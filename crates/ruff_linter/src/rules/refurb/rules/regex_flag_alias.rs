@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -32,8 +32,8 @@ use crate::importer::ImportRequest;
 ///     ...
 /// ```
 ///
-#[violation]
-pub struct RegexFlagAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct RegexFlagAlias {
     flag: RegexFlag,
 }
 

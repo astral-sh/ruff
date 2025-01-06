@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -45,8 +45,8 @@ impl fmt::Display for VarKind {
 ///
 /// _T = TypeVar("_T")
 /// ```
-#[violation]
-pub struct UnprefixedTypeParam {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnprefixedTypeParam {
     kind: VarKind,
 }
 

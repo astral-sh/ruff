@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -34,8 +34,8 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// async def func():
 ///     await trio.sleep_forever()
 /// ```
-#[violation]
-pub struct LongSleepNotForever {
+#[derive(ViolationMetadata)]
+pub(crate) struct LongSleepNotForever {
     module: AsyncModule,
 }
 
@@ -67,7 +67,7 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument("seconds", 0) else {
+    let Some(arg) = call.arguments.find_argument_value("seconds", 0) else {
         return;
     };
 

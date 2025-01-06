@@ -1,13 +1,13 @@
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Result};
 use libcst_native::{Arg, Expression};
-use once_cell::sync::Lazy;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -15,8 +15,8 @@ use crate::cst::matchers::{
     match_attribute, match_call_mut, match_expression, transform_expression_text,
 };
 use crate::fix::codemods::CodegenStylist;
-
 use crate::rules::pyflakes::format::FormatSummary;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary positional indices in format strings.
@@ -42,15 +42,15 @@ use crate::rules::pyflakes::format::FormatSummary;
 /// ## References
 /// - [Python documentation: Format String Syntax](https://docs.python.org/3/library/string.html#format-string-syntax)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct FormatLiterals;
+#[derive(ViolationMetadata)]
+pub(crate) struct FormatLiterals;
 
 impl Violation for FormatLiterals {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use implicit references for positional format fields")
+        "Use implicit references for positional format fields".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -127,8 +127,8 @@ fn is_sequential(indices: &[usize]) -> bool {
 
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.
-static FORMAT_SPECIFIER: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
+static FORMAT_SPECIFIER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
 
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {

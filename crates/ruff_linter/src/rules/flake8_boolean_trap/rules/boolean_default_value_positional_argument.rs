@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
 use ruff_python_semantic::analyze::visibility;
@@ -89,13 +89,13 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
-#[violation]
-pub struct BooleanDefaultValuePositionalArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct BooleanDefaultValuePositionalArgument;
 
 impl Violation for BooleanDefaultValuePositionalArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Boolean default positional argument in function definition")
+        "Boolean default positional argument in function definition".to_string()
     }
 }
 
@@ -106,6 +106,10 @@ pub(crate) fn boolean_default_value_positional_argument(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     // Allow Boolean defaults in explicitly-allowed functions.
     if is_allowed_func_def(name) {
         return;

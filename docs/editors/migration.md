@@ -4,6 +4,7 @@ While `ruff server` supports the same feature set as [`ruff-lsp`](https://github
 `ruff server` may require changes to your Ruff or language server configuration.
 
 !!! note
+
     The [VS Code extension](https://github.com/astral-sh/ruff-vscode) settings include documentation to indicate which
     settings are supported by `ruff server`. As such, this migration guide is primarily targeted at editors that lack
     explicit documentation for `ruff server` settings, such as Helix or Neovim.
@@ -20,6 +21,7 @@ Several `ruff-lsp` settings are not supported by `ruff server`. These are, as fo
 - `path`
 
 !!! note
+
     Some of these settings, like `interpreter` and `path`, are still accepted by the VS Code
     extension. `path`, in particular, can be used to specify a dedicated binary to use when
     initializing `ruff server`. But the language server itself will no longer accept such settings.

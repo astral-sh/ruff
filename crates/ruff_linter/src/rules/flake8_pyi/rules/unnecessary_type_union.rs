@@ -1,6 +1,6 @@
 use ast::ExprContext;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
@@ -25,10 +25,16 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// field: type[int | float] | str
 /// ```
-#[violation]
-pub struct UnnecessaryTypeUnion {
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
+///
+/// Note that while the fix may flatten nested unions into a single top-level union,
+/// the semantics of the annotation will remain unchanged.
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryTypeUnion {
     members: Vec<Name>,
-    is_pep604_union: bool,
+    union_kind: UnionKind,
 }
 
 impl Violation for UnnecessaryTypeUnion {
@@ -36,10 +42,9 @@ impl Violation for UnnecessaryTypeUnion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let union_str = if self.is_pep604_union {
-            format!("{}", self.members.join(" | "))
-        } else {
-            format!("Union[{}]", self.members.join(", "))
+        let union_str = match self.union_kind {
+            UnionKind::PEP604 => self.members.join(" | "),
+            UnionKind::TypingUnion => format!("Union[{}]", self.members.join(", ")),
         };
 
         format!(
@@ -48,7 +53,7 @@ impl Violation for UnnecessaryTypeUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Combine multiple `type` members"))
+        Some("Combine multiple `type` members".to_string())
     }
 }
 
@@ -63,43 +68,90 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
 
     // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`
     let subscript = union.as_subscript_expr();
-    if subscript.is_some_and(|subscript| !semantic.match_typing_expr(&subscript.value, "Union")) {
-        return;
-    }
+    let mut union_kind = match subscript {
+        Some(subscript) => {
+            if !semantic.match_typing_expr(&subscript.value, "Union") {
+                return;
+            }
+            UnionKind::TypingUnion
+        }
+        None => UnionKind::PEP604,
+    };
 
     let mut type_exprs: Vec<&Expr> = Vec::new();
     let mut other_exprs: Vec<&Expr> = Vec::new();
 
-    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| match expr {
-        Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
-            if semantic.match_builtin_expr(value, "type") {
-                type_exprs.push(slice);
-            } else {
-                other_exprs.push(expr);
-            }
+    let mut collect_type_exprs = |expr: &'a Expr, parent: &'a Expr| {
+        // If a PEP604-style union is used within a `typing.Union`, then the fix can
+        // use PEP604-style unions.
+        if matches!(parent, Expr::BinOp(_)) {
+            union_kind = UnionKind::PEP604;
         }
-        _ => other_exprs.push(expr),
+        match expr {
+            Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
+                // The annotation `type[a, b]` is not valid since `type` accepts
+                // a single parameter. This likely is a confusion with `type[a | b]` or
+                // `type[Union[a, b]]`. Do not emit a diagnostic for invalid type
+                // annotations.
+                if !matches!(**slice, Expr::Tuple(_)) && semantic.match_builtin_expr(value, "type")
+                {
+                    type_exprs.push(slice);
+                } else {
+                    other_exprs.push(expr);
+                }
+            }
+            _ => other_exprs.push(expr),
+        }
     };
 
     traverse_union(&mut collect_type_exprs, semantic, union);
 
-    if type_exprs.len() > 1 {
-        let type_members: Vec<Name> = type_exprs
-            .clone()
-            .into_iter()
-            .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
-            .collect();
+    // Return if zero or one `type` expressions are found.
+    if type_exprs.len() <= 1 {
+        return;
+    }
 
-        let mut diagnostic = Diagnostic::new(
-            UnnecessaryTypeUnion {
-                members: type_members.clone(),
-                is_pep604_union: subscript.is_none(),
-            },
-            union.range(),
-        );
+    let type_members: Vec<Name> = type_exprs
+        .iter()
+        .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
+        .collect();
 
-        if semantic.has_builtin_binding("type") {
-            let content = if let Some(subscript) = subscript {
+    let mut diagnostic = Diagnostic::new(
+        UnnecessaryTypeUnion {
+            members: type_members.clone(),
+            union_kind,
+        },
+        union.range(),
+    );
+
+    if semantic.has_builtin_binding("type") {
+        // Construct the content for the [`Fix`] based on if we encountered a PEP604 union.
+        let content = match union_kind {
+            UnionKind::PEP604 => {
+                let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
+                let types = Expr::Subscript(ast::ExprSubscript {
+                    value: Box::new(Expr::Name(ast::ExprName {
+                        id: Name::new_static("type"),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    })),
+                    slice: Box::new(pep_604_union(&elts)),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                });
+
+                if other_exprs.is_empty() {
+                    checker.generator().expr(&types)
+                } else {
+                    let elts: Vec<Expr> = std::iter::once(types)
+                        .chain(other_exprs.into_iter().cloned())
+                        .collect();
+                    checker.generator().expr(&pep_604_union(&elts))
+                }
+            }
+            UnionKind::TypingUnion => {
+                // When subscript is None, it uses the previous match case.
+                let subscript = subscript.unwrap();
                 let types = &Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {
                         id: Name::new_static("type"),
@@ -151,35 +203,29 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
 
                     checker.generator().expr(&union)
                 }
-            } else {
-                let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
-                let types = Expr::Subscript(ast::ExprSubscript {
-                    value: Box::new(Expr::Name(ast::ExprName {
-                        id: Name::new_static("type"),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                    })),
-                    slice: Box::new(pep_604_union(&elts)),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                });
+            }
+        };
 
-                if other_exprs.is_empty() {
-                    checker.generator().expr(&types)
-                } else {
-                    let elts: Vec<Expr> = std::iter::once(types)
-                        .chain(other_exprs.into_iter().cloned())
-                        .collect();
-                    checker.generator().expr(&pep_604_union(&elts))
-                }
-            };
+        // Mark [`Fix`] as unsafe when comments are in range.
+        let applicability = if checker.comment_ranges().intersects(union.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                union.range(),
-            )));
-        }
-
-        checker.diagnostics.push(diagnostic);
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(content, union.range()),
+            applicability,
+        ));
     }
+
+    checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnionKind {
+    /// E.g., `typing.Union[int, str]`
+    TypingUnion,
+    /// E.g., `int | str`
+    PEP604,
 }

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-#[violation]
-pub struct ForLoopSetMutations {
+#[derive(ViolationMetadata)]
+pub(crate) struct ForLoopSetMutations {
     method_name: &'static str,
     batch_method_name: &'static str,
 }

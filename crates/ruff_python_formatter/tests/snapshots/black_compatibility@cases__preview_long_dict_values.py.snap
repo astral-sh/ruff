@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_dict_values.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -114,37 +115,19 @@ class Random:
  }
  
  {
-@@ -52,16 +46,18 @@
- class Random:
-     def func():
-         random_service.status.active_states.inactive = (
--            make_new_top_level_state_from_dict({
--                "topLevelBase": {
--                    "secondaryBase": {
--                        "timestamp": 1234,
--                        "latitude": 1,
--                        "longitude": 2,
+@@ -58,9 +52,9 @@
+                         "timestamp": 1234,
+                         "latitude": 1,
+                         "longitude": 2,
 -                        "actionTimestamp": (
 -                            Timestamp(seconds=1530584000, nanos=0).ToJsonString()
 -                        ),
--                    }
--                },
--            })
-+            make_new_top_level_state_from_dict(
-+                {
-+                    "topLevelBase": {
-+                        "secondaryBase": {
-+                            "timestamp": 1234,
-+                            "latitude": 1,
-+                            "longitude": 2,
-+                            "actionTimestamp": Timestamp(
-+                                seconds=1530584000, nanos=0
-+                            ).ToJsonString(),
-+                        }
-+                    },
-+                }
-+            )
-         )
++                        "actionTimestamp": Timestamp(
++                            seconds=1530584000, nanos=0
++                        ).ToJsonString(),
+                     }
+                 },
+             })
 ```
 
 ## Ruff Output
@@ -198,20 +181,18 @@ my_dict = {
 class Random:
     def func():
         random_service.status.active_states.inactive = (
-            make_new_top_level_state_from_dict(
-                {
-                    "topLevelBase": {
-                        "secondaryBase": {
-                            "timestamp": 1234,
-                            "latitude": 1,
-                            "longitude": 2,
-                            "actionTimestamp": Timestamp(
-                                seconds=1530584000, nanos=0
-                            ).ToJsonString(),
-                        }
-                    },
-                }
-            )
+            make_new_top_level_state_from_dict({
+                "topLevelBase": {
+                    "secondaryBase": {
+                        "timestamp": 1234,
+                        "latitude": 1,
+                        "longitude": 2,
+                        "actionTimestamp": Timestamp(
+                            seconds=1530584000, nanos=0
+                        ).ToJsonString(),
+                    }
+                },
+            })
         )
 ```
 

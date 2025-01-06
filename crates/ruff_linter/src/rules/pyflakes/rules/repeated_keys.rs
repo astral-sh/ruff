@@ -1,8 +1,9 @@
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use std::collections::hash_map::Entry;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableExpr;
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -41,9 +42,10 @@ use crate::registry::Rule;
 ///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
-#[violation]
-pub struct MultiValueRepeatedKeyLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
+    existing: SourceCodeSnippet,
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
@@ -51,21 +53,29 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyLiteral { name } = self;
-        if let Some(name) = name.full_display() {
-            format!("Dictionary key literal `{name}` repeated")
-        } else {
-            format!("Dictionary key literal repeated")
+        match (self.name.full_display(), self.existing.full_display()) {
+            (Some(name), None) => {
+                format!("Dictionary key literal `{name}` repeated")
+            }
+            (Some(name), Some(existing)) => {
+                if name == existing {
+                    format!("Dictionary key literal `{name}` repeated")
+                } else {
+                    format!(
+                        "Dictionary key literal `{name}` repeated (`{name}` hashes to the same value as `{existing}`)"
+                    )
+                }
+            }
+            _ => "Dictionary key literal repeated".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let MultiValueRepeatedKeyLiteral { name } = self;
-        if let Some(name) = name.full_display() {
-            Some(format!("Remove repeated key literal `{name}`"))
-        } else {
-            Some(format!("Remove repeated key literal"))
-        }
+        let title = match self.name.full_display() {
+            Some(name) => format!("Remove repeated key literal `{name}`"),
+            None => "Remove repeated key literal".to_string(),
+        };
+        Some(title)
     }
 }
 
@@ -98,8 +108,8 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 ///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
-#[violation]
-pub struct MultiValueRepeatedKeyVariable {
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }
 
@@ -108,28 +118,26 @@ impl Violation for MultiValueRepeatedKeyVariable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyVariable { name } = self;
-        if let Some(name) = name.full_display() {
+        if let Some(name) = self.name.full_display() {
             format!("Dictionary key `{name}` repeated")
         } else {
-            format!("Dictionary key repeated")
+            "Dictionary key repeated".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let MultiValueRepeatedKeyVariable { name } = self;
-        if let Some(name) = name.full_display() {
-            Some(format!("Remove repeated key `{name}`"))
-        } else {
-            Some(format!("Remove repeated key"))
-        }
+        let title = match self.name.full_display() {
+            Some(name) => format!("Remove repeated key `{name}`"),
+            None => "Remove repeated key".to_string(),
+        };
+        Some(title)
     }
 }
 
 /// F601, F602
 pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
-    let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
+    let mut seen: FxHashMap<HashableExpr, (&Expr, FxHashSet<ComparableExpr>)> =
         FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
 
     // Detect duplicate keys.
@@ -138,86 +146,92 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
             continue;
         };
 
-        let comparable_key = ComparableExpr::from(key);
+        let comparable_key = HashableExpr::from(key);
         let comparable_value = ComparableExpr::from(value);
 
-        let Some(seen_values) = seen.get_mut(&comparable_key) else {
-            seen.insert(comparable_key, FxHashSet::from_iter([comparable_value]));
-            continue;
-        };
-
-        match key {
-            Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::Tuple(_)
-            | Expr::FString(_) => {
-                if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                    let mut diagnostic = Diagnostic::new(
-                        MultiValueRepeatedKeyLiteral {
-                            name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                        },
-                        key.range(),
-                    );
-                    if !seen_values.insert(comparable_value) {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                            parenthesized_range(
-                                dict.value(i - 1).into(),
-                                dict.into(),
-                                checker.comment_ranges(),
-                                checker.locator().contents(),
-                            )
-                            .unwrap_or_else(|| dict.value(i - 1).range())
-                            .end(),
-                            parenthesized_range(
-                                dict.value(i).into(),
-                                dict.into(),
-                                checker.comment_ranges(),
-                                checker.locator().contents(),
-                            )
-                            .unwrap_or_else(|| dict.value(i).range())
-                            .end(),
-                        )));
+        match seen.entry(comparable_key) {
+            Entry::Vacant(entry) => {
+                entry.insert((key, FxHashSet::from_iter([comparable_value])));
+            }
+            Entry::Occupied(mut entry) => {
+                let (seen_key, seen_values) = entry.get_mut();
+                match key {
+                    Expr::StringLiteral(_)
+                    | Expr::BytesLiteral(_)
+                    | Expr::NumberLiteral(_)
+                    | Expr::BooleanLiteral(_)
+                    | Expr::NoneLiteral(_)
+                    | Expr::EllipsisLiteral(_)
+                    | Expr::Tuple(_)
+                    | Expr::FString(_) => {
+                        if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
+                            let mut diagnostic = Diagnostic::new(
+                                MultiValueRepeatedKeyLiteral {
+                                    name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                                    existing: SourceCodeSnippet::from_str(
+                                        checker.locator().slice(*seen_key),
+                                    ),
+                                },
+                                key.range(),
+                            );
+                            if !seen_values.insert(comparable_value) {
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                                    parenthesized_range(
+                                        dict.value(i - 1).into(),
+                                        dict.into(),
+                                        checker.comment_ranges(),
+                                        checker.locator().contents(),
+                                    )
+                                    .unwrap_or_else(|| dict.value(i - 1).range())
+                                    .end(),
+                                    parenthesized_range(
+                                        dict.value(i).into(),
+                                        dict.into(),
+                                        checker.comment_ranges(),
+                                        checker.locator().contents(),
+                                    )
+                                    .unwrap_or_else(|| dict.value(i).range())
+                                    .end(),
+                                )));
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
                     }
-                    checker.diagnostics.push(diagnostic);
+                    Expr::Name(_) => {
+                        if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
+                            let mut diagnostic = Diagnostic::new(
+                                MultiValueRepeatedKeyVariable {
+                                    name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                                },
+                                key.range(),
+                            );
+                            let comparable_value: ComparableExpr = dict.value(i).into();
+                            if !seen_values.insert(comparable_value) {
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                                    parenthesized_range(
+                                        dict.value(i - 1).into(),
+                                        dict.into(),
+                                        checker.comment_ranges(),
+                                        checker.locator().contents(),
+                                    )
+                                    .unwrap_or_else(|| dict.value(i - 1).range())
+                                    .end(),
+                                    parenthesized_range(
+                                        dict.value(i).into(),
+                                        dict.into(),
+                                        checker.comment_ranges(),
+                                        checker.locator().contents(),
+                                    )
+                                    .unwrap_or_else(|| dict.value(i).range())
+                                    .end(),
+                                )));
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                    }
+                    _ => {}
                 }
             }
-            Expr::Name(_) => {
-                if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                    let mut diagnostic = Diagnostic::new(
-                        MultiValueRepeatedKeyVariable {
-                            name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                        },
-                        key.range(),
-                    );
-                    let comparable_value: ComparableExpr = dict.value(i).into();
-                    if !seen_values.insert(comparable_value) {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                            parenthesized_range(
-                                dict.value(i - 1).into(),
-                                dict.into(),
-                                checker.comment_ranges(),
-                                checker.locator().contents(),
-                            )
-                            .unwrap_or_else(|| dict.value(i - 1).range())
-                            .end(),
-                            parenthesized_range(
-                                dict.value(i).into(),
-                                dict.into(),
-                                checker.comment_ranges(),
-                                checker.locator().contents(),
-                            )
-                            .unwrap_or_else(|| dict.value(i).range())
-                            .end(),
-                        )));
-                    }
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            _ => {}
         }
     }
 }

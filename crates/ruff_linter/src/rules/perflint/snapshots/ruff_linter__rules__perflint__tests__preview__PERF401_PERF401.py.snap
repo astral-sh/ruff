@@ -1,0 +1,508 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF401.py:6:13: PERF401 [*] Use a list comprehension to create a transformed list
+  |
+4 |     for i in items:
+5 |         if i % 2:
+6 |             result.append(i)  # PERF401
+  |             ^^^^^^^^^^^^^^^^ PERF401
+  |
+  = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+1 1 | def f():
+2 2 |     items = [1, 2, 3, 4]
+3   |-    result = []
+4   |-    for i in items:
+5   |-        if i % 2:
+6   |-            result.append(i)  # PERF401
+  3 |+    result = [i for i in items if i % 2]  # PERF401
+7 4 | 
+8 5 | 
+9 6 | def f():
+
+PERF401.py:13:9: PERF401 [*] Use a list comprehension to create a transformed list
+   |
+11 |     result = []
+12 |     for i in items:
+13 |         result.append(i * i)  # PERF401
+   |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+   |
+   = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+8  8  | 
+9  9  | def f():
+10 10 |     items = [1, 2, 3, 4]
+11    |-    result = []
+12    |-    for i in items:
+13    |-        result.append(i * i)  # PERF401
+   11 |+    result = [i * i for i in items]  # PERF401
+14 12 | 
+15 13 | 
+16 14 | def f():
+
+PERF401.py:82:13: PERF401 [*] Use an async list comprehension to create a transformed list
+   |
+80 |     async for i in items:
+81 |         if i % 2:
+82 |             result.append(i)  # PERF401
+   |             ^^^^^^^^^^^^^^^^ PERF401
+   |
+   = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | async def f():
+78 78 |     items = [1, 2, 3, 4]
+79    |-    result = []
+80    |-    async for i in items:
+81    |-        if i % 2:
+82    |-            result.append(i)  # PERF401
+   79 |+    result = [i async for i in items if i % 2]  # PERF401
+83 80 | 
+84 81 | 
+85 82 | async def f():
+
+PERF401.py:89:9: PERF401 [*] Use an async list comprehension to create a transformed list
+   |
+87 |     result = []
+88 |     async for i in items:
+89 |         result.append(i)  # PERF401
+   |         ^^^^^^^^^^^^^^^^ PERF401
+   |
+   = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+84 84 | 
+85 85 | async def f():
+86 86 |     items = [1, 2, 3, 4]
+87    |-    result = []
+88    |-    async for i in items:
+89    |-        result.append(i)  # PERF401
+   87 |+    result = [i async for i in items]  # PERF401
+90 88 | 
+91 89 | 
+92 90 | async def f():
+
+PERF401.py:96:9: PERF401 [*] Use `list.extend` with an async comprehension to create a transformed list
+   |
+94 |     result = [1, 2]
+95 |     async for i in items:
+96 |         result.append(i)  # PERF401
+   |         ^^^^^^^^^^^^^^^^ PERF401
+   |
+   = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+92 92 | async def f():
+93 93 |     items = [1, 2, 3, 4]
+94 94 |     result = [1, 2]
+95    |-    async for i in items:
+96    |-        result.append(i)  # PERF401
+   95 |+    result.extend([i async for i in items])  # PERF401
+97 96 | 
+98 97 | 
+99 98 | def f():
+
+PERF401.py:102:9: PERF401 [*] Use `list.extend` to create a transformed list
+    |
+100 |     result, _ = [1, 2, 3, 4], ...
+101 |     for i in range(10):
+102 |         result.append(i * 2)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+98  98  | 
+99  99  | def f():
+100 100 |     result, _ = [1, 2, 3, 4], ...
+101     |-    for i in range(10):
+102     |-        result.append(i * 2)  # PERF401
+    101 |+    result.extend(i * 2 for i in range(10))  # PERF401
+103 102 | 
+104 103 | 
+105 104 | def f():
+
+PERF401.py:111:17: PERF401 [*] Use `list.extend` to create a transformed list
+    |
+109 |             # single-line comment 2 should be protected
+110 |             if i % 2:  # single-line comment 3 should be protected
+111 |                 result.append(i)  # PERF401
+    |                 ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+105 105 | def f():
+106 106 |     result = []
+107 107 |     if True:
+108     |-        for i in range(10):  # single-line comment 1 should be protected
+109     |-            # single-line comment 2 should be protected
+110     |-            if i % 2:  # single-line comment 3 should be protected
+111     |-                result.append(i)  # PERF401
+    108 |+        # single-line comment 1 should be protected
+    109 |+        # single-line comment 2 should be protected
+    110 |+        # single-line comment 3 should be protected
+    111 |+        result.extend(i for i in range(10) if i % 2)  # PERF401
+112 112 | 
+113 113 | 
+114 114 | def f():
+
+PERF401.py:119:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+117 |         # single-line comment 2 should be protected
+118 |         if i % 2:  # single-line comment 3 should be protected
+119 |             result.append(i)  # PERF401
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+112 112 | 
+113 113 | 
+114 114 | def f():
+115     |-    result = []  # comment after assignment should be protected
+116     |-    for i in range(10):  # single-line comment 1 should be protected
+117     |-        # single-line comment 2 should be protected
+118     |-        if i % 2:  # single-line comment 3 should be protected
+119     |-            result.append(i)  # PERF401
+    115 |+    # single-line comment 1 should be protected
+    116 |+    # single-line comment 2 should be protected
+    117 |+    # single-line comment 3 should be protected
+    118 |+    # comment after assignment should be protected
+    119 |+    result = [i for i in range(10) if i % 2]  # PERF401
+120 120 | 
+121 121 | 
+122 122 | def f():
+
+PERF401.py:135:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+133 |         new_layers = []
+134 |         for value in param:
+135 |             new_layers.append(value * 3)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+130 130 |     # PERF401
+131 131 |     # make sure the fix does not panic if there is no comments
+132 132 |     if param:
+133     |-        new_layers = []
+134     |-        for value in param:
+135     |-            new_layers.append(value * 3)
+    133 |+        new_layers = [value * 3 for value in param]
+136 134 | 
+137 135 | 
+138 136 | def f():
+
+PERF401.py:142:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+140 |     var = 1
+141 |     for _ in range(10):
+142 |         result.append(var + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+136 136 | 
+137 137 | 
+138 138 | def f():
+139     |-    result = []
+140 139 |     var = 1
+141     |-    for _ in range(10):
+142     |-        result.append(var + 1)  # PERF401
+    140 |+    result = [var + 1 for _ in range(10)]  # PERF401
+143 141 | 
+144 142 | 
+145 143 | def f():
+
+PERF401.py:149:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+147 |     tmp = 1; result = []  # commment should be protected
+148 |     for i in range(10):
+149 |         result.append(i + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+144 144 | 
+145 145 | def f():
+146 146 |     # make sure that `tmp` is not deleted
+147     |-    tmp = 1; result = []  # commment should be protected
+148     |-    for i in range(10):
+149     |-        result.append(i + 1)  # PERF401
+    147 |+    tmp = 1  # commment should be protected
+    148 |+    result = [i + 1 for i in range(10)]  # PERF401
+150 149 | 
+151 150 | 
+152 151 | def f():
+
+PERF401.py:156:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+154 |     result = []; tmp = 1  # commment should be protected
+155 |     for i in range(10):
+156 |         result.append(i + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+151 151 | 
+152 152 | def f():
+153 153 |     # make sure that `tmp` is not deleted
+154     |-    result = []; tmp = 1  # commment should be protected
+155     |-    for i in range(10):
+156     |-        result.append(i + 1)  # PERF401
+    154 |+    tmp = 1  # commment should be protected
+    155 |+    result = [i + 1 for i in range(10)]  # PERF401
+157 156 | 
+158 157 | 
+159 158 | def f():
+
+PERF401.py:162:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+160 |     result = []  # comment should be protected
+161 |     for i in range(10):
+162 |         result.append(i * 2)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+157 157 | 
+158 158 | 
+159 159 | def f():
+160     |-    result = []  # comment should be protected
+161     |-    for i in range(10):
+162     |-        result.append(i * 2)  # PERF401
+    160 |+    # comment should be protected
+    161 |+    result = [i * 2 for i in range(10)]  # PERF401
+163 162 | 
+164 163 | 
+165 164 | def f():
+
+PERF401.py:169:9: PERF401 [*] Use `list.extend` to create a transformed list
+    |
+167 |     result.append(1)
+168 |     for i in range(10):
+169 |         result.append(i * 2)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+165 165 | def f():
+166 166 |     result = []
+167 167 |     result.append(1)
+168     |-    for i in range(10):
+169     |-        result.append(i * 2)  # PERF401
+    168 |+    result.extend(i * 2 for i in range(10))  # PERF401
+170 169 | 
+171 170 | 
+172 171 | def f():
+
+PERF401.py:189:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+187 |     result = []
+188 |     for val in range(5):
+189 |         result.append(val * 2)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^ PERF401
+190 |     val = 1
+191 |     print(val)
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+184 184 | 
+185 185 | 
+186 186 | def f():
+187     |-    result = []
+188     |-    for val in range(5):
+189     |-        result.append(val * 2)  # PERF401
+    187 |+    result = [val * 2 for val in range(5)]  # PERF401
+190 188 |     val = 1
+191 189 |     print(val)
+192 190 | 
+
+PERF401.py:198:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+196 |     result = []
+197 |     for i in i:
+198 |         result.append(i + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+193 193 | 
+194 194 | def f():
+195 195 |     i = [1, 2, 3]
+196     |-    result = []
+197     |-    for i in i:
+198     |-        result.append(i + 1)  # PERF401
+    196 |+    result = [i + 1 for i in i]  # PERF401
+199 197 | 
+200 198 | 
+201 199 | def f():
+
+PERF401.py:210:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+208 |       ):  # Comment 3
+209 |           if i % 2:  # Comment 4
+210 |               result.append(
+    |  _____________^
+211 | |                 (
+212 | |                     i + 1,
+213 | |                     # Comment 5
+214 | |                     2,
+215 | |                 )
+216 | |             )  # PERF401
+    | |_____________^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+199 199 | 
+200 200 | 
+201 201 | def f():
+202     |-    result = []
+203     |-    for i in range(  # Comment 1 should not be duplicated
+    202 |+    # Comment 3
+    203 |+    # Comment 4
+    204 |+    result = [(
+    205 |+                    i + 1,
+    206 |+                    # Comment 5
+    207 |+                    2,
+    208 |+                ) for i in range(  # Comment 1 should not be duplicated
+204 209 |         (
+205 210 |             2  # Comment 2
+206 211 |             + 1
+207 212 |         )
+208     |-    ):  # Comment 3
+209     |-        if i % 2:  # Comment 4
+210     |-            result.append(
+211     |-                (
+212     |-                    i + 1,
+213     |-                    # Comment 5
+214     |-                    2,
+215     |-                )
+216     |-            )  # PERF401
+    213 |+    ) if i % 2]  # PERF401
+217 214 | 
+218 215 | 
+219 216 | def f():
+
+PERF401.py:222:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+220 |     result: list[int] = []
+221 |     for i in range(10):
+222 |         result.append(i * 2)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+217 217 | 
+218 218 | 
+219 219 | def f():
+220     |-    result: list[int] = []
+221     |-    for i in range(10):
+222     |-        result.append(i * 2)  # PERF401
+    220 |+    result: list[int] = [i * 2 for i in range(10)]  # PERF401
+223 221 | 
+224 222 | 
+225 223 | def f():
+
+PERF401.py:229:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+227 |     result = []
+228 |     for i in a, b:
+229 |         result.append(i[0] + i[1])  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+230 |     return result
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+224 224 | 
+225 225 | def f():
+226 226 |     a, b = [1, 2, 3], [4, 5, 6]
+227     |-    result = []
+228     |-    for i in a, b:
+229     |-        result.append(i[0] + i[1])  # PERF401
+    227 |+    result = [i[0] + i[1] for i in (a, b)]  # PERF401
+230 228 |     return result
+231 229 | 
+232 230 | 
+
+PERF401.py:239:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+237 |         print(a)
+238 |     for a in values:
+239 |         result.append(a + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+240 | 
+241 | def f():
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+232 232 | 
+233 233 | def f():
+234 234 |     values = [1, 2, 3]
+235     |-    result = []
+236 235 |     for a in values:
+237 236 |         print(a)
+238     |-    for a in values:
+239     |-        result.append(a + 1)  # PERF401
+    237 |+    result = [a + 1 for a in values]  # PERF401
+240 238 | 
+241 239 | def f():
+242 240 |     values = [1, 2, 3]
+
+PERF401.py:245:13: PERF401 [*] Use `list.extend` to create a transformed list
+    |
+243 |     def g():
+244 |         for a in values:
+245 |             result.append(a + 1)  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^ PERF401
+246 |     result = []
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+241 241 | def f():
+242 242 |     values = [1, 2, 3]
+243 243 |     def g():
+244     |-        for a in values:
+245     |-            result.append(a + 1)  # PERF401
+    244 |+        result.extend(a + 1 for a in values)  # PERF401
+246 245 |     result = []
+247 246 | 
+248 247 | def f():
+
+PERF401.py:262:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+260 |     for i in range(5):
+261 |         if j := i:
+262 |             items.append(j)
+    |             ^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+255 255 | # The fix here must parenthesize the walrus operator
+256 256 | # https://github.com/astral-sh/ruff/issues/15047
+257 257 | def f():
+258     |-    items = []
+259 258 | 
+260     |-    for i in range(5):
+261     |-        if j := i:
+262     |-            items.append(j)
+    259 |+    items = [j for i in range(5) if (j := i)]

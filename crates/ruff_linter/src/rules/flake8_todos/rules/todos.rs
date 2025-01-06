@@ -1,13 +1,14 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use regex::RegexSet;
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_trivia::CommentRanges;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
+use crate::Locator;
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -28,8 +29,8 @@ use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 /// ```python
 /// # TODO(ruff): this is now fixed!
 /// ```
-#[violation]
-pub struct InvalidTodoTag {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidTodoTag {
     pub tag: String,
 }
 
@@ -58,13 +59,14 @@ impl Violation for InvalidTodoTag {
 /// ```python
 /// # TODO(charlie): now an author is assigned
 /// ```
-#[violation]
-pub struct MissingTodoAuthor;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoAuthor;
 
 impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`")
+        "Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`"
+            .to_string()
     }
 }
 
@@ -89,16 +91,16 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
-/// # TODO(charlie): this comment has an issue code of (up to) 6 characters, then digits
+/// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
 /// ```
-#[violation]
-pub struct MissingTodoLink;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoLink;
 
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue link on the line following this TODO")
+        "Missing issue link on the line following this TODO".to_string()
     }
 }
 
@@ -121,13 +123,13 @@ impl Violation for MissingTodoLink {
 /// ```python
 /// # TODO(charlie): colon fixed
 /// ```
-#[violation]
-pub struct MissingTodoColon;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoColon;
 
 impl Violation for MissingTodoColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing colon in TODO")
+        "Missing colon in TODO".to_string()
     }
 }
 
@@ -148,13 +150,13 @@ impl Violation for MissingTodoColon {
 /// ```python
 /// # TODO(charlie): fix some issue
 /// ```
-#[violation]
-pub struct MissingTodoDescription;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoDescription;
 
 impl Violation for MissingTodoDescription {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue description after `TODO`")
+        "Missing issue description after `TODO`".to_string()
     }
 }
 
@@ -175,8 +177,8 @@ impl Violation for MissingTodoDescription {
 /// ```python
 /// # TODO(charlie): this is capitalized
 /// ```
-#[violation]
-pub struct InvalidTodoCapitalization {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidTodoCapitalization {
     tag: String,
 }
 
@@ -212,21 +214,21 @@ impl AlwaysFixableViolation for InvalidTodoCapitalization {
 /// ```python
 /// # TODO(charlie): fix this
 /// ```
-#[violation]
-pub struct MissingSpaceAfterTodoColon;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingSpaceAfterTodoColon;
 
 impl Violation for MissingSpaceAfterTodoColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing space after colon in TODO")
+        "Missing space after colon in TODO".to_string()
     }
 }
 
-static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+static ISSUE_LINK_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"^#\s*(http|https)://.*", // issue link
         r"^#\s*\d+$",              // issue code - like "003"
-        r"^#\s*[A-Z]{1,6}\-?\d+$", // issue code - like "TD003"
+        r"^#\s*[A-Z]+\-?\d+$",     // issue code - like "TD003"
     ])
     .unwrap()
 });

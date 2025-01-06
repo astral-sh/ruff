@@ -905,7 +905,7 @@ struct PrinterState<'a> {
     fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,
 }
 
-impl<'a> PrinterState<'a> {
+impl PrinterState<'_> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: String::with_capacity(capacity),
@@ -1048,8 +1048,6 @@ struct FitsMeasurer<'a, 'print> {
     /// Bomb that enforces that finish is explicitly called to restore the `fits_stack` and `fits_queue` vectors.
     bomb: DebugDropBomb,
 }
-
-impl<'a, 'print> FitsMeasurer<'a, 'print> {}
 
 impl<'a, 'print> FitsMeasurer<'a, 'print> {
     fn new_flat(
@@ -1718,7 +1716,7 @@ mod tests {
                 token("b"),
                 soft_block_indent(&format_args!(
                     token("c"),
-                    soft_block_indent(&format_args!(token("d"), soft_line_break(), token("d"),)),
+                    soft_block_indent(&format_args!(token("d"), soft_line_break(), token("d"))),
                     token("c"),
                 )),
                 token("b"),

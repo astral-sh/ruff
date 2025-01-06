@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
 use ruff_text_size::Ranged;
@@ -43,8 +43,8 @@ use crate::fix::edits::pad;
 /// incorrect fix if the object in question does not duck-type as a mapping
 /// (e.g., if it is missing a `.keys()` or `.values()` method, or if those
 /// methods behave differently than they do on standard mapping types).
-#[violation]
-pub struct IncorrectDictIterator {
+#[derive(ViolationMetadata)]
+pub(crate) struct IncorrectDictIterator {
     subset: DictSubset,
 }
 

@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -55,15 +55,15 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 563](https://peps.python.org/pep-0563/)
+/// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html#module-__future__)
-#[violation]
-pub struct QuotedAnnotation;
+#[derive(ViolationMetadata)]
+pub(crate) struct QuotedAnnotation;
 
 impl AlwaysFixableViolation for QuotedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove quotes from type annotation")
+        "Remove quotes from type annotation".to_string()
     }
 
     fn fix_title(&self) -> String {

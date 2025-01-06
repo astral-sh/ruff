@@ -1,11 +1,15 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
+use serde::de::{self};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
 use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
+use ruff_graph::Direction;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -24,13 +28,14 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
+use ruff_python_stdlib::identifiers::is_identifier;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -319,8 +324,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py38""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
+        default = r#""py39""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -336,7 +341,7 @@ pub struct Options {
     /// 1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the "project root").
     /// 2. The `"src"` subdirectory of the project root.
     ///
-    /// These defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box.
+    /// These defaults ensure that Ruff supports both flat layouts and `src` layouts out-of-the-box.
     /// (If a configuration file is explicitly provided (e.g., via the `--config` command-line
     /// flag), the current working directory will be considered the project root.)
     ///
@@ -412,17 +417,6 @@ pub struct Options {
     )]
     pub indent_width: Option<IndentWidth>,
 
-    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
-    /// or formatting code with the formatter.
-    ///
-    /// This option changes the number of spaces inserted by the formatter when
-    /// using soft-tabs (`indent-style = space`).
-    #[deprecated(
-        since = "0.1.2",
-        note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."
-    )]
-    pub tab_size: Option<IndentWidth>,
-
     #[option_group]
     pub lint: Option<LintOptions>,
 
@@ -433,6 +427,10 @@ pub struct Options {
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
+
+    /// Options to configure import map generation.
+    #[option_group]
+    pub analyze: Option<AnalyzeOptions>,
 }
 
 /// Configures how Ruff checks your code.
@@ -1011,7 +1009,7 @@ impl Flake8AnnotationsOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BanditOptions {
-    /// A list of directories to consider temporary.
+    /// A list of directories to consider temporary (see `S108`).
     #[option(
         default = "[\"/tmp\", \"/var/tmp\", \"/dev/shm\"]",
         value_type = "list[str]",
@@ -1020,7 +1018,7 @@ pub struct Flake8BanditOptions {
     pub hardcoded_tmp_directory: Option<Vec<String>>,
 
     /// A list of directories to consider temporary, in addition to those
-    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory).
+    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -1331,7 +1329,7 @@ pub struct Flake8ImportConventionsOptions {
             scipy = "sp"
         "#
     )]
-    pub aliases: Option<FxHashMap<String, String>>,
+    pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
     /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
@@ -1344,7 +1342,7 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<String, String>>,
+    pub extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to its banned import aliases.
     #[option(
@@ -1374,14 +1372,84 @@ pub struct Flake8ImportConventionsOptions {
     pub banned_from: Option<FxHashSet<String>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ModuleName(String);
+
+impl ModuleName {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ModuleName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        if name.is_empty() || name.split('.').any(|part| !is_identifier(part)) {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"a sequence of Python identifiers delimited by periods",
+            ))
+        } else {
+            Ok(Self(name))
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Alias(String);
+
+impl Alias {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Alias {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        // Assigning to "__debug__" is a SyntaxError
+        // see the note here:
+        // https://docs.python.org/3/library/constants.html#debug__
+        if &*name == "__debug__" {
+            return Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"an assignable Python identifier",
+            ));
+        }
+        if is_identifier(&name) {
+            Ok(Self(name))
+        } else {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"a Python identifier",
+            ))
+        }
+    }
+}
+
 impl Flake8ImportConventionsOptions {
     pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
-        let mut aliases = match self.aliases {
-            Some(options_aliases) => options_aliases,
+        let mut aliases: FxHashMap<String, String> = match self.aliases {
+            Some(options_aliases) => options_aliases
+                .into_iter()
+                .map(|(module, alias)| (module.into_string(), alias.into_string()))
+                .collect(),
             None => flake8_import_conventions::settings::default_aliases(),
         };
         if let Some(extend_aliases) = self.extend_aliases {
-            aliases.extend(extend_aliases);
+            aliases.extend(
+                extend_aliases
+                    .into_iter()
+                    .map(|(module, alias)| (module.into_string(), alias.into_string())),
+            );
         }
 
         flake8_import_conventions::settings::Settings {
@@ -1391,6 +1459,7 @@ impl Flake8ImportConventionsOptions {
         }
     }
 }
+
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1494,12 +1563,9 @@ pub struct Flake8PytestStyleOptions {
 }
 
 impl Flake8PytestStyleOptions {
-    pub fn try_into_settings(
-        self,
-        preview: PreviewMode,
-    ) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
+    pub fn try_into_settings(self) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
         Ok(flake8_pytest_style::settings::Settings {
-            fixture_parentheses: self.fixture_parentheses.unwrap_or(preview.is_disabled()),
+            fixture_parentheses: self.fixture_parentheses.unwrap_or_default(),
             parametrize_names_type: self.parametrize_names_type.unwrap_or_default(),
             parametrize_values_type: self.parametrize_values_type.unwrap_or_default(),
             parametrize_values_row_type: self.parametrize_values_row_type.unwrap_or_default(),
@@ -1525,7 +1591,7 @@ impl Flake8PytestStyleOptions {
                 .transpose()
                 .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
-            mark_parentheses: self.mark_parentheses.unwrap_or(preview.is_disabled()),
+            mark_parentheses: self.mark_parentheses.unwrap_or_default(),
         })
     }
 }
@@ -1753,6 +1819,21 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Common examples include Pydantic's `@pydantic.validate_call` decorator
     /// (for functions) and attrs' `@attrs.define` decorator (for classes).
+    ///
+    /// This also supports framework decorators like FastAPI's `fastapi.FastAPI.get`
+    /// which will work across assignments in the same module.
+    ///
+    /// For example:
+    /// ```python
+    /// import fastapi
+    ///
+    /// app = FastAPI("app")
+    ///
+    /// @app.get("/home")
+    /// def home() -> str: ...
+    /// ```
+    ///
+    /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -2105,7 +2186,7 @@ pub struct IsortOptions {
     /// Use `-1` for automatic determination.
     ///
     /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
-    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).
+    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).
     ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
@@ -2770,6 +2851,16 @@ pub struct PydocstyleOptions {
         "#
     )]
     pub property_decorators: Option<Vec<String>>,
+
+    /// If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            ignore_var_parameters = true
+        "#
+    )]
+    pub ignore_var_parameters: Option<bool>,
 }
 
 impl PydocstyleOptions {
@@ -2778,12 +2869,14 @@ impl PydocstyleOptions {
             convention,
             ignore_decorators,
             property_decorators,
+            ignore_var_parameters: ignore_variadics,
         } = self;
-        pydocstyle::settings::Settings::new(
+        pydocstyle::settings::Settings {
             convention,
-            ignore_decorators.unwrap_or_default(),
-            property_decorators.unwrap_or_default(),
-        )
+            ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
+            ignore_var_parameters: ignore_variadics.unwrap_or_default(),
+        }
     }
 }
 
@@ -2805,12 +2898,28 @@ pub struct PyflakesOptions {
         example = "extend-generics = [\"django.db.models.ForeignKey\"]"
     )]
     pub extend_generics: Option<Vec<String>>,
+
+    /// A list of modules to ignore when considering unused imports.
+    ///
+    /// Used to prevent violations for specific modules that are known to have side effects on
+    /// import (e.g., `hvplot.pandas`).
+    ///
+    /// Modules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any
+    /// submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas`
+    /// will also be ignored).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
+    )]
+    pub allowed_unused_imports: Option<Vec<String>>,
 }
 
 impl PyflakesOptions {
     pub fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
+            allowed_unused_imports: self.allowed_unused_imports.unwrap_or_default(),
         }
     }
 }
@@ -2996,6 +3105,50 @@ pub struct RuffOptions {
         "#
     )]
     pub parenthesize_tuple_in_subscript: Option<bool>,
+
+    /// A list of additional callable names that behave like
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
+    /// `literal`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    pub extend_markup_names: Option<Vec<String>>,
+
+    /// A list of callable names, whose result may be safely passed into
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).
+    ///
+    /// This setting helps you avoid false positives in code like:
+    ///
+    /// ```python
+    /// from bleach import clean
+    /// from markupsafe import Markup
+    ///
+    /// cleaned_markup = Markup(clean(some_user_input))
+    /// ```
+    ///
+    /// Where the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html)
+    /// usually ensures that there's no XSS vulnerability.
+    ///
+    /// Although it is not recommended, you may also use this setting to whitelist other
+    /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
+    /// will depend on the implementation and how well the translations are audited.
+    ///
+    /// Another common use-case is to wrap the output of functions that generate markup
+    /// like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring)
+    /// or template rendering engines where sanitization of potential user input is either
+    /// already baked in or has to happen before rendering.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+    )]
+    pub allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl RuffOptions {
@@ -3004,6 +3157,8 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
+            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
+            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
         }
     }
 }
@@ -3306,11 +3461,87 @@ pub struct FormatOptions {
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
 }
 
+/// Configures Ruff's `analyze` command.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AnalyzeOptions {
+    /// A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable
+    /// commands.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+    /// Whether to generate a map from file to files that it depends on (dependencies) or files that
+    /// depend on it (dependents).
+    #[option(
+        default = r#""dependencies""#,
+        value_type = r#""dependents" | "dependencies""#,
+        example = r#"
+            direction = "dependencies"
+        "#
+    )]
+    pub direction: Option<Direction>,
+    /// Whether to detect imports from string literals. When enabled, Ruff will search for string
+    /// literals that "look like" import paths, and include them in the import map, if they resolve
+    /// to valid Python modules.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            detect-string-imports = true
+        "#
+    )]
+    pub detect_string_imports: Option<bool>,
+    /// A map from file path to the list of Python or non-Python file paths or globs that should be
+    /// considered dependencies of that file, regardless of whether relevant imports are detected.
+    #[option(
+        default = "{}",
+        scope = "include-dependencies",
+        value_type = "dict[str, list[str]]",
+        example = r#"
+            "foo/bar.py" = ["foo/baz/*.py"]
+            "foo/baz/reader.py" = ["configs/bar.json"]
+        "#
+    )]
+    pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
+    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
+    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
@@ -3356,6 +3587,30 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_default() {
+        assert_eq!(
+            FormatterPythonVersion::default().as_tuple(),
+            LinterPythonVersion::default().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_latest() {
+        assert_eq!(
+            FormatterPythonVersion::latest().as_tuple(),
+            LinterPythonVersion::latest().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_minimal_supported() {
+        assert_eq!(
+            FormatterPythonVersion::minimal_supported().as_tuple(),
+            LinterPythonVersion::minimal_supported().as_tuple()
         );
     }
 }

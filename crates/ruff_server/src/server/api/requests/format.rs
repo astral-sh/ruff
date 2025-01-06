@@ -1,3 +1,4 @@
+use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use types::TextEdit;
 
@@ -64,7 +65,8 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     let text_document = snapshot
         .query()
         .as_single_document()
-        .expect("format should only be called on text documents or notebook cells");
+        .context("Failed to get text document for the format request")
+        .unwrap();
     let query = snapshot.query();
     format_text_document(
         text_document,
@@ -90,6 +92,7 @@ fn format_text_document(
             file_resolver_settings,
             None,
             Some(formatter_settings),
+            text_document.language_id(),
         ) {
             return Ok(None);
         }

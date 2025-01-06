@@ -151,7 +151,7 @@ impl Document {
         propagate_expands(self, &mut enclosing, &mut interned);
     }
 
-    pub fn display<'a>(&'a self, source_code: SourceCode<'a>) -> DisplayDocument {
+    pub fn display<'a>(&'a self, source_code: SourceCode<'a>) -> DisplayDocument<'a> {
         DisplayDocument {
             elements: self.elements.as_slice(),
             source_code,
@@ -878,9 +878,9 @@ mod tests {
                     [group(&format_args![
                         token("("),
                         soft_block_indent(&format_args![
-                            source_text_slice(TextRange::at(TextSize::new(0), TextSize::new(19)),),
+                            source_text_slice(TextRange::at(TextSize::new(0), TextSize::new(19))),
                             space(),
-                            source_text_slice(TextRange::at(TextSize::new(20), TextSize::new(28)),),
+                            source_text_slice(TextRange::at(TextSize::new(20), TextSize::new(28))),
                         ])
                     ])]
                 )

@@ -3,8 +3,6 @@
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
 [Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
 
-The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-ruff-formatter).
-
 ## `ruff format`
 
 `ruff format` is the primary entrypoint to the formatter. It accepts a list of files or
@@ -21,10 +19,6 @@ in-place, while `ruff format --check /path/to/file.py` will avoid writing any fo
 and instead exit with a non-zero status code upon detecting any unformatted files.
 
 For the full list of supported options, run `ruff format --help`.
-
-!!! note
-    As of Ruff v0.1.7 the `ruff format` command uses the current working directory (`.`) as the default path to format.
-    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
 
 ## Philosophy
 
@@ -328,7 +322,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
 - [`indentation-with-invalid-multiple-comment`](rules/indentation-with-invalid-multiple-comment.md) (`E114`)
 - [`over-indented`](rules/over-indented.md) (`E117`)
-- [`indent-with-spaces`](rules/indent-with-spaces.md) (`D206`)
+- [`docstring-tab-indentation`](rules/docstring-tab-indentation.md) (`D206`)
 - [`triple-single-quotes`](rules/triple-single-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)
 - [`bad-quotes-multiline-string`](rules/bad-quotes-multiline-string.md) (`Q001`)

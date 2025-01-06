@@ -44,20 +44,30 @@ impl Symbol {
     }
 
     /// Is the symbol defined in its containing scope?
-    pub fn is_defined(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_DEFINED)
+    pub fn is_bound(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_BOUND)
+    }
+
+    /// Is the symbol declared in its containing scope?
+    pub fn is_declared(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_DECLARED)
     }
 }
 
 bitflags! {
+    /// Flags that can be queried to obtain information about a symbol in a given scope.
+    ///
+    /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
+    /// means for a symbol to be *bound* as opposed to *declared*.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct SymbolFlags: u8 {
+    struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
-        const IS_DEFINED      = 1 << 1;
+        const IS_BOUND        = 1 << 1;
+        const IS_DECLARED     = 1 << 2;
         /// TODO: This flag is not yet set by anything
-        const MARKED_GLOBAL   = 1 << 2;
+        const MARKED_GLOBAL   = 1 << 3;
         /// TODO: This flag is not yet set by anything
-        const MARKED_NONLOCAL = 1 << 3;
+        const MARKED_NONLOCAL = 1 << 4;
     }
 }
 
@@ -93,13 +103,9 @@ pub struct ScopedSymbolId;
 pub struct ScopeId<'db> {
     #[id]
     pub file: File,
+
     #[id]
     pub file_scope_id: FileScopeId,
-
-    /// The node that introduces this scope.
-    #[no_eq]
-    #[return_ref]
-    pub node: NodeWithScopeKind,
 
     #[no_eq]
     count: countme::Count<ScopeId<'static>>,
@@ -110,15 +116,20 @@ impl<'db> ScopeId<'db> {
         // Type parameter scopes behave like function scopes in terms of name resolution; CPython
         // symbol table also uses the term "function-like" for these scopes.
         matches!(
-            self.node(db),
-            NodeWithScopeKind::ClassTypeParameters(_)
-                | NodeWithScopeKind::FunctionTypeParameters(_)
-                | NodeWithScopeKind::Function(_)
-                | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_)
-                | NodeWithScopeKind::DictComprehension(_)
-                | NodeWithScopeKind::GeneratorExpression(_)
+            self.node(db).scope_kind(),
+            ScopeKind::Annotation
+                | ScopeKind::Function
+                | ScopeKind::TypeAlias
+                | ScopeKind::Comprehension
         )
+    }
+
+    pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
+        self.scope(db).node()
+    }
+
+    pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
+        semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
     #[cfg(test)]
@@ -130,6 +141,12 @@ impl<'db> ScopeId<'db> {
             }
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
+            NodeWithScopeKind::TypeAlias(type_alias)
+            | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => type_alias
+                .name
+                .as_name_expr()
+                .map(|name| name.id.as_str())
+                .unwrap_or("<type alias>"),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
             NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
             NodeWithScopeKind::SetComprehension(_) => "<setcomp>",
@@ -159,10 +176,10 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Scope {
     pub(super) parent: Option<FileScopeId>,
-    pub(super) kind: ScopeKind,
+    pub(super) node: NodeWithScopeKind,
     pub(super) descendents: Range<FileScopeId>,
 }
 
@@ -171,8 +188,12 @@ impl Scope {
         self.parent
     }
 
+    pub fn node(&self) -> &NodeWithScopeKind {
+        &self.node
+    }
+
     pub fn kind(&self) -> ScopeKind {
-        self.kind
+        self.node().scope_kind()
     }
 }
 
@@ -183,6 +204,7 @@ pub enum ScopeKind {
     Class,
     Function,
     Comprehension,
+    TypeAlias,
 }
 
 impl ScopeKind {
@@ -192,7 +214,7 @@ impl ScopeKind {
 }
 
 /// Symbol table for a specific [`Scope`].
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SymbolTable {
     /// The symbols in this scope.
     symbols: IndexVec<ScopedSymbolId, Symbol>,
@@ -202,13 +224,6 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    fn new() -> Self {
-        Self {
-            symbols: IndexVec::new(),
-            symbols_by_name: SymbolMap::default(),
-        }
-    }
-
     fn shrink_to_fit(&mut self) {
         self.symbols.shrink_to_fit();
     }
@@ -260,23 +275,13 @@ impl PartialEq for SymbolTable {
 
 impl Eq for SymbolTable {}
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {
     table: SymbolTable,
 }
 
 impl SymbolTableBuilder {
-    pub(super) fn new() -> Self {
-        Self {
-            table: SymbolTable::new(),
-        }
-    }
-
-    pub(super) fn add_or_update_symbol(
-        &mut self,
-        name: Name,
-        flags: SymbolFlags,
-    ) -> (ScopedSymbolId, bool) {
+    pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
@@ -285,15 +290,9 @@ impl SymbolTableBuilder {
             .from_hash(hash, |id| self.table.symbols[*id].name() == &name);
 
         match entry {
-            RawEntryMut::Occupied(entry) => {
-                let symbol = &mut self.table.symbols[*entry.key()];
-                symbol.insert_flags(flags);
-
-                (*entry.key(), false)
-            }
+            RawEntryMut::Occupied(entry) => (*entry.key(), false),
             RawEntryMut::Vacant(entry) => {
-                let mut symbol = Symbol::new(name);
-                symbol.insert_flags(flags);
+                let symbol = Symbol::new(name);
 
                 let id = self.table.symbols.push(symbol);
                 entry.insert_with_hasher(hash, id, (), |id| {
@@ -302,6 +301,18 @@ impl SymbolTableBuilder {
                 (id, true)
             }
         }
+    }
+
+    pub(super) fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_BOUND);
+    }
+
+    pub(super) fn mark_symbol_declared(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_DECLARED);
+    }
+
+    pub(super) fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_USED);
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {
@@ -319,6 +330,8 @@ pub(crate) enum NodeWithScopeRef<'a> {
     Lambda(&'a ast::ExprLambda),
     FunctionTypeParameters(&'a ast::StmtFunctionDef),
     ClassTypeParameters(&'a ast::StmtClassDef),
+    TypeAlias(&'a ast::StmtTypeAlias),
+    TypeAliasTypeParameters(&'a ast::StmtTypeAlias),
     ListComprehension(&'a ast::ExprListComp),
     SetComprehension(&'a ast::ExprSetComp),
     DictComprehension(&'a ast::ExprDictComp),
@@ -339,6 +352,12 @@ impl NodeWithScopeRef<'_> {
             }
             NodeWithScopeRef::Function(function) => {
                 NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::TypeAlias(type_alias) => {
+                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+            }
+            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
             }
             NodeWithScopeRef::Lambda(lambda) => {
                 NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
@@ -364,21 +383,6 @@ impl NodeWithScopeRef<'_> {
         }
     }
 
-    pub(super) fn scope_kind(self) -> ScopeKind {
-        match self {
-            NodeWithScopeRef::Module => ScopeKind::Module,
-            NodeWithScopeRef::Class(_) => ScopeKind::Class,
-            NodeWithScopeRef::Function(_) => ScopeKind::Function,
-            NodeWithScopeRef::Lambda(_) => ScopeKind::Function,
-            NodeWithScopeRef::FunctionTypeParameters(_)
-            | NodeWithScopeRef::ClassTypeParameters(_) => ScopeKind::Annotation,
-            NodeWithScopeRef::ListComprehension(_)
-            | NodeWithScopeRef::SetComprehension(_)
-            | NodeWithScopeRef::DictComprehension(_)
-            | NodeWithScopeRef::GeneratorExpression(_) => ScopeKind::Comprehension,
-        }
-    }
-
     pub(crate) fn node_key(self) -> NodeWithScopeKey {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKey::Module,
@@ -394,6 +398,12 @@ impl NodeWithScopeRef<'_> {
             }
             NodeWithScopeRef::ClassTypeParameters(class) => {
                 NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
+            }
+            NodeWithScopeRef::TypeAlias(type_alias) => {
+                NodeWithScopeKey::TypeAlias(NodeKey::from_node(type_alias))
+            }
+            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                NodeWithScopeKey::TypeAliasTypeParameters(NodeKey::from_node(type_alias))
             }
             NodeWithScopeRef::ListComprehension(comprehension) => {
                 NodeWithScopeKey::ListComprehension(NodeKey::from_node(comprehension))
@@ -419,11 +429,56 @@ pub enum NodeWithScopeKind {
     ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
+    TypeAliasTypeParameters(AstNodeRef<ast::StmtTypeAlias>),
+    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     Lambda(AstNodeRef<ast::ExprLambda>),
     ListComprehension(AstNodeRef<ast::ExprListComp>),
     SetComprehension(AstNodeRef<ast::ExprSetComp>),
     DictComprehension(AstNodeRef<ast::ExprDictComp>),
     GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
+}
+
+impl NodeWithScopeKind {
+    pub(super) const fn scope_kind(&self) -> ScopeKind {
+        match self {
+            Self::Module => ScopeKind::Module,
+            Self::Class(_) => ScopeKind::Class,
+            Self::Function(_) | Self::Lambda(_) => ScopeKind::Function,
+            Self::FunctionTypeParameters(_)
+            | Self::ClassTypeParameters(_)
+            | Self::TypeAliasTypeParameters(_) => ScopeKind::Annotation,
+            Self::TypeAlias(_) => ScopeKind::TypeAlias,
+            Self::ListComprehension(_)
+            | Self::SetComprehension(_)
+            | Self::DictComprehension(_)
+            | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
+        }
+    }
+
+    pub fn expect_class(&self) -> &ast::StmtClassDef {
+        match self {
+            Self::Class(class) => class.node(),
+            _ => panic!("expected class"),
+        }
+    }
+
+    pub fn expect_function(&self) -> &ast::StmtFunctionDef {
+        self.as_function().expect("expected function")
+    }
+
+    pub fn expect_type_alias(&self) -> &ast::StmtTypeAlias {
+        match self {
+            Self::TypeAlias(type_alias) => type_alias.node(),
+            _ => panic!("expected type alias"),
+        }
+    }
+
+    pub const fn as_function(&self) -> Option<&ast::StmtFunctionDef> {
+        match self {
+            Self::Function(function) => Some(function.node()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -433,6 +488,8 @@ pub(crate) enum NodeWithScopeKey {
     ClassTypeParameters(NodeKey),
     Function(NodeKey),
     FunctionTypeParameters(NodeKey),
+    TypeAlias(NodeKey),
+    TypeAliasTypeParameters(NodeKey),
     Lambda(NodeKey),
     ListComprehension(NodeKey),
     SetComprehension(NodeKey),

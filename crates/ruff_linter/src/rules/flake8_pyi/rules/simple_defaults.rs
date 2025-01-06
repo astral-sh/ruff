@@ -1,17 +1,17 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
 use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.
@@ -43,13 +43,13 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
-#[violation]
-pub struct TypedArgumentDefaultInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct TypedArgumentDefaultInStub;
 
 impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for typed arguments")
+        "Only simple default values allowed for typed arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -89,13 +89,13 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 ///
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
-#[violation]
-pub struct ArgumentDefaultInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct ArgumentDefaultInStub;
 
 impl AlwaysFixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for arguments")
+        "Only simple default values allowed for arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -133,13 +133,13 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 ///
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
-#[violation]
-pub struct AssignmentDefaultInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssignmentDefaultInStub;
 
 impl AlwaysFixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for assignments")
+        "Only simple default values allowed for assignments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -153,8 +153,8 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
 /// ## Why is this bad?
 /// Stub files exist to provide type hints, and are never executed. As such,
 /// all assignments in stub files should be annotated with a type.
-#[violation]
-pub struct UnannotatedAssignmentInStub {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnannotatedAssignmentInStub {
     name: String,
 }
 
@@ -184,8 +184,8 @@ impl Violation for UnannotatedAssignmentInStub {
 /// ```pyi
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
-#[violation]
-pub struct UnassignedSpecialVariableInStub {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnassignedSpecialVariableInStub {
     name: String,
 }
 
@@ -220,8 +220,8 @@ impl Violation for UnassignedSpecialVariableInStub {
 ///
 /// Vector: TypeAlias = list[float]
 /// ```
-#[violation]
-pub struct TypeAliasWithoutAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeAliasWithoutAnnotation {
     module: TypingModule,
     name: String,
     value: String,
@@ -425,6 +425,8 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
+///
+/// See also [`ruff_python_semantic::analyze::typing::TypeVarLikeChecker::is_type_var_like_call`].
 fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;

@@ -8,11 +8,11 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
-use ruff_macros::CacheKey;
-use ruff_python_stdlib::sys::is_known_standard_library;
-
+use crate::package::PackageRoot;
 use crate::settings::types::PythonVersion;
 use crate::warn_user_once;
+use ruff_macros::CacheKey;
+use ruff_python_stdlib::sys::is_known_standard_library;
 
 use super::types::{ImportBlock, Importable};
 
@@ -93,7 +93,7 @@ pub(crate) fn categorize<'a>(
     module_name: &str,
     is_relative: bool,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
@@ -153,8 +153,10 @@ pub(crate) fn categorize<'a>(
     import_type
 }
 
-fn same_package(package: Option<&Path>, module_base: &str) -> bool {
-    package.is_some_and(|package| package.ends_with(module_base))
+fn same_package(package: Option<PackageRoot<'_>>, module_base: &str) -> bool {
+    package
+        .map(PackageRoot::path)
+        .is_some_and(|package| package.ends_with(module_base))
 }
 
 fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
@@ -177,7 +179,7 @@ fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
 pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,

@@ -1,12 +1,12 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{pad, remove_argument, Parentheses};
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.
@@ -27,8 +27,8 @@ use crate::fix::edits::{pad, remove_argument, Parentheses};
 ///
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
-#[violation]
-pub struct UnnecessaryEncodeUTF8 {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
 
@@ -36,8 +36,10 @@ impl AlwaysFixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.reason {
-            Reason::BytesLiteral => format!("Unnecessary call to `encode` as UTF-8"),
-            Reason::DefaultArgument => format!("Unnecessary UTF-8 `encoding` argument to `encode`"),
+            Reason::BytesLiteral => "Unnecessary call to `encode` as UTF-8".to_string(),
+            Reason::DefaultArgument => {
+                "Unnecessary UTF-8 `encoding` argument to `encode`".to_string()
+            }
         }
     }
 

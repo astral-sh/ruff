@@ -1,8 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::{is_python_whitespace, CommentRanges};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -25,19 +27,19 @@ use ruff_text_size::{TextRange, TextSize};
 ///
 /// ## References
 /// - [Pylint documentation](https://pylint.pycqa.org/en/latest/user_guide/messages/refactor/empty-comment.html)
-#[violation]
-pub struct EmptyComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyComment;
 
 impl Violation for EmptyComment {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line with empty comment")
+        "Line with empty comment".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Delete the empty comment"))
+        Some("Delete the empty comment".to_string())
     }
 }
 
@@ -47,7 +49,7 @@ pub(crate) fn empty_comments(
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    let block_comments = comment_ranges.block_comments(locator);
+    let block_comments = comment_ranges.block_comments(locator.contents());
 
     for range in comment_ranges {
         // Ignore comments that are part of multi-line "comment blocks".
@@ -56,7 +58,7 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        if let Some(diagnostic) = empty_comment(*range, locator) {
+        if let Some(diagnostic) = empty_comment(range, locator) {
             diagnostics.push(diagnostic);
         }
     }

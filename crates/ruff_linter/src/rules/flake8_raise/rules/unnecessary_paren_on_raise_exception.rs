@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::BindingKind;
 use ruff_text_size::Ranged;
@@ -38,17 +38,17 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
-#[violation]
-pub struct UnnecessaryParenOnRaiseException;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryParenOnRaiseException;
 
 impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses on raised exception")
+        "Unnecessary parentheses on raised exception".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary parentheses")
+        "Remove unnecessary parentheses".to_string()
     }
 }
 

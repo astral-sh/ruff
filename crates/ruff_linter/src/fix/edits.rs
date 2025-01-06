@@ -13,26 +13,27 @@ use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
     SimpleTokenizer,
 };
-use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
+use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 use crate::fix::codemods;
 use crate::fix::codemods::CodegenStylist;
 use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
+use crate::Locator;
 
-/// Return the `Fix` to use when deleting a `Stmt`.
+/// Return the [`Edit`] to use when deleting a [`Stmt`].
 ///
-/// In some cases, this is as simple as deleting the `Range` of the `Stmt`
+/// In some cases, this is as simple as deleting the [`TextRange`] of the [`Stmt`]
 /// itself. However, there are a few exceptions:
-/// - If the `Stmt` is _not_ the terminal statement in a multi-statement line,
+/// - If the [`Stmt`] is _not_ the terminal statement in a multi-statement line,
 ///   we need to delete up to the start of the next statement (and avoid
 ///   deleting any content that precedes the statement).
-/// - If the `Stmt` is the terminal statement in a multi-statement line, we need
+/// - If the [`Stmt`] is the terminal statement in a multi-statement line, we need
 ///   to avoid deleting any content that precedes the statement.
-/// - If the `Stmt` has no trailing and leading content, then it's convenient to
+/// - If the [`Stmt`] has no trailing and leading content, then it's convenient to
 ///   remove the entire start and end lines.
-/// - If the `Stmt` is the last statement in its parent body, replace it with a
+/// - If the [`Stmt`] is the last statement in its parent body, replace it with a
 ///   `pass` instead.
 pub(crate) fn delete_stmt(
     stmt: &Stmt,
@@ -48,9 +49,11 @@ pub(crate) fn delete_stmt(
         if let Some(semicolon) = trailing_semicolon(stmt.end(), locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
-        } else if has_leading_content(stmt.start(), locator) {
+        } else if has_leading_content(stmt.start(), locator.contents()) {
             Edit::range_deletion(stmt.range())
-        } else if let Some(start) = indexer.preceded_by_continuations(stmt.start(), locator) {
+        } else if let Some(start) =
+            indexer.preceded_by_continuations(stmt.start(), locator.contents())
+        {
             Edit::deletion(start, stmt.end())
         } else {
             let range = locator.full_lines_range(stmt.range());
@@ -289,7 +292,7 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
     {
         // Case 1: at least one regular parameter, so append after the last one.
         Edit::insertion(format!(", {parameter}"), last.end())
-    } else if parameters.args.first().is_some() {
+    } else if !parameters.args.is_empty() {
         // Case 2: no regular parameters, but at least one keyword parameter, so add before the
         // first.
         let pos = parameters.start();
@@ -313,7 +316,7 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         } else {
             Edit::insertion(format!(", {parameter}"), slash.start())
         }
-    } else if parameters.kwonlyargs.first().is_some() {
+    } else if !parameters.kwonlyargs.is_empty() {
         // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
         // We need to backtrack to before the `*` separator.
         // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
@@ -595,13 +598,13 @@ mod tests {
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};
-    use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::fix::apply_fixes;
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
+    use crate::Locator;
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {
@@ -726,7 +729,7 @@ x = 1 \
         let locator = Locator::new(raw);
         let edits = {
             let parsed = parse_expression(raw)?;
-            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
         };
         let diag = {

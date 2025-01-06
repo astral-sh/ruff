@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/bytes.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -140,7 +141,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -285,6 +286,33 @@ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -63,9 +63,9 @@
+ 
+ # String continuation
+ 
+-b"Let's" b"start" b"with" b"a" b"simple" b"example"
++b"Let'sstartwithasimpleexample"
+ 
+-b"Let's" b"start" b"with" b"a" b"simple" b"example" b"now repeat after me:" b"I am confident" b"I am confident" b"I am confident" b"I am confident" b"I am confident"
++b"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     b"Let's"
+@@ -132,6 +132,6 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{"key": ([], b"a" b"b" b"c")}
++{"key": ([], b"abc")}
+ 
+ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -296,7 +324,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -441,4 +469,28 @@ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 
-
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -63,9 +63,9 @@
+ 
+ # String continuation
+ 
+-b"Let's" b'start' b'with' b'a' b'simple' b'example'
++b"Let'sstartwithasimpleexample"
+ 
+-b"Let's" b'start' b'with' b'a' b'simple' b'example' b'now repeat after me:' b'I am confident' b'I am confident' b'I am confident' b'I am confident' b'I am confident'
++b"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     b"Let's"
+@@ -132,6 +132,6 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{'key': ([], b'a' b'b' b'c')}
++{'key': ([], b'abc')}
+ 
+ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
+```

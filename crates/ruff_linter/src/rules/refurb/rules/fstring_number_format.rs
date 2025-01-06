@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -24,8 +24,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```python
 /// print(f"{1337:b}")
 /// ```
-#[violation]
-pub struct FStringNumberFormat {
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringNumberFormat {
     replacement: Option<SourceCodeSnippet>,
     base: Base,
 }
@@ -49,14 +49,14 @@ impl Violation for FStringNumberFormat {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let FStringNumberFormat { replacement, .. } = self;
-        if let Some(display) = replacement
+        if let Some(display) = self
+            .replacement
             .as_ref()
             .and_then(SourceCodeSnippet::full_display)
         {
             Some(format!("Replace with `{display}`"))
         } else {
-            Some(format!("Replace with f-string"))
+            Some("Replace with f-string".to_string())
         }
     }
 }

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -38,13 +38,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__hash__` method](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
-#[violation]
-pub struct InvalidHashReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidHashReturnType;
 
 impl Violation for InvalidHashReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__hash__` does not return an integer")
+        "`__hash__` does not return an integer".to_string()
     }
 }
 

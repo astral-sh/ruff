@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S108.py:5:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
   |

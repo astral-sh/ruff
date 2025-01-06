@@ -4,6 +4,8 @@ use ruff_linter::settings::LinterSettings;
 use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
 use ruff_workspace::{FileResolverSettings, FormatterSettings};
 
+use crate::edit::LanguageId;
+
 /// Return `true` if the document at the given [`Path`] should be excluded.
 ///
 /// The tool-specific settings should be provided if the request for the document is specific to
@@ -19,6 +21,7 @@ pub(crate) fn is_document_excluded(
     resolver_settings: &FileResolverSettings,
     linter_settings: Option<&LinterSettings>,
     formatter_settings: Option<&FormatterSettings>,
+    language_id: Option<LanguageId>,
 ) -> bool {
     if let Some(exclusion) = match_any_exclusion(
         path,
@@ -38,8 +41,14 @@ pub(crate) fn is_document_excluded(
     ) {
         tracing::debug!("Included path via `{}`: {}", inclusion, path.display());
         false
+    } else if let Some(LanguageId::Python) = language_id {
+        tracing::debug!("Included path via Python language ID: {}", path.display());
+        false
     } else {
-        // Path is excluded by not being in the inclusion set.
+        tracing::debug!(
+            "Ignored path as it's not in the inclusion set: {}",
+            path.display()
+        );
         true
     }
 }

@@ -16,6 +16,9 @@
 //! have the same shape in that they evaluate to the same value.
 
 use crate as ast;
+use crate::{Expr, Number};
+use std::borrow::Cow;
+use std::hash::Hash;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -511,7 +514,7 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableFStringElement<'a> {
-    Literal(&'a str),
+    Literal(Cow<'a, str>),
     FStringExpressionElement(FStringExpressionElement<'a>),
 }
 
@@ -527,20 +530,31 @@ impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
     fn from(fstring_element: &'a ast::FStringElement) -> Self {
         match fstring_element {
             ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
-                Self::Literal(value)
+                Self::Literal(value.as_ref().into())
             }
-            ast::FStringElement::Expression(formatted_value) => {
-                Self::FStringExpressionElement(FStringExpressionElement {
-                    expression: (&formatted_value.expression).into(),
-                    debug_text: formatted_value.debug_text.as_ref(),
-                    conversion: formatted_value.conversion,
-                    format_spec: formatted_value
-                        .format_spec
-                        .as_ref()
-                        .map(|spec| spec.elements.iter().map(Into::into).collect()),
-                })
-            }
+            ast::FStringElement::Expression(formatted_value) => formatted_value.into(),
         }
+    }
+}
+
+impl<'a> From<&'a ast::FStringExpressionElement> for ComparableFStringElement<'a> {
+    fn from(fstring_expression_element: &'a ast::FStringExpressionElement) -> Self {
+        let ast::FStringExpressionElement {
+            expression,
+            debug_text,
+            conversion,
+            format_spec,
+            range: _,
+        } = fstring_expression_element;
+
+        Self::FStringExpressionElement(FStringExpressionElement {
+            expression: (expression).into(),
+            debug_text: debug_text.as_ref(),
+            conversion: *conversion,
+            format_spec: format_spec
+                .as_ref()
+                .map(|spec| spec.elements.iter().map(Into::into).collect()),
+        })
     }
 }
 
@@ -597,28 +611,82 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableFString<'a> {
-    elements: Vec<ComparableFStringElement<'a>>,
+    elements: Box<[ComparableFStringElement<'a>]>,
 }
 
-impl<'a> From<&'a ast::FString> for ComparableFString<'a> {
-    fn from(fstring: &'a ast::FString) -> Self {
-        Self {
-            elements: fstring.elements.iter().map(Into::into).collect(),
+impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
+    // The approach below is somewhat complicated, so it may
+    // require some justification.
+    //
+    // Suppose given an f-string of the form
+    // `f"{foo!r} one" " and two " f" and three {bar!s}"`
+    // This decomposes as:
+    // - An `FStringPart::FString`, `f"{foo!r} one"` with elements
+    //      - `FStringElement::Expression` encoding `{foo!r}`
+    //      - `FStringElement::Literal` encoding " one"
+    // - An `FStringPart::Literal` capturing `" and two "`
+    // - An `FStringPart::FString`, `f" and three {bar!s}"` with elements
+    //      - `FStringElement::Literal` encoding " and three "
+    //      - `FStringElement::Expression` encoding `{bar!s}`
+    //
+    // We would like to extract from this a vector of (comparable) f-string
+    // _elements_ which alternate between expression elements and literal
+    // elements. In order to do so, we need to concatenate adjacent string
+    // literals. String literals may be separated for two reasons: either
+    // they appear in adjacent string literal parts, or else a string literal
+    // part is adjacent to a string literal _element_ inside of an f-string part.
+    fn from(value: &'a ast::FStringValue) -> Self {
+        #[derive(Default)]
+        struct Collector<'a> {
+            elements: Vec<ComparableFStringElement<'a>>,
         }
-    }
-}
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableFStringPart<'a> {
-    Literal(ComparableStringLiteral<'a>),
-    FString(ComparableFString<'a>),
-}
+        impl<'a> Collector<'a> {
+            // The logic for concatenating adjacent string literals
+            // occurs here, implicitly: when we encounter a sequence
+            // of string literals, the first gets pushed to the
+            // `elements` vector, while subsequent strings
+            // are concatenated onto this top string.
+            fn push_literal(&mut self, literal: &'a str) {
+                if let Some(ComparableFStringElement::Literal(existing_literal)) =
+                    self.elements.last_mut()
+                {
+                    existing_literal.to_mut().push_str(literal);
+                } else {
+                    self.elements
+                        .push(ComparableFStringElement::Literal(literal.into()));
+                }
+            }
 
-impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
-    fn from(f_string_part: &'a ast::FStringPart) -> Self {
-        match f_string_part {
-            ast::FStringPart::Literal(string_literal) => Self::Literal(string_literal.into()),
-            ast::FStringPart::FString(f_string) => Self::FString(f_string.into()),
+            fn push_expression(&mut self, expression: &'a ast::FStringExpressionElement) {
+                self.elements.push(expression.into());
+            }
+        }
+
+        let mut collector = Collector::default();
+
+        for part in value {
+            match part {
+                ast::FStringPart::Literal(string_literal) => {
+                    collector.push_literal(&string_literal.value);
+                }
+                ast::FStringPart::FString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Literal(literal) => {
+                                collector.push_literal(&literal.value);
+                            }
+                            ast::FStringElement::Expression(expression) => {
+                                collector.push_expression(expression);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Self {
+            elements: collector.elements.into_boxed_slice(),
         }
     }
 }
@@ -638,13 +706,13 @@ impl<'a> From<&'a ast::StringLiteral> for ComparableStringLiteral<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableBytesLiteral<'a> {
-    value: &'a [u8],
+    value: Cow<'a, [u8]>,
 }
 
 impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
     fn from(bytes_literal: &'a ast::BytesLiteral) -> Self {
         Self {
-            value: &bytes_literal.value,
+            value: Cow::Borrowed(&bytes_literal.value),
         }
     }
 }
@@ -775,17 +843,17 @@ pub struct ExprFStringExpressionElement<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFString<'a> {
-    parts: Vec<ComparableFStringPart<'a>>,
+    value: ComparableFString<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprStringLiteral<'a> {
-    parts: Vec<ComparableStringLiteral<'a>>,
+    value: ComparableStringLiteral<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBytesLiteral<'a> {
-    parts: Vec<ComparableBytesLiteral<'a>>,
+    value: ComparableBytesLiteral<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -794,8 +862,8 @@ pub struct ExprNumberLiteral<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprBoolLiteral<'a> {
-    value: &'a bool,
+pub struct ExprBoolLiteral {
+    value: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -867,7 +935,7 @@ pub enum ComparableExpr<'a> {
     StringLiteral(ExprStringLiteral<'a>),
     BytesLiteral(ExprBytesLiteral<'a>),
     NumberLiteral(ExprNumberLiteral<'a>),
-    BoolLiteral(ExprBoolLiteral<'a>),
+    BoolLiteral(ExprBoolLiteral),
     NoneLiteral,
     EllipsisLiteral,
     Attribute(ExprAttribute<'a>),
@@ -1019,17 +1087,21 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::FString(ast::ExprFString { value, range: _ }) => {
                 Self::FString(ExprFString {
-                    parts: value.iter().map(Into::into).collect(),
+                    value: value.into(),
                 })
             }
             ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
                 Self::StringLiteral(ExprStringLiteral {
-                    parts: value.iter().map(Into::into).collect(),
+                    value: ComparableStringLiteral {
+                        value: value.to_str(),
+                    },
                 })
             }
             ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, range: _ }) => {
                 Self::BytesLiteral(ExprBytesLiteral {
-                    parts: value.iter().map(Into::into).collect(),
+                    value: ComparableBytesLiteral {
+                        value: Cow::from(value),
+                    },
                 })
             }
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, range: _ }) => {
@@ -1038,7 +1110,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 })
             }
             ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, range: _ }) => {
-                Self::BoolLiteral(ExprBoolLiteral { value })
+                Self::BoolLiteral(ExprBoolLiteral { value: *value })
             }
             ast::Expr::NoneLiteral(_) => Self::NoneLiteral,
             ast::Expr::EllipsisLiteral(_) => Self::EllipsisLiteral,
@@ -1602,5 +1674,78 @@ impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
         Self {
             body: (&expr.body).into(),
         }
+    }
+}
+
+/// Wrapper around [`Expr`] that implements [`Hash`] and [`PartialEq`] according to Python
+/// semantics:
+///
+/// > Values that compare equal (such as 1, 1.0, and True) can be used interchangeably to index the
+/// > same dictionary entry.
+///
+/// For example, considers `True`, `1`, and `1.0` to be equal, as they hash to the same value
+/// in Python, along with `False`, `0`, and `0.0`.
+///
+/// See: <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>
+#[derive(Debug)]
+pub struct HashableExpr<'a>(ComparableExpr<'a>);
+
+impl Hash for HashableExpr<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl PartialEq<Self> for HashableExpr<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for HashableExpr<'_> {}
+
+impl<'a> From<&'a Expr> for HashableExpr<'a> {
+    fn from(expr: &'a Expr) -> Self {
+        /// Returns a version of the given expression that can be hashed and compared according to
+        /// Python  semantics.
+        fn as_hashable(expr: &Expr) -> ComparableExpr {
+            match expr {
+                Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
+                    target: Box::new(ComparableExpr::from(&named.target)),
+                    value: Box::new(as_hashable(&named.value)),
+                }),
+                Expr::NumberLiteral(number) => as_bool(number)
+                    .map(|value| ComparableExpr::BoolLiteral(ExprBoolLiteral { value }))
+                    .unwrap_or_else(|| ComparableExpr::from(expr)),
+                Expr::Tuple(tuple) => ComparableExpr::Tuple(ExprTuple {
+                    elts: tuple.iter().map(as_hashable).collect(),
+                }),
+                _ => ComparableExpr::from(expr),
+            }
+        }
+
+        /// Returns the `bool` value of the given expression, if it has an equivalent hash to
+        /// `True` or `False`.
+        fn as_bool(number: &crate::ExprNumberLiteral) -> Option<bool> {
+            match &number.value {
+                Number::Int(int) => match int.as_u8() {
+                    Some(0) => Some(false),
+                    Some(1) => Some(true),
+                    _ => None,
+                },
+                Number::Float(float) => match float {
+                    0.0 => Some(false),
+                    1.0 => Some(true),
+                    _ => None,
+                },
+                Number::Complex { real, imag } => match (real, imag) {
+                    (0.0, 0.0) => Some(false),
+                    (1.0, 0.0) => Some(true),
+                    _ => None,
+                },
+            }
+        }
+
+        Self(as_hashable(expr))
     }
 }

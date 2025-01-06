@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
@@ -918,14 +919,14 @@ impl<'a> Iterator for DictKeyIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
+impl DoubleEndedIterator for DictKeyIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.items.next_back().map(DictItem::key)
     }
 }
 
-impl<'a> FusedIterator for DictKeyIterator<'a> {}
-impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
+impl FusedIterator for DictKeyIterator<'_> {}
+impl ExactSizeIterator for DictKeyIterator<'_> {}
 
 #[derive(Debug, Clone)]
 pub struct DictValueIterator<'a> {
@@ -960,14 +961,14 @@ impl<'a> Iterator for DictValueIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for DictValueIterator<'a> {
+impl DoubleEndedIterator for DictValueIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.items.next_back().map(DictItem::value)
     }
 }
 
-impl<'a> FusedIterator for DictValueIterator<'a> {}
-impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
+impl FusedIterator for DictValueIterator<'_> {}
+impl ExactSizeIterator for DictValueIterator<'_> {}
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
@@ -1272,6 +1273,15 @@ impl FStringValue {
         matches!(self.inner, FStringValueInner::Concatenated(_))
     }
 
+    /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
+    /// otherwise.
+    pub fn as_single(&self) -> Option<&FString> {
+        match &self.inner {
+            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
+            _ => None,
+        }
+    }
+
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
     pub fn as_slice(&self) -> &[FStringPart] {
         match &self.inner {
@@ -1295,7 +1305,7 @@ impl FStringValue {
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+    pub fn iter_mut(&mut self) -> IterMut<FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1748,7 +1758,7 @@ impl StringLiteralValue {
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<StringLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2047,7 +2057,7 @@ impl PartialEq for ConcatenatedStringLiteral {
         // The `zip` here is safe because we have checked the length of both parts.
         self.strings
             .iter()
-            .zip(other.strings.iter())
+            .zip(&other.strings)
             .all(|(s1, s2)| s1 == s2)
     }
 }
@@ -2137,7 +2147,7 @@ impl BytesLiteralValue {
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2183,6 +2193,22 @@ impl PartialEq<[u8]> for BytesLiteralValue {
         self.bytes()
             .zip(other.iter().copied())
             .all(|(b1, b2)| b1 == b2)
+    }
+}
+
+impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue) -> Self {
+        match &value.inner {
+            BytesLiteralValueInner::Single(BytesLiteral {
+                value: bytes_value, ..
+            }) => Cow::from(bytes_value.as_ref()),
+            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
+                bytes_literal_vec
+                    .iter()
+                    .flat_map(|bytes_literal| bytes_literal.value.to_vec())
+                    .collect::<Vec<u8>>(),
+            ),
+        }
     }
 }
 
@@ -2954,6 +2980,63 @@ impl Operator {
             Operator::FloorDiv => "//",
         }
     }
+
+    /// Returns the dunder method name for the operator.
+    pub const fn dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__add__",
+            Operator::Sub => "__sub__",
+            Operator::Mult => "__mul__",
+            Operator::MatMult => "__matmul__",
+            Operator::Div => "__truediv__",
+            Operator::Mod => "__mod__",
+            Operator::Pow => "__pow__",
+            Operator::LShift => "__lshift__",
+            Operator::RShift => "__rshift__",
+            Operator::BitOr => "__or__",
+            Operator::BitXor => "__xor__",
+            Operator::BitAnd => "__and__",
+            Operator::FloorDiv => "__floordiv__",
+        }
+    }
+
+    /// Returns the in-place dunder method name for the operator.
+    pub const fn in_place_dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__iadd__",
+            Operator::Sub => "__isub__",
+            Operator::Mult => "__imul__",
+            Operator::MatMult => "__imatmul__",
+            Operator::Div => "__itruediv__",
+            Operator::Mod => "__imod__",
+            Operator::Pow => "__ipow__",
+            Operator::LShift => "__ilshift__",
+            Operator::RShift => "__irshift__",
+            Operator::BitOr => "__ior__",
+            Operator::BitXor => "__ixor__",
+            Operator::BitAnd => "__iand__",
+            Operator::FloorDiv => "__ifloordiv__",
+        }
+    }
+
+    /// Returns the reflected dunder method name for the operator.
+    pub const fn reflected_dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__radd__",
+            Operator::Sub => "__rsub__",
+            Operator::Mult => "__rmul__",
+            Operator::MatMult => "__rmatmul__",
+            Operator::Div => "__rtruediv__",
+            Operator::Mod => "__rmod__",
+            Operator::Pow => "__rpow__",
+            Operator::LShift => "__rlshift__",
+            Operator::RShift => "__rrshift__",
+            Operator::BitOr => "__ror__",
+            Operator::BitXor => "__rxor__",
+            Operator::BitAnd => "__rand__",
+            Operator::FloorDiv => "__rfloordiv__",
+        }
+    }
 }
 
 impl fmt::Display for Operator {
@@ -3016,6 +3099,22 @@ impl CmpOp {
             CmpOp::IsNot => "is not",
             CmpOp::In => "in",
             CmpOp::NotIn => "not in",
+        }
+    }
+
+    #[must_use]
+    pub const fn negate(&self) -> Self {
+        match self {
+            CmpOp::Eq => CmpOp::NotEq,
+            CmpOp::NotEq => CmpOp::Eq,
+            CmpOp::Lt => CmpOp::GtE,
+            CmpOp::LtE => CmpOp::Gt,
+            CmpOp::Gt => CmpOp::LtE,
+            CmpOp::GtE => CmpOp::Lt,
+            CmpOp::Is => CmpOp::IsNot,
+            CmpOp::IsNot => CmpOp::Is,
+            CmpOp::In => CmpOp::NotIn,
+            CmpOp::NotIn => CmpOp::In,
         }
     }
 }
@@ -3120,6 +3219,29 @@ impl Pattern {
             Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
+
+    /// Checks if the [`Pattern`] is a [wildcard pattern].
+    ///
+    /// The following are wildcard patterns:
+    /// ```python
+    /// match subject:
+    ///     case _ as x: ...
+    ///     case _ | _: ...
+    ///     case _: ...
+    /// ```
+    ///
+    /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+            }
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Pattern::is_wildcard)
             }
             _ => false,
         }
@@ -3262,6 +3384,24 @@ pub enum TypeParam {
     TypeVar(TypeParamTypeVar),
     ParamSpec(TypeParamParamSpec),
     TypeVarTuple(TypeParamTypeVarTuple),
+}
+
+impl TypeParam {
+    pub const fn name(&self) -> &Identifier {
+        match self {
+            Self::TypeVar(x) => &x.name,
+            Self::ParamSpec(x) => &x.name,
+            Self::TypeVarTuple(x) => &x.name,
+        }
+    }
+
+    pub fn default(&self) -> Option<&Expr> {
+        match self {
+            Self::TypeVar(x) => x.default.as_deref(),
+            Self::ParamSpec(x) => x.default.as_deref(),
+            Self::TypeVarTuple(x) => x.default.as_deref(),
+        }
+    }
 }
 
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
@@ -3544,7 +3684,7 @@ impl<'a> Iterator for ParametersIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
+impl DoubleEndedIterator for ParametersIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let ParametersIterator {
             posonlyargs,
@@ -3570,17 +3710,25 @@ impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
     }
 }
 
-impl<'a> FusedIterator for ParametersIterator<'a> {}
+impl FusedIterator for ParametersIterator<'_> {}
 
 /// We rely on the same invariants outlined in the comment above `Parameters::len()`
 /// in order to implement `ExactSizeIterator` here
-impl<'a> ExactSizeIterator for ParametersIterator<'a> {}
+impl ExactSizeIterator for ParametersIterator<'_> {}
 
 impl<'a> IntoIterator for &'a Parameters {
     type IntoIter = ParametersIterator<'a>;
     type Item = AnyParameterRef<'a>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Box<Parameters> {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&**self).into_iter()
     }
 }
 
@@ -3626,10 +3774,19 @@ pub struct Arguments {
 }
 
 /// An entry in the argument list of a function call.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ArgOrKeyword<'a> {
     Arg(&'a Expr),
     Keyword(&'a Keyword),
+}
+
+impl<'a> ArgOrKeyword<'a> {
+    pub const fn value(self) -> &'a Expr {
+        match self {
+            ArgOrKeyword::Arg(argument) => argument,
+            ArgOrKeyword::Keyword(keyword) => &keyword.value,
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
@@ -3680,13 +3837,20 @@ impl Arguments {
             .nth(position)
     }
 
-    /// Return the argument with the given name or at the given position, or `None` if no such
+    /// Return the value for the argument with the given name or at the given position, or `None` if no such
+    /// argument exists. Used to retrieve argument values that can be provided _either_ as keyword or
+    /// positional arguments.
+    pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr> {
+        self.find_argument(name, position).map(ArgOrKeyword::value)
+    }
+
+    /// Return the the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {
         self.find_keyword(name)
-            .map(|keyword| &keyword.value)
-            .or_else(|| self.find_positional(position))
+            .map(ArgOrKeyword::from)
+            .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
     }
 
     /// Return the positional and keyword arguments in the order of declaration.
@@ -3931,7 +4095,7 @@ impl Ranged for Identifier {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Singleton {
     None,
     True,

@@ -6,9 +6,9 @@ use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
-use crate::semantic_index::ast_ids::HasScopedAstId;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::semantic_index;
-use crate::types::{definition_ty, global_symbol_ty, infer_scope_types, Type};
+use crate::types::{binding_ty, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -35,12 +35,8 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db.upcast(), self.file)
     }
 
-    pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
+    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
         resolve_module(self.db, module_name)
-    }
-
-    pub fn global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
-        global_symbol_ty(self.db, module.file(), symbol_name)
     }
 }
 
@@ -58,7 +54,7 @@ impl HasTy for ast::ExpressionRef<'_> {
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        let expression_id = self.scoped_ast_id(model.db, scope);
+        let expression_id = self.scoped_expression_id(model.db, scope);
         infer_scope_types(model.db, scope).expression_ty(expression_id)
     }
 }
@@ -147,55 +143,38 @@ impl HasTy for ast::Expr {
     }
 }
 
-macro_rules! impl_definition_has_ty {
+macro_rules! impl_binding_has_ty {
     ($ty: ty) => {
         impl HasTy for $ty {
             #[inline]
             fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
-                let definition = index.definition(self);
-                definition_ty(model.db, definition)
+                let binding = index.definition(self);
+                binding_ty(model.db, binding)
             }
         }
     };
 }
 
-impl_definition_has_ty!(ast::StmtFunctionDef);
-impl_definition_has_ty!(ast::StmtClassDef);
-impl_definition_has_ty!(ast::Alias);
-impl_definition_has_ty!(ast::Parameter);
-impl_definition_has_ty!(ast::ParameterWithDefault);
+impl_binding_has_ty!(ast::StmtFunctionDef);
+impl_binding_has_ty!(ast::StmtClassDef);
+impl_binding_has_ty!(ast::Alias);
+impl_binding_has_ty!(ast::Parameter);
+impl_binding_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
-    use crate::types::Type;
-    use crate::{HasTy, ProgramSettings, SemanticModel};
-
-    fn setup_db<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<TestDb> {
-        let mut db = TestDb::new();
-        db.write_files(files)?;
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(SystemPathBuf::from("/src")),
-            },
-        )?;
-
-        Ok(db)
-    }
+    use crate::db::tests::TestDbBuilder;
+    use crate::{HasTy, SemanticModel};
 
     #[test]
     fn function_ty() -> anyhow::Result<()> {
-        let db = setup_db([("/src/foo.py", "def test(): pass")])?;
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "def test(): pass")
+            .build()?;
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
@@ -205,14 +184,16 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = function.ty(&model);
 
-        assert!(matches!(ty, Type::Function(_)));
+        assert!(ty.is_function_literal());
 
         Ok(())
     }
 
     #[test]
     fn class_ty() -> anyhow::Result<()> {
-        let db = setup_db([("/src/foo.py", "class Test: pass")])?;
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "class Test: pass")
+            .build()?;
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
@@ -222,17 +203,17 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = class.ty(&model);
 
-        assert!(matches!(ty, Type::Class(_)));
+        assert!(ty.is_class_literal());
 
         Ok(())
     }
 
     #[test]
     fn alias_ty() -> anyhow::Result<()> {
-        let db = setup_db([
-            ("/src/foo.py", "class Test: pass"),
-            ("/src/bar.py", "from foo import Test"),
-        ])?;
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "class Test: pass")
+            .with_file("/src/bar.py", "from foo import Test")
+            .build()?;
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
@@ -243,7 +224,7 @@ mod tests {
         let model = SemanticModel::new(&db, bar);
         let ty = alias.ty(&model);
 
-        assert!(matches!(ty, Type::Class(_)));
+        assert!(ty.is_class_literal());
 
         Ok(())
     }

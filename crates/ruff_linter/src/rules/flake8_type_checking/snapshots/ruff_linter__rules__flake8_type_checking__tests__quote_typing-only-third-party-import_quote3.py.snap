@@ -1,0 +1,213 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+quote3.py:4:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+  |
+2 |     from typing import Literal, Union
+3 | 
+4 |     from django.contrib.auth.models import AbstractBaseUser
+  |                                            ^^^^^^^^^^^^^^^^ TC002
+5 | 
+6 |     def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
+  |
+  = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from django.contrib.auth.models import AbstractBaseUser
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+4     |-    from django.contrib.auth.models import AbstractBaseUser
+5  8  | 
+6     |-    def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
+   9  |+    def test_union_literal_mixed_quotes(user: 'AbstractBaseUser[Union[Literal["active", "inactive"], str]]'):
+7  10 |         pass
+8  11 | 
+9  12 | 
+
+quote3.py:13:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+   |
+11 |     from typing import Callable, Literal
+12 | 
+13 |     from django.contrib.auth.models import AbstractBaseUser
+   |                                            ^^^^^^^^^^^^^^^^ TC002
+14 | 
+15 |     def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from django.contrib.auth.models import AbstractBaseUser
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+--------------------------------------------------------------------------------
+10 14 | def f():
+11 15 |     from typing import Callable, Literal
+12 16 | 
+13    |-    from django.contrib.auth.models import AbstractBaseUser
+14 17 | 
+15    |-    def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
+   18 |+    def test_callable_literal_mixed_quotes(callable_fn: 'AbstractBaseUser[Callable[[int, Literal["admin", "user"]], bool]]'):
+16 19 |         pass
+17 20 | 
+18 21 | 
+
+quote3.py:22:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+   |
+20 |     from typing import Annotated, Callable, Literal
+21 | 
+22 |     from django.contrib.auth.models import AbstractBaseUser
+   |                                            ^^^^^^^^^^^^^^^^ TC002
+23 | 
+24 |     def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from django.contrib.auth.models import AbstractBaseUser
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+--------------------------------------------------------------------------------
+19 23 | def f():
+20 24 |     from typing import Annotated, Callable, Literal
+21 25 | 
+22    |-    from django.contrib.auth.models import AbstractBaseUser
+23 26 | 
+24    |-    def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
+   27 |+    def test_callable_annotated_literal(callable_fn: 'AbstractBaseUser[Callable[[int, Annotated[str, Literal["active", "inactive"]]], bool]]'):
+25 28 |         pass
+26 29 | 
+27 30 | 
+
+quote3.py:31:37: TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+   |
+29 |     from typing import literal
+30 | 
+31 |     from django.contrib.auth import models
+   |                                     ^^^^^^ TC002
+32 | 
+33 |     def test_attribute(arg: models.AbstractBaseUser["int"]):
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from django.contrib.auth import models
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+--------------------------------------------------------------------------------
+28 32 | def f():
+29 33 |     from typing import literal
+30 34 | 
+31    |-    from django.contrib.auth import models
+32 35 | 
+33    |-    def test_attribute(arg: models.AbstractBaseUser["int"]):
+   36 |+    def test_attribute(arg: 'models.AbstractBaseUser[int]'):
+34 37 |         pass
+35 38 | 
+36 39 | 
+
+quote3.py:40:37: TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+   |
+38 |     from typing import Literal
+39 | 
+40 |     from django.contrib.auth import models
+   |                                     ^^^^^^ TC002
+41 | 
+42 |     def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from django.contrib.auth import models
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+--------------------------------------------------------------------------------
+37 41 | def f():
+38 42 |     from typing import Literal
+39 43 | 
+40    |-    from django.contrib.auth import models
+41 44 | 
+42    |-    def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
+   45 |+    def test_attribute_typing_literal(arg: 'models.AbstractBaseUser[Literal["admin"]]'):
+43 46 |         pass
+44 47 | 
+45 48 | 
+
+quote3.py:59:29: TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+   |
+57 | def f():
+58 |     from typing import Literal
+59 |     from third_party import Type
+   |                             ^^^^ TC002
+60 | 
+61 |     def test_string_contains_opposite_quote(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from third_party import Type
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+--------------------------------------------------------------------------------
+56 60 | 
+57 61 | def f():
+58 62 |     from typing import Literal
+59    |-    from third_party import Type
+60 63 | 
+61    |-    def test_string_contains_opposite_quote(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
+   64 |+    def test_string_contains_opposite_quote(self, type1: 'Type[Literal["\'"]]', type2: 'Type[Literal["\'"]]'):
+62 65 |         pass
+63 66 | 
+64 67 | 
+
+quote3.py:67:29: TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+   |
+65 | def f():
+66 |     from typing import Literal
+67 |     from third_party import Type
+   |                             ^^^^ TC002
+68 | 
+69 |     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from third_party import Type
+1  5  | def f():
+2  6  |     from typing import Literal, Union
+3  7  | 
+--------------------------------------------------------------------------------
+64 68 | 
+65 69 | def f():
+66 70 |     from typing import Literal
+67    |-    from third_party import Type
+68 71 | 
+69    |-    def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
+   72 |+    def test_quote_contains_backslash(self, type1: 'Type[Literal["\\n"]]', type2: 'Type[Literal[\'"\']]'):
+70 73 |         pass

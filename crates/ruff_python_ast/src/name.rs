@@ -277,6 +277,14 @@ impl<'a> QualifiedName<'a> {
         inner.push(member);
         Self(inner)
     }
+
+    /// Extends the qualified name using the given members.
+    #[must_use]
+    pub fn extend_members<T: IntoIterator<Item = &'a str>>(self, members: T) -> Self {
+        let mut inner = self.0;
+        inner.extend(members);
+        Self(inner)
+    }
 }
 
 impl Display for QualifiedName<'_> {
@@ -669,7 +677,7 @@ impl<'a> Deref for SegmentsVec<'a> {
     }
 }
 
-impl<'a, 'b> PartialEq<SegmentsVec<'b>> for SegmentsVec<'a> {
+impl<'b> PartialEq<SegmentsVec<'b>> for SegmentsVec<'_> {
     fn eq(&self, other: &SegmentsVec<'b>) -> bool {
         self.as_slice() == other.as_slice()
     }

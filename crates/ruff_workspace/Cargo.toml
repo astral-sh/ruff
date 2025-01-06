@@ -13,14 +13,16 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_linter = { workspace = true }
-ruff_formatter = { workspace = true }
-ruff_python_formatter = { workspace = true, features = ["serde"] }
-ruff_python_ast = { workspace = true }
-ruff_python_semantic = { workspace = true, features = ["serde"] }
-ruff_source_file = { workspace = true }
 ruff_cache = { workspace = true }
+ruff_formatter = { workspace = true }
+ruff_graph = { workspace = true, features = ["serde", "schemars"] }
+ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_formatter = { workspace = true, features = ["serde"] }
+ruff_python_semantic = { workspace = true, features = ["serde"] }
+ruff_python_stdlib = {workspace = true}
+ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
@@ -33,7 +35,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 path-absolutize = { workspace = true }
 path-slash = { workspace = true }
-pep440_rs = { workspace = true, features = ["serde"] }
+pep440_rs = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }

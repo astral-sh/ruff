@@ -1,11 +1,11 @@
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBinOp;
+use ruff_python_ast::{AnyNodeRef, StringLike};
 
 use crate::expression::binary_like::BinaryLike;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::string::AnyString;
+use crate::string::StringLikeExtensions;
 
 #[derive(Default)]
 pub struct FormatExprBinOp;
@@ -25,10 +25,10 @@ impl NeedsParentheses for ExprBinOp {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if let Some(string) = AnyString::from_expression(&self.left) {
+        } else if let Ok(string) = StringLike::try_from(&*self.left) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !string.is_implicit_concatenated()
-                && string.is_multiline(context.source())
+                && string.is_multiline(context)
                 && has_parentheses(&self.right, context).is_some()
                 && !context.comments().has_dangling(self)
                 && !context.comments().has(string)

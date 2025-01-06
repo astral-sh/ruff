@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/parentheses.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -49,6 +50,3 @@ if ( # trailing open parentheses comment
 ) and   y:  # fmt: skip
     pass
 ```
-
-
-

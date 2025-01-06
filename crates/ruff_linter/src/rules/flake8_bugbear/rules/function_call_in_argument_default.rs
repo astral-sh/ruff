@@ -3,7 +3,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -64,19 +64,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
-#[violation]
-pub struct FunctionCallInDefaultArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct FunctionCallInDefaultArgument {
     name: Option<String>,
 }
 
 impl Violation for FunctionCallInDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionCallInDefaultArgument { name } = self;
-        if let Some(name) = name {
+        if let Some(name) = &self.name {
             format!("Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
         } else {
-            format!("Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
+            "Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable".to_string()
         }
     }
 }

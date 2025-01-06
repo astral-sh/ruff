@@ -1,7 +1,7 @@
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprCall, ExprStringLiteral};
 use ruff_text_size::Ranged;
 
@@ -22,8 +22,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Argument](https://docs.python.org/3/glossary.html#term-argument)
-#[violation]
-pub struct RepeatedKeywordArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedKeywordArgument {
     duplicate_keyword: String,
 }
 

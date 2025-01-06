@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
@@ -64,19 +64,19 @@ use crate::importer::ImportRequest;
 ///
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
-#[violation]
-pub struct ReimplementedStarmap;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `itertools.starmap` instead of the generator")
+        "Use `itertools.starmap` instead of the generator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `itertools.starmap`"))
+        Some("Replace with `itertools.starmap`".to_string())
     }
 }
 

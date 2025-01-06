@@ -113,33 +113,29 @@ impl From<&Expr> for ResolvedPythonType {
 
             // Unary operators.
             Expr::UnaryOp(ast::ExprUnaryOp { operand, op, .. }) => match op {
-                UnaryOp::Invert => {
-                    return match ResolvedPythonType::from(operand.as_ref()) {
-                        ResolvedPythonType::Atom(PythonType::Number(
-                            NumberLike::Bool | NumberLike::Integer,
-                        )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
-                        ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                        _ => ResolvedPythonType::Unknown,
-                    }
-                }
+                UnaryOp::Invert => match ResolvedPythonType::from(operand.as_ref()) {
+                    ResolvedPythonType::Atom(PythonType::Number(
+                        NumberLike::Bool | NumberLike::Integer,
+                    )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
+                    _ => ResolvedPythonType::Unknown,
+                },
                 // Ex) `not 1.0`
                 UnaryOp::Not => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
                 // Ex) `+1` or `-1`
-                UnaryOp::UAdd | UnaryOp::USub => {
-                    return match ResolvedPythonType::from(operand.as_ref()) {
-                        ResolvedPythonType::Atom(PythonType::Number(number)) => {
-                            ResolvedPythonType::Atom(PythonType::Number(
-                                if number == NumberLike::Bool {
-                                    NumberLike::Integer
-                                } else {
-                                    number
-                                },
-                            ))
-                        }
-                        ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                        _ => ResolvedPythonType::Unknown,
+                UnaryOp::UAdd | UnaryOp::USub => match ResolvedPythonType::from(operand.as_ref()) {
+                    ResolvedPythonType::Atom(PythonType::Number(number)) => {
+                        ResolvedPythonType::Atom(PythonType::Number(
+                            if number == NumberLike::Bool {
+                                NumberLike::Integer
+                            } else {
+                                number
+                            },
+                        ))
                     }
-                }
+                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
+                    _ => ResolvedPythonType::Unknown,
+                },
             },
 
             // Binary operators.
@@ -238,12 +234,39 @@ impl From<&Expr> for ResolvedPythonType {
                         }
                         _ => {}
                     },
-                    // Standard arithmetic operators, which coerce to the "highest" number type.
-                    Operator::Mult | Operator::FloorDiv | Operator::Pow => match (
+                    Operator::Mult => match (
                         ResolvedPythonType::from(left.as_ref()),
                         ResolvedPythonType::from(right.as_ref()),
                     ) {
-                        // Ex) `1 - 2`
+                        // Ex) `2 * 4`
+                        (
+                            ResolvedPythonType::Atom(PythonType::Number(left)),
+                            ResolvedPythonType::Atom(PythonType::Number(right)),
+                        ) => {
+                            return ResolvedPythonType::Atom(PythonType::Number(
+                                left.coerce(right),
+                            ));
+                        }
+                        // Ex) `"1" * 2` or `2 * "1"`
+                        (
+                            ResolvedPythonType::Atom(PythonType::String),
+                            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                        )
+                        | (
+                            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                            ResolvedPythonType::Atom(PythonType::String),
+                        ) => return ResolvedPythonType::Atom(PythonType::String),
+                        (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
+                            return ResolvedPythonType::TypeError;
+                        }
+                        _ => {}
+                    },
+                    // Standard arithmetic operators, which coerce to the "highest" number type.
+                    Operator::FloorDiv | Operator::Pow => match (
+                        ResolvedPythonType::from(left.as_ref()),
+                        ResolvedPythonType::from(right.as_ref()),
+                    ) {
+                        // Ex) `2 ** 4`
                         (
                             ResolvedPythonType::Atom(PythonType::Number(left)),
                             ResolvedPythonType::Atom(PythonType::Number(right)),
@@ -479,6 +502,14 @@ mod tests {
         assert_eq!(
             ResolvedPythonType::from(parse("1.0 * 2j").expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("'AA' * 2").expr()),
+            ResolvedPythonType::Atom(PythonType::String)
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("4 * 'AA'").expr()),
+            ResolvedPythonType::Atom(PythonType::String)
         );
         assert_eq!(
             ResolvedPythonType::from(parse("1 / True").expr()),

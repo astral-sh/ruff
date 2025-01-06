@@ -25,11 +25,13 @@ jobs:
         name: Checkout Ruff
         with:
           path: ruff
+          persist-credentials: true
       - uses: actions/checkout@v4
         name: Checkout typeshed
         with:
           repository: python/typeshed
           path: typeshed
+          persist-credentials: false
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -37,13 +39,13 @@ jobs:
       - name: Sync typeshed
         id: sync
         run: |
-          rm -rf ruff/crates/red_knot_python_semantic/vendor/typeshed
-          mkdir ruff/crates/red_knot_python_semantic/vendor/typeshed
-          cp typeshed/README.md ruff/crates/red_knot_python_semantic/vendor/typeshed
-          cp typeshed/LICENSE ruff/crates/red_knot_python_semantic/vendor/typeshed
-          cp -r typeshed/stdlib ruff/crates/red_knot_python_semantic/vendor/typeshed/stdlib
-          rm -rf ruff/crates/red_knot_python_semantic/vendor/typeshed/stdlib/@tests
-          git -C typeshed rev-parse HEAD > ruff/crates/red_knot_python_semantic/vendor/typeshed/source_commit.txt
+          rm -rf ruff/crates/red_knot_vendored/vendor/typeshed
+          mkdir ruff/crates/red_knot_vendored/vendor/typeshed
+          cp typeshed/README.md ruff/crates/red_knot_vendored/vendor/typeshed
+          cp typeshed/LICENSE ruff/crates/red_knot_vendored/vendor/typeshed
+          cp -r typeshed/stdlib ruff/crates/red_knot_vendored/vendor/typeshed/stdlib
+          rm -rf ruff/crates/red_knot_vendored/vendor/typeshed/stdlib/@tests
+          git -C typeshed rev-parse HEAD > ruff/crates/red_knot_vendored/vendor/typeshed/source_commit.txt
       - name: Commit the changes
         id: commit
         if: ${{ steps.sync.outcome == 'success' }}
@@ -57,7 +59,7 @@ jobs:
         run: |
           cd ruff
           git push --force origin typeshedbot/sync-typeshed
-          gh pr list --repo $GITHUB_REPOSITORY --head typeshedbot/sync-typeshed --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
+          gh pr list --repo "$GITHUB_REPOSITORY" --head typeshedbot/sync-typeshed --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
           gh pr create --title "Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "internal"
 
   create-issue-on-failure:

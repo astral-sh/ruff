@@ -1,5 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
 use ruff_text_size::Ranged;
@@ -25,11 +25,17 @@ use crate::fix::edits::pad;
 /// 1 == 1
 /// ```
 ///
+/// ## Fix safety
+///
+/// When the right-hand side is a string, the fix is marked as unsafe.
+/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
+/// so the fix can change the behavior of your program in these cases.
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
-#[violation]
-pub struct SingleItemMembershipTest {
+#[derive(ViolationMetadata)]
+pub(crate) struct SingleItemMembershipTest {
     membership_test: MembershipTest,
 }
 
@@ -38,7 +44,7 @@ impl Violation for SingleItemMembershipTest {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Membership test against single-item container")
+        "Membership test against single-item container".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -74,9 +80,9 @@ pub(crate) fn single_item_membership_test(
         return;
     };
 
-    let mut diagnostic =
-        Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    let diagnostic = Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
+
+    let edit = Edit::range_replacement(
         pad(
             generate_comparison(
                 left,
@@ -84,14 +90,23 @@ pub(crate) fn single_item_membership_test(
                 &[item.clone()],
                 expr.into(),
                 checker.comment_ranges(),
-                checker.locator(),
+                checker.source(),
             ),
             expr.range(),
             checker.locator(),
         ),
         expr.range(),
-    )));
-    checker.diagnostics.push(diagnostic);
+    );
+
+    let applicability = if right.is_string_literal_expr() {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    let fix = Fix::applicable_edit(edit, applicability);
+
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// Return the single item wrapped in `Some` if the expression contains a single

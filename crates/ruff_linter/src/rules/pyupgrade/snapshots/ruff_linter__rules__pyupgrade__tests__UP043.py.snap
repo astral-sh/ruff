@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP043.py:4:15: UP043 [*] Unnecessary default type arguments
   |
@@ -10,7 +11,7 @@ UP043.py:4:15: UP043 [*] Unnecessary default type arguments
   = help: Remove default type arguments
 
 ℹ Safe fix
-1 1 | from typing import Generator, AsyncGenerator
+1 1 | from collections.abc import Generator, AsyncGenerator
 2 2 | 
 3 3 | 
 4   |-def func() -> Generator[int, None, None]:
@@ -72,4 +73,63 @@ UP043.py:31:21: UP043 [*] Unnecessary default type arguments
    31 |+async def func() -> AsyncGenerator[int]:
 32 32 |     yield 42
 33 33 | 
-34 34 |
+34 34 | 
+
+UP043.py:47:15: UP043 [*] Unnecessary default type arguments
+   |
+47 | def func() -> Generator[str, None, None]:
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
+48 |     yield "hello"
+   |
+   = help: Remove default type arguments
+
+ℹ Safe fix
+44 44 | from typing import Generator, AsyncGenerator
+45 45 | 
+46 46 | 
+47    |-def func() -> Generator[str, None, None]:
+   47 |+def func() -> Generator[str]:
+48 48 |     yield "hello"
+49 49 | 
+50 50 | 
+
+UP043.py:51:21: UP043 [*] Unnecessary default type arguments
+   |
+51 | async def func() -> AsyncGenerator[str, None]:
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
+52 |     yield "hello"
+   |
+   = help: Remove default type arguments
+
+ℹ Safe fix
+48 48 |     yield "hello"
+49 49 | 
+50 50 | 
+51    |-async def func() -> AsyncGenerator[str, None]:
+   51 |+async def func() -> AsyncGenerator[str]:
+52 52 |     yield "hello"
+53 53 | 
+54 54 | 
+
+UP043.py:55:21: UP043 [*] Unnecessary default type arguments
+   |
+55 |   async def func() -> AsyncGenerator[  # type: ignore
+   |  _____________________^
+56 | |     str,
+57 | |     None
+58 | | ]:
+   | |_^ UP043
+59 |       yield "hello"
+   |
+   = help: Remove default type arguments
+
+ℹ Unsafe fix
+52 52 |     yield "hello"
+53 53 | 
+54 54 | 
+55    |-async def func() -> AsyncGenerator[  # type: ignore
+56    |-    str,
+57    |-    None
+58    |-]:
+   55 |+async def func() -> AsyncGenerator[str]:
+59 56 |     yield "hello"

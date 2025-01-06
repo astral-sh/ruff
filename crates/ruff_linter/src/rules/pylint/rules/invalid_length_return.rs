@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -39,13 +39,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__len__` method](https://docs.python.org/3/reference/datamodel.html#object.__len__)
-#[violation]
-pub struct InvalidLengthReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidLengthReturnType;
 
 impl Violation for InvalidLengthReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__len__` does not return a non-negative integer")
+        "`__len__` does not return a non-negative integer".to_string()
     }
 }
 

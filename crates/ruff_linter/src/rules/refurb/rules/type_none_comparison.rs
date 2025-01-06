@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -32,8 +32,8 @@ use crate::rules::refurb::helpers::generate_none_identity_comparison;
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
-#[violation]
-pub struct TypeNoneComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeNoneComparison {
     object: Name,
     comparison: Comparison,
 }

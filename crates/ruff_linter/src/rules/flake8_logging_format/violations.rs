@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for uses of `str.format` to format logging messages.
@@ -73,13 +73,13 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-#[violation]
-pub struct LoggingStringFormat;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingStringFormat;
 
 impl Violation for LoggingStringFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `str.format`")
+        "Logging statement uses `str.format`".to_string()
     }
 }
 
@@ -157,13 +157,13 @@ impl Violation for LoggingStringFormat {
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-#[violation]
-pub struct LoggingPercentFormat;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingPercentFormat;
 
 impl Violation for LoggingPercentFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `%`")
+        "Logging statement uses `%`".to_string()
     }
 }
 
@@ -240,13 +240,13 @@ impl Violation for LoggingPercentFormat {
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-#[violation]
-pub struct LoggingStringConcat;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingStringConcat;
 
 impl Violation for LoggingStringConcat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `+`")
+        "Logging statement uses `+`".to_string()
     }
 }
 
@@ -322,13 +322,13 @@ impl Violation for LoggingStringConcat {
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-#[violation]
-pub struct LoggingFString;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingFString;
 
 impl Violation for LoggingFString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses f-string")
+        "Logging statement uses f-string".to_string()
     }
 }
 
@@ -373,13 +373,13 @@ impl Violation for LoggingFString {
 /// ## References
 /// - [Python documentation: `logging.warning`](https://docs.python.org/3/library/logging.html#logging.warning)
 /// - [Python documentation: `logging.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
-#[violation]
-pub struct LoggingWarn;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingWarn;
 
 impl AlwaysFixableViolation for LoggingWarn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `warn` instead of `warning`")
+        "Logging statement uses `warn` instead of `warning`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -432,7 +432,7 @@ impl AlwaysFixableViolation for LoggingWarn {
 ///
 /// username = "Maria"
 ///
-/// logging.info("Something happened", extra=dict(user=username))
+/// logging.info("Something happened", extra=dict(user_id=username))
 /// ```
 ///
 /// ## Options
@@ -440,8 +440,8 @@ impl AlwaysFixableViolation for LoggingWarn {
 ///
 /// ## References
 /// - [Python documentation: LogRecord attributes](https://docs.python.org/3/library/logging.html#logrecord-attributes)
-#[violation]
-pub struct LoggingExtraAttrClash(pub String);
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingExtraAttrClash(pub String);
 
 impl Violation for LoggingExtraAttrClash {
     #[derive_message_formats]
@@ -502,13 +502,14 @@ impl Violation for LoggingExtraAttrClash {
 /// - [Python documentation: `exception`](https://docs.python.org/3/library/logging.html#logging.Logger.exception)
 /// - [Python documentation: `logging.error`](https://docs.python.org/3/library/logging.html#logging.error)
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
-#[violation]
-pub struct LoggingExcInfo;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingExcInfo;
 
 impl Violation for LoggingExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`")
+        "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
+            .to_string()
     }
 }
 
@@ -563,12 +564,12 @@ impl Violation for LoggingExcInfo {
 /// - [Python documentation: `exception`](https://docs.python.org/3/library/logging.html#logging.Logger.exception)
 /// - [Python documentation: `logging.error`](https://docs.python.org/3/library/logging.html#logging.error)
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
-#[violation]
-pub struct LoggingRedundantExcInfo;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingRedundantExcInfo;
 
 impl Violation for LoggingRedundantExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement has redundant `exc_info`")
+        "Logging statement has redundant `exc_info`".to_string()
     }
 }

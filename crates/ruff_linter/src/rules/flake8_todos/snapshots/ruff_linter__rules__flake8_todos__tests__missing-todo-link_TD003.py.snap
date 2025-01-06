@@ -1,50 +1,49 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+snapshot_kind: text
 ---
-TD003.py:9:3: TD003 Missing issue link on the line following this TODO
+TD003.py:15:3: TD003 Missing issue link on the line following this TODO
    |
- 8 | # TDO003 - errors
- 9 | # TODO: this comment has no
+14 | # TDO003 - errors
+15 | # TODO: this comment has no
    |   ^^^^ TD003
-10 | # link after it
+16 | # link after it
    |
 
-TD003.py:12:3: TD003 Missing issue link on the line following this TODO
+TD003.py:18:3: TD003 Missing issue link on the line following this TODO
    |
-10 | # link after it
-11 | 
-12 | # TODO: here's a TODO with no link after it
+16 | # link after it
+17 | 
+18 | # TODO: here's a TODO with no link after it
    |   ^^^^ TD003
-13 | def foo(x):
-14 |     return x
-   |
-
-TD003.py:25:3: TD003 Missing issue link on the line following this TODO
-   |
-23 | # TDO-3870
-24 | 
-25 | # TODO: here's a TODO without an issue link
-   |   ^^^^ TD003
-26 | # TODO: followed by a new TODO with an issue link
-27 | # TDO-3870
-   |
-
-TD003.py:29:9: TD003 Missing issue link on the line following this TODO
-   |
-27 | # TDO-3870
-28 | 
-29 | # foo # TODO: no link!
-   |         ^^^^ TD003
-30 | 
-31 | # TODO: here's a TODO on the last line with no link
+19 | def foo(x):
+20 |     return x
    |
 
 TD003.py:31:3: TD003 Missing issue link on the line following this TODO
    |
-29 | # foo # TODO: no link!
+29 | # TDO-3870
 30 | 
-31 | # TODO: here's a TODO on the last line with no link
+31 | # TODO: here's a TODO without an issue link
    |   ^^^^ TD003
+32 | # TODO: followed by a new TODO with an issue link
+33 | # TDO-3870
    |
 
+TD003.py:35:9: TD003 Missing issue link on the line following this TODO
+   |
+33 | # TDO-3870
+34 | 
+35 | # foo # TODO: no link!
+   |         ^^^^ TD003
+36 | 
+37 | # TODO: here's a TODO on the last line with no link
+   |
 
+TD003.py:37:3: TD003 Missing issue link on the line following this TODO
+   |
+35 | # foo # TODO: no link!
+36 | 
+37 | # TODO: here's a TODO on the last line with no link
+   |   ^^^^ TD003
+   |

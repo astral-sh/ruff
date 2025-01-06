@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+snapshot_kind: text
 ---
 ARG.py:37:17: ARG002 Unused method argument: `x`
    |
@@ -28,13 +29,41 @@ ARG.py:43:16: ARG002 Unused method argument: `x`
 44 |         print("Hello, world!")
    |
 
-ARG.py:192:24: ARG002 Unused method argument: `x`
+ARG.py:58:17: ARG002 Unused method argument: `x`
+   |
+56 |         print("Hello, world!")
+57 | 
+58 |     def f(self, x):
+   |                 ^ ARG002
+59 |         msg[0] = "..."
+60 |         raise NotImplementedError(msg)
+   |
+
+ARG.py:62:17: ARG002 Unused method argument: `x`
+   |
+60 |         raise NotImplementedError(msg)
+61 | 
+62 |     def f(self, x):
+   |                 ^ ARG002
+63 |         msg = "..."
+64 |         raise NotImplementedError(foo)
+   |
+
+ARG.py:66:17: ARG002 Unused method argument: `x`
+   |
+64 |         raise NotImplementedError(foo)
+65 | 
+66 |     def f(self, x):
+   |                 ^ ARG002
+67 |         msg = "..."
+68 |         raise NotImplementedError("must use msg")
+   |
+
+ARG.py:213:24: ARG002 Unused method argument: `x`
     |
-190 | ###
-191 | class C:
-192 |     def __init__(self, x) -> None:
+211 | ###
+212 | class C:
+213 |     def __init__(self, x) -> None:
     |                        ^ ARG002
-193 |         print("Hello, world!")
+214 |         print("Hello, world!")
     |
-
-

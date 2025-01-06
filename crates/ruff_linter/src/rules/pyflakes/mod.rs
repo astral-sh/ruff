@@ -12,15 +12,12 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use rustc_hash::FxHashMap;
-
     use test_case::test_case;
 
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
@@ -31,6 +28,7 @@ mod tests {
     use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_snippet};
+    use crate::Locator;
     use crate::{assert_messages, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
@@ -57,6 +55,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
@@ -97,6 +96,7 @@ mod tests {
     #[test_case(Rule::ReturnOutsideFunction, Path::new("F706.py"))]
     #[test_case(Rule::DefaultExceptNotLast, Path::new("F707.py"))]
     #[test_case(Rule::ForwardAnnotationSyntaxError, Path::new("F722.py"))]
+    #[test_case(Rule::ForwardAnnotationSyntaxError, Path::new("F722_1.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_0.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_1.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_2.py"))]
@@ -161,6 +161,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_26.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_27.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_28.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -206,6 +208,18 @@ mod tests {
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn f821_with_builtin_added_on_new_py_version_but_old_target_version_specified() {
+        let diagnostics = test_snippet(
+            "PythonFinalizationError",
+            &LinterSettings {
+                target_version: crate::settings::types::PythonVersion::Py312,
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert_messages!(diagnostics);
     }
 
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
@@ -316,6 +330,22 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnusedImport, Path::new("F401_31.py"))]
+    fn f401_allowed_unused_imports_option(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                pyflakes: pyflakes::settings::Settings {
+                    allowed_unused_imports: vec!["hvplot.pandas".to_string()],
+                    ..pyflakes::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
         let diagnostics = test_path(
@@ -415,7 +445,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bar.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -428,7 +458,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bop/baz.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -443,8 +473,9 @@ mod tests {
             &LinterSettings {
                 pyflakes: pyflakes::settings::Settings {
                     extend_generics: vec!["django.db.models.ForeignKey".to_string()],
+                    ..pyflakes::settings::Settings::default()
                 },
-                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
+                ..LinterSettings::for_rule(Rule::UnusedImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -684,8 +715,8 @@ mod tests {
         let parsed =
             ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
         let directives = directives::extract_directives(
             parsed.tokens(),
             directives::Flags::from_settings(&settings),

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{
     self as ast,
@@ -47,13 +47,13 @@ use crate::checkers::ast::Checker;
 ///     print(f"{instrument}: {section}")
 /// ```
 
-#[violation]
-pub struct DictIndexMissingItems;
+#[derive(ViolationMetadata)]
+pub(crate) struct DictIndexMissingItems;
 
 impl Violation for DictIndexMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Extracting value from dictionary without calling `.items()`")
+        "Extracting value from dictionary without calling `.items()`".to_string()
     }
 }
 

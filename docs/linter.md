@@ -19,11 +19,6 @@ $ ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdir
 
 For the full list of supported options, run `ruff check --help`.
 
-!!! note
-    As of Ruff v0.1.7 the `ruff check` command uses the current working directory (`.`) as the default path to check.
-    On older versions, you must provide this manually e.g. `ruff check .`.
-    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
-
 ## Rule selection
 
 The set of enabled rules is controlled via the [`lint.select`](settings.md#lint_select),
@@ -161,7 +156,11 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 ### Fix safety
 
 Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when
-applying safe fixes, but the meaning could be changed when applying unsafe fixes.
+applying safe fixes, but the meaning could change when applying unsafe fixes.
+
+Specifically, an unsafe fix could lead to a change in runtime behavior, the removal of comments, or both,
+while safe fixes are intended to preserve runtime behavior and will only remove comments when deleting
+entire statements or expressions (e.g., removing unused imports).
 
 For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unnecessary-iterable-allocation-for-first-element.md)
 (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix
@@ -177,7 +176,7 @@ $ python -m timeit "head = next(iter(range(99999999)))"
 5000000 loops, best of 5: 70.8 nsec per loop
 ```
 
-However, when the collection is empty, this changes the raised exception from an `IndexError` to `StopIteration`:
+However, when the collection is empty, this raised exception changes from an `IndexError` to `StopIteration`:
 
 ```console
 $ python -c 'list(range(0))[0]'
@@ -193,7 +192,7 @@ Traceback (most recent call last):
 StopIteration
 ```
 
-Since this could break error handling, this fix is categorized as unsafe.
+Since the change in exception type could break error handling upstream, this fix is categorized as unsafe.
 
 Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
 

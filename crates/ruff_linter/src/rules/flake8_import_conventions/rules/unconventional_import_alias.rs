@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
@@ -34,8 +34,8 @@ use crate::renamer::Renamer;
 /// ## Options
 /// - `lint.flake8-import-conventions.aliases`
 /// - `lint.flake8-import-conventions.extend-aliases`
-#[violation]
-pub struct UnconventionalImportAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnconventionalImportAlias {
     name: String,
     asname: String,
 }
@@ -65,7 +65,7 @@ pub(crate) fn unconventional_import_alias(
     let qualified_name = import.qualified_name().to_string();
     let expected_alias = conventions.get(qualified_name.as_str())?;
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(checker.source());
     if name == expected_alias {
         return None;
     }

@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
@@ -34,20 +34,37 @@ use crate::checkers::ast::Checker;
 /// for city, population in data.items():
 ///     print(f"{city} has population {population}.")
 /// ```
-#[violation]
-pub struct DictIterMissingItems;
+///
+/// ## Known problems
+/// If the dictionary key is a tuple, e.g.:
+///
+/// ```python
+/// d = {(1, 2): 3, (3, 4): 5}
+/// for x, y in d:
+///     print(x, y)
+/// ```
+///
+/// The tuple key is unpacked into `x` and `y` instead of the key and values. This means that
+/// the suggested fix of using `d.items()` would result in different runtime behavior. Ruff
+/// cannot consistently infer the type of a dictionary's keys.
+///
+/// ## Fix safety
+/// Due to the known problem with tuple keys, this fix is unsafe.
+#[derive(ViolationMetadata)]
+pub(crate) struct DictIterMissingItems;
 
 impl AlwaysFixableViolation for DictIterMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unpacking a dictionary in iteration without calling `.items()`")
+        "Unpacking a dictionary in iteration without calling `.items()`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add a call to `.items()`")
+        "Add a call to `.items()`".to_string()
     }
 }
 
+/// PLE1141
 pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter: &Expr) {
     let Expr::Tuple(tuple) = target else {
         return;
@@ -78,7 +95,7 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
     }
 
     let mut diagnostic = Diagnostic::new(DictIterMissingItems, iter.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.items()", name.id),
         iter.range(),
     )));

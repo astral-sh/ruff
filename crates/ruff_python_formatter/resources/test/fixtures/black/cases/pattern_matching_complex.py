@@ -82,7 +82,7 @@ match (0, 1, 2):
 match x:
     case [0]:
         y = 0
-    case [1, 0] if (x := x[:0]):
+    case [1, 0] if x := x[:0]:
         y = 1
     case [1, 0]:
         y = 2

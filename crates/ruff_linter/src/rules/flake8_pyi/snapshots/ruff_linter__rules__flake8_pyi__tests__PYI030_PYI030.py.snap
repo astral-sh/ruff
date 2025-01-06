@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI030.py:9:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -517,6 +518,8 @@ PYI030.py:89:10: PYI030 [*] Multiple literal members in a union. Use a single li
 88 | # Should use the first literal subscript attribute when fixing
 89 | field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+90 | 
+91 | from typing import IO, Literal
    |
    = help: Replace with a single `Literal`
 
@@ -526,5 +529,22 @@ PYI030.py:89:10: PYI030 [*] Multiple literal members in a union. Use a single li
 88 88 | # Should use the first literal subscript attribute when fixing
 89    |-field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    89 |+field25: typing.Union[typing_extensions.Literal[1, 2, 3, 4], str]  # Error
+90 90 | 
+91 91 | from typing import IO, Literal
+92 92 | 
 
+PYI030.py:93:16: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b"]`
+   |
+91 | from typing import IO, Literal
+92 | 
+93 | InlineOption = Literal["a"] | Literal["b"] | IO[str]
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+   |
+   = help: Replace with a single `Literal`
 
+ℹ Safe fix
+90 90 | 
+91 91 | from typing import IO, Literal
+92 92 | 
+93    |-InlineOption = Literal["a"] | Literal["b"] | IO[str]
+   93 |+InlineOption = Literal["a", "b"] | IO[str]

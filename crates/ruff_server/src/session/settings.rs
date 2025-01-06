@@ -735,7 +735,7 @@ mod tests {
     fn test_global_only_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(GLOBAL_ONLY_INIT_OPTIONS_FIXTURE);
 
-        assert_debug_snapshot!(options, @r###"
+        assert_debug_snapshot!(options, @r#"
         GlobalOnly {
             settings: ClientSettings {
                 configuration: None,
@@ -789,7 +789,7 @@ mod tests {
                 },
             },
         }
-        "###);
+        "#);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,16 +30,15 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// The [typing documentation on stub files](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
-#[violation]
-pub struct ComplexIfStatementInStub;
+/// - [Typing documentation: Version and platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
+#[derive(ViolationMetadata)]
+pub(crate) struct ComplexIfStatementInStub;
 
 impl Violation for ComplexIfStatementInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
-        )
+        "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
+            .to_string()
     }
 }
 

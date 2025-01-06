@@ -16,33 +16,38 @@ mod tests {
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_1.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_10.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_11.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_12.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_15.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_16.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_17.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_2.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_3.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_4.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_5.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_6.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_7.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
+    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TC005.py"))]
+    #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_1.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_10.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_11.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_12.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_13.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_14.pyi"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_15.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_16.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_17.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_3.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_4.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_5.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_6.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_7.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_8.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
-    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
-    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("singledispatchmethod.py")
+    )]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TC002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("singledispatch.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
@@ -58,8 +63,29 @@ mod tests {
         Ok(())
     }
 
+    // we test these rules as a pair, since they're opposites of one another
+    // so we want to make sure their fixes are not going around in circles.
+    #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.py"))]
+    fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnquotedTypeAlias,
+                Rule::QuotedTypeAlias,
+            ]),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
     fn quote(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -224,6 +250,33 @@ mod tests {
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("module/app.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/routes.py"))]
+    fn decorator_same_file(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_required_decorators: vec![
+                        "fastapi.FastAPI.get".to_string(),
+                        "fastapi.FastAPI.put".to_string(),
+                        "module.app.AppContainer.app.get".to_string(),
+                        "module.app.AppContainer.app.put".to_string(),
+                        "module.app.app.get".to_string(),
+                        "module.app.app.put".to_string(),
+                        "module.app.app_container.app.get".to_string(),
+                        "module.app.app_container.app.put".to_string(),
+                    ],
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
@@ -421,6 +474,29 @@ mod tests {
             pass
     ",
         "multiple_modules_different_types"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING, TypeAlias
+        if TYPE_CHECKING:
+            from foo import Foo  # TC004
+
+        a: TypeAlias = Foo | None  # OK
+    ",
+        "tc004_precedence_over_tc007"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TypeAlias
+
+        a: TypeAlias = 'int | None'  # TC008
+        b: TypeAlias = 'int' | None  # TC010
+    ",
+        "tc010_precedence_over_tc008"
     )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(

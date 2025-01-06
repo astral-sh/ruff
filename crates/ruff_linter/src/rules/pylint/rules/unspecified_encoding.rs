@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, StringLiteralFlags};
 use ruff_python_semantic::SemanticModel;
@@ -42,8 +42,8 @@ use crate::fix::edits::add_argument;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
-#[violation]
-pub struct UnspecifiedEncoding {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,
 }
@@ -67,7 +67,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add explicit `encoding` argument")
+        "Add explicit `encoding` argument".to_string()
     }
 }
 
@@ -203,19 +203,19 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
     match qualified_name {
         Callee::Qualified(qualified_name) => match qualified_name.segments() {
             ["" | "codecs" | "_io", "open"] => {
-                if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
+                if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
                     }
                 }
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument("encoding", 3).is_none()
+                call.arguments.find_argument_value("encoding", 3).is_none()
             }
             ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
             {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
-                if let Some(mode_arg) = call.arguments.find_argument("mode", mode_pos) {
+                if let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
@@ -225,27 +225,27 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                     return false;
                 }
                 call.arguments
-                    .find_argument("encoding", mode_pos + 2)
+                    .find_argument_value("encoding", mode_pos + 2)
                     .is_none()
             }
             ["io" | "_io", "TextIOWrapper"] => {
-                call.arguments.find_argument("encoding", 1).is_none()
+                call.arguments.find_argument_value("encoding", 1).is_none()
             }
             _ => false,
         },
         Callee::Pathlib(attr) => match *attr {
             "open" => {
-                if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
+                if let Some(mode_arg) = call.arguments.find_argument_value("mode", 0) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
                     }
                 }
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument("encoding", 2).is_none()
+                call.arguments.find_argument_value("encoding", 2).is_none()
             }
-            "read_text" => call.arguments.find_argument("encoding", 0).is_none(),
-            "write_text" => call.arguments.find_argument("encoding", 1).is_none(),
+            "read_text" => call.arguments.find_argument_value("encoding", 0).is_none(),
+            "write_text" => call.arguments.find_argument_value("encoding", 1).is_none(),
             _ => false,
         },
     }

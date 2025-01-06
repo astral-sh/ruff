@@ -6,16 +6,17 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+use itertools::Itertools;
+
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use is_macro;
-use natord;
+use crate::Locator;
 
 /// An enumeration of the different sorting styles
 /// currently supported for displays of string literals
@@ -315,6 +316,52 @@ impl<'a> SortClassification<'a> {
     }
 }
 
+/// The complexity of the comments in a multiline sequence.
+///
+/// A sequence like this has "simple" comments: it's unambiguous
+/// which item each comment refers to, so there's no "risk" in sorting it:
+///
+/// ```py
+/// __all__ = [
+///     "foo",  # comment1
+///     "bar",  # comment2
+/// ]
+/// ```
+///
+/// This sequence has complex comments: we can't safely autofix the sort here,
+/// as the own-line comments might be used to create sections in `__all__`:
+///
+/// ```py
+/// __all__ = [
+///     # fooey things
+///     "foo1",
+///     "foo2",
+///     # barey things
+///     "bar1",
+///     "foobar",
+/// ]
+/// ```
+///
+/// This sequence also has complex comments -- it's ambiguous which item
+/// each comment should belong to:
+///
+/// ```py
+/// __all__ = [
+///     "foo1", "foo", "barfoo",  # fooey things
+///     "baz", bazz2", "fbaz",  # barrey things
+/// ]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum CommentComplexity {
+    Simple,
+    Complex,
+}
+
+impl CommentComplexity {
+    pub(super) const fn is_complex(self) -> bool {
+        matches!(self, CommentComplexity::Complex)
+    }
+}
+
 // An instance of this struct encapsulates an analysis
 /// of a multiline Python tuple/list that represents an
 /// `__all__`/`__slots__`/etc. definition or augmentation.
@@ -327,6 +374,24 @@ pub(super) struct MultilineStringSequenceValue<'a> {
 impl<'a> MultilineStringSequenceValue<'a> {
     pub(super) fn len(&self) -> usize {
         self.items.len()
+    }
+
+    /// Determine the [`CommentComplexity`] of this multiline string sequence.
+    pub(super) fn comment_complexity(&self) -> CommentComplexity {
+        if self.items.iter().tuple_windows().any(|(first, second)| {
+            first.has_own_line_comments()
+                || first
+                    .end_of_line_comments
+                    .is_some_and(|end_line_comment| second.start() < end_line_comment.end())
+        }) || self
+            .items
+            .last()
+            .is_some_and(StringSequenceItem::has_own_line_comments)
+        {
+            CommentComplexity::Complex
+        } else {
+            CommentComplexity::Simple
+        }
     }
 
     /// Analyse the source range for a multiline Python tuple/list that
@@ -422,7 +487,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //
         let newline = stylist.line_ending().as_str();
         let start_offset = self.start();
-        let leading_indent = leading_indentation(locator.full_line(start_offset));
+        let leading_indent = leading_indentation(locator.full_line_str(start_offset));
         let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
 
         let prelude =
@@ -792,6 +857,10 @@ impl<'a> StringSequenceItem<'a> {
 
     fn with_no_comments(value: &'a str, element_range: TextRange) -> Self {
         Self::new(value, vec![], element_range, None)
+    }
+
+    fn has_own_line_comments(&self) -> bool {
+        !self.preceding_comment_ranges.is_empty()
     }
 }
 

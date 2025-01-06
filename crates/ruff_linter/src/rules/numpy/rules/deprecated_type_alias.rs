@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// int
 /// ```
-#[violation]
-pub struct NumpyDeprecatedTypeAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct NumpyDeprecatedTypeAlias {
     type_name: String,
 }
 

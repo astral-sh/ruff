@@ -8,16 +8,17 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_trivia::{indentation_at_offset, CommentRanges};
-use ruff_source_file::{LineEnding, Locator};
+use ruff_source_file::{LineEnding, LineRanges};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
+use crate::Locator;
 
 /// Generates an array of edits that matches the length of `diagnostics`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
@@ -33,8 +34,7 @@ pub fn generate_noqa_edits(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Vec<Option<Edit>> {
-    let file_directives =
-        FileNoqaDirectives::extract(locator.contents(), comment_ranges, external, path, locator);
+    let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
@@ -186,6 +186,8 @@ impl<'a> Directive<'a> {
             .take_while(char::is_ascii_digit)
             .count();
         if prefix > 0 && suffix > 0 {
+            // SAFETY: we can use `prefix` and `suffix` to index into `line` because we know that
+            // all characters in `line` are ASCII, i.e., a single byte.
             Some(&line[..prefix + suffix])
         } else {
             None
@@ -225,7 +227,7 @@ impl Display for Code<'_> {
     }
 }
 
-impl<'a> Ranged for Code<'a> {
+impl Ranged for Code<'_> {
     /// The range of the rule code.
     fn range(&self) -> TextRange {
         self.range
@@ -238,7 +240,7 @@ pub(crate) struct Codes<'a> {
     codes: Vec<Code<'a>>,
 }
 
-impl<'a> Codes<'a> {
+impl Codes<'_> {
     /// Returns an iterator over the [`Code`]s in the `noqa` directive.
     pub(crate) fn iter(&self) -> std::slice::Iter<Code> {
         self.codes.iter()
@@ -285,7 +287,7 @@ pub(crate) enum FileExemption<'a> {
     Codes(Vec<&'a NoqaCode>),
 }
 
-impl<'a> FileExemption<'a> {
+impl FileExemption<'_> {
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         let needle = needle.noqa_code();
@@ -317,7 +319,7 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
         if directives
             .lines()
             .iter()
-            .any(|line| ParsedFileExemption::All == line.parsed_file_exemption)
+            .any(|line| matches!(line.parsed_file_exemption, ParsedFileExemption::All))
         {
             FileExemption::All(codes)
         } else {
@@ -352,16 +354,15 @@ impl<'a> FileNoqaDirectives<'a> {
     /// Extract the [`FileNoqaDirectives`] for a given Python source file, enumerating any rules
     /// that are globally ignored within the file.
     pub(crate) fn extract(
-        contents: &'a str,
+        locator: &Locator<'a>,
         comment_ranges: &CommentRanges,
         external: &[String],
         path: &Path,
-        locator: &Locator,
     ) -> Self {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(&contents[*range]) {
+            match ParsedFileExemption::try_extract(range, locator.contents()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -369,7 +370,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
                 Ok(Some(exemption)) => {
-                    if indentation_at_offset(range.start(), locator).is_none() {
+                    if indentation_at_offset(range.start(), locator.contents()).is_none() {
                         #[allow(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
@@ -383,6 +384,7 @@ impl<'a> FileNoqaDirectives<'a> {
                         }
                         ParsedFileExemption::Codes(codes) => {
                             codes.iter().filter_map(|code| {
+                                let code = code.as_str();
                                 // Ignore externally-defined rules.
                                 if external.iter().any(|external| code.starts_with(external)) {
                                     return None;
@@ -403,7 +405,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     };
 
                     lines.push(FileNoqaDirectiveLine {
-                        range: *range,
+                        range,
                         parsed_file_exemption: exemption,
                         matches,
                     });
@@ -423,21 +425,26 @@ impl<'a> FileNoqaDirectives<'a> {
 /// An individual file-level exemption (e.g., `# ruff: noqa` or `# ruff: noqa: F401, F841`). Like
 /// [`FileNoqaDirectives`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub(crate) enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
-    Codes(Vec<&'a str>),
+    Codes(Codes<'a>),
 }
 
 impl<'a> ParsedFileExemption<'a> {
-    /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str) -> Result<Option<Self>, ParseError> {
+    /// Return a [`ParsedFileExemption`] for a given `comment_range` in `source`.
+    fn try_extract(comment_range: TextRange, source: &'a str) -> Result<Option<Self>, ParseError> {
+        let line = &source[comment_range];
+        let offset = comment_range.start();
+        let init_line_len = line.text_len();
+
         let line = Self::lex_whitespace(line);
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);
         };
+        let comment_start = init_line_len - line.text_len() - '#'.text_len();
         let line = Self::lex_whitespace(line);
 
         let Some(line) = Self::lex_flake8(line).or_else(|| Self::lex_ruff(line)) else {
@@ -468,7 +475,11 @@ impl<'a> ParsedFileExemption<'a> {
             let mut codes = vec![];
             let mut line = line;
             while let Some(code) = Self::lex_code(line) {
-                codes.push(code);
+                let codes_end = init_line_len - line.text_len();
+                codes.push(Code {
+                    code,
+                    range: TextRange::at(codes_end, code.text_len()).add(offset),
+                });
                 line = &line[code.len()..];
 
                 // Codes can be comma- or whitespace-delimited.
@@ -484,7 +495,12 @@ impl<'a> ParsedFileExemption<'a> {
                 return Err(ParseError::MissingCodes);
             }
 
-            Self::Codes(codes)
+            let codes_end = init_line_len - line.text_len();
+            let range = TextRange::new(comment_start, codes_end);
+            Self::Codes(Codes {
+                range: range.add(offset),
+                codes,
+            })
         }))
     }
 
@@ -550,7 +566,7 @@ impl<'a> ParsedFileExemption<'a> {
         // Extract, e.g., the `401` in `F401`.
         let suffix = line[prefix..]
             .chars()
-            .take_while(char::is_ascii_digit)
+            .take_while(char::is_ascii_alphanumeric)
             .count();
         if prefix > 0 && suffix > 0 {
             Some(&line[..prefix + suffix])
@@ -619,8 +635,7 @@ fn add_noqa_inner(
     let mut count = 0;
 
     // Whether the file is exempted from all checks.
-    let directives =
-        FileNoqaDirectives::extract(locator.contents(), comment_ranges, external, path, locator);
+    let directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&directives);
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
@@ -802,7 +817,7 @@ struct NoqaEdit<'a> {
     line_ending: LineEnding,
 }
 
-impl<'a> NoqaEdit<'a> {
+impl NoqaEdit<'_> {
     fn into_edit(self) -> Edit {
         let mut edit_content = String::new();
         self.write(&mut edit_content);
@@ -834,7 +849,7 @@ impl<'a> NoqaEdit<'a> {
     }
 }
 
-impl<'a> Ranged for NoqaEdit<'a> {
+impl Ranged for NoqaEdit<'_> {
     fn range(&self) -> TextRange {
         self.edit_range
     }
@@ -897,7 +912,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
-    // Whether the directive applies to range.end
+    /// Whether the directive applies to `range.end`.
     pub(crate) includes_end: bool,
 }
 
@@ -922,7 +937,7 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(locator.slice(*range), range.start()) {
+            match Directive::try_extract(locator.slice(range), range.start()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -1055,17 +1070,17 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_debug_snapshot;
-    use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
-    use ruff_source_file::{LineEnding, Locator};
+    use ruff_source_file::LineEnding;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::generate_noqa_edits;
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::{generate_noqa_edits, Locator};
 
     #[test]
     fn noqa_all() {
@@ -1194,6 +1209,30 @@ mod tests {
     }
 
     #[test]
+    fn noqa_squashed_codes() {
+        let source = "# noqa: F401F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_empty_comma() {
+        let source = "# noqa: F401,,F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_empty_comma_space() {
+        let source = "# noqa: F401, ,F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_non_code() {
+        let source = "# noqa: F401 We're ignoring an import";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
     fn noqa_invalid_suffix() {
         let source = "# noqa[F401]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
@@ -1202,50 +1241,74 @@ mod tests {
     #[test]
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn flake8_exemption_codes() {
         // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
         let source = "# flake8: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn ruff_exemption_codes() {
         let source = "# ruff: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
     }
 
     #[test]

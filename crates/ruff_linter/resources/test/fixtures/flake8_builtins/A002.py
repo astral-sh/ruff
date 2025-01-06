@@ -10,6 +10,8 @@ async def func3(id, dir):
     pass
 
 
+# this is Ok for A002 (trigger A005 instead)
+# https://github.com/astral-sh/ruff/issues/14135
 map([], lambda float: ...)
 
 from typing import override, overload

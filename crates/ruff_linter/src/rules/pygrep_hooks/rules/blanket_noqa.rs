@@ -1,11 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::Cursor;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
 use crate::settings::types::PreviewMode;
+use crate::Locator;
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -43,8 +43,8 @@ use crate::settings::types::PreviewMode;
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct BlanketNOQA {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlanketNOQA {
     missing_colon: bool,
     space_before_colon: bool,
     file_exemption: bool,
@@ -60,30 +60,23 @@ impl Violation for BlanketNOQA {
             space_before_colon,
             file_exemption,
         } = self;
-
         // This awkward branching is necessary to ensure that the generic message is picked up by
         // `derive_message_formats`.
         if !missing_colon && !space_before_colon && !file_exemption {
-            format!("Use specific rule codes when using `noqa`")
+            "Use specific rule codes when using `noqa`".to_string()
         } else if *file_exemption {
-            format!("Use specific rule codes when using `ruff: noqa`")
+            "Use specific rule codes when using `ruff: noqa`".to_string()
         } else if *missing_colon {
-            format!("Use a colon when specifying `noqa` rule codes")
+            "Use a colon when specifying `noqa` rule codes".to_string()
         } else {
-            format!("Do not add spaces between `noqa` and its colon")
+            "Do not add spaces between `noqa` and its colon".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let BlanketNOQA {
-            missing_colon,
-            space_before_colon,
-            ..
-        } = self;
-
-        if *missing_colon {
+        if self.missing_colon {
             Some("Add missing colon".to_string())
-        } else if *space_before_colon {
+        } else if self.space_before_colon {
             Some("Remove space(s) before colon".to_string())
         } else {
             None

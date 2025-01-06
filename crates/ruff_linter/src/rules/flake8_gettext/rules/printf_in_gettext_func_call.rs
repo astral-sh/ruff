@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -38,14 +38,15 @@ use ruff_text_size::Ranged;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: gettext](https://docs.python.org/3/library/gettext.html)
-#[violation]
-pub struct PrintfInGetTextFuncCall;
+/// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct PrintfInGetTextFuncCall;
 
 impl Violation for PrintfInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("printf-style format is resolved before function call; consider `_(\"string %s\") % arg`")
+        "printf-style format is resolved before function call; consider `_(\"string %s\") % arg`"
+            .to_string()
     }
 }
 

@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_ast::{self as ast, Arguments};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,8 +49,8 @@ use super::super::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
-#[violation]
-pub struct HashlibInsecureHashFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct HashlibInsecureHashFunction {
     library: String,
     string: String,
 }
@@ -64,6 +65,13 @@ impl Violation for HashlibInsecureHashFunction {
 
 /// S324
 pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker
+        .semantic()
+        .seen_module(Modules::HASHLIB | Modules::CRYPT)
+    {
+        return;
+    }
+
     if let Some(weak_hash_call) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -107,7 +115,7 @@ fn detect_insecure_hashlib_calls(
 
     match hashlib_call {
         HashlibCall::New => {
-            let Some(name_arg) = call.arguments.find_argument("name", 0) else {
+            let Some(name_arg) = call.arguments.find_argument_value("name", 0) else {
                 return;
             };
             let Some(hash_func_name) = string_literal(name_arg) else {
@@ -151,7 +159,7 @@ fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
             _ => None,
         })
         .and_then(|(argument_name, position)| {
-            call.arguments.find_argument(argument_name, position)
+            call.arguments.find_argument_value(argument_name, position)
         })
     else {
         return;

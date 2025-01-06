@@ -3,14 +3,15 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 use ruff_notebook::Notebook;
 
@@ -41,11 +42,11 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace = WorkspaceMetadata::from_path(
+        let workspace = WorkspaceMetadata::discover(
             SystemPath::new(root),
             &system,
-            Some(Configuration {
-                target_version: Some(settings.target_version.into()),
+            Some(&Configuration {
+                python_version: Some(settings.python_version.into()),
                 ..Configuration::default()
             }),
         )
@@ -110,14 +111,20 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        Ok(result.clone())
+        Ok(result
+            .into_iter()
+            .map(|diagnostic| diagnostic.display(&self.db).to_string())
+            .collect())
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<String>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        Ok(result.clone())
+        Ok(result
+            .into_iter()
+            .map(|diagnostic| diagnostic.display(&self.db).to_string())
+            .collect())
     }
 
     /// Returns the parsed AST for `path`
@@ -163,22 +170,22 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Settings {
-    pub target_version: TargetVersion,
+    pub python_version: PythonVersion,
 }
 #[wasm_bindgen]
 impl Settings {
     #[wasm_bindgen(constructor)]
-    pub fn new(target_version: TargetVersion) -> Self {
-        Self { target_version }
+    pub fn new(python_version: PythonVersion) -> Self {
+        Self { python_version }
     }
 }
 
 #[wasm_bindgen]
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum TargetVersion {
+pub enum PythonVersion {
     Py37,
-    #[default]
     Py38,
+    #[default]
     Py39,
     Py310,
     Py311,
@@ -186,16 +193,16 @@ pub enum TargetVersion {
     Py313,
 }
 
-impl From<TargetVersion> for red_knot_python_semantic::PythonVersion {
-    fn from(value: TargetVersion) -> Self {
+impl From<PythonVersion> for red_knot_python_semantic::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
         match value {
-            TargetVersion::Py37 => Self::PY37,
-            TargetVersion::Py38 => Self::PY38,
-            TargetVersion::Py39 => Self::PY39,
-            TargetVersion::Py310 => Self::PY310,
-            TargetVersion::Py311 => Self::PY311,
-            TargetVersion::Py312 => Self::PY312,
-            TargetVersion::Py313 => Self::PY313,
+            PythonVersion::Py37 => Self::PY37,
+            PythonVersion::Py38 => Self::PY38,
+            PythonVersion::Py39 => Self::PY39,
+            PythonVersion::Py310 => Self::PY310,
+            PythonVersion::Py311 => Self::PY311,
+            PythonVersion::Py312 => Self::PY312,
+            PythonVersion::Py313 => Self::PY313,
         }
     }
 }
@@ -219,7 +226,7 @@ impl System for WasmSystem {
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> ruff_db::system::Result<SystemPathBuf> {
-        Ok(self.fs.canonicalize(path))
+        self.fs.canonicalize(path)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
@@ -244,7 +251,7 @@ impl System for WasmSystem {
     fn read_virtual_path_to_notebook(
         &self,
         _path: &SystemVirtualPath,
-    ) -> Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
+    ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
@@ -265,15 +272,35 @@ impl System for WasmSystem {
         self.fs.walk_directory(path)
     }
 
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>>>, PatternError> {
+        Ok(Box::new(self.fs.glob(pattern)?))
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            red_knot_python_semantic::PythonVersion::from(PythonVersion::default()),
+            red_knot_python_semantic::PythonVersion::default()
+        );
+    }
 }

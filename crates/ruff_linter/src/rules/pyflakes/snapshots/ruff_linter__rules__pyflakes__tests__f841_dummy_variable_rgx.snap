@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
   |
@@ -273,5 +274,3 @@ F841_0.py:152:25: F841 [*] Local variable `_` is assigned to but never used
 152     |-    except Exception as _:
     152 |+    except Exception:
 153 153 |         pass
-
-

@@ -16,7 +16,6 @@ license = { workspace = true }
 ruff_text_size = { workspace = true }
 
 memchr = { workspace = true }
-once_cell = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]

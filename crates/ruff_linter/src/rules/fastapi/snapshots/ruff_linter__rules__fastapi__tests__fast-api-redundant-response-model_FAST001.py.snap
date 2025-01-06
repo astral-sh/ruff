@@ -171,4 +171,25 @@ FAST001.py:53:24: FAST001 [*] FastAPI route with redundant `response_model` argu
    53 |+@router.get("/items/")
 54 54 | async def create_item(item: Item) -> Item:
 55 55 |     return item
-56 56 |
+56 56 | 
+
+FAST001.py:118:23: FAST001 [*] FastAPI route with redundant `response_model` argument
+    |
+116 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
+117 |     # Error
+118 |     @app_arg.get("/", response_model=str)
+    |                       ^^^^^^^^^^^^^^^^^^ FAST001
+119 |     async def get_root() -> str:
+120 |         return "Hello World!"
+    |
+    = help: Remove argument
+
+ℹ Unsafe fix
+115 115 | 
+116 116 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
+117 117 |     # Error
+118     |-    @app_arg.get("/", response_model=str)
+    118 |+    @app_arg.get("/")
+119 119 |     async def get_root() -> str:
+120 120 |         return "Hello World!"
+121 121 |

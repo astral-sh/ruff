@@ -19,7 +19,10 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
+use crate::preview::{
+    is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
+    is_f_string_formatting_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
+};
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -324,7 +327,7 @@ fn format_with_parentheses_comments(
     )
 }
 
-/// Wraps an expression in an optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation
+/// Wraps an expression in optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation
 /// indicates that it is okay to omit the parentheses. For example, parentheses can always be omitted for lists,
 /// because they already bring their own parentheses.
 pub(crate) fn maybe_parenthesize_expression<'a, T>(
@@ -382,43 +385,59 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Always => OptionalParentheses::Always,
             // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
             // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
-            // is parenthesized.
-            _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
+            // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
+            // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
+            _ if f.context().node_level().is_parenthesized() => {
+                if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
+                    f.context(),
+                ) {
+                    OptionalParentheses::Never
+                } else if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
+                    return parenthesize_if_expands(
+                        &expression.format().with_options(Parentheses::Never),
+                    )
+                    .with_indent(!is_expression_huggable(expression, f.context()))
+                    .fmt(f);
+                } else {
+                    return expression.format().with_options(Parentheses::Never).fmt(f);
+                }
+            }
             needs_parentheses => needs_parentheses,
         };
 
+        let unparenthesized = expression.format().with_options(Parentheses::Never);
+
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
-                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .fmt(f)
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
+                    parenthesize_if_expands(&unparenthesized).fmt(f)
                 }
 
-                Parenthesize::IfRequired => {
-                    expression.format().with_options(Parentheses::Never).fmt(f)
-                }
+                Parenthesize::IfRequired => unparenthesized.fmt(f),
 
-                Parenthesize::Optional | Parenthesize::IfBreaks => {
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
-                        optional_parentheses(&expression.format().with_options(Parentheses::Never))
-                            .fmt(f)
+                        optional_parentheses(&unparenthesized).fmt(f)
                     } else {
-                        parenthesize_if_expands(
-                            &expression.format().with_options(Parentheses::Never),
-                        )
-                        .fmt(f)
+                        parenthesize_if_expands(&unparenthesized).fmt(f)
                     }
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
-                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .fmt(f)
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) =>
+                    parenthesize_if_expands(&unparenthesized).fmt(f),
+
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
+                    // Can-omit layout is relevant for `"abcd".call`. We don't want to add unnecessary
+                    // parentheses in this case.
+                    if can_omit_optional_parentheses(expression, f.context()) {
+                        optional_parentheses(&unparenthesized).fmt(f)
+                    } else {
+                        parenthesize_if_expands(&unparenthesized).fmt(f)
+                    }
                 }
 
-                Parenthesize::Optional | Parenthesize::IfRequired => {
-                    expression.format().with_options(Parentheses::Never).fmt(f)
-                }
+                Parenthesize::Optional | Parenthesize::IfRequired => unparenthesized.fmt(f),
 
                 Parenthesize::IfBreaks => {
                     if node_comments.has_trailing() {
@@ -428,21 +447,21 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                         let group_id = f.group_id("optional_parentheses");
                         let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
 
-                        best_fit_parenthesize(&expression.format().with_options(Parentheses::Never))
+                        best_fit_parenthesize(&unparenthesized)
                             .with_group_id(Some(group_id))
                             .fmt(f)
                     }
                 }
             },
             OptionalParentheses::Never => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
-                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
+                    parenthesize_if_expands(&unparenthesized)
                         .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired => {
-                    expression.format().with_options(Parentheses::Never).fmt(f)
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired | Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested => {
+                    unparenthesized.fmt(f)
                 }
             },
 
@@ -750,15 +769,26 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                self.update_max_precedence(OperatorPrecedence::String);
+                if !is_f_string_formatting_enabled(self.context) {
+                    self.update_max_precedence(OperatorPrecedence::String);
+                }
+
+                return;
             }
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                self.update_max_precedence(OperatorPrecedence::String);
+                if !is_f_string_formatting_enabled(self.context) {
+                    self.update_max_precedence(OperatorPrecedence::String);
+                }
+
+                return;
             }
             Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
-                self.update_max_precedence(OperatorPrecedence::String);
+                if !is_f_string_formatting_enabled(self.context) {
+                    self.update_max_precedence(OperatorPrecedence::String);
+                }
+
                 return;
             }
 

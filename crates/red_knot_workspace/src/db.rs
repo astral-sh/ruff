@@ -1,28 +1,33 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Cancelled, Event};
-
-use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb, Program};
+use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
+use crate::DEFAULT_LINT_REGISTRY;
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
+use red_knot_python_semantic::{Db as SemanticDb, Program};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-
-use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
+use salsa::plumbing::ZalsaDatabase;
+use salsa::{Cancelled, Event};
 
 mod changes;
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {}
+pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
+    fn workspace(&self) -> Workspace;
+}
 
 #[salsa::db]
+#[derive(Clone)]
 pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl RootDatabase {
@@ -30,11 +35,14 @@ impl RootDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
+        let rule_selection = RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY);
+
         let mut db = Self {
             workspace: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
             system: Arc::new(system),
+            rule_selection: Arc::new(rule_selection),
         };
 
         // Initialize the `Program` singleton
@@ -45,17 +53,12 @@ impl RootDatabase {
         Ok(db)
     }
 
-    pub fn workspace(&self) -> Workspace {
-        // SAFETY: The workspace is always initialized in `new`.
-        self.workspace.unwrap()
-    }
-
     /// Checks all open files in the workspace and its dependencies.
-    pub fn check(&self) -> Result<Vec<String>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
         let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
 
         self.with_db(|db| check_file(db, file))
@@ -77,16 +80,6 @@ impl RootDatabase {
         F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
     {
         Cancelled::catch(|| f(self))
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            workspace: self.workspace,
-            storage: self.storage.clone(),
-            files: self.files.snapshot(),
-            system: Arc::clone(&self.system),
-        }
     }
 }
 
@@ -119,12 +112,20 @@ impl SemanticDb for RootDatabase {
 
         workspace.is_file_open(self, file)
     }
+
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        &DEFAULT_LINT_REGISTRY
+    }
 }
 
 #[salsa::db]
 impl SourceDb for RootDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
-        vendored_typeshed_stubs()
+        red_knot_vendored::file_system()
     }
 
     fn system(&self) -> &dyn System {
@@ -153,7 +154,11 @@ impl salsa::Database for RootDatabase {
 }
 
 #[salsa::db]
-impl Db for RootDatabase {}
+impl Db for RootDatabase {
+    fn workspace(&self) -> Workspace {
+        self.workspace.unwrap()
+    }
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -161,32 +166,44 @@ pub(crate) mod tests {
 
     use salsa::Event;
 
-    use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
+    use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
+    use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
 
     use crate::db::Db;
+    use crate::workspace::{Workspace, WorkspaceMetadata};
+    use crate::DEFAULT_LINT_REGISTRY;
 
     #[salsa::db]
+    #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
-        events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        events: Arc<std::sync::Mutex<Vec<Event>>>,
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
+        rule_selection: RuleSelection,
+        workspace: Option<Workspace>,
     }
 
     impl TestDb {
-        pub(crate) fn new() -> Self {
-            Self {
+        pub(crate) fn new(workspace: WorkspaceMetadata) -> Self {
+            let mut db = Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().clone(),
+                vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
-            }
+                rule_selection: RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY),
+                workspace: None,
+            };
+
+            let workspace = Workspace::from_metadata(&db, workspace);
+            db.workspace = Some(workspace);
+            db
         }
     }
 
@@ -251,10 +268,22 @@ pub(crate) mod tests {
         fn is_file_open(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
         }
+
+        fn rule_selection(&self) -> &RuleSelection {
+            &self.rule_selection
+        }
+
+        fn lint_registry(&self) -> &LintRegistry {
+            &DEFAULT_LINT_REGISTRY
+        }
     }
 
     #[salsa::db]
-    impl Db for TestDb {}
+    impl Db for TestDb {
+        fn workspace(&self) -> Workspace {
+            self.workspace.unwrap()
+        }
+    }
 
     #[salsa::db]
     impl salsa::Database for TestDb {

@@ -1,6 +1,6 @@
 //! Rules from [isort](https://pypi.org/project/isort/).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use annotate::annotate_imports;
 use block::{Block, Trailer};
@@ -13,13 +13,14 @@ use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
 use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
+use crate::package::PackageRoot;
 use crate::settings::types::PythonVersion;
+use crate::Locator;
 
 mod annotate;
 pub(crate) mod block;
@@ -71,7 +72,7 @@ pub(crate) fn format_imports(
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
@@ -155,7 +156,7 @@ fn format_import_block(
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     target_version: PythonVersion,
     settings: &Settings,
 ) -> String {
@@ -282,10 +283,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
-    use ruff_text_size::Ranged;
     use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
+
+    use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
+    use ruff_text_size::Ranged;
 
     use crate::assert_messages;
     use crate::registry::Rule;
@@ -853,6 +855,57 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("this_this_from.py"))]
+    fn required_importfrom_with_useless_alias(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "required_importfrom_with_useless_alias_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                        MemberNameImport::alias(
+                            "module".to_string(),
+                            "this".to_string(),
+                            "this".to_string(),
+                        ),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UselessImportAlias])
+            },
+        )?;
+
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("this_this.py"))]
+    fn required_import_with_useless_alias(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "required_import_with_useless_alias_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::Import(
+                        ModuleNameImport::alias("this".to_string(), "this".to_string()),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UselessImportAlias])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
@@ -1143,7 +1196,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(*snapshot, diagnostics);
+        assert_messages!(&*snapshot, diagnostics);
         Ok(())
     }
 

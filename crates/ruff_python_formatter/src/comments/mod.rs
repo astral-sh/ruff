@@ -98,7 +98,6 @@ pub(crate) use format::{
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
 
@@ -258,8 +257,7 @@ impl<'a> Comments<'a> {
             let map = if comment_ranges.is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder =
-                    CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
                 CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
                 builder.finish()
             };
@@ -430,6 +428,41 @@ impl<'a> Comments<'a> {
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
+    }
+
+    /// Returns true if the node itself or any of its descendants have comments.
+    pub(crate) fn contains_comments(&self, node: AnyNodeRef) -> bool {
+        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+
+        struct Visitor<'a> {
+            comments: &'a Comments<'a>,
+            has_comment: bool,
+        }
+
+        impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
+            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+                if self.has_comment {
+                    TraversalSignal::Skip
+                } else if self.comments.has(node) {
+                    self.has_comment = true;
+                    TraversalSignal::Skip
+                } else {
+                    TraversalSignal::Traverse
+                }
+            }
+        }
+
+        if self.has(node) {
+            return true;
+        }
+
+        let mut visitor = Visitor {
+            comments: self,
+            has_comment: false,
+        };
+        node.visit_preorder(&mut visitor);
+
+        visitor.has_comment
     }
 }
 

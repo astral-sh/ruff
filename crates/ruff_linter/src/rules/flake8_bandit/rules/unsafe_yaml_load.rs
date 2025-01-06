@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -34,26 +34,26 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [PyYAML documentation: Loading YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 /// - [Common Weakness Enumeration: CWE-20](https://cwe.mitre.org/data/definitions/20.html)
-#[violation]
-pub struct UnsafeYAMLLoad {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsafeYAMLLoad {
     pub loader: Option<String>,
 }
 
 impl Violation for UnsafeYAMLLoad {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnsafeYAMLLoad { loader } = self;
-        match loader {
+        match &self.loader {
             Some(name) => {
                 format!(
                     "Probable use of unsafe loader `{name}` with `yaml.load`. Allows \
                      instantiation of arbitrary objects. Consider `yaml.safe_load`."
                 )
             }
-            None => format!(
+            None => {
                 "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. \
                  Consider `yaml.safe_load`."
-            ),
+                    .to_string()
+            }
         }
     }
 }
@@ -65,7 +65,7 @@ pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["yaml", "load"]))
     {
-        if let Some(loader_arg) = call.arguments.find_argument("Loader", 1) {
+        if let Some(loader_arg) = call.arguments.find_argument_value("Loader", 1) {
             if !checker
                 .semantic()
                 .resolve_qualified_name(loader_arg)

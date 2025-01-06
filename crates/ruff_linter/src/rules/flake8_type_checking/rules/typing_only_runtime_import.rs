@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::Ranged;
 
@@ -67,12 +67,13 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyFirstPartyImport {
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
 }
 
@@ -141,12 +142,13 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyThirdPartyImport {
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
 }
 
@@ -215,12 +217,13 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyStandardLibraryImport {
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
 }
 
@@ -240,7 +243,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
     }
 }
 
-/// TCH001, TCH002, TCH003
+/// TC001, TC002, TC003
 pub(crate) fn typing_only_runtime_import(
     checker: &Checker,
     scope: &Scope,
@@ -505,16 +508,15 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),
-                            checker.locator(),
                             checker.stylist(),
-                            checker.generator(),
+                            checker.locator(),
                         ))
                     } else {
                         None
                     }
                 })
             })
-            .collect::<Result<Vec<_>>>()?,
+            .collect::<Vec<_>>(),
     );
 
     Ok(Fix::unsafe_edits(

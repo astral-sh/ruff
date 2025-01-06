@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
@@ -50,8 +50,8 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// with errors.ExceptionRaisedContext():
 ///     _ = obj.attribute
 /// ```
-#[violation]
-pub struct UselessExpression {
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessExpression {
     kind: Kind,
 }
 
@@ -60,12 +60,11 @@ impl Violation for UselessExpression {
     fn message(&self) -> String {
         match self.kind {
             Kind::Expression => {
-                format!("Found useless expression. Either assign it to a variable or remove it.")
+                "Found useless expression. Either assign it to a variable or remove it.".to_string()
             }
             Kind::Attribute => {
-                format!(
-                    "Found useless attribute access. Either assign it to a variable or remove it."
-                )
+                "Found useless attribute access. Either assign it to a variable or remove it."
+                    .to_string()
             }
         }
     }

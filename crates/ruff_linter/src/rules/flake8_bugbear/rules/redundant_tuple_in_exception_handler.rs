@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
 
@@ -35,15 +35,15 @@ use crate::fix::edits::pad;
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-#[violation]
-pub struct RedundantTupleInExceptionHandler {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantTupleInExceptionHandler {
     name: String,
 }
 
 impl AlwaysFixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("A length-one tuple literal is redundant in exception handlers")
+        "A length-one tuple literal is redundant in exception handlers".to_string()
     }
 
     fn fix_title(&self) -> String {
