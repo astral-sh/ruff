@@ -1,0 +1,43 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
+---
+AIR302_airflow_plugin.py:7:5: AIR302 `operators` is removed in Airflow 3.0; This extension should just be imported as a regular python module.
+  |
+5 |     name = "test_plugin"
+6 |     # --- Invalid extensions start
+7 |     operators = [PluginOperator]
+  |     ^^^^^^^^^ AIR302
+8 |     sensors = [PluginSensorOperator]
+9 |     hooks = [PluginHook]
+  |
+
+AIR302_airflow_plugin.py:8:5: AIR302 `sensors` is removed in Airflow 3.0; This extension should just be imported as a regular python module.
+   |
+ 6 |     # --- Invalid extensions start
+ 7 |     operators = [PluginOperator]
+ 8 |     sensors = [PluginSensorOperator]
+   |     ^^^^^^^ AIR302
+ 9 |     hooks = [PluginHook]
+10 |     executors = [PluginExecutor]
+   |
+
+AIR302_airflow_plugin.py:9:5: AIR302 `hooks` is removed in Airflow 3.0; This extension should just be imported as a regular python module.
+   |
+ 7 |     operators = [PluginOperator]
+ 8 |     sensors = [PluginSensorOperator]
+ 9 |     hooks = [PluginHook]
+   |     ^^^^^ AIR302
+10 |     executors = [PluginExecutor]
+11 |     # --- Invalid extensions end
+   |
+
+AIR302_airflow_plugin.py:10:5: AIR302 `executors` is removed in Airflow 3.0; This extension should just be imported as a regular python module.
+   |
+ 8 |     sensors = [PluginSensorOperator]
+ 9 |     hooks = [PluginHook]
+10 |     executors = [PluginExecutor]
+   |     ^^^^^^^^^ AIR302
+11 |     # --- Invalid extensions end
+12 |     macros = [plugin_macro]
+   |

@@ -366,6 +366,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::AsyncFunctionWithTimeout) {
                 flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
+            #[cfg(any(feature = "test-rules", test))]
+            if checker.enabled(Rule::UnreachableCode) {
+                checker
+                    .diagnostics
+                    .extend(pylint::rules::in_function(name, body));
+            }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
             }
@@ -549,6 +555,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SubclassBuiltin) {
                 refurb::rules::subclass_builtin(checker, class_def);
+            }
+            if checker.enabled(Rule::DataclassEnum) {
+                ruff::rules::dataclass_enum(checker, class_def);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {

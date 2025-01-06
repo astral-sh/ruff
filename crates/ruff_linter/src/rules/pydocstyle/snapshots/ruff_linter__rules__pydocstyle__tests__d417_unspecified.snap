@@ -72,3 +72,12 @@ D417.py:155:5: D417 Missing argument description in the docstring for `select_da
 156 |     query: str,
 157 |     args: tuple,
     |
+
+D417.py:172:5: D417 Missing argument description in the docstring for `f`: `**kwargs`
+    |
+170 |     """
+171 | 
+172 | def f(x, *args, **kwargs):
+    |     ^ D417
+173 |     """Do something.
+    |

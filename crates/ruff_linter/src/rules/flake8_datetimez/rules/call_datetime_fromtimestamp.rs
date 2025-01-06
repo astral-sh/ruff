@@ -91,7 +91,7 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    let antipattern = match call.arguments.find_argument("tz", 1) {
+    let antipattern = match call.arguments.find_argument_value("tz", 1) {
         Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,

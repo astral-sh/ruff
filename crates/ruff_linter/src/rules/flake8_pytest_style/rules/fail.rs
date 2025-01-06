@@ -61,8 +61,8 @@ pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)
         if call
             .arguments
-            .find_argument("reason", 0)
-            .or_else(|| call.arguments.find_argument("msg", 0))
+            .find_argument_value("reason", 0)
+            .or_else(|| call.arguments.find_argument_value("msg", 0))
             .map_or(true, is_empty_or_null_string)
         {
             checker

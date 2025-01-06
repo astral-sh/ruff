@@ -80,7 +80,7 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::Ex
         return;
     }
 
-    let antipattern = match call.arguments.find_argument("tzinfo", 7) {
+    let antipattern = match call.arguments.find_argument_value("tzinfo", 7) {
         Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,

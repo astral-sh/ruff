@@ -15,6 +15,7 @@ from _pickle import (
 from _typeshed import ReadableBuffer, SupportsWrite
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, ClassVar, SupportsBytes, SupportsIndex, final
+from typing_extensions import Self
 
 __all__ = [
     "PickleBuffer",
@@ -108,7 +109,7 @@ bytes_types: tuple[type[Any], ...]  # undocumented
 
 @final
 class PickleBuffer:
-    def __init__(self, buffer: ReadableBuffer) -> None: ...
+    def __new__(cls, buffer: ReadableBuffer) -> Self: ...
     def raw(self) -> memoryview: ...
     def release(self) -> None: ...
     def __buffer__(self, flags: int, /) -> memoryview: ...

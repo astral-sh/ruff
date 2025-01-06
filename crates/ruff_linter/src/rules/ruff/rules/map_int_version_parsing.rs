@@ -103,7 +103,7 @@ fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
     }
 
     let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ })) =
-        arguments.find_argument("sep", 0)
+        arguments.find_argument_value("sep", 0)
     else {
         return false;
     };

@@ -46,13 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v2
+      - uses: astral-sh/ruff-action@v3
 ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
-      - uses: astral-sh/ruff-action@v2
+      - uses: astral-sh/ruff-action@v3
 ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
@@ -64,7 +64,7 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ```yaml
-- uses: astral-sh/ruff-action@v2
+- uses: astral-sh/ruff-action@v3
   with:
     version: 0.8.0
     args: check --select B
@@ -80,7 +80,7 @@ You can add the following configuration to `.gitlab-ci.yml` to run a `ruff forma
   stage: build
   interruptible: true
   image:
-    name: ghcr.io/astral-sh/ruff:0.8.4-alpine
+    name: ghcr.io/astral-sh/ruff:0.8.6-alpine
   before_script:
     - cd $CI_PROJECT_DIR
     - ruff --version
@@ -106,7 +106,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.8.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -119,7 +119,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.8.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -133,7 +133,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.8.4
+  rev: v0.8.6
   hooks:
     # Run the linter.
     - id: ruff

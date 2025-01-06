@@ -1,5 +1,5 @@
 import sys
-from typing import Any, final
+from typing import Any, ClassVar, final
 
 class Str(str): ...
 
@@ -17,6 +17,8 @@ if sys.version_info >= (3, 10):
 
 else:
     class error(Exception): ...
-    class Null: ...
+
+    class Null:
+        __hash__: ClassVar[None]  # type: ignore[assignment]
 
     def roj(b: Any, /) -> None: ...

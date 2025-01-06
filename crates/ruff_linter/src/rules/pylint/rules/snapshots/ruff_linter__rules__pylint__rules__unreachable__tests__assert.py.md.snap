@@ -1,0 +1,244 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    assert True
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["assert True\n"]
+
+  start --> block2
+  block2 -- "True" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    assert False
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["assert False\n"]
+
+  start --> block2
+  block2 -- "False" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func():
+    assert True, "oops"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["assert True, #quot;oops#quot;\n"]
+
+  start --> block2
+  block2 -- "True" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func():
+    assert False, "oops"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["assert False, #quot;oops#quot;\n"]
+
+  start --> block2
+  block2 -- "False" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func():
+    y = 2
+    assert y == 2
+    assert y > 1
+    assert y < 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["assert y < 3\n"]
+  block3[["Exception raised"]]
+  block4["assert y > 1\n"]
+  block5[["Exception raised"]]
+  block6["y = 2\nassert y == 2\n"]
+
+  start --> block6
+  block6 -- "y == 2" --> block4
+  block6 -- "else" --> block5
+  block5 --> return
+  block4 -- "y > 1" --> block2
+  block4 -- "else" --> block3
+  block3 --> return
+  block2 -- "y < 3" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func():
+    for i in range(3):
+        assert i < x
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2[["Exception raised"]]
+  block3["assert i < x\n"]
+  block4["for i in range(3):
+        assert i < x\n"]
+
+  start --> block4
+  block4 -- "range(3)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "i < x" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func():
+    for j in range(3):
+        x = 2
+    else:
+        assert False
+    return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 1\n"]
+  block1[["Exception raised"]]
+  block2["assert False\n"]
+  block3[["Loop continue"]]
+  block4["x = 2\n"]
+  block5["for j in range(3):
+        x = 2
+    else:
+        assert False\n"]
+
+  start --> block5
+  block5 -- "range(3)" --> block4
+  block5 -- "else" --> block2
+  block4 --> block3
+  block3 --> block5
+  block2 -- "False" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func():
+    for j in range(3):
+        if j == 2:
+            print('yay')
+            break
+    else:
+        assert False
+    return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 1\n"]
+  block1[["Exception raised"]]
+  block2["assert False\n"]
+  block3[["Loop continue"]]
+  block4["print('yay')\nbreak\n"]
+  block5["if j == 2:
+            print('yay')
+            break\n"]
+  block6["for j in range(3):
+        if j == 2:
+            print('yay')
+            break
+    else:
+        assert False\n"]
+
+  start --> block6
+  block6 -- "range(3)" --> block5
+  block6 -- "else" --> block2
+  block5 -- "j == 2" --> block4
+  block5 -- "else" --> block3
+  block4 --> block0
+  block3 --> block6
+  block2 -- "False" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+```

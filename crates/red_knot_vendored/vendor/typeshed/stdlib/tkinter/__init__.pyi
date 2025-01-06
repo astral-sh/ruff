@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
 from types import TracebackType
-from typing import Any, Generic, Literal, NamedTuple, Protocol, TypedDict, TypeVar, overload, type_check_only
+from typing import Any, ClassVar, Generic, Literal, NamedTuple, Protocol, TypedDict, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack, deprecated
 
 if sys.version_info >= (3, 11):
@@ -330,6 +330,7 @@ class Variable:
     def trace_vinfo(self): ...
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class StringVar(Variable):
     def __init__(self, master: Misc | None = None, value: str | None = None, name: str | None = None) -> None: ...
@@ -370,6 +371,9 @@ class _GridIndexInfo(TypedDict, total=False):
     uniform: str | None
     weight: int
 
+class _BusyInfo(TypedDict):
+    cursor: _Cursor
+
 class Misc:
     master: Misc | None
     tk: _tkinter.TkappType
@@ -407,6 +411,25 @@ class Misc:
         def after_info(self, id: str | None = None) -> tuple[str, ...]: ...
 
     def bell(self, displayof: Literal[0] | Misc | None = 0) -> None: ...
+    if sys.version_info >= (3, 13):
+        # Supports options from `_BusyInfo``
+        def tk_busy_cget(self, option: Literal["cursor"]) -> _Cursor: ...
+        busy_cget = tk_busy_cget
+        def tk_busy_configure(self, cnf: Any = None, **kw: Any) -> Any: ...
+        tk_busy_config = tk_busy_configure
+        busy_configure = tk_busy_configure
+        busy_config = tk_busy_configure
+        def tk_busy_current(self, pattern: str | None = None) -> list[Misc]: ...
+        busy_current = tk_busy_current
+        def tk_busy_forget(self) -> None: ...
+        busy_forget = tk_busy_forget
+        def tk_busy_hold(self, **kw: Unpack[_BusyInfo]) -> None: ...
+        tk_busy = tk_busy_hold
+        busy_hold = tk_busy_hold
+        busy = tk_busy_hold
+        def tk_busy_status(self) -> bool: ...
+        busy_status = tk_busy_status
+
     def clipboard_get(self, *, displayof: Misc = ..., type: str = ...) -> str: ...
     def clipboard_clear(self, *, displayof: Misc = ...) -> None: ...
     def clipboard_append(self, string: str, *, displayof: Misc = ..., format: str = ..., type: str = ...) -> None: ...

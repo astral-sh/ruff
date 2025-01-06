@@ -154,3 +154,9 @@ int(1 / 1)
 int(1 @ 1)
 
 int(1. if ... else .2)
+
+int(1 +
+    1)
+
+int(round(1,
+          0))

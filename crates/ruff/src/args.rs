@@ -9,6 +9,7 @@ use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser, Subcommand};
 use colored::Colorize;
+use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use ruff_graph::Direction;
@@ -24,6 +25,7 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
+use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
@@ -967,11 +969,36 @@ It looks like you were trying to pass a path to a configuration file.
 The path `{value}` does not point to a configuration file"
                 ));
             }
-        } else if value.contains('=') {
-            tip.push_str(&format!(
-                "\n\n{}:\n\n{underlying_error}",
-                config_parse_error.description()
-            ));
+        } else if let Some((key, value)) = value.split_once('=') {
+            let key = key.trim_ascii();
+            let value = value.trim_ascii_start();
+
+            match Options::metadata().find(key) {
+                Some(OptionEntry::Set(set)) if !value.starts_with('{') => {
+                    let prefixed_subfields = set
+                        .collect_fields()
+                        .iter()
+                        .map(|(name, _)| format!("- `{key}.{name}`"))
+                        .join("\n");
+
+                    tip.push_str(&format!(
+                        "
+
+`{key}` is a table of configuration options.
+Did you want to override one of the table's subkeys?
+
+Possible choices:
+
+{prefixed_subfields}"
+                    ));
+                }
+                _ => {
+                    tip.push_str(&format!(
+                        "\n\n{}:\n\n{underlying_error}",
+                        config_parse_error.description()
+                    ));
+                }
+            }
         }
         let tip = tip.trim_end().to_owned().into();
 

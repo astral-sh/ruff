@@ -1,7 +1,7 @@
 #[derive(Default, Debug)]
-pub(crate) struct PanicError {
-    pub(crate) info: String,
-    pub(crate) backtrace: Option<std::backtrace::Backtrace>,
+pub struct PanicError {
+    pub info: String,
+    pub backtrace: Option<std::backtrace::Backtrace>,
 }
 
 impl std::fmt::Display for PanicError {
@@ -21,7 +21,7 @@ thread_local! {
 
 /// [`catch_unwind`](std::panic::catch_unwind) wrapper that sets a custom [`set_hook`](std::panic::set_hook)
 /// to extract the backtrace. The original panic-hook gets restored before returning.
-pub(crate) fn catch_unwind<F, R>(f: F) -> Result<R, PanicError>
+pub fn catch_unwind<F, R>(f: F) -> Result<R, PanicError>
 where
     F: FnOnce() -> R + std::panic::UnwindSafe,
 {

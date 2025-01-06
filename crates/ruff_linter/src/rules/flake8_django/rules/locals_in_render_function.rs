@@ -59,7 +59,7 @@ pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprC
         return;
     }
 
-    if let Some(argument) = call.arguments.find_argument("context", 2) {
+    if let Some(argument) = call.arguments.find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
             checker.diagnostics.push(Diagnostic::new(
                 DjangoLocalsInRenderFunction,

@@ -14,9 +14,14 @@ class HTTPStatus(IntEnum):
     def phrase(self) -> str: ...
     @property
     def description(self) -> str: ...
+
+    # Keep these synced with the global constants in http/client.pyi.
     CONTINUE = 100
     SWITCHING_PROTOCOLS = 101
     PROCESSING = 102
+    if sys.version_info >= (3, 9):
+        EARLY_HINTS = 103
+
     OK = 200
     CREATED = 201
     ACCEPTED = 202
@@ -27,6 +32,7 @@ class HTTPStatus(IntEnum):
     MULTI_STATUS = 207
     ALREADY_REPORTED = 208
     IM_USED = 226
+
     MULTIPLE_CHOICES = 300
     MOVED_PERMANENTLY = 301
     FOUND = 302
@@ -35,6 +41,7 @@ class HTTPStatus(IntEnum):
     USE_PROXY = 305
     TEMPORARY_REDIRECT = 307
     PERMANENT_REDIRECT = 308
+
     BAD_REQUEST = 400
     UNAUTHORIZED = 401
     PAYMENT_REQUIRED = 402
@@ -59,15 +66,22 @@ class HTTPStatus(IntEnum):
         RANGE_NOT_SATISFIABLE = 416
     REQUESTED_RANGE_NOT_SATISFIABLE = 416
     EXPECTATION_FAILED = 417
+    if sys.version_info >= (3, 9):
+        IM_A_TEAPOT = 418
+    MISDIRECTED_REQUEST = 421
     if sys.version_info >= (3, 13):
         UNPROCESSABLE_CONTENT = 422
     UNPROCESSABLE_ENTITY = 422
     LOCKED = 423
     FAILED_DEPENDENCY = 424
+    if sys.version_info >= (3, 9):
+        TOO_EARLY = 425
     UPGRADE_REQUIRED = 426
     PRECONDITION_REQUIRED = 428
     TOO_MANY_REQUESTS = 429
     REQUEST_HEADER_FIELDS_TOO_LARGE = 431
+    UNAVAILABLE_FOR_LEGAL_REASONS = 451
+
     INTERNAL_SERVER_ERROR = 500
     NOT_IMPLEMENTED = 501
     BAD_GATEWAY = 502
@@ -79,12 +93,7 @@ class HTTPStatus(IntEnum):
     LOOP_DETECTED = 508
     NOT_EXTENDED = 510
     NETWORK_AUTHENTICATION_REQUIRED = 511
-    MISDIRECTED_REQUEST = 421
-    UNAVAILABLE_FOR_LEGAL_REASONS = 451
-    if sys.version_info >= (3, 9):
-        EARLY_HINTS = 103
-        IM_A_TEAPOT = 418
-        TOO_EARLY = 425
+
     if sys.version_info >= (3, 12):
         @property
         def is_informational(self) -> bool: ...

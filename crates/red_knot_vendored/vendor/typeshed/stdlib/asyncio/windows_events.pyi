@@ -6,6 +6,7 @@ from typing import IO, Any, ClassVar, Final, NoReturn
 
 from . import events, futures, proactor_events, selector_events, streams, windows_utils
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.platform == "win32":
     if sys.version_info >= (3, 13):
         # 3.13 added `EventLoop`.

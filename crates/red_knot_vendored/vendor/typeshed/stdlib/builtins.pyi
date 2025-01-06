@@ -1489,18 +1489,18 @@ def locals() -> dict[str, Any]: ...
 
 class map(Generic[_S]):
     @overload
-    def __new__(cls, func: Callable[[_T1], _S], iter1: Iterable[_T1], /) -> Self: ...
+    def __new__(cls, func: Callable[[_T1], _S], iterable: Iterable[_T1], /) -> Self: ...
     @overload
-    def __new__(cls, func: Callable[[_T1, _T2], _S], iter1: Iterable[_T1], iter2: Iterable[_T2], /) -> Self: ...
+    def __new__(cls, func: Callable[[_T1, _T2], _S], iterable: Iterable[_T1], iter2: Iterable[_T2], /) -> Self: ...
     @overload
     def __new__(
-        cls, func: Callable[[_T1, _T2, _T3], _S], iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /
+        cls, func: Callable[[_T1, _T2, _T3], _S], iterable: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /
     ) -> Self: ...
     @overload
     def __new__(
         cls,
         func: Callable[[_T1, _T2, _T3, _T4], _S],
-        iter1: Iterable[_T1],
+        iterable: Iterable[_T1],
         iter2: Iterable[_T2],
         iter3: Iterable[_T3],
         iter4: Iterable[_T4],
@@ -1510,7 +1510,7 @@ class map(Generic[_S]):
     def __new__(
         cls,
         func: Callable[[_T1, _T2, _T3, _T4, _T5], _S],
-        iter1: Iterable[_T1],
+        iterable: Iterable[_T1],
         iter2: Iterable[_T2],
         iter3: Iterable[_T3],
         iter4: Iterable[_T4],
@@ -1521,7 +1521,7 @@ class map(Generic[_S]):
     def __new__(
         cls,
         func: Callable[..., _S],
-        iter1: Iterable[Any],
+        iterable: Iterable[Any],
         iter2: Iterable[Any],
         iter3: Iterable[Any],
         iter4: Iterable[Any],
@@ -1964,9 +1964,7 @@ class NameError(Exception):
 
 class ReferenceError(Exception): ...
 class RuntimeError(Exception): ...
-
-class StopAsyncIteration(Exception):
-    value: Any
+class StopAsyncIteration(Exception): ...
 
 class SyntaxError(Exception):
     msg: str

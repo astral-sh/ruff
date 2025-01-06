@@ -41,7 +41,6 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
-/// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct SplitStaticString;
 
@@ -67,7 +66,7 @@ pub(crate) fn split_static_string(
 ) {
     let ExprCall { arguments, .. } = call;
 
-    let maxsplit_arg = arguments.find_argument("maxsplit", 1);
+    let maxsplit_arg = arguments.find_argument_value("maxsplit", 1);
     let Some(maxsplit_value) = get_maxsplit_value(maxsplit_arg) else {
         return;
     };
@@ -79,7 +78,7 @@ pub(crate) fn split_static_string(
         Direction::Right
     };
 
-    let sep_arg = arguments.find_argument("sep", 0);
+    let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
             Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value),

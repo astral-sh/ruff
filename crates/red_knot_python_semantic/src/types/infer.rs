@@ -435,6 +435,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         matches!(self.region, InferenceRegion::Deferred(_)) || self.deferred_state.is_deferred()
     }
 
+    fn in_stub(&self) -> bool {
+        self.context.in_stub()
+    }
+
     /// Get the already-inferred type of an expression node.
     ///
     /// ## Panics
@@ -1174,6 +1178,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             let inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
                     UnionType::from_elements(self.db(), [declared_ty, default_ty])
+                } else if self.in_stub()
+                    && default
+                        .as_ref()
+                        .is_some_and(|d| d.is_ellipsis_literal_expr())
+                {
+                    declared_ty
                 } else {
                     self.context.report_lint(
                         &INVALID_PARAMETER_DEFAULT,
@@ -1896,7 +1906,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
-            TargetKind::Name => value_ty,
+            TargetKind::Name => {
+                if self.in_stub() && value.is_ellipsis_literal_expr() {
+                    Type::Unknown
+                } else {
+                    value_ty
+                }
+            }
         };
 
         if let Some(known_instance) =
@@ -1963,6 +1979,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(value) = value.as_deref() {
             let value_ty = self.infer_expression(value);
+            let value_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
+                annotation_ty
+            } else {
+                value_ty
+            };
             self.add_declaration_with_binding(
                 assignment.into(),
                 definition,
@@ -2672,10 +2693,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = tuple;
 
-        let element_types: Vec<Type<'db>> =
-            elts.iter().map(|elt| self.infer_expression(elt)).collect();
+        // Collecting all elements is necessary to infer all sub-expressions even if some
+        // element types are `Never` (which leads `from_elements` to return early without
+        // consuming the whole iterator).
+        let element_types: Vec<_> = elts.iter().map(|elt| self.infer_expression(elt)).collect();
 
-        Type::tuple(self.db(), &element_types)
+        TupleType::from_elements(self.db(), element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -4251,8 +4274,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let (start, stop, step) = slice_ty.as_tuple(self.db());
 
                 if let Ok(new_elements) = elements.py_slice(start, stop, step) {
-                    let new_elements: Vec<_> = new_elements.copied().collect();
-                    Type::tuple(self.db(), &new_elements)
+                    TupleType::from_elements(self.db(), new_elements)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
                     Type::Unknown
@@ -4854,7 +4876,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let ty = if return_todo {
                     todo_type!("full tuple[...] support")
                 } else {
-                    Type::tuple(self.db(), &element_types)
+                    TupleType::from_elements(self.db(), element_types)
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
@@ -4869,7 +4891,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     todo_type!("full tuple[...] support")
                 } else {
-                    Type::tuple(self.db(), [single_element_ty])
+                    TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
                 }
             }
         }

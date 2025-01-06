@@ -55,7 +55,7 @@ camino = { version = "1.1.7" }
 chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
-clearscreen = { version = "3.0.0" }
+clearscreen = { version = "4.0.0" }
 codspeed-criterion-compat = { version = "2.6.0", default-features = false }
 colored = { version = "2.1.0" }
 console_error_panic_hook = { version = "0.1.7" }
@@ -89,7 +89,7 @@ insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
 is-wsl = { version = "0.4.0" }
-itertools = { version = "0.13.0" }
+itertools = { version = "0.14.0" }
 js-sys = { version = "0.3.69" }
 jod-thread = { version = "0.1.2" }
 libc = { version = "0.2.153" }
@@ -119,7 +119,7 @@ rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "3c7f1694c9efba751dbeeacfbc93b227586e316a" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "88a1d7774d78f048fbd77d40abca9ebd729fd1f0" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

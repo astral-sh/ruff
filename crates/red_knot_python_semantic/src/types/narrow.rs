@@ -7,8 +7,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass,
-    KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder,
+    infer_expression_types, ClassBase, ClassLiteralType, IntersectionBuilder, KnownClass,
+    KnownFunction, SubclassOfType, Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -83,28 +83,37 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
 }
 
-/// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
-///
-/// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
-/// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
-fn generate_classinfo_constraint<'db, F>(
-    db: &'db dyn Db,
-    classinfo: &Type<'db>,
-    to_constraint: F,
-) -> Option<Type<'db>>
-where
-    F: Fn(ClassLiteralType<'db>) -> Type<'db> + Copy,
-{
-    match classinfo {
-        Type::Tuple(tuple) => {
-            let mut builder = UnionBuilder::new(db);
-            for element in tuple.elements(db) {
-                builder = builder.add(generate_classinfo_constraint(db, element, to_constraint)?);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KnownConstraintFunction {
+    /// `builtins.isinstance`
+    IsInstance,
+    /// `builtins.issubclass`
+    IsSubclass,
+}
+
+impl KnownConstraintFunction {
+    /// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
+    ///
+    /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
+    /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
+    fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        match classinfo {
+            Type::Tuple(tuple) => {
+                let mut builder = UnionBuilder::new(db);
+                for element in tuple.elements(db) {
+                    builder = builder.add(self.generate_constraint(db, *element)?);
+                }
+                Some(builder.build())
             }
-            Some(builder.build())
+            Type::ClassLiteral(ClassLiteralType { class })
+            | Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Some(match self {
+                KnownConstraintFunction::IsInstance => Type::instance(class),
+                KnownConstraintFunction::IsSubclass => Type::subclass_of(class),
+            }),
+            _ => None,
         }
-        Type::ClassLiteral(class_literal_type) => Some(to_constraint(*class_literal_type)),
-        _ => None,
     }
 }
 
@@ -429,24 +438,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 let class_info_ty =
                     inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
 
-                let to_constraint = match function {
-                    KnownConstraintFunction::IsInstance => {
-                        |class_literal: ClassLiteralType<'db>| Type::instance(class_literal.class)
-                    }
-                    KnownConstraintFunction::IsSubclass => {
-                        |class_literal: ClassLiteralType<'db>| {
-                            Type::subclass_of(class_literal.class)
-                        }
-                    }
-                };
-
-                generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
-                    |constraint| {
+                function
+                    .generate_constraint(self.db, class_info_ty)
+                    .map(|constraint| {
                         let mut constraints = NarrowingConstraints::default();
                         constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
                         constraints
-                    },
-                )
+                    })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
             Type::ClassLiteral(class_type)

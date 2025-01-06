@@ -12,7 +12,7 @@ from ssl import (
     SSLWantWriteError as SSLWantWriteError,
     SSLZeroReturnError as SSLZeroReturnError,
 )
-from typing import Any, Literal, TypedDict, final, overload
+from typing import Any, ClassVar, Literal, TypedDict, final, overload
 from typing_extensions import NotRequired, Self, TypeAlias
 
 _PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
@@ -119,6 +119,7 @@ class MemoryBIO:
 
 @final
 class SSLSession:
+    __hash__: ClassVar[None]  # type: ignore[assignment]
     @property
     def has_ticket(self) -> bool: ...
     @property

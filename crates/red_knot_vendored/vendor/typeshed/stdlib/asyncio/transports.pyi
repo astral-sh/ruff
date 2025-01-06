@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 from socket import _Address
 from typing import Any
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 __all__ = ("BaseTransport", "ReadTransport", "WriteTransport", "Transport", "DatagramTransport", "SubprocessTransport")
 
 class BaseTransport:

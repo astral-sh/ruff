@@ -1,11 +1,18 @@
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::rules::ruff::rules::unnecessary_round::{
+    rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
+};
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -43,19 +50,17 @@ pub(crate) struct UnnecessaryCastToInt;
 impl AlwaysFixableViolation for UnnecessaryCastToInt {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Value being casted is already an integer".to_string()
+        "Value being cast to `int` is already an integer".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove unnecessary conversion to `int`".to_string()
+        "Remove unnecessary `int` call".to_string()
     }
 }
 
 /// RUF046
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
-    let semantic = checker.semantic();
-
-    let Some(argument) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
         return;
     };
 
@@ -74,30 +79,48 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let fix = unwrap_int_expression(checker, call, argument, applicability);
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
+    let fix = unwrap_int_expression(
+        call,
+        argument,
+        applicability,
+        checker.semantic(),
+        checker.locator(),
+        checker.comment_ranges(),
+        checker.source(),
+    );
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
+
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
 fn unwrap_int_expression(
-    checker: &mut Checker,
     call: &ExprCall,
     argument: &Expr,
     applicability: Applicability,
+    semantic: &SemanticModel,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+    source: &str,
 ) -> Fix {
-    let (locator, semantic) = (checker.locator(), checker.semantic());
-
-    let argument_expr = locator.slice(argument.range());
-
-    let has_parent_expr = semantic.current_expression_parent().is_some();
-    let new_content = if has_parent_expr || argument.is_named_expr() {
-        format!("({argument_expr})")
+    let content = if let Some(range) = parenthesized_range(
+        argument.into(),
+        (&call.arguments).into(),
+        comment_ranges,
+        source,
+    ) {
+        locator.slice(range).to_string()
     } else {
-        argument_expr.to_string()
+        let parenthesize = semantic.current_expression_parent().is_some()
+            || argument.is_named_expr()
+            || locator.count_lines(argument.range()) > 0;
+        if parenthesize && !has_own_parentheses(argument) {
+            format!("({})", locator.slice(argument.range()))
+        } else {
+            locator.slice(argument.range()).to_string()
+        }
     };
-
-    let edit = Edit::range_replacement(new_content, call.range);
+    let edit = Edit::range_replacement(content, call.range());
     Fix::applicable_edit(edit, applicability)
 }
 
@@ -116,7 +139,7 @@ fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Ap
         }
 
         // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => round_applicability(checker, arguments),
+        ["" | "builtins", "round"] => round_applicability(arguments, checker.semantic()),
 
         // Depends on `__ceil__`/`__floor__`/`__trunc__`
         ["math", "ceil" | "floor" | "trunc"] => Some(Applicability::Unsafe),
@@ -126,8 +149,8 @@ fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Ap
 }
 
 fn single_argument_to_int_call<'a>(
-    semantic: &SemanticModel,
     call: &'a ExprCall,
+    semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
     let ExprCall {
         func, arguments, ..
@@ -148,80 +171,76 @@ fn single_argument_to_int_call<'a>(
     Some(argument)
 }
 
-/// The type of the first argument to `round()`
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Rounded {
-    InferredInt,
-    InferredFloat,
-    LiteralInt,
-    LiteralFloat,
-    Other,
-}
-
-/// The type of the second argument to `round()`
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Ndigits {
-    NotGiven,
-    LiteralInt,
-    LiteralNone,
-    Other,
-}
-
 /// Determines the [`Applicability`] for a `round(..)` call.
 ///
 /// The Applicability depends on the `ndigits` and the number argument.
-fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
-    if arguments.len() > 2 {
-        return None;
-    }
+fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Option<Applicability> {
+    let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(arguments, semantic)?;
 
-    let number = arguments.find_argument("number", 0)?;
-    let ndigits = arguments.find_argument("ndigits", 1);
+    match (rounded_value, ndigits_value) {
+        // ```python
+        // int(round(2, -1))
+        // int(round(2, 0))
+        // int(round(2))
+        // int(round(2, None))
+        // ```
+        (
+            RoundedValue::Int(InferredType::Equivalent),
+            NdigitsValue::LiteralInt { .. }
+            | NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGivenOrNone,
+        ) => Some(Applicability::Safe),
 
-    let number_kind = match number {
-        Expr::Name(name) => {
-            let semantic = checker.semantic();
-
-            match semantic.only_binding(name).map(|id| semantic.binding(id)) {
-                Some(binding) if typing::is_int(binding, semantic) => Rounded::InferredInt,
-                Some(binding) if typing::is_float(binding, semantic) => Rounded::InferredFloat,
-                _ => Rounded::Other,
-            }
-        }
-
-        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-            Number::Int(..) => Rounded::LiteralInt,
-            Number::Float(..) => Rounded::LiteralFloat,
-            Number::Complex { .. } => Rounded::Other,
-        },
-
-        _ => Rounded::Other,
-    };
-
-    let ndigits_kind = match ndigits {
-        None => Ndigits::NotGiven,
-        Some(Expr::NoneLiteral(_)) => Ndigits::LiteralNone,
-
-        Some(Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(..),
-            ..
-        })) => Ndigits::LiteralInt,
-
-        _ => Ndigits::Other,
-    };
-
-    match (number_kind, ndigits_kind) {
-        (Rounded::LiteralInt, Ndigits::LiteralInt)
-        | (Rounded::LiteralInt | Rounded::LiteralFloat, Ndigits::NotGiven | Ndigits::LiteralNone) => {
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // ```
+        (RoundedValue::Float(InferredType::Equivalent), NdigitsValue::NotGivenOrNone) => {
             Some(Applicability::Safe)
         }
 
-        (Rounded::InferredInt, Ndigits::LiteralInt)
-        | (
-            Rounded::InferredInt | Rounded::InferredFloat | Rounded::Other,
-            Ndigits::NotGiven | Ndigits::LiteralNone,
+        // ```python
+        // a: int = 2 # or True
+        // int(round(a, -2))
+        // int(round(a, 1))
+        // int(round(a))
+        // int(round(a, None))
+        // ```
+        (
+            RoundedValue::Int(InferredType::AssignableTo),
+            NdigitsValue::LiteralInt { .. }
+            | NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGivenOrNone,
+        ) => Some(Applicability::Unsafe),
+
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // int(round(x))
+        // int(round(x, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::AssignableTo) | RoundedValue::Other,
+            NdigitsValue::NotGivenOrNone,
         ) => Some(Applicability::Unsafe),
 
         _ => None,
+    }
+}
+
+/// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
+fn has_own_parentheses(expr: &Expr) -> bool {
+    match expr {
+        Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Subscript(_)
+        | Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::Call(_) => true,
+        Expr::Generator(generator) => generator.parenthesized,
+        Expr::Tuple(tuple) => tuple.parenthesized,
+        _ => false,
     }
 }

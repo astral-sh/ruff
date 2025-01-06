@@ -122,3 +122,10 @@ class Foo: ...
 x = Foo()
 reveal_type(x)  # revealed: Foo
 ```
+
+## Annotated assignments in stub files are inferred correctly
+
+```pyi path=main.pyi
+x: int = 1
+reveal_type(x) # revealed: Literal[1]
+```

@@ -121,8 +121,8 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
         if let Some(unqualified_name) = UnqualifiedName::from_expr(func.as_ref()) {
             if matches!(unqualified_name.segments(), [.., "get_model"]) {
-                if let Some(argument) =
-                    arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
+                if let Some(argument) = arguments
+                    .find_argument_value("model_name", arguments.args.len().saturating_sub(1))
                 {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
                         if string_literal.value.to_str() == name {
@@ -141,7 +141,7 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
                 qualified_name.segments(),
                 ["django", "utils", "module_loading", "import_string"]
             ) {
-                if let Some(argument) = arguments.find_argument("dotted_path", 0) {
+                if let Some(argument) = arguments.find_argument_value("dotted_path", 0) {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
                         if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
                             if model == name {
