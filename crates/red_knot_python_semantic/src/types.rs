@@ -74,72 +74,75 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-#[salsa::tracked]
-fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Symbol<'db> {
-    let _span = tracing::trace_span!("symbol_by_id", ?symbol).entered();
+fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+    #[salsa::tracked]
+    fn symbol_by_id<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol: ScopedSymbolId,
+    ) -> Symbol<'db> {
+        let use_def = use_def_map(db, scope);
 
-    let use_def = use_def_map(db, scope);
+        // If the symbol is declared, the public type is based on declarations; otherwise, it's based
+        // on inference from bindings.
 
-    // If the symbol is declared, the public type is based on declarations; otherwise, it's based
-    // on inference from bindings.
+        let declarations = use_def.public_declarations(symbol);
+        let declared = declarations_ty(db, declarations);
 
-    let declarations = use_def.public_declarations(symbol);
-    let declared = declarations_ty(db, declarations);
+        match declared {
+            // Symbol is declared, trust the declared type
+            Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
+            // Symbol is possibly declared
+            Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
+                let bindings = use_def.public_bindings(symbol);
+                let inferred = bindings_ty(db, bindings);
 
-    match declared {
-        // Symbol is declared, trust the declared type
-        Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
-        // Symbol is possibly declared
-        Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
-            let bindings = use_def.public_bindings(symbol);
-            let inferred = bindings_ty(db, bindings);
-
-            match inferred {
-                // Symbol is possibly undeclared and definitely unbound
-                Symbol::Unbound => {
-                    // TODO: We probably don't want to report `Bound` here. This requires a bit of
-                    // design work though as we might want a different behavior for stubs and for
-                    // normal modules.
-                    Symbol::Type(declared_ty, Boundness::Bound)
+                match inferred {
+                    // Symbol is possibly undeclared and definitely unbound
+                    Symbol::Unbound => {
+                        // TODO: We probably don't want to report `Bound` here. This requires a bit of
+                        // design work though as we might want a different behavior for stubs and for
+                        // normal modules.
+                        Symbol::Type(declared_ty, Boundness::Bound)
+                    }
+                    // Symbol is possibly undeclared and (possibly) bound
+                    Symbol::Type(inferred_ty, boundness) => Symbol::Type(
+                        UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
+                        boundness,
+                    ),
                 }
-                // Symbol is possibly undeclared and (possibly) bound
-                Symbol::Type(inferred_ty, boundness) => Symbol::Type(
-                    UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
-                    boundness,
-                ),
+            }
+            // Symbol is undeclared, return the inferred type
+            Ok(Symbol::Unbound) => {
+                let bindings = use_def.public_bindings(symbol);
+                bindings_ty(db, bindings)
+            }
+            // Symbol is possibly undeclared
+            Err((declared_ty, _)) => {
+                // Intentionally ignore conflicting declared types; that's not our problem,
+                // it's the problem of the module we are importing from.
+                declared_ty.into()
             }
         }
-        // Symbol is undeclared, return the inferred type
-        Ok(Symbol::Unbound) => {
-            let bindings = use_def.public_bindings(symbol);
-            bindings_ty(db, bindings)
-        }
-        // Symbol is possibly undeclared
-        Err((declared_ty, _)) => {
-            // Intentionally ignore conflicting declared types; that's not our problem,
-            // it's the problem of the module we are importing from.
-            declared_ty.into()
-        }
+
+        // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
+        // currently only depends on bindings, and ignores declarations. This is inconsistent, since
+        // we only look at bindings if the symbol may be undeclared. Consider the following example:
+        // ```py
+        // x: int
+        //
+        // if flag:
+        //     y: int
+        // else
+        //     y = 3
+        // ```
+        // If we import from this module, we will currently report `x` as a definitely-bound symbol
+        // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
+        // every path has either a binding or a declaration for it.)
     }
 
-    // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
-    // currently only depends on bindings, and ignores declarations. This is inconsistent, since
-    // we only look at bindings if the symbol may be undeclared. Consider the following example:
-    // ```py
-    // x: int
-    //
-    // if flag:
-    //     y: int
-    // else
-    //     y = 3
-    // ```
-    // If we import from this module, we will currently report `x` as a definitely-bound symbol
-    // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
-    // every path has either a binding or a declaration for it.)
-}
+    let _span = tracing::trace_span!("symbol", ?name).entered();
 
-/// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
-fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
     // is just a re-export of `typing.TYPE_CHECKING`.
     if name == "TYPE_CHECKING"
