@@ -172,10 +172,7 @@ impl<'db> Parameters<'db> {
     ///
     /// In an invalid signature, there could be multiple parameters with the same name; we will
     /// just return the first that matches.
-    pub(crate) fn keyword_by_name(
-        &self,
-        name: &ast::name::Name,
-    ) -> Option<(usize, &Parameter<'db>)> {
+    pub(crate) fn keyword_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
             .enumerate()
             .find(|(_, parameter)| parameter.callable_by_name(name))
@@ -237,7 +234,7 @@ impl<'db> Parameter<'db> {
         matches!(self, Self::PositionalOnly(_))
     }
 
-    pub(crate) fn callable_by_name(&self, name: &ast::name::Name) -> bool {
+    pub(crate) fn callable_by_name(&self, name: &str) -> bool {
         match self {
             Self::PositionalOrKeyword(param) | Self::KeywordOnly(param) => param
                 .param
