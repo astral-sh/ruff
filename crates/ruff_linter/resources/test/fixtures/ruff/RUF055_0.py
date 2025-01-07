@@ -58,6 +58,7 @@ re.sub(r"abc{2,3}", "", s)
 re.sub(r"abc\n", "", s)  # this one could be fixed but is not currently
 re.sub(r"abc|def", "", s)
 re.sub(r"(a)bc", "", s)
+re.sub(r"a)bc", "", s)  # https://github.com/astral-sh/ruff/issues/15316
 
 # and these should not be modified because they have extra arguments
 re.sub("abc", "", s, flags=re.A)

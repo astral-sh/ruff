@@ -150,6 +150,6 @@ const fn escaped_char_is_regex_metasequence(c: char) -> bool {
 const fn char_is_regex_metacharacter(c: char) -> bool {
     matches!(
         c,
-        '.' | '^' | '$' | '*' | '+' | '?' | '{' | '[' | '\\' | '|' | '('
+        '.' | '^' | '$' | '*' | '+' | '?' | '{' | '[' | '\\' | '|' | '(' | ')'
     )
 }
