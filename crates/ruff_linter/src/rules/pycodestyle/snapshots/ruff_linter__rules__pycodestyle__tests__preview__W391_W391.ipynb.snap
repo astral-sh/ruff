@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-W391.ipynb:5:1: W391 [*] Too many newlines at end of file
+W391.ipynb:5:1: W391 [*] Too many newlines at end of cell
    |
  3 |   # just a comment in this cell
  4 |   # a comment and some newlines
@@ -26,7 +26,7 @@ W391.ipynb:5:1: W391 [*] Too many newlines at end of file
 10 7 | # a comment
 11 8 | 
 
-W391.ipynb:11:1: W391 [*] Too many newlines at end of file
+W391.ipynb:11:1: W391 [*] Too many newlines at end of cell
    |
  9 |   1 + 1
 10 |   # a comment
@@ -52,7 +52,7 @@ W391.ipynb:11:1: W391 [*] Too many newlines at end of file
 17 13 | 
 18 14 | 
 
-W391.ipynb:17:1: W391 [*] Too many newlines at end of file
+W391.ipynb:17:1: W391 [*] Too many newlines at end of cell
    |
 16 |   1+1
 17 | / 
