@@ -1,19 +1,9 @@
-//! The tracing system for `ruff server`.
+//! The logging system for `ruff server`.
 //!
-//! Traces are controlled by the `logLevel` setting, along with the
-//! trace level set through the LSP. On VS Code, the trace level can
-//! also be set with `ruff.trace.server`. A trace level of `messages` or
-//! `verbose` will enable tracing - otherwise, no traces will be shown.
-//!
-//! `logLevel` can be used to configure the level of tracing that is shown.
-//! By default, `logLevel` is set to `"info"`.
-//!
-//! The server also supports the `RUFF_TRACE` environment variable, which will
-//! override the trace value provided by the LSP client. Use this if there's no good way
-//! to set the trace value through your editor's configuration.
-//!
-//! Tracing will write to `stderr` by default, which should appear in the logs for most LSP clients.
-//! A `logFile` path can also be specified in the settings, and output will be directed there instead.
+//! Log messages are controlled by the `logLevel` setting which defaults to `"info"`. Log messages
+//! are written to `stderr` by default, which should appear in the logs for most LSP clients. A
+//! `logFile` path can also be specified in the settings, and output will be directed there
+//! instead.
 use core::str;
 use serde::Deserialize;
 use std::{
@@ -32,7 +22,7 @@ use crate::server::ClientSender;
 
 static LOGGING_SENDER: OnceLock<ClientSender> = OnceLock::new();
 
-pub(crate) fn init_tracing(
+pub(crate) fn init_logging(
     sender: ClientSender,
     log_level: LogLevel,
     log_file: Option<&std::path::Path>,
@@ -122,7 +112,7 @@ impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
         meta: &tracing::Metadata<'_>,
         _: &tracing_subscriber::layer::Context<'_, S>,
     ) -> bool {
-        let filter = if meta.target().starts_with("ruff") {
+        let filter = if meta.target().starts_with("red_knot") {
             self.filter.trace_level()
         } else {
             tracing::Level::INFO
