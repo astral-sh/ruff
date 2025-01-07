@@ -13,7 +13,7 @@ use crate::fix::edits::pad;
 use crate::settings::types::{PreviewMode, PythonVersion};
 
 /// ## What it does
-/// Check for `typing.Union` annotations that can be rewritten based on [PEP 604] syntax.
+/// Check for type annotations that can be rewritten based on [PEP 604] syntax.
 ///
 /// ## Why is this bad?
 /// [PEP 604] introduced a new syntax for union type annotations based on the
@@ -40,9 +40,9 @@ use crate::settings::types::{PreviewMode, PythonVersion};
 /// foo: int | str = 1
 /// ```
 ///
-/// ## Note
-/// Previously, this rule also covered the usage of `Optional[T]` => `T | None`.
-/// This specific aspect of handling Optional types is now addressed by the `UP007B` rule instead.
+/// ## Preview
+/// In preview mode, this rule only checks for usages of `typing.Union`,
+/// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
@@ -99,9 +99,6 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ```python
 /// foo: int | None = None
 /// ```
-///
-/// ## Note
-/// Previously, this rule was covered under the `UP007` rule, but it has now been moved to this new, specific rule.
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
