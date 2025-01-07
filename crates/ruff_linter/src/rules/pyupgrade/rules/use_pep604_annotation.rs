@@ -18,7 +18,7 @@ use crate::settings::types::{PreviewMode, PythonVersion};
 /// ## Why is this bad?
 /// [PEP 604] introduced a new syntax for union type annotations based on the
 /// `|` operator. This syntax is more concise and readable than the previous
-/// `typing.Union` syntax.
+/// `typing.Union` and `typing.Optional` syntaxes.
 ///
 /// This rule is enabled when targeting Python 3.10 or later (see:
 /// [`target-version`]). By default, it's _also_ enabled for earlier Python
