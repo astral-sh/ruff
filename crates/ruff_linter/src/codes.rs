@@ -501,7 +501,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "004") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessObjectInheritance),
         (Pyupgrade, "005") => (RuleGroup::Stable, rules::pyupgrade::rules::DeprecatedUnittestAlias),
         (Pyupgrade, "006") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP585Annotation),
-        (Pyupgrade, "007") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP604Annotation),
+        (Pyupgrade, "007") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP604AnnotationUnion),
         (Pyupgrade, "008") => (RuleGroup::Stable, rules::pyupgrade::rules::SuperCallWithParameters),
         (Pyupgrade, "009") => (RuleGroup::Stable, rules::pyupgrade::rules::UTF8EncodingDeclaration),
         (Pyupgrade, "010") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryFutureImport),
@@ -538,6 +538,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "042") => (RuleGroup::Preview, rules::pyupgrade::rules::ReplaceStrEnum),
         (Pyupgrade, "043") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryDefaultTypeArgs),
         (Pyupgrade, "044") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP646Unpack),
+        (Pyupgrade, "045") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP604AnnotationOptional),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),

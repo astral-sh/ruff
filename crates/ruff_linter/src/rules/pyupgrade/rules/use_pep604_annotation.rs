@@ -6,16 +6,17 @@ use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Rule;
 use crate::fix::edits::pad;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Check for type annotations that can be rewritten based on [PEP 604] syntax.
+/// Check for `typing.Union` annotations that can be rewritten based on [PEP 604] syntax.
 ///
 /// ## Why is this bad?
 /// [PEP 604] introduced a new syntax for union type annotations based on the
 /// `|` operator. This syntax is more concise and readable than the previous
-/// `typing.Union` and `typing.Optional` syntaxes.
+/// `typing.Union` syntax.
 ///
 /// This rule is enabled when targeting Python 3.10 or later (see:
 /// [`target-version`]). By default, it's _also_ enabled for earlier Python
@@ -37,6 +38,10 @@ use crate::settings::types::PythonVersion;
 /// foo: int | str = 1
 /// ```
 ///
+/// ## Note
+/// Previously, this rule also covered the usage of `Optional[T]` => `T | None`.
+/// This specific aspect of handling Optional types is now addressed by the `UP007B` rule instead.
+///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
@@ -50,9 +55,9 @@ use crate::settings::types::PythonVersion;
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
-pub(crate) struct NonPEP604Annotation;
+pub(crate) struct NonPEP604AnnotationUnion;
 
-impl Violation for NonPEP604Annotation {
+impl Violation for NonPEP604AnnotationUnion {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -65,8 +70,67 @@ impl Violation for NonPEP604Annotation {
     }
 }
 
-/// UP007
-pub(crate) fn use_pep604_annotation(
+/// ## What it does
+/// Check for `typing.Optional` annotations that can be rewritten based on [PEP 604] syntax.
+///
+/// ## Why is this bad?
+/// [PEP 604] introduced a new syntax for union type annotations based on the
+/// `|` operator. This syntax is more concise and readable than the previous
+/// `typing.Optional` syntax.
+///
+/// This rule is enabled when targeting Python 3.10 or later (see:
+/// [`target-version`]). By default, it's _also_ enabled for earlier Python
+/// versions if `from __future__ import annotations` is present, as
+/// `__future__` annotations are not evaluated at runtime. If your code relies
+/// on runtime type annotations (either directly or via a library like
+/// Pydantic), you can disable this behavior for Python versions prior to 3.10
+/// by setting [`lint.pyupgrade.keep-runtime-typing`] to `true`.
+///
+/// ## Example
+/// ```python
+/// from typing import Optional
+///
+/// foo: Optional[int] = None
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: int | None = None
+/// ```
+///
+/// ## Note
+/// Previously, this rule was covered under the `UP007` rule, but it has now been moved to this new, specific rule.
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
+/// alongside libraries that rely on runtime type annotations, like Pydantic,
+/// on Python versions prior to Python 3.10. It may also lead to runtime errors
+/// in unusual and likely incorrect type annotations where the type does not
+/// support the `|` operator.
+///
+/// ## Options
+/// - `target-version`
+/// - `lint.pyupgrade.keep-runtime-typing`
+///
+/// [PEP 604]: https://peps.python.org/pep-0604/
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP604AnnotationOptional;
+
+impl Violation for NonPEP604AnnotationOptional {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Use `X | Y` for type annotations".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Convert to `X | Y`".to_string())
+    }
+}
+
+/// UP007, UP045
+pub(crate) fn non_pep604_annotation(
     checker: &mut Checker,
     expr: &Expr,
     slice: &Expr,
@@ -86,7 +150,16 @@ pub(crate) fn use_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
+            let preview = checker.settings.preview.is_enabled();
+            let ruf007_enabled = checker.enabled(Rule::NonPEP604AnnotationUnion);
+            let ruf045_enabled = checker.enabled(Rule::NonPEP604AnnotationOptional);
+
+            let mut diagnostic = match (preview, ruf007_enabled, ruf045_enabled) {
+                (false, true, _) => Diagnostic::new(NonPEP604AnnotationUnion, expr.range()),
+                (true, _, true) => Diagnostic::new(NonPEP604AnnotationOptional, expr.range()),
+                _ => return,
+            };
+
             if fixable {
                 match slice {
                     Expr::Tuple(_) => {
@@ -109,8 +182,8 @@ pub(crate) fn use_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-        Pep604Operator::Union => {
-            let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
+        Pep604Operator::Union if checker.enabled(Rule::NonPEP604AnnotationUnion) => {
+            let mut diagnostic = Diagnostic::new(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {
                     Expr::Slice(_) => {
@@ -147,6 +220,7 @@ pub(crate) fn use_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
+        _ => return,
     }
 }
 
