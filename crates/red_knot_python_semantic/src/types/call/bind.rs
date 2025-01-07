@@ -308,7 +308,14 @@ impl<'db> CallBindingError<'db> {
                 context.report_lint(
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
-                    format_args!("Got multiple values for {parameter}"),
+                    format_args!(
+                        "Got multiple values for {parameter}{}",
+                        if let Some(callable_name) = callable_name {
+                            format!(" of function `{callable_name}`")
+                        } else {
+                            String::new()
+                        }
+                    ),
                 );
             }
         }

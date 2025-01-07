@@ -244,6 +244,6 @@ reveal_type(f(x=1, y=2))  # revealed: int
 def f(x: int) -> int:
     return 1
 
-# error: 18 [parameter-already-assigned] "Got multiple values for parameter `x`"
+# error: 18 [parameter-already-assigned] "Got multiple values for parameter `x` of function `f`"
 reveal_type(f(1, x=2))  # revealed: int
 ```
