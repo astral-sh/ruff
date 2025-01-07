@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
@@ -187,7 +186,7 @@ E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 92 |     from typing import Callable
-93 | 
+93 |
 94 |     f: Callable[[], None] = lambda: None
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
    |
@@ -207,7 +206,7 @@ E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 100 |     from typing import Callable
-101 | 
+101 |
 102 |     f: Callable[..., None] = lambda a, b: None
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
     |
@@ -227,7 +226,7 @@ E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 108 |     from typing import Callable
-109 | 
+109 |
 110 |     f: Callable[[int], int] = lambda x: 2 * x
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
     |
@@ -247,7 +246,7 @@ E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 117 |     from collections.abc import Callable
-118 | 
+118 |
 119 |     f: Callable[[str, int], str] = lambda a, b: a * b
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
     |
@@ -267,7 +266,7 @@ E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 125 |     from collections.abc import Callable
-126 | 
+126 |
 127 |     f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
     |
@@ -287,7 +286,7 @@ E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 133 |     from collections.abc import Callable
-134 | 
+134 |
 135 |     f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
     |
@@ -347,9 +346,8 @@ E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
 E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 145 |       # E731
-146 |   
-147 |       f = lambda: (
-    |  _____^
+146 |
+147 | /     f = lambda: (
 148 | |         i := 1,
 149 | |     )
     | |_____^ E731
@@ -380,7 +378,7 @@ E731.py:163:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 165 | |     b
 166 | | """
     | |___^ E731
-167 |   
+167 |
 168 |   # * https://github.com/astral-sh/ruff/issues/10277
     |
     = help: Rewrite `x` as a `def`
@@ -401,7 +399,7 @@ E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 168 | # * https://github.com/astral-sh/ruff/issues/10277
 169 | at_least_one_million = lambda _: _ >= 1_000_000
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
-170 | 
+170 |
 171 | x = lambda: (
     |
     = help: Rewrite `at_least_one_million` as a `def`
@@ -420,13 +418,13 @@ E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 169 |   at_least_one_million = lambda _: _ >= 1_000_000
-170 |   
+170 |
 171 | / x = lambda: (
 172 | |     # comment
 173 | |     5 + 10
 174 | | )
     | |_^ E731
-175 |   
+175 |
 176 |   x = lambda: (
     |
     = help: Rewrite `x` as a `def`
@@ -445,7 +443,7 @@ E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 174 |   )
-175 |   
+175 |
 176 | / x = lambda: (
 177 | |     # comment
 178 | |     y := 10

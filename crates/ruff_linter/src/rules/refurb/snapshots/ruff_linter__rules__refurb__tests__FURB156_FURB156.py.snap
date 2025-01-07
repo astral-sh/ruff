@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB156.py:3:5: FURB156 [*] Use of hardcoded string charset
   |
 1 | # Errors
-2 | 
+2 |
 3 | _ = "0123456789"
   |     ^^^^^^^^^^^^ FURB156
 4 | _ = "01234567"
@@ -174,7 +173,7 @@ FURB156.py:10:5: FURB156 [*] Use of hardcoded string charset
  9 | _ = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 10 | _ = " \t\n\r\v\f"
    |     ^^^^^^^^^^^^^ FURB156
-11 | 
+11 |
 12 | _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
    |
    = help: Replace hardcoded charset with `string.whitespace`
@@ -198,7 +197,7 @@ FURB156.py:10:5: FURB156 [*] Use of hardcoded string charset
 FURB156.py:12:5: FURB156 [*] Use of hardcoded string charset
    |
 10 | _ = " \t\n\r\v\f"
-11 | 
+11 |
 12 | _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB156
 13 | _ = (
@@ -226,8 +225,7 @@ FURB156.py:14:5: FURB156 [*] Use of hardcoded string charset
    |
 12 |   _ = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c'
 13 |   _ = (
-14 |       '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'
-   |  _____^
+14 | /     '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'
 15 | |     "'()*+,-./:;<=>?@[\\]^_`{|}~ \t\n\r\x0b\x0c"
    | |________________________________________________^ FURB156
 16 |   )
@@ -261,7 +259,7 @@ FURB156.py:17:8: FURB156 [*] Use of hardcoded string charset
 18 | |        "4567"
 19 | |        "89")
    | |___________^ FURB156
-20 |   
+20 |
 21 |   _ = (
    |
    = help: Replace hardcoded charset with `string.digits`

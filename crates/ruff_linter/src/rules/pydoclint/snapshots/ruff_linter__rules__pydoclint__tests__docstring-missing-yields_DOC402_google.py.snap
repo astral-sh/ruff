@@ -1,15 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
 DOC402_google.py:3:5: DOC402 `yield` is not documented in docstring
   |
 1 |   # DOC402
 2 |   def foo(num: int) -> str:
-3 |       """
-  |  _____^
+3 | /     """
 4 | |     Do something
-5 | | 
+5 | |
 6 | |     Args:
 7 | |         num (int): A number
 8 | |     """
@@ -22,10 +20,9 @@ DOC402_google.py:44:9: DOC402 `yield` is not documented in docstring
    |
 42 |       # DOC402
 43 |       def bar(self) -> str:
-44 |           """
-   |  _________^
+44 | /         """
 45 | |         Do something
-46 | | 
+46 | |
 47 | |         Args:
 48 | |             num (int): A number
 49 | |         """
@@ -58,8 +55,7 @@ DOC402_google.py:97:5: DOC402 `yield` is not documented in docstring
     |
  95 |   # DOC402
  96 |   def foo() -> collections.abc.Generator[int | None, None, None]:
- 97 |       """
-    |  _____^
+ 97 | /     """
  98 | |     Do something
  99 | |     """
     | |_______^ DOC402
@@ -71,8 +67,7 @@ DOC402_google.py:105:5: DOC402 `yield` is not documented in docstring
     |
 103 |   # DOC402
 104 |   def bar() -> collections.abc.Iterator[int | None]:
-105 |       """
-    |  _____^
+105 | /     """
 106 | |     Do something
 107 | |     """
     | |_______^ DOC402

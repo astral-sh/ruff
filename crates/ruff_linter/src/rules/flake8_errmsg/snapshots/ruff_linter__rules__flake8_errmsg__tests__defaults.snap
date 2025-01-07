@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_errmsg/mod.rs
-snapshot_kind: text
 ---
 EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
   |
@@ -121,7 +120,7 @@ EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variab
 EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
 37 |         msg = "hello"
-38 | 
+38 |
 39 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
@@ -261,8 +260,7 @@ EM.py:69:9: EM101 [*] Exception must not use a string literal, assign to variabl
    |
 67 |   def f_multi_line_string():
 68 |       raise RuntimeError(
-69 |           "first"
-   |  _________^
+69 | /         "first"
 70 | |         "second"
    | |________________^ EM101
 71 |       )
@@ -289,8 +287,7 @@ EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |
 74 |   def f_multi_line_string2():
 75 |       raise RuntimeError(
-76 |           "This is an {example} exception".format(
-   |  _________^
+76 | /         "This is an {example} exception".format(
 77 | |             example="example"
 78 | |         )
    | |_________^ EM103
@@ -319,8 +316,7 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |
 82 |   def f_multi_line_string2():
 83 |       raise RuntimeError(
-84 |           (
-   |  _________^
+84 | /         (
 85 | |             "This is an "
 86 | |             "{example} exception"
 87 | |         ).format(
