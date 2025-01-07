@@ -85,6 +85,7 @@ pub(crate) fn bind_call<'db>(
             provided_positional_count: next_positional,
         });
     }
+    let mut missing = vec![];
     for (index, bound_ty) in parameter_tys.iter().enumerate() {
         if bound_ty.is_none() {
             let param = signature
@@ -94,10 +95,14 @@ pub(crate) fn bind_call<'db>(
                 // variadic/keywords and defaulted arguments are not required
                 continue;
             }
-            errors.push(CallBindingError::MissingArgument {
-                parameter: ParameterContext::new(param, index),
-            });
+            missing.push(ParameterContext::new(param, index));
         }
+    }
+
+    if !missing.is_empty() {
+        errors.push(CallBindingError::MissingArguments {
+            parameters: ParameterContexts(missing),
+        });
     }
 
     CallBinding {
@@ -191,13 +196,30 @@ impl std::fmt::Display for ParameterContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(name) = &self.name {
             if self.positional_only {
-                write!(f, "positional parameter {} (`{name}`)", self.index)
+                write!(f, "{} (`{name}`)", self.index)
             } else {
-                write!(f, "parameter `{name}`")
+                write!(f, "`{name}`")
             }
         } else {
-            write!(f, "positional parameter {}", self.index)
+            write!(f, "{}", self.index)
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParameterContexts(Vec<ParameterContext>);
+
+impl std::fmt::Display for ParameterContexts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.0.iter();
+        if let Some(first) = iter.next() {
+            write!(f, "{first}")?;
+            for param in iter {
+                f.write_str(", ")?;
+                write!(f, "{param}")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -211,8 +233,8 @@ pub(crate) enum CallBindingError<'db> {
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
     },
-    /// A required parameter (that is, one without a default) is not supplied by any argument.
-    MissingArgument { parameter: ParameterContext },
+    /// One or more required parameters (that is, with no default) is not supplied by any argument.
+    MissingArguments { parameters: ParameterContexts },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
         unknown_name: ast::name::Name,
@@ -252,7 +274,7 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Object of type `{provided_ty_display}` cannot be assigned to \
-                        {parameter}{}; expected type `{expected_ty_display}`",
+                        parameter {parameter}{}; expected type `{expected_ty_display}`",
                         if let Some(callable_name) = callable_name {
                             format!(" of function `{callable_name}`")
                         } else {
@@ -282,11 +304,12 @@ impl<'db> CallBindingError<'db> {
                 );
             }
 
-            Self::MissingArgument { parameter } => {
+            Self::MissingArguments { parameters } => {
+                let s = if parameters.0.len() == 1 { "" } else { "s" };
                 context.report_lint(
                     &MISSING_ARGUMENT,
                     node,
-                    format_args!("No argument provided for required {parameter}"),
+                    format_args!("No argument{s} provided for required parameter{s} {parameters}",),
                 );
             }
 
@@ -309,7 +332,7 @@ impl<'db> CallBindingError<'db> {
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Got multiple values for {parameter}{}",
+                        "Got multiple values for parameter {parameter}{}",
                         if let Some(callable_name) = callable_name {
                             format!(" of function `{callable_name}`")
                         } else {

@@ -83,7 +83,7 @@ reveal_type(f("foo"))  # revealed: int
 def f(x: int, /) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to positional parameter 0 (`x`) of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 0 (`x`) of function `f`; expected type `int`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -225,6 +225,16 @@ reveal_type(f())  # revealed: int
 def f(**kwargs: int) -> int:
     return 1
 
+reveal_type(f())  # revealed: int
+```
+
+### Multiple
+
+```py
+def f(x: int, y: int) -> int:
+    return 1
+
+# error: 13 [missing-argument] "No arguments provided for required parameters `x`, `y`"
 reveal_type(f())  # revealed: int
 ```
 
