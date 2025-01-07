@@ -19,7 +19,7 @@ impl<'db> SubclassOfType<'db> {
     ///
     /// The eager normalization here means that we do not need to worry elsewhere about distinguishing
     /// between `@final` classes and other classes when dealing with [`Type::SubclassOf`] variants.
-    pub fn from(db: &'db dyn Db, subclass_of: impl Into<ClassBase<'db>>) -> Type<'db> {
+    pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<ClassBase<'db>>) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
             ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => {
@@ -38,21 +38,21 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
-    pub const fn subclass_of_unknown() -> Type<'db> {
+    pub(crate) const fn subclass_of_unknown() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
             subclass_of: ClassBase::Unknown,
         })
     }
 
     /// Return a [`Type`] instance representing the type `type[Any]`.
-    pub const fn subclass_of_any() -> Type<'db> {
+    pub(crate) const fn subclass_of_any() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
             subclass_of: ClassBase::Any,
         })
     }
 
-    /// Return the inner `ClassBase` value wrapped by this `SubclassOfType`.
-    pub const fn subclass_of(self) -> ClassBase<'db> {
+    /// Return the inner [`ClassBase`] value wrapped by this `SubclassOfType`.
+    pub(crate) const fn subclass_of(self) -> ClassBase<'db> {
         self.subclass_of
     }
 
@@ -74,7 +74,7 @@ impl<'db> SubclassOfType<'db> {
     ///
     /// This can only return `true` if `self.subclass_of` is a [`ClassBase::Class`] variant;
     /// only fully static types participate in subtyping.
-    pub fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
             // Non-fully-static types do not participate in subtyping
             (ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_), _)
