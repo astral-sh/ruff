@@ -564,6 +564,17 @@ def titlecase_sub_section_header():
     """
 
 
+def newline_sub_section_header():
+    """Below, `returns:` should be considered a section header.
+
+    Args:
+        arg: Here's a note.
+
+    returns:
+        Here's another note.
+    """
+
+
 def test_method_should_be_correctly_capitalized(parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
     """Test parameters and attributes sections are capitalized correctly.
 
