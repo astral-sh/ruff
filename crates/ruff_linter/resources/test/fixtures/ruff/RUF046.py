@@ -187,10 +187,22 @@ int((round  # Comment
 )(42)
 )
 
-int(  # Comment
+int(  # Unsafe fix because of this comment
 (  # Comment
     (round
 )  # Comment
 )(42)
 )
 
+int(
+    round(
+        42
+    ) # unsafe fix because of this comment
+)
+
+int(
+    round(
+        42
+    ) 
+# unsafe fix because of this comment
+)
