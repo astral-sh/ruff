@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 is_pytest_test.py:3:27: PT028 Test function parameter `a` has default argument
   |
 1 | # Errors
-2 | 
+2 |
 3 | def test_this_is_a_test(a=1): ...
   |                           ^ PT028
 4 | def testThisIsAlsoATest(a=1): ...
@@ -25,7 +25,7 @@ is_pytest_test.py:4:27: PT028 Test function parameter `a` has default argument
 3 | def test_this_is_a_test(a=1): ...
 4 | def testThisIsAlsoATest(a=1): ...
   |                           ^ PT028
-5 | 
+5 |
 6 | class TestClass:
   |
   = help: Remove default argument

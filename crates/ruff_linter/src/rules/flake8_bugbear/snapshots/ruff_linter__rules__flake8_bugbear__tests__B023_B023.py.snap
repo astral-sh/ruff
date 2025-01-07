@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B023.py:12:30: B023 Function definition does not bind loop variable `x`
    |
@@ -17,7 +16,7 @@ B023.py:13:30: B023 Function definition does not bind loop variable `y`
 12 |     functions.append(lambda: x)
 13 |     functions.append(lambda: y)  # not just the loop var
    |                              ^ B023
-14 | 
+14 |
 15 |     def f_bad_1():
    |
 
@@ -26,7 +25,7 @@ B023.py:16:16: B023 Function definition does not bind loop variable `x`
 15 |     def f_bad_1():
 16 |         return x
    |                ^ B023
-17 | 
+17 |
 18 |     # Actually OK
    |
 
@@ -72,14 +71,14 @@ B023.py:40:34: B023 Function definition does not bind loop variable `x`
 39 |     async for x in pointless_async_iterable():
 40 |         functions.append(lambda: x)  # error
    |                                  ^ B023
-41 | 
+41 |
 42 |     [lambda: x async for x in pointless_async_iterable()]  # error
    |
 
 B023.py:42:14: B023 Function definition does not bind loop variable `x`
    |
 40 |         functions.append(lambda: x)  # error
-41 | 
+41 |
 42 |     [lambda: x async for x in pointless_async_iterable()]  # error
    |              ^ B023
    |
@@ -146,7 +145,7 @@ B023.py:68:10: B023 Function definition does not bind loop variable `l`
 67 |         j = None  # OK because it's an assignment
 68 |         [l for k in range(2)]  # error for l, not for k
    |          ^ B023
-69 | 
+69 |
 70 |         assert a and functions
    |
 
@@ -202,7 +201,7 @@ B023.py:121:37: B023 Function definition does not bind loop variable `x`
 120 |     list(filter(bool, [None, lambda: x]))
 121 |     all(reduce(bool, [None, lambda: x]))
     |                                     ^ B023
-122 | 
+122 |
 123 |     # But all these should be OK:
     |
 
@@ -211,7 +210,7 @@ B023.py:171:29: B023 Function definition does not bind loop variable `name`
 170 |         if foo(name):
 171 |             return [lambda: name]  # known false alarm
     |                             ^^^^ B023
-172 | 
+172 |
 173 |         if False:
     |
 

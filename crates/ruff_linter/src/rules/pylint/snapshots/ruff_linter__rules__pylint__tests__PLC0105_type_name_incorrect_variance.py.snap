@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 type_name_incorrect_variance.py:5:5: PLC0105 `TypeVar` name "T" does not reflect its covariance; consider renaming it to "T_co"
   |
 3 | # Errors.
-4 | 
+4 |
 5 | T = TypeVar("T", covariant=True)
   |     ^^^^^^^ PLC0105
 6 | T = TypeVar("T", covariant=True, contravariant=False)
@@ -76,14 +75,14 @@ type_name_incorrect_variance.py:12:5: PLC0105 `ParamSpec` name "P" does not refl
 11 | P = ParamSpec("P", contravariant=True)
 12 | P = ParamSpec("P", covariant=False, contravariant=True)
    |     ^^^^^^^^^ PLC0105
-13 | 
+13 |
 14 | T_co = TypeVar("T_co")
    |
 
 type_name_incorrect_variance.py:14:8: PLC0105 `TypeVar` name "T_co" does not reflect its invariance; consider renaming it to "T"
    |
 12 | P = ParamSpec("P", covariant=False, contravariant=True)
-13 | 
+13 |
 14 | T_co = TypeVar("T_co")
    |        ^^^^^^^ PLC0105
 15 | T_co = TypeVar("T_co", covariant=False)
@@ -194,14 +193,14 @@ type_name_incorrect_variance.py:25:8: PLC0105 `ParamSpec` name "P_co" does not r
 24 | P_co = ParamSpec("P_co", contravariant=True)
 25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
    |        ^^^^^^^^^ PLC0105
-26 | 
+26 |
 27 | T_contra = TypeVar("T_contra")
    |
 
 type_name_incorrect_variance.py:27:12: PLC0105 `TypeVar` name "T_contra" does not reflect its invariance; consider renaming it to "T"
    |
 25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
-26 | 
+26 |
 27 | T_contra = TypeVar("T_contra")
    |            ^^^^^^^ PLC0105
 28 | T_contra = TypeVar("T_contra", covariant=False)
@@ -312,6 +311,6 @@ type_name_incorrect_variance.py:38:12: PLC0105 `ParamSpec` name "P_contra" does 
 37 | P_contra = ParamSpec("P_contra", covariant=True)
 38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
    |            ^^^^^^^^^ PLC0105
-39 | 
+39 |
 40 | # Non-errors.
    |

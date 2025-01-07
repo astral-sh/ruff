@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT008.py:35:1: PT008 Use `return_value=` instead of patching with `lambda`
    |
 33 | # Error
-34 | 
+34 |
 35 | mocker.patch("module.name", lambda: None)
    | ^^^^^^^^^^^^ PT008
 36 | module_mocker.patch("module.name", lambda: None)
@@ -36,14 +35,14 @@ PT008.py:38:1: PT008 Use `return_value=` instead of patching with `lambda`
 37 | mocker.patch.object(obj, "attr", lambda: None)
 38 | module_mocker.patch.object(obj, "attr", lambda: None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
-39 | 
+39 |
 40 | mocker.patch("module.name", lambda x, y: None)
    |
 
 PT008.py:40:1: PT008 Use `return_value=` instead of patching with `lambda`
    |
 38 | module_mocker.patch.object(obj, "attr", lambda: None)
-39 | 
+39 |
 40 | mocker.patch("module.name", lambda x, y: None)
    | ^^^^^^^^^^^^ PT008
 41 | module_mocker.patch("module.name", lambda x, y: None)
@@ -74,14 +73,14 @@ PT008.py:43:1: PT008 Use `return_value=` instead of patching with `lambda`
 42 | mocker.patch.object(obj, "attr", lambda x, y: None)
 43 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
-44 | 
+44 |
 45 | mocker.patch("module.name", lambda *args, **kwargs: None)
    |
 
 PT008.py:45:1: PT008 Use `return_value=` instead of patching with `lambda`
    |
 43 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
-44 | 
+44 |
 45 | mocker.patch("module.name", lambda *args, **kwargs: None)
    | ^^^^^^^^^^^^ PT008
 46 | module_mocker.patch("module.name", lambda *args, **kwargs: None)

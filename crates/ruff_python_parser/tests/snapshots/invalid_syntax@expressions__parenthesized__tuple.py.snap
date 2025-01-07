@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/tuple.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -251,30 +250,30 @@ Module(
 
   |
 1 | # Test cases for tuple expressions where the parser recovers from a syntax error.
-2 | 
+2 |
 3 | (,)
   |  ^ Syntax Error: Expected an expression
-4 | 
+4 |
 5 | (1,,2)
   |
 
 
   |
 3 | (,)
-4 | 
+4 |
 5 | (1,,2)
   |    ^ Syntax Error: Expected an expression or a ')'
-6 | 
+6 |
 7 | (1,,)
   |
 
 
   |
 5 | (1,,2)
-6 | 
+6 |
 7 | (1,,)
   |    ^ Syntax Error: Expected an expression or a ')'
-8 | 
+8 |
 9 | # Missing comma
   |
 
@@ -283,7 +282,7 @@ Module(
  9 | # Missing comma
 10 | (1 2)
    |    ^ Syntax Error: Expected ')', found int
-11 | 
+11 |
 12 | # Dictionary element in a list
    |
 
@@ -292,7 +291,7 @@ Module(
  9 | # Missing comma
 10 | (1 2)
    |     ^ Syntax Error: Expected a statement
-11 | 
+11 |
 12 | # Dictionary element in a list
    |
 
@@ -301,7 +300,7 @@ Module(
  9 | # Missing comma
 10 | (1 2)
    |      ^ Syntax Error: Expected a statement
-11 | 
+11 |
 12 | # Dictionary element in a list
 13 | (1: 2)
    |
@@ -311,7 +310,7 @@ Module(
 12 | # Dictionary element in a list
 13 | (1: 2)
    |   ^ Syntax Error: Expected ')', found ':'
-14 | 
+14 |
 15 | # Missing expression
    |
 
@@ -320,7 +319,7 @@ Module(
 12 | # Dictionary element in a list
 13 | (1: 2)
    |  ^ Syntax Error: Invalid annotated assignment target
-14 | 
+14 |
 15 | # Missing expression
    |
 
@@ -329,7 +328,7 @@ Module(
 12 | # Dictionary element in a list
 13 | (1: 2)
    |      ^ Syntax Error: Expected a statement
-14 | 
+14 |
 15 | # Missing expression
    |
 
@@ -338,7 +337,7 @@ Module(
 12 | # Dictionary element in a list
 13 | (1: 2)
    |       ^ Syntax Error: Expected a statement
-14 | 
+14 |
 15 | # Missing expression
 16 | (1, x + )
    |
@@ -348,37 +347,37 @@ Module(
 15 | # Missing expression
 16 | (1, x + )
    |         ^ Syntax Error: Expected an expression
-17 | 
+17 |
 18 | (1; 2)
    |
 
 
    |
 16 | (1, x + )
-17 | 
+17 |
 18 | (1; 2)
    |   ^ Syntax Error: Expected ')', found ';'
-19 | 
+19 |
 20 | # Unparenthesized named expression is not allowed
    |
 
 
    |
 16 | (1, x + )
-17 | 
+17 |
 18 | (1; 2)
    |      ^ Syntax Error: Expected a statement
-19 | 
+19 |
 20 | # Unparenthesized named expression is not allowed
    |
 
 
    |
 16 | (1, x + )
-17 | 
+17 |
 18 | (1; 2)
    |       ^ Syntax Error: Expected a statement
-19 | 
+19 |
 20 | # Unparenthesized named expression is not allowed
 21 | x, y := 2, z
    |

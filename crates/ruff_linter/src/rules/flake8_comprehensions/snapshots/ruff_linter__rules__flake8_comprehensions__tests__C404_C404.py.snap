@@ -19,7 +19,7 @@ C404.py:1:1: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehe
 C404.py:7:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
   |
 5 |     return x
-6 | 
+6 |
 7 | f'{dict([(s,s) for s in "ab"])}'
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
 8 | f"{dict([(s,s) for s in 'ab'])}"
@@ -83,7 +83,7 @@ C404.py:10:4: C404 [*] Unnecessary list comprehension (rewrite as a dict compreh
  9 | f"{dict([(s, s) for s in 'ab'])}"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    |
    = help: Rewrite as a dict comprehension
@@ -101,7 +101,7 @@ C404.py:10:4: C404 [*] Unnecessary list comprehension (rewrite as a dict compreh
 C404.py:12:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
    |
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
@@ -121,7 +121,7 @@ C404.py:12:4: C404 [*] Unnecessary list comprehension (rewrite as a dict compreh
 C404.py:12:34: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
    |
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
@@ -143,7 +143,7 @@ C404.py:13:5: C404 [*] Unnecessary list comprehension (rewrite as a dict compreh
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    |
    = help: Rewrite as a dict comprehension
@@ -163,7 +163,7 @@ C404.py:13:35: C404 [*] Unnecessary list comprehension (rewrite as a dict compre
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    |
    = help: Rewrite as a dict comprehension

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_raise/mod.rs
-snapshot_kind: text
 ---
 RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
   |
@@ -8,7 +7,7 @@ RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
 4 |     # RSE102
 5 |     raise ValueError()
   |                     ^^ RSE102
-6 | 
+6 |
 7 | try:
   |
   = help: Remove unnecessary parentheses
@@ -28,7 +27,7 @@ RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
 12 | # RSE102
 13 | raise TypeError()
    |                ^^ RSE102
-14 | 
+14 |
 15 | # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -48,7 +47,7 @@ RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
 15 | # RSE102
 16 | raise TypeError ()
    |                 ^^ RSE102
-17 | 
+17 |
 18 | # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -69,7 +68,7 @@ RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
 19 | raise TypeError \
 20 |     ()
    |     ^^ RSE102
-21 | 
+21 |
 22 | # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -90,7 +89,7 @@ RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
 23 | raise TypeError \
 24 |     ();
    |     ^^ RSE102
-25 | 
+25 |
 26 | # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -110,10 +109,10 @@ RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
 26 |   # RSE102
 27 |   raise TypeError(
    |  ________________^
-28 | | 
+28 | |
 29 | | )
    | |_^ RSE102
-30 |   
+30 |
 31 |   # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -135,10 +134,10 @@ RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
 31 |   # RSE102
 32 |   raise (TypeError) (
    |  ___________________^
-33 | | 
+33 | |
 34 | | )
    | |_^ RSE102
-35 |   
+35 |
 36 |   # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -163,7 +162,7 @@ RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
 38 | |     # Hello, world!
 39 | | )
    | |_^ RSE102
-40 |   
+40 |
 41 |   # OK
    |
    = help: Remove unnecessary parentheses
@@ -185,7 +184,7 @@ RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
 73 | # RSE102
 74 | raise IndexError()from ZeroDivisionError
    |                 ^^ RSE102
-75 | 
+75 |
 76 | raise IndexError()\
    |
    = help: Remove unnecessary parentheses
@@ -203,7 +202,7 @@ RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
 RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 74 | raise IndexError()from ZeroDivisionError
-75 | 
+75 |
 76 | raise IndexError()\
    |                 ^^ RSE102
 77 | from ZeroDivisionError
@@ -223,10 +222,10 @@ RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
 RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 77 | from ZeroDivisionError
-78 | 
+78 |
 79 | raise IndexError() from ZeroDivisionError
    |                 ^^ RSE102
-80 | 
+80 |
 81 | raise IndexError();
    |
    = help: Remove unnecessary parentheses
@@ -244,10 +243,10 @@ RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
 RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 79 | raise IndexError() from ZeroDivisionError
-80 | 
+80 |
 81 | raise IndexError();
    |                 ^^ RSE102
-82 | 
+82 |
 83 | # RSE102
    |
    = help: Remove unnecessary parentheses
@@ -267,7 +266,7 @@ RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
 83 | # RSE102
 84 | raise Foo()
    |          ^^ RSE102
-85 | 
+85 |
 86 | # OK
    |
    = help: Remove unnecessary parentheses

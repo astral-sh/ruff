@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F823.py:6:5: F823 Local variable `my_var` referenced before assignment
   |
@@ -31,7 +30,7 @@ F823.py:48:11: F823 Local variable `sys` referenced before assignment
 47 | def main():
 48 |     print(sys.argv)
    |           ^^^ F823
-49 | 
+49 |
 50 |     try:
    |
 
@@ -40,6 +39,6 @@ F823.py:62:11: F823 Local variable `sys` referenced before assignment
 61 | def main():
 62 |     print(sys.argv)
    |           ^^^ F823
-63 | 
+63 |
 64 |     for sys in range(5):
    |

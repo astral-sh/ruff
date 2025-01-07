@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR303.py:159:1: AIR303 `airflow.hooks.S3_hook.provide_bucket_name` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -116,7 +115,7 @@ AIR303.py:169:1: AIR303 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftT
 168 | S3ToRedshiftOperator()
 169 | S3ToRedshiftTransfer()
     | ^^^^^^^^^^^^^^^^^^^^ AIR303
-170 | 
+170 |
 171 | # apache-airflow-providers-celery
     |
     = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator` instead.
@@ -158,7 +157,7 @@ AIR303.py:175:1: AIR303 `airflow.executors.celery_kubernetes_executor.CeleryKube
 174 | CeleryExecutor()
 175 | CeleryKubernetesExecutor()
     | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR303
-176 | 
+176 |
 177 | # apache-airflow-providers-common-sql
     |
     = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` instead.
@@ -453,7 +452,7 @@ AIR303.py:206:1: AIR303 `airflow.operators.check_operator.ValueCheckOperator` is
 205 | ThresholdCheckOperator()
 206 | ValueCheckOperator()
     | ^^^^^^^^^^^^^^^^^^ AIR303
-207 | 
+207 |
 208 | # apache-airflow-providers-daskexecutor
     |
     = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
@@ -463,7 +462,7 @@ AIR303.py:209:1: AIR303 `airflow.executors.dask_executor.DaskExecutor` is moved 
 208 | # apache-airflow-providers-daskexecutor
 209 | DaskExecutor()
     | ^^^^^^^^^^^^ AIR303
-210 | 
+210 |
 211 | # apache-airflow-providers-docker
     |
     = help: Install `apache-airflow-provider-daskexecutor>=1.0.0` and use `airflow.providers.daskexecutor.executors.dask_executor.DaskExecutor` instead.
@@ -483,7 +482,7 @@ AIR303.py:213:1: AIR303 `airflow.operators.docker_operator.DockerOperator` is mo
 212 | DockerHook()
 213 | DockerOperator()
     | ^^^^^^^^^^^^^^ AIR303
-214 | 
+214 |
 215 | # apache-airflow-providers-apache-druid
     |
     = help: Install `apache-airflow-provider-docker>=1.0.0` and use `airflow.providers.docker.operators.docker.DockerOperator` instead.
@@ -514,7 +513,7 @@ AIR303.py:218:1: AIR303 `airflow.operators.druid_check_operator.DruidCheckOperat
 217 | DruidHook()
 218 | DruidCheckOperator()
     | ^^^^^^^^^^^^^^^^^^ AIR303
-219 | 
+219 |
 220 | # apache-airflow-providers-apache-hdfs
     |
     = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidCheckOperator` instead.
@@ -534,7 +533,7 @@ AIR303.py:222:1: AIR303 `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved
 221 | WebHDFSHook()
 222 | WebHdfsSensor()
     | ^^^^^^^^^^^^^ AIR303
-223 | 
+223 |
 224 | # apache-airflow-providers-apache-hive
     |
     = help: Install `apache-airflow-provider-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.sensors.web_hdfs.WebHdfsSensor` instead.
@@ -708,7 +707,7 @@ AIR303.py:240:1: AIR303 `airflow.sensors.named_hive_partition_sensor.NamedHivePa
 239 | MetastorePartitionSensor()
 240 | NamedHivePartitionSensor()
     | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR303
-241 | 
+241 |
 242 | # apache-airflow-providers-http
     |
     = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.named_hive_partition.NamedHivePartitionSensor` instead.
@@ -739,7 +738,7 @@ AIR303.py:245:1: AIR303 `airflow.operators.http_operator.SimpleHttpOperator` is 
 244 | HttpSensor()
 245 | SimpleHttpOperator()
     | ^^^^^^^^^^^^^^^^^^ AIR303
-246 | 
+246 |
 247 | # apache-airflow-providers-jdbc
     |
     = help: Install `apache-airflow-provider-http>=1.0.0` and use `airflow.providers.http.operators.http.SimpleHttpOperator` instead.
@@ -770,7 +769,7 @@ AIR303.py:250:1: AIR303 `airflow.operators.jdbc_operator.JdbcOperator` is moved 
 249 | JdbcHook()
 250 | JdbcOperator()
     | ^^^^^^^^^^^^ AIR303
-251 | 
+251 |
 252 | # apache-airflow-providers-fab
     |
     = help: Install `apache-airflow-provider-jdbc>=1.0.0` and use `airflow.providers.jdbc.operators.jdbc.JdbcOperator` instead.
@@ -844,7 +843,7 @@ AIR303.py:258:1: AIR303 `airflow.www.security.FabAirflowSecurityManagerOverride`
 257 | FabAuthManager()
 258 | FabAirflowSecurityManagerOverride()
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR303
-259 | 
+259 |
 260 | # apache-airflow-providers-cncf-kubernetes
     |
     = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride` instead.
@@ -1062,7 +1061,7 @@ AIR303.py:280:1: AIR303 `airflow.kubernetes.secret.Secret` is moved into `cncf-k
 279 | VolumeMount()
 280 | Secret()
     | ^^^^^^ AIR303
-281 | 
+281 |
 282 | add_pod_suffix()
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.secret.Secret` instead.
@@ -1070,7 +1069,7 @@ AIR303.py:280:1: AIR303 `airflow.kubernetes.secret.Secret` is moved into `cncf-k
 AIR303.py:282:1: AIR303 `airflow.kubernetes.kubernetes_helper_functions.add_pod_suffix` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 280 | Secret()
-281 | 
+281 |
 282 | add_pod_suffix()
     | ^^^^^^^^^^^^^^ AIR303
 283 | add_pod_suffix2()
@@ -1298,7 +1297,7 @@ AIR303.py:307:1: AIR303 `airflow.operators.mssql_to_hive.MsSqlToHiveTransfer` is
 306 | MsSqlToHiveOperator()
 307 | MsSqlToHiveTransfer()
     | ^^^^^^^^^^^^^^^^^^^ AIR303
-308 | 
+308 |
 309 | # apache-airflow-providers-mysql
     |
     = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mssql_to_hive.MsSqlToHiveOperator` instead.
@@ -1384,7 +1383,7 @@ AIR303.py:317:1: AIR303 `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer
 316 | PrestoToMySqlOperator()
 317 | PrestoToMySqlTransfer()
     | ^^^^^^^^^^^^^^^^^^^^^ AIR303
-318 | 
+318 |
 319 | # apache-airflow-providers-oracle
     |
     = help: Install `apache-airflow-provider-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
@@ -1404,7 +1403,7 @@ AIR303.py:321:1: AIR303 `airflow.operators.oracle_operator.OracleOperator` is mo
 320 | OracleHook()
 321 | OracleOperator()
     | ^^^^^^^^^^^^^^ AIR303
-322 | 
+322 |
 323 | # apache-airflow-providers-papermill
     |
     = help: Install `apache-airflow-provider-oracle>=1.0.0` and use `airflow.providers.oracle.operators.oracle.OracleOperator` instead.
@@ -1414,7 +1413,7 @@ AIR303.py:324:1: AIR303 `airflow.operators.papermill_operator.PapermillOperator`
 323 | # apache-airflow-providers-papermill
 324 | PapermillOperator()
     | ^^^^^^^^^^^^^^^^^ AIR303
-325 | 
+325 |
 326 | # apache-airflow-providers-apache-pig
     |
     = help: Install `apache-airflow-provider-papermill>=1.0.0` and use `airflow.providers.papermill.operators.papermill.PapermillOperator` instead.
@@ -1434,7 +1433,7 @@ AIR303.py:328:1: AIR303 `airflow.operators.pig_operator.PigOperator` is moved in
 327 | PigCliHook()
 328 | PigOperator()
     | ^^^^^^^^^^^ AIR303
-329 | 
+329 |
 330 | # apache-airflow-providers-postgres
     |
     = help: Install `apache-airflow-provider-apache-pig>=1.0.0` and use `airflow.providers.apache.pig.operators.pig.PigOperator` instead.
@@ -1465,7 +1464,7 @@ AIR303.py:333:1: AIR303 `airflow.operators.postgres_operator.PostgresOperator` i
 332 | PostgresHook()
 333 | PostgresOperator()
     | ^^^^^^^^^^^^^^^^ AIR303
-334 | 
+334 |
 335 | # apache-airflow-providers-presto
     |
     = help: Install `apache-airflow-provider-postgres>=1.0.0` and use `airflow.providers.postgres.operators.postgres.PostgresOperator` instead.
@@ -1475,7 +1474,7 @@ AIR303.py:336:1: AIR303 `airflow.hooks.presto_hook.PrestoHook` is moved into `pr
 335 | # apache-airflow-providers-presto
 336 | PrestoHook()
     | ^^^^^^^^^^ AIR303
-337 | 
+337 |
 338 | # apache-airflow-providers-samba
     |
     = help: Install `apache-airflow-provider-presto>=1.0.0` and use `airflow.providers.presto.hooks.presto.PrestoHook` instead.
@@ -1485,7 +1484,7 @@ AIR303.py:339:1: AIR303 `airflow.hooks.samba_hook.SambaHook` is moved into `samb
 338 | # apache-airflow-providers-samba
 339 | SambaHook()
     | ^^^^^^^^^ AIR303
-340 | 
+340 |
 341 | # apache-airflow-providers-slack
     |
     = help: Install `apache-airflow-provider-samba>=1.0.0` and use `airflow.providers.samba.hooks.samba.SambaHook` instead.
@@ -1516,7 +1515,7 @@ AIR303.py:344:1: AIR303 `airflow.operators.slack_operator.SlackAPIPostOperator` 
 343 | SlackAPIOperator()
 344 | SlackAPIPostOperator()
     | ^^^^^^^^^^^^^^^^^^^^ AIR303
-345 | 
+345 |
 346 | # apache-airflow-providers-sqlite
     |
     = help: Install `apache-airflow-provider-slack>=1.0.0` and use `airflow.providers.slack.operators.slack.SlackAPIPostOperator` instead.
@@ -1536,7 +1535,7 @@ AIR303.py:348:1: AIR303 `airflow.operators.sqlite_operator.SqliteOperator` is mo
 347 | SqliteHook()
 348 | SqliteOperator()
     | ^^^^^^^^^^^^^^ AIR303
-349 | 
+349 |
 350 | # apache-airflow-providers-zendesk
     |
     = help: Install `apache-airflow-provider-sqlite>=1.0.0` and use `airflow.providers.sqlite.operators.sqlite.SqliteOperator` instead.

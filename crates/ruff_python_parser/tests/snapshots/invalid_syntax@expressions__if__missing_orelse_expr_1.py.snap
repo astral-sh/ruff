@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_orelse_expr_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -78,6 +77,6 @@ Module(
 1 | # Missing orelse expression, followed by an expression
 2 | x if expr else
   |               ^ Syntax Error: Expected an expression
-3 | 
+3 |
 4 | 1 + 1
   |

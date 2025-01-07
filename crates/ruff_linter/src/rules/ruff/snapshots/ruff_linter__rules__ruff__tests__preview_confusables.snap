@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 confusables.py:1:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
   |
@@ -40,7 +39,7 @@ confusables.py:26:10: RUF001 String contains ambiguous `α` (GREEK SMALL LETTER 
 25 | # contains ASCII.
 26 | x = "βα Bαd"
    |          ^ RUF001
-27 | 
+27 |
 28 | # The two characters should be flagged here. The first character is a "word"
    |
 
@@ -50,7 +49,7 @@ confusables.py:31:6: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LET
 30 | # boundary" (whitespace) that it itself ambiguous.
 31 | x = "Р усский"
    |      ^ RUF001
-32 | 
+32 |
 33 | # Same test cases as above but using f-strings instead:
    |
 
@@ -60,7 +59,7 @@ confusables.py:31:7: RUF001 String contains ambiguous ` ` (EN QUAD). Did you m
 30 | # boundary" (whitespace) that it itself ambiguous.
 31 | x = "Р усский"
    |       ^ RUF001
-32 | 
+32 |
 33 | # Same test cases as above but using f-strings instead:
    |
 
@@ -88,7 +87,7 @@ confusables.py:38:7: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LET
 37 | x = f"βα Bαd"
 38 | x = f"Р усский"
    |       ^ RUF001
-39 | 
+39 |
 40 | # Nested f-strings
    |
 
@@ -98,7 +97,7 @@ confusables.py:38:8: RUF001 String contains ambiguous ` ` (EN QUAD). Did you m
 37 | x = f"βα Bαd"
 38 | x = f"Р усский"
    |        ^ RUF001
-39 | 
+39 |
 40 | # Nested f-strings
    |
 
@@ -107,7 +106,7 @@ confusables.py:41:7: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD 
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |       ^ RUF001
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -116,7 +115,7 @@ confusables.py:41:21: RUF001 String contains ambiguous ` ` (EN QUAD). Did you 
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |                     ^ RUF001
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -125,7 +124,7 @@ confusables.py:41:25: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LE
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |                         ^ RUF001
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -134,7 +133,7 @@ confusables.py:41:26: RUF001 String contains ambiguous ` ` (EN QUAD). Did you 
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |                          ^ RUF001
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -160,7 +159,7 @@ confusables.py:55:28: RUF001 String contains ambiguous `µ` (MICRO SIGN). Did yo
    |
 55 | assert getattr(Labware(), "µL") == 1.5
    |                            ^ RUF001
-56 | 
+56 |
 57 | # Implicit string concatenation
    |
 

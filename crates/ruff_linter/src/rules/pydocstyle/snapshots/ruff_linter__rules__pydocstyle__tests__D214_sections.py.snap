@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:146:9: D214 [*] Section is over-indented ("Returns")
     |
 144 |     """Toggle the gizmo.
-145 | 
+145 |
 146 |         Returns
     |         ^^^^^^^ D214
 147 |     -------
@@ -26,7 +25,7 @@ sections.py:146:9: D214 [*] Section is over-indented ("Returns")
 sections.py:563:9: D214 [*] Section is over-indented ("Returns")
     |
 561 |         Here's a note.
-562 | 
+562 |
 563 |         Returns:
     |         ^^^^^^^ D214
 564 |     """

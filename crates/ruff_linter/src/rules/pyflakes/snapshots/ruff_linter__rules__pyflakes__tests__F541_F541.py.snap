@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F541.py:6:5: F541 [*] f-string without any placeholders
   |
@@ -154,7 +153,7 @@ F541.py:19:5: F541 [*] f-string without any placeholders
 18 | )
 19 | g = f""
    |     ^^^ F541
-20 | 
+20 |
 21 | # OK
    |
    = help: Remove extraneous `f` prefix
@@ -174,7 +173,7 @@ F541.py:25:13: F541 [*] f-string without any placeholders
 24 | # Error
 25 | h = "x" "y" f"z"
    |             ^^^^ F541
-26 | 
+26 |
 27 | v = 23.234234
    |
    = help: Remove extraneous `f` prefix

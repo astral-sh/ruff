@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 useless_exception_statement.py:7:5: PLW0133 [*] Missing `raise` statement on exception
   |
@@ -86,7 +85,7 @@ useless_exception_statement.py:34:9: PLW0133 [*] Missing `raise` statement on ex
 33 |     def inner():
 34 |         IndexError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-35 | 
+35 |
 36 |     inner()
    |
    = help: Add `raise` keyword
@@ -218,10 +217,10 @@ useless_exception_statement.py:71:5: PLW0133 [*] Missing `raise` statement on ex
 useless_exception_statement.py:126:1: PLW0133 [*] Missing `raise` statement on exception
     |
 124 | import builtins
-125 | 
+125 |
 126 | builtins.TypeError("still an exception even though it's an Attribute")
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-127 | 
+127 |
 128 | PythonFinalizationError("Added in Python 3.13")
     |
     = help: Add `raise` keyword
@@ -238,7 +237,7 @@ useless_exception_statement.py:126:1: PLW0133 [*] Missing `raise` statement on e
 useless_exception_statement.py:128:1: PLW0133 [*] Missing `raise` statement on exception
     |
 126 | builtins.TypeError("still an exception even though it's an Attribute")
-127 | 
+127 |
 128 | PythonFinalizationError("Added in Python 3.13")
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
     |

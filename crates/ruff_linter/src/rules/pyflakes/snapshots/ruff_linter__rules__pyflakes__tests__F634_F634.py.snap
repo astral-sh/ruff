@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F634.py:1:4: F634 If test is a tuple, which is always `True`
   |
@@ -12,7 +11,7 @@ F634.py:1:4: F634 If test is a tuple, which is always `True`
 F634.py:4:4: F634 If test is a tuple, which is always `True`
   |
 2 |     pass
-3 | 
+3 |
 4 | if (3, 4):
   |    ^^^^^^ F634
 5 |     pass

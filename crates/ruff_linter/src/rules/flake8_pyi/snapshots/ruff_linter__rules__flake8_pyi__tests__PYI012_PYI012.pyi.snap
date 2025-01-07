@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
   |
@@ -8,7 +7,7 @@ PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
 4 |     value: int
 5 |     pass  # PYI012 Class body must not contain `pass`
   |     ^^^^ PYI012
-6 | 
+6 |
 7 | class OneAttributeClassRev:
   |
   = help: Remove unnecessary `pass`
@@ -43,10 +42,10 @@ PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
 PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
    |
 14 |     """
-15 | 
+15 |
 16 |     pass  # PYI012 Class body must not contain `pass`
    |     ^^^^ PYI012
-17 | 
+17 |
 18 | class NonEmptyChild(Exception):
    |
    = help: Remove unnecessary `pass`
@@ -66,7 +65,7 @@ PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
 19 |     value: int
 20 |     pass  # PYI012 Class body must not contain `pass`
    |     ^^^^ PYI012
-21 | 
+21 |
 22 | class NonEmptyChild2(Exception):
    |
    = help: Remove unnecessary `pass`
@@ -104,7 +103,7 @@ PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
 27 |     value: int
 28 |     pass  # PYI012 Class body must not contain `pass`
    |     ^^^^ PYI012
-29 | 
+29 |
 30 |     def __init__():
    |
    = help: Remove unnecessary `pass`

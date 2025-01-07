@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/with/unparenthesized_with_items.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -298,7 +297,7 @@ Module(
 
   |
 1 | # For parenthesized with items test cases, refer to `./ambiguous_lpar_with_items.py`
-2 | 
+2 |
 3 | with item,: pass
   |          ^ Syntax Error: Trailing comma not allowed
 4 | with item as x,: pass

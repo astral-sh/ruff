@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 subprocess_run_without_check.py:4:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
   |
@@ -70,7 +69,7 @@ subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without expli
  9 | )
 10 | subprocess.run(["ls"], **kwargs)
    | ^^^^^^^^^^^^^^ PLW1510
-11 | 
+11 |
 12 | # Non-errors.
    |
    = help: Add explicit `check=False`

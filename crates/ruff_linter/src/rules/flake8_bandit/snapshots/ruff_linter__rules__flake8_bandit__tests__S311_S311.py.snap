@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S311.py:10:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
    |
@@ -86,6 +85,6 @@ S311.py:18:1: S311 Standard pseudo-random generators are not suitable for crypto
 17 | random.triangular()
 18 | random.randbytes()
    | ^^^^^^^^^^^^^^^^^^ S311
-19 | 
+19 |
 20 | # Unrelated
    |

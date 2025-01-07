@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `if res:` for truth checks
   |
@@ -190,7 +189,7 @@ E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
    |
 23 |     pass
-24 | 
+24 |
 25 | if res == True != False:
    |    ^^^^^^^^^^^^^^^^^^^^ E712
 26 |     pass
@@ -210,7 +209,7 @@ E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
 E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
    |
 23 |     pass
-24 | 
+24 |
 25 | if res == True != False:
    |    ^^^^^^^^^^^^^^^^^^^^ E712
 26 |     pass
@@ -230,7 +229,7 @@ E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
 E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
 26 |     pass
-27 | 
+27 |
 28 | if(True) == TrueElement or x == TrueElement:
    |   ^^^^^^^^^^^^^^^^^^^^^ E712
 29 |     pass
@@ -250,7 +249,7 @@ E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` for truth checks
    |
 29 |     pass
-30 | 
+30 |
 31 | if (yield i) == True:
    |    ^^^^^^^^^^^^^^^^^ E712
 32 |       print("even")

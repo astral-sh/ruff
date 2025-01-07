@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC008.py:15:16: TC008 [*] Remove quotes from type alias
    |
 13 |     Bar = Foo
-14 | 
+14 |
 15 | a: TypeAlias = 'int'  # TC008
    |                ^^^^^ TC008
 16 | b: TypeAlias = 'Dict'  # OK
@@ -156,7 +156,7 @@ TC008.py:29:17: TC008 [*] Remove quotes from type alias
    |  _________________^
 30 | |     ' | None')
    | |_____________^ TC008
-31 |   
+31 |
 32 |   type B = 'Dict'  # TC008
    |
    = help: Remove quotes
@@ -175,7 +175,7 @@ TC008.py:29:17: TC008 [*] Remove quotes from type alias
 TC008.py:32:10: TC008 [*] Remove quotes from type alias
    |
 30 |     ' | None')
-31 | 
+31 |
 32 | type B = 'Dict'  # TC008
    |          ^^^^^^ TC008
 33 | type D = 'Foo[str]'  # TC008
@@ -388,7 +388,7 @@ TC008.py:48:14: TC008 [*] Remove quotes from type alias
 47 |     a: TypeAlias = 'Baz'  # OK
 48 |     type A = 'Baz'  # TC008
    |              ^^^^^ TC008
-49 | 
+49 |
 50 |     class Nested:
    |
    = help: Remove quotes

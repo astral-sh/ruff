@@ -7,14 +7,14 @@ S102.py:3:5: S102 Use of `exec` detected
 2 |     # Error
 3 |     exec('x = 2')
   |     ^^^^ S102
-4 | 
+4 |
 5 | exec('y = 3')
   |
 
 S102.py:5:1: S102 Use of `exec` detected
   |
 3 |     exec('x = 2')
-4 | 
+4 |
 5 | exec('y = 3')
   | ^^^^ S102
   |
@@ -25,6 +25,6 @@ S102.py:11:5: S102 Use of `exec` detected
 10 |     from builtins import exec
 11 |     exec('')  # Error
    |     ^^^^ S102
-12 | 
+12 |
 13 | def _():
    |

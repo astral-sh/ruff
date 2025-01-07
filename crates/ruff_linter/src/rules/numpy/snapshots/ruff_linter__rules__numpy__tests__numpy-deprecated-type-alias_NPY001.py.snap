@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
-snapshot_kind: text
 ---
 NPY001.py:6:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
   |
@@ -27,7 +26,7 @@ NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builti
 6 | npy.float
 7 | npy.int
   | ^^^^^^^ NPY001
-8 | 
+8 |
 9 | if dtype == np.object:
   |
   = help: Replace `np.int` with builtin type
@@ -45,7 +44,7 @@ NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builti
 NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
    |
  7 | npy.int
- 8 | 
+ 8 |
  9 | if dtype == np.object:
    |             ^^^^^^^^^ NPY001
 10 |     ...
@@ -65,10 +64,10 @@ NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with bu
 NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
 10 |     ...
-11 | 
+11 |
 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
    |                                                                        ^^^^^^ NPY001
-13 | 
+13 |
 14 | pdf = pd.DataFrame(
    |
    = help: Replace `np.int` with builtin type
@@ -86,10 +85,10 @@ NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with buil
 NPY001.py:12:80: NPY001 [*] Type alias `np.complex` is deprecated, replace with builtin type
    |
 10 |     ...
-11 | 
+11 |
 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
    |                                                                                ^^^^^^^^^^ NPY001
-13 | 
+13 |
 14 | pdf = pd.DataFrame(
    |
    = help: Replace `np.complex` with builtin type
@@ -127,10 +126,10 @@ NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with b
 NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
 18 | )
-19 | 
+19 |
 20 | _ = arr.astype(np.int)
    |                ^^^^^^ NPY001
-21 | 
+21 |
 22 | # Regression test for: https://github.com/astral-sh/ruff/issues/6952
    |
    = help: Replace `np.int` with builtin type
@@ -148,7 +147,7 @@ NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with buil
 NPY001.py:25:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
    |
 23 | from numpy import float
-24 | 
+24 |
 25 | float(1)
    | ^^^^^ NPY001
    |

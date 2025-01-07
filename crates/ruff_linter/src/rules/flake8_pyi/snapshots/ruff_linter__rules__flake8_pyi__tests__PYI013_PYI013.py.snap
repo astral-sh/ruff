@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
   |
@@ -76,7 +75,7 @@ PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
 PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 19 |     """
-20 | 
+20 |
 21 |     ...
    |     ^^^ PYI013
    |
@@ -133,7 +132,7 @@ PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
 35 |     value: int
 36 |     ...
    |     ^^^ PYI013
-37 | 
+37 |
 38 |     def __init__():
    |
    = help: Remove unnecessary `...`

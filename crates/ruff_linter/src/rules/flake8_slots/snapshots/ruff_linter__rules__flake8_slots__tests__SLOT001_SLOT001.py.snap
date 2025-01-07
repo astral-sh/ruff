@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
-snapshot_kind: text
 ---
 SLOT001.py:1:7: SLOT001 Subclasses of `tuple` should define `__slots__`
   |
@@ -26,7 +25,7 @@ SLOT001.py:16:7: SLOT001 Subclasses of `tuple` should define `__slots__`
 SLOT001.py:26:7: SLOT001 Subclasses of `tuple` should define `__slots__`
    |
 24 | import builtins
-25 | 
+25 |
 26 | class AlsoBad(builtins.tuple[int, int]):  # SLOT001
    |       ^^^^^^^ SLOT001
 27 |     pass

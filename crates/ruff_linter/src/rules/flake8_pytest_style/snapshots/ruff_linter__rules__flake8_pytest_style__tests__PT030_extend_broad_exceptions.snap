@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT030.py:11:23: PT030 `pytest.warns(EncodingWarning)` is too broad, set the `match` parameter or use a more specific warning
    |
@@ -21,7 +20,7 @@ PT030.py:16:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` 
 PT030.py:19:40: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
    |
 17 |         pass
-18 | 
+18 |
 19 |     with pytest.warns(expected_warning=UserWarning):
    |                                        ^^^^^^^^^^^ PT030
 20 |         pass
@@ -38,7 +37,7 @@ PT030.py:27:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` 
 PT030.py:30:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
    |
 28 |         pass
-29 | 
+29 |
 30 |     with pytest.warns(UserWarning, match=""):
    |                       ^^^^^^^^^^^ PT030
 31 |         pass
@@ -47,7 +46,7 @@ PT030.py:30:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` 
 PT030.py:33:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
    |
 31 |         pass
-32 | 
+32 |
 33 |     with pytest.warns(UserWarning, match=f""):
    |                       ^^^^^^^^^^^ PT030
 34 |         pass

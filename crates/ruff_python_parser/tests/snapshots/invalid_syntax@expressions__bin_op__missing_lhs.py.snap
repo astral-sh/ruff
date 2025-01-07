@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/missing_lhs.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -58,6 +57,6 @@ Module(
   |
 1 | / y
   | ^ Syntax Error: Expected a statement
-2 | 
+2 |
 3 | 1 + 2
   |

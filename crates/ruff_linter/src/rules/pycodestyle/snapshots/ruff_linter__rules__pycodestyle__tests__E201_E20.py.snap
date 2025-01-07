@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E20.py:2:6: E201 [*] Whitespace after '('
   |
@@ -130,7 +129,7 @@ E20.py:107:6: E201 [*] Whitespace after '['
 106 | #: E201:1:6
 107 | spam[ ~ham]
     |      ^ E201
-108 | 
+108 |
 109 | #: Okay
     |
     = help: Remove whitespace before '['
@@ -170,7 +169,7 @@ E20.py:145:5: E201 [*] Whitespace after '['
 144 | #: E201:1:5
 145 | ham[ : upper]
     |     ^ E201
-146 | 
+146 |
 147 | #: Okay
     |
     = help: Remove whitespace before '['

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 too_many_branches_params.py:6:5: PLR0912 Too many branches (2 > 1)
   |
@@ -13,7 +12,7 @@ too_many_branches_params.py:6:5: PLR0912 Too many branches (2 > 1)
 too_many_branches_params.py:15:9: PLR0912 Too many branches (2 > 1)
    |
 13 |         return
-14 | 
+14 |
 15 |     def i(x):
    |         ^ PLR0912
 16 |         if x:

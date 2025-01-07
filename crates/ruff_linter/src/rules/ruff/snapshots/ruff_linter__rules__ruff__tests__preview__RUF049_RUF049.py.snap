@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF049.py:10:1: RUF049 An enum class should not be decorated with `@dataclass`
    |
  8 | ## Errors
- 9 | 
+ 9 |
 10 | @dataclass
    | ^^^^^^^^^^ RUF049
 11 | class E(Enum): ...

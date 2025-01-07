@@ -135,7 +135,7 @@ RUF041.pyi:12:1: RUF041 [*] Unnecessary nested `Literal`
 16 | |     ]
 17 | | ]  # once
    | |_^ RUF041
-18 |   
+18 |
 19 |   # Ensure issue is only raised once, even on nested literals
    |
    = help: Replace with flattened `Literal`
@@ -160,7 +160,7 @@ RUF041.pyi:20:10: RUF041 [*] Unnecessary nested `Literal`
 19 | # Ensure issue is only raised once, even on nested literals
 20 | MyType = Literal["foo", Literal[True, False, True], "bar"]
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF041
-21 | 
+21 |
 22 | # nested literals, all equivalent to `Literal[1]`
    |
    = help: Replace with flattened `Literal`
@@ -221,7 +221,7 @@ RUF041.pyi:25:1: RUF041 [*] Unnecessary nested `Literal`
 24 | Literal[Literal[Literal[1], Literal[1]]]
 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF041
-26 | 
+26 |
 27 | # OK
    |
    = help: Replace with flattened `Literal`

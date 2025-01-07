@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
 1 | from typing import Never, NoReturn, Union
-2 | 
+2 |
 3 | Union[Never, int]
   |       ^^^^^ RUF020
 4 | Union[NoReturn, int]
@@ -168,7 +168,7 @@ RUF020.py:14:12: RUF020 `Never | T` is equivalent to `T`
 13 | y: (None | Never) | None
 14 | z: None | (Never | None)
    |            ^^^^^ RUF020
-15 | 
+15 |
 16 | a: int | Never | None
    |
    = help: Remove `Never`
@@ -176,7 +176,7 @@ RUF020.py:14:12: RUF020 `Never | T` is equivalent to `T`
 RUF020.py:16:10: RUF020 `Never | T` is equivalent to `T`
    |
 14 | z: None | (Never | None)
-15 | 
+15 |
 16 | a: int | Never | None
    |          ^^^^^ RUF020
 17 | b: Never | Never | None

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
@@ -28,7 +27,7 @@ invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, u
 15 | b = '␈'
 16 | b = f'␈'
    |       ^ PLE2510
-17 | 
+17 |
 18 | b_ok = '\\b'
    |
    = help: Replace with escape sequence
@@ -46,10 +45,10 @@ invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, u
 invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
-54 | 
+54 |
 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
    |                     ^ PLE2510
-56 | 
+56 |
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |
    = help: Replace with escape sequence

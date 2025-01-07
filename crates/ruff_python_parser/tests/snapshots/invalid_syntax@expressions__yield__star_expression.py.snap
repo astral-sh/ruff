@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/yield/star_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -101,14 +100,14 @@ Module(
 1 | # Cannot use starred expression here
 2 | yield (*x)
   |        ^^ Syntax Error: Starred expression cannot be used here
-3 | 
+3 |
 4 | yield *x and y, z
   |
 
 
   |
 2 | yield (*x)
-3 | 
+3 |
 4 | yield *x and y, z
   |        ^^^^^^^ Syntax Error: Boolean expression cannot be used here
   |

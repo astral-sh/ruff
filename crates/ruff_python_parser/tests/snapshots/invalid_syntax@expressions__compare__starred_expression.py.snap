@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/starred_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -167,14 +166,14 @@ Module(
 1 | x >= *y
 2 | x not in *y
   |          ^^ Syntax Error: Starred expression cannot be used here
-3 | 
+3 |
 4 | *x < y
   |
 
 
   |
 2 | x not in *y
-3 | 
+3 |
 4 | *x < y
   |  ^^^^^ Syntax Error: Comparison expression cannot be used here
 5 | *x is not y

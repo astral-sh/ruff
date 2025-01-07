@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
-snapshot_kind: text
 ---
 custom.py:3:8: ICN001 `altair` should be imported as `alt`
   |
 1 | import math  # not checked
-2 | 
+2 |
 3 | import altair  # unconventional
   |        ^^^^^^ ICN001
 4 | import dask.array  # unconventional
@@ -149,7 +148,7 @@ custom.py:16:8: ICN001 `pyarrow` should be imported as `pa`
 15 | import polars  # unconventional
 16 | import pyarrow  # unconventional
    |        ^^^^^^^ ICN001
-17 | 
+17 |
 18 | import altair as altr  # unconventional
    |
    = help: Alias `pyarrow` to `pa`
@@ -157,7 +156,7 @@ custom.py:16:8: ICN001 `pyarrow` should be imported as `pa`
 custom.py:18:18: ICN001 `altair` should be imported as `alt`
    |
 16 | import pyarrow  # unconventional
-17 | 
+17 |
 18 | import altair as altr  # unconventional
    |                  ^^^^ ICN001
 19 | import matplotlib.pyplot as plot  # unconventional
@@ -301,7 +300,7 @@ custom.py:31:19: ICN001 `pyarrow` should be imported as `pa`
 30 | import polars as ps # unconventional
 31 | import pyarrow as arr  # unconventional
    |                   ^^^ ICN001
-32 | 
+32 |
 33 | import altair as alt  # conventional
    |
    = help: Alias `pyarrow` to `pa`

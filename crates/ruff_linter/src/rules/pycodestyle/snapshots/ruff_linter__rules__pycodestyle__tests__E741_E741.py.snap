@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E741.py:3:1: E741 Ambiguous variable name: `l`
   |
 1 | from contextlib import contextmanager
-2 | 
+2 |
 3 | l = 0
   | ^ E741
 4 | I = 0
@@ -36,14 +35,14 @@ E741.py:6:1: E741 Ambiguous variable name: `l`
 5 | O = 0
 6 | l: int = 0
   | ^ E741
-7 | 
+7 |
 8 | a, l = 0, 1
   |
 
 E741.py:8:4: E741 Ambiguous variable name: `l`
    |
  6 | l: int = 0
- 7 | 
+ 7 |
  8 | a, l = 0, 1
    |    ^ E741
  9 | [a, l] = 0, 1
@@ -74,14 +73,14 @@ E741.py:11:5: E741 Ambiguous variable name: `l`
 10 | a, *l = 0, 1, 2
 11 | a = l = 0
    |     ^ E741
-12 | 
+12 |
 13 | o = 0
    |
 
 E741.py:16:5: E741 Ambiguous variable name: `l`
    |
 14 | i = 0
-15 | 
+15 |
 16 | for l in range(3):
    |     ^ E741
 17 |     pass
@@ -115,7 +114,7 @@ E741.py:30:5: E741 Ambiguous variable name: `l`
 29 | def f2():
 30 |     l = 0
    |     ^ E741
-31 | 
+31 |
 32 |     def f3():
    |
 
@@ -133,7 +132,7 @@ E741.py:34:9: E741 Ambiguous variable name: `l`
 33 |         nonlocal l
 34 |         l = 1
    |         ^ E741
-35 | 
+35 |
 36 |     f3()
    |
 
@@ -205,7 +204,7 @@ E741.py:71:22: E741 Ambiguous variable name: `l`
 E741.py:74:5: E741 Ambiguous variable name: `l`
    |
 72 |     pass
-73 | 
+73 |
 74 | if (l := 5) > 0:
    |     ^ E741
 75 |     pass

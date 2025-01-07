@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
-snapshot_kind: text
 ---
 LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
@@ -27,7 +26,7 @@ LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
 11 | getLogger(__file__)
 12 | logging.getLogger(name=__file__)
    |                        ^^^^^^^^ LOG002
-13 | 
+13 |
 14 | logging.getLogger(__cached__)
    |
    = help: Replace with `__name__`
@@ -45,7 +44,7 @@ LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
 LOG002.py:14:19: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
 12 | logging.getLogger(name=__file__)
-13 | 
+13 |
 14 | logging.getLogger(__cached__)
    |                   ^^^^^^^^^^ LOG002
 15 | getLogger(name=__cached__)

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/invalid_augmented_assignment_target.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -1278,7 +1277,7 @@ Module(
 
   |
 2 | # assignment targets.
-3 | 
+3 |
 4 | x or y += 42
   | ^^^^^^ Syntax Error: Invalid augmented assignment target
 5 | (x := 5) += 42
@@ -1439,14 +1438,14 @@ Module(
 19 | a < b < c += 42
 20 | foo() += 42
    | ^^^^^ Syntax Error: Invalid augmented assignment target
-21 | 
+21 |
 22 | f"{quux}" += 42
    |
 
 
    |
 20 | foo() += 42
-21 | 
+21 |
 22 | f"{quux}" += 42
    | ^^^^^^^^^ Syntax Error: Invalid augmented assignment target
 23 | f"{foo} and {bar}" += 42
@@ -1457,14 +1456,14 @@ Module(
 22 | f"{quux}" += 42
 23 | f"{foo} and {bar}" += 42
    | ^^^^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
-24 | 
+24 |
 25 | "foo" += 42
    |
 
 
    |
 23 | f"{foo} and {bar}" += 42
-24 | 
+24 |
 25 | "foo" += 42
    | ^^^^^ Syntax Error: Invalid augmented assignment target
 26 | b"foo" += 42

@@ -123,7 +123,7 @@ RUF039.py:13:9: RUF039 First argument to `re.subn()` is not raw bytes literal
 12 | re.sub(u'''nicode''', u"f(?i)rst")
 13 | re.subn(b"""ytes are""", f"\u006e")
    |         ^^^^^^^^^^^^^^^ RUF039
-14 | 
+14 |
 15 | regex.compile('single free-spacing', flags=regex.X)
    |
    = help: Replace with raw bytes literal
@@ -131,7 +131,7 @@ RUF039.py:13:9: RUF039 First argument to `re.subn()` is not raw bytes literal
 RUF039.py:15:15: RUF039 [*] First argument to `regex.compile()` is not raw string
    |
 13 | re.subn(b"""ytes are""", f"\u006e")
-14 | 
+14 |
 15 | regex.compile('single free-spacing', flags=regex.X)
    |               ^^^^^^^^^^^^^^^^^^^^^ RUF039
 16 | regex.findall('si\ngle')
@@ -250,7 +250,7 @@ RUF039.py:23:12: RUF039 First argument to `regex.subn()` is not raw bytes litera
 22 | regex.sub(u'''nicode''', u"f(?i)rst")
 23 | regex.subn(b"""ytes are""", f"\u006e")
    |            ^^^^^^^^^^^^^^^ RUF039
-24 | 
+24 |
 25 | regex.template("""(?m)
    |
    = help: Replace with raw bytes literal
@@ -258,7 +258,7 @@ RUF039.py:23:12: RUF039 First argument to `regex.subn()` is not raw bytes litera
 RUF039.py:25:16: RUF039 [*] First argument to `regex.template()` is not raw string
    |
 23 |   regex.subn(b"""ytes are""", f"\u006e")
-24 |   
+24 |
 25 |   regex.template("""(?m)
    |  ________________^
 26 | |     (?:ulti)?

@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-assertion_line: 82
-snapshot_kind: text
 ---
 RUF012.py:9:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
  7 |     }
- 8 | 
+ 8 |
  9 |     mutable_default: list[int] = []
    |                                  ^^ RUF012
 10 |     immutable_annotation: Sequence[int] = []
@@ -39,6 +37,6 @@ RUF012.py:89:38: RUF012 Mutable class attributes should be annotated with `typin
 88 |         id: int
 89 |         mutable_default: list[int] = []
    |                                      ^^ RUF012
-90 | 
+90 |
 91 | from sqlmodel import SQLModel
    |

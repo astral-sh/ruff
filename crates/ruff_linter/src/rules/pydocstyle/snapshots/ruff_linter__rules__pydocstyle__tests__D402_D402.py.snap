@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D402.py:2:5: D402 First line should not be the function's signature
   |
 1 | def foo():
 2 |     """Returns foo()."""
   |     ^^^^^^^^^^^^^^^^^^^^ D402
-3 | 
+3 |
 4 | def foo():
   |
 

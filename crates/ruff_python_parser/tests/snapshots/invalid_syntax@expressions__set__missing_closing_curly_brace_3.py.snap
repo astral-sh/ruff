@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_closing_curly_brace_3.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -74,10 +73,10 @@ Module(
 
   |
 2 | # token starts a statement.
-3 | 
+3 |
 4 | {1, 2
   |      ^ Syntax Error: Expected '}', found newline
-5 | 
+5 |
 6 | def foo():
 7 |     pass
   |
