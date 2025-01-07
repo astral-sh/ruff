@@ -10,7 +10,7 @@ your [preferred package manager](installation.md):
 
 ```console
 $ # With uv.
-$ uv tool install ruff
+$ uv tool install ruff@latest
 
 $ # With pip.
 $ pip install ruff

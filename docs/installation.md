@@ -3,8 +3,8 @@
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/):
 
 ```console
-$ # With uv.
-$ uv tool install ruff
+$ uv tool install ruff@latest  # Install Ruff globally.
+$ uv add --dev ruff            # Or add Ruff to your project.
 
 $ # With pip.
 $ pip install ruff
