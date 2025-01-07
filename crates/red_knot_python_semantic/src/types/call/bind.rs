@@ -127,7 +127,6 @@ pub(crate) struct CallBinding<'db> {
     parameter_tys: Box<[Type<'db>]>,
 
     /// Call binding errors, if any.
-    // TODO use SmallVec once variance bug is fixed
     errors: Vec<CallBindingError<'db>>,
 }
 
