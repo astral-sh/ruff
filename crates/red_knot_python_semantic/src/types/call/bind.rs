@@ -44,8 +44,8 @@ pub(crate) fn bind_call<'db>(
                     .or_else(|| parameters.keyword_variadic())
                 else {
                     errors.push(CallBindingError::UnknownArgument {
-                        unknown_name: name.clone(),
-                        unknown_argument_index: argument_index,
+                        argument_name: name.clone(),
+                        argument_index,
                     });
                     continue;
                 };
@@ -236,8 +236,8 @@ pub(crate) enum CallBindingError<'db> {
     MissingArguments { parameters: ParameterContexts },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
-        unknown_name: ast::name::Name,
-        unknown_argument_index: usize,
+        argument_name: ast::name::Name,
+        argument_index: usize,
     },
     /// More positional arguments are provided in the call than can be handled by the signature.
     TooManyPositionalArguments {
@@ -313,13 +313,13 @@ impl<'db> CallBindingError<'db> {
             }
 
             Self::UnknownArgument {
-                unknown_name,
-                unknown_argument_index,
+                argument_name,
+                argument_index,
             } => {
                 context.report_lint(
                     &UNKNOWN_ARGUMENT,
-                    Self::get_node(node, *unknown_argument_index),
-                    format_args!("Argument `{unknown_name}` does not match any known parameter"),
+                    Self::get_node(node, *argument_index),
+                    format_args!("Argument `{argument_name}` does not match any known parameter"),
                 );
             }
 
