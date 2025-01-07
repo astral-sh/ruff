@@ -57,14 +57,15 @@ pub(crate) fn bind_call<'db>(
                 continue;
             }
         };
-        let expected_ty = parameter.annotated_ty();
-        if !argument_ty.is_assignable_to(db, expected_ty) {
-            errors.push(CallBindingError::InvalidArgumentType {
-                parameter: ParameterContext::new(parameter, index),
-                argument_index,
-                expected_ty,
-                provided_ty: *argument_ty,
-            });
+        if let Some(expected_ty) = parameter.annotated_ty() {
+            if !argument_ty.is_assignable_to(db, expected_ty) {
+                errors.push(CallBindingError::InvalidArgumentType {
+                    parameter: ParameterContext::new(parameter, index),
+                    argument_index,
+                    expected_ty,
+                    provided_ty: *argument_ty,
+                });
+            }
         }
         if let Some(existing) = parameter_tys[index].replace(*argument_ty) {
             if parameter.is_variadic() {
@@ -105,7 +106,7 @@ pub(crate) fn bind_call<'db>(
 
     CallBinding {
         callable_ty,
-        return_ty: signature.return_ty,
+        return_ty: signature.return_ty.unwrap_or(Type::Unknown),
         parameter_tys: parameter_tys
             .into_iter()
             .map(|opt_ty| opt_ty.unwrap_or(Type::Unknown))

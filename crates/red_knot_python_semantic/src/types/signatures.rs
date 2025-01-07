@@ -14,8 +14,8 @@ pub(crate) struct Signature<'db> {
     /// must come after parameters without defaults.
     parameters: Parameters<'db>,
 
-    /// Annotated return type (Unknown if no annotation.)
-    pub(crate) return_ty: Type<'db>,
+    /// Annotated return type, if any.
+    pub(crate) return_ty: Option<Type<'db>>,
 }
 
 impl<'db> Signature<'db> {
@@ -23,7 +23,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn todo() -> Self {
         Self {
             parameters: Parameters::todo(),
-            return_ty: todo_type!("return type"),
+            return_ty: Some(todo_type!("return type")),
         }
     }
 
@@ -33,17 +33,13 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &'db ast::StmtFunctionDef,
     ) -> Self {
-        let return_ty = function_node
-            .returns
-            .as_ref()
-            .map(|returns| {
-                if function_node.is_async {
-                    todo_type!("generic types.CoroutineType")
-                } else {
-                    definition_expression_ty(db, definition, returns.as_ref())
-                }
-            })
-            .unwrap_or(Type::Unknown);
+        let return_ty = function_node.returns.as_ref().map(|returns| {
+            if function_node.is_async {
+                todo_type!("generic types.CoroutineType")
+            } else {
+                definition_expression_ty(db, definition, returns.as_ref())
+            }
+        });
 
         Self {
             parameters: Parameters::from_parameters(
@@ -71,11 +67,11 @@ impl<'db> Parameters<'db> {
         Self(vec![
             Parameter::Variadic(Param {
                 name: Some(Name::new_static("args")),
-                annotated_ty: todo_type!("todo signature *args"),
+                annotated_ty: Some(todo_type!("todo signature *args")),
             }),
             Parameter::Keywords(Param {
                 name: Some(Name::new_static("kwargs")),
-                annotated_ty: todo_type!("todo signature **kwargs"),
+                annotated_ty: Some(todo_type!("todo signature **kwargs")),
             }),
         ])
     }
@@ -245,8 +241,8 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    /// Annotated type of the parameter.
-    pub(crate) fn annotated_ty(&self) -> Type<'db> {
+    /// Annotated type of the parameter, if annotated.
+    pub(crate) fn annotated_ty(&self) -> Option<Type<'db>> {
         self.param().annotated_ty
     }
 
@@ -319,8 +315,8 @@ pub(crate) struct Param<'db> {
     /// nameless (e.g. via `Callable` annotations).
     name: Option<Name>,
 
-    /// Annotated type of the parameter (Unknown if no annotation.)
-    annotated_ty: Type<'db>,
+    /// Annotated type of the parameter.
+    annotated_ty: Option<Type<'db>>,
 }
 
 impl<'db> Param<'db> {
@@ -334,8 +330,7 @@ impl<'db> Param<'db> {
             annotated_ty: parameter
                 .annotation
                 .as_deref()
-                .map(|annotation| definition_expression_ty(db, definition, annotation))
-                .unwrap_or(Type::Unknown),
+                .map(|annotation| definition_expression_ty(db, definition, annotation)),
         }
     }
 }
@@ -368,7 +363,7 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        assert_eq!(sig.return_ty.display(&db).to_string(), "Unknown");
+        assert!(sig.return_ty.is_none());
         assert_params(&sig, &[]);
     }
 
@@ -389,73 +384,73 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        assert_eq!(sig.return_ty.display(&db).to_string(), "bytes");
+        assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
         assert_params(
             &sig,
             &[
                 Parameter::PositionalOnly(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("a")),
-                        annotated_ty: Type::Unknown,
+                        annotated_ty: None,
                     },
                     default_ty: None,
                 }),
                 Parameter::PositionalOnly(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("b")),
-                        annotated_ty: KnownClass::Int.to_instance(&db),
+                        annotated_ty: Some(KnownClass::Int.to_instance(&db)),
                     },
                     default_ty: None,
                 }),
                 Parameter::PositionalOnly(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("c")),
-                        annotated_ty: Type::Unknown,
+                        annotated_ty: None,
                     },
                     default_ty: Some(Type::IntLiteral(1)),
                 }),
                 Parameter::PositionalOnly(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("d")),
-                        annotated_ty: KnownClass::Int.to_instance(&db),
+                        annotated_ty: Some(KnownClass::Int.to_instance(&db)),
                     },
                     default_ty: Some(Type::IntLiteral(2)),
                 }),
                 Parameter::PositionalOrKeyword(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("e")),
-                        annotated_ty: Type::Unknown,
+                        annotated_ty: None,
                     },
                     default_ty: Some(Type::IntLiteral(3)),
                 }),
                 Parameter::PositionalOrKeyword(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("f")),
-                        annotated_ty: Type::IntLiteral(4),
+                        annotated_ty: Some(Type::IntLiteral(4)),
                     },
                     default_ty: Some(Type::IntLiteral(4)),
                 }),
                 Parameter::Variadic(Param {
                     name: Some(Name::new_static("args")),
-                    annotated_ty: KnownClass::Object.to_instance(&db),
+                    annotated_ty: Some(KnownClass::Object.to_instance(&db)),
                 }),
                 Parameter::KeywordOnly(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("g")),
-                        annotated_ty: Type::Unknown,
+                        annotated_ty: None,
                     },
                     default_ty: Some(Type::IntLiteral(5)),
                 }),
                 Parameter::KeywordOnly(ParamWithDefault {
                     param: Param {
                         name: Some(Name::new_static("h")),
-                        annotated_ty: Type::IntLiteral(6),
+                        annotated_ty: Some(Type::IntLiteral(6)),
                     },
                     default_ty: Some(Type::IntLiteral(6)),
                 }),
                 Parameter::Keywords(Param {
                     name: Some(Name::new_static("kwargs")),
-                    annotated_ty: KnownClass::Str.to_instance(&db),
+                    annotated_ty: Some(KnownClass::Str.to_instance(&db)),
                 }),
             ],
         );
@@ -495,7 +490,7 @@ mod tests {
         };
         assert_eq!(name, "a");
         // Parameter resolution not deferred; we should see A not B
-        assert_eq!(annotated_ty.display(&db).to_string(), "A");
+        assert_eq!(annotated_ty.unwrap().display(&db).to_string(), "A");
     }
 
     #[test]
@@ -532,7 +527,7 @@ mod tests {
         };
         assert_eq!(name, "a");
         // Parameter resolution deferred; we should see B
-        assert_eq!(annotated_ty.display(&db).to_string(), "B");
+        assert_eq!(annotated_ty.unwrap().display(&db).to_string(), "B");
     }
 
     #[test]
@@ -577,8 +572,8 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         // TODO resolution should not be deferred; we should see A not B
-        assert_eq!(a_annotated_ty.display(&db).to_string(), "B");
-        assert_eq!(b_annotated_ty.display(&db).to_string(), "T");
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "B");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
 
     #[test]
@@ -623,8 +618,8 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         // Parameter resolution deferred; we should see B
-        assert_eq!(a_annotated_ty.display(&db).to_string(), "B");
-        assert_eq!(b_annotated_ty.display(&db).to_string(), "T");
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "B");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
 
     #[test]
