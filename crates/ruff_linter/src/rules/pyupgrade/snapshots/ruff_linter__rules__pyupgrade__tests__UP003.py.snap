@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP003.py:1:1: UP003 [*] Use `str` instead of `type(...)`
   |
@@ -82,7 +81,7 @@ UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
 4 | type(0.0)
 5 | type(0j)
   | ^^^^^^^^ UP003
-6 | 
+6 |
 7 | # OK
   |
   = help: Replace `type(...)` with `complex`

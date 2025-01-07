@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
-snapshot_kind: text
 ---
 ASYNC22x.py:8:5: ASYNC221 Async functions should not run processes with blocking methods
   |
@@ -32,14 +31,14 @@ ASYNC22x.py:32:5: ASYNC221 Async functions should not run processes with blockin
 31 |     subprocess.Popen()  # ASYNC220
 32 |     os.system()  # ASYNC221
    |     ^^^^^^^^^ ASYNC221
-33 | 
+33 |
 34 |     system()
    |
 
 ASYNC22x.py:38:5: ASYNC221 Async functions should not run processes with blocking methods
    |
 36 |     os.anything()
-37 | 
+37 |
 38 |     subprocess.run()  # ASYNC221
    |     ^^^^^^^^^^^^^^ ASYNC221
 39 |     subprocess.call()  # ASYNC221
@@ -90,7 +89,7 @@ ASYNC22x.py:43:5: ASYNC221 Async functions should not run processes with blockin
 42 |     subprocess.getoutput()  # ASYNC221
 43 |     subprocess.getstatusoutput()  # ASYNC221
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC221
-44 | 
+44 |
 45 |     await async_fun(
    |
 
@@ -105,7 +104,7 @@ ASYNC22x.py:46:9: ASYNC221 Async functions should not run processes with blockin
 ASYNC22x.py:54:5: ASYNC221 Async functions should not run processes with blocking methods
    |
 52 |     subprocess()
-53 | 
+53 |
 54 |     os.posix_spawn()  # ASYNC221
    |     ^^^^^^^^^^^^^^ ASYNC221
 55 |     os.posix_spawnp()  # ASYNC221
@@ -116,14 +115,14 @@ ASYNC22x.py:55:5: ASYNC221 Async functions should not run processes with blockin
 54 |     os.posix_spawn()  # ASYNC221
 55 |     os.posix_spawnp()  # ASYNC221
    |     ^^^^^^^^^^^^^^^ ASYNC221
-56 | 
+56 |
 57 |     os.spawn()
    |
 
 ASYNC22x.py:61:5: ASYNC221 Async functions should not run processes with blocking methods
    |
 59 |     os.spawnllll()
-60 | 
+60 |
 61 |     os.spawnl()  # ASYNC221
    |     ^^^^^^^^^ ASYNC221
 62 |     os.spawnle()  # ASYNC221
@@ -194,7 +193,7 @@ ASYNC22x.py:68:5: ASYNC221 Async functions should not run processes with blockin
 67 |     os.spawnvp()  # ASYNC221
 68 |     os.spawnvpe()  # ASYNC221
    |     ^^^^^^^^^^^ ASYNC221
-69 | 
+69 |
 70 |     P_NOWAIT = os.P_NOWAIT
    |
 
@@ -222,6 +221,6 @@ ASYNC22x.py:83:5: ASYNC221 Async functions should not run processes with blockin
 82 |     os.spawnl(mode=os.P_WAIT)  # ASYNC221
 83 |     os.spawnl(mode=P_WAIT)  # ASYNC221
    |     ^^^^^^^^^ ASYNC221
-84 | 
+84 |
 85 |     # other weird cases: ASYNC220
    |

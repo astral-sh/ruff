@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF027_0.py:5:7: RUF027 [*] Possible f-string without an `f` prefix
   |
 3 | "always ignore this: {val}"
-4 | 
+4 |
 5 | print("but don't ignore this: {val}")  # RUF027
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
   |
@@ -286,7 +285,7 @@ RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
 69 |     last = "Appleseed"
 70 |     value.method("{first} {last}")  # RUF027
    |                  ^^^^^^^^^^^^^^^^ RUF027
-71 | 
+71 |
 72 | def format_specifiers():
    |
    = help: Add `f` prefix

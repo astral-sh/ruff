@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
-snapshot_kind: text
 ---
 PTH203.py:5:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
   |
 3 | from os.path import getatime
-4 | 
+4 |
 5 | os.path.getatime("filename")
   | ^^^^^^^^^^^^^^^^ PTH203
 6 | os.path.getatime(b"filename")

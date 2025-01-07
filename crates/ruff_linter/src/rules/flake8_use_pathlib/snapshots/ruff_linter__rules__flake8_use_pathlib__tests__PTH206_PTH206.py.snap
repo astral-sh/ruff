@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
-snapshot_kind: text
 ---
 PTH206.py:8:12: PTH206 Replace `.split(os.sep)` with `Path.parts`
    |
@@ -96,6 +95,6 @@ PTH206.py:17:30: PTH206 Replace `.split(os.sep)` with `Path.parts`
 16 | file_name.split(os.sep)
 17 | (os.path.abspath(file_name)).split(os.sep)
    |                              ^^^^^ PTH206
-18 | 
+18 |
 19 | # OK
    |

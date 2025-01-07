@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
-snapshot_kind: text
 ---
 LOG001.py:3:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
   |
 1 | import logging
-2 | 
+2 |
 3 | logging.Logger(__name__)
   | ^^^^^^^^^^^^^^ LOG001
 4 | logging.Logger()

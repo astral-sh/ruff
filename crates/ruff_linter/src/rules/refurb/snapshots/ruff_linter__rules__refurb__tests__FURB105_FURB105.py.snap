@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB105.py:3:1: FURB105 [*] Unnecessary empty string passed to `print`
   |
 1 | # Errors.
-2 | 
+2 |
 3 | print("")
   | ^^^^^^^^^ FURB105
 4 | print("", sep=",")
@@ -362,7 +361,7 @@ FURB105.py:21:1: FURB105 [*] Unnecessary separator passed to `print`
 20 | print(sep="\t")
 21 | print(sep=print(1))
    | ^^^^^^^^^^^^^^^^^^^ FURB105
-22 | 
+22 |
 23 | # OK.
    |
    = help: Remove separator

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F821_3.py:11:10: F821 Undefined name `key`
    |
@@ -8,7 +7,7 @@ F821_3.py:11:10: F821 Undefined name `key`
 10 | # F821 Undefined name `value`
 11 | x: dict["key", "value"]
    |          ^^^ F821
-12 | 
+12 |
 13 | # OK
    |
 
@@ -18,6 +17,6 @@ F821_3.py:11:17: F821 Undefined name `value`
 10 | # F821 Undefined name `value`
 11 | x: dict["key", "value"]
    |                 ^^^^^ F821
-12 | 
+12 |
 13 | # OK
    |

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/function_type_parameters.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -324,57 +323,57 @@ Module(
 
    |
  9 | # on following lines.
-10 | 
+10 |
 11 | def keyword[A, await](): ...
    |                ^^^^^ Syntax Error: Expected an identifier, but found a keyword 'await' that cannot be used here
-12 | 
+12 |
 13 | def not_a_type_param[A, |, B](): ...
    |
 
 
    |
 11 | def keyword[A, await](): ...
-12 | 
+12 |
 13 | def not_a_type_param[A, |, B](): ...
    |                         ^ Syntax Error: Expected ',', found '|'
-14 | 
+14 |
 15 | def multiple_commas[A,,B](): ...
    |
 
 
    |
 11 | def keyword[A, await](): ...
-12 | 
+12 |
 13 | def not_a_type_param[A, |, B](): ...
    |                          ^ Syntax Error: Expected a type parameter or the end of the type parameter list
-14 | 
+14 |
 15 | def multiple_commas[A,,B](): ...
    |
 
 
    |
 13 | def not_a_type_param[A, |, B](): ...
-14 | 
+14 |
 15 | def multiple_commas[A,,B](): ...
    |                       ^ Syntax Error: Expected a type parameter or the end of the type parameter list
-16 | 
+16 |
 17 | def multiple_trailing_commas[A,,](): ...
    |
 
 
    |
 15 | def multiple_commas[A,,B](): ...
-16 | 
+16 |
 17 | def multiple_trailing_commas[A,,](): ...
    |                                ^ Syntax Error: Expected a type parameter or the end of the type parameter list
-18 | 
+18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
    |
 
 
    |
 17 | def multiple_trailing_commas[A,,](): ...
-18 | 
+18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
    |                                    ^ Syntax Error: Expected a type parameter or the end of the type parameter list
    |
@@ -382,7 +381,7 @@ Module(
 
    |
 17 | def multiple_trailing_commas[A,,](): ...
-18 | 
+18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
    |                                     ^^^ Syntax Error: Expected ']', found int
    |
@@ -390,7 +389,7 @@ Module(
 
    |
 17 | def multiple_trailing_commas[A,,](): ...
-18 | 
+18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
    |                                        ^ Syntax Error: Expected newline, found ']'
    |
@@ -398,7 +397,7 @@ Module(
 
    |
 17 | def multiple_trailing_commas[A,,](): ...
-18 | 
+18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
    |                                         ^^ Syntax Error: Only single target (not tuple) can be annotated
    |

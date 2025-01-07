@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB152.py:3:5: FURB152 [*] Replace `3.14` with `math.pi`
   |
 1 | r = 3.1  # OK
-2 | 
+2 |
 3 | A = 3.14 * r ** 2  # FURB152
   |     ^^^^ FURB152
-4 | 
+4 |
 5 | C = 6.28 * r  # FURB152
   |
   = help: Use `math.pi`
@@ -26,10 +25,10 @@ FURB152.py:3:5: FURB152 [*] Replace `3.14` with `math.pi`
 FURB152.py:5:5: FURB152 [*] Replace `6.28` with `math.tau`
   |
 3 | A = 3.14 * r ** 2  # FURB152
-4 | 
+4 |
 5 | C = 6.28 * r  # FURB152
   |     ^^^^ FURB152
-6 | 
+6 |
 7 | e = 2.71  # FURB152
   |
   = help: Use `math.tau`
@@ -49,10 +48,10 @@ FURB152.py:5:5: FURB152 [*] Replace `6.28` with `math.tau`
 FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
   |
 5 | C = 6.28 * r  # FURB152
-6 | 
+6 |
 7 | e = 2.71  # FURB152
   |     ^^^^ FURB152
-8 | 
+8 |
 9 | r = 3.15  # OK
   |
   = help: Use `math.e`
@@ -74,10 +73,10 @@ FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
 FURB152.py:11:5: FURB152 [*] Replace `3.141` with `math.pi`
    |
  9 | r = 3.15  # OK
-10 | 
+10 |
 11 | r = 3.141  # FURB152
    |     ^^^^^ FURB152
-12 | 
+12 |
 13 | r = 3.142  # FURB152
    |
    = help: Use `math.pi`
@@ -100,10 +99,10 @@ FURB152.py:11:5: FURB152 [*] Replace `3.141` with `math.pi`
 FURB152.py:13:5: FURB152 [*] Replace `3.142` with `math.pi`
    |
 11 | r = 3.141  # FURB152
-12 | 
+12 |
 13 | r = 3.142  # FURB152
    |     ^^^^^ FURB152
-14 | 
+14 |
 15 | r = 3.1415  # FURB152
    |
    = help: Use `math.pi`
@@ -126,10 +125,10 @@ FURB152.py:13:5: FURB152 [*] Replace `3.142` with `math.pi`
 FURB152.py:15:5: FURB152 [*] Replace `3.1415` with `math.pi`
    |
 13 | r = 3.142  # FURB152
-14 | 
+14 |
 15 | r = 3.1415  # FURB152
    |     ^^^^^^ FURB152
-16 | 
+16 |
 17 | r = 3.1416  # FURB152
    |
    = help: Use `math.pi`
@@ -152,10 +151,10 @@ FURB152.py:15:5: FURB152 [*] Replace `3.1415` with `math.pi`
 FURB152.py:17:5: FURB152 [*] Replace `3.1416` with `math.pi`
    |
 15 | r = 3.1415  # FURB152
-16 | 
+16 |
 17 | r = 3.1416  # FURB152
    |     ^^^^^^ FURB152
-18 | 
+18 |
 19 | r = 3.141592  # FURB152
    |
    = help: Use `math.pi`
@@ -178,10 +177,10 @@ FURB152.py:17:5: FURB152 [*] Replace `3.1416` with `math.pi`
 FURB152.py:19:5: FURB152 [*] Replace `3.141592` with `math.pi`
    |
 17 | r = 3.1416  # FURB152
-18 | 
+18 |
 19 | r = 3.141592  # FURB152
    |     ^^^^^^^^ FURB152
-20 | 
+20 |
 21 | r = 3.141593  # FURB152
    |
    = help: Use `math.pi`
@@ -204,10 +203,10 @@ FURB152.py:19:5: FURB152 [*] Replace `3.141592` with `math.pi`
 FURB152.py:21:5: FURB152 [*] Replace `3.141593` with `math.pi`
    |
 19 | r = 3.141592  # FURB152
-20 | 
+20 |
 21 | r = 3.141593  # FURB152
    |     ^^^^^^^^ FURB152
-22 | 
+22 |
 23 | r = 3.14159265  # FURB152
    |
    = help: Use `math.pi`
@@ -230,10 +229,10 @@ FURB152.py:21:5: FURB152 [*] Replace `3.141593` with `math.pi`
 FURB152.py:23:5: FURB152 [*] Replace `3.14159265` with `math.pi`
    |
 21 | r = 3.141593  # FURB152
-22 | 
+22 |
 23 | r = 3.14159265  # FURB152
    |     ^^^^^^^^^^ FURB152
-24 | 
+24 |
 25 | r = 3.141592653589793238462643383279  # FURB152
    |
    = help: Use `math.pi`
@@ -256,10 +255,10 @@ FURB152.py:23:5: FURB152 [*] Replace `3.14159265` with `math.pi`
 FURB152.py:25:5: FURB152 [*] Replace `3.141592653589793238462643383279` with `math.pi`
    |
 23 | r = 3.14159265  # FURB152
-24 | 
+24 |
 25 | r = 3.141592653589793238462643383279  # FURB152
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB152
-26 | 
+26 |
 27 | r = 3.14159266  # OK
    |
    = help: Use `math.pi`
@@ -282,10 +281,10 @@ FURB152.py:25:5: FURB152 [*] Replace `3.141592653589793238462643383279` with `ma
 FURB152.py:31:5: FURB152 [*] Replace `2.718` with `math.e`
    |
 29 | e = 2.7 # OK
-30 | 
+30 |
 31 | e = 2.718  # FURB152
    |     ^^^^^ FURB152
-32 | 
+32 |
 33 | e = 2.7182  # FURB152
    |
    = help: Use `math.e`
@@ -308,10 +307,10 @@ FURB152.py:31:5: FURB152 [*] Replace `2.718` with `math.e`
 FURB152.py:33:5: FURB152 [*] Replace `2.7182` with `math.e`
    |
 31 | e = 2.718  # FURB152
-32 | 
+32 |
 33 | e = 2.7182  # FURB152
    |     ^^^^^^ FURB152
-34 | 
+34 |
 35 | e = 2.7183  # FURB152
    |
    = help: Use `math.e`
@@ -334,10 +333,10 @@ FURB152.py:33:5: FURB152 [*] Replace `2.7182` with `math.e`
 FURB152.py:35:5: FURB152 [*] Replace `2.7183` with `math.e`
    |
 33 | e = 2.7182  # FURB152
-34 | 
+34 |
 35 | e = 2.7183  # FURB152
    |     ^^^^^^ FURB152
-36 | 
+36 |
 37 | e = 2.719  # OK
    |
    = help: Use `math.e`
@@ -360,7 +359,7 @@ FURB152.py:35:5: FURB152 [*] Replace `2.7183` with `math.e`
 FURB152.py:45:5: FURB152 [*] Replace `2.7182000000000001` with `math.e`
    |
 43 | e = 2.718200000000001  # OK
-44 | 
+44 |
 45 | e = 2.7182000000000001  # FURB152
    |     ^^^^^^^^^^^^^^^^^^ FURB152
    |

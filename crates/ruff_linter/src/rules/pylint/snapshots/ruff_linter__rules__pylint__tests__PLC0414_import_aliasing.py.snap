@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 import_aliasing.py:6:8: PLC0414 [*] Import alias does not rename original package
   |
 4 | # 2. consider-using-from-import
-5 | 
+5 |
 6 | import collections as collections  # [useless-import-alias]
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0414
 7 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]

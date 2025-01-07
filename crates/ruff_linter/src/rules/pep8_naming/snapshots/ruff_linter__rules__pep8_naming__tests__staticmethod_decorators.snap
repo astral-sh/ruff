@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N805.py:7:20: N805 [*] First argument of a method should be named `self`
   |
@@ -81,7 +80,7 @@ N805.py:34:15: N805 [*] First argument of a method should be named `self`
 N805.py:63:29: N805 [*] First argument of a method should be named `self`
    |
 61 |         pass
-62 | 
+62 |
 63 |     def bad_method_pos_only(this, blah, /, something: str):
    |                             ^^^^ N805
 64 |         pass
@@ -168,7 +167,7 @@ N805.py:98:26: N805 First argument of a method should be named `self`
 N805.py:101:35: N805 First argument of a method should be named `self`
     |
  99 |         pass
-100 | 
+100 |
 101 |     def self_as_pos_only_argument(this, self, /):
     |                                   ^^^^ N805
 102 |         pass
@@ -178,7 +177,7 @@ N805.py:101:35: N805 First argument of a method should be named `self`
 N805.py:104:34: N805 First argument of a method should be named `self`
     |
 102 |         pass
-103 | 
+103 |
 104 |     def self_as_kw_only_argument(this, *, self):
     |                                  ^^^^ N805
 105 |         pass
@@ -188,7 +187,7 @@ N805.py:104:34: N805 First argument of a method should be named `self`
 N805.py:107:24: N805 First argument of a method should be named `self`
     |
 105 |         pass
-106 | 
+106 |
 107 |     def self_as_varags(this, *self):
     |                        ^^^^ N805
 108 |         pass
@@ -198,7 +197,7 @@ N805.py:107:24: N805 First argument of a method should be named `self`
 N805.py:110:24: N805 First argument of a method should be named `self`
     |
 108 |         pass
-109 | 
+109 |
 110 |     def self_as_kwargs(this, **self):
     |                        ^^^^ N805
 111 |         pass
@@ -232,7 +231,7 @@ N805.py:115:20: N805 [*] First argument of a method should be named `self`
 N805.py:119:20: N805 [*] First argument of a method should be named `self`
     |
 117 |         this
-118 | 
+118 |
 119 |     def bad_method(this):
     |                    ^^^^ N805
 120 |         self = this

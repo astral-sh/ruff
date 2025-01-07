@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N806.py:12:5: N806 Variable `Camel` in function should be lowercase
    |
@@ -33,7 +32,7 @@ N806.py:46:5: N806 Variable `Bad` in function should be lowercase
 N806.py:53:5: N806 Variable `Bad` in function should be lowercase
    |
 51 |     from django.utils.module_loading import import_string
-52 | 
+52 |
 53 |     Bad = import_string("django.core.exceptions.ValidationError")  # N806
    |     ^^^ N806
 54 |     ValidationError = import_string("django.core.exceptions.ValidationError")  # OK
@@ -42,7 +41,7 @@ N806.py:53:5: N806 Variable `Bad` in function should be lowercase
 N806.py:56:5: N806 Variable `Bad` in function should be lowercase
    |
 54 |     ValidationError = import_string("django.core.exceptions.ValidationError")  # OK
-55 | 
+55 |
 56 |     Bad = apps.get_model()  # N806
    |     ^^^ N806
 57 |     Bad = apps.get_model(model_name="Stream")  # N806
@@ -53,7 +52,7 @@ N806.py:57:5: N806 Variable `Bad` in function should be lowercase
 56 |     Bad = apps.get_model()  # N806
 57 |     Bad = apps.get_model(model_name="Stream")  # N806
    |     ^^^ N806
-58 | 
+58 |
 59 |     Address: Type = apps.get_model("zerver", variable)  # OK
    |
 

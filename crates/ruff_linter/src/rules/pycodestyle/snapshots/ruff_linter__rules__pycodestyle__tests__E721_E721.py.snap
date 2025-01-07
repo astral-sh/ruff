@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E721.py:2:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
   |
@@ -145,14 +144,14 @@ E721.py:140:1: E721 Use `is` and `is not` for type comparisons, or `isinstance()
 139 | #: E721
 140 | dtype == float
     | ^^^^^^^^^^^^^^ E721
-141 | 
+141 |
 142 | import builtins
     |
 
 E721.py:144:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
     |
 142 | import builtins
-143 | 
+143 |
 144 | if builtins.type(res) == memoryview:  # E721
     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
 145 |     pass

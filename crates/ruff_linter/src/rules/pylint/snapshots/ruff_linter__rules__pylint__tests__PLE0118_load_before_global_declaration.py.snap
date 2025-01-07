@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 load_before_global_declaration.py:5:11: PLE0118 Name `x` is used prior to global declaration on line 7
   |
@@ -8,17 +7,17 @@ load_before_global_declaration.py:5:11: PLE0118 Name `x` is used prior to global
 4 | def f():
 5 |     print(x)
   |           ^ PLE0118
-6 | 
+6 |
 7 |     global x
   |
 
 load_before_global_declaration.py:15:11: PLE0118 Name `x` is used prior to global declaration on line 17
    |
 13 |     global x
-14 | 
+14 |
 15 |     print(x)
    |           ^ PLE0118
-16 | 
+16 |
 17 |     global x
    |
 
@@ -27,17 +26,17 @@ load_before_global_declaration.py:23:11: PLE0118 Name `x` is used prior to globa
 22 | def f():
 23 |     print(x)
    |           ^ PLE0118
-24 | 
+24 |
 25 |     global x, y
    |
 
 load_before_global_declaration.py:33:11: PLE0118 Name `x` is used prior to global declaration on line 35
    |
 31 |     global x, y
-32 | 
+32 |
 33 |     print(x)
    |           ^ PLE0118
-34 | 
+34 |
 35 |     global x, y
    |
 
@@ -46,17 +45,17 @@ load_before_global_declaration.py:41:5: PLE0118 Name `x` is used prior to global
 40 | def f():
 41 |     x = 1
    |     ^ PLE0118
-42 | 
+42 |
 43 |     global x
    |
 
 load_before_global_declaration.py:51:5: PLE0118 Name `x` is used prior to global declaration on line 53
    |
 49 |     global x
-50 | 
+50 |
 51 |     x = 1
    |     ^ PLE0118
-52 | 
+52 |
 53 |     global x
    |
 
@@ -65,17 +64,17 @@ load_before_global_declaration.py:59:9: PLE0118 Name `x` is used prior to global
 58 | def f():
 59 |     del x
    |         ^ PLE0118
-60 | 
+60 |
 61 |     global x, y
    |
 
 load_before_global_declaration.py:69:9: PLE0118 Name `x` is used prior to global declaration on line 71
    |
 67 |     global x, y
-68 | 
+68 |
 69 |     del x
    |         ^ PLE0118
-70 | 
+70 |
 71 |     global x, y
    |
 
@@ -84,17 +83,17 @@ load_before_global_declaration.py:77:9: PLE0118 Name `x` is used prior to global
 76 | def f():
 77 |     del x
    |         ^ PLE0118
-78 | 
+78 |
 79 |     global x
    |
 
 load_before_global_declaration.py:87:9: PLE0118 Name `x` is used prior to global declaration on line 89
    |
 85 |     global x
-86 | 
+86 |
 87 |     del x
    |         ^ PLE0118
-88 | 
+88 |
 89 |     global x
    |
 
@@ -103,17 +102,17 @@ load_before_global_declaration.py:95:9: PLE0118 Name `x` is used prior to global
 94 | def f():
 95 |     del x
    |         ^ PLE0118
-96 | 
+96 |
 97 |     global x, y
    |
 
 load_before_global_declaration.py:105:9: PLE0118 Name `x` is used prior to global declaration on line 107
     |
 103 |     global x, y
-104 | 
+104 |
 105 |     del x
     |         ^ PLE0118
-106 | 
+106 |
 107 |     global x, y
     |
 

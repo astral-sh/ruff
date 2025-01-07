@@ -234,7 +234,7 @@ PT006.py:74:39: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
    |
 74 | parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
    |                                       ^^^^^^^^^^^^^^^^^ PT006
-75 | 
+75 |
 76 | @parametrize
    |
    = help: Use a `tuple` for the first argument

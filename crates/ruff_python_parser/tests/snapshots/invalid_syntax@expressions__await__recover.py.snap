@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/await/recover.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -249,7 +248,7 @@ Module(
 4 | # Nested await
 5 | await await x
   |       ^^^^^^^ Syntax Error: Await expression cannot be used here
-6 | 
+6 |
 7 | # Starred expressions
   |
 
@@ -267,7 +266,7 @@ Module(
  8 | await *x
  9 | await (*x)
    |        ^^ Syntax Error: Starred expression cannot be used here
-10 | 
+10 |
 11 | # Invalid expression as per precedence
    |
 

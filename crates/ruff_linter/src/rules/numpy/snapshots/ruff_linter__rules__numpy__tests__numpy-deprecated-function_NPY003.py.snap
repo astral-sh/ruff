@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
-snapshot_kind: text
 ---
 NPY003.py:4:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
   |
 2 |     import numpy as np
-3 | 
+3 |
 4 |     np.round_(np.random.rand(5, 5), 2)
   |     ^^^^^^^^^ NPY003
 5 |     np.product(np.random.rand(5, 5))
@@ -106,7 +105,7 @@ NPY003.py:8:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
 NPY003.py:14:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
    |
 12 |     from numpy import round_, product, cumproduct, sometrue, alltrue
-13 | 
+13 |
 14 |     round_(np.random.rand(5, 5), 2)
    |     ^^^^^^ NPY003
 15 |     product(np.random.rand(5, 5))

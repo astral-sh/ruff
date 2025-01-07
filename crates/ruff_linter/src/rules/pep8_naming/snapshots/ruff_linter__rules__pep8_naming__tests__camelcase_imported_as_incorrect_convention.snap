@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N817.py:1:8: N817 CamelCase `CaMel` imported as acronym `CM`
   |
@@ -30,7 +29,7 @@ N817.py:7:23: N817 CamelCase `ElementTree` imported as acronym `ET`
 6 | import xml.etree.ElementTree as ET
 7 | from xml.etree import ElementTree as ET
   |                       ^^^^^^^^^^^^^^^^^ N817
-8 | 
+8 |
 9 | # Always an error (relative import)
   |
 

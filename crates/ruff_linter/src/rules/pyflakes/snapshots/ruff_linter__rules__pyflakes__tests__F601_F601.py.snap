@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F601.py:3:5: F601 Dictionary key literal `"a"` repeated
   |
@@ -246,7 +245,7 @@ F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
 F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
    |
 47 | }
-48 | 
+48 |
 49 | x = {"a": 1, "a": 1}
    |              ^^^ F601
 50 | x = {"a": 1, "b": 2, "a": 1}
@@ -268,7 +267,7 @@ F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
 49 | x = {"a": 1, "a": 1}
 50 | x = {"a": 1, "b": 2, "a": 1}
    |                      ^^^ F601
-51 | 
+51 |
 52 | x = {
    |
    = help: Remove repeated key literal `"a"`
@@ -298,7 +297,7 @@ F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
 58 | t={"x":"test123", "x":("test123")}
    |                   ^^^ F601
-59 | 
+59 |
 60 | t={"x":("test123"), "x":"test123"}
    |
    = help: Remove repeated key literal `"x"`
@@ -316,10 +315,10 @@ F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
 F601.py:60:21: F601 [*] Dictionary key literal `"x"` repeated
    |
 58 | t={"x":"test123", "x":("test123")}
-59 | 
+59 |
 60 | t={"x":("test123"), "x":"test123"}
    |                     ^^^ F601
-61 | 
+61 |
 62 | # Regression test for: https://github.com/astral-sh/ruff/issues/12772
    |
    = help: Remove repeated key literal `"x"`

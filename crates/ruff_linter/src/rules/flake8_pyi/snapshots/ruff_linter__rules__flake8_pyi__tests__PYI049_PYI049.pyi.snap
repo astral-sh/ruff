@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI049.pyi:6:7: PYI049 Private TypedDict `_UnusedTypedDict` is never used
   |
@@ -19,7 +18,7 @@ PYI049.pyi:10:7: PYI049 Private TypedDict `_UnusedTypedDict2` is never used
 PYI049.pyi:34:1: PYI049 Private TypedDict `_UnusedTypedDict3` is never used
    |
 32 |    bar: list[int]
-33 | 
+33 |
 34 | _UnusedTypedDict3 = TypedDict("_UnusedTypedDict3", {"foo": int})
    | ^^^^^^^^^^^^^^^^^ PYI049
 35 | _UsedTypedDict3 = TypedDict("_UsedTypedDict3", {"bar": bytes})

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 bad_dunder_method_name.py:5:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
   |
@@ -13,7 +12,7 @@ bad_dunder_method_name.py:5:9: PLW3201 Dunder method `_init_` has no special mea
 bad_dunder_method_name.py:8:9: PLW3201 Dunder method `__hello__` has no special meaning in Python 3
   |
 6 |         pass
-7 | 
+7 |
 8 |     def __hello__(self):  # [bad-dunder-name]
   |         ^^^^^^^^^ PLW3201
 9 |         print("hello")
@@ -22,7 +21,7 @@ bad_dunder_method_name.py:8:9: PLW3201 Dunder method `__hello__` has no special 
 bad_dunder_method_name.py:11:9: PLW3201 Dunder method `__init_` has no special meaning in Python 3
    |
  9 |         print("hello")
-10 | 
+10 |
 11 |     def __init_(self):  # [bad-dunder-name]
    |         ^^^^^^^ PLW3201
 12 |         # author likely unintentionally misspelled the correct init dunder.
@@ -32,7 +31,7 @@ bad_dunder_method_name.py:11:9: PLW3201 Dunder method `__init_` has no special m
 bad_dunder_method_name.py:15:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
    |
 13 |         pass
-14 | 
+14 |
 15 |     def _init_(self):  # [bad-dunder-name]
    |         ^^^^^^ PLW3201
 16 |         # author likely unintentionally misspelled the correct init dunder.
@@ -42,7 +41,7 @@ bad_dunder_method_name.py:15:9: PLW3201 Dunder method `_init_` has no special me
 bad_dunder_method_name.py:19:9: PLW3201 Dunder method `___neg__` has no special meaning in Python 3
    |
 17 |         pass
-18 | 
+18 |
 19 |     def ___neg__(self):  # [bad-dunder-name]
    |         ^^^^^^^^ PLW3201
 20 |         # author likely accidentally added an additional `_`
@@ -52,7 +51,7 @@ bad_dunder_method_name.py:19:9: PLW3201 Dunder method `___neg__` has no special 
 bad_dunder_method_name.py:23:9: PLW3201 Dunder method `__inv__` has no special meaning in Python 3
    |
 21 |         pass
-22 | 
+22 |
 23 |     def __inv__(self):  # [bad-dunder-name]
    |         ^^^^^^^ PLW3201
 24 |         # author likely meant to call the invert dunder method

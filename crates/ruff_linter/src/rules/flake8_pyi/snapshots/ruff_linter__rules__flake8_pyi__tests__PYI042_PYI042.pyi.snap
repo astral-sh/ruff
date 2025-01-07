@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI042.pyi:10:1: PYI042 Type alias `just_literals_pipe_union` should be CamelCase
    |
  8 | )
- 9 | 
+ 9 |
 10 | just_literals_pipe_union: TypeAlias = (
    | ^^^^^^^^^^^^^^^^^^^^^^^^ PYI042
 11 |     Literal[True] | Literal["idk"]
@@ -15,7 +14,7 @@ PYI042.pyi:10:1: PYI042 Type alias `just_literals_pipe_union` should be CamelCas
 PYI042.pyi:19:1: PYI042 Type alias `snake_case_alias1` should be CamelCase
    |
 17 | _PrivateAliasS2: TypeAlias = Annotated[str, "also okay"]
-18 | 
+18 |
 19 | snake_case_alias1: TypeAlias = str | int  # PYI042, since not camel case
    | ^^^^^^^^^^^^^^^^^ PYI042
 20 | _snake_case_alias2: TypeAlias = Literal["whatever"]  # PYI042, since not camel case

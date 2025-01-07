@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC008_typing_execution_context.py:13:20: TC008 [*] Remove quotes from type alias
    |
 11 |     Bar: TypeAlias = Foo[int]
-12 | 
+12 |
 13 |     a: TypeAlias = 'int'  # TC008
    |                    ^^^^^ TC008
 14 |     b: TypeAlias = 'Dict'  # TC008

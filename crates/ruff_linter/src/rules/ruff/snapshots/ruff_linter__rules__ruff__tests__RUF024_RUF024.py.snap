@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF024.py:9:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -133,7 +132,7 @@ RUF024.py:16:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 15 | import builtins
 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
-17 | 
+17 |
 18 | # Okay.
    |
    = help: Replace with comprehension

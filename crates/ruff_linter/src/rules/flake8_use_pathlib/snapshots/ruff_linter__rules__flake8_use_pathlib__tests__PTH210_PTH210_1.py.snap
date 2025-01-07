@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
-snapshot_kind: text
 ---
 PTH210_1.py:13:5: PTH210 Invalid suffix passed to `.with_suffix()`
    |
@@ -81,7 +80,7 @@ PTH210_1.py:17:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 16 |     p.with_suffix(u'' "json")
 17 |     p.with_suffix(suffix="js")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
-18 | 
+18 |
 19 |     ## No errors
    |
    = help: Add a leading dot
@@ -175,7 +174,7 @@ PTH210_1.py:35:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 34 |     p.with_suffix(u'' "json")
 35 |     p.with_suffix(suffix="js")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
-36 | 
+36 |
 37 |     ## No errors
    |
    = help: Add a leading dot
@@ -269,7 +268,7 @@ PTH210_1.py:53:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 52 |     p.with_suffix(u'' "json")
 53 |     p.with_suffix(suffix="js")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
-54 | 
+54 |
 55 |     ## No errors
    |
    = help: Add a leading dot
@@ -363,7 +362,7 @@ PTH210_1.py:71:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 70 |     p.with_suffix(u'' "json")
 71 |     p.with_suffix(suffix="js")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
-72 | 
+72 |
 73 |     ## No errors
    |
    = help: Add a leading dot
@@ -457,7 +456,7 @@ PTH210_1.py:89:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 88 |     p.with_suffix(u'' "json")
 89 |     p.with_suffix(suffix="js")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
-90 | 
+90 |
 91 |     ## No errors
    |
    = help: Add a leading dot
@@ -551,7 +550,7 @@ PTH210_1.py:107:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 106 |     p.with_suffix(u'' "json")
 107 |     p.with_suffix(suffix="js")
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
-108 | 
+108 |
 109 |     ## No errors
     |
     = help: Add a leading dot

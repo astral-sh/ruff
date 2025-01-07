@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR302_class_attribute.py:13:4: AIR302 `register_dataset_change` is removed in Airflow 3.0
    |
@@ -50,7 +49,7 @@ AIR302_class_attribute.py:17:4: AIR302 `notify_dataset_alias_created` is removed
 16 | dm.notify_dataset_changed()
 17 | dm.notify_dataset_alias_created()
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-18 | 
+18 |
 19 | hlc = HookLineageCollector()
    |
    = help: Use `notify_asset_alias_created` instead
@@ -92,7 +91,7 @@ AIR302_class_attribute.py:23:5: AIR302 `collected_datasets` is removed in Airflo
 22 | hlc.add_output_dataset()
 23 | hlc.collected_datasets()
    |     ^^^^^^^^^^^^^^^^^^ AIR302
-24 | 
+24 |
 25 | aam = AwsAuthManager()
    |
    = help: Use `collected_assets` instead
@@ -102,7 +101,7 @@ AIR302_class_attribute.py:26:5: AIR302 `is_authorized_dataset` is removed in Air
 25 | aam = AwsAuthManager()
 26 | aam.is_authorized_dataset()
    |     ^^^^^^^^^^^^^^^^^^^^^ AIR302
-27 | 
+27 |
 28 | pm = ProvidersManager()
    |
    = help: Use `is_authorized_asset` instead
@@ -113,7 +112,7 @@ AIR302_class_attribute.py:30:4: AIR302 `dataset_factories` is removed in Airflow
 29 | pm.initialize_providers_asset_uri_resources()
 30 | pm.dataset_factories
    |    ^^^^^^^^^^^^^^^^^ AIR302
-31 | 
+31 |
 32 | base_secret_backend = BaseSecretsBackend()
    |
    = help: Use `asset_factories` instead
@@ -133,7 +132,7 @@ AIR302_class_attribute.py:34:21: AIR302 `get_connections` is removed in Airflow 
 33 | base_secret_backend.get_conn_uri()
 34 | base_secret_backend.get_connections()
    |                     ^^^^^^^^^^^^^^^ AIR302
-35 | 
+35 |
 36 | csm_backend = CloudSecretManagerBackend()
    |
    = help: Use `get_connection` instead
@@ -153,7 +152,7 @@ AIR302_class_attribute.py:38:13: AIR302 `get_connections` is removed in Airflow 
 37 | csm_backend.get_conn_uri()
 38 | csm_backend.get_connections()
    |             ^^^^^^^^^^^^^^^ AIR302
-39 | 
+39 |
 40 | vault_backend = VaultBackend()
    |
    = help: Use `get_connection` instead
@@ -173,7 +172,7 @@ AIR302_class_attribute.py:42:15: AIR302 `get_connections` is removed in Airflow 
 41 | vault_backend.get_conn_uri()
 42 | vault_backend.get_connections()
    |               ^^^^^^^^^^^^^^^ AIR302
-43 | 
+43 |
 44 | not_an_error = NotAir302SecretError()
    |
    = help: Use `get_connection` instead
@@ -204,7 +203,7 @@ AIR302_class_attribute.py:56:18: AIR302 `dataset_to_openlineage_converters` is r
 55 | provider_manager.dataset_uri_handlers
 56 | provider_manager.dataset_to_openlineage_converters
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-57 | 
+57 |
 58 | dl_info = DatasetLineageInfo()
    |
    = help: Use `asset_to_openlineage_converters` instead
@@ -212,7 +211,7 @@ AIR302_class_attribute.py:56:18: AIR302 `dataset_to_openlineage_converters` is r
 AIR302_class_attribute.py:58:11: AIR302 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
    |
 56 | provider_manager.dataset_to_openlineage_converters
-57 | 
+57 |
 58 | dl_info = DatasetLineageInfo()
    |           ^^^^^^^^^^^^^^^^^^ AIR302
 59 | dl_info.dataset

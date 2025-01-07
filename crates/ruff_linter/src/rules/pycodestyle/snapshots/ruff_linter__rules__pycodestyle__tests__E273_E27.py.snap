@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E27.py:11:9: E273 [*] Tab after keyword
    |
@@ -112,7 +111,7 @@ E27.py:74:5: E273 [*] Tab after keyword
 73 | #: E273
 74 | type    Number = int
    |     ^^^^ E273
-75 | 
+75 |
 76 | #: E275
    |
    = help: Replace with single space

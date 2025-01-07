@@ -1,30 +1,29 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 bad_string_format_type.py:2:7: PLE1307 Format type does not match argument type
   |
 1 | # Errors
 2 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-3 | 
+3 |
 4 | "foo %e bar %s" % ("1", 2)
   |
 
 bad_string_format_type.py:4:1: PLE1307 Format type does not match argument type
   |
 2 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
-3 | 
+3 |
 4 | "foo %e bar %s" % ("1", 2)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-5 | 
+5 |
 6 | "%d" % "1"
   |
 
 bad_string_format_type.py:6:1: PLE1307 Format type does not match argument type
   |
 4 | "foo %e bar %s" % ("1", 2)
-5 | 
+5 |
 6 | "%d" % "1"
   | ^^^^^^^^^^ PLE1307
 7 | "%o" % "1"
@@ -125,6 +124,6 @@ bad_string_format_type.py:16:1: PLE1307 Format type does not match argument type
 15 | "%d" % ((1, 2, 3),)
 16 | "%d" % (1 if x > 0 else [])
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-17 | 
+17 |
 18 | # False negatives
    |

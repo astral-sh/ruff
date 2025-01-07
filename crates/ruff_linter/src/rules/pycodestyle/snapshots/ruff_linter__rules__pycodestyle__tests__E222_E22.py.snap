@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E22.py:28:8: E222 [*] Multiple spaces after operator
    |
@@ -109,7 +108,7 @@ E22.py:36:7: E222 [*] Multiple spaces after operator
 E22.py:184:9: E222 [*] Multiple spaces after operator
     |
 182 | #:
-183 | 
+183 |
 184 | if a  ==  1:
     |         ^^ E222
 185 |     print(a)

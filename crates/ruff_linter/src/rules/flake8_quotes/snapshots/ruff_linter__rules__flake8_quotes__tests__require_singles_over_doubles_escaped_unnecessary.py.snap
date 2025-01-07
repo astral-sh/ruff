@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 doubles_escaped_unnecessary.py:1:26: Q004 [*] Unnecessary escape on inner quote character
   |
@@ -205,7 +204,7 @@ doubles_escaped_unnecessary.py:35:1: Q004 [*] Unnecessary escape on inner quote 
 34 | f'\"foo\" {f'nested'}'  # Q004
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q004
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
    |
    = help: Remove backslash
@@ -226,7 +225,7 @@ doubles_escaped_unnecessary.py:35:12: Q004 [*] Unnecessary escape on inner quote
 34 | f'\"foo\" {f'nested'}'  # Q004
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
    |            ^^^^^^^^^^^^^ Q004
-36 | 
+36 |
 37 | f'normal {f'nested'} normal'
    |
    = help: Remove backslash
@@ -328,7 +327,7 @@ doubles_escaped_unnecessary.py:41:1: Q004 [*] Unnecessary escape on inner quote 
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q004
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
    |
    = help: Remove backslash
@@ -349,7 +348,7 @@ doubles_escaped_unnecessary.py:41:15: Q004 [*] Unnecessary escape on inner quote
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q004
-42 | 
+42 |
 43 | # Make sure we do not unescape quotes
    |
    = help: Remove backslash

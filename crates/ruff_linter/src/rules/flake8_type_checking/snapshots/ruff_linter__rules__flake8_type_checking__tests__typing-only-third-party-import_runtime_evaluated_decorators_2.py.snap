@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 runtime_evaluated_decorators_2.py:10:8: TC002 [*] Move third-party import `numpy` into a type-checking block
    |
  8 | from attrs import frozen
- 9 | 
+ 9 |
 10 | import numpy  # TC002
    |        ^^^^^ TC002
    |

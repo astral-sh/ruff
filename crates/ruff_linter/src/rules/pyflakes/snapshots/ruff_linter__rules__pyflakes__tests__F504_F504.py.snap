@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
   |
@@ -8,7 +7,7 @@ F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
 2 | a = "wrong"
 3 | "%(a)s %(c)s" % {a: "?", "b": "!"}  # F504 ("b" not used)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
-4 | 
+4 |
 5 | hidden = {"a": "!"}
   |
   = help: Remove extra named arguments: b
@@ -25,7 +24,7 @@ F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
 F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
   |
 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
-7 | 
+7 |
 8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
 9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
@@ -47,7 +46,7 @@ F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
  8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
  9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
-10 | 
+10 |
 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    |
    = help: Remove extra named arguments: b
@@ -65,10 +64,10 @@ F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
 F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
    |
  9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
-10 | 
+10 |
 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    | ^^^^^^^^^^^^^^^^^^ F504
-12 | 
+12 |
 13 | # https://github.com/astral-sh/ruff/issues/4899
    |
    = help: Remove extra named arguments: ab

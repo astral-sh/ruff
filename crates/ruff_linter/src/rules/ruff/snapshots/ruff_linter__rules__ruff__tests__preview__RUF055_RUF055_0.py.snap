@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF055_0.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
   |
@@ -86,7 +85,7 @@ RUF055_0.py:39:1: RUF055 [*] Plain string pattern passed to `re` function
 38 | # this should be replaced with s.split("abc")
 39 | re.split("abc", s)
    | ^^^^^^^^^^^^^^^^^^ RUF055
-40 | 
+40 |
 41 | # these currently should not be modified because the patterns contain regex
    |
    = help: Replace with `s.split("abc")`
@@ -112,7 +111,7 @@ RUF055_0.py:71:1: RUF055 [*] Plain string pattern passed to `re` function
 76 | |     s,  # string
 77 | | )
    | |_^ RUF055
-78 |   
+78 |
 79 |   # A diagnostic should not be emitted for `sub` replacements with backreferences or
    |
    = help: Replace with `s.replace("abc", "")`
@@ -190,14 +189,14 @@ RUF055_0.py:92:1: RUF055 Plain string pattern passed to `re` function
 91 | re.sub(r"a", "\a", "a")
 92 | re.sub(r"a", r"\a", "a")
    | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
-93 | 
+93 |
 94 | re.sub(r"a", "\?", "a")
    |
 
 RUF055_0.py:94:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 92 | re.sub(r"a", r"\a", "a")
-93 | 
+93 |
 94 | re.sub(r"a", "\?", "a")
    | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
 95 | re.sub(r"a", r"\?", "a")

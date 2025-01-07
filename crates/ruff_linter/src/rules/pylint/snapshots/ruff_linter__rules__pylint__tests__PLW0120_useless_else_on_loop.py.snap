@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 useless_else_on_loop.py:9:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
@@ -49,7 +48,7 @@ useless_else_on_loop.py:18:5: PLW0120 [*] `else` clause on loop without a `break
 useless_else_on_loop.py:30:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
 28 |             break
-29 | 
+29 |
 30 | else:  # [useless-else-on-loop]
    | ^^^^ PLW0120
 31 |     print("or else!")

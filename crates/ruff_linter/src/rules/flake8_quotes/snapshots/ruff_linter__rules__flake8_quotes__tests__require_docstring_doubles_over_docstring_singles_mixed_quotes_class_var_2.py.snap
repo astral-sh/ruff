@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 docstring_singles_mixed_quotes_class_var_2.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
   |
@@ -77,7 +76,7 @@ docstring_singles_mixed_quotes_class_var_2.py:6:44: Q002 [*] Single quote docstr
 docstring_singles_mixed_quotes_class_var_2.py:9:29: Q002 [*] Single quote docstring found but double quotes preferred
   |
 7 |         pass
-8 | 
+8 |
 9 |     class Nested(foo()[:]): 'Do not'" start with empty string" ' and lint docstring safely'; pass
   |                             ^^^^^^^^ Q002
   |
@@ -93,7 +92,7 @@ docstring_singles_mixed_quotes_class_var_2.py:9:29: Q002 [*] Single quote docstr
 docstring_singles_mixed_quotes_class_var_2.py:9:64: Q002 [*] Single quote docstring found but double quotes preferred
   |
 7 |         pass
-8 | 
+8 |
 9 |     class Nested(foo()[:]): 'Do not'" start with empty string" ' and lint docstring safely'; pass
   |                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
   |

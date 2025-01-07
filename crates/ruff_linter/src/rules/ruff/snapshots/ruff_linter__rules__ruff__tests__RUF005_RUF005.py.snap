@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF005.py:4:1: RUF005 Consider `[*foo]` instead of concatenation
   |
@@ -173,7 +172,7 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
 46 | excitement = ("we all think",) + Fun().yay()
 47 | astonishment = ("we all feel",) + Fun.words
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-48 | 
+48 |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    |
    = help: Replace with `("we all feel", *Fun.words)`
@@ -191,10 +190,10 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
 RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
 47 | astonishment = ("we all feel",) + Fun.words
-48 | 
+48 |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-50 | 
+50 |
 51 | baz = () + zoob
    |
    = help: Replace with iterable unpacking
@@ -212,10 +211,10 @@ RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
 RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
    |
 47 | astonishment = ("we all feel",) + Fun.words
-48 | 
+48 |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-50 | 
+50 |
 51 | baz = () + zoob
    |
    = help: Replace with `("yes", "no", "pants", *zoob)`
@@ -233,10 +232,10 @@ RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of 
 RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
    |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50 | 
+50 |
 51 | baz = () + zoob
    |       ^^^^^^^^^ RUF005
-52 | 
+52 |
 53 | [] + foo + [
    |
    = help: Replace with `(*zoob,)`
@@ -254,11 +253,11 @@ RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
 RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |
 51 |   baz = () + zoob
-52 |   
+52 |
 53 | / [] + foo + [
 54 | | ]
    | |_^ RUF005
-55 |   
+55 |
 56 |   pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
    |
    = help: Replace with `[*foo]`
@@ -277,7 +276,7 @@ RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
 RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
    |
 54 | ]
-55 | 
+55 |
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
@@ -320,7 +319,7 @@ RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 58 | b = a + [2, 3] + [4]
    |     ^^^^^^^^^^^^^^^^ RUF005
-59 | 
+59 |
 60 | # Uses the non-preferred quote style, which should be retained.
    |
    = help: Replace with `[*a, 2, 3, 4]`
@@ -340,7 +339,7 @@ RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
 60 | # Uses the non-preferred quote style, which should be retained.
 61 | f"{a() + ['b']}"
    |    ^^^^^^^^^^^ RUF005
-62 | 
+62 |
 63 | ###
    |
    = help: Replace with `[*a(), 'b']`

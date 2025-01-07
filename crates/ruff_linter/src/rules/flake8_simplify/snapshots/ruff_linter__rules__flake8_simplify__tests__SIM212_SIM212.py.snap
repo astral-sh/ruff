@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM212.py:1:5: SIM212 [*] Use `a if a else b` instead of `b if not a else a`
   |
 1 | c = b if not a else a  # SIM212
   |     ^^^^^^^^^^^^^^^^^ SIM212
-2 | 
+2 |
 3 | c = b + c if not a else a  # SIM212
   |
   = help: Replace with `a if a else b`
@@ -21,10 +20,10 @@ SIM212.py:1:5: SIM212 [*] Use `a if a else b` instead of `b if not a else a`
 SIM212.py:3:5: SIM212 [*] Use `a if a else b + c` instead of `b + c if not a else a`
   |
 1 | c = b if not a else a  # SIM212
-2 | 
+2 |
 3 | c = b + c if not a else a  # SIM212
   |     ^^^^^^^^^^^^^^^^^^^^^ SIM212
-4 | 
+4 |
 5 | c = b if not x else a  # OK
   |
   = help: Replace with `a if a else b + c`

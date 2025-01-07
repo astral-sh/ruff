@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B028.py:8:1: B028 [*] No explicit `stacklevel` keyword argument found
    |
  6 | """
- 7 | 
+ 7 |
  8 | warnings.warn("test", DeprecationWarning)
    | ^^^^^^^^^^^^^ B028
  9 | warnings.warn("test", DeprecationWarning, source=None)
@@ -47,7 +46,7 @@ B028.py:9:1: B028 [*] No explicit `stacklevel` keyword argument found
 B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
    |
 20 | warnings.warn(*args, **kwargs)
-21 | 
+21 |
 22 | warnings.warn(
    | ^^^^^^^^^^^^^ B028
 23 |         "test",

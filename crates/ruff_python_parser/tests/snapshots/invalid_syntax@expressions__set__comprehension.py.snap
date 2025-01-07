@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/set/comprehension.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -680,7 +679,7 @@ Module(
 1 | # Iterable unpacking not allowed
 2 | {*x for x in y}
   |  ^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
-3 | 
+3 |
 4 | # Invalid target
   |
 
@@ -718,7 +717,7 @@ Module(
  7 | {x for call() in y}
  8 | {x for {a, b} in y}
    |        ^^^^^^ Syntax Error: Invalid assignment target
- 9 | 
+ 9 |
 10 | # Invalid iter
    |
 
@@ -756,7 +755,7 @@ Module(
 13 | {x for x in yield from y}
 14 | {x for x in lambda y: y}
    |             ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
-15 | 
+15 |
 16 | # Invalid if
    |
 

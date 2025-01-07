@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 unnecessary_list_index_lookup.py:7:6: PLR1736 [*] List index lookup in `enumerate()` loop
   |
@@ -48,7 +47,7 @@ unnecessary_list_index_lookup.py:9:14: PLR1736 [*] List index lookup in `enumera
  8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
  9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
    |              ^^^^^^^^^^^^^^ PLR1736
-10 | 
+10 |
 11 |     for index, letter in enumerate(letters):
    |
    = help: Use the loop variable directly
@@ -109,7 +108,7 @@ unnecessary_list_index_lookup.py:14:16: PLR1736 [*] List index lookup in `enumer
 13 |         blah = letters[index]  # PLR1736
 14 |         assert letters[index]  == "d"  # PLR1736
    |                ^^^^^^^^^^^^^^ PLR1736
-15 | 
+15 |
 16 |     for index, letter in builtins.enumerate(letters):
    |
    = help: Use the loop variable directly
@@ -189,7 +188,7 @@ unnecessary_list_index_lookup.py:74:15: PLR1736 [*] List index lookup in `enumer
 73 |     for index, list_item in enumerate(some_list, start=0):
 74 |         print(some_list[index])
    |               ^^^^^^^^^^^^^^^^ PLR1736
-75 | 
+75 |
 76 |     # PLR1736
    |
    = help: Use the loop variable directly

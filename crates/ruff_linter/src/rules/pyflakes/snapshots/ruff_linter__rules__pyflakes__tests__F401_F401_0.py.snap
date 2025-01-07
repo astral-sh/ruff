@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F401_0.py:2:8: F401 [*] `functools` imported but unused
   |
@@ -84,7 +83,7 @@ F401_0.py:33:12: F401 [*] `importlib` imported but unused
 32 |     import shelve
 33 |     import importlib
    |            ^^^^^^^^^ F401
-34 | 
+34 |
 35 | if TYPE_CHECKING:
    |
    = help: Remove unused import: `importlib`
@@ -104,7 +103,7 @@ F401_0.py:37:12: F401 [*] `pathlib` imported but unused
 36 |     """Hello, world!"""
 37 |     import pathlib
    |            ^^^^^^^ F401
-38 | 
+38 |
 39 |     z = 1
    |
    = help: Remove unused import: `pathlib`
@@ -179,7 +178,7 @@ F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
  98 | import foo.bar as bop
  99 | import foo.bar.baz
     |        ^^^^^^^^^^^ F401
-100 | 
+100 |
 101 | print(bop.baz.read_csv("test.csv"))
     |
     = help: Remove unused import: `foo.bar.baz`
@@ -199,7 +198,7 @@ F401_0.py:105:12: F401 [*] `a1` imported but unused
 104 | if TYPE_CHECKING:
 105 |     import a1
     |            ^^ F401
-106 | 
+106 |
 107 |     import a2
     |
     = help: Remove unused import: `a1`
@@ -216,7 +215,7 @@ F401_0.py:105:12: F401 [*] `a1` imported but unused
 F401_0.py:107:12: F401 [*] `a2` imported but unused
     |
 105 |     import a1
-106 | 
+106 |
 107 |     import a2
     |            ^^ F401
     |
@@ -237,7 +236,7 @@ F401_0.py:112:16: F401 [*] `b1` imported but unused
 111 |     case 0,:
 112 |         import b1
     |                ^^ F401
-113 | 
+113 |
 114 |         import b2
     |
     = help: Remove unused import: `b1`
@@ -254,7 +253,7 @@ F401_0.py:112:16: F401 [*] `b1` imported but unused
 F401_0.py:114:16: F401 [*] `b2` imported but unused
     |
 112 |         import b1
-113 | 
+113 |
 114 |         import b2
     |                ^^ F401
     |

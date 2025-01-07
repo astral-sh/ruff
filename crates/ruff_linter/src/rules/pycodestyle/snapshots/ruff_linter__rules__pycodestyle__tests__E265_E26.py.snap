@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E26.py:10:1: E265 [*] Block comment should start with `# `
    |
@@ -70,7 +69,7 @@ E26.py:32:1: E265 [*] Block comment should start with `# `
 31 | #: Okay
 32 | #!/usr/bin/env python
    | ^^^^^^^^^^^^^^^^^^^^^ E265
-33 | 
+33 |
 34 | pass  # an inline comment
    |
    = help: Format space
@@ -108,10 +107,10 @@ E26.py:73:1: E265 [*] Block comment should start with `# `
 E26.py:78:1: E265 [*] Block comment should start with `# `
    |
 76 | #: Colon prefix is okay
-77 | 
+77 |
 78 | ###This is a variable ###
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ E265
-79 | 
+79 |
 80 | # We should strip the space, but preserve the hashes.
    |
    = help: Format space

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
-snapshot_kind: text
 ---
 A004.py:1:16: A004 Import `sum` is shadowing a Python builtin
   |
@@ -53,6 +52,6 @@ A004.py:5:30: A004 Import `dir` is shadowing a Python builtin
 4 | from some import input, exec
 5 | from directory import new as dir
   |                              ^^^ A004
-6 | 
+6 |
 7 | # See: https://github.com/astral-sh/ruff/issues/13037
   |

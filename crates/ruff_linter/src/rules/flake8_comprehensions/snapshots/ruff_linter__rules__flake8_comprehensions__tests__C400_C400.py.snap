@@ -72,7 +72,7 @@ C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
 11 | |     x for x in range(3)
 12 | | )
    | |_^ C400
-13 |   
+13 |
 14 |   # Strip parentheses from inner generators.
    |
    = help: Rewrite using `list()`
@@ -135,7 +135,7 @@ C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
 16 | list(((2 * x for x in range(3))))
 17 | list((((2 * x for x in range(3)))))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C400
-18 | 
+18 |
 19 | # Not built-in list.
    |
    = help: Rewrite as a list comprehension
