@@ -403,17 +403,37 @@ RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function abl
 332 333 | 
 333 334 | # function return type annotation NoReturn
 
-RET503.py:415:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:403:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-413 |     else:
-414 |         with c:
-415 |             d
+401 |     else:
+402 |         with c:
+403 |             d
     |             ^ RET503
     |
     = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-413 413 |     else:
-414 414 |         with c:
-415 415 |             d
-    416 |+            return None
+401 401 |     else:
+402 402 |         with c:
+403 403 |             d
+    404 |+            return None
+404 405 | 
+405 406 | 
+406 407 | 
+
+RET503.py:418:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+416 |     if x == 5:
+417 |         return 5
+418 |     bar()
+    |     ^^^^^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Unsafe fix
+415 415 |         abort()
+416 416 |     if x == 5:
+417 417 |         return 5
+418     |-    bar()
+    418 |+    bar()
+    419 |+    return None

@@ -331,17 +331,14 @@ def end_of_file():
 
 
 # function return type annotation NoReturn
-def bar() -> NoReturn:
+def bar_no_return_annotation() -> NoReturn:
     abort()
 
 def foo(x: int) -> int:
     if x == 5:
         return 5
-    bar()
+    bar_no_return_annotation()
 
-
-def raises(value: str) -> NoReturn:
-    raise RuntimeError("something went wrong")
 
 def foo(string: str) -> str:
 
@@ -353,11 +350,8 @@ def foo(string: str) -> str:
         case "c":
             return "third"
         case _:
-            raises(string)
+            bar_no_return_annotation()
 
-def bar() -> NoReturn:
-    a = 1 + 2
-    raise AssertionError("Very bad")
 
 def foo() -> int:
     def baz() -> int:
@@ -365,22 +359,19 @@ def foo() -> int:
 
     if baz() > 3:
         return 1
-    bar()
+    bar_no_return_annotation()
 
 
 
 # function return type annotation typing_extensions.Never
-def bar() -> typing_extensions.Never:
+def bar_never_annotation() -> typing_extensions.Never:
     abort()
 
 def foo(x: int) -> int:
     if x == 5:
         return 5
-    bar()
+    bar_never_annotation()
 
-
-def raises(value: str) -> typing_extensions.Never:
-    raise RuntimeError("something went wrong")
 
 def foo(string: str) -> str:
 
@@ -392,11 +383,8 @@ def foo(string: str) -> str:
         case "c":
             return "third"
         case _:
-            raises(string)
+            bar_never_annotation()
 
-def bar() -> typing_extensions.Never:
-    a = 1 + 2
-    raise AssertionError("Very bad")
 
 def foo() -> int:
     def baz() -> int:
@@ -404,7 +392,7 @@ def foo() -> int:
 
     if baz() > 3:
         return 1
-    bar()
+    bar_never_annotation()
 
 
 def f():
@@ -413,3 +401,18 @@ def f():
     else:
         with c:
             d
+
+
+
+# The rule shouldn't generate a diagnostic for functions where one branch
+# calls a nested function annotated with `NoReturn` or `Never`.
+# However, the rule isn't handling this case correctly yet.
+# This is because looking up `bar` fails when analysing `foo` because
+# the semantic model hasn't yet seen `bar`'s declaration.
+# Supporting nested functions requires making this a deferred rule.
+def foo(x: int) -> int:
+    def bar() -> NoReturn:
+        abort()
+    if x == 5:
+        return 5
+    bar()
