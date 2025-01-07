@@ -234,7 +234,11 @@ impl<'db> Parameter<'db> {
     /// Display name of the parameter, with fallback if it doesn't have a name.
     pub(crate) fn display_name(&self, index: usize) -> ast::name::Name {
         self.name()
-            .cloned()
+            .map(|name| match self {
+                Self::Variadic(_) => ast::name::Name::new(format!("*{name}")),
+                Self::Keywords(_) => ast::name::Name::new(format!("**{name}")),
+                _ => name.clone(),
+            })
             .unwrap_or_else(|| ast::name::Name::new(format!("positional parameter {index}")))
     }
 

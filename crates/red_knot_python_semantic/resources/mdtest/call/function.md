@@ -93,7 +93,7 @@ reveal_type(f("foo"))  # revealed: int
 def f(*args: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `args` of type `int`"
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `*args` of type `int`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -123,7 +123,7 @@ reveal_type(f(x="foo"))  # revealed: int
 def f(**kwargs: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `kwargs` of type `int`"
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `**kwargs` of type `int`"
 reveal_type(f(x="foo"))  # revealed: int
 ```
 
