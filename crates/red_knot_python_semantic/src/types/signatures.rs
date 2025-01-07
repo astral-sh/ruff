@@ -127,15 +127,8 @@ impl<'db> Parameters<'db> {
     /// For a valid signature, this will be all positional parameters. In an invalid signature,
     /// there could be non-initial positional parameters; effectively, we just won't consider those
     /// to be positional, which is fine.
-    pub(crate) fn positional_only(&self) -> impl Iterator<Item = &Parameter<'db>> {
+    pub(crate) fn positional(&self) -> impl Iterator<Item = &Parameter<'db>> {
         self.iter().take_while(|param| param.is_positional())
-    }
-
-    /// Return number of positional parameters this signature can accept.
-    ///
-    /// Doesn't account for variadic parameter.
-    pub(crate) fn positional_count(&self) -> usize {
-        self.positional_only().count()
     }
 
     /// Return parameter at given index, or `None` if index is out-of-range.
@@ -147,12 +140,8 @@ impl<'db> Parameters<'db> {
     ///
     /// Does not return variadic parameter.
     pub(crate) fn get_positional(&self, index: usize) -> Option<&Parameter<'db>> {
-        if let Some(candidate) = self.get(index) {
-            if candidate.is_positional() {
-                return Some(candidate);
-            }
-        }
-        None
+        self.get(index)
+            .and_then(|parameter| parameter.is_positional().then_some(parameter))
     }
 
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.

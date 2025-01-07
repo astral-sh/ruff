@@ -82,7 +82,7 @@ pub(crate) fn bind_call<'db>(
     if let Some(first_excess_argument_index) = first_excess_positional {
         errors.push(CallBindingError::TooManyPositionalArguments {
             first_excess_argument_index,
-            expected_positional_count: parameters.positional_count(),
+            expected_positional_count: parameters.positional().count(),
             provided_positional_count: next_positional,
         });
     }
