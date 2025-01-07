@@ -1809,11 +1809,7 @@ impl<'db> Type<'db> {
             }
 
             instance_ty @ Type::Instance(_) => {
-                match instance_ty.call_dunder(
-                    db,
-                    "__call__",
-                    &arguments.clone().with_self(instance_ty),
-                ) {
+                match instance_ty.call_dunder(db, "__call__", &arguments.with_self(instance_ty)) {
                     CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
                         // Turn "`<type of illegal '__call__'>` not callable" into
                         // "`X` not callable"

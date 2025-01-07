@@ -1,10 +1,9 @@
 use super::Type;
 use ruff_python_ast::name::Name;
-use std::collections::VecDeque;
 
 /// Typed arguments for a single call, in source order.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CallArguments<'db>(VecDeque<Argument<'db>>);
+pub(crate) struct CallArguments<'db>(Vec<Argument<'db>>);
 
 impl<'db> CallArguments<'db> {
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
@@ -16,9 +15,11 @@ impl<'db> CallArguments<'db> {
     }
 
     /// Prepend an extra positional argument.
-    pub(crate) fn with_self(mut self, self_ty: Type<'db>) -> Self {
-        self.0.push_front(Argument::Positional(self_ty));
-        self
+    pub(crate) fn with_self(&self, self_ty: Type<'db>) -> Self {
+        let mut arguments = Vec::with_capacity(self.0.len() + 1);
+        arguments.push(Argument::Positional(self_ty));
+        arguments.extend_from_slice(&self.0);
+        Self(arguments)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'db>> {
@@ -27,13 +28,13 @@ impl<'db> CallArguments<'db> {
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
-        self.0.front().map(Argument::ty)
+        self.0.first().map(Argument::ty)
     }
 }
 
 impl<'db, 'a> IntoIterator for &'a CallArguments<'db> {
     type Item = &'a Argument<'db>;
-    type IntoIter = std::collections::vec_deque::Iter<'a, Argument<'db>>;
+    type IntoIter = std::slice::Iter<'a, Argument<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
