@@ -1780,26 +1780,62 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
+        // We need to create a standalone expression for each arm of a match statement, since they
+        // can introduce constraints on the match subject. (Or more accurately, for the match arm's
+        // pattern, since its the pattern that introduces any constraints, not the body.) Ideally,
+        // that standalone expression would wrap the match arm's pattern as a whole. But a
+        // standalone expression can currently only wrap an ast::Expr, which patterns are not. So,
+        // we need to choose an Expr that can “stand in” for the pattern, which we can wrap in a
+        // standalone expression.
+        //
+        // That said, when inferring the type of a standalone expression, we don't have access to
+        // its parent or sibling nodes.  That means, for instance, that in a class pattern, where
+        // we are currently using the class name as the standalone expression, we do not have
+        // access to the class pattern's arguments in the standalone expression inference scope.
+        // At the moment, we aren't trying to do anything with those arguments when creating a
+        // narrowing constraint for the pattern.  But in the future, if we do, we will have to
+        // either wrap those arguments in their own standalone expressions, or update Expression to
+        // be able to wrap other AST node types besides just ast::Expr.
+        //
+        // This function is only called for the top-level pattern of a match arm, and is
+        // responsible for inferring the standalone expression for each supported pattern type. It
+        // then hands off to `infer_nested_match_pattern` for any subexpressions and subpatterns,
+        // where we do NOT have any additional standalone expressions to infer through.
+        //
         // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
         // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value);
             }
+            ast::Pattern::MatchClass(match_class) => {
+                let ast::PatternMatchClass {
+                    range: _,
+                    cls,
+                    arguments,
+                } = match_class;
+                for pattern in &arguments.patterns {
+                    self.infer_nested_match_pattern(pattern);
+                }
+                for keyword in &arguments.keywords {
+                    self.infer_nested_match_pattern(&keyword.pattern);
+                }
+                self.infer_standalone_expression(cls);
+            }
             _ => {
-                self.infer_match_pattern_impl(pattern);
+                self.infer_nested_match_pattern(pattern);
             }
         }
     }
 
-    fn infer_match_pattern_impl(&mut self, pattern: &ast::Pattern) {
+    fn infer_nested_match_pattern(&mut self, pattern: &ast::Pattern) {
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_expression(&match_value.value);
             }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
@@ -1813,7 +1849,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(key);
                 }
                 for pattern in patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -1823,21 +1859,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     arguments,
                 } = match_class;
                 for pattern in &arguments.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.infer_match_pattern_impl(&keyword.pattern);
+                    self.infer_nested_match_pattern(&keyword.pattern);
                 }
                 self.infer_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
