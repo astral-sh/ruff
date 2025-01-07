@@ -93,12 +93,12 @@ impl Server {
             workspace_settings,
         } = all_settings;
 
-        crate::trace::init_tracing(
+        crate::logging::init_logging(
             connection.make_sender(),
             global_settings
                 .tracing
                 .log_level
-                .unwrap_or(crate::trace::LogLevel::Info),
+                .unwrap_or(crate::logging::LogLevel::Info),
             global_settings.tracing.log_file.as_deref(),
         );
 
