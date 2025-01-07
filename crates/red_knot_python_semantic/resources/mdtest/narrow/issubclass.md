@@ -90,7 +90,7 @@ def _(t: type[object]):
         if issubclass(t, B):
             reveal_type(t)  # revealed: type[A] & type[B]
     else:
-        reveal_type(t)  # revealed: type[object] & ~type[A]
+        reveal_type(t)  # revealed: type & ~type[A]
 ```
 
 ### Handling of `None`

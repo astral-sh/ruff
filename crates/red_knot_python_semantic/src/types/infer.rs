@@ -49,7 +49,6 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
-use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
     report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -65,7 +64,7 @@ use crate::types::{
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
     KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    SubclassOfType, Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
     TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
@@ -4903,9 +4902,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
-                    Type::ClassLiteral(ClassLiteralType { class }) => Type::subclass_of(class),
+                    Type::ClassLiteral(ClassLiteralType { class }) => {
+                        SubclassOfType::from(self.db(), class)
+                    }
                     Type::KnownInstance(KnownInstanceType::Any) => {
-                        Type::subclass_of_base(ClassBase::Any)
+                        SubclassOfType::subclass_of_any()
                     }
                     _ => todo_type!("unsupported type[X] special form"),
                 }
