@@ -1154,7 +1154,7 @@ RUF046.py:186:1: RUF046 [*] Value being cast to `int` is already an integer
 188 | | )
     | |_^ RUF046
 189 |   
-190 |   int(  # Comment
+190 |   int(  # Unsafe fix because of this comment
     |
     = help: Remove unnecessary `int` call
 
@@ -1167,31 +1167,92 @@ RUF046.py:186:1: RUF046 [*] Value being cast to `int` is already an integer
 187 187 | )(42)
 188     |-)
 189 188 | 
-190 189 | int(  # Comment
+190 189 | int(  # Unsafe fix because of this comment
 191 190 | (  # Comment
 
 RUF046.py:190:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 188 |   )
 189 |   
-190 | / int(  # Comment
+190 | / int(  # Unsafe fix because of this comment
 191 | | (  # Comment
 192 | |     (round
 193 | | )  # Comment
 194 | | )(42)
 195 | | )
     | |_^ RUF046
+196 |   
+197 |   int(
     |
     = help: Remove unnecessary `int` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 187 187 | )(42)
 188 188 | )
 189 189 | 
-190     |-int(  # Comment
+190     |-int(  # Unsafe fix because of this comment
 191 190 | (  # Comment
 192 191 |     (round
 193 192 | )  # Comment
 194 193 | )(42)
 195     |-)
-196 194 |
+196 194 | 
+197 195 | int(
+198 196 |     round(
+
+RUF046.py:197:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+195 |   )
+196 |   
+197 | / int(
+198 | |     round(
+199 | |         42
+200 | |     ) # unsafe fix because of this comment
+201 | | )
+    | |_^ RUF046
+202 |   
+203 |   int(
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Unsafe fix
+194 194 | )(42)
+195 195 | )
+196 196 | 
+197     |-int(
+198     |-    round(
+    197 |+round(
+199 198 |         42
+200     |-    ) # unsafe fix because of this comment
+201     |-)
+    199 |+    )
+202 200 | 
+203 201 | int(
+204 202 |     round(
+
+RUF046.py:203:1: RUF046 [*] Value being cast to `int` is already an integer
+    |
+201 |   )
+202 |   
+203 | / int(
+204 | |     round(
+205 | |         42
+206 | |     ) 
+207 | | # unsafe fix because of this comment
+208 | | )
+    | |_^ RUF046
+    |
+    = help: Remove unnecessary `int` call
+
+ℹ Unsafe fix
+200 200 |     ) # unsafe fix because of this comment
+201 201 | )
+202 202 | 
+203     |-int(
+204     |-    round(
+    203 |+round(
+205 204 |         42
+206     |-    ) 
+207     |-# unsafe fix because of this comment
+208     |-)
+    205 |+    )
