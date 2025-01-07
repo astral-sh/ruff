@@ -942,9 +942,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // pydoclint
         (Pydoclint, "201") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingReturns),
-        (Pydoclint, "202") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousReturns),
+        (Pydoclint, "202") => (RuleGroup::Stable, rules::pydoclint::rules::DocstringExtraneousReturns),
         (Pydoclint, "402") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingYields),
-        (Pydoclint, "403") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousYields),
+        (Pydoclint, "403") => (RuleGroup::Stable, rules::pydoclint::rules::DocstringExtraneousYields),
         (Pydoclint, "501") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingException),
         (Pydoclint, "502") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousException),
 
