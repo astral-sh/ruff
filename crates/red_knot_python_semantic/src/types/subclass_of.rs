@@ -8,6 +8,17 @@ pub struct SubclassOfType<'db> {
 }
 
 impl<'db> SubclassOfType<'db> {
+    /// Construct a new [`Type`] instance representing a given class object (or a given dynamic type)
+    /// and all possible subclasses of that class object/dynamic type.
+    ///
+    /// This method does not always return a [`Type::SubclassOf`] variant.
+    /// If the class object is known to be a final class,
+    /// this method will return a [`Type::ClassLiteral`] variant; this is a more precise type.
+    /// If the class object is `builtins.object`, `Type::Instance(<builtins.type>)` will be returned;
+    /// this is no more precise, but it is exactly equivalent to `type[object]`.
+    ///
+    /// The eager normalization here means that we do not need to worry elsewhere about distinguishing
+    /// between `@final` classes and other classes when dealing with [`Type::SubclassOf`] variants.
     pub fn from(db: &'db dyn Db, subclass_of: impl Into<ClassBase<'db>>) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
@@ -26,6 +37,21 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Return a [`Type`] instance representing the type `type[Unknown]`.
+    pub const fn subclass_of_unknown() -> Type<'db> {
+        Type::SubclassOf(SubclassOfType {
+            subclass_of: ClassBase::Unknown,
+        })
+    }
+
+    /// Return a [`Type`] instance representing the type `type[Any]`.
+    pub const fn subclass_of_any() -> Type<'db> {
+        Type::SubclassOf(SubclassOfType {
+            subclass_of: ClassBase::Any,
+        })
+    }
+
+    /// Return the inner `ClassBase` value wrapped by this `SubclassOfType`.
     pub const fn subclass_of(self) -> ClassBase<'db> {
         self.subclass_of
     }
@@ -44,6 +70,10 @@ impl<'db> SubclassOfType<'db> {
         Type::from(self.subclass_of).member(db, name)
     }
 
+    /// Return `true` if `self` is a subtype of `other`.
+    ///
+    /// This can only return `true` if `self.subclass_of` is a [`ClassBase::Class`] variant;
+    /// only fully static types participate in subtyping.
     pub fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
             // Non-fully-static types do not participate in subtyping

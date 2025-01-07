@@ -1167,6 +1167,10 @@ impl<'db> Type<'db> {
             }
 
             (Type::SubclassOf(_), other) | (other, Type::SubclassOf(_)) => {
+                // TODO we could do better here: if both variants are `SubclassOf` and they have different "solid bases",
+                // multiple inheritance between the two is impossible, so they are disjoint.
+                //
+                // Note that `type[<@final class>]` is eagerly simplified to `Literal[<@final class>]` by [`SubclassOfType::from`].
                 other.is_disjoint_from(db, KnownClass::Type.to_instance(db))
             }
 
@@ -2114,8 +2118,8 @@ impl<'db> Type<'db> {
             },
 
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            Type::Any => SubclassOfType::from(db, ClassBase::Any),
-            Type::Unknown => SubclassOfType::from(db, ClassBase::Unknown),
+            Type::Any => SubclassOfType::subclass_of_any(),
+            Type::Unknown => SubclassOfType::subclass_of_unknown(),
             // TODO intersections
             Type::Intersection(_) => SubclassOfType::from(
                 db,
@@ -2333,7 +2337,7 @@ impl<'db> KnownClass {
         self.to_class_literal(db)
             .into_class_literal()
             .map(|ClassLiteralType { class }| SubclassOfType::from(db, class))
-            .unwrap_or_else(|| SubclassOfType::from(db, ClassBase::Unknown))
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
@@ -2731,6 +2735,7 @@ impl<'db> KnownInstanceType<'db> {
         self.class().to_instance(db)
     }
 
+    /// Return `true` if this symbol is an instance of `class`.
     pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
         self.class().is_subclass_of(db, class)
     }
@@ -3324,7 +3329,7 @@ impl<'db> Class<'db> {
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
-            .unwrap_or_else(|_| SubclassOfType::from(db, ClassBase::Unknown))
+            .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
@@ -3337,7 +3342,7 @@ impl<'db> Class<'db> {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
-            return Ok(SubclassOfType::from(db, ClassBase::Unknown));
+            return Ok(SubclassOfType::subclass_of_unknown());
         }
 
         let explicit_metaclass = self.explicit_metaclass(db);
@@ -3786,8 +3791,8 @@ pub(crate) mod tests {
                     let elements = tys.into_iter().map(|ty| ty.into_type(db));
                     TupleType::from_elements(db, elements)
                 }
-                Ty::SubclassOfAny => SubclassOfType::from(db, ClassBase::Any),
-                Ty::SubclassOfUnknown => SubclassOfType::from(db, ClassBase::Unknown),
+                Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
+                Ty::SubclassOfUnknown => SubclassOfType::subclass_of_unknown(),
                 Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                     db,
                     builtins_symbol(db, s)
