@@ -117,10 +117,10 @@ fn is_simple_assignment_to_attribute(stmt: &ast::Stmt) -> bool {
             let [target] = targets.as_slice() else {
                 return false;
             };
-            target.is_attribute_expr() & value.is_name_expr()
+            target.is_attribute_expr() && value.is_name_expr()
         }
         ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-            target.is_attribute_expr() & value.as_ref().is_some_and(|val| val.is_name_expr())
+            target.is_attribute_expr() && value.as_ref().is_some_and(|val| val.is_name_expr())
         }
         _ => false,
     }
