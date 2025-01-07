@@ -1104,7 +1104,7 @@ where
                 cases,
                 range: _,
             }) => {
-                debug_assert!(self.current_match_case.is_none());
+                debug_assert_eq!(self.current_match_case, None);
 
                 let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
