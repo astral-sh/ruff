@@ -20,17 +20,7 @@ use tracing_subscriber::{
 
 use crate::server::ClientSender;
 
-static LOGGING_SENDER: OnceLock<ClientSender> = OnceLock::new();
-
-pub(crate) fn init_logging(
-    sender: ClientSender,
-    log_level: LogLevel,
-    log_file: Option<&std::path::Path>,
-) {
-    LOGGING_SENDER
-        .set(sender)
-        .expect("logging sender should only be initialized once");
-
+pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
     let log_file = log_file
         .map(|path| {
             // this expands `logFile` so that tildes and environment variables
@@ -78,12 +68,15 @@ pub(crate) fn init_logging(
         .expect("should be able to set global default subscriber");
 }
 
+/// The log level for the server as provided by the client during initialization.
+///
+/// The default log level is `info`.
 #[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum LogLevel {
-    #[default]
     Error,
     Warn,
+    #[default]
     Info,
     Debug,
     Trace,
