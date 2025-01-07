@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for classes that only have a public `__init__` method,
-/// without base classes and 0 decorators.
+/// without base classes and decorators.
 ///
 /// ## Why is this bad?
 /// Classes with just an `__init__` are possibly better off
@@ -100,8 +100,7 @@ pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::St
     }
 }
 
-// Checks whether a statement
-// is a, possibly augmented,
+// Checks whether a statement is a, possibly augmented,
 // assignment of a name to an attribute.
 fn is_simple_assignment_to_attribute(stmt: &ast::Stmt) -> bool {
     match stmt {
