@@ -12,6 +12,8 @@ pub(crate) struct Signature<'db> {
     /// then positional-or-keyword, then optionally the variadic parameter, then keyword-only
     /// parameters, and last, optionally the variadic keywords parameter. Parameters with defaults
     /// must come after parameters without defaults.
+    ///
+    /// We may get invalid signatures, though, and need to handle them without panicking.
     parameters: Parameters<'db>,
 
     /// Annotated return type, if any.
