@@ -199,12 +199,12 @@ impl std::fmt::Display for ParameterContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(name) = &self.name {
             if self.positional {
-                write!(f, "{} (`{name}`)", self.index)
+                write!(f, "{} (`{name}`)", self.index + 1)
             } else {
                 write!(f, "`{name}`")
             }
         } else {
-            write!(f, "{}", self.index)
+            write!(f, "{}", self.index + 1)
         }
     }
 }
