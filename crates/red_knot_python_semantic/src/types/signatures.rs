@@ -226,10 +226,6 @@ impl<'db> Parameter<'db> {
         matches!(self, Self::PositionalOnly(_) | Self::PositionalOrKeyword(_))
     }
 
-    pub(crate) fn is_positional_only(&self) -> bool {
-        matches!(self, Self::PositionalOnly(_))
-    }
-
     pub(crate) fn callable_by_name(&self, name: &str) -> bool {
         match self {
             Self::PositionalOrKeyword(param) | Self::KeywordOnly(param) => param

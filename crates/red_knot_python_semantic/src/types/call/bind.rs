@@ -24,7 +24,7 @@ pub(crate) fn bind_call<'db>(
     let mut next_positional = 0;
     let mut first_excess_positional = None;
     for (argument_index, argument) in arguments.iter().enumerate() {
-        let (index, parameter, argument_ty) = match argument {
+        let (index, parameter, argument_ty, positional) = match argument {
             Argument::Positional(ty) => {
                 let Some((index, parameter)) = parameters
                     .get_positional(next_positional)
@@ -36,7 +36,7 @@ pub(crate) fn bind_call<'db>(
                     continue;
                 };
                 next_positional += 1;
-                (index, parameter, ty)
+                (index, parameter, ty, !parameter.is_variadic())
             }
             Argument::Keyword { name, ty } => {
                 let Some((index, parameter)) = parameters
@@ -49,7 +49,7 @@ pub(crate) fn bind_call<'db>(
                     });
                     continue;
                 };
-                (index, parameter, ty)
+                (index, parameter, ty, false)
             }
 
             Argument::Variadic(_) | Argument::Keywords(_) => {
@@ -60,7 +60,7 @@ pub(crate) fn bind_call<'db>(
         if let Some(expected_ty) = parameter.annotated_ty() {
             if !argument_ty.is_assignable_to(db, expected_ty) {
                 errors.push(CallBindingError::InvalidArgumentType {
-                    parameter: ParameterContext::new(parameter, index),
+                    parameter: ParameterContext::new(parameter, index, positional),
                     argument_index,
                     expected_ty,
                     provided_ty: *argument_ty,
@@ -74,7 +74,7 @@ pub(crate) fn bind_call<'db>(
             } else {
                 errors.push(CallBindingError::ParameterAlreadyAssigned {
                     argument_index,
-                    parameter: ParameterContext::new(parameter, index),
+                    parameter: ParameterContext::new(parameter, index, positional),
                 });
             }
         }
@@ -94,7 +94,7 @@ pub(crate) fn bind_call<'db>(
                 // variadic/keywords and defaulted arguments are not required
                 continue;
             }
-            missing.push(ParameterContext::new(param, index));
+            missing.push(ParameterContext::new(param, index, false));
         }
     }
 
@@ -173,19 +173,24 @@ impl<'db> CallBinding<'db> {
     }
 }
 
+/// Information needed to emit a diagnostic regarding a parameter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ParameterContext {
     name: Option<ast::name::Name>,
     index: usize,
-    positional_only: bool,
+
+    /// Was the argument for this parameter passed positionally, and matched to a non-variadic
+    /// positional parameter? (If so, we will provide the index in the diagnostic, not just the
+    /// name.)
+    positional: bool,
 }
 
 impl ParameterContext {
-    fn new(parameter: &Parameter, index: usize) -> Self {
+    fn new(parameter: &Parameter, index: usize, positional: bool) -> Self {
         Self {
             name: parameter.display_name(),
             index,
-            positional_only: parameter.is_positional_only(),
+            positional,
         }
     }
 }
@@ -193,7 +198,7 @@ impl ParameterContext {
 impl std::fmt::Display for ParameterContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(name) = &self.name {
-            if self.positional_only {
+            if self.positional {
                 write!(f, "{} (`{name}`)", self.index)
             } else {
                 write!(f, "`{name}`")

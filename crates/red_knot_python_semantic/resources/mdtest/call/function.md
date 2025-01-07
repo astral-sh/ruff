@@ -73,7 +73,7 @@ def _(flag: bool):
 def f(x: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter `x` of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 0 (`x`) of function `f`; expected type `int`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
