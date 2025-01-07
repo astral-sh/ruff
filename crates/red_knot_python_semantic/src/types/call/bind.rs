@@ -91,7 +91,7 @@ pub(crate) fn bind_call<'db>(
     for (index, bound_ty) in parameter_tys.iter().enumerate() {
         if bound_ty.is_none() {
             let param = &parameters[index];
-            if param.is_variadic() || param.is_keywords() || param.default_ty().is_some() {
+            if param.is_variadic() || param.is_keyword_variadic() || param.default_ty().is_some() {
                 // variadic/keywords and defaulted arguments are not required
                 continue;
             }

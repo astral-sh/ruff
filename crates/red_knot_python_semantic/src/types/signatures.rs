@@ -65,14 +65,16 @@ impl<'db> Parameters<'db> {
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     fn todo() -> Self {
         Self(vec![
-            Parameter::Variadic(Param {
+            Parameter {
                 name: Some(Name::new_static("args")),
                 annotated_ty: Some(todo_type!("todo signature *args")),
-            }),
-            Parameter::Keywords(Param {
+                kind: ParameterKind::Variadic,
+            },
+            Parameter {
                 name: Some(Name::new_static("kwargs")),
                 annotated_ty: Some(todo_type!("todo signature **kwargs")),
-            }),
+                kind: ParameterKind::KeywordVariadic,
+            },
         ])
     }
 
@@ -89,21 +91,48 @@ impl<'db> Parameters<'db> {
             kwarg,
             range: _,
         } = parameters;
-        let positional_only = posonlyargs
-            .iter()
-            .map(|arg| Parameter::PositionalOnly(ParamWithDefault::from_node(db, definition, arg)));
+        let default_ty = |parameter_with_default: &ast::ParameterWithDefault| {
+            parameter_with_default
+                .default
+                .as_deref()
+                .map(|default| definition_expression_ty(db, definition, default))
+        };
+        let positional_only = posonlyargs.iter().map(|arg| {
+            Parameter::from_node_and_kind(
+                db,
+                definition,
+                &arg.parameter,
+                ParameterKind::PositionalOnly {
+                    default_ty: default_ty(arg),
+                },
+            )
+        });
         let positional_or_keyword = args.iter().map(|arg| {
-            Parameter::PositionalOrKeyword(ParamWithDefault::from_node(db, definition, arg))
+            Parameter::from_node_and_kind(
+                db,
+                definition,
+                &arg.parameter,
+                ParameterKind::PositionalOrKeyword {
+                    default_ty: default_ty(arg),
+                },
+            )
         });
         let variadic = vararg
             .as_ref()
-            .map(|arg| Parameter::Variadic(Param::from_node(db, definition, arg)));
-        let keyword_only = kwonlyargs
-            .iter()
-            .map(|arg| Parameter::KeywordOnly(ParamWithDefault::from_node(db, definition, arg)));
-        let keywords = kwarg
-            .as_ref()
-            .map(|arg| Parameter::Keywords(Param::from_node(db, definition, arg)));
+            .map(|arg| Parameter::from_node_and_kind(db, definition, arg, ParameterKind::Variadic));
+        let keyword_only = kwonlyargs.iter().map(|arg| {
+            Parameter::from_node_and_kind(
+                db,
+                definition,
+                &arg.parameter,
+                ParameterKind::KeywordOnly {
+                    default_ty: default_ty(arg),
+                },
+            )
+        });
+        let keywords = kwarg.as_ref().map(|arg| {
+            Parameter::from_node_and_kind(db, definition, arg, ParameterKind::KeywordVariadic)
+        });
         Self(
             positional_only
                 .chain(positional_or_keyword)
@@ -167,7 +196,7 @@ impl<'db> Parameters<'db> {
     pub(crate) fn keyword_variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
             .enumerate()
-            .rfind(|(_, parameter)| parameter.is_keywords())
+            .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
 }
 
@@ -189,36 +218,54 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Parameter<'db> {
-    /// Positional-only parameter, e.g. `def f(x, /): ...`
-    PositionalOnly(ParamWithDefault<'db>),
-    /// Positional-or-keyword parameter, e.g. `def f(x): ...`
-    PositionalOrKeyword(ParamWithDefault<'db>),
-    /// Variadic parameter, e.g. `def f(*args): ...`
-    Variadic(Param<'db>),
-    /// Keyword-only parameter, e.g. `def f(*, x): ...`
-    KeywordOnly(ParamWithDefault<'db>),
-    /// Variadic keywords parameter, e.g. `def f(**kwargs): ...`
-    Keywords(Param<'db>),
+pub(crate) struct Parameter<'db> {
+    /// Parameter name.
+    ///
+    /// It is possible for signatures to be defined in ways that leave positional-only parameters
+    /// nameless (e.g. via `Callable` annotations).
+    name: Option<Name>,
+
+    /// Annotated type of the parameter.
+    annotated_ty: Option<Type<'db>>,
+
+    kind: ParameterKind<'db>,
 }
 
 impl<'db> Parameter<'db> {
-    pub(crate) fn is_variadic(&self) -> bool {
-        matches!(self, Self::Variadic(_))
+    fn from_node_and_kind(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        parameter: &'db ast::Parameter,
+        kind: ParameterKind<'db>,
+    ) -> Self {
+        Self {
+            name: Some(parameter.name.id.clone()),
+            annotated_ty: parameter
+                .annotation
+                .as_deref()
+                .map(|annotation| definition_expression_ty(db, definition, annotation)),
+            kind,
+        }
     }
 
-    pub(crate) fn is_keywords(&self) -> bool {
-        matches!(self, Self::Keywords(_))
+    pub(crate) fn is_variadic(&self) -> bool {
+        matches!(self.kind, ParameterKind::Variadic)
+    }
+
+    pub(crate) fn is_keyword_variadic(&self) -> bool {
+        matches!(self.kind, ParameterKind::KeywordVariadic)
     }
 
     pub(crate) fn is_positional(&self) -> bool {
-        matches!(self, Self::PositionalOnly(_) | Self::PositionalOrKeyword(_))
+        matches!(
+            self.kind,
+            ParameterKind::PositionalOnly { .. } | ParameterKind::PositionalOrKeyword { .. }
+        )
     }
 
     pub(crate) fn callable_by_name(&self, name: &str) -> bool {
-        match self {
-            Self::PositionalOrKeyword(param) | Self::KeywordOnly(param) => param
-                .param
+        match self.kind {
+            ParameterKind::PositionalOrKeyword { .. } | ParameterKind::KeywordOnly { .. } => self
                 .name
                 .as_ref()
                 .is_some_and(|param_name| param_name == name),
@@ -228,96 +275,47 @@ impl<'db> Parameter<'db> {
 
     /// Annotated type of the parameter, if annotated.
     pub(crate) fn annotated_ty(&self) -> Option<Type<'db>> {
-        self.param().annotated_ty
+        self.annotated_ty
     }
 
     /// Name of the parameter (if it has one).
     pub(crate) fn name(&self) -> Option<&ast::name::Name> {
-        self.param().name.as_ref()
+        self.name.as_ref()
     }
 
     /// Display name of the parameter, if it has one.
     pub(crate) fn display_name(&self) -> Option<ast::name::Name> {
-        self.name().map(|name| match self {
-            Self::Variadic(_) => ast::name::Name::new(format!("*{name}")),
-            Self::Keywords(_) => ast::name::Name::new(format!("**{name}")),
+        self.name().map(|name| match self.kind {
+            ParameterKind::Variadic => ast::name::Name::new(format!("*{name}")),
+            ParameterKind::KeywordVariadic => ast::name::Name::new(format!("**{name}")),
             _ => name.clone(),
         })
     }
 
     /// Default-value type of the parameter, if any.
     pub(crate) fn default_ty(&self) -> Option<Type<'db>> {
-        match self {
-            Self::PositionalOnly(ParamWithDefault { default_ty, .. }) => *default_ty,
-            Self::PositionalOrKeyword(ParamWithDefault { default_ty, .. }) => *default_ty,
-            Self::Variadic(_) => None,
-            Self::KeywordOnly(ParamWithDefault { default_ty, .. }) => *default_ty,
-            Self::Keywords(_) => None,
+        match self.kind {
+            ParameterKind::PositionalOnly { default_ty } => default_ty,
+            ParameterKind::PositionalOrKeyword { default_ty } => default_ty,
+            ParameterKind::Variadic => None,
+            ParameterKind::KeywordOnly { default_ty } => default_ty,
+            ParameterKind::KeywordVariadic => None,
         }
-    }
-
-    fn param(&self) -> &Param<'db> {
-        let (Self::PositionalOnly(ParamWithDefault { param, .. })
-        | Self::PositionalOrKeyword(ParamWithDefault { param, .. })
-        | Self::Variadic(param)
-        | Self::KeywordOnly(ParamWithDefault { param, .. })
-        | Self::Keywords(param)) = self;
-        param
     }
 }
 
-/// A single parameter of a typed signature, with optional default value.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ParamWithDefault<'db> {
-    param: Param<'db>,
-
-    /// Type of the default value, if any.
-    default_ty: Option<Type<'db>>,
-}
-
-impl<'db> ParamWithDefault<'db> {
-    fn from_node(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        parameter_with_default: &'db ast::ParameterWithDefault,
-    ) -> Self {
-        Self {
-            default_ty: parameter_with_default
-                .default
-                .as_deref()
-                .map(|default| definition_expression_ty(db, definition, default)),
-            param: Param::from_node(db, definition, &parameter_with_default.parameter),
-        }
-    }
-}
-
-/// A single parameter of a typed signature.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Param<'db> {
-    /// Parameter name.
-    ///
-    /// It is possible for signatures to be defined in ways that leave positional-only parameters
-    /// nameless (e.g. via `Callable` annotations).
-    name: Option<Name>,
-
-    /// Annotated type of the parameter.
-    annotated_ty: Option<Type<'db>>,
-}
-
-impl<'db> Param<'db> {
-    fn from_node(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        parameter: &'db ast::Parameter,
-    ) -> Self {
-        Param {
-            name: Some(parameter.name.id.clone()),
-            annotated_ty: parameter
-                .annotation
-                .as_deref()
-                .map(|annotation| definition_expression_ty(db, definition, annotation)),
-        }
-    }
+pub(crate) enum ParameterKind<'db> {
+    /// Positional-only parameter, e.g. `def f(x, /): ...`
+    PositionalOnly { default_ty: Option<Type<'db>> },
+    /// Positional-or-keyword parameter, e.g. `def f(x): ...`
+    PositionalOrKeyword { default_ty: Option<Type<'db>> },
+    /// Variadic parameter, e.g. `def f(*args): ...`
+    Variadic,
+    /// Keyword-only parameter, e.g. `def f(*, x): ...`
+    KeywordOnly { default_ty: Option<Type<'db>> },
+    /// Variadic keywords parameter, e.g. `def f(**kwargs): ...`
+    KeywordVariadic,
 }
 
 #[cfg(test)]
@@ -373,70 +371,68 @@ mod tests {
         assert_params(
             &sig,
             &[
-                Parameter::PositionalOnly(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("a")),
-                        annotated_ty: None,
+                Parameter {
+                    name: Some(Name::new_static("a")),
+                    annotated_ty: None,
+                    kind: ParameterKind::PositionalOnly { default_ty: None },
+                },
+                Parameter {
+                    name: Some(Name::new_static("b")),
+                    annotated_ty: Some(KnownClass::Int.to_instance(&db)),
+                    kind: ParameterKind::PositionalOnly { default_ty: None },
+                },
+                Parameter {
+                    name: Some(Name::new_static("c")),
+                    annotated_ty: None,
+                    kind: ParameterKind::PositionalOnly {
+                        default_ty: Some(Type::IntLiteral(1)),
                     },
-                    default_ty: None,
-                }),
-                Parameter::PositionalOnly(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("b")),
-                        annotated_ty: Some(KnownClass::Int.to_instance(&db)),
+                },
+                Parameter {
+                    name: Some(Name::new_static("d")),
+                    annotated_ty: Some(KnownClass::Int.to_instance(&db)),
+                    kind: ParameterKind::PositionalOnly {
+                        default_ty: Some(Type::IntLiteral(2)),
                     },
-                    default_ty: None,
-                }),
-                Parameter::PositionalOnly(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("c")),
-                        annotated_ty: None,
+                },
+                Parameter {
+                    name: Some(Name::new_static("e")),
+                    annotated_ty: None,
+                    kind: ParameterKind::PositionalOrKeyword {
+                        default_ty: Some(Type::IntLiteral(3)),
                     },
-                    default_ty: Some(Type::IntLiteral(1)),
-                }),
-                Parameter::PositionalOnly(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("d")),
-                        annotated_ty: Some(KnownClass::Int.to_instance(&db)),
+                },
+                Parameter {
+                    name: Some(Name::new_static("f")),
+                    annotated_ty: Some(Type::IntLiteral(4)),
+                    kind: ParameterKind::PositionalOrKeyword {
+                        default_ty: Some(Type::IntLiteral(4)),
                     },
-                    default_ty: Some(Type::IntLiteral(2)),
-                }),
-                Parameter::PositionalOrKeyword(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("e")),
-                        annotated_ty: None,
-                    },
-                    default_ty: Some(Type::IntLiteral(3)),
-                }),
-                Parameter::PositionalOrKeyword(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("f")),
-                        annotated_ty: Some(Type::IntLiteral(4)),
-                    },
-                    default_ty: Some(Type::IntLiteral(4)),
-                }),
-                Parameter::Variadic(Param {
+                },
+                Parameter {
                     name: Some(Name::new_static("args")),
                     annotated_ty: Some(KnownClass::Object.to_instance(&db)),
-                }),
-                Parameter::KeywordOnly(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("g")),
-                        annotated_ty: None,
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: Some(Name::new_static("g")),
+                    annotated_ty: None,
+                    kind: ParameterKind::KeywordOnly {
+                        default_ty: Some(Type::IntLiteral(5)),
                     },
-                    default_ty: Some(Type::IntLiteral(5)),
-                }),
-                Parameter::KeywordOnly(ParamWithDefault {
-                    param: Param {
-                        name: Some(Name::new_static("h")),
-                        annotated_ty: Some(Type::IntLiteral(6)),
+                },
+                Parameter {
+                    name: Some(Name::new_static("h")),
+                    annotated_ty: Some(Type::IntLiteral(6)),
+                    kind: ParameterKind::KeywordOnly {
+                        default_ty: Some(Type::IntLiteral(6)),
                     },
-                    default_ty: Some(Type::IntLiteral(6)),
-                }),
-                Parameter::Keywords(Param {
+                },
+                Parameter {
                     name: Some(Name::new_static("kwargs")),
                     annotated_ty: Some(KnownClass::Str.to_instance(&db)),
-                }),
+                    kind: ParameterKind::KeywordVariadic,
+                },
             ],
         );
     }
@@ -462,14 +458,11 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter::PositionalOrKeyword(ParamWithDefault {
-            param:
-                Param {
-                    name: Some(name),
-                    annotated_ty,
-                },
-            ..
-        })] = &sig.parameters.0[..]
+        let [Parameter {
+            name: Some(name),
+            annotated_ty,
+            kind: ParameterKind::PositionalOrKeyword { .. },
+        }] = &sig.parameters.0[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -499,14 +492,11 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter::PositionalOrKeyword(ParamWithDefault {
-            param:
-                Param {
-                    name: Some(name),
-                    annotated_ty,
-                },
-            default_ty: None,
-        })] = &sig.parameters.0[..]
+        let [Parameter {
+            name: Some(name),
+            annotated_ty,
+            kind: ParameterKind::PositionalOrKeyword { .. },
+        }] = &sig.parameters.0[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -536,21 +526,15 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter::PositionalOrKeyword(ParamWithDefault {
-            param:
-                Param {
-                    name: Some(a_name),
-                    annotated_ty: a_annotated_ty,
-                },
-            default_ty: None,
-        }), Parameter::PositionalOrKeyword(ParamWithDefault {
-            param:
-                Param {
-                    name: Some(b_name),
-                    annotated_ty: b_annotated_ty,
-                },
-            default_ty: None,
-        })] = &sig.parameters.0[..]
+        let [Parameter {
+            name: Some(a_name),
+            annotated_ty: a_annotated_ty,
+            kind: ParameterKind::PositionalOrKeyword { .. },
+        }, Parameter {
+            name: Some(b_name),
+            annotated_ty: b_annotated_ty,
+            kind: ParameterKind::PositionalOrKeyword { .. },
+        }] = &sig.parameters.0[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -582,21 +566,15 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        let [Parameter::PositionalOrKeyword(ParamWithDefault {
-            param:
-                Param {
-                    name: Some(a_name),
-                    annotated_ty: a_annotated_ty,
-                },
-            default_ty: None,
-        }), Parameter::PositionalOrKeyword(ParamWithDefault {
-            param:
-                Param {
-                    name: Some(b_name),
-                    annotated_ty: b_annotated_ty,
-                },
-            default_ty: None,
-        })] = &sig.parameters.0[..]
+        let [Parameter {
+            name: Some(a_name),
+            annotated_ty: a_annotated_ty,
+            kind: ParameterKind::PositionalOrKeyword { .. },
+        }, Parameter {
+            name: Some(b_name),
+            annotated_ty: b_annotated_ty,
+            kind: ParameterKind::PositionalOrKeyword { .. },
+        }] = &sig.parameters.0[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
