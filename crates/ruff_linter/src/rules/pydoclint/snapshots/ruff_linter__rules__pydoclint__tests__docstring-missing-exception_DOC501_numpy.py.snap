@@ -1,22 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
 DOC501_numpy.py:35:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
 33 |   # DOC501
 34 |   def calculate_speed(distance: float, time: float) -> float:
-35 |       """
-   |  _____^
+35 | /     """
 36 | |     Calculate speed as distance divided by time.
-37 | | 
+37 | |
 38 | |     Parameters
 39 | |     ----------
 40 | |     distance : float
 41 | |         Distance traveled.
 42 | |     time : float
 43 | |         Time spent traveling.
-44 | | 
+44 | |
 45 | |     Returns
 46 | |     -------
 47 | |     float
@@ -32,17 +30,16 @@ DOC501_numpy.py:58:5: DOC501 Raised exception `ValueError` missing from docstrin
    |
 56 |   # DOC501
 57 |   def calculate_speed(distance: float, time: float) -> float:
-58 |       """
-   |  _____^
+58 | /     """
 59 | |     Calculate speed as distance divided by time.
-60 | | 
+60 | |
 61 | |     Parameters
 62 | |     ----------
 63 | |     distance : float
 64 | |         Distance traveled.
 65 | |     time : float
 66 | |         Time spent traveling.
-67 | | 
+67 | |
 68 | |     Returns
 69 | |     -------
 70 | |     float
@@ -58,17 +55,16 @@ DOC501_numpy.py:58:5: DOC501 Raised exception `FasterThanLightError` missing fro
    |
 56 |   # DOC501
 57 |   def calculate_speed(distance: float, time: float) -> float:
-58 |       """
-   |  _____^
+58 | /     """
 59 | |     Calculate speed as distance divided by time.
-60 | | 
+60 | |
 61 | |     Parameters
 62 | |     ----------
 63 | |     distance : float
 64 | |         Distance traveled.
 65 | |     time : float
 66 | |         Time spent traveling.
-67 | | 
+67 | |
 68 | |     Returns
 69 | |     -------
 70 | |     float
@@ -84,23 +80,22 @@ DOC501_numpy.py:83:5: DOC501 Raised exception `TypeError` missing from docstring
     |
  81 |   # DOC501
  82 |   def calculate_speed(distance: float, time: float) -> float:
- 83 |       """Calculate speed as distance divided by time.
-    |  _____^
- 84 | | 
+ 83 | /     """Calculate speed as distance divided by time.
+ 84 | |
  85 | |     ACalculate speed as distance divided by time.
- 86 | | 
+ 86 | |
  87 | |     Parameters
  88 | |     ----------
  89 | |     distance : float
  90 | |         Distance traveled.
  91 | |     time : float
  92 | |         Time spent traveling.
- 93 | | 
+ 93 | |
  94 | |     Returns
  95 | |     -------
  96 | |     float
  97 | |         Speed as distance divided by time.
- 98 | | 
+ 98 | |
  99 | |     Raises
 100 | |     ------
 101 | |     ZeroDivisionError
@@ -115,9 +110,8 @@ DOC501_numpy.py:83:5: DOC501 Raised exception `TypeError` missing from docstring
 DOC501_numpy.py:139:5: DOC501 Raised exception `TypeError` missing from docstring
     |
 138 |   def foo():
-139 |       """Foo.
-    |  _____^
-140 | | 
+139 | /     """Foo.
+140 | |
 141 | |     Returns
 142 | |     -------
 143 | |     int
@@ -132,9 +126,8 @@ DOC501_numpy.py:139:5: DOC501 Raised exception `TypeError` missing from docstrin
 DOC501_numpy.py:139:5: DOC501 Raised exception `ValueError` missing from docstring
     |
 138 |   def foo():
-139 |       """Foo.
-    |  _____^
-140 | | 
+139 | /     """Foo.
+140 | |
 141 | |     Returns
 142 | |     -------
 143 | |     int

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -159,8 +158,7 @@ PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
    |
 19 |       assert not (something or something_else)
 20 |       assert not (something or something_else or something_third)
-21 |       assert something and something_else == """error
-   |  _____^
+21 | /     assert something and something_else == """error
 22 | |     message
 23 | |     """
    | |_______^ PT018
@@ -184,8 +182,7 @@ PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
    |
 22 |       message
 23 |       """
-24 |       assert (
-   |  _____^
+24 | /     assert (
 25 | |         something
 26 | |         and something_else
 27 | |         == """error
@@ -193,7 +190,7 @@ PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
 29 | | """
 30 | |     )
    | |_____^ PT018
-31 |   
+31 |
 32 |       # recursive case
    |
    = help: Break down assertion into multiple parts
@@ -237,7 +234,7 @@ PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
 33 |     assert not (a or not (b or c))
 34 |     assert not (a or not (b and c))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-35 | 
+35 |
 36 |     # detected, but no fix for messages
    |
    = help: Break down assertion into multiple parts
@@ -328,7 +325,7 @@ PT018.py:49:5: PT018 Assertion should be broken down into multiple parts
 48 | def test_multiline():
 49 |     assert something and something_else; x = 1
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-50 | 
+50 |
 51 |     x = 1; assert something and something_else
    |
    = help: Break down assertion into multiple parts
@@ -336,10 +333,10 @@ PT018.py:49:5: PT018 Assertion should be broken down into multiple parts
 PT018.py:51:12: PT018 Assertion should be broken down into multiple parts
    |
 49 |     assert something and something_else; x = 1
-50 | 
+50 |
 51 |     x = 1; assert something and something_else
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-52 | 
+52 |
 53 |     x = 1; \
    |
    = help: Break down assertion into multiple parts
@@ -356,14 +353,13 @@ PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
    |
 57 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7143
 58 |   def test_parenthesized_not():
-59 |       assert not (
-   |  _____^
+59 | /     assert not (
 60 | |         self.find_graph_output(node.output[0])
 61 | |         or self.find_graph_input(node.input[0])
 62 | |         or self.find_graph_output(node.input[0])
 63 | |     )
    | |_____^ PT018
-64 |   
+64 |
 65 |       assert (not (
    |
    = help: Break down assertion into multiple parts
@@ -384,15 +380,14 @@ PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
 PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
    |
 63 |       )
-64 |   
-65 |       assert (not (
-   |  _____^
+64 |
+65 | /     assert (not (
 66 | |         self.find_graph_output(node.output[0])
 67 | |         or self.find_graph_input(node.input[0])
 68 | |         or self.find_graph_output(node.input[0])
 69 | |     ))
    | |______^ PT018
-70 |   
+70 |
 71 |       assert (not self.find_graph_output(node.output[0]) or
    |
    = help: Break down assertion into multiple parts

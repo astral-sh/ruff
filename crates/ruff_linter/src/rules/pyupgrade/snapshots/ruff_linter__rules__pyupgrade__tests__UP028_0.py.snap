@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
 1 |   def f():
-2 |       for x in y:
-  |  _____^
+2 | /     for x in y:
 3 | |         yield x
   | |_______________^ UP028
   |
@@ -24,8 +22,7 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
 6 |   def g():
-7 |       for x, y in z:
-  |  _____^
+7 | /     for x, y in z:
 8 | |         yield (x, y)
   | |____________________^ UP028
   |
@@ -45,8 +42,7 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 11 |   def h():
-12 |       for x in [1, 2, 3]:
-   |  _____^
+12 | /     for x in [1, 2, 3]:
 13 | |         yield x
    | |_______________^ UP028
    |
@@ -66,8 +62,7 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 16 |   def i():
-17 |       for x in {x for x in y}:
-   |  _____^
+17 | /     for x in {x for x in y}:
 18 | |         yield x
    | |_______________^ UP028
    |
@@ -87,8 +82,7 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 21 |   def j():
-22 |       for x in (1, 2, 3):
-   |  _____^
+22 | /     for x in (1, 2, 3):
 23 | |         yield x
    | |_______________^ UP028
    |
@@ -108,8 +102,7 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 26 |   def k():
-27 |       for x, y in {3: "x", 6: "y"}:
-   |  _____^
+27 | /     for x, y in {3: "x", 6: "y"}:
 28 | |         yield x, y
    | |__________________^ UP028
    |
@@ -130,8 +123,7 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 31 |   def f():  # Comment one\n'
 32 |       # Comment two\n'
-33 |       for x, y in {  # Comment three\n'
-   |  _____^
+33 | /     for x, y in {  # Comment three\n'
 34 | |         3: "x",  # Comment four\n'
 35 | |         # Comment five\n'
 36 | |         6: "y",  # Comment six\n'
@@ -163,8 +155,7 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 43 |   def f():
-44 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
-   |  _____^
+44 | /     for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
 45 | |         yield x, y
    | |__________________^ UP028
    |
@@ -184,11 +175,10 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 48 |   def f():
-49 |       for x, y in z():
-   |  _____^
+49 | /     for x, y in z():
 50 | |         yield x, y
    | |__________________^ UP028
-51 |   
+51 |
 52 |   def f():
    |
    = help: Replace with `yield from`
@@ -208,8 +198,7 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 53 |       def func():
 54 |           # This comment is preserved\n'
-55 |           for x, y in z():  # Comment one\n'
-   |  _________^
+55 | /         for x, y in z():  # Comment one\n'
 56 | |             # Comment two\n'
 57 | |             yield x, y  # Comment three\n'
    | |______________________^ UP028
@@ -234,8 +223,7 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 65 |       for x in y:
 66 |           yield x
-67 |       for z in x:
-   |  _____^
+67 | /     for z in x:
 68 | |         yield z
    | |_______________^ UP028
    |
@@ -255,8 +243,7 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 71 |   def f():
-72 |       for x, y in z():
-   |  _____^
+72 | /     for x, y in z():
 73 | |         yield x, y
    | |__________________^ UP028
 74 |       x = 1
@@ -278,8 +265,7 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 77 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 |   def _serve_method(fn):
-79 |       for h in (
-   |  _____^
+79 | /     for h in (
 80 | |         TaggedText.from_file(args.input)
 81 | |             .markup(highlight=args.region)
 82 | |     ):
@@ -307,8 +293,7 @@ UP028_0.py:97:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
     |
  95 |   # UP028: The exception binding is not a reference to the loop variable
  96 |   def f():
- 97 |       for x in (1, 2, 3):
-    |  _____^
+ 97 | /     for x in (1, 2, 3):
  98 | |         yield x
     | |_______________^ UP028
  99 |       # Shadowing with an `except`
@@ -331,8 +316,7 @@ UP028_0.py:108:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
     |
 106 |   # UP028: The context binding is not a reference to the loop variable
 107 |   def f():
-108 |       for x in (1, 2, 3):
-    |  _____^
+108 | /     for x in (1, 2, 3):
 109 | |         yield x
     | |_______________^ UP028
 110 |       # Shadowing with `with`
@@ -355,8 +339,7 @@ UP028_0.py:118:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
     |
 116 |   # UP028: The type annotation binding is not a reference to the loop variable
 117 |   def f():
-118 |       for x in (1, 2, 3):
-    |  _____^
+118 | /     for x in (1, 2, 3):
 119 | |         yield x
     | |_______________^ UP028
 120 |       # Shadowing with a type annotation
@@ -379,8 +362,7 @@ UP028_0.py:134:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
     |
 132 |   # UP028: The exception bindings are not a reference to the loop variable
 133 |   def f():
-134 |       for x in (1, 2, 3):
-    |  _____^
+134 | /     for x in (1, 2, 3):
 135 | |         yield x
     | |_______________^ UP028
 136 |       # Shadowing with multiple `except` blocks

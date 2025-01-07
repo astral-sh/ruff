@@ -1,13 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF031_prefer_parens.py:8:5: RUF031 [*] Use parentheses for tuples in subscripts
    |
  6 |   )]
  7 |   d[
- 8 |       1,
-   |  _____^
+ 8 | /     1,
  9 | |     2
    | |_____^ RUF031
 10 |   ]
@@ -96,7 +94,7 @@ RUF031_prefer_parens.py:21:3: RUF031 [*] Use parentheses for tuples in subscript
 20 | e[((1,2),(3,4))]
 21 | e[(1,2),(3,4)]
    |   ^^^^^^^^^^^ RUF031
-22 | 
+22 |
 23 | token_features[
    |
    = help: Parenthesize tuple

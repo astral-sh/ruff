@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP012.py:2:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
@@ -130,7 +129,7 @@ UP012.py:8:1: UP012 [*] Unnecessary call to `encode` as UTF-8
  7 |   "foo".encode(encoding="utf-8")  # b"foo"
  8 | / """
  9 | | Lorem
-10 | | 
+10 | |
 11 | | Ipsum
 12 | | """.encode(
 13 | |     "utf-8"
@@ -162,8 +161,7 @@ UP012.py:16:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 14 |   )
 15 |   (
-16 |       "Lorem "
-   |  _____^
+16 | /     "Lorem "
 17 | |     "Ipsum".encode()
    | |____________________^ UP012
 18 |   )
@@ -187,8 +185,7 @@ UP012.py:20:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 18 |   )
 19 |   (
-20 |       "Lorem "  # Comment
-   |  _____^
+20 | /     "Lorem "  # Comment
 21 | |     "Ipsum".encode()  # Comment
    | |____________________^ UP012
 22 |   )
@@ -256,7 +253,7 @@ UP012.py:36:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 37 | |     "utf-8",
 38 | | )
    | |_^ UP012
-39 |   
+39 |
 40 |   # `encode` with custom args and kwargs should not be processed.
    |
    = help: Remove unnecessary `encoding` argument
@@ -299,7 +296,7 @@ UP012.py:55:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 54 | "unicode text©".encode()
 55 | "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP012
-56 | 
+56 |
 57 | r"foo\o".encode("utf-8")  # br"foo\o"
    |
    = help: Remove unnecessary `encoding` argument
@@ -317,7 +314,7 @@ UP012.py:55:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 UP012.py:57:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 55 | "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
-56 | 
+56 |
 57 | r"foo\o".encode("utf-8")  # br"foo\o"
    | ^^^^^^^^^^^^^^^^^^^^^^^^ UP012
 58 | u"foo".encode("utf-8")  # b"foo"
@@ -402,7 +399,7 @@ UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
 60 | U"foo".encode("utf-8")  # b"foo"
 61 | print("foo".encode())  # print(b"foo")
    |       ^^^^^^^^^^^^^^ UP012
-62 | 
+62 |
 63 | # `encode` on parenthesized strings.
    |
    = help: Rewrite as bytes literal
@@ -425,7 +422,7 @@ UP012.py:64:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 66 | |     "def"
 67 | | ).encode()
    | |__________^ UP012
-68 |   
+68 |
 69 |   ((
    |
    = help: Rewrite as bytes literal
@@ -447,13 +444,13 @@ UP012.py:64:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 67 |   ).encode()
-68 |   
+68 |
 69 | / ((
 70 | |     "abc"
 71 | |     "def"
 72 | | )).encode()
    | |___________^ UP012
-73 |   
+73 |
 74 |   (f"foo{bar}").encode("utf-8")
    |
    = help: Rewrite as bytes literal
@@ -475,7 +472,7 @@ UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 UP012.py:74:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
 72 | )).encode()
-73 | 
+73 |
 74 | (f"foo{bar}").encode("utf-8")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP012
 75 | (f"foo{bar}").encode(encoding="utf-8")
@@ -558,7 +555,7 @@ UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
 81 | def _match_ignore(line):
 82 |     input=stdin and'\n'.encode()or None
    |                    ^^^^^^^^^^^^^ UP012
-83 | 
+83 |
 84 | # Not a valid type annotation but this test shouldn't result in a panic.
    |
    = help: Rewrite as bytes literal

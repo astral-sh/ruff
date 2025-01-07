@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
-snapshot_kind: text
 ---
 PTH201.py:6:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
@@ -69,7 +68,7 @@ PTH201.py:9:10: PTH201 [*] Do not pass the current directory explicitly to `Path
  8 | _ = PurePath(".")
  9 | _ = Path("")
    |          ^^ PTH201
-10 | 
+10 |
 11 | Path('', )
    |
    = help: Remove the current directory argument
@@ -87,10 +86,10 @@ PTH201.py:9:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 PTH201.py:11:6: PTH201 [*] Do not pass the current directory explicitly to `Path`
    |
  9 | _ = Path("")
-10 | 
+10 |
 11 | Path('', )
    |      ^^ PTH201
-12 | 
+12 |
 13 | Path(
    |
    = help: Remove the current directory argument
@@ -171,8 +170,7 @@ PTH201.py:22:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 PTH201.py:26:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
    |
 25 |   Path(
-26 |       ''  # Comment in the middle of implicitly concatenated string
-   |  _____^
+26 | /     ''  # Comment in the middle of implicitly concatenated string
 27 | |     ".",
    | |_______^ PTH201
 28 |   )
@@ -281,8 +279,7 @@ PTH201.py:44:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 PTH201.py:48:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
    |
 47 |   (  Path(
-48 |       ''  # Comment in the middle of implicitly concatenated string
-   |  _____^
+48 | /     ''  # Comment in the middle of implicitly concatenated string
 49 | |     ".",
    | |_______^ PTH201
 50 |   ) )/ (("parenthesized path call")

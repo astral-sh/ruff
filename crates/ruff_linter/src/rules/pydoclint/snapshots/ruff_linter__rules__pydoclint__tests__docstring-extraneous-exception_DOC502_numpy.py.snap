@@ -1,27 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
 DOC502_numpy.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
    |
  5 |   # DOC502
  6 |   def calculate_speed(distance: float, time: float) -> float:
- 7 |       """
-   |  _____^
+ 7 | /     """
  8 | |     Calculate speed as distance divided by time.
- 9 | | 
+ 9 | |
 10 | |     Parameters
 11 | |     ----------
 12 | |     distance : float
 13 | |         Distance traveled.
 14 | |     time : float
 15 | |         Time spent traveling.
-16 | | 
+16 | |
 17 | |     Returns
 18 | |     -------
 19 | |     float
 20 | |         Speed as distance divided by time.
-21 | | 
+21 | |
 22 | |     Raises
 23 | |     ------
 24 | |     FasterThanLightError
@@ -36,22 +34,21 @@ DOC502_numpy.py:32:5: DOC502 Raised exceptions are not explicitly raised: `Faste
    |
 30 |   # DOC502
 31 |   def calculate_speed(distance: float, time: float) -> float:
-32 |       """
-   |  _____^
+32 | /     """
 33 | |     Calculate speed as distance divided by time.
-34 | | 
+34 | |
 35 | |     Parameters
 36 | |     ----------
 37 | |     distance : float
 38 | |         Distance traveled.
 39 | |     time : float
 40 | |         Time spent traveling.
-41 | | 
+41 | |
 42 | |     Returns
 43 | |     -------
 44 | |     float
 45 | |         Speed as distance divided by time.
-46 | | 
+46 | |
 47 | |     Raises
 48 | |     ------
 49 | |     FasterThanLightError
@@ -68,22 +65,21 @@ DOC502_numpy.py:59:5: DOC502 Raised exception is not explicitly raised: `Divisio
    |
 57 |   # DOC502
 58 |   def calculate_speed(distance: float, time: float) -> float:
-59 |       """
-   |  _____^
+59 | /     """
 60 | |     Calculate speed as distance divided by time.
-61 | | 
+61 | |
 62 | |     Parameters
 63 | |     ----------
 64 | |     distance : float
 65 | |         Distance traveled.
 66 | |     time : float
 67 | |         Time spent traveling.
-68 | | 
+68 | |
 69 | |     Returns
 70 | |     -------
 71 | |     float
 72 | |         Speed as distance divided by time.
-73 | | 
+73 | |
 74 | |     Raises
 75 | |     ------
 76 | |     FasterThanLightError
