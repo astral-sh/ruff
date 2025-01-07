@@ -2523,11 +2523,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn infer_arguments(
+    fn infer_arguments<'a>(
         &mut self,
-        arguments: &ast::Arguments,
+        arguments: &'a ast::Arguments,
         infer_as_type_expressions: bool,
-    ) -> CallArguments<'db> {
+    ) -> CallArguments<'a, 'db> {
         let infer_argument_type = if infer_as_type_expressions {
             Self::infer_type_expression
         } else {
@@ -2558,10 +2558,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }) => {
                         let ty = infer_argument_type(self, value);
                         if let Some(arg) = arg {
-                            Argument::Keyword {
-                                name: arg.id.clone(),
-                                ty,
-                            }
+                            Argument::Keyword { name: &arg.id, ty }
                         } else {
                             // TODO diagnostic if not last
                             Argument::Keywords(ty)
