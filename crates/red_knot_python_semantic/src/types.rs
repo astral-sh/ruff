@@ -956,6 +956,12 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
+            // TODO this special case might be removable once the below cases are comprehensive
+            (_, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Object) =>
+            {
+                true
+            }
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -981,7 +987,10 @@ impl<'db> Type<'db> {
             }
             (Type::SubclassOf(subclass_of_ty), Type::Instance(_))
                 if subclass_of_ty.is_dynamic()
-                    && target.is_assignable_to(db, KnownClass::Type.to_instance(db)) =>
+                    && (target.is_assignable_to(db, KnownClass::Type.to_instance(db))
+                        || KnownClass::Type
+                            .to_instance(db)
+                            .is_assignable_to(db, target)) =>
             {
                 true
             }
@@ -3893,6 +3902,7 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfUnknown, Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::SubclassOfAny, Ty::AbcInstance("ABCMeta"))]
     #[test_case(Ty::SubclassOfUnknown, Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("object"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));

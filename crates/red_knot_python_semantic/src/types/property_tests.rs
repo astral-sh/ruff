@@ -220,6 +220,8 @@ macro_rules! type_property_test {
 }
 
 mod stable {
+    use super::KnownClass;
+
     // `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
@@ -284,6 +286,12 @@ mod stable {
     type_property_test!(
         non_fully_static_types_do_not_participate_in_subtyping, db,
         forall types s, t. !s.is_fully_static(db) => !s.is_subtype_of(db, t) && !t.is_subtype_of(db, s)
+    );
+
+    // All types should be assignable to `object`
+    type_property_test!(
+        all_types_assignable_to_object, db,
+        forall types t. t.is_assignable_to(db, KnownClass::Object.to_instance(db))
     );
 }
 
