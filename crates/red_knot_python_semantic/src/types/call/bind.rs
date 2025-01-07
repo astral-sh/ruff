@@ -16,6 +16,7 @@ pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'db>,
     signature: &Signature<'db>,
+    callable_ty: Option<Type<'db>>,
 ) -> CallBinding<'db> {
     let param_count = signature.parameter_count();
     let mut parameter_tys = vec![None; param_count];
@@ -100,6 +101,7 @@ pub(crate) fn bind_call<'db>(
     }
 
     CallBinding {
+        callable_ty,
         return_ty: signature.return_ty,
         parameter_tys: parameter_tys
             .into_iter()
@@ -111,6 +113,9 @@ pub(crate) fn bind_call<'db>(
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
+    /// Type of the callable object (function, class...)
+    callable_ty: Option<Type<'db>>,
+
     /// Return type of the call.
     return_ty: Type<'db>,
 
@@ -126,6 +131,7 @@ impl<'db> CallBinding<'db> {
     // TODO remove this constructor and construct always from `bind_call`
     pub(crate) fn from_return_ty(return_ty: Type<'db>) -> Self {
         Self {
+            callable_ty: None,
             return_ty,
             parameter_tys: Box::default(),
             errors: vec![],
@@ -148,9 +154,18 @@ impl<'db> CallBinding<'db> {
         self.parameter_tys().first().copied()
     }
 
+    fn callable_name(&self, db: &'db dyn Db) -> Option<&ast::name::Name> {
+        match self.callable_ty {
+            Some(Type::FunctionLiteral(function)) => Some(function.name(db)),
+            Some(Type::ClassLiteral(class_type)) => Some(class_type.class.name(db)),
+            _ => None,
+        }
+    }
+
     pub(super) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+        let callable_name = self.callable_name(context.db());
         for error in &self.errors {
-            error.report_diagnostic(context, node);
+            error.report_diagnostic(context, node, callable_name);
         }
     }
 }
@@ -217,7 +232,12 @@ pub(crate) enum CallBindingError<'db> {
 }
 
 impl<'db> CallBindingError<'db> {
-    pub(super) fn report_diagnostic(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+    pub(super) fn report_diagnostic(
+        &self,
+        context: &InferContext<'db>,
+        node: ast::AnyNodeRef,
+        callable_name: Option<&ast::name::Name>,
+    ) {
         match self {
             Self::InvalidArgumentType {
                 parameter,
@@ -231,8 +251,13 @@ impl<'db> CallBindingError<'db> {
                     &INVALID_ARGUMENT_TYPE,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Cannot assign type `{provided_ty_display}` to \
-                        {parameter} of type `{expected_ty_display}`",
+                        "Object of type `{provided_ty_display}` cannot be assigned to \
+                        {parameter}{}; expected type `{expected_ty_display}`",
+                        if let Some(callable_name) = callable_name {
+                            format!(" of function `{callable_name}`")
+                        } else {
+                            String::new()
+                        }
                     ),
                 );
             }
