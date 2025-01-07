@@ -55,70 +55,15 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Return number of parameters in this signature.
-    pub(crate) fn parameter_count(&self) -> usize {
-        self.parameters.0.len()
-    }
-
-    /// Return number of positional parameters this signature can accept.
-    ///
-    /// Doesn't account for variadic parameter.
-    pub(crate) fn positional_parameter_count(&self) -> usize {
-        self.parameters
-            .into_iter()
-            .take_while(|param| param.is_positional())
-            .count()
-    }
-
-    pub(crate) fn parameter_at_index(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.parameters.0.get(index)
-    }
-
-    /// Return positional parameter at given index, or `None` if `index` is out of range.
-    ///
-    /// Does not return variadic parameter.
-    pub(crate) fn positional_at_index(&self, index: usize) -> Option<&Parameter<'db>> {
-        if let Some(candidate) = self.parameter_at_index(index) {
-            if candidate.is_positional() {
-                return Some(candidate);
-            }
-        }
-        None
-    }
-
-    /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
-    pub(crate) fn variadic_parameter(&self) -> Option<(usize, &Parameter<'db>)> {
-        self.parameters
-            .into_iter()
-            .enumerate()
-            .find(|(_, parameter)| parameter.is_variadic())
-    }
-
-    /// Return parameter (with index) for given name, or `None` if no such parameter.
-    ///
-    /// Does not return keywords (`**kwargs`) parameter.
-    pub(crate) fn keyword_by_name(
-        &self,
-        name: &ast::name::Name,
-    ) -> Option<(usize, &Parameter<'db>)> {
-        self.parameters
-            .into_iter()
-            .enumerate()
-            .find(|(_, parameter)| parameter.callable_by_name(name))
-    }
-
-    /// Return the keywords parameter (`**kwargs`), if any, and its index, or `None`.
-    pub(crate) fn keywords_parameter(&self) -> Option<(usize, &Parameter<'db>)> {
-        self.parameters
-            .into_iter()
-            .enumerate()
-            .find(|(_, parameter)| parameter.is_keywords())
+    /// Return the parameters in this signature.
+    pub(crate) fn parameters(&self) -> &Parameters<'db> {
+        &self.parameters
     }
 }
 
 // TODO: use SmallVec here once invariance bug is fixed
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct Parameters<'db>(Vec<Parameter<'db>>);
+pub(crate) struct Parameters<'db>(Vec<Parameter<'db>>);
 
 impl<'db> Parameters<'db> {
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
@@ -172,6 +117,76 @@ impl<'db> Parameters<'db> {
                 .collect(),
         )
     }
+
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
+        self.0.iter()
+    }
+
+    /// Iterate initial positional parameters, not including variadic parameter, if any.
+    ///
+    /// For a valid signature, this will be all positional parameters. In an invalid signature,
+    /// there could be non-initial positional parameters; effectively, we just won't consider those
+    /// to be positional, which is fine.
+    pub(crate) fn positional_only(&self) -> impl Iterator<Item = &Parameter<'db>> {
+        self.iter().take_while(|param| param.is_positional())
+    }
+
+    /// Return number of positional parameters this signature can accept.
+    ///
+    /// Doesn't account for variadic parameter.
+    pub(crate) fn positional_count(&self) -> usize {
+        self.positional_only().count()
+    }
+
+    /// Return parameter at given index, or `None` if index is out-of-range.
+    pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
+        self.0.get(index)
+    }
+
+    /// Return positional parameter at given index, or `None` if `index` is out of range.
+    ///
+    /// Does not return variadic parameter.
+    pub(crate) fn get_positional(&self, index: usize) -> Option<&Parameter<'db>> {
+        if let Some(candidate) = self.get(index) {
+            if candidate.is_positional() {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
+    /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
+    pub(crate) fn variadic(&self) -> Option<(usize, &Parameter<'db>)> {
+        self.iter()
+            .enumerate()
+            .find(|(_, parameter)| parameter.is_variadic())
+    }
+
+    /// Return parameter (with index) for given name, or `None` if no such parameter.
+    ///
+    /// Does not return keywords (`**kwargs`) parameter.
+    ///
+    /// In an invalid signature, there could be multiple parameters with the same name; we will
+    /// just return the first that matches.
+    pub(crate) fn keyword_by_name(
+        &self,
+        name: &ast::name::Name,
+    ) -> Option<(usize, &Parameter<'db>)> {
+        self.iter()
+            .enumerate()
+            .find(|(_, parameter)| parameter.callable_by_name(name))
+    }
+
+    /// Return the keywords parameter (`**kwargs`), if any, and its index, or `None`.
+    pub(crate) fn keyword_variadic(&self) -> Option<(usize, &Parameter<'db>)> {
+        self.iter()
+            .enumerate()
+            .rfind(|(_, parameter)| parameter.is_keywords())
+    }
 }
 
 impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
@@ -180,6 +195,14 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+impl<'db> std::ops::Index<usize> for Parameters<'db> {
+    type Output = Parameter<'db>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
     }
 }
 

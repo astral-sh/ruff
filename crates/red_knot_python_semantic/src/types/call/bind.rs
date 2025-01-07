@@ -18,18 +18,18 @@ pub(crate) fn bind_call<'db>(
     signature: &Signature<'db>,
     callable_ty: Option<Type<'db>>,
 ) -> CallBinding<'db> {
-    let param_count = signature.parameter_count();
-    let mut parameter_tys = vec![None; param_count];
+    let parameters = signature.parameters();
+    let mut parameter_tys = vec![None; parameters.len()];
     let mut errors = vec![];
     let mut next_positional = 0;
     let mut first_excess_positional = None;
     for (argument_index, argument) in arguments.iter().enumerate() {
         let (index, parameter, argument_ty) = match argument {
             Argument::Positional(ty) => {
-                let Some((index, parameter)) = signature
-                    .positional_at_index(next_positional)
+                let Some((index, parameter)) = parameters
+                    .get_positional(next_positional)
                     .map(|param| (next_positional, param))
-                    .or_else(|| signature.variadic_parameter())
+                    .or_else(|| parameters.variadic())
                 else {
                     first_excess_positional.get_or_insert(argument_index);
                     next_positional += 1;
@@ -39,9 +39,9 @@ pub(crate) fn bind_call<'db>(
                 (index, parameter, ty)
             }
             Argument::Keyword { name, ty } => {
-                let Some((index, parameter)) = signature
+                let Some((index, parameter)) = parameters
                     .keyword_by_name(name)
-                    .or_else(|| signature.keywords_parameter())
+                    .or_else(|| parameters.keyword_variadic())
                 else {
                     errors.push(CallBindingError::UnknownArgument {
                         unknown_name: name.clone(),
@@ -81,16 +81,14 @@ pub(crate) fn bind_call<'db>(
     if let Some(first_excess_argument_index) = first_excess_positional {
         errors.push(CallBindingError::TooManyPositionalArguments {
             first_excess_argument_index,
-            expected_positional_count: signature.positional_parameter_count(),
+            expected_positional_count: parameters.positional_count(),
             provided_positional_count: next_positional,
         });
     }
     let mut missing = vec![];
     for (index, bound_ty) in parameter_tys.iter().enumerate() {
         if bound_ty.is_none() {
-            let param = signature
-                .parameter_at_index(index)
-                .expect("parameter_tys array should not be larger than number of parameters");
+            let param = &parameters[index];
             if param.is_variadic() || param.is_keywords() || param.default_ty().is_some() {
                 // variadic/keywords and defaulted arguments are not required
                 continue;
