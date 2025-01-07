@@ -1386,6 +1386,7 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
+            // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
