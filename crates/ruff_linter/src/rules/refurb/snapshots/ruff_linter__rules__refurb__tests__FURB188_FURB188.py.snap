@@ -1,8 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
-FURB188.py:7:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+FURB188.py:7:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    |
  6 |   def remove_extension_via_slice(filename: str) -> str:
  7 |       if filename.endswith(".txt"):
@@ -25,7 +24,7 @@ FURB188.py:7:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing w
 10 9 |     return filename
 11 10 | 
 
-FURB188.py:14:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+FURB188.py:14:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    |
 13 |   def remove_extension_via_slice_len(filename: str, extension: str) -> str:
 14 |       if filename.endswith(extension):
@@ -48,7 +47,7 @@ FURB188.py:14:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing 
 17 16 |     return filename
 18 17 | 
 
-FURB188.py:21:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+FURB188.py:21:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    |
 20 | def remove_extension_via_ternary(filename: str) -> str:
 21 |     return filename[:-4] if filename.endswith(".txt") else filename
@@ -66,7 +65,7 @@ FURB188.py:21:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing
 23 23 | 
 24 24 | def remove_extension_via_ternary_with_len(filename: str, extension: str) -> str:
 
-FURB188.py:25:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+FURB188.py:25:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    |
 24 | def remove_extension_via_ternary_with_len(filename: str, extension: str) -> str:
 25 |     return filename[:-len(extension)] if filename.endswith(extension) else filename
@@ -84,7 +83,7 @@ FURB188.py:25:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing
 27 27 | 
 28 28 | def remove_prefix(filename: str) -> str:
 
-FURB188.py:29:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:29:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    |
 28 | def remove_prefix(filename: str) -> str:
 29 |     return filename[4:] if filename.startswith("abc-") else filename
@@ -102,7 +101,7 @@ FURB188.py:29:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 31 31 | 
 32 32 | def remove_prefix_via_len(filename: str, prefix: str) -> str:
 
-FURB188.py:33:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:33:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    |
 32 | def remove_prefix_via_len(filename: str, prefix: str) -> str:
 33 |     return filename[len(prefix):] if filename.startswith(prefix) else filename
@@ -120,7 +119,7 @@ FURB188.py:33:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 35 35 | 
 36 36 | # these should not
 
-FURB188.py:146:9: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+FURB188.py:146:9: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
     |
 144 |     SUFFIX = "suffix"
 145 | 
@@ -141,7 +140,7 @@ FURB188.py:146:9: FURB188 [*] Prefer `removesuffix` over conditionally replacing
 148 148 | def remove_prefix_comparable_literal_expr() -> None:
 149 149 |     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
 
-FURB188.py:149:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:149:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 148 | def remove_prefix_comparable_literal_expr() -> None:
 149 |     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
@@ -161,7 +160,7 @@ FURB188.py:149:12: FURB188 [*] Prefer `removeprefix` over conditionally replacin
 151 151 | def shadow_builtins(filename: str, extension: str) -> None:
 152 152 |     from builtins import len as builtins_len
 
-FURB188.py:154:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+FURB188.py:154:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
     |
 152 |     from builtins import len as builtins_len
 153 | 
@@ -182,7 +181,7 @@ FURB188.py:154:12: FURB188 [*] Prefer `removesuffix` over conditionally replacin
 156 156 | def okay_steps():
 157 157 |     text = "!x!y!z"
 
-FURB188.py:158:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:158:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 156 |   def okay_steps():
 157 |       text = "!x!y!z"
@@ -206,7 +205,7 @@ FURB188.py:158:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 161 160 |         text = text[1::True]
 162 161 |     if text.startswith("!"):
 
-FURB188.py:160:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:160:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 158 |       if text.startswith("!"):
 159 |           text = text[1::1]
@@ -230,7 +229,7 @@ FURB188.py:160:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 163 162 |         text = text[1::None]
 164 163 |     print(text)
 
-FURB188.py:162:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:162:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 160 |       if text.startswith("!"):
 161 |           text = text[1::True]
@@ -253,7 +252,7 @@ FURB188.py:162:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 165 164 | 
 166 165 | 
 
-FURB188.py:183:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:183:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 181 |       # with fix `text = text.removeprefix("ř")`
 182 |       text = "řetězec"
@@ -275,7 +274,7 @@ FURB188.py:183:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 186 185 | 
 187 186 | def handle_surrogates():
 
-FURB188.py:190:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:190:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 188 |       # should be linted
 189 |       text = "\ud800\udc00heythere"
@@ -299,7 +298,7 @@ FURB188.py:190:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 193 192 |     if text.startswith("\U00010000"):
 194 193 |         text = text[1:]
 
-FURB188.py:193:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+FURB188.py:193:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
     |
 191 |           text = text[2:]
 192 |       text = "\U00010000heythere"
