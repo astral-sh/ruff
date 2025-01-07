@@ -97,7 +97,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
 fn unwrap_int_expression(
     call: &ExprCall,
     argument: &Expr,
-    mut applicability: Applicability,
+    applicability: Applicability,
     semantic: &SemanticModel,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -121,21 +121,29 @@ fn unwrap_int_expression(
         }
     };
 
-    // We are deleting the complement of the argument range within
-    // the call range, so we have to check both ends for comments.
+    // Since we're deleting the complement of the argument range within
+    // the call range, we have to check both ends for comments.
+    //
     // For example:
-    // ```
+    // ```python
     // int( # comment
     //     round(
     //         42.1
     //     ) # comment
     // )
     // ```
-    let call_to_arg_start = TextRange::new(call.start(), argument.start());
-    let arg_to_call_end = TextRange::new(argument.end(), call.end());
-    if comment_ranges.intersects(call_to_arg_start) || comment_ranges.intersects(arg_to_call_end) {
-        applicability = Applicability::Unsafe;
-    }
+    let applicability = {
+        let call_to_arg_start = TextRange::new(call.start(), argument.start());
+        let arg_to_call_end = TextRange::new(argument.end(), call.end());
+        if comment_ranges.intersects(call_to_arg_start)
+            || comment_ranges.intersects(arg_to_call_end)
+        {
+            Applicability::Unsafe
+        } else {
+            applicability
+        }
+    };
+
     let edit = Edit::range_replacement(content, call.range());
     Fix::applicable_edit(edit, applicability)
 }
