@@ -371,7 +371,7 @@ impl<'db> CallBindingError<'db> {
                     .arguments
                     .arguments_source_order()
                     .nth(argument_index)
-                    .expect("InvalidArgumentType argument_index should not be out of range")
+                    .expect("argument index should not be out of range")
                 {
                     ast::ArgOrKeyword::Arg(expr) => expr.into(),
                     ast::ArgOrKeyword::Keyword(keyword) => keyword.into(),
