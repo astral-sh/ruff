@@ -210,6 +210,10 @@ impl<'db> Parameter<'db> {
         matches!(self, Self::PositionalOnly(_) | Self::PositionalOrKeyword(_))
     }
 
+    pub(crate) fn is_positional_only(&self) -> bool {
+        matches!(self, Self::PositionalOnly(_))
+    }
+
     pub(crate) fn callable_by_name(&self, name: &ast::name::Name) -> bool {
         match self {
             Self::PositionalOrKeyword(param) | Self::KeywordOnly(param) => param
@@ -231,15 +235,13 @@ impl<'db> Parameter<'db> {
         self.param().name.as_ref()
     }
 
-    /// Display name of the parameter, with fallback if it doesn't have a name.
-    pub(crate) fn display_name(&self, index: usize) -> ast::name::Name {
-        self.name()
-            .map(|name| match self {
-                Self::Variadic(_) => ast::name::Name::new(format!("*{name}")),
-                Self::Keywords(_) => ast::name::Name::new(format!("**{name}")),
-                _ => name.clone(),
-            })
-            .unwrap_or_else(|| ast::name::Name::new(format!("positional parameter {index}")))
+    /// Display name of the parameter, if it has one.
+    pub(crate) fn display_name(&self) -> Option<ast::name::Name> {
+        self.name().map(|name| match self {
+            Self::Variadic(_) => ast::name::Name::new(format!("*{name}")),
+            Self::Keywords(_) => ast::name::Name::new(format!("**{name}")),
+            _ => name.clone(),
+        })
     }
 
     /// Default-value type of the parameter, if any.

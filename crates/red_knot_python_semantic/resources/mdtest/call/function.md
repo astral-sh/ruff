@@ -83,7 +83,7 @@ reveal_type(f("foo"))  # revealed: int
 def f(x: int, /) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `x` of type `int`"
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to positional parameter 0 (`x`) of type `int`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -244,6 +244,6 @@ reveal_type(f(x=1, y=2))  # revealed: int
 def f(x: int) -> int:
     return 1
 
-# error: 18 [parameter-already-assigned] "Parameter `x` is already assigned"
+# error: 18 [parameter-already-assigned] "Got multiple values for parameter `x`"
 reveal_type(f(1, x=2))  # revealed: int
 ```

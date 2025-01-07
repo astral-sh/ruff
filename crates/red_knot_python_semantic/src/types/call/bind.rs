@@ -4,6 +4,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
+use crate::types::signatures::Parameter;
 use crate::types::UnionType;
 use ruff_python_ast as ast;
 
@@ -58,7 +59,7 @@ pub(crate) fn bind_call<'db>(
         let expected_ty = parameter.annotated_ty();
         if !argument_ty.is_assignable_to(db, expected_ty) {
             errors.push(CallBindingError::InvalidArgumentType {
-                parameter_name: parameter.display_name(index),
+                parameter: ParameterContext::new(parameter, index),
                 argument_index,
                 expected_ty,
                 provided_ty: *argument_ty,
@@ -71,7 +72,7 @@ pub(crate) fn bind_call<'db>(
             } else {
                 errors.push(CallBindingError::ParameterAlreadyAssigned {
                     argument_index,
-                    parameter_name: parameter.display_name(index),
+                    parameter: ParameterContext::new(parameter, index),
                 });
             }
         }
@@ -93,7 +94,7 @@ pub(crate) fn bind_call<'db>(
                 continue;
             }
             errors.push(CallBindingError::MissingArgument {
-                parameter_name: param.display_name(index),
+                parameter: ParameterContext::new(param, index),
             });
         }
     }
@@ -155,17 +156,48 @@ impl<'db> CallBinding<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParameterContext {
+    name: Option<ast::name::Name>,
+    index: usize,
+    positional_only: bool,
+}
+
+impl ParameterContext {
+    fn new(parameter: &Parameter, index: usize) -> Self {
+        Self {
+            name: parameter.display_name(),
+            index,
+            positional_only: parameter.is_positional_only(),
+        }
+    }
+}
+
+impl std::fmt::Display for ParameterContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(name) = &self.name {
+            if self.positional_only {
+                write!(f, "positional parameter {} (`{name}`)", self.index)
+            } else {
+                write!(f, "parameter `{name}`")
+            }
+        } else {
+            write!(f, "positional parameter {}", self.index)
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CallBindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.
     InvalidArgumentType {
-        parameter_name: ast::name::Name,
+        parameter: ParameterContext,
         argument_index: usize,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
     },
     /// A required parameter (that is, one without a default) is not supplied by any argument.
-    MissingArgument { parameter_name: ast::name::Name },
+    MissingArgument { parameter: ParameterContext },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
         unknown_name: ast::name::Name,
@@ -180,7 +212,7 @@ pub(crate) enum CallBindingError<'db> {
     /// Multiple arguments were provided for a single parameter.
     ParameterAlreadyAssigned {
         argument_index: usize,
-        parameter_name: ast::name::Name,
+        parameter: ParameterContext,
     },
 }
 
@@ -188,7 +220,7 @@ impl<'db> CallBindingError<'db> {
     pub(super) fn report_diagnostic(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         match self {
             Self::InvalidArgumentType {
-                parameter_name,
+                parameter,
                 argument_index,
                 expected_ty,
                 provided_ty,
@@ -199,8 +231,8 @@ impl<'db> CallBindingError<'db> {
                     &INVALID_ARGUMENT_TYPE,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Cannot assign type `{provided_ty_display}` to parameter \
-                        `{parameter_name}` of type `{expected_ty_display}`",
+                        "Cannot assign type `{provided_ty_display}` to \
+                        {parameter} of type `{expected_ty_display}`",
                     ),
                 );
             }
@@ -220,11 +252,11 @@ impl<'db> CallBindingError<'db> {
                 );
             }
 
-            Self::MissingArgument { parameter_name } => {
+            Self::MissingArgument { parameter } => {
                 context.report_lint(
                     &MISSING_ARGUMENT,
                     node,
-                    format_args!("No argument provided for required parameter `{parameter_name}`"),
+                    format_args!("No argument provided for required {parameter}"),
                 );
             }
 
@@ -241,12 +273,12 @@ impl<'db> CallBindingError<'db> {
 
             Self::ParameterAlreadyAssigned {
                 argument_index,
-                parameter_name,
+                parameter,
             } => {
                 context.report_lint(
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
-                    format_args!("Parameter `{parameter_name}` is already assigned"),
+                    format_args!("Got multiple values for {parameter}"),
                 );
             }
         }
