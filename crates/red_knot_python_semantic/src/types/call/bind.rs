@@ -19,6 +19,7 @@ pub(crate) fn bind_call<'db>(
     callable_ty: Option<Type<'db>>,
 ) -> CallBinding<'db> {
     let parameters = signature.parameters();
+    // The type assigned to each parameter at this call site.
     let mut parameter_tys = vec![None; parameters.len()];
     let mut errors = vec![];
     let mut next_positional = 0;
