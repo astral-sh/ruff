@@ -169,8 +169,7 @@ def _(flag: bool):
 def _(flag: bool):
     x = 1 if flag else "a"
 
-    # TODO: this should cause us to emit a diagnostic
-    # (`isinstance` has no `foo` parameter)
+    # error: [unknown-argument]
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1] | Literal["a"]
 ```

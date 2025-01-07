@@ -33,6 +33,8 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
+    // We don't handle intersections in `is_assignable_to` yet
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:211:31 Object of type `Unknown & object | @Todo` cannot be assigned to parameter 1 (`obj`) of function `isinstance`; expected type `object`",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
@@ -42,8 +44,11 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:626:46 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
-    "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive"
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:632:58 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:639:52 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`",
+    "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
