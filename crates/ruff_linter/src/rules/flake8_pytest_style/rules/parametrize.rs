@@ -863,41 +863,23 @@ pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
     }
 
     if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-        let names = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argnames", 0)
-        } else {
-            call.arguments.find_positional(0)
-        };
-        let values = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argvalues", 1)
-        } else {
-            call.arguments.find_positional(1)
-        };
+        let names = call.arguments.find_argument_value("argnames", 0);
+        let values = call.arguments.find_argument_value("argvalues", 1);
+
         if let (Some(names), Some(values)) = (names, values) {
             check_names(checker, call, names, values);
         }
     }
     if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-        let names = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argnames", 0)
-        } else {
-            call.arguments.find_positional(0)
-        };
-        let values = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argvalues", 1)
-        } else {
-            call.arguments.find_positional(1)
-        };
+        let names = call.arguments.find_argument_value("argnames", 0);
+        let values = call.arguments.find_argument_value("argvalues", 1);
+
         if let (Some(names), Some(values)) = (names, values) {
             check_values(checker, names, values);
         }
     }
     if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argvalues", 1)
-        } else {
-            call.arguments.find_positional(1)
-        } {
+        if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
             check_duplicates(checker, values);
         }
     }
