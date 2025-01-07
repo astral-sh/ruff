@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
    |
@@ -118,22 +117,22 @@ sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters"
 532 532 | 
 533 533 | 
 
-sections.py:602:4: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:613:4: D407 [*] Missing dashed underline after section ("Parameters")
     |
-600 |    """Test that lower case subsection header is valid even if it is of a different kind.
-601 | 
-602 |    Parameters
+611 |    """Test that lower case subsection header is valid even if it is of a different kind.
+612 | 
+613 |    Parameters
     |    ^^^^^^^^^^ D407
-603 |    -‐-----------------
-604 |    returns:
+614 |    -‐-----------------
+615 |    returns:
     |
     = help: Add dashed line under "Parameters"
 
 ℹ Safe fix
-600 600 |    """Test that lower case subsection header is valid even if it is of a different kind.
-601 601 | 
-602 602 |    Parameters
-    603 |+   ----------
-603 604 |    -‐-----------------
-604 605 |    returns:
-605 606 |        some value
+611 611 |    """Test that lower case subsection header is valid even if it is of a different kind.
+612 612 | 
+613 613 |    Parameters
+    614 |+   ----------
+614 615 |    -‐-----------------
+615 616 |    returns:
+616 617 |        some value
