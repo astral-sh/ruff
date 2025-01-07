@@ -90,7 +90,7 @@ where
     let line_end = locator.full_line_end(script_start.end());
     let rest = locator.after(line_end);
     let mut end_offset = None;
-    let mut lines = UniversalNewlineIterator::with_offset(rest, line_end);
+    let lines = UniversalNewlineIterator::with_offset(rest, line_end);
 
     for line in lines {
         let Some(content) = script_line_content(&line) else {
