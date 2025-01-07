@@ -19,15 +19,15 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a "returns" section in
-/// their docstring.
+/// Checks for functions with explicit `return` statements that do not have
+/// "Returns" sections in their docstrings.
 ///
 /// ## Why is this bad?
-/// Docstrings missing return sections are a sign of incomplete documentation
-/// or refactors.
+/// A missing "Returns" section is a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods, stubs functions, or
-/// functions that only return `None`.
+/// This rule is not enforced for abstract methods or functions that only return
+/// `None`. It is also ignored for "stub functions": functions where the body only
+/// consists of `pass`, `...`, `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -70,14 +70,15 @@ impl Violation for DocstringMissingReturns {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a "returns" section without
-/// needing one.
+/// Checks for function docstrings with redundant "Returns" sections.
 ///
 /// ## Why is this bad?
-/// Functions without an explicit return should not have a returns section
-/// in their docstrings.
+/// A function without an explicit `return` statement should not have a
+/// "Returns" section in its docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -121,15 +122,15 @@ impl Violation for DocstringExtraneousReturns {
 }
 
 /// ## What it does
-/// Checks for functions with yield statements missing a "yields" section in
-/// their docstring.
+/// Checks for functions with `yield` statements that do not have "Yields" sections in
+/// their docstrings.
 ///
 /// ## Why is this bad?
-/// Docstrings missing yields sections are a sign of incomplete documentation
-/// or refactors.
+/// A missing "Yields" section is a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods, stubs functions, or
-/// functions that only yield `None`.
+/// This rule is not enforced for abstract methods or functions that only yield `None`.
+/// It is also ignored for "stub functions": functions where the body only consists
+/// of `pass`, `...`, `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -172,14 +173,15 @@ impl Violation for DocstringMissingYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a "yields" section without
-/// needing one.
+/// Checks for function docstrings with redundant "Yields" sections.
 ///
 /// ## Why is this bad?
-/// Functions which don't yield anything should not have a yields section
-/// in their docstrings.
+/// A function that doesn't yield anything should not have a "Yields" section
+/// in its docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -222,15 +224,17 @@ impl Violation for DocstringExtraneousYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings that do not include documentation for all
-/// explicitly raised exceptions.
+/// Checks for function docstrings that do not document all explicitly raised
+/// exceptions.
 ///
 /// ## Why is this bad?
-/// If a function raises an exception without documenting it in its docstring,
-/// it can be misleading to users and/or a sign of incomplete documentation or
-/// refactors.
+/// A function should document all exceptions that are directly raised in some
+/// circumstances. Failing to document an exception that could be raised
+/// can be misleading to users and/or a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -289,14 +293,16 @@ impl Violation for DocstringMissingException {
 }
 
 /// ## What it does
-/// Checks for function docstrings that include exceptions which are not
-/// explicitly raised.
+/// Checks for function docstrings that state that exceptions could be raised
+/// even though they are not directly raised in the function body.
 ///
 /// ## Why is this bad?
 /// Some conventions prefer non-explicit exceptions be omitted from the
 /// docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -330,6 +336,11 @@ impl Violation for DocstringMissingException {
 ///     """
 ///     return distance / time
 /// ```
+///
+/// ## Known issues
+/// It may often be desirable to document *all* exceptions that a function
+/// could possibly raise, even those which are not explicitly raised using
+/// `raise` statements in the function body.
 #[derive(ViolationMetadata)]
 pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
@@ -849,7 +860,6 @@ pub(crate) fn check_docstring(
 
     let semantic = checker.semantic();
 
-    // Ignore stubs.
     if function_type::is_stub(function_def, semantic) {
         return;
     }
