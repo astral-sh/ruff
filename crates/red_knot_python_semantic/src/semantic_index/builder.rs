@@ -1637,6 +1637,7 @@ impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 struct CurrentMatchCase<'a> {
     /// The pattern that's part of the current match case.
     pattern: &'a ast::Pattern,
