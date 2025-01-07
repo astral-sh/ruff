@@ -6,7 +6,7 @@ use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, Reso
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{lines_after_ignoring_trivia, CommentRanges};
 use ruff_source_file::LineRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::unnecessary_round::{
@@ -97,7 +97,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
 fn unwrap_int_expression(
     call: &ExprCall,
     argument: &Expr,
-    applicability: Applicability,
+    mut applicability: Applicability,
     semantic: &SemanticModel,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -120,6 +120,22 @@ fn unwrap_int_expression(
             locator.slice(argument.range()).to_string()
         }
     };
+
+    // We are deleting the complement of the argument range within
+    // the call range, so we have to check both ends for comments.
+    // For example:
+    // ```
+    // int( # comment
+    //     round(
+    //         42.1
+    //     ) # comment
+    // )
+    // ```
+    let call_to_arg_start = TextRange::new(call.start(), argument.start());
+    let arg_to_call_end = TextRange::new(argument.end(), call.end());
+    if comment_ranges.intersects(call_to_arg_start) || comment_ranges.intersects(arg_to_call_end) {
+        applicability = Applicability::Unsafe;
+    }
     let edit = Edit::range_replacement(content, call.range());
     Fix::applicable_edit(edit, applicability)
 }
