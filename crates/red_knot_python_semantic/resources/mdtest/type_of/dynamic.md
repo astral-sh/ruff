@@ -47,9 +47,8 @@ x: type = A()  # error: [invalid-assignment]
 
 ```py
 def f(x: type[object]):
-    reveal_type(x)  # revealed: type[object]
-    # TODO: bound method types
-    reveal_type(x.__repr__)  # revealed: Literal[__repr__]
+    reveal_type(x)  # revealed: type
+    reveal_type(x.__repr__)  # revealed: @Todo(instance attributes)
 
 class A: ...
 

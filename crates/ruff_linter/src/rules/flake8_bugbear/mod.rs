@@ -21,6 +21,7 @@ mod tests {
     #[test_case(Rule::AssertRaisesException, Path::new("B017.py"))]
     #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"))]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"))]
+    #[test_case(Rule::ClassAsDataStructure, Path::new("class_as_data_structure.py"))]
     #[test_case(Rule::DuplicateHandlerException, Path::new("B014.py"))]
     #[test_case(Rule::DuplicateTryBlockException, Path::new("B025.py"))]
     #[test_case(Rule::DuplicateValue, Path::new("B033.py"))]

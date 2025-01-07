@@ -49,7 +49,6 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
-use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
     report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -65,7 +64,7 @@ use crate::types::{
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
     KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    SubclassOfType, Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
     TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
@@ -3433,6 +3432,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
             (Type::Any, _, _) | (_, Type::Any, _) => Some(Type::Any),
+            (todo @ Type::Todo(_), _, _) | (_, todo @ Type::Todo(_), _) => Some(todo),
+            (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
             (Type::Unknown, _, _) | (_, Type::Unknown, _) => Some(Type::Unknown),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -3531,54 +3532,78 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(ty)
             }
 
-            (Type::Instance(_), Type::IntLiteral(_), op) => self.infer_binary_expression_type(
-                left_ty,
-                KnownClass::Int.to_instance(self.db()),
+            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
+                Some(Type::BooleanLiteral(b1 | b2))
+            }
+
+            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
+                Type::IntLiteral(i64::from(bool_value)),
+                right,
                 op,
             ),
+            (left, Type::BooleanLiteral(bool_value), op) => {
+                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
+            }
 
-            (Type::IntLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Int.to_instance(self.db()),
-                right_ty,
+            // We've handled all of the special cases that we support for literals, so we need to
+            // fall back on looking for dunder methods on one of the operand types.
+            (
+                Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::Instance(_)
+                | Type::KnownInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::SliceLiteral(_)
+                | Type::Tuple(_),
+                Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::Instance(_)
+                | Type::KnownInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::SliceLiteral(_)
+                | Type::Tuple(_),
                 op,
-            ),
+            ) => {
+                // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
+                // the Python spec [1] is:
+                //
+                //   - If rhs is a (proper) subclass of lhs, and it provides a different
+                //     implementation of __rop__, use that.
+                //   - Otherwise, if lhs implements __op__, use that.
+                //   - Otherwise, if lhs and rhs are different types, and rhs implements __rop__,
+                //     use that.
+                //
+                // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
 
-            (Type::Instance(_), Type::Tuple(_), op) => self.infer_binary_expression_type(
-                left_ty,
-                KnownClass::Tuple.to_instance(self.db()),
-                op,
-            ),
-
-            (Type::Tuple(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Tuple.to_instance(self.db()),
-                right_ty,
-                op,
-            ),
-
-            (Type::Instance(_), Type::StringLiteral(_) | Type::LiteralString, op) => self
-                .infer_binary_expression_type(left_ty, KnownClass::Str.to_instance(self.db()), op),
-
-            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(_), op) => self
-                .infer_binary_expression_type(KnownClass::Str.to_instance(self.db()), right_ty, op),
-
-            (Type::Instance(_), Type::BytesLiteral(_), op) => self.infer_binary_expression_type(
-                left_ty,
-                KnownClass::Bytes.to_instance(self.db()),
-                op,
-            ),
-
-            (Type::BytesLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Bytes.to_instance(self.db()),
-                right_ty,
-                op,
-            ),
-
-            (Type::Instance(left), Type::Instance(right), op) => {
-                if left != right && right.is_subtype_of(self.db(), left) {
+                // Technically we don't have to check left_ty != right_ty here, since if the types
+                // are the same, they will trivially have the same implementation of the reflected
+                // dunder, and so we'll fail the inner check. But the type equality check will be
+                // faster for the common case, and allow us to skip the (two) class member lookups.
+                let left_class = left_ty.to_meta_type(self.db());
+                let right_class = right_ty.to_meta_type(self.db());
+                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
                     let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right.class.class_member(self.db(), reflected_dunder);
+                    let rhs_reflected = right_class.member(self.db(), reflected_dunder);
                     if !rhs_reflected.is_unbound()
-                        && rhs_reflected != left.class.class_member(self.db(), reflected_dunder)
+                        && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
                         return right_ty
                             .call_dunder(self.db(), reflected_dunder, &[right_ty, left_ty])
@@ -3592,7 +3617,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let call_on_left_instance = if let Symbol::Type(class_member, _) =
-                    left.class.class_member(self.db(), op.dunder())
+                    left_class.member(self.db(), op.dunder())
                 {
                     class_member
                         .call(self.db(), &[left_ty, right_ty])
@@ -3602,11 +3627,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 call_on_left_instance.or_else(|| {
-                    if left == right {
+                    if left_ty == right_ty {
                         None
                     } else {
                         if let Symbol::Type(class_member, _) =
-                            right.class.class_member(self.db(), op.reflected_dunder())
+                            right_class.member(self.db(), op.reflected_dunder())
                         {
                             class_member
                                 .call(self.db(), &[right_ty, left_ty])
@@ -3617,20 +3642,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 })
             }
-
-            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
-                Some(Type::BooleanLiteral(b1 | b2))
-            }
-
-            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
-                Type::IntLiteral(i64::from(bool_value)),
-                right,
-                op,
-            ),
-            (left, Type::BooleanLiteral(bool_value), op) => {
-                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
-            }
-            _ => Some(todo_type!("Support for more binary expressions")),
         }
     }
 
@@ -4926,9 +4937,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
-                    Type::ClassLiteral(ClassLiteralType { class }) => Type::subclass_of(class),
+                    Type::ClassLiteral(ClassLiteralType { class }) => {
+                        SubclassOfType::from(self.db(), class)
+                    }
                     Type::KnownInstance(KnownInstanceType::Any) => {
-                        Type::subclass_of_base(ClassBase::Any)
+                        SubclassOfType::subclass_of_any()
                     }
                     _ => todo_type!("unsupported type[X] special form"),
                 }
