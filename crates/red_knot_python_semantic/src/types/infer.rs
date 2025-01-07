@@ -1787,13 +1787,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         // we need to choose an Expr that can “stand in” for the pattern, which we can wrap in a
         // standalone expression.
         //
-        // Standalone expressions also define an “inference scope”, where inferring the types of
-        // any expression within that scope requires doing so via the standalone expression.
-        // Typically, that inference scope follows the AST structure: all AST subexpressions of the
-        // standalone expression are part of the inference scope. Here we diverge from that, since
-        // it is the overall match arm pattern that defines the inference scope, and we are
-        // choosing precisely one of the subexpressions to represent it as the wrapped standalone
-        // expression.
+        // That said, when inferring the type of a standalone expression, we don't have access to
+        // its parent or sibling nodes.  That means, for instance, that in a class pattern, where
+        // we are currently using the class name as the standalone expression, we do not have
+        // access to the class pattern's arguments in the standalone expression inference scope.
+        // At the moment, we aren't trying to do anything with those arguments when creating a
+        // narrowing constraint for the pattern.  But in the future, if we do, we will have to
+        // either wrap those arguments in their own standalone expressions, or update Expression to
+        // be able to wrap other AST node types besides just ast::Expr.
         //
         // This function is only called for the top-level pattern of a match arm, and is
         // responsible for inferring the standalone expression for each supported pattern type. It
