@@ -293,6 +293,12 @@ mod stable {
         all_types_assignable_to_object, db,
         forall types t. t.is_assignable_to(db, KnownClass::Object.to_instance(db))
     );
+
+    // And for fully static types, they should also be subtypes of `object`
+    type_property_test!(
+        all_fully_static_types_subtype_of_object, db,
+        forall types t. t.is_fully_static() => t.is_subtype_of(db, KnownClass::Object.to_instance(db))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
