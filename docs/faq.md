@@ -221,7 +221,7 @@ Ruff is installable under any Python version from 3.7 onwards.
 ## Do I need to install Rust to use Ruff?
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/),
-though it's also installable with `pip`, `pipx`, and a [variety of other package managers](installation.md).
+though it's also installable with `pip`, `pipx`, and a [variety of other package managers](installation.md):
 
 ```console
 $ # Install Ruff globally.
@@ -237,8 +237,22 @@ $ # With pipx.
 $ pipx install ruff
 ```
 
-Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
-on Rust at all.
+Starting with version `0.5.0`, Ruff can also be installed with our standalone installers:
+
+```console
+$ # On macOS and Linux.
+$ curl -LsSf https://astral.sh/ruff/install.sh | sh
+
+$ # On Windows.
+$ powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
+
+$ # For a specific version.
+$ curl -LsSf https://astral.sh/ruff/0.5.0/install.sh | sh
+$ powershell -c "irm https://astral.sh/ruff/0.5.0/install.ps1 | iex"
+```
+
+Ruff ships with wheels for all major platforms, which enables `uv`, `pip`, and other tools to install Ruff without
+relying on a Rust toolchain at all.
 
 ## Can I write my own linter plugins for Ruff?
 
