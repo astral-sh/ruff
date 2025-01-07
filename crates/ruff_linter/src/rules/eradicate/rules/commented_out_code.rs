@@ -92,7 +92,7 @@ where
     let mut end_offset = None;
     let mut lines = UniversalNewlineIterator::with_offset(rest, line_end);
 
-    while let Some(line) = lines.next() {
+    for line in lines {
         let Some(content) = script_line_content(&line) else {
             break;
         };
