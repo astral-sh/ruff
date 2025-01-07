@@ -121,11 +121,11 @@ impl Violation for NonPEP604AnnotationOptional {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `X | Y` for type annotations".to_string()
+        "Use `X | None` for type annotations".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Convert to `X | Y`".to_string())
+        Some("Convert to `X | None`".to_string())
     }
 }
 
