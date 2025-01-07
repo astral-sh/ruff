@@ -9,6 +9,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 /// ## What it does
 /// Checks for files with multiple trailing blank lines.
 ///
+/// In the case of notebooks, this check is applied to
+/// each cell separately.
+///
 /// ## Why is this bad?
 /// Trailing blank lines in a file are superfluous.
 ///
@@ -26,17 +29,19 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 #[derive(ViolationMetadata)]
 pub(crate) struct TooManyNewlinesAtEndOfFile {
     num_trailing_newlines: u32,
+    in_notebook: bool,
 }
 
 impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
+        let domain = if self.in_notebook { "cell" } else { "file" };
         // We expect a single trailing newline; so two trailing newlines is one too many, three
         // trailing newlines is two too many, etc.
         if self.num_trailing_newlines > 2 {
-            "Too many newlines at end of file".to_string()
+            format!("Too many newlines at end of {domain}")
         } else {
-            "Extra newline at end of file".to_string()
+            format!("Extra newline at end of {domain}")
         }
     }
 
