@@ -769,6 +769,14 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
 
+            // `object` is the only type that can be known to be a supertype of any intersection,
+            // even an intersection with no positive elements
+            (Type::Intersection(_), Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Object) =>
+            {
+                true
+            }
+
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Check that all target positive values are covered in self positive values
                 target_intersection
@@ -954,16 +962,32 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
+            // The dynamic type is assignable-to and assignable-from any type.
             (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
+
+            // All types are assignable to `object`.
+            // TODO this special case might be removable once the below cases are comprehensive
+            (_, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Object) =>
+            {
+                true
+            }
+
+            // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
                 .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            // A type T is assignable to a union iff T is assignable to any element of the union.
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+
+            // A tuple type S is assignable to a tuple type T if their lengths are the same, and
+            // each element of S is assignable to the corresponding element of T.
             (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
                 let self_elements = self_tuple.elements(db);
                 let target_elements = target_tuple.elements(db);
@@ -974,28 +998,53 @@ impl<'db> Type<'db> {
                         },
                     )
             }
+
+            // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
+            // materialize to any `type[...]` type.
             (Type::SubclassOf(subclass_of_ty), Type::SubclassOf(_))
                 if subclass_of_ty.is_dynamic() =>
             {
                 true
             }
-            (Type::SubclassOf(subclass_of_ty), Type::Instance(_))
-                if subclass_of_ty.is_dynamic()
-                    && target.is_assignable_to(db, KnownClass::Type.to_instance(db)) =>
+
+            // All `type[...]` types are assignable to `type[Any]`, because `type[Any]` can
+            // materialize to any `type[...]` type.
+            //
+            // Every class literal type is also assignable to `type[Any]`, because the class
+            // literal type for a class `C` is a subtype of `type[C]`, and `type[C]` is assignable
+            // to `type[Any]`.
+            (Type::ClassLiteral(_) | Type::SubclassOf(_), Type::SubclassOf(target_subclass_of))
+                if target_subclass_of.is_dynamic() =>
             {
                 true
             }
+
+            // `type[Any]` is assignable to any type that `type[object]` is assignable to, because
+            // `type[Any]` can materialize to `type[object]`.
+            //
+            // `type[Any]` is also assignable to any subtype of `type[object]`, because all
+            // subtypes of `type[object]` are `type[...]` types (or `Never`), and `type[Any]` can
+            // materialize to any `type[...]` type (or to `type[Never]`, which is equivalent to
+            // `Never`.)
+            (Type::SubclassOf(subclass_of_ty), Type::Instance(_))
+                if subclass_of_ty.is_dynamic()
+                    && (KnownClass::Type
+                        .to_instance(db)
+                        .is_assignable_to(db, target)
+                        || target.is_subtype_of(db, KnownClass::Type.to_instance(db))) =>
+            {
+                true
+            }
+
+            // Any type that is assignable to `type[object]` is also assignable to `type[Any]`,
+            // because `type[Any]` can materialize to `type[object]`.
             (Type::Instance(_), Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic()
                     && self.is_assignable_to(db, KnownClass::Type.to_instance(db)) =>
             {
                 true
             }
-            (Type::ClassLiteral(_) | Type::SubclassOf(_), Type::SubclassOf(target_subclass_of))
-                if target_subclass_of.is_dynamic() =>
-            {
-                true
-            }
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -3893,6 +3942,7 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfUnknown, Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::SubclassOfAny, Ty::AbcInstance("ABCMeta"))]
     #[test_case(Ty::SubclassOfUnknown, Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("object"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3976,6 +4026,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Never, Ty::AlwaysTruthy)]
     #[test_case(Ty::Never, Ty::AlwaysFalsy)]
     #[test_case(Ty::BuiltinClassLiteral("bool"), Ty::SubclassOfBuiltinClass("int"))]
+    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::LiteralString]}, Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
