@@ -2488,39 +2488,42 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_arguments(&mut self, arguments: &ast::Arguments) -> CallArguments<'db> {
-        CallArguments::from_arguments(arguments.arguments_source_order().map(|arg_or_keyword| {
-            match arg_or_keyword {
-                ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred {
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| {
+                match arg_or_keyword {
+                    ast::ArgOrKeyword::Arg(arg) => match arg {
+                        ast::Expr::Starred(ast::ExprStarred {
+                            value,
+                            range: _,
+                            ctx: _,
+                        }) => {
+                            let ty = self.infer_expression(value);
+                            self.store_expression_type(arg, ty);
+                            Argument::Variadic(ty)
+                        }
+                        // TODO diagnostic if after a keyword argument
+                        _ => Argument::Positional(self.infer_expression(arg)),
+                    },
+                    ast::ArgOrKeyword::Keyword(ast::Keyword {
+                        arg,
                         value,
                         range: _,
-                        ctx: _,
                     }) => {
                         let ty = self.infer_expression(value);
-                        self.store_expression_type(arg, ty);
-                        Argument::Variadic(ty)
-                    }
-                    // TODO diagnostic if after a keyword argument
-                    _ => Argument::Positional(self.infer_expression(arg)),
-                },
-                ast::ArgOrKeyword::Keyword(ast::Keyword {
-                    arg,
-                    value,
-                    range: _,
-                }) => {
-                    let ty = self.infer_expression(value);
-                    if let Some(arg) = arg {
-                        Argument::Keyword {
-                            name: arg.id.clone(),
-                            ty,
+                        if let Some(arg) = arg {
+                            Argument::Keyword {
+                                name: arg.id.clone(),
+                                ty,
+                            }
+                        } else {
+                            // TODO diagnostic if not last
+                            Argument::Keywords(ty)
                         }
-                    } else {
-                        // TODO diagnostic if not last
-                        Argument::Keywords(ty)
                     }
                 }
-            }
-        }))
+            })
+            .collect()
     }
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {

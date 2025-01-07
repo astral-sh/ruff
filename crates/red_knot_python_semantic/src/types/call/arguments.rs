@@ -7,20 +7,22 @@ use std::collections::VecDeque;
 pub(crate) struct CallArguments<'db>(VecDeque<Argument<'db>>);
 
 impl<'db> CallArguments<'db> {
-    /// Create a [`CallArguments`] from an iterator over [`Argument`]s.
-    pub(crate) fn from_arguments(arguments: impl IntoIterator<Item = Argument<'db>>) -> Self {
-        Self(arguments.into_iter().collect())
-    }
-
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        Self::from_arguments(positional_tys.into_iter().map(Argument::Positional))
+        positional_tys
+            .into_iter()
+            .map(Argument::Positional)
+            .collect()
     }
 
     /// Prepend an extra positional argument.
     pub(crate) fn with_self(mut self, self_ty: Type<'db>) -> Self {
         self.0.push_front(Argument::Positional(self_ty));
         self
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'db>> {
+        self.0.iter()
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
@@ -35,6 +37,12 @@ impl<'db, 'a> IntoIterator for &'a CallArguments<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+impl<'db> FromIterator<Argument<'db>> for CallArguments<'db> {
+    fn from_iter<T: IntoIterator<Item = Argument<'db>>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 

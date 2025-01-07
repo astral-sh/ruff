@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::context::InferContext;
 use super::diagnostic::CALL_NON_CALLABLE;
 use super::{Severity, Signature, Type, TypeArrayDisplay, UnionBuilder};

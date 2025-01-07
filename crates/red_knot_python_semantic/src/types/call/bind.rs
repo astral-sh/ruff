@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::{Argument, CallArguments, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::types::diagnostic::{
@@ -22,7 +21,7 @@ pub(crate) fn bind_call<'db>(
     let mut errors = vec![];
     let mut next_positional = 0;
     let mut first_excess_positional = None;
-    for (argument_index, argument) in arguments.into_iter().enumerate() {
+    for (argument_index, argument) in arguments.iter().enumerate() {
         let (index, parameter, argument_ty) = match argument {
             Argument::Positional(ty) => {
                 let Some((index, parameter)) = signature
@@ -146,10 +145,6 @@ impl<'db> CallBinding<'db> {
 
     pub(crate) fn first_parameter(&self) -> Option<Type<'db>> {
         self.parameter_tys().first().copied()
-    }
-
-    pub(crate) fn errors(&self) -> std::slice::Iter<'_, CallBindingError<'db>> {
-        self.errors.iter()
     }
 
     pub(super) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {

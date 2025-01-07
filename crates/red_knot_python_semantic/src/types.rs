@@ -1687,6 +1687,7 @@ impl<'db> Type<'db> {
                     {
                         bool_val.into()
                     } else {
+                        // TODO diagnostic if not assignable to bool
                         Truthiness::Ambiguous
                     }
                 }
