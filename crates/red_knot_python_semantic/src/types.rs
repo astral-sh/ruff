@@ -769,6 +769,14 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
 
+            // `object` is the only type that can be known to be a supertype of any intersection,
+            // even an intersection with no positive elements
+            (Type::Intersection(_), Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Object) =>
+            {
+                true
+            }
+
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Check that all target positive values are covered in self positive values
                 target_intersection
@@ -3986,6 +3994,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Never, Ty::AlwaysTruthy)]
     #[test_case(Ty::Never, Ty::AlwaysFalsy)]
     #[test_case(Ty::BuiltinClassLiteral("bool"), Ty::SubclassOfBuiltinClass("int"))]
+    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::LiteralString]}, Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
