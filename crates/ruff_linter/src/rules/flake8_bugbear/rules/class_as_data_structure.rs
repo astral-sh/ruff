@@ -90,11 +90,15 @@ pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::St
                     public_methods += 1;
                 }
             }
-            ast::Stmt::ClassDef(_) => {
-                // allow classes with nested classes, often used for config
+            // Ignore class variables
+            ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) |
+            // and expressions (e.g. string literals)
+            ast::Stmt::Expr(_) => {}
+            _ => {
+                // Bail for anything else - e.g. nested classes
+                // or conditional methods.
                 return;
             }
-            _ => {}
         }
     }
 
