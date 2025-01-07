@@ -177,7 +177,7 @@ reveal_type(f(1, 2, 3))  # revealed: int
 def f(x: int) -> int:
     return 1
 
-# error: 13 [missing-argument] "No argument provided for required parameter `x`"
+# error: 13 [missing-argument] "No argument provided for required parameter `x` of function `f`"
 reveal_type(f())  # revealed: int
 ```
 
@@ -187,7 +187,7 @@ reveal_type(f())  # revealed: int
 def f(x: int, y: str = "foo") -> int:
     return 1
 
-# error: 13 [missing-argument] "No argument provided for required parameter `x`"
+# error: 13 [missing-argument] "No argument provided for required parameter `x` of function `f`"
 reveal_type(f())  # revealed: int
 ```
 
@@ -206,7 +206,7 @@ reveal_type(f())  # revealed: int
 def f(x: int, *y: str) -> int:
     return 1
 
-# error: 13 [missing-argument] "No argument provided for required parameter `x`"
+# error: 13 [missing-argument] "No argument provided for required parameter `x` of function `f`"
 reveal_type(f())  # revealed: int
 ```
 
@@ -234,7 +234,7 @@ reveal_type(f())  # revealed: int
 def f(x: int, y: int) -> int:
     return 1
 
-# error: 13 [missing-argument] "No arguments provided for required parameters `x`, `y`"
+# error: 13 [missing-argument] "No arguments provided for required parameters `x`, `y` of function `f`"
 reveal_type(f())  # revealed: int
 ```
 
@@ -244,7 +244,7 @@ reveal_type(f())  # revealed: int
 def f(x: int) -> int:
     return 1
 
-# error: 20 [unknown-argument] "Argument `y` does not match any known parameter"
+# error: 20 [unknown-argument] "Argument `y` does not match any known parameter of function `f`"
 reveal_type(f(x=1, y=2))  # revealed: int
 ```
 
@@ -254,6 +254,6 @@ reveal_type(f(x=1, y=2))  # revealed: int
 def f(x: int) -> int:
     return 1
 
-# error: 18 [parameter-already-assigned] "Got multiple values for parameter `x` of function `f`"
+# error: 18 [parameter-already-assigned] "Multiple values provided for parameter `x` of function `f`"
 reveal_type(f(1, x=2))  # revealed: int
 ```

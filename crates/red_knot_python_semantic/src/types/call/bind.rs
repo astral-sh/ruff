@@ -312,7 +312,14 @@ impl<'db> CallBindingError<'db> {
                 context.report_lint(
                     &MISSING_ARGUMENT,
                     node,
-                    format_args!("No argument{s} provided for required parameter{s} {parameters}",),
+                    format_args!(
+                        "No argument{s} provided for required parameter{s} {parameters}{}",
+                        if let Some(callable_name) = callable_name {
+                            format!(" of function `{callable_name}`")
+                        } else {
+                            String::new()
+                        }
+                    ),
                 );
             }
 
@@ -323,7 +330,14 @@ impl<'db> CallBindingError<'db> {
                 context.report_lint(
                     &UNKNOWN_ARGUMENT,
                     Self::get_node(node, *argument_index),
-                    format_args!("Argument `{argument_name}` does not match any known parameter"),
+                    format_args!(
+                        "Argument `{argument_name}` does not match any known parameter{}",
+                        if let Some(callable_name) = callable_name {
+                            format!(" of function `{callable_name}`")
+                        } else {
+                            String::new()
+                        }
+                    ),
                 );
             }
 
@@ -335,7 +349,7 @@ impl<'db> CallBindingError<'db> {
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Got multiple values for parameter {parameter}{}",
+                        "Multiple values provided for parameter {parameter}{}",
                         if let Some(callable_name) = callable_name {
                             format!(" of function `{callable_name}`")
                         } else {
