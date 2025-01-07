@@ -271,8 +271,13 @@ impl<'db> CallBindingError<'db> {
                     &TOO_MANY_POSITIONAL_ARGUMENTS,
                     Self::get_node(node, *first_excess_argument_index),
                     format_args!(
-                        "Too many positional arguments: expected \
-                        {expected_positional_count}, got {provided_positional_count}"
+                        "Too many positional arguments{}: expected \
+                        {expected_positional_count}, got {provided_positional_count}",
+                        if let Some(callable_name) = callable_name {
+                            format!(" to function `{callable_name}`")
+                        } else {
+                            String::new()
+                        }
                     ),
                 );
             }

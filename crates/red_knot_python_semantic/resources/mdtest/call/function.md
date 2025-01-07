@@ -146,7 +146,7 @@ reveal_type(f(y=2, x="bar"))  # revealed: int
 def f() -> int:
     return 1
 
-# error: 15 [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
+# error: 15 [too-many-positional-arguments] "Too many positional arguments to function `f`: expected 0, got 1"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -156,7 +156,7 @@ reveal_type(f("foo"))  # revealed: int
 def f() -> int:
     return 1
 
-# error: 15 [too-many-positional-arguments] "Too many positional arguments: expected 0, got 2"
+# error: 15 [too-many-positional-arguments] "Too many positional arguments to function `f`: expected 0, got 2"
 reveal_type(f("foo", "bar"))  # revealed: int
 ```
 
