@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
    |
 13 |     pick_colors = classmethod(pick_colors)
-14 | 
+14 |
 15 |     def pick_one_color():  # [no-staticmethod-decorator]
-   |      PLR0203
+   |     ^ PLR0203
 16 |         """staticmethod to pick one fruit color"""
 17 |         return choice(Fruit.COLORS)
    |
@@ -30,9 +29,9 @@ no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
 no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
    |
 25 |     class_method = classmethod(class_method);another_statement
-26 | 
+26 |
 27 |     def static_method():
-   |      PLR0203
+   |     ^ PLR0203
 28 |         pass
    |
    = help: Add @staticmethod decorator
