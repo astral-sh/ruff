@@ -220,7 +220,7 @@ pub(crate) fn non_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-        _ => return,
+        Pep604Operator::Union => {}
     }
 }
 
