@@ -1,5 +1,6 @@
 use std::iter::Peekable;
 
+use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_notebook::CellOffsets;
@@ -61,91 +62,87 @@ pub(crate) fn too_many_newlines_at_end_of_file(
     tokens: &Tokens,
     cell_offsets: Option<&CellOffsets>,
 ) {
-    let Some(last_token) = tokens.last() else {
-        return;
-    };
-    let last_textsize = last_token.end();
+    let mut tokens_iter = tokens.iter().rev().peekable();
 
-    let tokens_iter = tokens.iter().rev().peekable();
-
-    let newline_diagnostics = if let Some(cell_offsets) = cell_offsets {
-        let offset_iter = cell_offsets.iter().rev().peekable();
-        collect_trailing_newlines_diagnostics(tokens_iter, offset_iter)
-    } else {
-        // To handle notebooks and ordinary source files uniformly,
-        // we "convert" the source type to a notebook by appending
-        // a newline.
-        let last_textsize = last_textsize + TextSize::from(1);
-        let offset_iter = std::iter::once(&last_textsize).peekable();
-        collect_trailing_newlines_diagnostics(tokens_iter, offset_iter)
+    if let Some(cell_offsets) = cell_offsets {
+        diagnostics.extend(notebook_newline_diagnostics(tokens_iter, cell_offsets));
+    } else if let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, false) {
+        diagnostics.push(diagnostic);
     };
-    diagnostics.extend(newline_diagnostics);
 }
 
-fn collect_trailing_newlines_diagnostics<'a>(
+/// Collects trailing newline diagnostics for each cell
+fn notebook_newline_diagnostics<'a>(
     mut tokens_iter: Peekable<impl Iterator<Item = &'a Token>>,
-    offset_iter: Peekable<impl Iterator<Item = &'a TextSize>>,
+    cell_offsets: &CellOffsets,
 ) -> Vec<Diagnostic> {
     let mut results = Vec::new();
+    let offset_iter = cell_offsets.iter().rev();
 
     // NB: When interpreting the below, recall that the iterators
-    // passed into this function are reversed.
+    // have been reversed.
     for &offset in offset_iter {
-        // Advance to the offset
-        while let Some(next_token) = tokens_iter.peek() {
-            if next_token.end() >= offset {
+        // Advance to offset
+        tokens_iter
+            .peeking_take_while(|tok| tok.end() >= offset)
+            .for_each(drop);
+
+        let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, true) else {
+            continue;
+        };
+
+        results.push(diagnostic);
+    }
+    results
+}
+
+/// Possible diagnostic, with fix, for too many newlines in cell or source file
+fn newline_diagnostic<'a>(
+    tokens_iter: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    in_notebook: bool,
+) -> Option<Diagnostic> {
+    let mut num_trailing_newlines: u32 = 0;
+    let mut newline_range_start: Option<TextSize> = None;
+    let mut newline_range_end: Option<TextSize> = None;
+
+    while let Some(next_token) = tokens_iter.peek() {
+        match next_token.kind() {
+            TokenKind::Newline | TokenKind::NonLogicalNewline => {
+                if newline_range_end.is_none() {
+                    newline_range_end = Some(next_token.end());
+                }
+                newline_range_start = Some(next_token.end());
+
                 tokens_iter.next();
-            } else {
+                num_trailing_newlines += 1;
+            }
+            TokenKind::Dedent => {
+                tokens_iter.next();
+            }
+            _ => {
                 break;
             }
         }
-
-        let mut num_trailing_newlines: u32 = 0;
-        let mut newline_range_start: Option<TextSize> = None;
-        let mut newline_range_end: Option<TextSize> = None;
-
-        while let Some(next_token) = tokens_iter.peek() {
-            match next_token.kind() {
-                TokenKind::Newline | TokenKind::NonLogicalNewline => {
-                    if newline_range_end.is_none() {
-                        newline_range_end = Some(next_token.end());
-                    }
-                    newline_range_start = Some(next_token.end());
-
-                    tokens_iter.next();
-                    num_trailing_newlines += 1;
-                }
-                TokenKind::Dedent => {
-                    tokens_iter.next();
-                }
-                _ => {
-                    break;
-                }
-            }
-        }
-
-        if num_trailing_newlines == 0 || num_trailing_newlines == 1 {
-            continue;
-        };
-
-        let Some((start, end)) = (match (newline_range_start, newline_range_end) {
-            (Some(s), Some(e)) => Some((s, e)),
-            _ => None,
-        }) else {
-            continue;
-        };
-
-        let diagnostic_range = TextRange::new(start, end);
-
-        results.push(
-            Diagnostic::new(
-                TooManyNewlinesAtEndOfFile {
-                    num_trailing_newlines,
-                },
-                diagnostic_range,
-            )
-            .with_fix(Fix::safe_edit(Edit::range_deletion(diagnostic_range))),
-        );
     }
-    results
+
+    if num_trailing_newlines == 0 || num_trailing_newlines == 1 {
+        return None;
+    };
+
+    let (start, end) = (match (newline_range_start, newline_range_end) {
+        (Some(s), Some(e)) => Some((s, e)),
+        _ => None,
+    })?;
+
+    let diagnostic_range = TextRange::new(start, end);
+    Some(
+        Diagnostic::new(
+            TooManyNewlinesAtEndOfFile {
+                num_trailing_newlines,
+                in_notebook,
+            },
+            diagnostic_range,
+        )
+        .with_fix(Fix::safe_edit(Edit::range_deletion(diagnostic_range))),
+    )
 }
