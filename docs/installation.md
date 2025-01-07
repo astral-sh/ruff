@@ -1,10 +1,15 @@
 # Installing Ruff
 
-Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/):
+Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/).
+
+To install Ruff globally:
 
 ```console
-$ uv tool install ruff@latest  # Install Ruff globally.
-$ uv add --dev ruff            # Or add Ruff to your project.
+$ # Install Ruff globally.
+$ uv tool install ruff@latest
+
+$ # Or add Ruff to your project.
+$ uv add --dev ruff
 
 $ # With pip.
 $ pip install ruff

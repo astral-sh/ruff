@@ -223,9 +223,11 @@ Ruff is installable under any Python version from 3.7 onwards.
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/):
 
 ```console
-$ # With uv.
-$ uv tool install ruff  # Install Ruff globally.
-$ uv add --dev ruff     # Or add Ruff to your project.
+$ # Install Ruff globally.
+$ uv tool install ruff@latest
+
+$ # Or add Ruff to your project.
+$ uv add --dev ruff
 
 $ # With pip.
 $ pip install ruff
