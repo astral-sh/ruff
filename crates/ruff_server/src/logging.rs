@@ -13,7 +13,7 @@ use std::{
 };
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
-    fmt::{time::Uptime, writer::BoxMakeWriter},
+    fmt::{format::FmtSpan, time::Uptime, writer::BoxMakeWriter},
     layer::SubscriberExt,
     Layer,
 };
@@ -71,6 +71,7 @@ pub(crate) fn init_logging(
             .with_thread_names(true)
             .with_ansi(false)
             .with_writer(logger)
+            .with_span_events(FmtSpan::ENTER)
             .with_filter(LogLevelFilter { filter: log_level }),
     );
 

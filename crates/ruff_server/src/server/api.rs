@@ -26,6 +26,9 @@ macro_rules! define_document_url {
 use define_document_url;
 
 pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
+    let _span =
+        tracing::trace_span!("request", id = %req.id, method = req.method.as_str()).entered();
+
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -68,6 +71,8 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
 }
 
 pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
+    let _span = tracing::trace_span!("notification", method = notif.method.as_str()).entered();
+
     match notif.method.as_str() {
         notification::Cancel::METHOD => local_notification_task::<notification::Cancel>(notif),
         notification::DidChange::METHOD => {
