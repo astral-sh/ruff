@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/node_range_with_gaps.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -120,4 +119,5 @@ Module(
   |
 2 | def bar(): ...
 3 | def baz
+  |        ^ Syntax Error: Expected ')', found end of file
   |

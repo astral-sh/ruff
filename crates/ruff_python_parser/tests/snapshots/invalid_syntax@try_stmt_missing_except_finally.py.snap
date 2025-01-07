@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_missing_except_finally.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -67,4 +66,5 @@ Module(
   |
 5 | else:
 6 |     pass
+  |         ^ Syntax Error: Expected `except` or `finally` after `try` block
   |

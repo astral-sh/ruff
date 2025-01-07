@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_expect_indented_block.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -63,4 +62,5 @@ Module(
   |
 1 | match foo:
 2 | case _: ...
+  |            ^ Syntax Error: Expected dedent, found end of file
   |

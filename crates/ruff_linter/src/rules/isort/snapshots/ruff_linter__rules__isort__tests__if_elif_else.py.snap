@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 if_elif_else.py:6:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -8,6 +7,7 @@ if_elif_else.py:6:1: I001 [*] Import block is un-sorted or un-formatted
 5 |   else:
 6 | /     from setuptools.command.sdist import sdist as _sdist
 7 | |     from distutils.command.sdist import sdist as _sdist
+  | |________________________________________________________^ I001
   |
   = help: Organize imports
 
