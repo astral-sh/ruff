@@ -44,9 +44,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
-                    if checker.enabled(Rule::NonPEP604AnnotationUnion)
-                        || checker.enabled(Rule::NonPEP604AnnotationOptional)
-                    {
+                    if checker.any_enabled(&[
+                        Rule::NonPEP604AnnotationUnion,
+                        Rule::NonPEP604AnnotationOptional,
+                    ]) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37

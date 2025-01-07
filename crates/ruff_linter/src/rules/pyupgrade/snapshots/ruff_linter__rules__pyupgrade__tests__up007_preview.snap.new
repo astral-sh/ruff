@@ -1,5 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
+assertion_line: 124
 ---
 

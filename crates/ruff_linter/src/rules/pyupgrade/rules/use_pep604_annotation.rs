@@ -1,4 +1,6 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{
+    Applicability, Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation,
+};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
@@ -8,7 +10,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::settings::types::PythonVersion;
+use crate::settings::types::{PreviewMode, PythonVersion};
 
 /// ## What it does
 /// Check for `typing.Union` annotations that can be rewritten based on [PEP 604] syntax.
@@ -150,15 +152,22 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let preview = checker.settings.preview.is_enabled();
-            let ruf007_enabled = checker.enabled(Rule::NonPEP604AnnotationUnion);
-            let ruf045_enabled = checker.enabled(Rule::NonPEP604AnnotationOptional);
-
-            let mut diagnostic = match (preview, ruf007_enabled, ruf045_enabled) {
-                (false, true, _) => Diagnostic::new(NonPEP604AnnotationUnion, expr.range()),
-                (true, _, true) => Diagnostic::new(NonPEP604AnnotationOptional, expr.range()),
-                _ => return,
+            let (rule, diagnostic_kind) = match checker.settings.preview {
+                PreviewMode::Disabled => (
+                    Rule::NonPEP604AnnotationUnion,
+                    DiagnosticKind::from(NonPEP604AnnotationUnion),
+                ),
+                PreviewMode::Enabled => (
+                    Rule::NonPEP604AnnotationOptional,
+                    DiagnosticKind::from(NonPEP604AnnotationOptional),
+                ),
             };
+
+            if !checker.enabled(rule) {
+                return;
+            }
+
+            let mut diagnostic = Diagnostic::new(diagnostic_kind, expr.range());
 
             if fixable {
                 match slice {
@@ -182,7 +191,11 @@ pub(crate) fn non_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-        Pep604Operator::Union if checker.enabled(Rule::NonPEP604AnnotationUnion) => {
+        Pep604Operator::Union => {
+            if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
+                return;
+            }
+
             let mut diagnostic = Diagnostic::new(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {
@@ -220,7 +233,6 @@ pub(crate) fn non_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-        Pep604Operator::Union => {}
     }
 }
 

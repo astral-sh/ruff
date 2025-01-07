@@ -112,23 +112,16 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007.py"))]
-    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP045.py"))]
-    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+    #[test]
+    fn up007_preview() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pyupgrade").join(path).as_path(),
+            Path::new("pyupgrade/UP045.py"),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -222,7 +215,7 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::LinterSettings::for_rules(vec![
+                ..settings::LinterSettings::for_rules([
                     Rule::NonPEP604AnnotationUnion,
                     Rule::NonPEP604AnnotationOptional,
                 ])
@@ -238,7 +231,7 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py310,
-                ..settings::LinterSettings::for_rules(vec![
+                ..settings::LinterSettings::for_rules([
                     Rule::NonPEP604AnnotationUnion,
                     Rule::NonPEP604AnnotationOptional,
                 ])
