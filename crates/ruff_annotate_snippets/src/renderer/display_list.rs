@@ -331,28 +331,27 @@ impl DisplaySet<'_> {
 
                     // On long lines, we strip the source line, accounting for unicode.
                     let mut taken = 0;
-                    let code: String = text
-                        .chars()
-                        .skip(left)
-                        .take_while(|ch| {
-                            // Make sure that the trimming on the right will fall within the terminal width.
-                            // FIXME: `unicode_width` sometimes disagrees with terminals on how wide a `char`
-                            // is. For now, just accept that sometimes the code line will be longer than
-                            // desired.
-                            let next = unicode_width::UnicodeWidthChar::width(*ch).unwrap_or(1);
-                            if taken + next > right - left {
-                                return false;
-                            }
-                            taken += next;
-                            true
-                        })
-                        .collect();
+                    let mut was_cut_right = false;
+                    let mut code = String::new();
+                    for ch in text.chars().skip(left) {
+                        // Make sure that the trimming on the right will fall within the terminal width.
+                        // FIXME: `unicode_width` sometimes disagrees with terminals on how wide a `char`
+                        // is. For now, just accept that sometimes the code line will be longer than
+                        // desired.
+                        let next = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                        if taken + next > right - left {
+                            was_cut_right = true;
+                            break;
+                        }
+                        taken += next;
+                        code.push(ch);
+                    }
                     buffer.puts(line_offset, code_offset, &code, Style::new());
                     if self.margin.was_cut_left() {
                         // We have stripped some code/whitespace from the beginning, make it clear.
                         buffer.puts(line_offset, code_offset, "...", *lineno_color);
                     }
-                    if self.margin.was_cut_right(line_len) {
+                    if was_cut_right {
                         buffer.puts(line_offset, code_offset + taken - 3, "...", *lineno_color);
                     }
 
