@@ -68,14 +68,20 @@ impl Violation for UnquotedTypeAlias {
 ///
 /// ## Why is this bad?
 /// Unnecessary string forward references can lead to additional overhead
-/// in runtime libraries making use of type hints, as well as lead to bad
+/// in runtime libraries making use of type hints. They can also have bad
 /// interactions with other runtime uses like [PEP 604] type unions.
 ///
-/// For explicit type aliases the quotes are only considered redundant
-/// if the type expression contains no subscripts or attribute accesses
-/// this is because of stubs packages. Some types will only be subscriptable
-/// at type checking time, similarly there may be some module-level
-/// attributes like type aliases that are only available in the stubs.
+/// PEP-613 type aliases are only flagged by the rule if Ruff can have high
+/// confidence that the quotes are unnecessary. Specifically, any PEP-613
+/// type alias where the type expression on the right-hand side contains
+/// subscripts or attribute accesses will not be flagged. This is because
+/// type aliases can reference types that are, for example, generic in stub
+/// files but not at runtime. That can mean that a type checker expects the
+/// referenced type to be subscripted with type arguments despite the fact
+/// that doing so would fail at runtime if the type alias value was not
+/// quoted. Similarly, a type alias might need to reference a module-level
+/// attribute that exists in a stub file but not at runtime, meaning that
+/// the type alias value would need to be quoted to avoid a runtime error.
 ///
 /// ## Example
 /// Given:
@@ -98,12 +104,17 @@ impl Violation for UnquotedTypeAlias {
 /// type OptInt = int | None
 /// ```
 ///
-/// To achieve the same thing in stub files you should instead take a look at
-/// [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md), which gets rid
-/// of all the unnecessary quotes in stub files.
-///
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
+///
+/// ## See also
+/// This rule only applies to type aliases in non-stub files. For removing quotes in other
+/// contexts or in stub files, see:
+///
+/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+///   removes all quoted annotations from stub files
+/// - [`quoted-annotation`](quoted-annotation.md): A rule that removes unnecessary quotes
+///   from *annotations* in runtime files.
 ///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
