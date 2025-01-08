@@ -305,6 +305,12 @@ mod stable {
         never_assignable_to_every_type, db,
         forall types t. Type::Never.is_assignable_to(db, t)
     );
+
+    // And it should be a subtype of all fully static types
+    type_property_test!(
+        never_subtype_of_every_fully_static_type, db,
+        forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
