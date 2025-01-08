@@ -400,15 +400,8 @@ For a complete enumeration of these intentional deviations, see [_Known deviatio
 Unintentional deviations from Black are tracked in the [issue tracker](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter).
 
 ### Preview style
-
-Black gates formatting changes behind a [`preview`](https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style)
-flag. The formatter does not yet support Black's preview style, though the intention is to support
-it within the coming months behind Ruff's own [`preview`](https://docs.astral.sh/ruff/settings/#preview)
-flag.
-
-Black promotes some of its preview styling to stable at the end of each year. Ruff will similarly
-implement formatting changes under the [`preview`](https://docs.astral.sh/ruff/settings/#preview)
-flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
+Similar to [Black](https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style), Ruff implements formatting changes 
+under the [`preview`](https://docs.astral.sh/ruff/settings/#format_preview) flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
 
 ## Sorting imports
 
