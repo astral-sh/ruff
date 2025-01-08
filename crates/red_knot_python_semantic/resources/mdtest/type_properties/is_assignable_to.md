@@ -207,7 +207,7 @@ static_assert(not is_assignable_to(tuple[Any, Literal[2]], tuple[int, str]))
 
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
-from typing import Literal
+from typing import Literal, Any
 
 static_assert(is_assignable_to(int, int | str))
 static_assert(is_assignable_to(str, int | str))
@@ -218,11 +218,15 @@ static_assert(is_assignable_to(Literal[1], Unknown | str))
 static_assert(is_assignable_to(Literal[1] | Literal[2], Literal[1] | Literal[2]))
 static_assert(is_assignable_to(Literal[1] | Literal[2], int))
 static_assert(is_assignable_to(Literal[1] | None, int | None))
+static_assert(is_assignable_to(Any, int | str))
+static_assert(is_assignable_to(Any | int, int))
+static_assert(is_assignable_to(str, int | Any))
 
 static_assert(not is_assignable_to(int | None, int))
 static_assert(not is_assignable_to(int | None, str | None))
 static_assert(not is_assignable_to(Literal[1] | None, int))
 static_assert(not is_assignable_to(Literal[1] | None, str | None))
+static_assert(not is_assignable_to(Any | int | str, int))
 ```
 
 ## Intersection types
