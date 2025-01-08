@@ -1,9 +1,10 @@
-use ruff_text_size::TextRange;
-
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::LineRanges;
 
 /// ## What it does
 /// Checks for the presence of unnecessary quotes in type annotations.
@@ -73,10 +74,29 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 
 /// UP037
 pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        annotation.to_string(),
-        range,
-    )));
-    checker.diagnostics.push(diagnostic);
+    let diagnostic = Diagnostic::new(QuotedAnnotation, range);
+
+    let len = TextSize::try_from(annotation.len()).unwrap();
+    let placeholder_range = TextRange::up_to(len);
+    let spans_multiple_lines = annotation.count_lines(placeholder_range) > 1;
+
+    let tokenizer = SimpleTokenizer::new(annotation, placeholder_range);
+    let last_token_is_comment = matches!(
+        tokenizer.last(),
+        Some(SimpleToken {
+            kind: SimpleTokenKind::Comment,
+            ..
+        })
+    );
+
+    let new_content = match (spans_multiple_lines, last_token_is_comment) {
+        (false, false) => format!("{annotation}"),
+        (true, false) => format!("({annotation})"),
+        (false, true) => format!("({annotation}\n)"),
+        (true, true) => format!("({annotation}\n)"),
+    };
+    let edit = Edit::range_replacement(new_content, range);
+    let fix = Fix::safe_edit(edit);
+
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }
