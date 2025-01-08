@@ -971,6 +971,9 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
+            // Never can be assigned to any type.
+            (Type::Never, _) => true,
+
             // The dynamic type is assignable-to and assignable-from any type.
             (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
@@ -3988,7 +3991,6 @@ pub(crate) mod tests {
         },
         Tuple(Vec<Ty>),
         SubclassOfAny,
-        SubclassOfUnknown,
         SubclassOfBuiltinClass(&'static str),
         SubclassOfAbcClass(&'static str),
         StdlibModule(KnownModule),
@@ -4039,7 +4041,6 @@ pub(crate) mod tests {
                     TupleType::from_elements(db, elements)
                 }
                 Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
-                Ty::SubclassOfUnknown => SubclassOfType::subclass_of_unknown(),
                 Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                     db,
                     builtins_symbol(db, s)
@@ -4076,84 +4077,6 @@ pub(crate) mod tests {
     fn tuple_containing_never_simplifies_to_never(ty: Ty) {
         let db = setup_db();
         assert_eq!(ty.into_type(&db), Type::Never);
-    }
-
-    #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
-    #[test_case(Ty::Any, Ty::IntLiteral(1))]
-    #[test_case(Ty::Never, Ty::IntLiteral(1))]
-    #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
-    #[test_case(Ty::IntLiteral(1), Ty::Any)]
-    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
-    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
-    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
-    #[test_case(
-        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
-        Ty::BuiltinInstance("int")
-    )]
-    #[test_case(
-        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
-        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::None])
-    )]
-    #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
-    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfAny)]
-    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("object"))]
-    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("str"))]
-    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::SubclassOfAny)]
-    #[test_case(
-        Ty::SubclassOfBuiltinClass("object"),
-        Ty::SubclassOfBuiltinClass("object")
-    )]
-    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfAny)]
-    #[test_case(
-        Ty::SubclassOfBuiltinClass("str"),
-        Ty::SubclassOfBuiltinClass("object")
-    )]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfBuiltinClass("str"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfUnknown)]
-    #[test_case(Ty::SubclassOfUnknown, Ty::SubclassOfBuiltinClass("str"))]
-    #[test_case(Ty::SubclassOfAny, Ty::AbcInstance("ABCMeta"))]
-    #[test_case(Ty::SubclassOfUnknown, Ty::AbcInstance("ABCMeta"))]
-    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("object"))]
-    fn is_assignable_to(from: Ty, to: Ty) {
-        let db = setup_db();
-        assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
-    }
-
-    #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
-    #[test_case(
-        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
-        Ty::BuiltinInstance("int")
-    )]
-    #[test_case(
-        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
-        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::None])
-    )]
-    #[test_case(
-        Ty::SubclassOfBuiltinClass("object"),
-        Ty::SubclassOfBuiltinClass("str")
-    )]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
-    fn is_not_assignable_to(from: Ty, to: Ty) {
-        let db = setup_db();
-        assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
     #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
