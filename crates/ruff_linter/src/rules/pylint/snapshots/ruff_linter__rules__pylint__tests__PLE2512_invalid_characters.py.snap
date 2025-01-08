@@ -46,7 +46,7 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 |
 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
-   |                       ^ PLE2512
+   |                         ^ PLE2512
 56 |
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |
