@@ -12,7 +12,6 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -302,7 +301,6 @@ mod tests {
                 .join(Path::new("PT006_and_PT007.py"))
                 .as_path(),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::PytestParametrizeNamesWrongType,
                     Rule::PytestParametrizeValuesWrongType,
