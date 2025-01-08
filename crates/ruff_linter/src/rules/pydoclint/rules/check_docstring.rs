@@ -19,8 +19,8 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit `return` statements that do not have
-/// "Returns" sections in their docstrings.
+/// Checks for functions with `return` statements that do not have "Returns"
+/// sections in their docstrings.
 ///
 /// ## Why is this bad?
 /// A missing "Returns" section is a sign of incomplete documentation.
@@ -70,7 +70,7 @@ impl Violation for DocstringMissingReturns {
 }
 
 /// ## What it does
-/// Checks for function docstrings with redundant "Returns" sections.
+/// Checks for function docstrings with unnecessary "Returns" sections.
 ///
 /// ## Why is this bad?
 /// A function without an explicit `return` statement should not have a
@@ -173,7 +173,7 @@ impl Violation for DocstringMissingYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings with redundant "Yields" sections.
+/// Checks for function docstrings with unnecessary "Yields" sections.
 ///
 /// ## Why is this bad?
 /// A function that doesn't yield anything should not have a "Yields" section
