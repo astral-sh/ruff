@@ -418,6 +418,7 @@ fn loop_block<'stmt>(
         after,
         after,
     );
+
     NextBlock::If {
         condition,
         next: last_statement_index,
@@ -437,12 +438,14 @@ fn post_process_loop(
     clause_exit: Option<BlockIndex>,
 ) {
     let mut idx = start_index;
+
     loop {
         if Some(idx) == clause_exit || idx == loop_start {
             return;
         }
 
         let block = &mut blocks.blocks[idx];
+
         if block.is_loop_continue() {
             return;
         }
