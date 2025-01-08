@@ -18,7 +18,7 @@ DJ012.py:43:5: DJ012 Order of model's inner classes, methods, and fields does no
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
    |
 
-DJ012.py:56:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
+DJ012.py:56:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: Magic method should come before custom method
    |
 54 |           pass
 55 |   
