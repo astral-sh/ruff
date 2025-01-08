@@ -66,6 +66,6 @@ jobs:
               owner: "astral-sh",
               repo: "ruff",
               title: `Daily property test run failed on ${new Date().toDateString()}`,
-              body: "Runs listed here: https://github.com/astral-sh/ruff/actions/workflows/daily_property_tests.yaml",
-              labels: ["bug", "red_knot", "testing"],
+              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              labels: ["bug", "red-knot", "testing"],
             })
