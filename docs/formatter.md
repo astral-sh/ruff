@@ -33,7 +33,7 @@ adoption is minimally disruptive for the vast majority of projects.
 
 Specifically, the formatter is intended to emit near-identical output when run over existing
 Black-formatted code. When run over extensive Black-formatted projects like Django and Zulip, > 99.9%
-of lines are formatted identically. (See: [_Black compatibility_](#black-compatibility).)
+of lines are formatted identically. (See: [_Style Guide](#style-guide).)
 
 Given this focus on Black compatibility, the formatter thus adheres to [Black's (stable) code style](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html),
 which aims for "consistency, generality, readability and reducing git diffs". To give you a sense
