@@ -14,7 +14,7 @@ use ruff_python_ast as ast;
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
-    arguments: &CallArguments<'db>,
+    arguments: &CallArguments<'_, 'db>,
     signature: &Signature<'db>,
     callable_ty: Option<Type<'db>>,
 ) -> CallBinding<'db> {
@@ -45,7 +45,7 @@ pub(crate) fn bind_call<'db>(
                     .or_else(|| parameters.keyword_variadic())
                 else {
                     errors.push(CallBindingError::UnknownArgument {
-                        argument_name: name.clone(),
+                        argument_name: ast::name::Name::new(name),
                         argument_index,
                     });
                     continue;
@@ -168,7 +168,7 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    fn callable_name(&self, db: &'db dyn Db) -> Option<&ast::name::Name> {
+    fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
         match self.callable_ty {
             Some(Type::FunctionLiteral(function)) => Some(function.name(db)),
             Some(Type::ClassLiteral(class_type)) => Some(class_type.class.name(db)),
@@ -272,7 +272,7 @@ impl<'db> CallBindingError<'db> {
         &self,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
-        callable_name: Option<&ast::name::Name>,
+        callable_name: Option<&str>,
     ) {
         match self {
             Self::InvalidArgumentType {
