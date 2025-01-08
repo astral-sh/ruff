@@ -184,17 +184,23 @@ static_assert(is_assignable_to(Meta, type[Unknown]))
 
 ```py
 from knot_extensions import static_assert, is_assignable_to
-from typing import Literal
+from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
 static_assert(is_assignable_to(tuple[int], tuple[int]))
+static_assert(is_assignable_to(tuple[int], tuple[Any]))
+static_assert(is_assignable_to(tuple[Any], tuple[int]))
 static_assert(is_assignable_to(tuple[int, str], tuple[int, str]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, int]))
+static_assert(is_assignable_to(tuple[Any, Literal[2]], tuple[int, int]))
+static_assert(is_assignable_to(tuple[Literal[1], Any], tuple[int, int]))
 
 static_assert(not is_assignable_to(tuple[()], tuple[int]))
+static_assert(not is_assignable_to(tuple[int], tuple[str]))
 static_assert(not is_assignable_to(tuple[int], tuple[int, str]))
 static_assert(not is_assignable_to(tuple[int, str], tuple[int]))
 static_assert(not is_assignable_to(tuple[int, int], tuple[Literal[1], int]))
+static_assert(not is_assignable_to(tuple[Any, Literal[2]], tuple[int, str]))
 ```
 
 ## Union types
