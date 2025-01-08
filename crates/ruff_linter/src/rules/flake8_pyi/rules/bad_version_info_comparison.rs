@@ -9,7 +9,7 @@ use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for uses of comparators other than `<` and `>=` for
-/// `sys.version_info` checks in `.pyi` files. All other comparators, such
+/// `sys.version_info` checks. All other comparators, such
 /// as `>`, `<=`, and `==`, are banned.
 ///
 /// ## Why is this bad?
@@ -34,17 +34,15 @@ use crate::registry::Rule;
 /// False
 /// ```
 ///
-/// In [preview], this rule will also flag non-stub files.
-///
 /// ## Example
-/// ```pyi
+/// ```py
 /// import sys
 ///
 /// if sys.version_info > (3, 8): ...
 /// ```
 ///
 /// Use instead:
-/// ```pyi
+/// ```py
 /// import sys
 ///
 /// if sys.version_info >= (3, 9): ...
@@ -144,7 +142,10 @@ pub(crate) fn bad_version_info_comparison(
     }
 
     if matches!(op, CmpOp::Lt) {
-        if checker.enabled(Rule::BadVersionInfoOrder) {
+        if checker.enabled(Rule::BadVersionInfoOrder)
+            // See https://github.com/astral-sh/ruff/issues/15347
+            && (checker.source_type.is_stub() || checker.settings.preview.is_enabled())
+        {
             if has_else_clause {
                 checker
                     .diagnostics
