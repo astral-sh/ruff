@@ -1,7 +1,7 @@
-from typing import _SpecialForm, Any
+from typing import _SpecialForm, Any, LiteralString
 
 # Special operations
-def static_assert(condition: object) -> None: ...
+def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
 
 # Types
 Unknown = object()

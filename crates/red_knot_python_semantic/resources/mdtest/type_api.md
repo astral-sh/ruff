@@ -193,6 +193,28 @@ class InvalidBoolDunder:
 static_assert(InvalidBoolDunder())
 ```
 
+### Custom error messages
+
+Alternatively, users can provide custom error messages:
+
+```py
+from knot_extensions import static_assert
+
+# error: "Static assertion error: I really want this to be true"
+static_assert(1 + 1 == 3, "I really want this to be true")
+
+error_message = "A custom message "
+error_message += "constructed from multiple string literals"
+# error: "Static assertion error: A custom message constructed from multiple string literals"
+static_assert(False, error_message)
+
+# There are limitations to what we can still infer as a string literal. In those cases,
+# we simply fall back to the default message.
+shouted_message = "A custom message".upper()
+# error: "Static assertion error: argument evaluates to `False`"
+static_assert(False, shouted_message)
+```
+
 ## Type predicates
 
 The `knot_extensions` module also provides predicates to test various properties of types. These are

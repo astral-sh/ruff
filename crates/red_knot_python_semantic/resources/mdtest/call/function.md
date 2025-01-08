@@ -284,7 +284,7 @@ from knot_extensions import static_assert
 # error: [static-assert-error]
 static_assert()
 
-# error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 1, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
 static_assert(True, 2, 3)
 ```
 

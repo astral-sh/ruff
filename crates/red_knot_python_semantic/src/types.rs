@@ -657,6 +657,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
+        match self {
+            Type::StringLiteral(string_literal) => Some(string_literal),
+            _ => None,
+        }
+    }
+
     #[track_caller]
     pub fn expect_int_literal(self) -> i64 {
         self.into_int_literal()
@@ -1779,16 +1786,19 @@ impl<'db> Type<'db> {
                         CallOutcome::revealed(binding, revealed_ty)
                     }
                     Some(KnownFunction::StaticAssert) => {
-                        if let Some(parameter_ty) = binding.one_parameter_ty() {
+                        if let Some((parameter_ty, message)) = binding.two_parameter_tys() {
                             let truthiness = parameter_ty.bool(db);
 
                             if truthiness.is_always_true() {
                                 CallOutcome::callable(binding)
                             } else {
+                                let message = message.into_string_literal().map(|s| &**s.value(db));
+
                                 CallOutcome::StaticAssertionError {
                                     binding,
                                     parameter_ty,
                                     truthiness,
+                                    message,
                                 }
                             }
                         } else {

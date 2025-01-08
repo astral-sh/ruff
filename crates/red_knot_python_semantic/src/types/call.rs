@@ -37,6 +37,7 @@ pub(super) enum CallOutcome<'db> {
         binding: CallBinding<'db>,
         parameter_ty: Type<'db>,
         truthiness: Truthiness,
+        message: Option<&'db str>,
     },
 }
 
@@ -259,9 +260,23 @@ impl<'db> CallOutcome<'db> {
                 }
             }
             CallOutcome::StaticAssertionError {
+                binding: _,
+                parameter_ty: _,
+                truthiness: _,
+                message: Some(message),
+            } => {
+                context.report_lint(
+                    &STATIC_ASSERT_ERROR,
+                    node,
+                    format_args!("Static assertion error: {message}"),
+                );
+                Ok(Type::Unknown)
+            }
+            CallOutcome::StaticAssertionError {
                 binding,
                 parameter_ty: Type::BooleanLiteral(false),
                 truthiness: _,
+                message: _,
             } => {
                 binding.report_diagnostics(context, node);
                 context.report_lint(
@@ -276,6 +291,7 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 parameter_ty,
                 truthiness,
+                message: _,
             } if truthiness.is_always_false() => {
                 binding.report_diagnostics(context, node);
                 context.report_lint(
@@ -293,6 +309,7 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 parameter_ty,
                 truthiness,
+                message: _,
             } if truthiness.is_ambiguous() => {
                 binding.report_diagnostics(context, node);
                 context.report_lint(
@@ -310,6 +327,7 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 parameter_ty,
                 truthiness: _,
+                message: _,
             } => {
                 binding.report_diagnostics(context, node);
                 context.report_lint(
