@@ -1775,11 +1775,11 @@ impl<'db> Type<'db> {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), Some(self));
                 match function_type.known(db) {
                     Some(KnownFunction::RevealType) => {
-                        let revealed_ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        let revealed_ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
                         CallOutcome::revealed(binding, revealed_ty)
                     }
                     Some(KnownFunction::StaticAssert) => {
-                        if let Some(parameter_ty) = binding.first_parameter() {
+                        if let Some(parameter_ty) = binding.one_parameter_ty() {
                             let truthiness = parameter_ty.bool(db);
 
                             if truthiness.is_always_true() {
@@ -1796,55 +1796,54 @@ impl<'db> Type<'db> {
                         }
                     }
                     Some(KnownFunction::IsEquivalentTo) => {
-                        let return_ty = match binding.parameter_tys() {
-                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_equivalent_to(db, *ty_b)),
-                            _ => Type::Unknown,
-                        };
-                        binding.set_return_ty(return_ty);
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
-                        let return_ty = match binding.parameter_tys() {
-                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_subtype_of(db, *ty_b)),
-                            _ => Type::Unknown,
-                        };
-                        binding.set_return_ty(return_ty);
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding.set_return_ty(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsAssignableTo) => {
-                        let return_ty = match binding.parameter_tys() {
-                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_assignable_to(db, *ty_b)),
-                            _ => Type::Unknown,
-                        };
-                        binding.set_return_ty(return_ty);
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsDisjointFrom) => {
-                        let return_ty = match binding.parameter_tys() {
-                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_disjoint_from(db, *ty_b)),
-                            _ => Type::Unknown,
-                        };
-                        binding.set_return_ty(return_ty);
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsFullyStatic) => {
-                        let ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_fully_static(db)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleton) => {
-                        let ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_singleton(db)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleValued) => {
-                        let ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_single_valued(db)));
                         CallOutcome::callable(binding)
                     }
 
                     Some(KnownFunction::Len) => {
-                        if let Some(first_arg) = binding.first_parameter() {
+                        if let Some(first_arg) = binding.one_parameter_ty() {
                             if let Some(len_ty) = first_arg.len(db) {
                                 binding.set_return_ty(len_ty);
                             }
