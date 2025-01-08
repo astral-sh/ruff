@@ -410,7 +410,7 @@ Ruff will use the configured quote style for the f-string expression unless doin
 invalid syntax for the target Python version or requires more backslash escapes than the original
 expression. Specifically, Ruff will preserve the original quote style for the following cases:
 
-When the target Python version is < 3.12 and a [self-documenting f-string expressions] contains a string
+When the target Python version is < 3.12 and a [self-documenting f-string] contains a string
 literal with the configured quote style:
 
 ```python
@@ -428,8 +428,8 @@ f'{"""nested " """}'`
 f"{'''nested " '''}``
 ```
 
-For all target Python versions, when a [self-documenting f-string expressions] contains any expression between
-the curly braces (`{...}`) with a format specifier that contains the configured quote style:
+For all target Python versions, when a [self-documenting f-string] contains an expression between
+the curly braces (`{...}`) with a format specifier containing the configured quote style:
 
 ```python
 f'{1=:"foo}'
@@ -452,11 +452,11 @@ f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
 
 #### Line breaks
 
-Starting with Python 3.12 ([PEP 701](https://peps.python.org/pep-0701/)), expression parts of an f-string can
+Starting with Python 3.12 ([PEP 701](https://peps.python.org/pep-0701/)), the expression parts of an f-string can
 span multiple lines. Ruff needs to decide when to introduce a line break in an f-string expression.
 This depends on the semantic content of the expression parts of an f-string - for example,
 introducing a line break in the middle of a natural-language sentence is undesirable. Since Ruff
-doesn't have enough information to make that decision, it uses a heuristic similar to [Prettier](https://prettier.io/docs/en/next/rationale.html#template-literals):
+doesn't have enough information to make that decision, it adopts a heuristic similar to [Prettier](https://prettier.io/docs/en/next/rationale.html#template-literals):
 it will only split the expression parts of an f-string across multiple lines if there was already a line break
 within any of the expression parts.
 
@@ -490,7 +490,7 @@ f"this f-string has a multiline expression {['red', 'green', 'blue', 'yellow']} 
 If you want Ruff to split an f-string across multiple lines, ensure there's a linebreak somewhere within the
 `{...}` parts of an f-string.
 
-[self-documenting f-string expressions]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
+[self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 
 ## Sorting imports
 
