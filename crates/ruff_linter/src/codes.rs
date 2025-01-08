@@ -268,6 +268,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R6104") => (RuleGroup::Preview, rules::pylint::rules::NonAugmentedAssignment),
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
         (Pylint, "R6301") => (RuleGroup::Preview, rules::pylint::rules::NoSelfUse),
+        #[cfg(any(feature = "test-rules", test))]
+        (Pylint, "W0101") => (RuleGroup::Preview, rules::pylint::rules::UnreachableCode),
         (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
         (Pylint, "W0177") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
@@ -315,7 +317,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Builtins, "002") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinArgumentShadowing),
         (Flake8Builtins, "003") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinAttributeShadowing),
         (Flake8Builtins, "004") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinImportShadowing),
-        (Flake8Builtins, "005") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinModuleShadowing),
+        (Flake8Builtins, "005") => (RuleGroup::Preview, rules::flake8_builtins::rules::StdlibModuleShadowing),
         (Flake8Builtins, "006") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinLambdaArgumentShadowing),
 
         // flake8-bugbear
@@ -355,6 +357,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
         (Flake8Bugbear, "039") => (RuleGroup::Stable, rules::flake8_bugbear::rules::MutableContextvarDefault),
         (Flake8Bugbear, "901") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ReturnInGenerator),
+        (Flake8Bugbear, "903") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ClassAsDataStructure),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
@@ -498,7 +501,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "004") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessObjectInheritance),
         (Pyupgrade, "005") => (RuleGroup::Stable, rules::pyupgrade::rules::DeprecatedUnittestAlias),
         (Pyupgrade, "006") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP585Annotation),
-        (Pyupgrade, "007") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP604Annotation),
+        (Pyupgrade, "007") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP604AnnotationUnion),
         (Pyupgrade, "008") => (RuleGroup::Stable, rules::pyupgrade::rules::SuperCallWithParameters),
         (Pyupgrade, "009") => (RuleGroup::Stable, rules::pyupgrade::rules::UTF8EncodingDeclaration),
         (Pyupgrade, "010") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryFutureImport),
@@ -535,6 +538,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "042") => (RuleGroup::Preview, rules::pyupgrade::rules::ReplaceStrEnum),
         (Pyupgrade, "043") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryDefaultTypeArgs),
         (Pyupgrade, "044") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP646Unpack),
+        (Pyupgrade, "045") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP604AnnotationOptional),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -981,6 +985,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
         (Ruff, "035") => (RuleGroup::Preview, rules::ruff::rules::UnsafeMarkupUse),
         (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
+        (Ruff, "037") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall),
         (Ruff, "038") => (RuleGroup::Preview, rules::ruff::rules::RedundantBoolLiteral),
         (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
         (Ruff, "040") => (RuleGroup::Preview, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
@@ -988,6 +993,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "043") => (RuleGroup::Preview, rules::ruff::rules::PytestRaisesAmbiguousPattern),
         (Ruff, "046") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
+        (Ruff, "049") => (RuleGroup::Preview, rules::ruff::rules::DataclassEnum),
         (Ruff, "051") => (RuleGroup::Preview, rules::ruff::rules::IfKeyInDictDel),
         (Ruff, "052") => (RuleGroup::Preview, rules::ruff::rules::UsedDummyVariable),
         (Ruff, "055") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),

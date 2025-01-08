@@ -449,6 +449,13 @@ impl<'a> Checker<'a> {
             match_fn(expr)
         }
     }
+
+    /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
+    pub(crate) fn push_type_diagnostic(&mut self, diagnostic: Diagnostic) {
+        if !self.semantic.in_no_type_check() {
+            self.diagnostics.push(diagnostic);
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -724,6 +731,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // deferred.
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
+
+                    if self
+                        .semantic
+                        .match_typing_expr(&decorator.expression, "no_type_check")
+                    {
+                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
+                    }
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
@@ -2338,7 +2352,8 @@ impl<'a> Checker<'a> {
                     let parsed_expr = parsed_annotation.expression();
                     self.visit_expr(parsed_expr);
                     if self.semantic.in_type_alias_value() {
-                        if self.enabled(Rule::QuotedTypeAlias) {
+                        // stub files are covered by PYI020
+                        if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
                             flake8_type_checking::rules::quoted_type_alias(
                                 self,
                                 parsed_expr,
@@ -2348,8 +2363,10 @@ impl<'a> Checker<'a> {
                     }
                     self.parsed_type_annotation = None;
                 } else {
+                    self.semantic.restore(snapshot);
+
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                        self.diagnostics.push(Diagnostic::new(
+                        self.push_type_diagnostic(Diagnostic::new(
                             pyflakes::rules::ForwardAnnotationSyntaxError {
                                 body: string_expr.value.to_string(),
                             },

@@ -9,39 +9,39 @@ def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[(
 x = foo()
 
 if x:
-    reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"] | Literal[b"bar"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 else:
-    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 
 if not x:
-    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 else:
-    reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"] | Literal[b"bar"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 
 if x and not x:
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, "", b"", -1, "foo", b"bar"] | bool | None | tuple[()]
 
 if not (x and not x):
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, "", b"", -1, "foo", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[-1, "foo", b"bar", 0, "", b""] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[-1, "foo", b"bar", 0, "", b""] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
-    reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo"]
 else:
-    reveal_type(x)  # revealed: Literal[b"", b"bar"] | None | tuple[()] | Literal[0] | Literal[False] | Literal[""]
+    reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
 ```
 
 ## Function Literals
@@ -166,16 +166,16 @@ y = literals()
 
 if isinstance(x, str) and not isinstance(x, B):
     reveal_type(x)  # revealed: A & str & ~B
-    reveal_type(y)  # revealed: Literal[0, 42] | Literal["", "hello"]
+    reveal_type(y)  # revealed: Literal[0, 42, "", "hello"]
 
     z = x if flag() else y
 
-    reveal_type(z)  # revealed: A & str & ~B | Literal[0, 42] | Literal["", "hello"]
+    reveal_type(z)  # revealed: A & str & ~B | Literal[0, 42, "", "hello"]
 
     if z:
-        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysFalsy | Literal[42] | Literal["hello"]
+        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysFalsy | Literal[42, "hello"]
     else:
-        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysTruthy | Literal[0] | Literal[""]
+        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysTruthy | Literal[0, ""]
 ```
 
 ## Narrowing Multiple Variables

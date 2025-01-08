@@ -24,6 +24,10 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
             }
         } else {
             if checker.enabled(Rule::UndefinedName) {
+                if checker.semantic.in_no_type_check() {
+                    continue;
+                }
+
                 // Avoid flagging if `NameError` is handled.
                 if reference.exceptions().contains(Exceptions::NAME_ERROR) {
                     continue;

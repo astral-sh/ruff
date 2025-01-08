@@ -90,7 +90,7 @@ def _(t: type[object]):
         if issubclass(t, B):
             reveal_type(t)  # revealed: type[A] & type[B]
     else:
-        reveal_type(t)  # revealed: type[object] & ~type[A]
+        reveal_type(t)  # revealed: type & ~type[A]
 ```
 
 ### Handling of `None`
@@ -146,7 +146,7 @@ class A: ...
 
 t = object()
 
-# TODO: we should emit a diagnostic here
+# error: [invalid-argument-type]
 if issubclass(t, A):
     reveal_type(t)  # revealed: type[A]
 ```
@@ -160,7 +160,7 @@ branch:
 ```py
 t = 1
 
-# TODO: we should emit a diagnostic here
+# error: [invalid-argument-type]
 if issubclass(t, int):
     reveal_type(t)  # revealed: Never
 ```
@@ -234,8 +234,15 @@ def flag() -> bool: ...
 
 t = int if flag() else str
 
-# TODO: this should cause us to emit a diagnostic
-# (`issubclass` has no `foo` parameter)
+# error: [unknown-argument]
 if issubclass(t, int, foo="bar"):
     reveal_type(t)  # revealed: Literal[int, str]
+```
+
+### `type[]` types are narrowed as well as class-literal types
+
+```py
+def _(x: type, y: type[int]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[int]
 ```

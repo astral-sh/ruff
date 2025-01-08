@@ -450,6 +450,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
+        || semantic.match_typing_qualified_name(&qualified_name, "Never")
 }
 
 fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {

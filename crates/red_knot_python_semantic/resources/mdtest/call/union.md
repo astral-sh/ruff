@@ -56,7 +56,7 @@ def _(flag: bool, flag2: bool):
     else:
         def f() -> int:
             return 1
-    # error: "Object of type `Literal[1] | Literal["foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
+    # error: "Object of type `Literal[1, "foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
     # revealed: Unknown | int
     reveal_type(f())
 ```
@@ -72,6 +72,6 @@ def _(flag: bool):
     else:
         f = "foo"
 
-    x = f()  # error: "Object of type `Literal[1] | Literal["foo"]` is not callable"
+    x = f()  # error: "Object of type `Literal[1, "foo"]` is not callable"
     reveal_type(x)  # revealed: Unknown
 ```

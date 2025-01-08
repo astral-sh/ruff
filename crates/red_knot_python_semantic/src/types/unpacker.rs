@@ -45,6 +45,15 @@ impl<'db> Unpacker<'db> {
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
+        if value.is_assign()
+            && self.context.in_stub()
+            && value
+                .expression()
+                .node_ref(self.db())
+                .is_ellipsis_literal_expr()
+        {
+            value_ty = Type::Unknown;
+        }
         if value.is_iterable() {
             // If the value is an iterable, then the type that needs to be unpacked is the iterator
             // type.
@@ -96,7 +105,7 @@ impl<'db> Unpacker<'db> {
                             // with each individual character, instead of just an array of
                             // `LiteralString`, but there would be a cost and it's not clear that
                             // it's worth it.
-                            Type::tuple(
+                            TupleType::from_elements(
                                 self.db(),
                                 std::iter::repeat(Type::LiteralString)
                                     .take(string_literal_ty.python_len(self.db())),

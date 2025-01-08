@@ -154,3 +154,55 @@ int(1 / 1)
 int(1 @ 1)
 
 int(1. if ... else .2)
+
+int(1 +
+    1)
+
+int(round(1,
+          0))
+
+# function calls may need to retain parentheses
+# if the parentheses for the call itself
+# lie on the next line.
+# See https://github.com/astral-sh/ruff/issues/15263
+int(round
+(1))
+
+int(round # a comment
+# and another comment
+(10)
+)
+
+int(round (17)) # this is safe without parens
+
+int( round (
+                17
+            )) # this is also safe without parens
+
+int((round)  # Comment
+(42)
+)
+
+int((round  # Comment
+)(42)
+)
+
+int(  # Unsafe fix because of this comment
+(  # Comment
+    (round
+)  # Comment
+)(42)
+)
+
+int(
+    round(
+        42
+    ) # unsafe fix because of this comment
+)
+
+int(
+    round(
+        42
+    ) 
+# unsafe fix because of this comment
+)

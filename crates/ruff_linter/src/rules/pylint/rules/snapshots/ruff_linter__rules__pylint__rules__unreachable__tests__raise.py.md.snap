@@ -1,0 +1,43 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    raise Exception
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["Exception raised"]]
+  block1["raise Exception\n"]
+
+  start --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    raise "a glass!"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["Exception raised"]]
+  block1["raise #quot;a glass!#quot;\n"]
+
+  start --> block1
+  block1 --> block0
+  block0 --> return
+```

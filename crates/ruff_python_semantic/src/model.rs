@@ -710,8 +710,17 @@ impl<'a> SemanticModel<'a> {
     ///
     /// References from within an [`ast::Comprehension`] can produce incorrect
     /// results when referring to a [`BindingKind::NamedExprAssignment`].
-    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
-        self.simulate_runtime_load_at_location_in_scope(name.id.as_str(), name.range, self.scope_id)
+    pub fn simulate_runtime_load(
+        &self,
+        name: &ast::ExprName,
+        typing_only_bindings_status: TypingOnlyBindingsStatus,
+    ) -> Option<BindingId> {
+        self.simulate_runtime_load_at_location_in_scope(
+            name.id.as_str(),
+            name.range,
+            self.scope_id,
+            typing_only_bindings_status,
+        )
     }
 
     /// Simulates a runtime load of the given symbol.
@@ -743,6 +752,7 @@ impl<'a> SemanticModel<'a> {
         symbol: &str,
         symbol_range: TextRange,
         scope_id: ScopeId,
+        typing_only_bindings_status: TypingOnlyBindingsStatus,
     ) -> Option<BindingId> {
         let mut seen_function = false;
         let mut class_variables_visible = true;
@@ -785,7 +795,9 @@ impl<'a> SemanticModel<'a> {
                     // runtime binding with a source-order inaccurate one
                     for shadowed_id in scope.shadowed_bindings(binding_id) {
                         let binding = &self.bindings[shadowed_id];
-                        if binding.context.is_typing() {
+                        if typing_only_bindings_status.is_disallowed()
+                            && binding.context.is_typing()
+                        {
                             continue;
                         }
                         if let BindingKind::Annotation
@@ -820,7 +832,9 @@ impl<'a> SemanticModel<'a> {
                         _ => binding_id,
                     };
 
-                    if self.bindings[candidate_id].context.is_typing() {
+                    if typing_only_bindings_status.is_disallowed()
+                        && self.bindings[candidate_id].context.is_typing()
+                    {
                         continue;
                     }
 
@@ -1949,6 +1963,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::ATTRIBUTE_DOCSTRING)
     }
 
+    /// Return `true` if the model is in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
+    }
+
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
@@ -2064,6 +2083,32 @@ impl ShadowedBinding {
 
     pub const fn same_scope(&self) -> bool {
         self.same_scope
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypingOnlyBindingsStatus {
+    Allowed,
+    Disallowed,
+}
+
+impl TypingOnlyBindingsStatus {
+    pub const fn is_allowed(self) -> bool {
+        matches!(self, TypingOnlyBindingsStatus::Allowed)
+    }
+
+    pub const fn is_disallowed(self) -> bool {
+        matches!(self, TypingOnlyBindingsStatus::Disallowed)
+    }
+}
+
+impl From<bool> for TypingOnlyBindingsStatus {
+    fn from(value: bool) -> Self {
+        if value {
+            TypingOnlyBindingsStatus::Allowed
+        } else {
+            TypingOnlyBindingsStatus::Disallowed
+        }
     }
 }
 
@@ -2490,6 +2535,23 @@ bitflags! {
         /// assert (y := x**2) > 42, y
         /// ```
         const ASSERT_STATEMENT = 1 << 29;
+
+        /// The model is in a [`@no_type_check`] context.
+        ///
+        /// This is used to skip type checking when the `@no_type_check` decorator is found.
+        ///
+        /// For example (adapted from [#13824]):
+        /// ```python
+        /// from typing import no_type_check
+        ///
+        /// @no_type_check
+        /// def fn(arg: "A") -> "R":
+        ///     pass
+        /// ```
+        ///
+        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
+        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
+        const NO_TYPE_CHECK = 1 << 30;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

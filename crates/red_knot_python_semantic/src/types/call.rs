@@ -1,17 +1,32 @@
 use super::context::InferContext;
 use super::diagnostic::CALL_NON_CALLABLE;
-use super::{Severity, Type, TypeArrayDisplay, UnionBuilder};
+use super::{Severity, Signature, Type, TypeArrayDisplay, UnionBuilder};
+use crate::types::diagnostic::STATIC_ASSERT_ERROR;
 use crate::Db;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_python_ast as ast;
 
+mod arguments;
+mod bind;
+
+pub(super) use arguments::{Argument, CallArguments};
+pub(super) use bind::{bind_call, CallBinding};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StaticAssertionErrorKind<'db> {
+    ArgumentIsFalse,
+    ArgumentIsFalsy(Type<'db>),
+    ArgumentTruthinessIsAmbiguous(Type<'db>),
+    CustomError(&'db str),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallOutcome<'db> {
     Callable {
-        return_ty: Type<'db>,
+        binding: CallBinding<'db>,
     },
     RevealType {
-        return_ty: Type<'db>,
+        binding: CallBinding<'db>,
         revealed_ty: Type<'db>,
     },
     NotCallable {
@@ -25,12 +40,16 @@ pub(super) enum CallOutcome<'db> {
         called_ty: Type<'db>,
         call_outcome: Box<CallOutcome<'db>>,
     },
+    StaticAssertionError {
+        binding: CallBinding<'db>,
+        error_kind: StaticAssertionErrorKind<'db>,
+    },
 }
 
 impl<'db> CallOutcome<'db> {
     /// Create a new `CallOutcome::Callable` with given return type.
-    pub(super) fn callable(return_ty: Type<'db>) -> CallOutcome<'db> {
-        CallOutcome::Callable { return_ty }
+    pub(super) fn callable(binding: CallBinding<'db>) -> CallOutcome<'db> {
+        CallOutcome::Callable { binding }
     }
 
     /// Create a new `CallOutcome::NotCallable` with given not-callable type.
@@ -39,9 +58,9 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Create a new `CallOutcome::RevealType` with given revealed and return types.
-    pub(super) fn revealed(return_ty: Type<'db>, revealed_ty: Type<'db>) -> CallOutcome<'db> {
+    pub(super) fn revealed(binding: CallBinding<'db>, revealed_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::RevealType {
-            return_ty,
+            binding,
             revealed_ty,
         }
     }
@@ -60,11 +79,11 @@ impl<'db> CallOutcome<'db> {
     /// Get the return type of the call, or `None` if not callable.
     pub(super) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::Callable { return_ty } => Some(*return_ty),
+            Self::Callable { binding } => Some(binding.return_ty()),
             Self::RevealType {
-                return_ty,
+                binding,
                 revealed_ty: _,
-            } => Some(*return_ty),
+            } => Some(binding.return_ty()),
             Self::NotCallable { not_callable_ty: _ } => None,
             Self::Union {
                 outcomes,
@@ -83,6 +102,7 @@ impl<'db> CallOutcome<'db> {
                 })
                 .map(UnionBuilder::build),
             Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
+            Self::StaticAssertionError { .. } => Some(Type::none(db)),
         }
     }
 
@@ -163,19 +183,26 @@ impl<'db> CallOutcome<'db> {
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
+        // TODO should this method emit diagnostics directly, or just return results that allow the
+        // caller to decide about emitting diagnostics? Currently it emits binding diagnostics, but
+        // only non-callable diagnostics in the union case, which is inconsistent.
         match self {
-            Self::Callable { return_ty } => Ok(*return_ty),
+            Self::Callable { binding } => {
+                binding.report_diagnostics(context, node);
+                Ok(binding.return_ty())
+            }
             Self::RevealType {
-                return_ty,
+                binding,
                 revealed_ty,
             } => {
+                binding.report_diagnostics(context, node);
                 context.report_diagnostic(
                     node,
                     DiagnosticId::RevealedType,
                     Severity::Info,
                     format_args!("Revealed type is `{}`", revealed_ty.display(context.db())),
                 );
-                Ok(*return_ty)
+                Ok(binding.return_ty())
             }
             Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
                 not_callable_ty: *not_callable_ty,
@@ -204,11 +231,11 @@ impl<'db> CallOutcome<'db> {
                             Type::Unknown
                         }
                         Self::RevealType {
-                            return_ty,
+                            binding,
                             revealed_ty: _,
                         } => {
                             if revealed {
-                                *return_ty
+                                binding.return_ty()
                             } else {
                                 revealed = true;
                                 outcome.unwrap_with_diagnostic(context, node)
@@ -236,6 +263,51 @@ impl<'db> CallOutcome<'db> {
                         return_ty,
                     }),
                 }
+            }
+            CallOutcome::StaticAssertionError {
+                binding,
+                error_kind,
+            } => {
+                binding.report_diagnostics(context, node);
+
+                match error_kind {
+                    StaticAssertionErrorKind::ArgumentIsFalse => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: argument evaluates to `False`"),
+                        );
+                    }
+                    StaticAssertionErrorKind::ArgumentIsFalsy(parameter_ty) => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!(
+                                "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                parameter_ty=parameter_ty.display(context.db())
+                            ),
+                        );
+                    }
+                    StaticAssertionErrorKind::ArgumentTruthinessIsAmbiguous(parameter_ty) => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!(
+                                "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                parameter_ty=parameter_ty.display(context.db())
+                            ),
+                        );
+                    }
+                    StaticAssertionErrorKind::CustomError(message) => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: {message}"),
+                        );
+                    }
+                }
+
+                Ok(Type::Unknown)
             }
         }
     }

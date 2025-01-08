@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailab
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
-use ruff_python_semantic::{Binding, SemanticModel};
+use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_literal};
 use ruff_text_size::Ranged;
 
@@ -68,14 +68,20 @@ impl Violation for UnquotedTypeAlias {
 ///
 /// ## Why is this bad?
 /// Unnecessary string forward references can lead to additional overhead
-/// in runtime libraries making use of type hints, as well as lead to bad
+/// in runtime libraries making use of type hints. They can also have bad
 /// interactions with other runtime uses like [PEP 604] type unions.
 ///
-/// For explicit type aliases the quotes are only considered redundant
-/// if the type expression contains no subscripts or attribute accesses
-/// this is because of stubs packages. Some types will only be subscriptable
-/// at type checking time, similarly there may be some module-level
-/// attributes like type aliases that are only available in the stubs.
+/// PEP-613 type aliases are only flagged by the rule if Ruff can have high
+/// confidence that the quotes are unnecessary. Specifically, any PEP-613
+/// type alias where the type expression on the right-hand side contains
+/// subscripts or attribute accesses will not be flagged. This is because
+/// type aliases can reference types that are, for example, generic in stub
+/// files but not at runtime. That can mean that a type checker expects the
+/// referenced type to be subscripted with type arguments despite the fact
+/// that doing so would fail at runtime if the type alias value was not
+/// quoted. Similarly, a type alias might need to reference a module-level
+/// attribute that exists in a stub file but not at runtime, meaning that
+/// the type alias value would need to be quoted to avoid a runtime error.
 ///
 /// ## Example
 /// Given:
@@ -100,6 +106,15 @@ impl Violation for UnquotedTypeAlias {
 ///
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
+///
+/// ## See also
+/// This rule only applies to type aliases in non-stub files. For removing quotes in other
+/// contexts or in stub files, see:
+///
+/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+///   removes all quoted annotations from stub files
+/// - [`quoted-annotation`](quoted-annotation.md): A rule that removes unnecessary quotes
+///   from *annotations* in runtime files.
 ///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
@@ -219,7 +234,11 @@ fn collect_typing_references<'a>(
             let Some(binding_id) = checker.semantic().resolve_name(name) else {
                 return;
             };
-            if checker.semantic().simulate_runtime_load(name).is_some() {
+            if checker
+                .semantic()
+                .simulate_runtime_load(name, TypingOnlyBindingsStatus::Disallowed)
+                .is_some()
+            {
                 return;
             }
 
@@ -291,11 +310,22 @@ fn quotes_are_unremovable(semantic: &SemanticModel, expr: &Expr) -> bool {
             ctx: ExprContext::Load,
             ..
         }) => quotes_are_unremovable(semantic, value),
-        // for subscripts and attributes we don't know whether it's safe
-        // to do at runtime, since the operation may only be available at
-        // type checking time. E.g. stubs only generics. Or stubs only
-        // type aliases.
-        Expr::Subscript(_) | Expr::Attribute(_) => true,
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            // for subscripts we don't know whether it's safe to do at runtime
+            // since the operation may only be available at type checking time.
+            // E.g. stubs only generics.
+            if !semantic.in_type_checking_block() {
+                return true;
+            }
+            quotes_are_unremovable(semantic, value) || quotes_are_unremovable(semantic, slice)
+        }
+        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+            // for attributes we also don't know whether it's safe
+            if !semantic.in_type_checking_block() {
+                return true;
+            }
+            quotes_are_unremovable(semantic, value)
+        }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
                 if quotes_are_unremovable(semantic, elt) {
@@ -305,7 +335,10 @@ fn quotes_are_unremovable(semantic: &SemanticModel, expr: &Expr) -> bool {
             false
         }
         Expr::Name(name) => {
-            semantic.resolve_name(name).is_some() && semantic.simulate_runtime_load(name).is_none()
+            semantic.resolve_name(name).is_some()
+                && semantic
+                    .simulate_runtime_load(name, semantic.in_type_checking_block().into())
+                    .is_none()
         }
         _ => false,
     }
