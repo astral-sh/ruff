@@ -220,7 +220,7 @@ macro_rules! type_property_test {
 }
 
 mod stable {
-    use super::KnownClass;
+    use crate::types::{KnownClass, Type};
 
     // `T` is equivalent to itself.
     type_property_test!(
@@ -298,6 +298,18 @@ mod stable {
     type_property_test!(
         all_fully_static_types_subtype_of_object, db,
         forall types t. t.is_fully_static(db) => t.is_subtype_of(db, KnownClass::Object.to_instance(db))
+    );
+
+    // Never should be assignable to every type
+    type_property_test!(
+        never_assignable_to_every_type, db,
+        forall types t. Type::Never.is_assignable_to(db, t)
+    );
+
+    // And it should be a subtype of all fully static types
+    type_property_test!(
+        never_subtype_of_every_fully_static_type, db,
+        forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
     );
 }
 
