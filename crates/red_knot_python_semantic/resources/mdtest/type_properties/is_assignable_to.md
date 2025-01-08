@@ -8,7 +8,6 @@ of this concept.
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown, TypeOf, Intersection, Not
 from typing_extensions import Never, Any, Literal, LiteralString
-from abc import ABCMeta
 
 class Parent: ...
 class Child1(Parent): ...
@@ -149,8 +148,11 @@ static_assert(is_assignable_to(TypeOf[str], type[Any]))
 static_assert(is_assignable_to(type[str], type[Unknown]))
 static_assert(is_assignable_to(type[Unknown], type[str]))
 static_assert(is_assignable_to(type[Any], type[Unknown]))
-static_assert(is_assignable_to(type[Any], ABCMeta))
-static_assert(is_assignable_to(type[Unknown], ABCMeta))
+
+class Meta(type): ...
+
+static_assert(is_assignable_to(type[Any], Meta))
+static_assert(is_assignable_to(type[Unknown], Meta))
 
 # Tuple types
 
