@@ -34,6 +34,7 @@ pub(super) enum CallOutcome<'db> {
         call_outcome: Box<CallOutcome<'db>>,
     },
     StaticAssertionError {
+        binding: CallBinding<'db>,
         parameter_ty: Type<'db>,
         truthiness: Truthiness,
     },
@@ -188,6 +189,7 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 revealed_ty,
             } => {
+                binding.report_diagnostics(context, node);
                 context.report_diagnostic(
                     node,
                     DiagnosticId::RevealedType,
@@ -257,9 +259,11 @@ impl<'db> CallOutcome<'db> {
                 }
             }
             CallOutcome::StaticAssertionError {
+                binding,
                 parameter_ty: Type::BooleanLiteral(false),
                 truthiness: _,
             } => {
+                binding.report_diagnostics(context, node);
                 context.report_lint(
                     &STATIC_ASSERT_ERROR,
                     node,
@@ -269,9 +273,11 @@ impl<'db> CallOutcome<'db> {
                 Ok(Type::Unknown)
             }
             CallOutcome::StaticAssertionError {
+                binding,
                 parameter_ty,
                 truthiness,
             } if truthiness.is_always_false() => {
+                binding.report_diagnostics(context, node);
                 context.report_lint(
                     &STATIC_ASSERT_ERROR,
                     node,
@@ -284,9 +290,11 @@ impl<'db> CallOutcome<'db> {
                 Ok(Type::Unknown)
             }
             CallOutcome::StaticAssertionError {
+                binding,
                 parameter_ty,
                 truthiness,
             } if truthiness.is_ambiguous() => {
+                binding.report_diagnostics(context, node);
                 context.report_lint(
                     &STATIC_ASSERT_ERROR,
                     node,
@@ -299,9 +307,11 @@ impl<'db> CallOutcome<'db> {
                 Ok(Type::Unknown)
             }
             CallOutcome::StaticAssertionError {
+                binding,
                 parameter_ty,
                 truthiness: _,
             } => {
+                binding.report_diagnostics(context, node);
                 context.report_lint(
                     &STATIC_ASSERT_ERROR,
                     node,

@@ -1786,6 +1786,7 @@ impl<'db> Type<'db> {
                                 CallOutcome::callable(binding)
                             } else {
                                 CallOutcome::StaticAssertionError {
+                                    binding,
                                     parameter_ty,
                                     truthiness,
                                 }

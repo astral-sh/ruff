@@ -257,3 +257,57 @@ def f(x: int) -> int:
 # error: 18 [parameter-already-assigned] "Multiple values provided for parameter `x` of function `f`"
 reveal_type(f(1, x=2))  # revealed: int
 ```
+
+## Special functions
+
+Some functions require special handling in type inference. Here, we make sure that we still emit
+proper diagnostics in case of missing or superfluous arguments.
+
+### `reveal_type`
+
+```py
+from typing_extensions import reveal_type
+
+# error: [missing-argument] "No argument provided for required parameter `obj` of function `reveal_type`"
+reveal_type()  # revealed: Unknown
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `reveal_type`: expected 1, got 2"
+reveal_type(1, 2)  # revealed: Literal[1]
+```
+
+### `static_assert`
+
+```py
+from knot_extensions import static_assert
+
+# error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
+# error: [static-assert-error]
+static_assert()
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 1, got 3"
+static_assert(True, 2, 3)
+```
+
+### Type API predicates
+
+```py
+from knot_extensions import is_subtype_of, is_fully_static
+
+# error: [missing-argument]
+is_subtype_of()
+
+# error: [missing-argument]
+is_subtype_of(int)
+
+# error: [too-many-positional-arguments]
+is_subtype_of(int, int, int)
+
+# error: [too-many-positional-arguments]
+is_subtype_of(int, int, int, int)
+
+# error: [missing-argument]
+is_fully_static()
+
+# error: [too-many-positional-arguments]
+is_fully_static(int, int)
+```

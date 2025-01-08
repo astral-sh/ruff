@@ -25,6 +25,9 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
     static_assert(not_one != 1)
     static_assert(not (not_one == 1))
+
+# error: "Special form `knot_extensions.Not` expected exactly one type parameter"
+n: Not[int, str]
 ```
 
 ### Intersection
@@ -86,6 +89,9 @@ class C(Unknown): ...
 
 # revealed: tuple[Literal[C], Unknown, Literal[object]]
 reveal_type(C.__mro__)
+
+# error: "Special form `knot_extensions.Unknown` expected no type parameter"
+u: Unknown[str]
 ```
 
 ## Static assertions
@@ -162,6 +168,29 @@ static_assert("")  # error: "Static assertion error: argument of type `Literal["
 
 static_assert(b"a")
 static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is statically known to be falsy"
+```
+
+### Error messages
+
+We provide various tailored error messages for wrong argument types to `static_assert`:
+
+```py
+from knot_extensions import static_assert
+
+static_assert(2 * 3 == 6)
+
+# error: "Static assertion error: argument evaluates to `False`"
+static_assert(2 * 3 == 7)
+
+# error: "Static assertion error: argument of type `bool` has an ambiguous static truthiness"
+static_assert(int(2.0 * 3.0) == 6)
+
+class InvalidBoolDunder:
+    def __bool__(self) -> int:
+        return 1
+
+# error: "Static assertion error: argument of type `InvalidBoolDunder` has an ambiguous static truthiness"
+static_assert(InvalidBoolDunder())
 ```
 
 ## Type predicates
@@ -295,67 +324,6 @@ def type_of_annotation() -> None:
     # Note how this is different from `type[…]` which includes subclasses:
     s1: type[Base] = Base
     s2: type[Base] = Derived  # no error here
-```
-
-## Error handling
-
-### Failed assertions
-
-We provide various tailored error messages for wrong argument types to `static_assert`:
-
-```py
-from knot_extensions import static_assert
-
-static_assert(2 * 3 == 6)
-
-# error: "Static assertion error: argument evaluates to `False`"
-static_assert(2 * 3 == 7)
-
-# error: "Static assertion error: argument of type `bool` has an ambiguous static truthiness"
-static_assert(int(2.0 * 3.0) == 6)
-
-class InvalidBoolDunder:
-    def __bool__(self) -> int:
-        return 1
-
-# error: "Static assertion error: argument of type `InvalidBoolDunder` has an ambiguous static truthiness"
-static_assert(InvalidBoolDunder())
-```
-
-### Wrong number of arguments for type predicates
-
-```py
-from knot_extensions import is_subtype_of, is_fully_static
-
-# error: [missing-argument]
-is_subtype_of()
-
-# error: [missing-argument]
-is_subtype_of(int)
-
-# error: [too-many-positional-arguments]
-is_subtype_of(int, int, int)
-
-# error: [too-many-positional-arguments]
-is_subtype_of(int, int, int, int)
-
-# error: [missing-argument]
-is_fully_static()
-
-# error: [too-many-positional-arguments]
-is_fully_static(int, int)
-```
-
-### Wrong argument number for types and type constructors
-
-```py
-from knot_extensions import Not, Unknown, TypeOf
-
-# error: "Special form `knot_extensions.Unknown` expected no type parameter"
-u: Unknown[str]
-
-# error: "Special form `knot_extensions.Not` expected exactly one type parameter"
-n: Not[int, str]
 
 # error: "Special form `knot_extensions.TypeOf` expected exactly one type parameter"
 t: TypeOf[int, str, bytes]
