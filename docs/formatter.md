@@ -225,6 +225,81 @@ def f(x):
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
 [`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
 
+## F-string formatting
+
+_Stabilized in 2025 style with Ruff 0.9.0_
+
+By default, Ruff formats f-string expressions. This is a [known deviation](formatter/black.md#f-strings)
+from Black, which does not format f-strings.
+
+Ruff employs several heuristics to determine how an f-string should be formatted, including the
+following considerations:
+
+* The quote style for both outer and nested f-strings
+* Whether to break the f-string into multiple lines
+* When to skip formatting the f-string altogether
+
+### Quotes
+
+Ruff will use the configured quote style for the f-string expression unless doing so would result in
+invalid syntax for the target Python version. In such cases, Ruff will avoid changing the
+quote style.
+
+For example, if a self-documenting f-string contains a string literal with the configured quote
+style, Ruff cannot use the same quote style for the f-string itself when targeting Python versions
+earlier than 3.12:
+
+```python
+f'{10 + len("hello")=}'
+# This f-string cannot be formatted as follows when targeting Python < 3.12
+f"{10 + len("hello")=}"
+```
+
+For nested f-strings, Ruff alternates quote styles, starting with the configured style for the
+outermost f-string. If this would result in an invalid syntax, Ruff avoids changing the quote style.
+For example, consider the following f-string:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
+```
+
+Ruff formats it as:
+
+```python
+f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+### Line breaks
+
+Starting with Python 3.12 ([PEP 701](https://peps.python.org/pep-0701/)), f-string expressions can
+span multiple lines. Ruff adopts a similar heuristic as [Prettier](https://prettier.io/docs/en/next/rationale.html#template-literals)
+for when to introduce a line break in an f-string expression: it introduces line breaks only
+if the original f-string expression already contains them.
+
+For example, the following code:
+
+```python
+f"this f-string has a multiline expression {
+  ['red', 'green', 'blue', 'yellow',]} and does not fit within the line length"
+```
+
+... is formatted as:
+
+```python
+# The list expression is split across multiple lines because of the trailing comma
+f"this f-string has a multiline expression {
+    [
+        'red',
+        'green',
+        'blue',
+        'yellow',
+    ]
+} and does not fit within the line length"
+```
+
+If you want Ruff to split an f-string across multiple lines, ensure there's a linebreak within the
+`{...}` expression.
+
 ## Format suppression
 
 Like Black, Ruff supports `# fmt: on`, `# fmt: off`, and `# fmt: skip` pragma comments, which can
