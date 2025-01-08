@@ -11,34 +11,35 @@ use crate::package::PackageRoot;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for modules that use the same names as Python builtin modules.
+/// Checks for modules that use the same names as Python standard-library
+/// modules.
 ///
 /// ## Why is this bad?
-/// Reusing a builtin module name for the name of a module increases the
-/// difficulty of reading and maintaining the code, and can cause
-/// non-obvious errors, as readers may mistake the variable for the
-/// builtin and vice versa.
+/// Reusing a standard-library module name for the name of a module increases
+/// the difficulty of reading and maintaining the code, and can cause
+/// non-obvious errors. Readers may mistake the first-party module for the
+/// standard-library module and vice versa.
 ///
-/// Builtin modules can be marked as exceptions to this rule via the
+/// Standard-library modules can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-allowed-modules`] configuration option.
 ///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
 #[derive(ViolationMetadata)]
-pub(crate) struct BuiltinModuleShadowing {
+pub(crate) struct StdlibModuleShadowing {
     name: String,
 }
 
-impl Violation for BuiltinModuleShadowing {
+impl Violation for StdlibModuleShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinModuleShadowing { name } = self;
-        format!("Module `{name}` is shadowing a Python builtin module")
+        let StdlibModuleShadowing { name } = self;
+        format!("Module `{name}` shadows a Python standard-library module")
     }
 }
 
 /// A005
-pub(crate) fn builtin_module_shadowing(
+pub(crate) fn stdlib_module_shadowing(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     allowed_modules: &[String],
@@ -74,7 +75,7 @@ pub(crate) fn builtin_module_shadowing(
     }
 
     Some(Diagnostic::new(
-        BuiltinModuleShadowing {
+        StdlibModuleShadowing {
             name: module_name.to_string(),
         },
         TextRange::default(),

@@ -21,26 +21,26 @@ mod tests {
     #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
     #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/non_builtin/__init__.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/logging/__init__.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/string/__init__.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/package/bisect.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/_abc/__init__.py")
     )]
-    #[test_case(Rule::BuiltinModuleShadowing, Path::new("A005/modules/package/xml.py"))]
+    #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
     #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -80,26 +80,26 @@ mod tests {
     }
 
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/non_builtin/__init__.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/logging/__init__.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/string/__init__.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/package/bisect.py")
     )]
     #[test_case(
-        Rule::BuiltinModuleShadowing,
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/_abc/__init__.py")
     )]
-    #[test_case(Rule::BuiltinModuleShadowing, Path::new("A005/modules/package/xml.py"))]
+    #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
     fn builtins_allowed_modules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_allowed_modules",
