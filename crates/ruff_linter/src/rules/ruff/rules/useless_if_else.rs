@@ -9,9 +9,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 ///
 /// ## Why is this bad?
 /// Useless `if`-`else` conditions add unnecessary complexity to the code without
-/// providing any logical benefit.
-///
-/// Assigning the value directly is clearer.
+/// providing any logical benefit. Assigning the value directly is clearer.
 ///
 /// ## Example
 /// ```python
