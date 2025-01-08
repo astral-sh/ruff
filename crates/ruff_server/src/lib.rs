@@ -12,10 +12,10 @@ mod edit;
 mod fix;
 mod format;
 mod lint;
+mod logging;
 mod resolve;
 mod server;
 mod session;
-mod trace;
 
 pub(crate) const SERVER_NAME: &str = "ruff";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";

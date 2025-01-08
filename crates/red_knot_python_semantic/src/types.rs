@@ -31,7 +31,9 @@ use crate::semantic_index::{
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
 use crate::symbol::{Boundness, Symbol};
-use crate::types::call::{CallDunderResult, CallOutcome};
+use crate::types::call::{
+    bind_call, CallArguments, CallBinding, CallDunderResult, CallOutcome, StaticAssertionErrorKind,
+};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -657,6 +659,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
+        match self {
+            Type::StringLiteral(string_literal) => Some(string_literal),
+            _ => None,
+        }
+    }
+
     #[track_caller]
     pub fn expect_int_literal(self) -> i64 {
         self.into_int_literal()
@@ -768,6 +777,14 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
+
+            // `object` is the only type that can be known to be a supertype of any intersection,
+            // even an intersection with no positive elements
+            (Type::Intersection(_), Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Object) =>
+            {
+                true
+            }
 
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Check that all target positive values are covered in self positive values
@@ -954,16 +971,32 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
+            // The dynamic type is assignable-to and assignable-from any type.
             (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
+
+            // All types are assignable to `object`.
+            // TODO this special case might be removable once the below cases are comprehensive
+            (_, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Object) =>
+            {
+                true
+            }
+
+            // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
                 .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            // A type T is assignable to a union iff T is assignable to any element of the union.
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+
+            // A tuple type S is assignable to a tuple type T if their lengths are the same, and
+            // each element of S is assignable to the corresponding element of T.
             (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
                 let self_elements = self_tuple.elements(db);
                 let target_elements = target_tuple.elements(db);
@@ -974,28 +1007,53 @@ impl<'db> Type<'db> {
                         },
                     )
             }
+
+            // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
+            // materialize to any `type[...]` type.
             (Type::SubclassOf(subclass_of_ty), Type::SubclassOf(_))
                 if subclass_of_ty.is_dynamic() =>
             {
                 true
             }
-            (Type::SubclassOf(subclass_of_ty), Type::Instance(_))
-                if subclass_of_ty.is_dynamic()
-                    && target.is_assignable_to(db, KnownClass::Type.to_instance(db)) =>
+
+            // All `type[...]` types are assignable to `type[Any]`, because `type[Any]` can
+            // materialize to any `type[...]` type.
+            //
+            // Every class literal type is also assignable to `type[Any]`, because the class
+            // literal type for a class `C` is a subtype of `type[C]`, and `type[C]` is assignable
+            // to `type[Any]`.
+            (Type::ClassLiteral(_) | Type::SubclassOf(_), Type::SubclassOf(target_subclass_of))
+                if target_subclass_of.is_dynamic() =>
             {
                 true
             }
+
+            // `type[Any]` is assignable to any type that `type[object]` is assignable to, because
+            // `type[Any]` can materialize to `type[object]`.
+            //
+            // `type[Any]` is also assignable to any subtype of `type[object]`, because all
+            // subtypes of `type[object]` are `type[...]` types (or `Never`), and `type[Any]` can
+            // materialize to any `type[...]` type (or to `type[Never]`, which is equivalent to
+            // `Never`.)
+            (Type::SubclassOf(subclass_of_ty), Type::Instance(_))
+                if subclass_of_ty.is_dynamic()
+                    && (KnownClass::Type
+                        .to_instance(db)
+                        .is_assignable_to(db, target)
+                        || target.is_subtype_of(db, KnownClass::Type.to_instance(db))) =>
+            {
+                true
+            }
+
+            // Any type that is assignable to `type[object]` is also assignable to `type[Any]`,
+            // because `type[Any]` can materialize to `type[object]`.
             (Type::Instance(_), Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic()
                     && self.is_assignable_to(db, KnownClass::Type.to_instance(db)) =>
             {
                 true
             }
-            (Type::ClassLiteral(_) | Type::SubclassOf(_), Type::SubclassOf(target_subclass_of))
-                if target_subclass_of.is_dynamic() =>
-            {
-                true
-            }
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -1681,11 +1739,13 @@ impl<'db> Type<'db> {
                         return Truthiness::Ambiguous;
                     }
 
-                    if let Some(Type::BooleanLiteral(bool_val)) =
-                        bool_method.call(db, &[*instance_ty]).return_ty(db)
+                    if let Some(Type::BooleanLiteral(bool_val)) = bool_method
+                        .call(db, &CallArguments::positional([*instance_ty]))
+                        .return_ty(db)
                     {
                         bool_val.into()
                     } else {
+                        // TODO diagnostic if not assignable to bool
                         Truthiness::Ambiguous
                     }
                 }
@@ -1753,7 +1813,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+        let return_ty = match self.call_dunder(db, "__len__", &CallArguments::positional([*self])) {
             // TODO: emit a diagnostic
             CallDunderResult::MethodNotAvailable => return None,
 
@@ -1767,49 +1827,123 @@ impl<'db> Type<'db> {
 
     /// Return the outcome of calling an object of this type.
     #[must_use]
-    fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
+    fn call(self, db: &'db dyn Db, arguments: &CallArguments<'db>) -> CallOutcome<'db> {
         match self {
-            // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                Some(KnownFunction::RevealType) => CallOutcome::revealed(
-                    function_type.signature(db).return_ty,
-                    *arg_types.first().unwrap_or(&Type::Unknown),
-                ),
+            Type::FunctionLiteral(function_type) => {
+                let mut binding = bind_call(db, arguments, function_type.signature(db), Some(self));
+                match function_type.known(db) {
+                    Some(KnownFunction::RevealType) => {
+                        let revealed_ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        CallOutcome::revealed(binding, revealed_ty)
+                    }
+                    Some(KnownFunction::StaticAssert) => {
+                        if let Some((parameter_ty, message)) = binding.two_parameter_tys() {
+                            let truthiness = parameter_ty.bool(db);
 
-                Some(KnownFunction::Len) => {
-                    let normal_return_ty = function_type.signature(db).return_ty;
+                            if truthiness.is_always_true() {
+                                CallOutcome::callable(binding)
+                            } else {
+                                let error_kind = if let Some(message) =
+                                    message.into_string_literal().map(|s| &**s.value(db))
+                                {
+                                    StaticAssertionErrorKind::CustomError(message)
+                                } else if parameter_ty == Type::BooleanLiteral(false) {
+                                    StaticAssertionErrorKind::ArgumentIsFalse
+                                } else if truthiness.is_always_false() {
+                                    StaticAssertionErrorKind::ArgumentIsFalsy(parameter_ty)
+                                } else {
+                                    StaticAssertionErrorKind::ArgumentTruthinessIsAmbiguous(
+                                        parameter_ty,
+                                    )
+                                };
 
-                    let [only_arg] = arg_types else {
-                        // TODO: Emit a diagnostic
-                        return CallOutcome::callable(normal_return_ty);
-                    };
-                    let len_ty = only_arg.len(db);
+                                CallOutcome::StaticAssertionError {
+                                    binding,
+                                    error_kind,
+                                }
+                            }
+                        } else {
+                            CallOutcome::callable(binding)
+                        }
+                    }
+                    Some(KnownFunction::IsEquivalentTo) => {
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsSubtypeOf) => {
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding.set_return_ty(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsAssignableTo) => {
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsDisjointFrom) => {
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::Unknown, Type::Unknown));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsFullyStatic) => {
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        binding.set_return_ty(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsSingleton) => {
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        binding.set_return_ty(Type::BooleanLiteral(ty.is_singleton(db)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsSingleValued) => {
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        binding.set_return_ty(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        CallOutcome::callable(binding)
+                    }
 
-                    CallOutcome::callable(len_ty.unwrap_or(normal_return_ty))
+                    Some(KnownFunction::Len) => {
+                        if let Some(first_arg) = binding.one_parameter_ty() {
+                            if let Some(len_ty) = first_arg.len(db) {
+                                binding.set_return_ty(len_ty);
+                            }
+                        };
+
+                        CallOutcome::callable(binding)
+                    }
+
+                    _ => CallOutcome::callable(binding),
                 }
-
-                _ => CallOutcome::callable(function_type.signature(db).return_ty),
-            },
+            }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
+            // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                CallOutcome::callable(match class.known(db) {
+                CallOutcome::callable(CallBinding::from_return_ty(match class.known(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
                     // the example above.
-                    Some(KnownClass::Bool) => arg_types
-                        .first()
+                    Some(KnownClass::Bool) => arguments
+                        .first_argument()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
                     _ => Type::Instance(InstanceType { class }),
-                })
+                }))
             }
 
             instance_ty @ Type::Instance(_) => {
-                let args = std::iter::once(self)
-                    .chain(arg_types.iter().copied())
-                    .collect::<Vec<_>>();
-                match instance_ty.call_dunder(db, "__call__", &args) {
+                match instance_ty.call_dunder(db, "__call__", &arguments.with_self(instance_ty)) {
                     CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
                         // Turn "`<type of illegal '__call__'>` not callable" into
                         // "`X` not callable"
@@ -1836,17 +1970,21 @@ impl<'db> Type<'db> {
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Any | Type::Todo(_) | Type::Unknown => CallOutcome::callable(self),
+            Type::Any | Type::Todo(_) | Type::Unknown => {
+                CallOutcome::callable(CallBinding::from_return_ty(self))
+            }
 
             Type::Union(union) => CallOutcome::union(
                 self,
                 union
                     .elements(db)
                     .iter()
-                    .map(|elem| elem.call(db, arg_types)),
+                    .map(|elem| elem.call(db, arguments)),
             ),
 
-            Type::Intersection(_) => CallOutcome::callable(todo_type!("Type::Intersection.call()")),
+            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_ty(
+                todo_type!("Type::Intersection.call()"),
+            )),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -1857,14 +1995,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        arg_types: &[Type<'db>],
+        arguments: &CallArguments<'db>,
     ) -> CallDunderResult<'db> {
         match self.to_meta_type(db).member(db, name) {
             Symbol::Type(callable_ty, Boundness::Bound) => {
-                CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
+                CallDunderResult::CallOutcome(callable_ty.call(db, arguments))
             }
             Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
+                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arguments))
             }
             Symbol::Unbound => CallDunderResult::MethodNotAvailable,
         }
@@ -1885,7 +2023,8 @@ impl<'db> Type<'db> {
             };
         }
 
-        let dunder_iter_result = self.call_dunder(db, "__iter__", &[self]);
+        let dunder_iter_result =
+            self.call_dunder(db, "__iter__", &CallArguments::positional([self]));
         match dunder_iter_result {
             CallDunderResult::CallOutcome(ref call_outcome)
             | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
@@ -1896,7 +2035,7 @@ impl<'db> Type<'db> {
                 };
 
                 return if let Some(element_ty) = iterator_ty
-                    .call_dunder(db, "__next__", &[iterator_ty])
+                    .call_dunder(db, "__next__", &CallArguments::positional([iterator_ty]))
                     .return_ty(db)
                 {
                     if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
@@ -1923,7 +2062,11 @@ impl<'db> Type<'db> {
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
         if let Some(element_ty) = self
-            .call_dunder(db, "__getitem__", &[self, KnownClass::Int.to_instance(db)])
+            .call_dunder(
+                db,
+                "__getitem__",
+                &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
+            )
             .return_ty(db)
         {
             IterationOutcome::Iterable { element_ty }
@@ -2049,6 +2192,7 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::Unknown,
             }),
+            Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::Unknown),
             Type::Todo(_) => Ok(*self),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
@@ -2555,6 +2699,14 @@ pub enum KnownInstanceType<'db> {
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
+    /// The symbol `knot_extensions.Unknown`
+    Unknown,
+    /// The symbol `knot_extensions.Not`
+    Not,
+    /// The symbol `knot_extensions.Intersection`
+    Intersection,
+    /// The symbol `knot_extensions.TypeOf`
+    TypeOf,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -2609,6 +2761,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "ChainMap",
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
+            Self::Unknown => "Unknown",
+            Self::Not => "Not",
+            Self::Intersection => "Intersection",
+            Self::TypeOf => "TypeOf",
         }
     }
 
@@ -2647,7 +2803,11 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::ReadOnly
-            | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
+            | Self::TypeAliasType(_)
+            | Self::Unknown
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2687,6 +2847,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
+            Self::Unknown => "knot_extensions.Unknown",
+            Self::Not => "knot_extensions.Not",
+            Self::Intersection => "knot_extensions.Intersection",
+            Self::TypeOf => "knot_extensions.TypeOf",
         }
     }
 
@@ -2726,6 +2890,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::TypeOf => KnownClass::SpecialForm,
+            Self::Not => KnownClass::SpecialForm,
+            Self::Intersection => KnownClass::SpecialForm,
+            Self::Unknown => KnownClass::Object,
         }
     }
 
@@ -2776,6 +2944,10 @@ impl<'db> KnownInstanceType<'db> {
             "Concatenate" => Self::Concatenate,
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
+            "Unknown" => Self::Unknown,
+            "Not" => Self::Not,
+            "Intersection" => Self::Intersection,
+            "TypeOf" => Self::TypeOf,
             _ => return None,
         };
 
@@ -2824,6 +2996,9 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeAliasType(_)
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+            Self::Unknown | Self::Not | Self::Intersection | Self::TypeOf => {
+                module.is_knot_extensions()
             }
         }
     }
@@ -3063,13 +3238,41 @@ pub enum KnownFunction {
 
     /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+
+    /// `knot_extensions.static_assert`
+    StaticAssert,
+    /// `knot_extensions.is_equivalent_to`
+    IsEquivalentTo,
+    /// `knot_extensions.is_subtype_of`
+    IsSubtypeOf,
+    /// `knot_extensions.is_assignable_to`
+    IsAssignableTo,
+    /// `knot_extensions.is_disjoint_from`
+    IsDisjointFrom,
+    /// `knot_extensions.is_fully_static`
+    IsFullyStatic,
+    /// `knot_extensions.is_singleton`
+    IsSingleton,
+    /// `knot_extensions.is_single_valued`
+    IsSingleValued,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck => None,
+            Self::RevealType
+            | Self::Len
+            | Self::Final
+            | Self::NoTypeCheck
+            | Self::StaticAssert
+            | Self::IsEquivalentTo
+            | Self::IsSubtypeOf
+            | Self::IsAssignableTo
+            | Self::IsDisjointFrom
+            | Self::IsFullyStatic
+            | Self::IsSingleton
+            | Self::IsSingleValued => None,
         }
     }
 
@@ -3091,8 +3294,49 @@ impl KnownFunction {
             "no_type_check" if definition.is_typing_definition(db) => {
                 Some(KnownFunction::NoTypeCheck)
             }
+            "static_assert" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::StaticAssert)
+            }
+            "is_subtype_of" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsSubtypeOf)
+            }
+            "is_disjoint_from" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsDisjointFrom)
+            }
+            "is_equivalent_to" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsEquivalentTo)
+            }
+            "is_assignable_to" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsAssignableTo)
+            }
+            "is_fully_static" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsFullyStatic)
+            }
+            "is_singleton" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsSingleton)
+            }
+            "is_single_valued" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsSingleValued)
+            }
+
             _ => None,
         }
+    }
+
+    /// Whether or not a particular function takes type expression as arguments, i.e. should
+    /// the argument of a call like `f(int)` be interpreted as the type int (true) or as the
+    /// type of the expression `int`, i.e. `Literal[int]` (false).
+    const fn takes_type_expression_arguments(self) -> bool {
+        matches!(
+            self,
+            KnownFunction::IsEquivalentTo
+                | KnownFunction::IsSubtypeOf
+                | KnownFunction::IsAssignableTo
+                | KnownFunction::IsDisjointFrom
+                | KnownFunction::IsFullyStatic
+                | KnownFunction::IsSingleton
+                | KnownFunction::IsSingleValued
+        )
     }
 }
 
@@ -3884,6 +4128,7 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfUnknown, Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::SubclassOfAny, Ty::AbcInstance("ABCMeta"))]
     #[test_case(Ty::SubclassOfUnknown, Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("object"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3967,6 +4212,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Never, Ty::AlwaysTruthy)]
     #[test_case(Ty::Never, Ty::AlwaysFalsy)]
     #[test_case(Ty::BuiltinClassLiteral("bool"), Ty::SubclassOfBuiltinClass("int"))]
+    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::LiteralString]}, Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

@@ -54,6 +54,12 @@ use crate::checkers::ast::Checker;
 ///     bar: Bar
 /// ```
 ///
+/// ## See also
+/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+///   removes all quoted annotations from stub files
+/// - [`quoted-type-alias`](quoted-type-alias.md): A rule that removes unnecessary quotes
+///   from type aliases.
+///
 /// ## References
 /// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html#module-__future__)

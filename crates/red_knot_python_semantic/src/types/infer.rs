@@ -28,7 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
@@ -49,6 +49,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
+use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
     report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -918,7 +919,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            self.infer_arguments(arguments);
+            self.infer_arguments(arguments, false);
         }
     }
 
@@ -1530,7 +1531,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let target_ty = enter_ty
-                    .call(self.db(), &[context_expression_ty])
+                    .call(self.db(), &CallArguments::positional([context_expression_ty]))
                     .return_ty_result(&self.context, context_expression.into())
                     .unwrap_or_else(|err| {
                         self.context.report_lint(
@@ -1571,12 +1572,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if exit_ty
                             .call(
                                 self.db(),
-                                &[
+                                &CallArguments::positional([
                                     context_manager_ty,
                                     Type::none(self.db()),
                                     Type::none(self.db()),
                                     Type::none(self.db()),
-                                ],
+                                ]),
                             )
                             .return_ty_result(&self.context, context_expression.into())
                             .is_err()
@@ -1779,26 +1780,62 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
+        // We need to create a standalone expression for each arm of a match statement, since they
+        // can introduce constraints on the match subject. (Or more accurately, for the match arm's
+        // pattern, since its the pattern that introduces any constraints, not the body.) Ideally,
+        // that standalone expression would wrap the match arm's pattern as a whole. But a
+        // standalone expression can currently only wrap an ast::Expr, which patterns are not. So,
+        // we need to choose an Expr that can “stand in” for the pattern, which we can wrap in a
+        // standalone expression.
+        //
+        // That said, when inferring the type of a standalone expression, we don't have access to
+        // its parent or sibling nodes.  That means, for instance, that in a class pattern, where
+        // we are currently using the class name as the standalone expression, we do not have
+        // access to the class pattern's arguments in the standalone expression inference scope.
+        // At the moment, we aren't trying to do anything with those arguments when creating a
+        // narrowing constraint for the pattern.  But in the future, if we do, we will have to
+        // either wrap those arguments in their own standalone expressions, or update Expression to
+        // be able to wrap other AST node types besides just ast::Expr.
+        //
+        // This function is only called for the top-level pattern of a match arm, and is
+        // responsible for inferring the standalone expression for each supported pattern type. It
+        // then hands off to `infer_nested_match_pattern` for any subexpressions and subpatterns,
+        // where we do NOT have any additional standalone expressions to infer through.
+        //
         // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
         // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value);
             }
+            ast::Pattern::MatchClass(match_class) => {
+                let ast::PatternMatchClass {
+                    range: _,
+                    cls,
+                    arguments,
+                } = match_class;
+                for pattern in &arguments.patterns {
+                    self.infer_nested_match_pattern(pattern);
+                }
+                for keyword in &arguments.keywords {
+                    self.infer_nested_match_pattern(&keyword.pattern);
+                }
+                self.infer_standalone_expression(cls);
+            }
             _ => {
-                self.infer_match_pattern_impl(pattern);
+                self.infer_nested_match_pattern(pattern);
             }
         }
     }
 
-    fn infer_match_pattern_impl(&mut self, pattern: &ast::Pattern) {
+    fn infer_nested_match_pattern(&mut self, pattern: &ast::Pattern) {
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_expression(&match_value.value);
             }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
@@ -1812,7 +1849,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(key);
                 }
                 for pattern in patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -1822,21 +1859,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     arguments,
                 } = match_class;
                 for pattern in &arguments.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.infer_match_pattern_impl(&keyword.pattern);
+                    self.infer_nested_match_pattern(&keyword.pattern);
                 }
                 self.infer_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
-                    self.infer_match_pattern_impl(pattern);
+                    self.infer_nested_match_pattern(pattern);
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
@@ -2024,7 +2061,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db(), op.in_place_dunder())
                 {
-                    let call = class_member.call(self.db(), &[target_type, value_type]);
+                    let call = class_member.call(
+                        self.db(),
+                        &CallArguments::positional([target_type, value_type]),
+                    );
                     let augmented_return_ty = match call
                         .return_ty_result(&self.context, AnyNodeRef::StmtAugAssign(assignment))
                     {
@@ -2483,25 +2523,53 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn infer_arguments(&mut self, arguments: &ast::Arguments) -> Vec<Type<'db>> {
-        let mut types = Vec::with_capacity(
-            arguments
-                .args
-                .len()
-                .saturating_add(arguments.keywords.len()),
-        );
+    fn infer_arguments(
+        &mut self,
+        arguments: &ast::Arguments,
+        infer_as_type_expressions: bool,
+    ) -> CallArguments<'db> {
+        let infer_argument_type = if infer_as_type_expressions {
+            Self::infer_type_expression
+        } else {
+            Self::infer_expression
+        };
 
-        types.extend(arguments.args.iter().map(|arg| self.infer_expression(arg)));
-
-        types.extend(arguments.keywords.iter().map(
-            |ast::Keyword {
-                 range: _,
-                 arg: _,
-                 value,
-             }| self.infer_expression(value),
-        ));
-
-        types
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| {
+                match arg_or_keyword {
+                    ast::ArgOrKeyword::Arg(arg) => match arg {
+                        ast::Expr::Starred(ast::ExprStarred {
+                            value,
+                            range: _,
+                            ctx: _,
+                        }) => {
+                            let ty = infer_argument_type(self, value);
+                            self.store_expression_type(arg, ty);
+                            Argument::Variadic(ty)
+                        }
+                        // TODO diagnostic if after a keyword argument
+                        _ => Argument::Positional(infer_argument_type(self, arg)),
+                    },
+                    ast::ArgOrKeyword::Keyword(ast::Keyword {
+                        arg,
+                        value,
+                        range: _,
+                    }) => {
+                        let ty = infer_argument_type(self, value);
+                        if let Some(arg) = arg {
+                            Argument::Keyword {
+                                name: arg.id.clone(),
+                                ty,
+                            }
+                        } else {
+                            // TODO diagnostic if not last
+                            Argument::Keywords(ty)
+                        }
+                    }
+                }
+            })
+            .collect()
     }
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
@@ -3012,12 +3080,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
-        // TODO: proper typed call signature, representing keyword args etc
-        let arg_types = self.infer_arguments(arguments);
         let function_type = self.infer_expression(func);
+
+        let infer_arguments_as_type_expressions = function_type
+            .into_function_literal()
+            .and_then(|f| f.known(self.db()))
+            .is_some_and(KnownFunction::takes_type_expression_arguments);
+
+        let call_arguments = self.infer_arguments(arguments, infer_arguments_as_type_expressions);
         function_type
-            .call(self.db(), arg_types.as_slice())
-            .unwrap_with_diagnostic(&self.context, func.as_ref().into())
+            .call(self.db(), &call_arguments)
+            .unwrap_with_diagnostic(&self.context, call_expression.into())
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -3316,9 +3389,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if let CallDunderResult::CallOutcome(call)
-                | CallDunderResult::PossiblyUnbound(call) =
-                    operand_type.call_dunder(self.db(), unary_dunder_method, &[operand_type])
-                {
+                | CallDunderResult::PossiblyUnbound(call) = operand_type.call_dunder(
+                    self.db(),
+                    unary_dunder_method,
+                    &CallArguments::positional([operand_type]),
+                ) {
                     match call.return_ty_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {
@@ -3571,11 +3646,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
                         return right_ty
-                            .call_dunder(self.db(), reflected_dunder, &[right_ty, left_ty])
+                            .call_dunder(
+                                self.db(),
+                                reflected_dunder,
+                                &CallArguments::positional([right_ty, left_ty]),
+                            )
                             .return_ty(self.db())
                             .or_else(|| {
                                 left_ty
-                                    .call_dunder(self.db(), op.dunder(), &[left_ty, right_ty])
+                                    .call_dunder(
+                                        self.db(),
+                                        op.dunder(),
+                                        &CallArguments::positional([left_ty, right_ty]),
+                                    )
                                     .return_ty(self.db())
                             });
                     }
@@ -3585,7 +3668,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     left_class.member(self.db(), op.dunder())
                 {
                     class_member
-                        .call(self.db(), &[left_ty, right_ty])
+                        .call(self.db(), &CallArguments::positional([left_ty, right_ty]))
                         .return_ty(self.db())
                 } else {
                     None
@@ -3599,7 +3682,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             right_class.member(self.db(), op.reflected_dunder())
                         {
                             class_member
-                                .call(self.db(), &[right_ty, left_ty])
+                                .call(self.db(), &CallArguments::positional([right_ty, left_ty]))
                                 .return_ty(self.db())
                         } else {
                             None
@@ -4380,8 +4463,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
 
                         return dunder_getitem_method
-                            .call(self.db(), &[slice_ty])
-                            .return_ty_result(&self.context, value_node.into())
+                            .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
+                            .return_ty_result( &self.context, value_node.into())
                             .unwrap_or_else(|err| {
                                 self.context.report_lint(
                                     &CALL_NON_CALLABLE,
@@ -4425,7 +4508,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
 
                             return ty
-                                .call(self.db(), &[slice_ty])
+                                .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
                                 .return_ty_result(&self.context, value_node.into())
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(
@@ -5089,6 +5172,55 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("Callable types")
             }
 
+            // Type API special forms
+            KnownInstanceType::Not => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.context.report_lint(
+                        &INVALID_TYPE_FORM,
+                        subscript.into(),
+                        format_args!(
+                            "Special form `{}` expected exactly one type parameter",
+                            known_instance.repr(self.db())
+                        ),
+                    );
+                    Type::Unknown
+                }
+                _ => {
+                    let argument_type = self.infer_type_expression(arguments_slice);
+                    argument_type.negate(self.db())
+                }
+            },
+            KnownInstanceType::Intersection => {
+                let elements = match arguments_slice {
+                    ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
+                    element => Either::Right(std::iter::once(element)),
+                };
+
+                elements
+                    .fold(IntersectionBuilder::new(self.db()), |builder, element| {
+                        builder.add_positive(self.infer_type_expression(element))
+                    })
+                    .build()
+            }
+            KnownInstanceType::TypeOf => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.context.report_lint(
+                        &INVALID_TYPE_FORM,
+                        subscript.into(),
+                        format_args!(
+                            "Special form `{}` expected exactly one type parameter",
+                            known_instance.repr(self.db())
+                        ),
+                    );
+                    Type::Unknown
+                }
+                _ => {
+                    // NB: This calls `infer_expression` instead of `infer_type_expression`.
+                    let argument_type = self.infer_expression(arguments_slice);
+                    argument_type
+                }
+            },
+
             // TODO: Generics
             KnownInstanceType::ChainMap => {
                 self.infer_type_expression(arguments_slice);
@@ -5174,7 +5306,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
-            KnownInstanceType::TypingSelf | KnownInstanceType::TypeAlias => {
+            KnownInstanceType::TypingSelf
+            | KnownInstanceType::TypeAlias
+            | KnownInstanceType::Unknown => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript.into(),
@@ -5506,7 +5640,10 @@ fn perform_rich_comparison<'db>(
                        right: InstanceType<'db>| {
         match left.class.class_member(db, op.dunder()) {
             Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                .call(db, &[Type::Instance(left), Type::Instance(right)])
+                .call(
+                    db,
+                    &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
+                )
                 .return_ty(db),
             _ => None,
         }
@@ -5550,7 +5687,10 @@ fn perform_membership_test_comparison<'db>(
         Symbol::Type(contains_dunder, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.
             contains_dunder
-                .call(db, &[Type::Instance(right), Type::Instance(left)])
+                .call(
+                    db,
+                    &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                )
                 .return_ty(db)
         }
         _ => {

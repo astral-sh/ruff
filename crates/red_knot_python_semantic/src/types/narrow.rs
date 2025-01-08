@@ -233,6 +233,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             PatternConstraintKind::Singleton(singleton, _guard) => {
                 self.evaluate_match_pattern_singleton(*subject, *singleton)
             }
+            PatternConstraintKind::Class(cls, _guard) => {
+                self.evaluate_match_pattern_class(*subject, *cls)
+            }
             // TODO: support more pattern kinds
             PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,
         }
@@ -478,6 +481,27 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 ast::Singleton::True => Type::BooleanLiteral(true),
                 ast::Singleton::False => Type::BooleanLiteral(false),
             };
+            let mut constraints = NarrowingConstraints::default();
+            constraints.insert(symbol, ty);
+            Some(constraints)
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_match_pattern_class(
+        &mut self,
+        subject: Expression<'db>,
+        cls: Expression<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
+            // SAFETY: we should always have a symbol for every Name node.
+            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+            let scope = self.scope();
+            let inference = infer_expression_types(self.db, cls);
+            let ty = inference
+                .expression_ty(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
+                .to_instance(self.db);
             let mut constraints = NarrowingConstraints::default();
             constraints.insert(symbol, ty);
             Some(constraints)
