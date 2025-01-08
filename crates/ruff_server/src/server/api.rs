@@ -26,9 +26,6 @@ macro_rules! define_document_url {
 use define_document_url;
 
 pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
-    let _span =
-        tracing::trace_span!("request", id = %req.id, method = req.method.as_str()).entered();
-
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -71,8 +68,6 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
 }
 
 pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
-    let _span = tracing::trace_span!("notification", method = notif.method.as_str()).entered();
-
     match notif.method.as_str() {
         notification::Cancel::METHOD => local_notification_task::<notification::Cancel>(notif),
         notification::DidChange::METHOD => {
@@ -115,6 +110,7 @@ fn local_request_task<'a, R: traits::SyncRequestHandler>(
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::local(|session, notifier, requester, responder| {
+        let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, notifier, requester, params);
         respond::<R>(id, result, &responder);
     }))
@@ -131,6 +127,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, responder| {
+            let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
             let result = R::run_with_snapshot(snapshot, notifier, params);
             respond::<R>(id, result, &responder);
         })
@@ -142,6 +139,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, requester, _| {
+        let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, notifier, requester, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
@@ -161,6 +159,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {
+            let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
             if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
                 tracing::error!("An error occurred while running {id}: {err}");
                 show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
@@ -207,7 +206,7 @@ fn respond<Req>(
     Req: traits::RequestHandler,
 {
     if let Err(err) = &result {
-        tracing::error!("An error occurred with result ID {id}: {err}");
+        tracing::error!("An error occurred with request ID {id}: {err}");
         show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
     }
     if let Err(err) = responder.respond(id, result) {

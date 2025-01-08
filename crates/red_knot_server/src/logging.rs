@@ -1,4 +1,4 @@
-//! The logging system for `ruff server`.
+//! The logging system for `red_knot server`.
 //!
 //! Log messages are controlled by the `logLevel` setting which defaults to `"info"`. Log messages
 //! are written to `stderr` by default, which should appear in the logs for most LSP clients. A
@@ -6,19 +6,13 @@
 //! instead.
 use core::str;
 use serde::Deserialize;
-use std::{
-    path::PathBuf,
-    str::FromStr,
-    sync::{Arc, OnceLock},
-};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
     fmt::{time::Uptime, writer::BoxMakeWriter},
     layer::SubscriberExt,
     Layer,
 };
-
-use crate::server::ClientSender;
 
 pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
     let log_file = log_file
