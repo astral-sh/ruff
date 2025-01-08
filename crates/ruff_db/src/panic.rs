@@ -1,20 +1,27 @@
 use std::cell::Cell;
+use std::panic::Location;
 use std::sync::OnceLock;
 
 #[derive(Default, Debug)]
 pub struct PanicError {
-    pub info: String,
+    pub location: Option<String>,
+    pub payload: Option<String>,
     pub backtrace: Option<std::backtrace::Backtrace>,
 }
 
 impl std::fmt::Display for PanicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.info)?;
-        if let Some(backtrace) = &self.backtrace {
-            writeln!(f, "Backtrace: {backtrace}")
-        } else {
-            Ok(())
+        writeln!(f, "panicked at")?;
+        if let Some(location) = &self.location {
+            write!(f, " {location}")?;
         }
+        if let Some(payload) = &self.payload {
+            write!(f, ":\n{payload}")?;
+        }
+        if let Some(backtrace) = &self.backtrace {
+            writeln!(f, "\nBacktrace: {backtrace}")?;
+        }
+        Ok(())
     }
 }
 
@@ -34,11 +41,17 @@ fn install_hook() {
             if !should_capture {
                 return (*prev)(info);
             }
-            let info = info.to_string();
+            let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+                Some(s.to_string())
+            } else {
+                info.payload().downcast_ref::<String>().cloned()
+            };
+            let location = info.location().map(Location::to_string);
             let backtrace = std::backtrace::Backtrace::force_capture();
             LAST_PANIC.with(|cell| {
                 cell.set(Some(PanicError {
-                    info,
+                    payload,
+                    location,
                     backtrace: Some(backtrace),
                 }));
             });
