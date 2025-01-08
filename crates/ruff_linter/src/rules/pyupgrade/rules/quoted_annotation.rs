@@ -90,10 +90,9 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     );
 
     let new_content = match (spans_multiple_lines, last_token_is_comment) {
-        (false, false) => format!("{annotation}"),
+        (false, false) => annotation.to_string(),
         (true, false) => format!("({annotation})"),
-        (false, true) => format!("({annotation}\n)"),
-        (true, true) => format!("({annotation}\n)"),
+        (_, true) => format!("({annotation}\n)"),
     };
     let edit = Edit::range_replacement(new_content, range);
     let fix = Fix::safe_edit(edit);
