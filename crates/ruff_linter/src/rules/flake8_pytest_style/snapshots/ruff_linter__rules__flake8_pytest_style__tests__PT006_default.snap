@@ -230,6 +230,25 @@ PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 71 71 |     ...
 72 72 | 
 
+PT006.py:74:39: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
+   |
+74 | parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
+   |                                       ^^^^^^^^^^^^^^^^^ PT006
+75 | 
+76 | @parametrize
+   |
+   = help: Use a `tuple` for the first argument
+
+ℹ Unsafe fix
+71 71 |     ...
+72 72 | 
+73 73 | 
+74    |-parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
+   74 |+parametrize = pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+75 75 | 
+76 76 | @parametrize
+77 77 | def test_not_decorator(param1, param2):
+
 PT006.py:81:35: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 81 | @pytest.mark.parametrize(argnames=("param1,param2"), argvalues=[(1, 2), (3, 4)])

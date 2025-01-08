@@ -312,22 +312,4 @@ mod tests {
         assert_messages!("PT006_and_PT007", diagnostics);
         Ok(())
     }
-
-    #[test_case(Rule::PytestParametrizeNamesWrongType, Path::new("PT006.py"))]
-    fn test_pytest_style_preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_pytest_style").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
 }
