@@ -3255,22 +3255,17 @@ impl KnownFunction {
     /// Whether or not a particular function takes type expression as arguments, i.e. should
     /// the argument of a call like `f(int)` be interpreted as the type int (true) or as the
     /// type of the expression `int`, i.e. `Literal[int]` (false).
-    fn takes_type_expression_arguments(self) -> bool {
-        match self {
+    const fn takes_type_expression_arguments(self) -> bool {
+        matches!(
+            self,
             KnownFunction::IsEquivalentTo
-            | KnownFunction::IsSubtypeOf
-            | KnownFunction::IsAssignableTo
-            | KnownFunction::IsDisjointFrom
-            | KnownFunction::IsFullyStatic
-            | KnownFunction::IsSingleton
-            | KnownFunction::IsSingleValued => true,
-            KnownFunction::ConstraintFunction(_)
-            | KnownFunction::RevealType
-            | KnownFunction::Len
-            | KnownFunction::Final
-            | KnownFunction::NoTypeCheck
-            | KnownFunction::StaticAssert => false,
-        }
+                | KnownFunction::IsSubtypeOf
+                | KnownFunction::IsAssignableTo
+                | KnownFunction::IsDisjointFrom
+                | KnownFunction::IsFullyStatic
+                | KnownFunction::IsSingleton
+                | KnownFunction::IsSingleValued
+        )
     }
 }
 
