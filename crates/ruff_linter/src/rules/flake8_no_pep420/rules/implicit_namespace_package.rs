@@ -10,7 +10,6 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
-use crate::settings::types::PreviewMode;
 use crate::Locator;
 
 /// ## What it does
@@ -60,7 +59,6 @@ pub(crate) fn implicit_namespace_package(
     comment_ranges: &CommentRanges,
     project_root: &Path,
     src: &[PathBuf],
-    preview: PreviewMode,
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
@@ -93,27 +91,25 @@ pub(crate) fn implicit_namespace_package(
         ));
     }
 
-    if preview.is_enabled() {
-        if let Some(PackageRoot::Nested { path: root }) = package.as_ref() {
-            if path.ends_with("__init__.py") {
-                // Identify the intermediary package that's missing the `__init__.py` file.
-                if let Some(parent) = root
-                    .ancestors()
-                    .find(|parent| !parent.join("__init__.py").exists())
-                {
-                    #[cfg(all(test, windows))]
-                    let path = path
-                        .to_string_lossy()
-                        .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
+    if let Some(PackageRoot::Nested { path: root }) = package.as_ref() {
+        if path.ends_with("__init__.py") {
+            // Identify the intermediary package that's missing the `__init__.py` file.
+            if let Some(parent) = root
+                .ancestors()
+                .find(|parent| !parent.join("__init__.py").exists())
+            {
+                #[cfg(all(test, windows))]
+                let path = path
+                    .to_string_lossy()
+                    .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
 
-                    return Some(Diagnostic::new(
-                        ImplicitNamespacePackage {
-                            filename: fs::relativize_path(path),
-                            parent: Some(fs::relativize_path(parent)),
-                        },
-                        TextRange::default(),
-                    ));
-                }
+                return Some(Diagnostic::new(
+                    ImplicitNamespacePackage {
+                        filename: fs::relativize_path(path),
+                        parent: Some(fs::relativize_path(parent)),
+                    },
+                    TextRange::default(),
+                ));
             }
         }
     }

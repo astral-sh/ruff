@@ -2016,26 +2016,11 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .child("bop.py")
         .touch()?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--select")
-        .arg("INP")
-        .current_dir(&tempdir)
-        , @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    ");
-
     insta::with_settings!({filters => vec![(r"\\", "/")]}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--select")
             .arg("INP")
-            .arg("--preview")
             .current_dir(&tempdir)
             , @r"
         success: false

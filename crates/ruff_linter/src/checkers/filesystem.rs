@@ -29,7 +29,6 @@ pub(crate) fn check_file_path(
             comment_ranges,
             &settings.project_root,
             &settings.src,
-            settings.preview,
         ) {
             diagnostics.push(diagnostic);
         }
