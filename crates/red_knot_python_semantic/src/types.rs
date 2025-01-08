@@ -31,7 +31,9 @@ use crate::semantic_index::{
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
 use crate::symbol::{Boundness, Symbol};
-use crate::types::call::{bind_call, CallArguments, CallBinding, CallDunderResult, CallOutcome};
+use crate::types::call::{
+    bind_call, CallArguments, CallBinding, CallDunderResult, CallOutcome, StaticAssertionErrorKind,
+};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -1792,13 +1794,23 @@ impl<'db> Type<'db> {
                             if truthiness.is_always_true() {
                                 CallOutcome::callable(binding)
                             } else {
-                                let message = message.into_string_literal().map(|s| &**s.value(db));
+                                let error_kind = if let Some(message) =
+                                    message.into_string_literal().map(|s| &**s.value(db))
+                                {
+                                    StaticAssertionErrorKind::CustomError(message)
+                                } else if parameter_ty == Type::BooleanLiteral(false) {
+                                    StaticAssertionErrorKind::ArgumentIsFalse
+                                } else if truthiness.is_always_false() {
+                                    StaticAssertionErrorKind::ArgumentIsFalsy(parameter_ty)
+                                } else {
+                                    StaticAssertionErrorKind::ArgumentTruthinessIsAmbiguous(
+                                        parameter_ty,
+                                    )
+                                };
 
                                 CallOutcome::StaticAssertionError {
                                     binding,
-                                    parameter_ty,
-                                    truthiness,
-                                    message,
+                                    error_kind,
                                 }
                             }
                         } else {
