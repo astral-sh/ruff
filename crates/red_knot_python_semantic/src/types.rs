@@ -1779,18 +1779,19 @@ impl<'db> Type<'db> {
                         CallOutcome::revealed(binding, revealed_ty)
                     }
                     Some(KnownFunction::StaticAssert) => {
-                        let parameter_ty = binding.first_parameter().unwrap_or(Type::Unknown);
-                        let truthiness = parameter_ty.bool(db);
+                        if let Some(parameter_ty) = binding.first_parameter() {
+                            let truthiness = parameter_ty.bool(db);
 
-                        binding.set_return_ty(Type::none(db));
-
-                        if truthiness.is_always_true() {
-                            CallOutcome::callable(binding)
-                        } else {
-                            CallOutcome::StaticAssertionError {
-                                parameter_ty,
-                                truthiness,
+                            if truthiness.is_always_true() {
+                                CallOutcome::callable(binding)
+                            } else {
+                                CallOutcome::StaticAssertionError {
+                                    parameter_ty,
+                                    truthiness,
+                                }
                             }
+                        } else {
+                            CallOutcome::callable(binding)
                         }
                     }
                     Some(KnownFunction::IsEquivalentTo) => {

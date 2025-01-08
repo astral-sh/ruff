@@ -1532,7 +1532,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let target_ty = enter_ty
                     .call(self.db(), &CallArguments::positional([context_expression_ty]))
-                    .return_ty_result(self.db(), &self.context, context_expression.into())
+                    .return_ty_result(&self.context, context_expression.into())
                     .unwrap_or_else(|err| {
                         self.context.report_lint(
                             &INVALID_CONTEXT_MANAGER,
@@ -1579,7 +1579,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     Type::none(self.db()),
                                 ]),
                             )
-                            .return_ty_result(self.db(), &self.context, context_expression.into())
+                            .return_ty_result(&self.context, context_expression.into())
                             .is_err()
                         {
                             self.context.report_lint(
@@ -2008,7 +2008,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_augmented_op(
         &mut self,
-        db: &'db dyn Db,
         assignment: &ast::StmtAugAssign,
         target_type: Type<'db>,
         value_type: Type<'db>,
@@ -2019,7 +2018,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         match target_type {
             Type::Union(union) => {
                 return union.map(self.db(), |&target_type| {
-                    self.infer_augmented_op(db, assignment, target_type, value_type)
+                    self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
             Type::Instance(InstanceType { class }) => {
@@ -2030,11 +2029,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.db(),
                         &CallArguments::positional([target_type, value_type]),
                     );
-                    let augmented_return_ty = match call.return_ty_result(
-                        db,
-                        &self.context,
-                        AnyNodeRef::StmtAugAssign(assignment),
-                    ) {
+                    let augmented_return_ty = match call
+                        .return_ty_result(&self.context, AnyNodeRef::StmtAugAssign(assignment))
+                    {
                         Ok(t) => t,
                         Err(e) => {
                             self.context.report_lint(
@@ -2131,7 +2128,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let value_type = self.infer_expression(value);
 
-        self.infer_augmented_op(self.db(), assignment, target_type, value_type)
+        self.infer_augmented_op(assignment, target_type, value_type)
     }
 
     fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
@@ -3057,7 +3054,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let call_arguments = self.infer_arguments(arguments, infer_arguments_as_type_expressions);
         function_type
             .call(self.db(), &call_arguments)
-            .unwrap_with_diagnostic(self.db(), &self.context, call_expression.into())
+            .unwrap_with_diagnostic(&self.context, call_expression.into())
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -3361,11 +3358,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     unary_dunder_method,
                     &CallArguments::positional([operand_type]),
                 ) {
-                    match call.return_ty_result(
-                        self.db(),
-                        &self.context,
-                        AnyNodeRef::ExprUnaryOp(unary),
-                    ) {
+                    match call.return_ty_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {
                             self.context.report_lint(
@@ -4435,7 +4428,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return dunder_getitem_method
                             .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                            .return_ty_result(self.db(), &self.context, value_node.into())
+                            .return_ty_result( &self.context, value_node.into())
                             .unwrap_or_else(|err| {
                                 self.context.report_lint(
                                     &CALL_NON_CALLABLE,
@@ -4480,7 +4473,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             return ty
                                 .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                                .return_ty_result(self.db(), &self.context, value_node.into())
+                                .return_ty_result(&self.context, value_node.into())
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(
                                         &CALL_NON_CALLABLE,
