@@ -221,9 +221,6 @@ impl Display for DisplayLiteralGroup<'_> {
 /// Enumeration of literal types that are displayed in a "condensed way" inside `Literal` slices.
 ///
 /// For example, `Literal[1] | Literal[2] | Literal["s"]` is displayed as `"Literal[1, 2, "s"]"`.
-/// Not all `Literal` types are displayed using `Literal` slices
-/// (e.g. it would be inappropriate to display `LiteralString`
-/// as `Literal[LiteralString]`).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum CondensedDisplayTypeKind {
     Class,
