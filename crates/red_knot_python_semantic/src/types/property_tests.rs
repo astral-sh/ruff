@@ -258,12 +258,6 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
     );
 
-    // `T` can be assigned to itself.
-    type_property_test!(
-        assignable_to_is_reflexive, db,
-        forall types t. t.is_assignable_to(db, t)
-    );
-
     // `S <: T` implies that `S` can be assigned to `T`.
     type_property_test!(
         subtype_of_implies_assignable_to, db,
@@ -321,6 +315,32 @@ mod stable {
 /// tests to the `stable` section. In the meantime, it can still be useful to run these
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
+    use crate::{
+        db::tests::TestDb,
+        types::{IntersectionBuilder, Type},
+    };
+
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    // `T` can be assigned to itself.
+    type_property_test!(
+        assignable_to_is_reflexive, db,
+        forall types t. t.is_assignable_to(db, t)
+    );
+
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    // An intersection of two types should be assignable to both of them
+    fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(db)
+            .add_positive(s)
+            .add_positive(t)
+            .build()
+    }
+
+    type_property_test!(
+        intersection_assignable_to_both, db,
+        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
+    );
+
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
     type_property_test!(
         subtype_of_is_antisymmetric, db,
