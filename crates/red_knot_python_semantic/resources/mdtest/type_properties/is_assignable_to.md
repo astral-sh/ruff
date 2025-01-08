@@ -9,6 +9,9 @@ of this concept.
 
 ### Fully static
 
+Fully static types participate in subtyping. If a type `S` is a subtype of `T`, `S` will also be
+assignable to `T`. Two equivalent types are subtypes of each other:
+
 ```py
 from knot_extensions import static_assert, is_assignable_to
 
@@ -33,6 +36,9 @@ static_assert(not is_assignable_to(Child1, Child2))
 
 ### Gradual types
 
+Gradual types do not participate in subtyping, but can still be assignable to other types (and
+static types can be assignable to gradual types):
+
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
 from typing import Any
@@ -46,6 +52,9 @@ static_assert(is_assignable_to(Literal[1], Any))
 ## Literal types
 
 ### Boolean literals
+
+`Literal[True]` and `Literal[False]` are both subtypes of (and therefore assignable to) `bool`,
+which is in turn a subtype of `int`:
 
 ```py
 from knot_extensions import static_assert, is_assignable_to
@@ -74,6 +83,9 @@ static_assert(not is_assignable_to(Literal[1], str))
 ```
 
 ### String literals and `LiteralString`
+
+All string-literal types are subtypes of (and therefore assignable to) `LiteralString`, which is in
+turn a subtype of `str`:
 
 ```py
 from knot_extensions import static_assert, is_assignable_to
@@ -109,6 +121,12 @@ static_assert(not is_assignable_to(Literal["foo"], Literal[b"foo"]))
 ## `type[…]` and class literals
 
 In the following tests, `TypeOf[str]` is a singleton type with a single inhabitant, the class `str`.
+This contrasts with `type[str]`, which represents "all possible subclasses of `str`".
+
+Both `TypeOf[str]` and `type[str]` are subtypes of `type` and `type[object]`, which both represent
+"all possible instances of `type`"; therefore both `type[str]` and `TypeOf[str]` are assignable to
+`type`. `type[Any]`, on the other hand, represents a type of unknown size or inhabitants, but which
+is known to be no larger than the set of possible objects represented by `type`.
 
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown, TypeOf
@@ -158,6 +176,8 @@ class Meta(type): ...
 
 static_assert(is_assignable_to(type[Any], Meta))
 static_assert(is_assignable_to(type[Unknown], Meta))
+static_assert(is_assignable_to(Meta, type[Any]))
+static_assert(is_assignable_to(Meta, type[Unknown]))
 ```
 
 ## Tuple types
@@ -247,6 +267,8 @@ See also: our property tests in `property_tests.rs`.
 
 ### Everything is assignable to `object`
 
+`object` is Python's top type; the set of all possible objects at runtime:
+
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
 from typing import Literal, Any
@@ -263,6 +285,9 @@ static_assert(is_assignable_to(type[Any], object))
 ```
 
 ### Every type is assignable to `Any` / `Unknown`
+
+`Any` and `Unknown` are gradual types. They could materialize to any given type at runtime, and so
+any type is assignable to them:
 
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
@@ -290,6 +315,9 @@ static_assert(is_assignable_to(type[Any], Unknown))
 ```
 
 ### `Never` is assignable to every type
+
+`Never` is Python's bottom type: the empty set, a type with no inhabitants. It is therefore
+assignable to any arbitrary type.
 
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
