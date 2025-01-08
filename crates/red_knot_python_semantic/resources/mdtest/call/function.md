@@ -288,6 +288,16 @@ static_assert()
 static_assert(True, 2, 3)
 ```
 
+### `len`
+
+```py
+# error: [missing-argument] "No argument provided for required parameter `obj` of function `len`"
+len()
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `len`: expected 1, got 2"
+len([], 1)
+```
+
 ### Type API predicates
 
 ```py
