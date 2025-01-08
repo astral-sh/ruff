@@ -227,27 +227,22 @@ def f(x):
 
 ## F-string formatting
 
-_Stabilized in 2025 style with Ruff 0.9.0_
+_Stabilized in Ruff 0.9.0_
 
-By default, Ruff formats f-string expressions. This is a [known deviation](formatter/black.md#f-strings)
-from Black, which does not format f-strings.
+Unlike Black, Ruff formats the expression parts of f-strings which are the parts inside the curly
+braces `{...}`. This is a [known deviation](formatter/black.md#f-strings) from Black.
 
-Ruff employs several heuristics to determine how an f-string should be formatted, including the
-following considerations:
-
-* The quote style for both outer and nested f-strings
-* Whether to break the f-string into multiple lines
-* When to skip formatting the f-string altogether
+Ruff employs several heuristics to determine how an f-string should be formatted which are detailed
+below.
 
 ### Quotes
 
 Ruff will use the configured quote style for the f-string expression unless doing so would result in
-invalid syntax for the target Python version. In such cases, Ruff will avoid changing the
-quote style.
+invalid syntax for the target Python version or it results in more backslashes than the original
+expression. Specifically, Ruff will preserve the original quote style for the following cases:
 
-For example, if a self-documenting f-string contains a string literal with the configured quote
-style, Ruff cannot use the same quote style for the f-string itself when targeting Python versions
-earlier than 3.12:
+When the target Python version is < 3.12 and a [self-documenting f-string expressions] contains a string
+literal with the configured quote style:
 
 ```python
 f'{10 + len("hello")=}'
@@ -255,9 +250,26 @@ f'{10 + len("hello")=}'
 f"{10 + len("hello")=}"
 ```
 
+When the target Python version is < 3.12 and an f-string contains any triple-quoted string, byte
+or f-string literal that contains the configured quote style:
+
+```python
+f'{"""nested " """}'`
+# This f-string cannot be formatted as follows when targeting Python < 3.12
+f"{'''nested " '''}``
+```
+
+For all target Python versions, when a [self-documenting f-string expressions] contains any expression between
+the curly braces (`{...}`) with a format specifier that contains the configured quote style:
+
+```python
+f'{1=:"foo}'
+# This f-string cannot be formatted as follows for all target Python versions
+f"{1=:"foo}"
+```
+
 For nested f-strings, Ruff alternates quote styles, starting with the configured style for the
-outermost f-string. If this would result in an invalid syntax, Ruff avoids changing the quote style.
-For example, consider the following f-string:
+outermost f-string. For example, consider the following f-string:
 
 ```python
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
@@ -271,10 +283,10 @@ f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
 
 ### Line breaks
 
-Starting with Python 3.12 ([PEP 701](https://peps.python.org/pep-0701/)), f-string expressions can
+Starting with Python 3.12 ([PEP 701](https://peps.python.org/pep-0701/)), expression parts of an f-string can
 span multiple lines. Ruff adopts a similar heuristic as [Prettier](https://prettier.io/docs/en/next/rationale.html#template-literals)
 for when to introduce a line break in an f-string expression: it introduces line breaks only
-if the original f-string expression already contains them.
+if there was already a line break within any of the expression parts of an f-string.
 
 For example, the following code:
 
@@ -297,8 +309,16 @@ f"this f-string has a multiline expression {
 } and does not fit within the line length"
 ```
 
-If you want Ruff to split an f-string across multiple lines, ensure there's a linebreak within the
+But, the following will not be split across multiple lines even though it exceeds the line length:
+
+```python
+f"this f-string has a multiline expression {['red', 'green', 'blue', 'yellow']} and does not fit within the line length"
+```
+
+If you want Ruff to split an f-string across multiple lines, ensure there's a linebreak somewhere within the
 `{...}` expression.
+
+[self-documenting f-string expressions]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 
 ## Format suppression
 
