@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 too_many_boolean_expressions.py:11:6: PLR0916 Too many Boolean expressions (6 > 5)
    |
@@ -169,7 +168,7 @@ too_many_boolean_expressions.py:43:6: PLR0916 Too many Boolean expressions (22 >
 43 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0916
 44 |     ...
-45 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w:
+45 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and …
    |
 
 too_many_boolean_expressions.py:45:6: PLR0916 Too many Boolean expressions (23 > 5)
@@ -179,7 +178,7 @@ too_many_boolean_expressions.py:45:6: PLR0916 Too many Boolean expressions (23 >
 45 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0916
 46 |     ...
-47 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x:
+47 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and …
    |
 
 too_many_boolean_expressions.py:47:6: PLR0916 Too many Boolean expressions (24 > 5)
@@ -189,7 +188,7 @@ too_many_boolean_expressions.py:47:6: PLR0916 Too many Boolean expressions (24 >
 47 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0916
 48 |     ...
-49 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and y:
+49 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and …
    |
 
 too_many_boolean_expressions.py:49:6: PLR0916 Too many Boolean expressions (25 > 5)
@@ -199,7 +198,7 @@ too_many_boolean_expressions.py:49:6: PLR0916 Too many Boolean expressions (25 >
 49 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and y:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0916
 50 |     ...
-51 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and y and z:
+51 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and y and …
    |
 
 too_many_boolean_expressions.py:51:6: PLR0916 Too many Boolean expressions (26 > 5)

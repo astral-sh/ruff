@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI003.pyi:4:4: PYI003 Unrecognized `sys.version_info` check
   |
 3 | if sys.version_info[0] == 2: ...
-4 | if sys.version_info[0] == True: ...  # Y003 Unrecognized sys.version_info check  # E712 comparison to True should be 'if cond is True:' or 'if cond:'
+4 | if sys.version_info[0] == True: ...  # Y003 Unrecognized sys.version_info check  # E712 comparison to True should be 'if cond is True:'…
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI003
 5 | if sys.version_info[0.0] == 2: ...  # Y003 Unrecognized sys.version_info check
 6 | if sys.version_info[False] == 2: ...  # Y003 Unrecognized sys.version_info check
@@ -14,7 +13,7 @@ PYI003.pyi:4:4: PYI003 Unrecognized `sys.version_info` check
 PYI003.pyi:5:4: PYI003 Unrecognized `sys.version_info` check
   |
 3 | if sys.version_info[0] == 2: ...
-4 | if sys.version_info[0] == True: ...  # Y003 Unrecognized sys.version_info check  # E712 comparison to True should be 'if cond is True:' or 'if cond:'
+4 | if sys.version_info[0] == True: ...  # Y003 Unrecognized sys.version_info check  # E712 comparison to True should be 'if cond is True:'…
 5 | if sys.version_info[0.0] == 2: ...  # Y003 Unrecognized sys.version_info check
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI003
 6 | if sys.version_info[False] == 2: ...  # Y003 Unrecognized sys.version_info check
@@ -23,7 +22,7 @@ PYI003.pyi:5:4: PYI003 Unrecognized `sys.version_info` check
 
 PYI003.pyi:6:4: PYI003 Unrecognized `sys.version_info` check
   |
-4 | if sys.version_info[0] == True: ...  # Y003 Unrecognized sys.version_info check  # E712 comparison to True should be 'if cond is True:' or 'if cond:'
+4 | if sys.version_info[0] == True: ...  # Y003 Unrecognized sys.version_info check  # E712 comparison to True should be 'if cond is True:'…
 5 | if sys.version_info[0.0] == 2: ...  # Y003 Unrecognized sys.version_info check
 6 | if sys.version_info[False] == 2: ...  # Y003 Unrecognized sys.version_info check
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI003
