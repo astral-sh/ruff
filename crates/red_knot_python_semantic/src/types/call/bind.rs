@@ -154,8 +154,18 @@ impl<'db> CallBinding<'db> {
         &self.parameter_tys
     }
 
-    pub(crate) fn first_parameter(&self) -> Option<Type<'db>> {
-        self.parameter_tys().first().copied()
+    pub(crate) fn one_parameter_ty(&self) -> Option<Type<'db>> {
+        match self.parameter_tys() {
+            [ty] => Some(*ty),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn two_parameter_tys(&self) -> Option<(Type<'db>, Type<'db>)> {
+        match self.parameter_tys() {
+            [first, second] => Some((*first, *second)),
+            _ => None,
+        }
     }
 
     fn callable_name(&self, db: &'db dyn Db) -> Option<&ast::name::Name> {

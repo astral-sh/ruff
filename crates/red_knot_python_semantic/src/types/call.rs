@@ -1,6 +1,7 @@
 use super::context::InferContext;
 use super::diagnostic::CALL_NON_CALLABLE;
 use super::{Severity, Signature, Type, TypeArrayDisplay, UnionBuilder};
+use crate::types::diagnostic::STATIC_ASSERT_ERROR;
 use crate::Db;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_python_ast as ast;
@@ -10,6 +11,14 @@ mod bind;
 
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{bind_call, CallBinding};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StaticAssertionErrorKind<'db> {
+    ArgumentIsFalse,
+    ArgumentIsFalsy(Type<'db>),
+    ArgumentTruthinessIsAmbiguous(Type<'db>),
+    CustomError(&'db str),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallOutcome<'db> {
@@ -30,6 +39,10 @@ pub(super) enum CallOutcome<'db> {
     PossiblyUnboundDunderCall {
         called_ty: Type<'db>,
         call_outcome: Box<CallOutcome<'db>>,
+    },
+    StaticAssertionError {
+        binding: CallBinding<'db>,
+        error_kind: StaticAssertionErrorKind<'db>,
     },
 }
 
@@ -89,6 +102,7 @@ impl<'db> CallOutcome<'db> {
                 })
                 .map(UnionBuilder::build),
             Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
+            Self::StaticAssertionError { .. } => Some(Type::none(db)),
         }
     }
 
@@ -181,6 +195,7 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 revealed_ty,
             } => {
+                binding.report_diagnostics(context, node);
                 context.report_diagnostic(
                     node,
                     DiagnosticId::RevealedType,
@@ -248,6 +263,51 @@ impl<'db> CallOutcome<'db> {
                         return_ty,
                     }),
                 }
+            }
+            CallOutcome::StaticAssertionError {
+                binding,
+                error_kind,
+            } => {
+                binding.report_diagnostics(context, node);
+
+                match error_kind {
+                    StaticAssertionErrorKind::ArgumentIsFalse => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: argument evaluates to `False`"),
+                        );
+                    }
+                    StaticAssertionErrorKind::ArgumentIsFalsy(parameter_ty) => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!(
+                                "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                parameter_ty=parameter_ty.display(context.db())
+                            ),
+                        );
+                    }
+                    StaticAssertionErrorKind::ArgumentTruthinessIsAmbiguous(parameter_ty) => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!(
+                                "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                parameter_ty=parameter_ty.display(context.db())
+                            ),
+                        );
+                    }
+                    StaticAssertionErrorKind::CustomError(message) => {
+                        context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: {message}"),
+                        );
+                    }
+                }
+
+                Ok(Type::Unknown)
             }
         }
     }
