@@ -58,18 +58,6 @@ impl Margin {
         self.computed_left > 0
     }
 
-    pub(crate) fn was_cut_right(&self, line_len: usize) -> bool {
-        let right =
-            if self.computed_right == self.span_right || self.computed_right == self.label_right {
-                // Account for the "..." padding given above. Otherwise we end up with code lines that
-                // do fit but end in "..." as if they were trimmed.
-                self.computed_right - ELLIPSIS_PASSING
-            } else {
-                self.computed_right
-            };
-        right < line_len && self.computed_left + self.term_width < line_len
-    }
-
     fn compute(&mut self, max_line_len: usize) {
         // When there's a lot of whitespace (>20), we want to trim it as it is useless.
         self.computed_left = if self.whitespace_left > LONG_WHITESPACE {
