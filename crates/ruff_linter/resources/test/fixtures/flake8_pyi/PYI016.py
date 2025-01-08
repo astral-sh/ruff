@@ -112,7 +112,11 @@ field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
 # Test case for mixed union type
 field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
 
+field35: "int | str | int"  # Error
 
-field35: "int | str" | int  # Error, but currently not detected
 
-field36: "int | str | int"  # Error
+
+# Technically, this falls into the domain of the rule but it is an unlikely edge case,
+# only works if you have from `__future__ import annotations` at the top of the file,
+# and stringified annotations are discouraged in stub files.
+field36: "int | str" | int  # Ok

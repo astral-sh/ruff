@@ -884,6 +884,8 @@ PYI016.py:113:61: PYI016 [*] Duplicate union member `list[int]`
 112 | # Test case for mixed union type
 113 | field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
     |                                                             ^^^^^^^^^ PYI016
+114 | 
+115 | field35: "int | str | int"  # Error
     |
     = help: Remove duplicate union member `list[int]`
 
@@ -894,21 +896,24 @@ PYI016.py:113:61: PYI016 [*] Duplicate union member `list[int]`
 113     |-field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
     113 |+field34: typing.Union[list[int], str, bytes]  # Error
 114 114 | 
-115 115 | 
-116 116 | field35: "int | str" | int  # Error, but currently not detected
+115 115 | field35: "int | str | int"  # Error
+116 116 | 
 
-PYI016.py:118:23: PYI016 [*] Duplicate union member `int`
+PYI016.py:115:23: PYI016 [*] Duplicate union member `int`
     |
-116 | field35: "int | str" | int  # Error, but currently not detected
-117 | 
-118 | field36: "int | str | int"  # Error
+113 | field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
+114 | 
+115 | field35: "int | str | int"  # Error
     |                       ^^^ PYI016
     |
     = help: Remove duplicate union member `int`
 
 ℹ Safe fix
-115 115 | 
-116 116 | field35: "int | str" | int  # Error, but currently not detected
+112 112 | # Test case for mixed union type
+113 113 | field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
+114 114 | 
+115     |-field35: "int | str | int"  # Error
+    115 |+field35: "int | str"  # Error
+116 116 | 
 117 117 | 
-118     |-field36: "int | str | int"  # Error
-    118 |+field36: "int | str"  # Error
+118 118 |
