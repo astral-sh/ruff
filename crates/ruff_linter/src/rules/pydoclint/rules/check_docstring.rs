@@ -621,17 +621,10 @@ fn parse_parameters(content: &str, style: Option<SectionStyle>) -> Vec<&str> {
 fn parse_parameters_google(content: &str) -> Vec<&str> {
     let mut entries: Vec<&str> = Vec::new();
     // Find first entry to determine indentation
-    let mut indentation = None;
-    for potential in content.lines() {
-        if potential.find(':').is_none() {
-            continue;
-        };
-        indentation = Some(&potential[..potential.len() - potential.trim_start().len()]);
-        break;
-    }
-    let Some(indentation) = indentation else {
+    let Some(first_arg) = content.lines().next() else {
         return entries;
     };
+    let indentation = &first_arg[..first_arg.len() - first_arg.trim_start().len()];
     for potential in content.lines() {
         if let Some(entry) = potential.strip_prefix(indentation) {
             if entry
