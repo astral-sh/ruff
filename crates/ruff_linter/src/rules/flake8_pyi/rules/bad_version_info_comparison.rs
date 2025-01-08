@@ -72,9 +72,12 @@ impl Violation for BadVersionInfoComparison {
 /// This rule enforces the convention by checking for `if` tests that compare
 /// `sys.version_info` with `<` rather than `>=`.
 ///
+/// By default, this rule only applies to stub files.
+/// In [preview], it will also flag this anti-pattern in non-stub files.
+///
 /// ## Example
 ///
-/// ```py
+/// ```pyi
 /// import sys
 ///
 /// if sys.version_info < (3, 10):
@@ -86,7 +89,7 @@ impl Violation for BadVersionInfoComparison {
 ///
 /// Use instead:
 ///
-/// ```py
+/// ```pyi
 /// if sys.version_info >= (3, 10):
 ///     def read_data(x): ...
 ///
@@ -139,7 +142,10 @@ pub(crate) fn bad_version_info_comparison(
     }
 
     if matches!(op, CmpOp::Lt) {
-        if checker.enabled(Rule::BadVersionInfoOrder) {
+        if checker.enabled(Rule::BadVersionInfoOrder)
+            // See https://github.com/astral-sh/ruff/issues/15347
+            && (checker.source_type.is_stub() || checker.settings.preview.is_enabled())
+        {
             if has_else_clause {
                 checker
                     .diagnostics
