@@ -141,8 +141,7 @@ def f(x: int) -> None:
 
 ### Truthy expressions
 
-See also:
-<https://docs.python.org/3/library/stdtypes.html?utm_source=chatgpt.com#truth-value-testing>
+See also: <https://docs.python.org/3/library/stdtypes.html#truth-value-testing>
 
 ```py
 from knot_extensions import static_assert
