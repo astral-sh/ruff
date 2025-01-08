@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -76,9 +76,8 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: TextRange) {
     let diagnostic = Diagnostic::new(QuotedAnnotation, range);
 
-    let len = TextSize::try_from(annotation.len()).unwrap();
-    let placeholder_range = TextRange::up_to(len);
-    let spans_multiple_lines = annotation.count_lines(placeholder_range) > 1;
+    let placeholder_range = TextRange::up_to(annotation.text_len());
+    let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
     let tokenizer = SimpleTokenizer::new(annotation, placeholder_range);
     let last_token_is_comment = matches!(

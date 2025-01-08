@@ -89,3 +89,53 @@ UP037_2.pyi:17:14: UP037 [*] Remove quotes from type annotation
 19    |-    Line]  # Comment''']): ...
    19 |+    Line]  # Comment
    20 |+)]): ...
+20 21 | 
+21 22 | 
+22 23 | def f(a: Foo['''
+
+UP037_2.pyi:22:14: UP037 [*] Remove quotes from type annotation
+   |
+22 |   def f(a: Foo['''
+   |  ______________^
+23 | | Bar[
+24 | |     Multi |
+25 | |     Line]  # Comment''']): ...
+   | |_______________________^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+19 19 |     Line]  # Comment''']): ...
+20 20 | 
+21 21 | 
+22    |-def f(a: Foo['''
+   22 |+def f(a: Foo[(
+23 23 | Bar[
+24 24 |     Multi |
+25    |-    Line]  # Comment''']): ...
+   25 |+    Line]  # Comment
+   26 |+)]): ...
+26 27 | 
+27 28 | 
+28 29 | a: '''\\
+
+UP037_2.pyi:28:4: UP037 [*] Remove quotes from type annotation
+   |
+28 |   a: '''\\
+   |  ____^
+29 | | list[int]''' = [42]
+   | |____________^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+25 25 |     Line]  # Comment''']): ...
+26 26 | 
+27 27 | 
+28    |-a: '''\\
+29    |-list[int]''' = [42]
+   28 |+a: (\
+   29 |+list[int]) = [42]
+30 30 | 
+31 31 | 
+32 32 | # TODO: These are valid too. String annotations are assumed to be quoted.
