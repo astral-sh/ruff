@@ -138,4 +138,4 @@ UP037_2.pyi:28:4: UP037 [*] Remove quotes from type annotation
    29 |+list[int]) = [42]
 30 30 | 
 31 31 | 
-32 32 | # TODO: These are valid too. String annotations are assumed to be quoted.
+32 32 | # TODO: These are valid too. String annotations are assumed to be enclosed in parentheses.
