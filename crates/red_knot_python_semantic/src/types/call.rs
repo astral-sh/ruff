@@ -273,10 +273,13 @@ impl<'db> CallOutcome<'db> {
                 truthiness,
             } if truthiness.is_always_false() => {
                 context.report_lint(
-                            &STATIC_ASSERT_ERROR,
-                            node,
-                            format_args!("Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy", parameter_ty=parameter_ty.display(context.db())),
-                        );
+                    &STATIC_ASSERT_ERROR,
+                    node,
+                    format_args!(
+                        "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                        parameter_ty=parameter_ty.display(context.db())
+                    ),
+                );
 
                 Ok(Type::Unknown)
             }
@@ -285,10 +288,13 @@ impl<'db> CallOutcome<'db> {
                 truthiness,
             } if truthiness.is_ambiguous() => {
                 context.report_lint(
-                            &STATIC_ASSERT_ERROR,
-                            node,
-                            format_args!("Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness", parameter_ty=parameter_ty.display(context.db())),
-                        );
+                    &STATIC_ASSERT_ERROR,
+                    node,
+                    format_args!(
+                        "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                        parameter_ty=parameter_ty.display(context.db())
+                    ),
+                );
 
                 Ok(Type::Unknown)
             }
@@ -297,10 +303,13 @@ impl<'db> CallOutcome<'db> {
                 truthiness: _,
             } => {
                 context.report_lint(
-                            &STATIC_ASSERT_ERROR,
-                            node,
-                            format_args!("Static assertion error: expected argument of type `{parameter_ty}` to have static truthiness", parameter_ty=parameter_ty.display(context.db())),
-                        );
+                    &STATIC_ASSERT_ERROR,
+                    node,
+                    format_args!(
+                        "Static assertion error: expected argument of type `{parameter_ty}` to have static truthiness",
+                        parameter_ty=parameter_ty.display(context.db())
+                    ),
+                );
 
                 Ok(Type::Unknown)
             }
