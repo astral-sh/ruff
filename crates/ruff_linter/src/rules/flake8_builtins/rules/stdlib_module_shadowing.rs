@@ -23,6 +23,10 @@ use crate::settings::types::PythonVersion;
 /// Standard-library modules can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-allowed-modules`] configuration option.
 ///
+/// This rule is not applied to stub files, as the name of a stub module is out
+/// of the control of the author of the stub file. Instead, a stub should aim to
+/// faithfully emulate the runtime module it is stubbing.
+///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
 #[derive(ViolationMetadata)]
@@ -45,7 +49,7 @@ pub(crate) fn stdlib_module_shadowing(
     allowed_modules: &[String],
     target_version: PythonVersion,
 ) -> Option<Diagnostic> {
-    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
+    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
     }
 
