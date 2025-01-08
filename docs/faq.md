@@ -28,7 +28,7 @@ to see a few differences on the margins, but the vast majority of your code shou
 When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
 and so more deviations should be expected, especially around the treatment of end-of-line comments.
 
-See [_Black compatibility_](formatter.md#black-compatibility) for more.
+See [_Style Guide_](formatter.md#style-guide) for more.
 
 ## How does Ruff's linter compare to Flake8?
 
