@@ -664,6 +664,10 @@ fn post_process_try(
             NextBlock::Terminate => {
                 match block.stmts.last() {
                     Some(Stmt::Return(_)) => {
+                        // if we are already in a `finally` block, terminate
+                        if Some(idx) == finally_index {
+                            return;
+                        }
                         // re-route to finally if present and not already re-routed
                         if let Some(finally_index) = finally_index {
                             blocks.blocks[idx].next = NextBlock::Always(finally_index);
@@ -1063,6 +1067,7 @@ mod tests {
     #[test_case("raise.py")]
     #[test_case("assert.py")]
     #[test_case("match.py")]
+    #[test_case("try-finally-nested-if-while.py")]
     fn control_flow_graph(filename: &str) {
         let path = PathBuf::from_iter(["resources/test/fixtures/control-flow-graph", filename]);
         let source = fs::read_to_string(path).expect("failed to read file");

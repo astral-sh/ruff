@@ -27,7 +27,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             // Ex) Optional[...], Union[...]
             if checker.any_enabled(&[
                 Rule::FutureRewritableTypeAnnotation,
-                Rule::NonPEP604Annotation,
+                Rule::NonPEP604AnnotationUnion,
+                Rule::NonPEP604AnnotationOptional,
             ]) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
@@ -43,7 +44,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
-                    if checker.enabled(Rule::NonPEP604Annotation) {
+                    if checker.any_enabled(&[
+                        Rule::NonPEP604AnnotationUnion,
+                        Rule::NonPEP604AnnotationOptional,
+                    ]) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
@@ -51,7 +55,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
-                            pyupgrade::rules::use_pep604_annotation(checker, expr, slice, operator);
+                            pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
                         }
                     }
                 }

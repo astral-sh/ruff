@@ -18,6 +18,9 @@ def test_foo():
     with pytest.raises(EscapedFollowedByUnescaped, match="foo\\.*bar"): ...
     with pytest.raises(UnescapedFollowedByEscaped, match="foo.\\*bar"): ...
 
+    # https://github.com/astral-sh/ruff/issues/15316
+    with pytest.raises(ClosingParenthesis, match="foo)"): ...
+
 
     ## Metasequences
 

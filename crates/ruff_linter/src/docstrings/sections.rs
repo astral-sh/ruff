@@ -528,6 +528,22 @@ fn is_docstring_section(
                 }
             }
 
+            // If the section has a preceding empty line, assume it's _not_ a subsection, as in:
+            // ```python
+            // def func(args: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Args:
+            //         args: The arguments to the function.
+            //
+            //     returns:
+            //         The return value of the function.
+            //     """
+            // ```
+            if previous_line.map_or(false, |line| line.trim().is_empty()) {
+                return true;
+            }
+
             // If the section isn't underlined, and isn't title-cased, assume it's a subsection,
             // as in:
             // ```python

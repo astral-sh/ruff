@@ -411,99 +411,45 @@ RET503.py:326:1: RET503 [*] Missing explicit `return` at the end of function abl
 332 333 | 
 333 334 | # function return type annotation NoReturn
 
-RET503.py:334:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:398:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-333 |   # function return type annotation NoReturn
-334 | / def foo(x: int) -> int:
-335 | |     def bar() -> NoReturn:
-336 | |         abort()
-337 | |     if x == 5:
-338 | |         return 5
-339 | |     bar()
-    | |_________^ RET503
-    |
-    = help: Add explicit `return` statement
-
-ℹ Unsafe fix
-337 337 |     if x == 5:
-338 338 |         return 5
-339 339 |     bar()
-    340 |+    return None
-340 341 | 
-341 342 | 
-342 343 | def foo(string: str) -> str:
-
-RET503.py:342:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-    |
-342 | / def foo(string: str) -> str:
-343 | |     def raises(value: str) -> NoReturn:
-344 | |         raise RuntimeError("something went wrong")
-345 | | 
-346 | |     match string:
-347 | |         case "a":
-348 | |             return "first"
-349 | |         case "b":
-350 | |             return "second"
-351 | |         case "c":
-352 | |             return "third"
-353 | |         case _:
-354 | |             raises(string)
-    | |__________________________^ RET503
-    |
-    = help: Add explicit `return` statement
-
-ℹ Unsafe fix
-352 352 |             return "third"
-353 353 |         case _:
-354 354 |             raises(string)
-    355 |+    return None
-355 356 | 
-356 357 | 
-357 358 | def foo() -> int:
-
-RET503.py:357:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-    |
-357 | / def foo() -> int:
-358 | |     def baz() -> int:
-359 | |         return 1
-360 | | 
-361 | | 
-362 | |     def bar() -> NoReturn:
-363 | |         a = 1 + 2
-364 | |         raise AssertionError("Very bad")
-365 | | 
-366 | | 
-367 | | 
-368 | |     if baz() > 3:
-369 | |         return 1
-370 | |     bar()
-    | |_________^ RET503
-    |
-    = help: Add explicit `return` statement
-
-ℹ Unsafe fix
-368 368 |     if baz() > 3:
-369 369 |         return 1
-370 370 |     bar()
-    371 |+    return None
-371 372 | 
-372 373 | 
-373 374 | def f():
-
-RET503.py:373:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-    |
-373 | / def f():
-374 | |     if a:
-375 | |         return b
-376 | |     else:
-377 | |         with c:
-378 | |             d
+398 | / def f():
+399 | |     if a:
+400 | |         return b
+401 | |     else:
+402 | |         with c:
+403 | |             d
     | |_____________^ RET503
     |
     = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-376 376 |     else:
-377 377 |         with c:
-378 378 |             d
-    379 |+    return None
+401 401 |     else:
+402 402 |         with c:
+403 403 |             d
+    404 |+    return None
+404 405 | 
+405 406 | 
+406 407 | 
+
+RET503.py:413:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+411 |   # the semantic model hasn't yet seen `bar`'s declaration.
+412 |   # Supporting nested functions requires making this a deferred rule.
+413 | / def foo(x: int) -> int:
+414 | |     def bar() -> NoReturn:
+415 | |         abort()
+416 | |     if x == 5:
+417 | |         return 5
+418 | |     bar()
+    | |_________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Unsafe fix
+415 415 |         abort()
+416 416 |     if x == 5:
+417 417 |         return 5
+418     |-    bar()
+    418 |+    bar()
+    419 |+    return None

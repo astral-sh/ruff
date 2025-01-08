@@ -68,7 +68,7 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 

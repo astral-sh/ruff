@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:19:5: D405 [*] Section name should be properly capitalized ("returns")
    |
@@ -42,3 +41,24 @@ sections.py:218:5: D405 [*] Section name should be properly capitalized ("Short 
 219 219 |     -------------
 220 220 | 
 221 221 |     This is the function's description, which will also specify what it
+
+sections.py:573:5: D405 [*] Section name should be properly capitalized ("returns")
+    |
+571 |         arg: Here's a note.
+572 | 
+573 |     returns:
+    |     ^^^^^^^ D405
+574 |         Here's another note.
+575 |     """
+    |
+    = help: Capitalize "returns"
+
+ℹ Safe fix
+570 570 |     Args:
+571 571 |         arg: Here's a note.
+572 572 | 
+573     |-    returns:
+    573 |+    Returns:
+574 574 |         Here's another note.
+575 575 |     """
+576 576 |

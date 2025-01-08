@@ -329,9 +329,9 @@ impl<'db> VisibilityConstraints<'db> {
                         Truthiness::Ambiguous
                     }
                 }
-                PatternConstraintKind::Singleton(..) | PatternConstraintKind::Unsupported => {
-                    Truthiness::Ambiguous
-                }
+                PatternConstraintKind::Singleton(..)
+                | PatternConstraintKind::Class(..)
+                | PatternConstraintKind::Unsupported => Truthiness::Ambiguous,
             },
         }
     }
