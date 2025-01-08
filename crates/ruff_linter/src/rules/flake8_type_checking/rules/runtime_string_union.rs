@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExprContext, Operator};
 use ruff_python_parser::typing::parse_type_annotation;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -271,7 +271,9 @@ fn quotes_are_removable(semantic: &SemanticModel, expr: &Expr, settings: &Linter
         }
         Expr::Name(name) => {
             semantic.lookup_symbol(name.id.as_str()).is_none()
-                || semantic.simulate_runtime_load(name).is_some()
+                || semantic
+                    .simulate_runtime_load(name, TypingOnlyBindingsStatus::Disallowed)
+                    .is_some()
         }
         _ => true,
     }
