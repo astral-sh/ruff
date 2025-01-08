@@ -146,6 +146,7 @@ See also: <https://docs.python.org/3/library/stdtypes.html#truth-value-testing>
 ```py
 from knot_extensions import static_assert
 
+static_assert(True)
 static_assert(False)  # error: "Static assertion error: argument evaluates to `False`"
 
 static_assert(None)  # error: "Static assertion error: argument of type `None` is statically known to be falsy"
