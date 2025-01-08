@@ -982,7 +982,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "031") => (RuleGroup::Preview, rules::ruff::rules::IncorrectlyParenthesizedTupleInSubscript),
         (Ruff, "032") => (RuleGroup::Stable, rules::ruff::rules::DecimalFromFloatLiteral),
         (Ruff, "033") => (RuleGroup::Stable, rules::ruff::rules::PostInitDefault),
-        (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
+        (Ruff, "034") => (RuleGroup::Stable, rules::ruff::rules::UselessIfElse),
         (Ruff, "035") => (RuleGroup::Preview, rules::ruff::rules::UnsafeMarkupUse),
         (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
         (Ruff, "037") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall),
