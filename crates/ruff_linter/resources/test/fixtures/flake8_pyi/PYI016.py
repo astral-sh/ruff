@@ -111,3 +111,8 @@ field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
 
 # Test case for mixed union type
 field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
+
+
+field35: "int | str" | int  # Error, but currently not detected
+
+field36: "int | str | int"  # Error
