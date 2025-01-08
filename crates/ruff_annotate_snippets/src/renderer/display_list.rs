@@ -1394,9 +1394,7 @@ fn format_body(
                 }
             })
             .sum();
-        if line.chars().any(|c| !c.is_whitespace()) {
-            whitespace_margin = min(whitespace_margin, leading_whitespace);
-        }
+        whitespace_margin = min(whitespace_margin, leading_whitespace);
         max_line_len = max(max_line_len, line_length);
 
         let line_start_index = line_range.0;
