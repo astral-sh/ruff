@@ -5,11 +5,11 @@ W391.ipynb:5:1: W391 [*] Too many newlines at end of cell
    |
  3 |   # just a comment in this cell
  4 |   # a comment and some newlines
- 5 | / 
- 6 | | 
- 7 | | 
- 8 | | 
-   | |_^ W391
+ 5 | /
+ 6 | |
+ 7 | |
+   | |__^ W391
+ 8 |
  9 |   1 + 1
 10 |   # a comment
    |
@@ -30,12 +30,12 @@ W391.ipynb:11:1: W391 [*] Too many newlines at end of cell
    |
  9 |   1 + 1
 10 |   # a comment
-11 | / 
-12 | | 
-13 | | 
-14 | | 
-15 | | 
-   | |_^ W391
+11 | /
+12 | |
+13 | |
+14 | |
+   | |__^ W391
+15 |
 16 |   1+1
    |
    = help: Remove trailing newlines
@@ -55,12 +55,12 @@ W391.ipynb:11:1: W391 [*] Too many newlines at end of cell
 W391.ipynb:17:1: W391 [*] Too many newlines at end of cell
    |
 16 |   1+1
-17 | / 
-18 | | 
-19 | | 
-20 | | 
-21 | | 
-   | |_^ W391
+17 | /
+18 | |
+19 | |
+20 | |
+   | |__^ W391
+21 |
    |
    = help: Remove trailing newlines
 
