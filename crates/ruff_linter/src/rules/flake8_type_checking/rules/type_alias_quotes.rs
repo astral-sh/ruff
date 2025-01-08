@@ -349,8 +349,8 @@ fn quotes_are_unremovable(
                         return !elts.is_empty()
                             && quotes_are_unremovable(semantic, &elts[0], settings);
                     }
+                    return false;
                 }
-                return false;
             }
             quotes_are_unremovable(semantic, slice, settings)
         }

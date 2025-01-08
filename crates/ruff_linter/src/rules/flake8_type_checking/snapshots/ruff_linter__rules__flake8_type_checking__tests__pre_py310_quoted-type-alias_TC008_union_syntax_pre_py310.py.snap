@@ -8,6 +8,7 @@ TC008_union_syntax_pre_py310.py:10:20: TC008 [*] Remove quotes from type alias
 10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
    |                    ^^^^^^^^^^^^^^^^^^^^^^^ TC008
 11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
    |
    = help: Remove quotes
 
@@ -18,6 +19,7 @@ TC008_union_syntax_pre_py310.py:10:20: TC008 [*] Remove quotes from type alias
 10    |-    d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
    10 |+    d: TypeAlias = Annotated[int, 1 | 2]  # TC008
 11 11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+12 12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
 
 TC008_union_syntax_pre_py310.py:11:20: TC008 [*] Remove quotes from type alias
    |
@@ -25,6 +27,7 @@ TC008_union_syntax_pre_py310.py:11:20: TC008 [*] Remove quotes from type alias
 10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
 11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
    |                    ^^^^^^^^^^^^^^^^^^^^^^^ TC008
+12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
    |
    = help: Remove quotes
 
@@ -34,3 +37,4 @@ TC008_union_syntax_pre_py310.py:11:20: TC008 [*] Remove quotes from type alias
 10 10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
 11    |-    e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
    11 |+    e: TypeAlias = Annotated[int, 1 + 2]  # TC008
+12 12 |     f: TypeAlias = 'dict[str, int | None]'  # OK

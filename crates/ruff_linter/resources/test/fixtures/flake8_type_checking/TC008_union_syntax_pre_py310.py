@@ -9,3 +9,4 @@ if TYPE_CHECKING:
     c: TypeAlias = 'int | None'  # OK
     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+    f: TypeAlias = 'dict[str, int | None]'  # OK
