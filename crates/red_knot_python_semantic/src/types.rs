@@ -3607,7 +3607,7 @@ impl<'db> Class<'db> {
                 explicit_metaclass_of: class_metaclass_was_from,
             }
         } else {
-            let name = Type::string_literal(self.name(db));
+            let name = Type::string_literal(db, self.name(db));
             let bases = TupleType::from_elements(db, self.explicit_bases(db));
             // TODO: Should be `dict[str, Any]`
             let namespace = KnownClass::Dict.to_instance(db);
