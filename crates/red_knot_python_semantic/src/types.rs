@@ -547,7 +547,7 @@ pub enum Type<'db> {
 
 impl<'db> Type<'db> {
     pub const fn any() -> Self {
-        Self::Gradual(GradualType::Annotated)
+        Self::Gradual(GradualType::Any)
     }
 
     pub const fn unknown() -> Self {
@@ -1083,8 +1083,8 @@ impl<'db> Type<'db> {
         matches!(
             (self, other),
             (
-                Type::Gradual(GradualType::Annotated),
-                Type::Gradual(GradualType::Annotated)
+                Type::Gradual(GradualType::Any),
+                Type::Gradual(GradualType::Any)
             ) | (
                 Type::Gradual(GradualType::Unknown),
                 Type::Gradual(GradualType::Unknown)
@@ -2330,7 +2330,7 @@ impl<'db> From<&Type<'db>> for Symbol<'db> {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum GradualType {
     // An explicitly annotated `typing.Any`
-    Annotated,
+    Any,
     // An unannotated value
     Unknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
@@ -2348,7 +2348,7 @@ pub enum GradualType {
 impl std::fmt::Display for GradualType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GradualType::Annotated => f.write_str("Any"),
+            GradualType::Any => f.write_str("Any"),
             GradualType::Unknown => f.write_str("Unknown"),
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type

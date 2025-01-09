@@ -3479,8 +3479,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         match (left_ty, right_ty, op) {
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (any @ Type::Gradual(GradualType::Annotated), _, _)
-            | (_, any @ Type::Gradual(GradualType::Annotated), _) => Some(any),
+            (any @ Type::Gradual(GradualType::Any), _, _)
+            | (_, any @ Type::Gradual(GradualType::Any), _) => Some(any),
             (unknown @ Type::Gradual(GradualType::Unknown), _, _)
             | (_, unknown @ Type::Gradual(GradualType::Unknown), _) => Some(unknown),
             (todo @ Type::Gradual(GradualType::Todo(_)), _, _)

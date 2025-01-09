@@ -17,7 +17,7 @@ pub enum ClassBase<'db> {
 
 impl<'db> ClassBase<'db> {
     pub const fn any() -> Self {
-        Self::Gradual(GradualType::Annotated)
+        Self::Gradual(GradualType::Any)
     }
 
     pub const fn unknown() -> Self {
