@@ -1,5 +1,5 @@
 use crate::types::{
-    todo_type, Class, ClassLiteralType, GradualType, KnownClass, KnownInstanceType, Type,
+    todo_type, Class, ClassLiteralType, DynamicType, KnownClass, KnownInstanceType, Type,
 };
 use crate::Db;
 use itertools::Either;
@@ -11,22 +11,22 @@ use itertools::Either;
 /// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum ClassBase<'db> {
-    Gradual(GradualType),
+    Dynamic(DynamicType),
     Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
     pub const fn any() -> Self {
-        Self::Gradual(GradualType::Any)
+        Self::Dynamic(DynamicType::Any)
     }
 
     pub const fn unknown() -> Self {
-        Self::Gradual(GradualType::Unknown)
+        Self::Dynamic(DynamicType::Unknown)
     }
 
     pub const fn is_dynamic(self) -> bool {
         match self {
-            ClassBase::Gradual(_) => true,
+            ClassBase::Dynamic(_) => true,
             ClassBase::Class(_) => false,
         }
     }
@@ -40,7 +40,7 @@ impl<'db> ClassBase<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
-                    ClassBase::Gradual(gradual) => gradual.fmt(f),
+                    ClassBase::Dynamic(gradual) => gradual.fmt(f),
                     ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
                 }
             }
@@ -64,7 +64,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::Gradual(gradual) => Some(Self::Gradual(gradual)),
+            Type::Dynamic(gradual) => Some(Self::Dynamic(gradual)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -163,7 +163,7 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
         match self {
-            ClassBase::Gradual(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
+            ClassBase::Dynamic(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }
@@ -178,7 +178,7 @@ impl<'db> From<Class<'db>> for ClassBase<'db> {
 impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
-            ClassBase::Gradual(gradual) => Type::Gradual(gradual),
+            ClassBase::Dynamic(gradual) => Type::Dynamic(gradual),
             ClassBase::Class(class) => Type::class_literal(class),
         }
     }

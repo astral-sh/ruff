@@ -62,11 +62,11 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
-    typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
-    GradualType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
-    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
-    SubclassOfType, Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType,
+    FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
+    KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
+    SliceLiteralType, SubclassOfType, Symbol, Truthiness, TupleType, Type, TypeAliasType,
+    TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -3355,7 +3355,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let operand_type = self.infer_expression(operand);
 
         match (op, operand_type) {
-            (_, Type::Gradual(_)) => operand_type,
+            (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
@@ -3479,12 +3479,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         match (left_ty, right_ty, op) {
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (any @ Type::Gradual(GradualType::Any), _, _)
-            | (_, any @ Type::Gradual(GradualType::Any), _) => Some(any),
-            (unknown @ Type::Gradual(GradualType::Unknown), _, _)
-            | (_, unknown @ Type::Gradual(GradualType::Unknown), _) => Some(unknown),
-            (todo @ Type::Gradual(GradualType::Todo(_)), _, _)
-            | (_, todo @ Type::Gradual(GradualType::Todo(_)), _) => Some(todo),
+            (any @ Type::Dynamic(DynamicType::Any), _, _)
+            | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
+            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+            (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -4152,7 +4152,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                             match eq_result {
-                                todo @ Type::Gradual(GradualType::Todo(_)) => return Ok(todo),
+                                todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
                                 ty => match ty.bool(self.db()) {
                                     Truthiness::AlwaysTrue => eq_count += 1,
                                     Truthiness::AlwaysFalse => not_eq_count += 1,
@@ -4177,7 +4177,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
 
                         Ok(match eq_result {
-                            todo @ Type::Gradual(GradualType::Todo(_)) => todo,
+                            todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
                             ty => match ty.bool(self.db()) {
                                 Truthiness::AlwaysFalse => Type::BooleanLiteral(op.is_is_not()),
                                 _ => KnownClass::Bool.to_instance(self.db()),
@@ -4259,7 +4259,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             match pairwise_eq_result {
                 // If propagation is required, return the result as is
-                todo @ Type::Gradual(GradualType::Todo(_)) => return Ok(todo),
+                todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
                 ty => match ty.bool(self.db()) {
                     // - AlwaysTrue : Continue to the next pair for lexicographic comparison
                     Truthiness::AlwaysTrue => continue,
@@ -5077,7 +5077,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::KnownInstance(known_instance) => {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }
-            Type::Gradual(GradualType::Todo(_)) => {
+            Type::Dynamic(DynamicType::Todo(_)) => {
                 self.infer_type_expression(slice);
                 value_ty
             }
@@ -5716,7 +5716,7 @@ fn perform_membership_test_comparison<'db>(
 
     compare_result_opt
         .map(|ty| {
-            if matches!(ty, Type::Gradual(GradualType::Todo(_))) {
+            if matches!(ty, Type::Dynamic(DynamicType::Todo(_))) {
                 return ty;
             }
 

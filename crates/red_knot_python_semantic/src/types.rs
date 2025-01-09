@@ -475,12 +475,12 @@ impl std::fmt::Display for TodoType {
 #[cfg(debug_assertions)]
 macro_rules! todo_type {
     () => {
-        $crate::types::Type::Gradual($crate::types::GradualType::Todo(
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
             crate::types::TodoType::FileAndLine(file!(), line!()),
         ))
     };
     ($message:literal) => {
-        $crate::types::Type::Gradual($crate::types::GradualType::Todo(
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
             crate::types::TodoType::Message($message),
         ))
     };
@@ -489,10 +489,10 @@ macro_rules! todo_type {
 #[cfg(not(debug_assertions))]
 macro_rules! todo_type {
     () => {
-        $crate::types::Type::Gradual($crate::types::GradualType::Todo(crate::types::TodoType))
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(crate::types::TodoType))
     };
     ($message:literal) => {
-        $crate::types::Type::Gradual($crate::types::GradualType::Todo(crate::types::TodoType))
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(crate::types::TodoType))
     };
 }
 
@@ -502,7 +502,7 @@ pub(crate) use todo_type;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
-    Gradual(GradualType),
+    Dynamic(DynamicType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -547,15 +547,15 @@ pub enum Type<'db> {
 
 impl<'db> Type<'db> {
     pub const fn any() -> Self {
-        Self::Gradual(GradualType::Any)
+        Self::Dynamic(DynamicType::Any)
     }
 
     pub const fn unknown() -> Self {
-        Self::Gradual(GradualType::Unknown)
+        Self::Dynamic(DynamicType::Unknown)
     }
 
     pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Gradual(GradualType::Unknown))
+        matches!(self, Type::Dynamic(DynamicType::Unknown))
     }
 
     pub const fn is_never(&self) -> bool {
@@ -563,7 +563,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn is_todo(&self) -> bool {
-        matches!(self, Type::Gradual(GradualType::Todo(_)))
+        matches!(self, Type::Dynamic(DynamicType::Todo(_)))
     }
 
     pub const fn class_literal(class: Class<'db>) -> Self {
@@ -755,7 +755,7 @@ impl<'db> Type<'db> {
 
         match (self, target) {
             // We should have handled these immediately above.
-            (Type::Gradual(_), _) | (_, Type::Gradual(_)) => {
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
                 unreachable!("Non-fully-static types do not participate in subtyping!")
             }
 
@@ -972,8 +972,8 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
 
             // The dynamic type is assignable-to and assignable-from any type.
-            (Type::Gradual(_), _) => true,
-            (_, Type::Gradual(_)) => true,
+            (Type::Dynamic(_), _) => true,
+            (_, Type::Dynamic(_)) => true,
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
@@ -1083,14 +1083,14 @@ impl<'db> Type<'db> {
         matches!(
             (self, other),
             (
-                Type::Gradual(GradualType::Any),
-                Type::Gradual(GradualType::Any)
+                Type::Dynamic(DynamicType::Any),
+                Type::Dynamic(DynamicType::Any)
             ) | (
-                Type::Gradual(GradualType::Unknown),
-                Type::Gradual(GradualType::Unknown)
+                Type::Dynamic(DynamicType::Unknown),
+                Type::Dynamic(DynamicType::Unknown)
             ) | (
-                Type::Gradual(GradualType::Todo(_)),
-                Type::Gradual(GradualType::Todo(_))
+                Type::Dynamic(DynamicType::Todo(_)),
+                Type::Dynamic(DynamicType::Todo(_))
             )
         )
     }
@@ -1103,7 +1103,7 @@ impl<'db> Type<'db> {
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
 
-            (Type::Gradual(_), _) | (_, Type::Gradual(_)) => false,
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -1183,7 +1183,7 @@ impl<'db> Type<'db> {
                 Type::ClassLiteral(ClassLiteralType { class: class_b }),
                 Type::SubclassOf(subclass_of_ty),
             ) => match subclass_of_ty.subclass_of() {
-                ClassBase::Gradual(_) => false,
+                ClassBase::Dynamic(_) => false,
                 ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
             },
 
@@ -1379,7 +1379,7 @@ impl<'db> Type<'db> {
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
     pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Gradual(_) => false,
+            Type::Dynamic(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
@@ -1442,7 +1442,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Gradual(_)
+            Type::Dynamic(_)
             | Type::Never
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -1553,7 +1553,7 @@ impl<'db> Type<'db> {
                 None => false,
             },
 
-            Type::Gradual(_)
+            Type::Dynamic(_)
             | Type::Never
             | Type::Union(..)
             | Type::Intersection(..)
@@ -1575,7 +1575,7 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Gradual(_) => self.into(),
+            Type::Dynamic(_) => self.into(),
 
             Type::Never => todo_type!("attribute lookup on Never").into(),
 
@@ -1700,7 +1700,7 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Gradual(_) | Type::Never => Truthiness::Ambiguous,
+            Type::Dynamic(_) | Type::Never => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -1971,7 +1971,7 @@ impl<'db> Type<'db> {
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Gradual(_) => CallOutcome::callable(CallBinding::from_return_ty(self)),
+            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_ty(self)),
 
             Type::Union(union) => CallOutcome::union(
                 self,
@@ -2079,12 +2079,12 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::Gradual(_) => *self,
+            Type::Dynamic(_) => *self,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Class(class) => Type::instance(class),
-                ClassBase::Gradual(gradual) => Type::Gradual(gradual),
+                ClassBase::Dynamic(gradual) => Type::Dynamic(gradual),
             },
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             Type::Intersection(_) => todo_type!("Type::Intersection.to_instance()"),
@@ -2169,7 +2169,7 @@ impl<'db> Type<'db> {
                     })
                 }
             }
-            Type::Gradual(_) => Ok(*self),
+            Type::Dynamic(_) => Ok(*self),
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Ok(*self),
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => Ok(alias.value_ty(db)),
@@ -2251,7 +2251,7 @@ impl<'db> Type<'db> {
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                ClassBase::Gradual(_) => *self,
+                ClassBase::Dynamic(_) => *self,
                 ClassBase::Class(class) => SubclassOfType::from(
                     db,
                     ClassBase::try_from_ty(db, class.metaclass(db)).unwrap_or(ClassBase::unknown()),
@@ -2259,7 +2259,7 @@ impl<'db> Type<'db> {
             },
 
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            Type::Gradual(gradual) => SubclassOfType::from(db, ClassBase::Gradual(*gradual)),
+            Type::Dynamic(gradual) => SubclassOfType::from(db, ClassBase::Dynamic(*gradual)),
             // TODO intersections
             Type::Intersection(_) => SubclassOfType::from(
                 db,
@@ -2328,7 +2328,7 @@ impl<'db> From<&Type<'db>> for Symbol<'db> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub enum GradualType {
+pub enum DynamicType {
     // An explicitly annotated `typing.Any`
     Any,
     // An unannotated value, or a gradual type resulting from an error
@@ -2345,14 +2345,14 @@ pub enum GradualType {
     Todo(TodoType),
 }
 
-impl std::fmt::Display for GradualType {
+impl std::fmt::Display for DynamicType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GradualType::Any => f.write_str("Any"),
-            GradualType::Unknown => f.write_str("Unknown"),
+            DynamicType::Any => f.write_str("Any"),
+            DynamicType::Unknown => f.write_str("Unknown"),
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
-            GradualType::Todo(todo) => write!(f, "@Todo{todo}"),
+            DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
         }
     }
 }
@@ -3735,7 +3735,7 @@ impl<'db> Class<'db> {
             match superclass {
                 // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
                 // the type found on the next "real" class.
-                ClassBase::Gradual(_) => return Type::from(superclass).member(db, name),
+                ClassBase::Dynamic(_) => return Type::from(superclass).member(db, name),
                 ClassBase::Class(class) => {
                     let member = class.own_class_member(db, name);
                     if !member.is_unbound() {
