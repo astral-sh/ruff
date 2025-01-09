@@ -18,11 +18,12 @@ const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
 const KNOT_EXTENSIONS_STUBS: &str = "knot_extensions/knot_extensions.pyi";
 const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 
-/// Recursively zip the contents of an entire directory.
+/// Recursively zip the contents of the entire typeshed directory and patch typeshed
+/// on the fly to include the `knot_extensions` module.
 ///
 /// This routine is adapted from a recipe at
 /// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
-fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
+fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
     let mut zip = ZipWriter::new(writer);
 
     // Use deflated compression for WASM builds because compiling `zstd-sys` requires clang
@@ -44,11 +45,11 @@ fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
         .compression_method(method)
         .unix_permissions(0o644);
 
-    for entry in walkdir::WalkDir::new(directory_path) {
+    for entry in walkdir::WalkDir::new(TYPESHED_SOURCE_DIR) {
         let dir_entry = entry.unwrap();
         let absolute_path = dir_entry.path();
         let normalized_relative_path = absolute_path
-            .strip_prefix(Path::new(directory_path))
+            .strip_prefix(Path::new(TYPESHED_SOURCE_DIR))
             .unwrap()
             .to_slash()
             .expect("Unexpected non-utf8 typeshed path!");
@@ -97,6 +98,6 @@ fn main() {
     // which can't be done at compile time.)
     let zipped_typeshed_location = format!("{out_dir}{TYPESHED_ZIP_LOCATION}");
 
-    let zipped_typeshed = File::create(zipped_typeshed_location).unwrap();
-    zip_dir(TYPESHED_SOURCE_DIR, zipped_typeshed).unwrap();
+    let zipped_typeshed_file = File::create(zipped_typeshed_location).unwrap();
+    write_zipped_typeshed_to(zipped_typeshed_file).unwrap();
 }
