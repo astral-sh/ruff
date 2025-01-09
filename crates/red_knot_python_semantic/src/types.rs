@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::iter;
 
 use context::InferContext;
 use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
@@ -1095,6 +1096,84 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Returns true if this type and `other` are gradual equivalent.
+    ///
+    /// > Two gradual types `A` and `B` are equivalent
+    /// > (that is, the same gradual type, not merely consistent with one another)
+    /// > if and only if all materializations of `A` are also materializations of `B`,
+    /// > and all materializations of `B` are also materializations of `A`.
+    /// >
+    /// > &mdash; [Summary of type relations]
+    ///
+    /// This powers the `assert_type()` directive.
+    ///
+    /// [Summary of type relations]: https://typing.readthedocs.io/en/latest/spec/concepts.html#summary-of-type-relations
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        let equivalent =
+            |(first, second): (&Type<'db>, &Type<'db>)| first.is_gradual_equivalent_to(db, *second);
+
+        match (self, other) {
+            (_, _) if self == other => true,
+
+            (Type::Dynamic(_), Type::Dynamic(_)) => true,
+
+            (Type::Instance(instance), Type::SubclassOf(subclass))
+            | (Type::SubclassOf(subclass), Type::Instance(instance)) => {
+                let Some(base_class) = subclass.subclass_of().into_class() else {
+                    return false;
+                };
+
+                instance.class.is_known(db, KnownClass::Type)
+                    && base_class.is_known(db, KnownClass::Object)
+            }
+
+            (Type::SubclassOf(first), Type::SubclassOf(second)) => {
+                match (first.subclass_of(), second.subclass_of()) {
+                    (first, second) if first == second => true,
+                    (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => true,
+                    _ => false,
+                }
+            }
+
+            (Type::Tuple(first), Type::Tuple(second)) => {
+                first.len(db) == second.len(db)
+                    && iter::zip(first.elements(db), second.elements(db)).all(equivalent)
+            }
+
+            // TODO: Handle equivalent unions with items in different order
+            (Type::Union(first), Type::Union(second)) => {
+                let first_elements = first.elements(db);
+                let second_elements = second.elements(db);
+
+                if first_elements.len() != second_elements.len() {
+                    return false;
+                }
+
+                iter::zip(first_elements, second_elements).all(equivalent)
+            }
+
+            // TODO: Handle equivalent intersections with items in different order
+            (Type::Intersection(first), Type::Intersection(second)) => {
+                let first_positive = first.positive(db);
+                let first_negative = first.negative(db);
+
+                let second_positive = second.positive(db);
+                let second_negative = second.negative(db);
+
+                if first_positive.len() != second_positive.len()
+                    || first_negative.len() != second_negative.len()
+                {
+                    return false;
+                }
+
+                iter::zip(first_positive, second_positive).all(equivalent)
+                    && iter::zip(first_negative, second_negative).all(equivalent)
+            }
+
+            _ => false,
+        }
+    }
+
     /// Return true if this type and `other` have no common elements.
     ///
     /// Note: This function aims to have no false positives, but might return
@@ -1922,6 +2001,14 @@ impl<'db> Type<'db> {
                         };
 
                         CallOutcome::callable(binding)
+                    }
+
+                    Some(KnownFunction::AssertType) => {
+                        let Some((_, asserted_ty)) = binding.two_parameter_tys() else {
+                            return CallOutcome::callable(binding);
+                        };
+
+                        CallOutcome::asserted(binding, asserted_ty)
                     }
 
                     _ => CallOutcome::callable(binding),
@@ -3261,6 +3348,9 @@ pub enum KnownFunction {
     /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
 
+    /// `typing(_extensions).assert_type`
+    AssertType,
+
     /// `knot_extensions.static_assert`
     StaticAssert,
     /// `knot_extensions.is_equivalent_to`
@@ -3283,18 +3373,7 @@ impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType
-            | Self::Len
-            | Self::Final
-            | Self::NoTypeCheck
-            | Self::StaticAssert
-            | Self::IsEquivalentTo
-            | Self::IsSubtypeOf
-            | Self::IsAssignableTo
-            | Self::IsDisjointFrom
-            | Self::IsFullyStatic
-            | Self::IsSingleton
-            | Self::IsSingleValued => None,
+            _ => None,
         }
     }
 
@@ -3316,6 +3395,7 @@ impl KnownFunction {
             "no_type_check" if definition.is_typing_definition(db) => {
                 Some(KnownFunction::NoTypeCheck)
             }
+            "assert_type" if definition.is_typing_definition(db) => Some(KnownFunction::AssertType),
             "static_assert" if definition.is_knot_extensions_definition(db) => {
                 Some(KnownFunction::StaticAssert)
             }
@@ -3345,20 +3425,34 @@ impl KnownFunction {
         }
     }
 
-    /// Whether or not a particular function takes type expression as arguments, i.e. should
-    /// the argument of a call like `f(int)` be interpreted as the type int (true) or as the
-    /// type of the expression `int`, i.e. `Literal[int]` (false).
-    const fn takes_type_expression_arguments(self) -> bool {
-        matches!(
-            self,
-            KnownFunction::IsEquivalentTo
-                | KnownFunction::IsSubtypeOf
-                | KnownFunction::IsAssignableTo
-                | KnownFunction::IsDisjointFrom
-                | KnownFunction::IsFullyStatic
-                | KnownFunction::IsSingleton
-                | KnownFunction::IsSingleValued
-        )
+    /// Returns a `u32` bitmask specifying whether or not
+    /// arguments given to a particular function
+    /// should be interpreted as type expressions or value expressions.
+    ///
+    /// The argument is treated as a type expression
+    /// when the corresponding bit is `1`.
+    /// The least-significant (right-most) bit corresponds to
+    /// the argument at the index 0 and so on.
+    ///
+    /// For example, `assert_type()` has the bitmask value of `0b10`.
+    /// This means the second argument is a type expression and the first a value expression.
+    const fn takes_type_expression_arguments(self) -> u32 {
+        const ALL_VALUES: u32 = 0b0;
+        const SINGLE_TYPE: u32 = 0b1;
+        const TYPE_TYPE: u32 = 0b11;
+        const VALUE_TYPE: u32 = 0b10;
+
+        match self {
+            KnownFunction::IsEquivalentTo => TYPE_TYPE,
+            KnownFunction::IsSubtypeOf => TYPE_TYPE,
+            KnownFunction::IsAssignableTo => TYPE_TYPE,
+            KnownFunction::IsDisjointFrom => TYPE_TYPE,
+            KnownFunction::IsFullyStatic => SINGLE_TYPE,
+            KnownFunction::IsSingleton => SINGLE_TYPE,
+            KnownFunction::IsSingleValued => SINGLE_TYPE,
+            KnownFunction::AssertType => VALUE_TYPE,
+            _ => ALL_VALUES,
+        }
     }
 }
 
@@ -3681,7 +3775,8 @@ impl<'db> Class<'db> {
                 // does not accept the right arguments
                 CallOutcome::Callable { binding }
                 | CallOutcome::RevealType { binding, .. }
-                | CallOutcome::StaticAssertionError { binding, .. } => Ok(binding.return_ty()),
+                | CallOutcome::StaticAssertionError { binding, .. }
+                | CallOutcome::AssertType { binding, .. } => Ok(binding.return_ty()),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));
@@ -4642,6 +4737,82 @@ pub(crate) mod tests {
         let db = setup_db();
 
         assert!(!from.into_type(&db).is_fully_static(&db));
+    }
+
+    #[test_case(Ty::Todo, Ty::Todo)]
+    #[test_case(Ty::Any, Ty::Any)]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
+    #[test_case(Ty::Any, Ty::Unknown)]
+    #[test_case(Ty::Todo, Ty::Unknown)]
+    #[test_case(Ty::Todo, Ty::Any)]
+    #[test_case(Ty::Never, Ty::Never)]
+    #[test_case(Ty::AlwaysTruthy, Ty::AlwaysTruthy)]
+    #[test_case(Ty::AlwaysFalsy, Ty::AlwaysFalsy)]
+    #[test_case(Ty::LiteralString, Ty::LiteralString)]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BooleanLiteral(true))]
+    #[test_case(Ty::BooleanLiteral(false), Ty::BooleanLiteral(false))]
+    #[test_case(Ty::SliceLiteral(0, 1, 2), Ty::SliceLiteral(0, 1, 2))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
+    // TODO: Compare unions/intersections with different orders
+    // #[test_case(
+    //     Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
+    //     Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")])
+    // )]
+    // #[test_case(
+    //     Ty::Intersection {
+    //         pos: vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")],
+    //         neg: vec![Ty::BuiltinInstance("bytes"), Ty::None]
+    //     },
+    //     Ty::Intersection {
+    //         pos: vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")],
+    //         neg: vec![Ty::None, Ty::BuiltinInstance("bytes")]
+    //     }
+    // )]
+    // #[test_case(
+    //     Ty::Intersection {
+    //         pos: vec![Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")])],
+    //         neg: vec![Ty::SubclassOfAny]
+    //     },
+    //     Ty::Intersection {
+    //         pos: vec![Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")])],
+    //         neg: vec![Ty::SubclassOfUnknown]
+    //     }
+    // )]
+    fn is_gradual_equivalent_to(a: Ty, b: Ty) {
+        let db = setup_db();
+        let a = a.into_type(&db);
+        let b = b.into_type(&db);
+
+        assert!(a.is_gradual_equivalent_to(&db, b));
+        assert!(b.is_gradual_equivalent_to(&db, a));
+    }
+
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
+        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"), Ty::BuiltinInstance("bytes")])
+    )]
+    #[test_case(
+        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int"), Ty::BuiltinInstance("bytes")]),
+        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"), Ty::BuiltinInstance("dict")])
+    )]
+    #[test_case(
+        Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
+        Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int"), Ty::BuiltinInstance("bytes")])
+    )]
+    #[test_case(
+        Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
+        Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")])
+    )]
+    fn is_not_gradual_equivalent_to(a: Ty, b: Ty) {
+        let db = setup_db();
+        let a = a.into_type(&db);
+        let b = b.into_type(&db);
+
+        assert!(!a.is_gradual_equivalent_to(&db, b));
+        assert!(!b.is_gradual_equivalent_to(&db, a));
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
