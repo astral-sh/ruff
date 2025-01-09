@@ -36,10 +36,10 @@ UP037_2.pyi:6:14: UP037 [*] Remove quotes from type annotation
 4 4 | 
 5 5 | 
 6   |-def f(a: Foo['''Bar[
-  6 |+def f(a: Foo[(Bar[
+  6 |+def f(a: Foo[Bar[
 7 7 |     Multi |
 8   |-    Line]''']): ...
-  8 |+    Line])]): ...
+  8 |+    Line]]): ...
 9 9 | 
 10 10 | 
 11 11 | def f(a: Foo['''Bar[
@@ -60,11 +60,11 @@ UP037_2.pyi:11:14: UP037 [*] Remove quotes from type annotation
 9  9  | 
 10 10 | 
 11    |-def f(a: Foo['''Bar[
-   11 |+def f(a: Foo[(Bar[
+   11 |+def f(a: Foo[Bar[
 12 12 |     Multi |
 13 13 |     Line  # Comment
 14    |-]''']): ...
-   14 |+])]): ...
+   14 |+]]): ...
 15 15 | 
 16 16 | 
 17 17 | def f(a: Foo['''Bar[
@@ -117,14 +117,14 @@ UP037_2.pyi:22:14: UP037 [*] Remove quotes from type annotation
    26 |+)]): ...
 26 27 | 
 27 28 | 
-28 29 | a: '''\\
+28 29 | def f(a: '''list[int]
 
-UP037_2.pyi:28:4: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:28:10: UP037 [*] Remove quotes from type annotation
    |
-28 |   a: '''\\
-   |  ____^
-29 | | list[int]''' = [42]
-   | |____________^ UP037
+28 |   def f(a: '''list[int]
+   |  __________^
+29 | |     ''' = []): ...
+   | |_______^ UP037
    |
    = help: Remove quotes
 
@@ -132,10 +132,31 @@ UP037_2.pyi:28:4: UP037 [*] Remove quotes from type annotation
 25 25 |     Line]  # Comment''']): ...
 26 26 | 
 27 27 | 
-28    |-a: '''\\
-29    |-list[int]''' = [42]
-   28 |+a: (\
-   29 |+list[int]) = [42]
+28    |-def f(a: '''list[int]
+29    |-	''' = []): ...
+   28 |+def f(a: list[int]
+   29 |+	 = []): ...
 30 30 | 
 31 31 | 
-32 32 | # TODO: These are valid too. String annotations are assumed to be enclosed in parentheses.
+32 32 | a: '''\\
+
+UP037_2.pyi:32:4: UP037 [*] Remove quotes from type annotation
+   |
+32 |   a: '''\\
+   |  ____^
+33 | | list[int]''' = [42]
+   | |____________^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+29 29 | 	''' = []): ...
+30 30 | 
+31 31 | 
+32    |-a: '''\\
+33    |-list[int]''' = [42]
+   32 |+a: (\
+   33 |+list[int]) = [42]
+34 34 | 
+35 35 | 
+36 36 | # TODO: These are valid too. String annotations are assumed to be enclosed in parentheses.

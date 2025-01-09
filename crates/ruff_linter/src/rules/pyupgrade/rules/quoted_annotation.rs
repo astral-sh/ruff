@@ -1,8 +1,10 @@
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::Stmt;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 
@@ -89,6 +91,9 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     );
 
     let new_content = match (spans_multiple_lines, last_token_is_comment) {
+        (_, false) if in_parameter_annotation(range.start(), checker.semantic()) => {
+            annotation.to_string()
+        }
         (false, false) => annotation.to_string(),
         (true, false) => format!("({annotation})"),
         (_, true) => format!("({annotation}\n)"),
@@ -97,4 +102,12 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     let fix = Fix::safe_edit(edit);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
+}
+
+fn in_parameter_annotation(offset: TextSize, semantic: &SemanticModel) -> bool {
+    let Stmt::FunctionDef(stmt) = semantic.current_statement() else {
+        return false;
+    };
+
+    stmt.parameters.range.contains(offset)
 }
