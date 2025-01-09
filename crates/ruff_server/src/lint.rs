@@ -206,6 +206,7 @@ pub(crate) fn fixes_for_diagnostics(
 ) -> crate::Result<Vec<DiagnosticFix>> {
     diagnostics
         .into_iter()
+        .filter(|diagnostic| diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME))
         .map(move |mut diagnostic| {
             let Some(data) = diagnostic.data.take() else {
                 return Ok(None);
