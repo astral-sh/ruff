@@ -15,7 +15,7 @@ This release doesn’t remove or remap any existing stable rules.
 The following rules have been stabilized and are no longer in preview:
 
 - [`stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/) (`A005`).
-  This rule has also been renamed: previously, it was called `builtin-module-shadowing`.
+    This rule has also been renamed: previously, it was called `builtin-module-shadowing`.
 - [`builtin-lambda-argument-shadowing`](https://docs.astral.sh/ruff/rules/builtin-lambda-argument-shadowing/) (`A006`)
 - [`slice-to-remove-prefix-or-suffix`](https://docs.astral.sh/ruff/rules/slice-to-remove-prefix-or-suffix/) (`FURB188`)
 - [`boolean-chained-comparison`](https://docs.astral.sh/ruff/rules/boolean-chained-comparison/) (`PLR1716`)
@@ -71,6 +71,7 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 
 - Improve the observability by removing the need for the ["trace" value](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#traceValue) to turn on or off logging. The server logging is solely controlled using the [`logLevel` server setting](https://docs.astral.sh/ruff/editors/settings/#loglevel)
     which defaults to `info`. This addresses the issue where users were notified about an error and told to consult the log, but it didn’t contain any messages. ([#15232](https://github.com/astral-sh/ruff/pull/15232))
+- Ignore diagnostics from other sources for code action requests ([#15373](https://github.com/astral-sh/ruff/pull/15373))
 
 ### CLI
 
@@ -79,6 +80,7 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 ### Bug fixes
 
 - \[`eradicate`\] Ignore metadata blocks directly followed by normal blocks (`ERA001`) ([#15330](https://github.com/astral-sh/ruff/pull/15330))
+- \[`flake8-django`\] Recognize other magic methods (`DJ012`) ([#15365](https://github.com/astral-sh/ruff/pull/15365))
 - \[`pycodestyle`\] Avoid false positives related to type aliases (`E252`) ([#15356](https://github.com/astral-sh/ruff/pull/15356))
 - \[`pydocstyle`\] Avoid treating newline-separated sections as sub-sections (`D405`) ([#15311](https://github.com/astral-sh/ruff/pull/15311))
 - \[`pyflakes`\] Remove call when removing final argument from `format` (`F523`) ([#15309](https://github.com/astral-sh/ruff/pull/15309))
