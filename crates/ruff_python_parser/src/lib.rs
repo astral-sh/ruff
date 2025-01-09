@@ -166,6 +166,16 @@ pub fn parse_expression_range(
         .into_result()
 }
 
+pub fn parse_parenthesized_expression_range(
+    source: &str,
+    range: TextRange,
+) -> Result<Parsed<ModExpression>, ParseError> {
+    let source = &source[..range.end().to_usize()];
+    let parsed =
+        Parser::new_starts_at(source, Mode::ParenthesizedExpression, range.start()).parse();
+    parsed.try_into_expression().unwrap().into_result()
+}
+
 /// Parse the given Python source code using the specified [`Mode`].
 ///
 /// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
@@ -599,6 +609,8 @@ pub enum Mode {
     /// [System shell access]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#system-shell-access
     /// [Automatic parentheses and quotes]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#automatic-parentheses-and-quotes
     Ipython,
+
+    ParenthesizedExpression,
 }
 
 impl std::str::FromStr for Mode {

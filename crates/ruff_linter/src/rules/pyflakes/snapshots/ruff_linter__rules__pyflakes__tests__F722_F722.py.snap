@@ -13,4 +13,6 @@ F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
    |
 13 | X: """List[int]"""'☃' = []
    |    ^^^^^^^^^^^^^^^^^^ F722
+14 | 
+15 | y: """
    |
