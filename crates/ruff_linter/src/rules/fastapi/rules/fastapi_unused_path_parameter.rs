@@ -6,8 +6,8 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Parameter, ParameterWithDefault};
-use ruff_python_semantic::{Modules, SemanticModel};
+use ruff_python_ast::{Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
+use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -136,12 +136,26 @@ pub(crate) fn fastapi_unused_path_parameter(
     // Extract the path parameters from the route path.
     let path_params = PathParamIterator::new(path.to_str());
 
+    let dependables = keywordable_parameters(function_def)
+        .filter_map(|parameter_with_default| {
+            match Dependable::from_parameter(parameter_with_default, checker.semantic()) {
+                Dependable::None => None,
+                dependable => Some(dependable),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if dependables.iter().any(Dependable::is_unknown) {
+        return;
+    }
+
+    let dependables_parameter_names: Vec<_> = dependables
+        .into_iter()
+        .flat_map(Dependable::parameter_names)
+        .collect();
+
     // Extract the arguments from the function signature
-    let named_args: Vec<_> = function_def
-        .parameters
-        .args
-        .iter()
-        .chain(&function_def.parameters.kwonlyargs)
+    let named_args: Vec<_> = keywordable_parameters(function_def)
         .map(|ParameterWithDefault { parameter, .. }| {
             parameter_alias(parameter, checker.semantic())
                 .unwrap_or_else(|| parameter.name.as_str())
@@ -158,6 +172,10 @@ pub(crate) fn fastapi_unused_path_parameter(
 
         // If the path parameter is already in the function signature, we don't need to do anything.
         if named_args.contains(&path_param) {
+            continue;
+        }
+
+        if dependables_parameter_names.contains(&path_param.to_string()) {
             continue;
         }
 
@@ -192,6 +210,134 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     checker.diagnostics.extend(diagnostics);
+}
+
+fn keywordable_parameters(
+    function_def: &ast::StmtFunctionDef,
+) -> impl Iterator<Item = &ParameterWithDefault> {
+    function_def
+        .parameters
+        .args
+        .iter()
+        .chain(&function_def.parameters.kwonlyargs)
+}
+
+#[derive(Debug, is_macro::Is)]
+enum Dependable {
+    /// `Depends` call not found or invalid.
+    None,
+    /// Not defined in the same file, or otherwise cannot be determined to be a function.
+    Unknown,
+    /// A function defined in the same file, whose parameter names are as given.
+    Function(Vec<String>),
+}
+
+impl Dependable {
+    fn parameter_names(self) -> Vec<String> {
+        match self {
+            Self::None | Self::Unknown => vec![],
+            Self::Function(parameter_names) => parameter_names,
+        }
+    }
+}
+
+impl Dependable {
+    /// Return `foo` in the first metadata `Depends(foo)`,
+    /// or that of the default value:
+    ///
+    /// ```python
+    /// def _(
+    ///     a: Annotated[str, Depends(foo), Depends(bar)],
+    ///     #                 ^^^^^^^^^^^^
+    ///     a: str = Depends(foo),
+    ///     #        ^^^^^^^^^^^^
+    /// ): ...
+    /// ```
+    fn from_parameter(
+        parameter_with_default: &ParameterWithDefault,
+        semantic: &SemanticModel,
+    ) -> Self {
+        let ParameterWithDefault {
+            parameter, default, ..
+        } = parameter_with_default;
+
+        if let Some(default) = default {
+            let dependable = Self::from_call(default.as_ref(), semantic);
+
+            if !matches!(dependable, Self::None) {
+                return dependable;
+            }
+        }
+
+        let Some(annotation) = &parameter.annotation else {
+            return Dependable::None;
+        };
+        let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation.as_ref() else {
+            return Dependable::None;
+        };
+
+        if !semantic.match_typing_expr(value, "Annotated") {
+            return Dependable::None;
+        }
+
+        match slice.as_ref() {
+            Expr::Tuple(tuple) => tuple
+                .elts
+                .iter()
+                .skip(1)
+                .find_map(|metadata| match Self::from_call(metadata, semantic) {
+                    Self::None => None,
+                    dependable => Some(dependable),
+                })
+                .unwrap_or(Self::None),
+            _ => Dependable::None,
+        }
+    }
+
+    fn from_call(expr: &Expr, semantic: &SemanticModel) -> Self {
+        let Expr::Call(ExprCall {
+            func, arguments, ..
+        }) = expr
+        else {
+            return Self::None;
+        };
+
+        if !is_fastapi_depends(func.as_ref(), semantic) {
+            return Self::None;
+        }
+
+        let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
+            return Self::None;
+        };
+
+        let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+            return Self::Unknown;
+        };
+
+        let BindingKind::FunctionDefinition(scope_id) = binding.kind else {
+            return Self::Unknown;
+        };
+
+        let scope = &semantic.scopes.raw[scope_id.as_u32() as usize];
+
+        let ScopeKind::Function(function_def) = scope.kind else {
+            return Self::Unknown;
+        };
+
+        let parameter_names = keywordable_parameters(function_def)
+            .map(|ParameterWithDefault { parameter, .. }| parameter.name.to_string())
+            .collect::<Vec<_>>();
+
+        Self::Function(parameter_names)
+    }
+}
+
+fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        return false;
+    };
+
+    matches!(qualified_name.segments(), ["fastapi", "Depends"])
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.

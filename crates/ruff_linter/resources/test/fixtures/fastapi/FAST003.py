@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import FastAPI, Path
+from fastapi import Depends, FastAPI, Path
 
 app = FastAPI()
 
@@ -144,3 +144,35 @@ async def read_thing(query: str):
 @app.get("/things/{thing_id=}")
 async def read_thing(query: str):
     return {"query": query}
+
+
+# https://github.com/astral-sh/ruff/issues/13657
+def dependable(thing_id): ...
+def not_so_dependable(lorem): ...
+
+from foo import unknown_imported
+unknown_not_function = unknown_imported()
+
+
+### Errors
+@app.get("/things/{thing_id}")
+async def single(other: Annotated[str, Depends(not_so_dependable)]): ...
+@app.get("/things/{thing_id}")
+async def double(other: Annotated[str, Depends(not_so_dependable), Depends(dependable)]): ...
+@app.get("/things/{thing_id}")
+async def default(other: str = Depends(not_so_dependable)): ...
+
+
+### No errors
+@app.get("/things/{thing_id}")
+async def single(other: Annotated[str, Depends(dependable)]): ...
+@app.get("/things/{thing_id}")
+async def double(other: Annotated[str, Depends(dependable), Depends(not_so_dependable)]): ...
+@app.get("/things/{thing_id}")
+async def default(other: str = Depends(dependable)): ...
+@app.get("/things/{thing_id}")
+async def unknown_1(other: str = Depends(unknown_unresolved)): ...
+@app.get("/things/{thing_id}")
+async def unknown_2(other: str = Depends(unknown_not_function)): ...
+@app.get("/things/{thing_id}")
+async def unknown_3(other: str = Depends(unknown_imported)): ...
