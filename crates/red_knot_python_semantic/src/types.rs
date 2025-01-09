@@ -489,10 +489,10 @@ macro_rules! todo_type {
 #[cfg(not(debug_assertions))]
 macro_rules! todo_type {
     () => {
-        Type::Todo(crate::types::TodoType)
+        $crate::types::Type::Any($crate::types::AnyType::Todo(crate::types::TodoType))
     };
     ($message:literal) => {
-        Type::Todo(crate::types::TodoType)
+        $crate::types::Type::Any($crate::types::AnyType::Todo(crate::types::TodoType))
     };
 }
 
