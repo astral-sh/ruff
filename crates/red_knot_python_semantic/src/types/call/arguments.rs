@@ -16,7 +16,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// Prepend an extra positional argument.
     pub(crate) fn with_self(&self, self_ty: Type<'db>) -> Self {
         let mut arguments = Vec::with_capacity(self.0.len() + 1);
-        arguments.push(Argument::Positional(self_ty));
+        arguments.push(Argument::Synthetic(self_ty));
         arguments.extend_from_slice(&self.0);
         Self(arguments)
     }
@@ -48,6 +48,8 @@ impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
 
 #[derive(Clone, Debug)]
 pub(crate) enum Argument<'a, 'db> {
+    /// The synthetic `self` or `cls` argument, which doesn't appear explicitly at the call site.
+    Synthetic(Type<'db>),
     /// A positional argument.
     Positional(Type<'db>),
     /// A starred positional argument (e.g. `*args`).
@@ -61,6 +63,7 @@ pub(crate) enum Argument<'a, 'db> {
 impl<'db> Argument<'_, 'db> {
     fn ty(&self) -> Type<'db> {
         match self {
+            Self::Synthetic(ty) => *ty,
             Self::Positional(ty) => *ty,
             Self::Variadic(ty) => *ty,
             Self::Keyword { name: _, ty } => *ty,

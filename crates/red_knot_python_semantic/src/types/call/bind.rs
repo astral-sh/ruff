@@ -24,9 +24,24 @@ pub(crate) fn bind_call<'db>(
     let mut errors = vec![];
     let mut next_positional = 0;
     let mut first_excess_positional = None;
+    let mut num_synthetic_args = 0;
+    let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
+        if argument_index >= num_synthetic_args {
+            // Adjust the argument index to skip synthetic args, which don't appear at the call
+            // site and thus won't be in the Call node arguments list.
+            Some(argument_index - num_synthetic_args)
+        } else {
+            // we are erroring on a synthetic argument, we'll just emit the diagnostic on the
+            // entire Call node, since there's no argument node for this argument at the call site
+            None
+        }
+    };
     for (argument_index, argument) in arguments.iter().enumerate() {
         let (index, parameter, argument_ty, positional) = match argument {
-            Argument::Positional(ty) => {
+            Argument::Positional(ty) | Argument::Synthetic(ty) => {
+                if matches!(argument, Argument::Synthetic(_)) {
+                    num_synthetic_args += 1;
+                }
                 let Some((index, parameter)) = parameters
                     .get_positional(next_positional)
                     .map(|param| (next_positional, param))
@@ -46,7 +61,7 @@ pub(crate) fn bind_call<'db>(
                 else {
                     errors.push(CallBindingError::UnknownArgument {
                         argument_name: ast::name::Name::new(name),
-                        argument_index,
+                        argument_index: get_argument_index(argument_index, num_synthetic_args),
                     });
                     continue;
                 };
@@ -62,7 +77,7 @@ pub(crate) fn bind_call<'db>(
             if !argument_ty.is_assignable_to(db, expected_ty) {
                 errors.push(CallBindingError::InvalidArgumentType {
                     parameter: ParameterContext::new(parameter, index, positional),
-                    argument_index,
+                    argument_index: get_argument_index(argument_index, num_synthetic_args),
                     expected_ty,
                     provided_ty: *argument_ty,
                 });
@@ -74,7 +89,7 @@ pub(crate) fn bind_call<'db>(
                 parameter_tys[index].replace(union);
             } else {
                 errors.push(CallBindingError::ParameterAlreadyAssigned {
-                    argument_index,
+                    argument_index: get_argument_index(argument_index, num_synthetic_args),
                     parameter: ParameterContext::new(parameter, index, positional),
                 });
             }
@@ -82,7 +97,10 @@ pub(crate) fn bind_call<'db>(
     }
     if let Some(first_excess_argument_index) = first_excess_positional {
         errors.push(CallBindingError::TooManyPositionalArguments {
-            first_excess_argument_index,
+            first_excess_argument_index: get_argument_index(
+                first_excess_argument_index,
+                num_synthetic_args,
+            ),
             expected_positional_count: parameters.positional().count(),
             provided_positional_count: next_positional,
         });
@@ -243,7 +261,7 @@ pub(crate) enum CallBindingError<'db> {
     /// parameter.
     InvalidArgumentType {
         parameter: ParameterContext,
-        argument_index: usize,
+        argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
     },
@@ -252,17 +270,17 @@ pub(crate) enum CallBindingError<'db> {
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
         argument_name: ast::name::Name,
-        argument_index: usize,
+        argument_index: Option<usize>,
     },
     /// More positional arguments are provided in the call than can be handled by the signature.
     TooManyPositionalArguments {
-        first_excess_argument_index: usize,
+        first_excess_argument_index: Option<usize>,
         expected_positional_count: usize,
         provided_positional_count: usize,
     },
     /// Multiple arguments were provided for a single parameter.
     ParameterAlreadyAssigned {
-        argument_index: usize,
+        argument_index: Option<usize>,
         parameter: ParameterContext,
     },
 }
@@ -372,11 +390,11 @@ impl<'db> CallBindingError<'db> {
         }
     }
 
-    fn get_node(node: ast::AnyNodeRef, argument_index: usize) -> ast::AnyNodeRef {
-        // If we have a Call node, report the diagnostic on the correct argument node;
-        // otherwise, report it on the entire provided node.
-        match node {
-            ast::AnyNodeRef::ExprCall(call_node) => {
+    fn get_node(node: ast::AnyNodeRef, argument_index: Option<usize>) -> ast::AnyNodeRef {
+        // If we have a Call node and an argument index, report the diagnostic on the correct
+        // argument node; otherwise, report it on the entire provided node.
+        match (node, argument_index) {
+            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => {
                 match call_node
                     .arguments
                     .arguments_source_order()
