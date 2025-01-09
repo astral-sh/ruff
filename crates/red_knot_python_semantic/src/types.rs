@@ -3607,13 +3607,13 @@ impl<'db> Class<'db> {
                 explicit_metaclass_of: class_metaclass_was_from,
             }
         } else {
-            let self_ty = Type::class_literal(self);
+            let name = Type::string_literal(self.name(db));
             let bases = TupleType::from_elements(db, self.explicit_bases(db));
             // TODO: Should be `dict[str, Any]`
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArguments::positional([self_ty, bases, namespace]);
+            let arguments = CallArguments::positional([name, bases, namespace]);
 
             let return_ty_result = match metaclass.call(db, &arguments) {
                 CallOutcome::NotCallable { not_callable_ty } => Err(MetaclassError {
