@@ -40,7 +40,6 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 
 - Format expressions in f-string elements ([#7594](https://github.com/astral-sh/ruff/issues/7594))
 - Alternate quotes for strings inside f-strings ([#13860](https://github.com/astral-sh/ruff/pull/13860))
-- Prefer the configured quotes for f-string expressions ([#13860](https://github.com/astral-sh/ruff/pull/13860))
 - Preserve the casing of hex codes in f-string debug expressions ([#14766](https://github.com/astral-sh/ruff/issues/14766))
 - Choose the quote style for each string literal in an implicitly concatenated f-string rather than for the entire string ([#13539](https://github.com/astral-sh/ruff/pull/13539))
 - Automatically join an implicitly concatenated string into a single string literal if it fits on a single line ([#9457](https://github.com/astral-sh/ruff/issues/9457))
@@ -50,7 +49,7 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 - More consistent formatting for `match` `case` patterns ([#6933](https://github.com/astral-sh/ruff/issues/6933))
 - Avoid unnecessary parentheses around return type annotations ([#13381](https://github.com/astral-sh/ruff/pull/13381))
 - Keep the opening parentheses on the same line as the `if` keyword for comprehensions where the condition has a leading comment ([#12282](https://github.com/astral-sh/ruff/pull/12282))
-- More consistent formatting for `with` statements with a single context manager for Python 3.8 or older ([#10276](https://github.com/astral-sh/ruff/pull/12282))
+- More consistent formatting for `with` statements with a single context manager for Python 3.8 or older ([#10276](https://github.com/astral-sh/ruff/pull/10276))
 - Correctly calculate the line-width for code blocks in docstrings when using `max-doc-code-line-length = "dynamic"` ([#13523](https://github.com/astral-sh/ruff/pull/13523))
 
 ### Preview features
@@ -59,8 +58,7 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 - \[`flake8-type-checking`\] Apply `quoted-type-alias` more eagerly in `TYPE_CHECKING` blocks and ignore it in stubs (`TC008`) ([#15180](https://github.com/astral-sh/ruff/pull/15180))
 - \[`pylint`\] Ignore `eq-without-hash` in stub files (`PLW1641`) ([#15310](https://github.com/astral-sh/ruff/pull/15310))
 - \[`pyupgrade`\] Split `UP007` into two individual rules: `UP007` for `Union` and `UP045` for `Optional` (`UP007`, `UP045`) ([#15313](https://github.com/astral-sh/ruff/pull/15313))
-- \[`refurb`\] Mark fix as unsafe when the right-hand side is a string (`FURB171`) ([#15273](https://github.com/astral-sh/ruff/pull/15273))
-- \[`ruff`\] New rule that detects enums that are also a `dataclass` (`RUF049`) ([#15299](https://github.com/astral-sh/ruff/pull/15299))
+- \[`ruff`\] New rule that detects classes that are both an enum and a `dataclass` (`RUF049`) ([#15299](https://github.com/astral-sh/ruff/pull/15299))
 - \[`ruff`\] Recode `RUF025` to `RUF037` (`RUF037`) ([#15258](https://github.com/astral-sh/ruff/pull/15258))
 
 ### Rule changes
@@ -84,6 +82,7 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 - \[`pycodestyle`\] Avoid false positives related to type aliases (`E252`) ([#15356](https://github.com/astral-sh/ruff/pull/15356))
 - \[`pydocstyle`\] Avoid treating newline-separated sections as sub-sections (`D405`) ([#15311](https://github.com/astral-sh/ruff/pull/15311))
 - \[`pyflakes`\] Remove call when removing final argument from `format` (`F523`) ([#15309](https://github.com/astral-sh/ruff/pull/15309))
+- \[`refurb`\] Mark fix as unsafe when the right-hand side is a string (`FURB171`) ([#15273](https://github.com/astral-sh/ruff/pull/15273))
 - \[`ruff`\] Treat `)` as a regex metacharacter (`RUF043`, `RUF055`) ([#15318](https://github.com/astral-sh/ruff/pull/15318))
 - \[`ruff`\] Parenthesize the `int`-call argument when removing the `int` call would change semantics (`RUF046`) ([#15277](https://github.com/astral-sh/ruff/pull/15277))
 
