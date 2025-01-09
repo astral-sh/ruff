@@ -9,6 +9,7 @@
 //!
 //!  let renderer = Renderer::styled();
 //!  println!("{}", renderer.render(snippet));
+//! ```
 
 mod display_list;
 mod margin;
@@ -30,6 +31,7 @@ pub struct Renderer {
     anonymized_line_numbers: bool,
     term_width: usize,
     stylesheet: Stylesheet,
+    cut_indicator: &'static str,
 }
 
 impl Renderer {
@@ -39,6 +41,7 @@ impl Renderer {
             anonymized_line_numbers: false,
             term_width: DEFAULT_TERM_WIDTH,
             stylesheet: Stylesheet::plain(),
+            cut_indicator: "...",
         }
     }
 
@@ -151,6 +154,14 @@ impl Renderer {
         self
     }
 
+    /// Set the string used for when a long line is cut.
+    ///
+    /// The default is `...` (three `U+002E` characters).
+    pub const fn cut_indicator(mut self, string: &'static str) -> Self {
+        self.cut_indicator = string;
+        self
+    }
+
     /// Render a snippet into a `Display`able object
     pub fn render<'a>(&'a self, msg: Message<'a>) -> impl Display + 'a {
         DisplayList::new(
@@ -158,6 +169,7 @@ impl Renderer {
             &self.stylesheet,
             self.anonymized_line_numbers,
             self.term_width,
+            self.cut_indicator,
         )
     }
 }

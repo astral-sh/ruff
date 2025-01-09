@@ -210,7 +210,7 @@ impl std::fmt::Display for CodeFrame<'_> {
             .annotation(annotation)
             .fold(false);
         let message = Level::None.title("").snippet(snippet);
-        let renderer = Renderer::plain();
+        let renderer = Renderer::plain().cut_indicator("…");
         let rendered = renderer.render(message);
         writeln!(f, "{rendered}")
     }
