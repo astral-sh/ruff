@@ -136,27 +136,30 @@ pub(crate) fn fastapi_unused_path_parameter(
     // Extract the path parameters from the route path.
     let path_params = PathParamIterator::new(path.to_str());
 
-    let dependencies = keywordable_parameters(function_def).filter_map(|parameter_with_default| {
-        Dependency::from_parameter(parameter_with_default, checker.semantic())
-    });
+    // Extract the arguments from the function signature
+    let mut named_args = vec![];
 
-    let mut dependencies_parameter_names = vec![];
+    for parameter_with_default in non_posonly_non_variadic_parameters(function_def) {
+        let ParameterWithDefault { parameter, .. } = parameter_with_default;
 
-    for dependency in dependencies {
+        if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
+            named_args.push(alias.to_string());
+        } else {
+            named_args.push(parameter.name.to_string());
+        }
+
+        let Some(dependency) =
+            Dependency::from_parameter(parameter_with_default, checker.semantic())
+        else {
+            continue;
+        };
+
         if let Some(parameter_names) = dependency.parameter_names() {
-            dependencies_parameter_names.extend(parameter_names);
+            named_args.extend(parameter_names);
         } else {
             return;
         }
     }
-
-    // Extract the arguments from the function signature
-    let named_args: Vec<_> = keywordable_parameters(function_def)
-        .map(|ParameterWithDefault { parameter, .. }| {
-            parameter_alias(parameter, checker.semantic())
-                .unwrap_or_else(|| parameter.name.as_str())
-        })
-        .collect();
 
     // Check if any of the path parameters are not in the function signature.
     let mut diagnostics = vec![];
@@ -166,12 +169,9 @@ pub(crate) fn fastapi_unused_path_parameter(
             continue;
         }
 
-        // If the path parameter is already in the function signature, we don't need to do anything.
-        if named_args.contains(&path_param) {
-            continue;
-        }
-
-        if dependencies_parameter_names.contains(&path_param.to_string()) {
+        // If the path parameter is already in the function or the dependency signature,
+        // we don't need to do anything.
+        if named_args.contains(&path_param.to_string()) {
             continue;
         }
 
@@ -208,7 +208,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     checker.diagnostics.extend(diagnostics);
 }
 
-fn keywordable_parameters(
+fn non_posonly_non_variadic_parameters(
     function_def: &ast::StmtFunctionDef,
 ) -> impl Iterator<Item = &ParameterWithDefault> {
     function_def
@@ -271,14 +271,15 @@ impl Dependency {
             return None;
         }
 
-        match slice.as_ref() {
-            Expr::Tuple(tuple) => tuple
-                .elts
-                .iter()
-                .skip(1)
-                .find_map(|metadata| Self::from_call(metadata, semantic)),
-            _ => None,
-        }
+        let Expr::Tuple(tuple) = slice.as_ref() else {
+            return None;
+        };
+
+        tuple
+            .elts
+            .iter()
+            .skip(1)
+            .find_map(|metadata| Self::from_call(metadata, semantic))
     }
 
     fn from_call(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
@@ -311,7 +312,7 @@ impl Dependency {
             return Some(Self::Unknown);
         };
 
-        let parameter_names = keywordable_parameters(function_def)
+        let parameter_names = non_posonly_non_variadic_parameters(function_def)
             .map(|ParameterWithDefault { parameter, .. }| parameter.name.to_string())
             .collect::<Vec<_>>();
 
