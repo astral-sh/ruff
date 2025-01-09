@@ -253,6 +253,9 @@ f'test{inner   + "nested_string"} including math {5 ** 3 + 10}'
 f"test{inner + 'nested_string'} including math {5**3 + 10}"
 ```
 
+For more details on the formatting style, refer to the [f-string
+formatting](../formatter.md#f-string-formatting) section.
+
 ### Implicit concatenated strings
 
 Ruff merges implicitly concatenated strings if the entire string fits on a single line:
@@ -348,7 +351,7 @@ match some_variable:
     ) or last_condition:
         pass
 
-    
+
 # Ruff
 match some_variable:
     case "short-guard" if other_condition:
