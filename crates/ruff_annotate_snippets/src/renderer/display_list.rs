@@ -38,6 +38,8 @@ use std::fmt::Display;
 use std::ops::Range;
 use std::{cmp, fmt};
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::renderer::styled_buffer::StyledBuffer;
 use crate::renderer::{stylesheet::Stylesheet, Margin, Style, DEFAULT_TERM_WIDTH};
 
@@ -53,6 +55,7 @@ pub(crate) struct DisplayList<'a> {
     pub(crate) body: Vec<DisplaySet<'a>>,
     pub(crate) stylesheet: &'a Stylesheet,
     pub(crate) anonymized_line_numbers: bool,
+    pub(crate) cut_indicator: &'static str,
 }
 
 impl PartialEq for DisplayList<'_> {
@@ -119,13 +122,21 @@ impl<'a> DisplayList<'a> {
         stylesheet: &'a Stylesheet,
         anonymized_line_numbers: bool,
         term_width: usize,
+        cut_indicator: &'static str,
     ) -> DisplayList<'a> {
-        let body = format_message(message, term_width, anonymized_line_numbers, true);
+        let body = format_message(
+            message,
+            term_width,
+            anonymized_line_numbers,
+            cut_indicator,
+            true,
+        );
 
         Self {
             body,
             stylesheet,
             anonymized_line_numbers,
+            cut_indicator,
         }
     }
 
@@ -143,6 +154,7 @@ impl<'a> DisplayList<'a> {
                 multiline_depth,
                 self.stylesheet,
                 self.anonymized_line_numbers,
+                self.cut_indicator,
                 buffer,
             )?;
         }
@@ -270,6 +282,7 @@ impl DisplaySet<'_> {
     }
 
     // Adapted from https://github.com/rust-lang/rust/blob/d371d17496f2ce3a56da76aa083f4ef157572c20/compiler/rustc_errors/src/emitter.rs#L706-L1211
+    #[allow(clippy::too_many_arguments)]
     #[inline]
     fn format_line(
         &self,
@@ -278,6 +291,7 @@ impl DisplaySet<'_> {
         multiline_depth: usize,
         stylesheet: &Stylesheet,
         anonymized_line_numbers: bool,
+        cut_indicator: &'static str,
         buffer: &mut StyledBuffer,
     ) -> fmt::Result {
         let line_offset = buffer.num_lines();
@@ -349,10 +363,15 @@ impl DisplaySet<'_> {
                     buffer.puts(line_offset, code_offset, &code, Style::new());
                     if self.margin.was_cut_left() {
                         // We have stripped some code/whitespace from the beginning, make it clear.
-                        buffer.puts(line_offset, code_offset, "...", *lineno_color);
+                        buffer.puts(line_offset, code_offset, cut_indicator, *lineno_color);
                     }
                     if was_cut_right {
-                        buffer.puts(line_offset, code_offset + taken - 3, "...", *lineno_color);
+                        buffer.puts(
+                            line_offset,
+                            code_offset + taken - cut_indicator.width(),
+                            cut_indicator,
+                            *lineno_color,
+                        );
                     }
 
                     let left: usize = text
@@ -724,7 +743,7 @@ impl DisplaySet<'_> {
                 Ok(())
             }
             DisplayLine::Fold { inline_marks } => {
-                buffer.puts(line_offset, 0, "...", *stylesheet.line_no());
+                buffer.puts(line_offset, 0, cut_indicator, *stylesheet.line_no());
                 if !inline_marks.is_empty() || 0 < multiline_depth {
                     format_inline_marks(
                         line_offset,
@@ -987,12 +1006,13 @@ impl<'a> Iterator for CursorLines<'a> {
     }
 }
 
-fn format_message(
-    message: snippet::Message<'_>,
+fn format_message<'m>(
+    message: snippet::Message<'m>,
     term_width: usize,
     anonymized_line_numbers: bool,
+    cut_indicator: &'static str,
     primary: bool,
-) -> Vec<DisplaySet<'_>> {
+) -> Vec<DisplaySet<'m>> {
     let snippet::Message {
         level,
         id,
@@ -1016,6 +1036,7 @@ fn format_message(
             !footer.is_empty(),
             term_width,
             anonymized_line_numbers,
+            cut_indicator,
         ));
     }
 
@@ -1035,6 +1056,7 @@ fn format_message(
             annotation,
             term_width,
             anonymized_line_numbers,
+            cut_indicator,
             false,
         ));
     }
@@ -1089,13 +1111,14 @@ fn format_label(
     result
 }
 
-fn format_snippet(
-    snippet: snippet::Snippet<'_>,
+fn format_snippet<'m>(
+    snippet: snippet::Snippet<'m>,
     is_first: bool,
     has_footer: bool,
     term_width: usize,
     anonymized_line_numbers: bool,
-) -> DisplaySet<'_> {
+    cut_indicator: &'static str,
+) -> DisplaySet<'m> {
     let main_range = snippet.annotations.first().map(|x| x.range.start);
     let origin = snippet.origin;
     let need_empty_header = origin.is_some() || is_first;
@@ -1105,6 +1128,7 @@ fn format_snippet(
         has_footer,
         term_width,
         anonymized_line_numbers,
+        cut_indicator,
     );
     let header = format_header(origin, main_range, &body.display_lines, is_first);
 
@@ -1241,7 +1265,7 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
                     match unhighlighed_lines.len() {
                         0 => {}
                         n if n <= INNER_UNFOLD_SIZE => {
-                            // Rather than render `...`, don't fold
+                            // Rather than render our cut indicator, don't fold
                             lines.append(&mut unhighlighed_lines);
                         }
                         _ => {
@@ -1280,13 +1304,14 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
     lines
 }
 
-fn format_body(
-    snippet: snippet::Snippet<'_>,
+fn format_body<'m>(
+    snippet: snippet::Snippet<'m>,
     need_empty_header: bool,
     has_footer: bool,
     term_width: usize,
     anonymized_line_numbers: bool,
-) -> DisplaySet<'_> {
+    cut_indicator: &'static str,
+) -> DisplaySet<'m> {
     let source_len = snippet.source.len();
     if let Some(bigger) = snippet.annotations.iter().find_map(|x| {
         // Allow highlighting one past the last character in the source.
@@ -1617,7 +1642,7 @@ fn format_body(
         current_line.to_string().len()
     };
 
-    let width_offset = 3 + max_line_num_len;
+    let width_offset = cut_indicator.len() + max_line_num_len;
 
     if span_left_margin == usize::MAX {
         span_left_margin = 0;

@@ -990,3 +990,42 @@ error: title
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input).to_string(), expected);
 }
+
+#[test]
+fn long_line_cut() {
+    let source = "abcd abcd abcd abcd abcd abcd abcd";
+    let input = Level::Error.title("").snippet(
+        Snippet::source(source)
+            .line_start(1)
+            .annotation(Level::Error.span(0..4)),
+    );
+    let expected = str![[r#"
+error
+  |
+1 | abcd abcd a...
+  | ^^^^
+  |
+"#]];
+    let renderer = Renderer::plain().term_width(18);
+    assert_data_eq!(renderer.render(input).to_string(), expected);
+}
+
+#[test]
+fn long_line_cut_custom() {
+    let source = "abcd abcd abcd abcd abcd abcd abcd";
+    let input = Level::Error.title("").snippet(
+        Snippet::source(source)
+            .line_start(1)
+            .annotation(Level::Error.span(0..4)),
+    );
+    // This trims a little less because `…` is visually smaller than `...`.
+    let expected = str![[r#"
+error
+  |
+1 | abcd abcd abc…
+  | ^^^^
+  |
+"#]];
+    let renderer = Renderer::plain().term_width(18).cut_indicator("…");
+    assert_data_eq!(renderer.render(input).to_string(), expected);
+}

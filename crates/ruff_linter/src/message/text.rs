@@ -277,7 +277,8 @@ impl Display for MessageCodeFrame<'_> {
             Renderer::styled()
         } else {
             Renderer::plain()
-        };
+        }
+        .cut_indicator("…");
         let rendered = renderer.render(message);
         writeln!(f, "{rendered}")
     }
