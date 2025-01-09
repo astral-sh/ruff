@@ -65,9 +65,8 @@ struct DisplayRepresentation<'db> {
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
-            Type::Any => f.write_str("Any"),
+            Type::Any(any) => any.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Unknown => f.write_str("Unknown"),
             Type::Instance(InstanceType { class }) => {
                 let representation = match class.known(self.db) {
                     Some(KnownClass::NoneType) => "None",
@@ -76,9 +75,6 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 f.write_str(representation)
             }
-            // `[Type::Todo]`'s display should be explicit that is not a valid display of
-            // any other type
-            Type::Todo(todo) => write!(f, "@Todo{todo}"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
@@ -88,9 +84,7 @@ impl Display for DisplayRepresentation<'_> {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
                 ClassBase::Class(class) => write!(f, "type[{}]", class.name(self.db)),
-                base @ (ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown) => {
-                    write!(f, "type[{}]", base.display(self.db))
-                }
+                ClassBase::Any(any) => write!(f, "type[{any}]"),
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),

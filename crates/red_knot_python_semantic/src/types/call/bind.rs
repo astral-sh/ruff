@@ -125,10 +125,10 @@ pub(crate) fn bind_call<'db>(
 
     CallBinding {
         callable_ty,
-        return_ty: signature.return_ty.unwrap_or(Type::Unknown),
+        return_ty: signature.return_ty.unwrap_or(Type::unknown()),
         parameter_tys: parameter_tys
             .into_iter()
-            .map(|opt_ty| opt_ty.unwrap_or(Type::Unknown))
+            .map(|opt_ty| opt_ty.unwrap_or(Type::unknown()))
             .collect(),
         errors,
     }

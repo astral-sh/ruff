@@ -475,10 +475,14 @@ impl std::fmt::Display for TodoType {
 #[cfg(debug_assertions)]
 macro_rules! todo_type {
     () => {
-        Type::Todo(crate::types::TodoType::FileAndLine(file!(), line!()))
+        $crate::types::Type::Any($crate::types::AnyType::Todo(
+            crate::types::TodoType::FileAndLine(file!(), line!()),
+        ))
     };
     ($message:literal) => {
-        Type::Todo(crate::types::TodoType::Message($message))
+        $crate::types::Type::Any($crate::types::AnyType::Todo(
+            crate::types::TodoType::Message($message),
+        ))
     };
 }
 
@@ -498,21 +502,7 @@ pub(crate) use todo_type;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
-    Any,
-    /// Unknown type (either no annotation, or some kind of type error).
-    /// Equivalent to Any, or possibly to object in strict mode
-    Unknown,
-    /// Temporary type for symbols that can't be inferred yet because of missing implementations.
-    /// Behaves equivalently to `Any`.
-    ///
-    /// This variant should eventually be removed once red-knot is spec-compliant.
-    ///
-    /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
-    /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not
-    /// `Todo` would change the output type.
-    ///
-    /// This variant should be created with the `todo_type!` macro.
-    Todo(TodoType),
+    Any(AnyType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -556,8 +546,16 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn annotated_any() -> Self {
+        Self::Any(AnyType::Annotated)
+    }
+
+    pub const fn unknown() -> Self {
+        Self::Any(AnyType::Unknown)
+    }
+
     pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown)
+        matches!(self, Type::Any(AnyType::Unknown))
     }
 
     pub const fn is_never(&self) -> bool {
@@ -565,7 +563,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn is_todo(&self) -> bool {
-        matches!(self, Type::Todo(_))
+        matches!(self, Type::Any(AnyType::Todo(_)))
     }
 
     pub const fn class_literal(class: Class<'db>) -> Self {
@@ -757,8 +755,7 @@ impl<'db> Type<'db> {
 
         match (self, target) {
             // We should have handled these immediately above.
-            (Type::Any | Type::Unknown | Type::Todo(_), _)
-            | (_, Type::Any | Type::Unknown | Type::Todo(_)) => {
+            (Type::Any(_), _) | (_, Type::Any(_)) => {
                 unreachable!("Non-fully-static types do not participate in subtyping!")
             }
 
@@ -975,8 +972,8 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
 
             // The dynamic type is assignable-to and assignable-from any type.
-            (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
-            (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
+            (Type::Any(_), _) => true,
+            (_, Type::Any(_)) => true,
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
@@ -1085,9 +1082,9 @@ impl<'db> Type<'db> {
     pub(crate) fn is_same_gradual_form(self, other: Type<'db>) -> bool {
         matches!(
             (self, other),
-            (Type::Unknown, Type::Unknown)
-                | (Type::Any, Type::Any)
-                | (Type::Todo(_), Type::Todo(_))
+            (Type::Any(AnyType::Annotated), Type::Any(AnyType::Annotated))
+                | (Type::Any(AnyType::Unknown), Type::Any(AnyType::Unknown))
+                | (Type::Any(AnyType::Todo(_)), Type::Any(AnyType::Todo(_)))
         )
     }
 
@@ -1099,9 +1096,7 @@ impl<'db> Type<'db> {
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
 
-            (Type::Any, _) | (_, Type::Any) => false,
-            (Type::Unknown, _) | (_, Type::Unknown) => false,
-            (Type::Todo(_), _) | (_, Type::Todo(_)) => false,
+            (Type::Any(_), _) | (_, Type::Any(_)) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -1181,7 +1176,7 @@ impl<'db> Type<'db> {
                 Type::ClassLiteral(ClassLiteralType { class: class_b }),
                 Type::SubclassOf(subclass_of_ty),
             ) => match subclass_of_ty.subclass_of() {
-                ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown => false,
+                ClassBase::Any(_) => false,
                 ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
             },
 
@@ -1377,7 +1372,7 @@ impl<'db> Type<'db> {
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
     pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Any | Type::Unknown | Type::Todo(_) => false,
+            Type::Any(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
@@ -1440,10 +1435,8 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Any
+            Type::Any(_)
             | Type::Never
-            | Type::Unknown
-            | Type::Todo(_)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
@@ -1553,10 +1546,8 @@ impl<'db> Type<'db> {
                 None => false,
             },
 
-            Type::Any
+            Type::Any(_)
             | Type::Never
-            | Type::Unknown
-            | Type::Todo(_)
             | Type::Union(..)
             | Type::Intersection(..)
             | Type::LiteralString
@@ -1577,7 +1568,7 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Any | Type::Unknown | Type::Todo(_) => self.into(),
+            Type::Any(_) => self.into(),
 
             Type::Never => todo_type!("attribute lookup on Never").into(),
 
@@ -1702,7 +1693,7 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
+            Type::Any(_) | Type::Never => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -1836,7 +1827,7 @@ impl<'db> Type<'db> {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), Some(self));
                 match function_type.known(db) {
                     Some(KnownFunction::RevealType) => {
-                        let revealed_ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        let revealed_ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
                         CallOutcome::revealed(binding, revealed_ty)
                     }
                     Some(KnownFunction::StaticAssert) => {
@@ -1872,7 +1863,7 @@ impl<'db> Type<'db> {
                     Some(KnownFunction::IsEquivalentTo) => {
                         let (ty_a, ty_b) = binding
                             .two_parameter_tys()
-                            .unwrap_or((Type::Unknown, Type::Unknown));
+                            .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
                             .set_return_ty(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
                         CallOutcome::callable(binding)
@@ -1880,14 +1871,14 @@ impl<'db> Type<'db> {
                     Some(KnownFunction::IsSubtypeOf) => {
                         let (ty_a, ty_b) = binding
                             .two_parameter_tys()
-                            .unwrap_or((Type::Unknown, Type::Unknown));
+                            .unwrap_or((Type::unknown(), Type::unknown()));
                         binding.set_return_ty(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsAssignableTo) => {
                         let (ty_a, ty_b) = binding
                             .two_parameter_tys()
-                            .unwrap_or((Type::Unknown, Type::Unknown));
+                            .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
                             .set_return_ty(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
                         CallOutcome::callable(binding)
@@ -1895,23 +1886,23 @@ impl<'db> Type<'db> {
                     Some(KnownFunction::IsDisjointFrom) => {
                         let (ty_a, ty_b) = binding
                             .two_parameter_tys()
-                            .unwrap_or((Type::Unknown, Type::Unknown));
+                            .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
                             .set_return_ty(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsFullyStatic) => {
-                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_fully_static(db)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleton) => {
-                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_singleton(db)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleValued) => {
-                        let ty = binding.one_parameter_ty().unwrap_or(Type::Unknown);
+                        let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_single_valued(db)));
                         CallOutcome::callable(binding)
                     }
@@ -1973,9 +1964,7 @@ impl<'db> Type<'db> {
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Any | Type::Todo(_) | Type::Unknown => {
-                CallOutcome::callable(CallBinding::from_return_ty(self))
-            }
+            Type::Any(_) => CallOutcome::callable(CallBinding::from_return_ty(self)),
 
             Type::Union(union) => CallOutcome::union(
                 self,
@@ -2083,16 +2072,12 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::Any => Type::Any,
-            todo @ Type::Todo(_) => *todo,
-            Type::Unknown => Type::Unknown,
+            Type::Any(_) => *self,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Class(class) => Type::instance(class),
-                ClassBase::Any => Type::Any,
-                ClassBase::Unknown => Type::Unknown,
-                ClassBase::Todo(todo) => Type::Todo(todo),
+                ClassBase::Any(any) => Type::Any(any),
             },
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             Type::Intersection(_) => todo_type!("Type::Intersection.to_instance()"),
@@ -2110,7 +2095,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => Type::Unknown,
+            | Type::AlwaysFalsy => Type::unknown(),
         }
     }
 
@@ -2177,7 +2162,7 @@ impl<'db> Type<'db> {
                     })
                 }
             }
-            Type::Unknown => Ok(Type::Unknown),
+            Type::Any(_) => Ok(*self),
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Ok(*self),
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => Ok(alias.value_ty(db)),
@@ -2185,18 +2170,17 @@ impl<'db> Type<'db> {
                 Ok(Type::Never)
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
-            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::Any),
+            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::annotated_any()),
             // TODO: Should emit a diagnostic
             Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
-                fallback_type: Type::Unknown,
+                fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
-                fallback_type: Type::Unknown,
+                fallback_type: Type::unknown(),
             }),
-            Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::Unknown),
-            Type::Todo(_) => Ok(*self),
+            Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
             )),
@@ -2260,16 +2244,15 @@ impl<'db> Type<'db> {
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => *self,
+                ClassBase::Any(_) => *self,
                 ClassBase::Class(class) => SubclassOfType::from(
                     db,
-                    ClassBase::try_from_ty(db, class.metaclass(db)).unwrap_or(ClassBase::Unknown),
+                    ClassBase::try_from_ty(db, class.metaclass(db)).unwrap_or(ClassBase::unknown()),
                 ),
             },
 
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            Type::Any => SubclassOfType::subclass_of_any(),
-            Type::Unknown => SubclassOfType::subclass_of_unknown(),
+            Type::Any(any) => SubclassOfType::from(db, ClassBase::Any(*any)),
             // TODO intersections
             Type::Intersection(_) => SubclassOfType::from(
                 db,
@@ -2277,7 +2260,6 @@ impl<'db> Type<'db> {
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
-            Type::Todo(todo) => SubclassOfType::from(db, ClassBase::Todo(*todo)),
         }
     }
 
@@ -2335,6 +2317,36 @@ impl<'db> From<Type<'db>> for Symbol<'db> {
 impl<'db> From<&Type<'db>> for Symbol<'db> {
     fn from(value: &Type<'db>) -> Self {
         Self::from(*value)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum AnyType {
+    // An explicitly annotated `typing.Any`
+    Annotated,
+    // An unannotated value
+    Unknown,
+    /// Temporary type for symbols that can't be inferred yet because of missing implementations.
+    ///
+    /// This variant should eventually be removed once red-knot is spec-compliant.
+    ///
+    /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
+    /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not
+    /// `Todo` would change the output type.
+    ///
+    /// This variant should be created with the `todo_type!` macro.
+    Todo(TodoType),
+}
+
+impl std::fmt::Display for AnyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AnyType::Annotated => f.write_str("Any"),
+            AnyType::Unknown => f.write_str("Unknown"),
+            // `[Type::Todo]`'s display should be explicit that is not a valid display of
+            // any other type
+            AnyType::Todo(todo) => write!(f, "@Todo{todo}"),
+        }
     }
 }
 
@@ -2480,7 +2492,7 @@ impl<'db> KnownClass {
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
         known_module_symbol(db, self.canonical_module(db), self.as_str())
             .ignore_possibly_unbound()
-            .unwrap_or(Type::Unknown)
+            .unwrap_or(Type::unknown())
     }
 
     pub fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
@@ -3090,7 +3102,7 @@ impl<'db> IterationOutcome<'db> {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
                 report_not_iterable(context, iterable_node, not_iterable_ty);
-                Type::Unknown
+                Type::unknown()
             }
             Self::PossiblyUnboundDunderIter {
                 iterable_ty,
@@ -3650,7 +3662,7 @@ impl<'db> Class<'db> {
                             kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
                         })
                     } else {
-                        Ok(return_ty.unwrap_or(Type::Unknown))
+                        Ok(return_ty.unwrap_or(Type::unknown()))
                     }
                 }
 
@@ -3716,9 +3728,7 @@ impl<'db> Class<'db> {
             match superclass {
                 // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
                 // the type found on the next "real" class.
-                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => {
-                    return Type::from(superclass).member(db, name)
-                }
+                ClassBase::Any(_) => return Type::from(superclass).member(db, name),
                 ClassBase::Class(class) => {
                     let member = class.own_class_member(db, name);
                     if !member.is_unbound() {
@@ -4059,9 +4069,9 @@ pub(crate) mod tests {
         pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
             match self {
                 Ty::Never => Type::Never,
-                Ty::Unknown => Type::Unknown,
+                Ty::Unknown => Type::unknown(),
                 Ty::None => Type::none(db),
-                Ty::Any => Type::Any,
+                Ty::Any => Type::annotated_any(),
                 Ty::Todo => todo_type!("Ty::Todo"),
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::string_literal(db, s),

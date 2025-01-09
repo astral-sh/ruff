@@ -97,7 +97,7 @@ impl<'db> CallOutcome<'db> {
                     match (acc, ty) {
                         (None, None) => None,
                         (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
-                        (Some(builder), ty) => Some(builder.add(ty.unwrap_or(Type::Unknown))),
+                        (Some(builder), ty) => Some(builder.add(ty.unwrap_or(Type::unknown()))),
                     }
                 })
                 .map(UnionBuilder::build),
@@ -206,7 +206,7 @@ impl<'db> CallOutcome<'db> {
             }
             Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
                 not_callable_ty: *not_callable_ty,
-                return_ty: Type::Unknown,
+                return_ty: Type::unknown(),
             }),
             Self::PossiblyUnboundDunderCall {
                 called_ty,
@@ -215,7 +215,7 @@ impl<'db> CallOutcome<'db> {
                 callable_ty: *called_ty,
                 return_ty: call_outcome
                     .return_ty(context.db())
-                    .unwrap_or(Type::Unknown),
+                    .unwrap_or(Type::unknown()),
             }),
             Self::Union {
                 outcomes,
@@ -228,7 +228,7 @@ impl<'db> CallOutcome<'db> {
                     let return_ty = match outcome {
                         Self::NotCallable { not_callable_ty } => {
                             not_callable.push(*not_callable_ty);
-                            Type::Unknown
+                            Type::unknown()
                         }
                         Self::RevealType {
                             binding,
@@ -307,7 +307,7 @@ impl<'db> CallOutcome<'db> {
                     }
                 }
 
-                Ok(Type::Unknown)
+                Ok(Type::unknown())
             }
         }
     }

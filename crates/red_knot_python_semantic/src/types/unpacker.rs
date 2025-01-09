@@ -52,7 +52,7 @@ impl<'db> Unpacker<'db> {
                 .node_ref(self.db())
                 .is_ellipsis_literal_expr()
         {
-            value_ty = Type::Unknown;
+            value_ty = Type::unknown();
         }
         if value.is_iterable() {
             // If the value is an iterable, then the type that needs to be unpacked is the iterator
@@ -164,7 +164,7 @@ impl<'db> Unpacker<'db> {
                 for (index, element) in elts.iter().enumerate() {
                     // SAFETY: `target_types` is initialized with the same length as `elts`.
                     let element_ty = match target_types[index].as_slice() {
-                        [] => Type::Unknown,
+                        [] => Type::unknown(),
                         types => UnionType::from_elements(self.db(), types),
                     };
                     self.unpack_inner(element, element_ty);
@@ -241,7 +241,7 @@ impl<'db> Unpacker<'db> {
 
             // Subtract 1 to insert the starred expression type at the correct
             // index.
-            element_types.resize(targets.len() - 1, Type::Unknown);
+            element_types.resize(targets.len() - 1, Type::unknown());
             // TODO: This should be `list[Unknown]`
             element_types.insert(starred_index, todo_type!("starred unpacking"));
 

@@ -1,5 +1,5 @@
 use crate::types::{
-    todo_type, Class, ClassLiteralType, KnownClass, KnownInstanceType, TodoType, Type,
+    todo_type, AnyType, Class, ClassLiteralType, KnownClass, KnownInstanceType, Type,
 };
 use crate::Db;
 use itertools::Either;
@@ -8,19 +8,25 @@ use itertools::Either;
 ///
 /// This is much more limited than the [`Type`] enum:
 /// all types that would be invalid to have as a class base are
-/// transformed into [`ClassBase::Unknown`]
+/// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum ClassBase<'db> {
-    Any,
-    Unknown,
-    Todo(TodoType),
+    Any(AnyType),
     Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
+    pub const fn annotated_any() -> Self {
+        Self::Any(AnyType::Annotated)
+    }
+
+    pub const fn unknown() -> Self {
+        Self::Any(AnyType::Unknown)
+    }
+
     pub const fn is_dynamic(self) -> bool {
         match self {
-            ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => true,
+            ClassBase::Any(_) => true,
             ClassBase::Class(_) => false,
         }
     }
@@ -34,9 +40,7 @@ impl<'db> ClassBase<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
-                    ClassBase::Any => f.write_str("Any"),
-                    ClassBase::Todo(todo) => todo.fmt(f),
-                    ClassBase::Unknown => f.write_str("Unknown"),
+                    ClassBase::Any(any) => any.fmt(f),
                     ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
                 }
             }
@@ -50,7 +54,7 @@ impl<'db> ClassBase<'db> {
         KnownClass::Object
             .to_class_literal(db)
             .into_class_literal()
-            .map_or(Self::Unknown, |ClassLiteralType { class }| {
+            .map_or(Self::Any(AnyType::Unknown), |ClassLiteralType { class }| {
                 Self::Class(class)
             })
     }
@@ -60,9 +64,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::Any => Some(Self::Any),
-            Type::Unknown => Some(Self::Unknown),
-            Type::Todo(todo) => Some(Self::Todo(todo)),
+            Type::Any(any) => Some(Self::Any(any)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -104,8 +106,8 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf => None,
-                KnownInstanceType::Unknown => Some(Self::Unknown),
-                KnownInstanceType::Any => Some(Self::Any),
+                KnownInstanceType::Unknown => Some(Self::Any(AnyType::Unknown)),
+                KnownInstanceType::Any => Some(Self::Any(AnyType::Annotated)),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
                     Self::try_from_ty(db, KnownClass::Dict.to_class_literal(db))
@@ -148,6 +150,7 @@ impl<'db> ClassBase<'db> {
     }
 
     pub(super) fn into_class(self) -> Option<Class<'db>> {
+        #[allow(clippy::match_wildcard_for_single_variants)]
         match self {
             Self::Class(class) => Some(class),
             _ => None,
@@ -160,13 +163,7 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
         match self {
-            ClassBase::Any => Either::Left([ClassBase::Any, ClassBase::object(db)].into_iter()),
-            ClassBase::Unknown => {
-                Either::Left([ClassBase::Unknown, ClassBase::object(db)].into_iter())
-            }
-            ClassBase::Todo(todo) => {
-                Either::Left([ClassBase::Todo(todo), ClassBase::object(db)].into_iter())
-            }
+            ClassBase::Any(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }
@@ -181,9 +178,7 @@ impl<'db> From<Class<'db>> for ClassBase<'db> {
 impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
-            ClassBase::Any => Type::Any,
-            ClassBase::Todo(todo) => Type::Todo(todo),
-            ClassBase::Unknown => Type::Unknown,
+            ClassBase::Any(any) => Type::Any(any),
             ClassBase::Class(class) => Type::class_literal(class),
         }
     }
