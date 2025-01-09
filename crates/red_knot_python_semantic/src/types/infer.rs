@@ -77,7 +77,7 @@ use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_non_subscriptable,
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
-    SUBCLASS_OF_FINAL_CLASS,
+    INVALID_METACLASS, SUBCLASS_OF_FINAL_CLASS,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -639,6 +639,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             // (4) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
+                    MetaclassErrorKind::NotCallable(ty) => self.context.report_lint(
+                        &INVALID_METACLASS,
+                        class_node.into(),
+                        format_args!("Metaclass type `{}` is not callable", ty.display(self.db())),
+                    ),
+                    MetaclassErrorKind::PartlyNotCallable(ty) => self.context.report_lint(
+                        &INVALID_METACLASS,
+                        class_node.into(),
+                        format_args!(
+                            "Metaclass type `{}` is partly not callable",
+                            ty.display(self.db())
+                        ),
+                    ),
                     MetaclassErrorKind::Conflict {
                         candidate1:
                             MetaclassCandidate {

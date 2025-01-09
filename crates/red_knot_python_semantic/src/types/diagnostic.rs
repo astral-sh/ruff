@@ -36,6 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_TYPE_FORM);
@@ -290,6 +291,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    /// ## What it does
     /// Checks for exception handlers that catch non-exception classes.
     ///
     /// ## Why is this bad?
@@ -319,6 +321,33 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for arguments to `metaclass=` that are invalid.
+    ///
+    /// ## Why is this bad?
+    /// Python allows arbitrary expressions to be used as the argument to `metaclass=`.
+    /// These expressions, however, need to be callable and accept the same arguments
+    /// as `type.__new__`.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(): ...
+    ///
+    /// # TypeError: f() takes 0 positional arguments but 3 were given
+    /// class B(metaclass=f): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)
+    pub(crate) static INVALID_METACLASS = {
+        summary: "detects invalid `metaclass=` arguments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
