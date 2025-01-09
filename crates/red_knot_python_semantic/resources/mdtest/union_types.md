@@ -22,10 +22,17 @@ def _(u1: int | int | str, u2: int | str | int) -> None:
 
 ## `Never` is removed
 
-```py
-from typing_extensions import Never
+`Never` is an empty set, a type with no inhabitants. Its presence in a union is always redundant,
+and so we eagerly simplify it away. `NoReturn` is equivalent to `Never`.
 
-def _(u1: int | Never, u2: int | Never | str) -> None:
+```py
+from typing_extensions import Never, NoReturn
+
+def never(u1: int | Never, u2: int | Never | str) -> None:
+    reveal_type(u1)  # revealed: int
+    reveal_type(u2)  # revealed:  int | str
+
+def noreturn(u1: int | NoReturn, u2: int | NoReturn | str) -> None:
     reveal_type(u1)  # revealed: int
     reveal_type(u2)  # revealed:  int | str
 ```
@@ -47,7 +54,7 @@ def _(
 
 ## Simplification using subtyping
 
-Elements that are subtypes of other elements can be removed.
+The type `S | T` can be simplified to `T` if `S` is a subtype of `T`:
 
 ```py
 from typing_extensions import Literal, LiteralString
@@ -63,17 +70,17 @@ def _(
 
 ## Boolean literals
 
-The Boolean literals `True` and `False` can be unioned to create `bool`.
+The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`:
 
 ```py
 from typing import Literal
 
 def _(
-    u1: Literal[True] | Literal[False],
+    u1: Literal[True, False],
     u2: bool | Literal[True],
     u3: Literal[True] | bool,
-    u4: Literal[True] | Literal[True] | Literal[17],
-    u5: Literal[True] | Literal[True] | Literal[False] | Literal[17],
+    u4: Literal[True] | Literal[True, 17],
+    u5: Literal[True, False, True, 17],
 ) -> None:
     reveal_type(u1)  # revealed: bool
     reveal_type(u2)  # revealed: bool
@@ -88,11 +95,14 @@ def _(
 from knot_extensions import Unknown
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
-    reveal_type(u2)  # revealed: str | Unknown
     reveal_type(u1)  # revealed: Unknown | str
+    reveal_type(u2)  # revealed: str | Unknown
 ```
 
 ## Collapse multiple `Unknown`s
+
+Since `Unknown` is a gradual type, it is not a subtype of anything, but multiple `Unknown`s in a
+union are still redundant:
 
 ```py
 from knot_extensions import Unknown
