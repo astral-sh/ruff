@@ -175,6 +175,9 @@ RUF052.py:138:5: RUF052 [*] Local dummy variable `_P` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:139:5: RUF052 [*] Local dummy variable `_T` is accessed
     |
@@ -201,6 +204,9 @@ RUF052.py:139:5: RUF052 [*] Local dummy variable `_T` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:140:5: RUF052 [*] Local dummy variable `_NT` is accessed
     |
@@ -227,6 +233,9 @@ RUF052.py:140:5: RUF052 [*] Local dummy variable `_NT` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, _P, NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:141:5: RUF052 [*] Local dummy variable `_E` is accessed
     |
@@ -252,6 +261,9 @@ RUF052.py:141:5: RUF052 [*] Local dummy variable `_E` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, _P, _NT, E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:142:5: RUF052 [*] Local dummy variable `_NT2` is accessed
     |
@@ -276,6 +288,9 @@ RUF052.py:142:5: RUF052 [*] Local dummy variable `_NT2` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, _P, _NT, _E, NT2, _NT3, _DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:143:5: RUF052 [*] Local dummy variable `_NT3` is accessed
     |
@@ -299,6 +314,9 @@ RUF052.py:143:5: RUF052 [*] Local dummy variable `_NT3` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, _P, _NT, _E, _NT2, NT3, _DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:144:5: RUF052 [*] Local dummy variable `_DynamicClass` is accessed
     |
@@ -320,6 +338,9 @@ RUF052.py:144:5: RUF052 [*] Local dummy variable `_DynamicClass` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, _P, _NT, _E, _NT2, _NT3, DynamicClass, _NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
 
 RUF052.py:145:5: RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
     |
@@ -341,3 +362,6 @@ RUF052.py:145:5: RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
 146 146 | 
 147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     147 |+    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, NotADynamicClass)
+148 148 | 
+149 149 | # Do not emit diagnostic if parameter is private
+150 150 | # even if it is later shadowed in the body of the function
