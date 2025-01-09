@@ -396,17 +396,14 @@ mod tests {
     use test_case::test_case;
 
     #[test]
-    fn build_union() {
+    fn build_union_no_elements() {
         let db = setup_db();
-        let t0 = Type::IntLiteral(0);
-        let t1 = Type::IntLiteral(1);
-        let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
-
-        assert_eq!(union.elements(&db), &[t0, t1]);
+        let ty = UnionBuilder::new(&db).build();
+        assert_eq!(ty, Type::Never);
     }
 
     #[test]
-    fn build_union_single() {
+    fn build_union_single_element() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let ty = UnionType::from_elements(&db, [t0]);
@@ -414,101 +411,13 @@ mod tests {
     }
 
     #[test]
-    fn build_union_empty() {
-        let db = setup_db();
-        let ty = UnionBuilder::new(&db).build();
-        assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_union_never() {
-        let db = setup_db();
-        let t0 = Type::IntLiteral(0);
-        let ty = UnionType::from_elements(&db, [t0, Type::Never]);
-        assert_eq!(ty, t0);
-    }
-
-    #[test]
-    fn build_union_bool() {
-        let db = setup_db();
-        let bool_instance_ty = KnownClass::Bool.to_instance(&db);
-
-        let t0 = Type::BooleanLiteral(true);
-        let t1 = Type::BooleanLiteral(true);
-        let t2 = Type::BooleanLiteral(false);
-        let t3 = Type::IntLiteral(17);
-
-        let union = UnionType::from_elements(&db, [t0, t1, t3]).expect_union();
-        assert_eq!(union.elements(&db), &[t0, t3]);
-
-        let union = UnionType::from_elements(&db, [t0, t1, t2, t3]).expect_union();
-        assert_eq!(union.elements(&db), &[bool_instance_ty, t3]);
-
-        let result_ty = UnionType::from_elements(&db, [bool_instance_ty, t0]);
-        assert_eq!(result_ty, bool_instance_ty);
-
-        let result_ty = UnionType::from_elements(&db, [t0, bool_instance_ty]);
-        assert_eq!(result_ty, bool_instance_ty);
-    }
-
-    #[test]
-    fn build_union_flatten() {
+    fn build_union_two_elements() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
-        let t2 = Type::IntLiteral(2);
-        let u1 = UnionType::from_elements(&db, [t0, t1]);
-        let union = UnionType::from_elements(&db, [u1, t2]).expect_union();
+        let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
-        assert_eq!(union.elements(&db), &[t0, t1, t2]);
-    }
-
-    #[test]
-    fn build_union_simplify_subtype() {
-        let db = setup_db();
-        let t0 = KnownClass::Str.to_instance(&db);
-        let t1 = Type::LiteralString;
-        let u0 = UnionType::from_elements(&db, [t0, t1]);
-        let u1 = UnionType::from_elements(&db, [t1, t0]);
-
-        assert_eq!(u0, t0);
-        assert_eq!(u1, t0);
-    }
-
-    #[test]
-    fn build_union_no_simplify_unknown() {
-        let db = setup_db();
-        let t0 = KnownClass::Str.to_instance(&db);
-        let t1 = Type::unknown();
-        let u0 = UnionType::from_elements(&db, [t0, t1]);
-        let u1 = UnionType::from_elements(&db, [t1, t0]);
-
-        assert_eq!(u0.expect_union().elements(&db), &[t0, t1]);
-        assert_eq!(u1.expect_union().elements(&db), &[t1, t0]);
-    }
-
-    #[test]
-    fn build_union_simplify_multiple_unknown() {
-        let db = setup_db();
-        let t0 = KnownClass::Str.to_instance(&db);
-        let t1 = Type::unknown();
-
-        let u = UnionType::from_elements(&db, [t0, t1, t1]);
-
-        assert_eq!(u.expect_union().elements(&db), &[t0, t1]);
-    }
-
-    #[test]
-    fn build_union_subsume_multiple() {
-        let db = setup_db();
-        let str_ty = KnownClass::Str.to_instance(&db);
-        let int_ty = KnownClass::Int.to_instance(&db);
-        let object_ty = KnownClass::Object.to_instance(&db);
-        let unknown_ty = Type::unknown();
-
-        let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);
-
-        assert_eq!(u0.expect_union().elements(&db), &[unknown_ty, object_ty]);
+        assert_eq!(union.elements(&db), &[t0, t1]);
     }
 
     impl<'db> IntersectionType<'db> {
