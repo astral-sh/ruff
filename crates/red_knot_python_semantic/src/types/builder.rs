@@ -525,7 +525,7 @@ mod tests {
     fn build_intersection() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
-        let ta = Type::annotated_any();
+        let ta = Type::any();
         let intersection = IntersectionBuilder::new(&db)
             .add_positive(ta)
             .add_negative(t0)
@@ -548,7 +548,7 @@ mod tests {
     #[test]
     fn build_intersection_flatten_positive() {
         let db = setup_db();
-        let ta = Type::annotated_any();
+        let ta = Type::any();
         let t1 = Type::IntLiteral(1);
         let t2 = Type::IntLiteral(2);
         let i0 = IntersectionBuilder::new(&db)
@@ -568,7 +568,7 @@ mod tests {
     #[test]
     fn build_intersection_flatten_negative() {
         let db = setup_db();
-        let ta = Type::annotated_any();
+        let ta = Type::any();
         let t1 = Type::IntLiteral(1);
         let t2 = KnownClass::Int.to_instance(&db);
         // i0 = Any & ~Literal[1]
@@ -594,13 +594,13 @@ mod tests {
         let db = setup_db();
 
         let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::annotated_any())
+            .add_negative(Type::any())
             .build();
-        assert_eq!(ty, Type::annotated_any());
+        assert_eq!(ty, Type::any());
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(Type::Never)
-            .add_negative(Type::annotated_any())
+            .add_negative(Type::any())
             .build();
         assert_eq!(ty, Type::Never);
     }
@@ -646,7 +646,7 @@ mod tests {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
-        let ta = Type::annotated_any();
+        let ta = Type::any();
         let u0 = UnionType::from_elements(&db, [t0, t1]);
 
         let union = IntersectionBuilder::new(&db)
@@ -1049,7 +1049,7 @@ mod tests {
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
     }
 
-    #[test_case(Type::annotated_any())]
+    #[test_case(Type::any())]
     #[test_case(Type::unknown())]
     #[test_case(todo_type!())]
     fn build_intersection_t_and_negative_t_does_not_simplify(ty: Type) {

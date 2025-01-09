@@ -16,7 +16,7 @@ pub enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    pub const fn annotated_any() -> Self {
+    pub const fn any() -> Self {
         Self::Gradual(GradualType::Annotated)
     }
 
@@ -107,7 +107,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
-                KnownInstanceType::Any => Some(Self::annotated_any()),
+                KnownInstanceType::Any => Some(Self::any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
                     Self::try_from_ty(db, KnownClass::Dict.to_class_literal(db))

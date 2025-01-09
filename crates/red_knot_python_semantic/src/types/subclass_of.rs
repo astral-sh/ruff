@@ -45,7 +45,7 @@ impl<'db> SubclassOfType<'db> {
     /// Return a [`Type`] instance representing the type `type[Any]`.
     pub(crate) const fn subclass_of_any() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::annotated_any(),
+            subclass_of: ClassBase::any(),
         })
     }
 

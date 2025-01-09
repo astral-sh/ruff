@@ -546,7 +546,7 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub const fn annotated_any() -> Self {
+    pub const fn any() -> Self {
         Self::Gradual(GradualType::Annotated)
     }
 
@@ -2177,7 +2177,7 @@ impl<'db> Type<'db> {
                 Ok(Type::Never)
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
-            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::annotated_any()),
+            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::any()),
             // TODO: Should emit a diagnostic
             Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
@@ -4078,7 +4078,7 @@ pub(crate) mod tests {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::unknown(),
                 Ty::None => Type::none(db),
-                Ty::Any => Type::annotated_any(),
+                Ty::Any => Type::any(),
                 Ty::Todo => todo_type!("Ty::Todo"),
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::string_literal(db, s),
