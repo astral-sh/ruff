@@ -136,23 +136,19 @@ pub(crate) fn fastapi_unused_path_parameter(
     // Extract the path parameters from the route path.
     let path_params = PathParamIterator::new(path.to_str());
 
-    let dependables = keywordable_parameters(function_def)
-        .filter_map(|parameter_with_default| {
-            match Dependable::from_parameter(parameter_with_default, checker.semantic()) {
-                Dependable::None => None,
-                dependable => Some(dependable),
-            }
-        })
-        .collect::<Vec<_>>();
+    let dependencies = keywordable_parameters(function_def).filter_map(|parameter_with_default| {
+        Dependency::from_parameter(parameter_with_default, checker.semantic())
+    });
 
-    if dependables.iter().any(Dependable::is_unknown) {
-        return;
+    let mut dependencies_parameter_names = vec![];
+
+    for dependency in dependencies {
+        if let Some(parameter_names) = dependency.parameter_names() {
+            dependencies_parameter_names.extend(parameter_names);
+        } else {
+            return;
+        }
     }
-
-    let dependables_parameter_names: Vec<_> = dependables
-        .into_iter()
-        .flat_map(Dependable::parameter_names)
-        .collect();
 
     // Extract the arguments from the function signature
     let named_args: Vec<_> = keywordable_parameters(function_def)
@@ -175,7 +171,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             continue;
         }
 
-        if dependables_parameter_names.contains(&path_param.to_string()) {
+        if dependencies_parameter_names.contains(&path_param.to_string()) {
             continue;
         }
 
@@ -223,25 +219,23 @@ fn keywordable_parameters(
 }
 
 #[derive(Debug, is_macro::Is)]
-enum Dependable {
-    /// `Depends` call not found or invalid.
-    None,
+enum Dependency {
     /// Not defined in the same file, or otherwise cannot be determined to be a function.
     Unknown,
     /// A function defined in the same file, whose parameter names are as given.
     Function(Vec<String>),
 }
 
-impl Dependable {
-    fn parameter_names(self) -> Vec<String> {
+impl Dependency {
+    fn parameter_names(self) -> Option<Vec<String>> {
         match self {
-            Self::None | Self::Unknown => vec![],
-            Self::Function(parameter_names) => parameter_names,
+            Self::Unknown => None,
+            Self::Function(parameter_names) => Some(parameter_names),
         }
     }
 }
 
-impl Dependable {
+impl Dependency {
     /// Return `foo` in the first metadata `Depends(foo)`,
     /// or that of the default value:
     ///
@@ -256,28 +250,25 @@ impl Dependable {
     fn from_parameter(
         parameter_with_default: &ParameterWithDefault,
         semantic: &SemanticModel,
-    ) -> Self {
+    ) -> Option<Self> {
         let ParameterWithDefault {
             parameter, default, ..
         } = parameter_with_default;
 
         if let Some(default) = default {
-            let dependable = Self::from_call(default.as_ref(), semantic);
-
-            if !matches!(dependable, Self::None) {
-                return dependable;
-            }
+            if let Some(dependency) = Self::from_call(default.as_ref(), semantic) {
+                return Some(dependency);
+            };
         }
 
-        let Some(annotation) = &parameter.annotation else {
-            return Dependable::None;
-        };
-        let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation.as_ref() else {
-            return Dependable::None;
+        let Expr::Subscript(ExprSubscript { value, slice, .. }) =
+            &parameter.annotation.as_deref()?
+        else {
+            return None;
         };
 
         if !semantic.match_typing_expr(value, "Annotated") {
-            return Dependable::None;
+            return None;
         }
 
         match slice.as_ref() {
@@ -285,50 +276,46 @@ impl Dependable {
                 .elts
                 .iter()
                 .skip(1)
-                .find_map(|metadata| match Self::from_call(metadata, semantic) {
-                    Self::None => None,
-                    dependable => Some(dependable),
-                })
-                .unwrap_or(Self::None),
-            _ => Dependable::None,
+                .find_map(|metadata| Self::from_call(metadata, semantic)),
+            _ => None,
         }
     }
 
-    fn from_call(expr: &Expr, semantic: &SemanticModel) -> Self {
+    fn from_call(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
         let Expr::Call(ExprCall {
             func, arguments, ..
         }) = expr
         else {
-            return Self::None;
+            return None;
         };
 
         if !is_fastapi_depends(func.as_ref(), semantic) {
-            return Self::None;
+            return None;
         }
 
         let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
-            return Self::None;
+            return None;
         };
 
         let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-            return Self::Unknown;
+            return Some(Self::Unknown);
         };
 
         let BindingKind::FunctionDefinition(scope_id) = binding.kind else {
-            return Self::Unknown;
+            return Some(Self::Unknown);
         };
 
-        let scope = &semantic.scopes.raw[scope_id.as_u32() as usize];
+        let scope = &semantic.scopes[scope_id];
 
         let ScopeKind::Function(function_def) = scope.kind else {
-            return Self::Unknown;
+            return Some(Self::Unknown);
         };
 
         let parameter_names = keywordable_parameters(function_def)
             .map(|ParameterWithDefault { parameter, .. }| parameter.name.to_string())
             .collect::<Vec<_>>();
 
-        Self::Function(parameter_names)
+        Some(Self::Function(parameter_names))
     }
 }
 
