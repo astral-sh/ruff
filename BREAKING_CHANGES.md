@@ -1,5 +1,9 @@
 # Breaking Changes
 
+## 0.9.0
+
+Ruff now formats your code according to the 2025 style guide. As a result, your code might now get formatted differently. See the [changelog](./CHANGELOG.md#090) for a detailed list of changes.
+
 ## 0.8.0
 
 - **Default to Python 3.9**
