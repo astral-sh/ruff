@@ -2331,7 +2331,7 @@ impl<'db> From<&Type<'db>> for Symbol<'db> {
 pub enum GradualType {
     // An explicitly annotated `typing.Any`
     Any,
-    // An unannotated value
+    // An unannotated value, or a gradual type resulting from an error
     Unknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
