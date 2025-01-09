@@ -46,10 +46,6 @@ jobs:
           cp -r typeshed/stdlib ruff/crates/red_knot_vendored/vendor/typeshed/stdlib
           rm -rf ruff/crates/red_knot_vendored/vendor/typeshed/stdlib/@tests
           git -C typeshed rev-parse HEAD > ruff/crates/red_knot_vendored/vendor/typeshed/source_commit.txt
-          # Patch the typeshed stubs to include `knot_extensions`
-          ln -s ../../../knot_extensions/knot_extensions.pyi ruff/crates/red_knot_vendored/vendor/typeshed/stdlib/
-          echo "# Patch applied for red_knot:" >> ruff/crates/red_knot_vendored/vendor/typeshed/stdlib/VERSIONS
-          echo "knot_extensions: 3.0-" >> ruff/crates/red_knot_vendored/vendor/typeshed/stdlib/VERSIONS
       - name: Commit the changes
         id: commit
         if: ${{ steps.sync.outcome == 'success' }}
