@@ -373,7 +373,7 @@ Meanwhile, `ruff format --check` exits with the following status codes:
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
 
-## Style Guide
+## Style Guide <span id="black-compatibility"></span>
 
 The formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black).
 This section documents the areas where the Ruff formatter goes beyond Black in terms of code style.
