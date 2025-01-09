@@ -776,7 +776,8 @@ result_f = (
 )
 
 (
-    f"{1}{2}"  # comment 3
+    f"{1}"
+    f"{2}"  # comment 3
 )
 
 (
@@ -1550,7 +1551,8 @@ result_f = (
 )
 
 (
-    f"{1}{2}"  # comment 3
+    f"{1}"
+    f"{2}"  # comment 3
 )
 
 (

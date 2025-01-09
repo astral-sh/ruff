@@ -291,3 +291,46 @@ aaaaa[aaaaaaaaaaa] = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
     =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
 )
+
+
+# Trailing last-part comments
+
+a = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = (
+    "a"
+    "b"
+)  # belongs to the assignment
+
+
+a = (
+    "a" "b"  # belongs to the f-string expression
+)
+
+a = (
+    "a" "b"
+    # belongs to the f-string expression
+)
+
+a = (
+    "a"
+    "b" "c"  # belongs to the f-string expression
+)
+
+logger.error(
+    f"Failed to run task {task} for job"  
+    f"with id {str(job.id)}" # type: ignore[union-attr]
+)
+
+a = (10 +
+     "Exception in {call_back_name} when handling msg on "
+     f"'{msg.topic}': '{msg.payload}'"   # belongs to binary operation
+)
+
+a = 10 + (
+    "Exception in {call_back_name} when handling msg on "
+    f"'{msg.topic}': '{msg.payload}'"   # belongs to last-part
+)
