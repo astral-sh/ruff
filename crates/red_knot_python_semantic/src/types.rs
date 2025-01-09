@@ -3655,6 +3655,8 @@ impl<'db> Class<'db> {
                     kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
                 }),
 
+                // TODO we should also check for binding errors that would indicate the metaclass
+                // does not accept the right arguments
                 CallOutcome::Callable { binding }
                 | CallOutcome::RevealType { binding, .. }
                 | CallOutcome::StaticAssertionError { binding, .. } => Ok(binding.return_ty()),
