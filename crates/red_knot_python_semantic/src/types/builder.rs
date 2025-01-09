@@ -321,7 +321,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, *neg);
                 }
             }
-            ty @ Type::Any(_) => {
+            ty @ Type::Gradual(_) => {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.

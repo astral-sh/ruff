@@ -1,5 +1,5 @@
 use crate::types::{
-    todo_type, AnyType, Class, ClassLiteralType, KnownClass, KnownInstanceType, Type,
+    todo_type, Class, ClassLiteralType, GradualType, KnownClass, KnownInstanceType, Type,
 };
 use crate::Db;
 use itertools::Either;
@@ -11,22 +11,22 @@ use itertools::Either;
 /// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum ClassBase<'db> {
-    Any(AnyType),
+    Gradual(GradualType),
     Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
     pub const fn annotated_any() -> Self {
-        Self::Any(AnyType::Annotated)
+        Self::Gradual(GradualType::Annotated)
     }
 
     pub const fn unknown() -> Self {
-        Self::Any(AnyType::Unknown)
+        Self::Gradual(GradualType::Unknown)
     }
 
     pub const fn is_dynamic(self) -> bool {
         match self {
-            ClassBase::Any(_) => true,
+            ClassBase::Gradual(_) => true,
             ClassBase::Class(_) => false,
         }
     }
@@ -40,7 +40,7 @@ impl<'db> ClassBase<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
-                    ClassBase::Any(any) => any.fmt(f),
+                    ClassBase::Gradual(gradual) => gradual.fmt(f),
                     ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
                 }
             }
@@ -54,7 +54,7 @@ impl<'db> ClassBase<'db> {
         KnownClass::Object
             .to_class_literal(db)
             .into_class_literal()
-            .map_or(Self::Any(AnyType::Unknown), |ClassLiteralType { class }| {
+            .map_or(Self::unknown(), |ClassLiteralType { class }| {
                 Self::Class(class)
             })
     }
@@ -64,7 +64,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::Any(any) => Some(Self::Any(any)),
+            Type::Gradual(gradual) => Some(Self::Gradual(gradual)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -106,8 +106,8 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf => None,
-                KnownInstanceType::Unknown => Some(Self::Any(AnyType::Unknown)),
-                KnownInstanceType::Any => Some(Self::Any(AnyType::Annotated)),
+                KnownInstanceType::Unknown => Some(Self::unknown()),
+                KnownInstanceType::Any => Some(Self::annotated_any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
                     Self::try_from_ty(db, KnownClass::Dict.to_class_literal(db))
@@ -163,7 +163,7 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
         match self {
-            ClassBase::Any(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
+            ClassBase::Gradual(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }
@@ -178,7 +178,7 @@ impl<'db> From<Class<'db>> for ClassBase<'db> {
 impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
-            ClassBase::Any(any) => Type::Any(any),
+            ClassBase::Gradual(gradual) => Type::Gradual(gradual),
             ClassBase::Class(class) => Type::class_literal(class),
         }
     }
