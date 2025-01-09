@@ -321,6 +321,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, *neg);
                 }
             }
+            Type::Never => {
+                // Adding ~Never to an intersection is a no-op.
+            }
+            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Object) => {
+                // Adding ~object to an intersection results in Never.
+                *self = Self::default();
+                self.positive.insert(Type::Never);
+            }
             ty @ Type::Dynamic(_) => {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
@@ -386,33 +394,34 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{IntersectionBuilder, IntersectionType, Type, UnionType};
+    use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
 
-    use crate::db::tests::{setup_db, TestDb};
-    use crate::types::{global_symbol, todo_type, KnownClass, Truthiness, UnionBuilder};
+    use crate::db::tests::setup_db;
+    use crate::types::{KnownClass, Truthiness};
 
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithTestSystem;
     use test_case::test_case;
 
     #[test]
     fn build_union_no_elements() {
         let db = setup_db();
-        let ty = UnionBuilder::new(&db).build();
-        assert_eq!(ty, Type::Never);
+
+        let empty_union = UnionBuilder::new(&db).build();
+        assert_eq!(empty_union, Type::Never);
     }
 
     #[test]
     fn build_union_single_element() {
         let db = setup_db();
+
         let t0 = Type::IntLiteral(0);
-        let ty = UnionType::from_elements(&db, [t0]);
-        assert_eq!(ty, t0);
+        let union = UnionType::from_elements(&db, [t0]);
+        assert_eq!(union, t0);
     }
 
     #[test]
     fn build_union_two_elements() {
         let db = setup_db();
+
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
@@ -420,499 +429,12 @@ mod tests {
         assert_eq!(union.elements(&db), &[t0, t1]);
     }
 
-    impl<'db> IntersectionType<'db> {
-        fn pos_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.positive(db).into_iter().copied().collect()
-        }
-
-        fn neg_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.negative(db).into_iter().copied().collect()
-        }
-    }
-
-    #[test]
-    fn build_intersection() {
-        let db = setup_db();
-        let t0 = Type::IntLiteral(0);
-        let ta = Type::any();
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(ta)
-            .add_negative(t0)
-            .build()
-            .expect_intersection();
-
-        assert_eq!(intersection.pos_vec(&db), &[ta]);
-        assert_eq!(intersection.neg_vec(&db), &[t0]);
-    }
-
     #[test]
     fn build_intersection_empty_intersection_equals_object() {
         let db = setup_db();
 
-        let ty = IntersectionBuilder::new(&db).build();
-
-        assert_eq!(ty, KnownClass::Object.to_instance(&db));
-    }
-
-    #[test]
-    fn build_intersection_flatten_positive() {
-        let db = setup_db();
-        let ta = Type::any();
-        let t1 = Type::IntLiteral(1);
-        let t2 = Type::IntLiteral(2);
-        let i0 = IntersectionBuilder::new(&db)
-            .add_positive(ta)
-            .add_negative(t1)
-            .build();
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(t2)
-            .add_positive(i0)
-            .build()
-            .expect_intersection();
-
-        assert_eq!(intersection.pos_vec(&db), &[t2, ta]);
-        assert_eq!(intersection.neg_vec(&db), &[]);
-    }
-
-    #[test]
-    fn build_intersection_flatten_negative() {
-        let db = setup_db();
-        let ta = Type::any();
-        let t1 = Type::IntLiteral(1);
-        let t2 = KnownClass::Int.to_instance(&db);
-        // i0 = Any & ~Literal[1]
-        let i0 = IntersectionBuilder::new(&db)
-            .add_positive(ta)
-            .add_negative(t1)
-            .build();
-        // ta_not_i0 = int & ~(Any & ~Literal[1])
-        // -> int & (~Any  | Literal[1])
-        // (~Any is equivalent to Any)
-        // -> (int & Any) | (int & Literal[1])
-        // -> (int & Any) | Literal[1]
-        let ta_not_i0 = IntersectionBuilder::new(&db)
-            .add_positive(t2)
-            .add_negative(i0)
-            .build();
-
-        assert_eq!(ta_not_i0.display(&db).to_string(), "int & Any | Literal[1]");
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_any() {
-        let db = setup_db();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::any())
-            .build();
-        assert_eq!(ty, Type::any());
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::Never)
-            .add_negative(Type::any())
-            .build();
-        assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_intersection_simplify_multiple_unknown() {
-        let db = setup_db();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::unknown())
-            .add_positive(Type::unknown())
-            .build();
-        assert_eq!(ty, Type::unknown());
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::unknown())
-            .add_negative(Type::unknown())
-            .build();
-        assert_eq!(ty, Type::unknown());
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::unknown())
-            .add_negative(Type::unknown())
-            .build();
-        assert_eq!(ty, Type::unknown());
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::unknown())
-            .add_positive(Type::IntLiteral(0))
-            .add_negative(Type::unknown())
-            .build();
-        assert_eq!(
-            ty,
-            IntersectionBuilder::new(&db)
-                .add_positive(Type::unknown())
-                .add_positive(Type::IntLiteral(0))
-                .build()
-        );
-    }
-
-    #[test]
-    fn intersection_distributes_over_union() {
-        let db = setup_db();
-        let t0 = Type::IntLiteral(0);
-        let t1 = Type::IntLiteral(1);
-        let ta = Type::any();
-        let u0 = UnionType::from_elements(&db, [t0, t1]);
-
-        let union = IntersectionBuilder::new(&db)
-            .add_positive(ta)
-            .add_positive(u0)
-            .build()
-            .expect_union();
-        let [Type::Intersection(i0), Type::Intersection(i1)] = union.elements(&db)[..] else {
-            panic!("expected a union of two intersections");
-        };
-        assert_eq!(i0.pos_vec(&db), &[ta, t0]);
-        assert_eq!(i1.pos_vec(&db), &[ta, t1]);
-    }
-
-    #[test]
-    fn intersection_negation_distributes_over_union() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/module.py",
-            r#"
-            class A: ...
-            class B: ...
-            "#,
-        )
-        .unwrap();
-        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
-
-        let a = global_symbol(&db, module, "A")
-            .expect_type()
-            .to_instance(&db);
-        let b = global_symbol(&db, module, "B")
-            .expect_type()
-            .to_instance(&db);
-
-        // intersection: A & B
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(a)
-            .add_positive(b)
-            .build()
-            .expect_intersection();
-        assert_eq!(intersection.pos_vec(&db), &[a, b]);
-        assert_eq!(intersection.neg_vec(&db), &[]);
-
-        // ~intersection => ~A | ~B
-        let negated_intersection = IntersectionBuilder::new(&db)
-            .add_negative(Type::Intersection(intersection))
-            .build()
-            .expect_union();
-
-        // should have as elements ~A and ~B
-        let not_a = a.negate(&db);
-        let not_b = b.negate(&db);
-        assert_eq!(negated_intersection.elements(&db), &[not_a, not_b]);
-    }
-
-    #[test]
-    fn mixed_intersection_negation_distributes_over_union() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/module.py",
-            r#"
-            class A: ...
-            class B: ...
-            "#,
-        )
-        .unwrap();
-        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
-
-        let a = global_symbol(&db, module, "A")
-            .expect_type()
-            .to_instance(&db);
-        let b = global_symbol(&db, module, "B")
-            .expect_type()
-            .to_instance(&db);
-        let int = KnownClass::Int.to_instance(&db);
-
-        // a_not_b: A & ~B
-        let a_not_b = IntersectionBuilder::new(&db)
-            .add_positive(a)
-            .add_negative(b)
-            .build()
-            .expect_intersection();
-        assert_eq!(a_not_b.pos_vec(&db), &[a]);
-        assert_eq!(a_not_b.neg_vec(&db), &[b]);
-
-        // let's build
-        //         int & ~(A & ~B)
-        //       = int & ~(A & ~B)
-        //       = int & (~A | B)
-        //       = (int & ~A) | (int & B)
-        let t = IntersectionBuilder::new(&db)
-            .add_positive(int)
-            .add_negative(Type::Intersection(a_not_b))
-            .build();
-        assert_eq!(t.display(&db).to_string(), "int & ~A | int & B");
-    }
-
-    #[test]
-    fn build_intersection_self_negation() {
-        let db = setup_db();
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::none(&db))
-            .add_negative(Type::none(&db))
-            .build();
-
-        assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_never() {
-        let db = setup_db();
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::none(&db))
-            .add_negative(Type::Never)
-            .build();
-
-        assert_eq!(ty, Type::none(&db));
-    }
-
-    #[test]
-    fn build_intersection_simplify_positive_never() {
-        let db = setup_db();
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::none(&db))
-            .add_positive(Type::Never)
-            .build();
-
-        assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_none() {
-        let db = setup_db();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::none(&db))
-            .add_positive(Type::IntLiteral(1))
-            .build();
-        assert_eq!(ty, Type::IntLiteral(1));
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::IntLiteral(1))
-            .add_negative(Type::none(&db))
-            .build();
-        assert_eq!(ty, Type::IntLiteral(1));
-    }
-
-    #[test]
-    fn build_negative_union_de_morgan() {
-        let db = setup_db();
-
-        let union = UnionBuilder::new(&db)
-            .add(Type::IntLiteral(1))
-            .add(Type::IntLiteral(2))
-            .build();
-        assert_eq!(union.display(&db).to_string(), "Literal[1, 2]");
-
-        let ty = IntersectionBuilder::new(&db).add_negative(union).build();
-
-        let expected = IntersectionBuilder::new(&db)
-            .add_negative(Type::IntLiteral(1))
-            .add_negative(Type::IntLiteral(2))
-            .build();
-
-        assert_eq!(ty.display(&db).to_string(), "~Literal[1] & ~Literal[2]");
-        assert_eq!(ty, expected);
-    }
-
-    #[test]
-    fn build_intersection_simplify_positive_type_and_positive_subtype() {
-        let db = setup_db();
-
-        let t = KnownClass::Str.to_instance(&db);
-        let s = Type::LiteralString;
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(t)
-            .add_positive(s)
-            .build();
-        assert_eq!(ty, s);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(s)
-            .add_positive(t)
-            .build();
-        assert_eq!(ty, s);
-
-        let literal = Type::string_literal(&db, "a");
-        let expected = IntersectionBuilder::new(&db)
-            .add_positive(s)
-            .add_negative(literal)
-            .build();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(t)
-            .add_negative(literal)
-            .add_positive(s)
-            .build();
-        assert_eq!(ty, expected);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(s)
-            .add_negative(literal)
-            .add_positive(t)
-            .build();
-        assert_eq!(ty, expected);
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_type_and_negative_subtype() {
-        let db = setup_db();
-
-        let t = KnownClass::Str.to_instance(&db);
-        let s = Type::LiteralString;
-
-        let expected = IntersectionBuilder::new(&db).add_negative(t).build();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(t)
-            .add_negative(s)
-            .build();
-        assert_eq!(ty, expected);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(s)
-            .add_negative(t)
-            .build();
-        assert_eq!(ty, expected);
-
-        let object = KnownClass::Object.to_instance(&db);
-        let expected = IntersectionBuilder::new(&db)
-            .add_negative(t)
-            .add_positive(object)
-            .build();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(t)
-            .add_positive(object)
-            .add_negative(s)
-            .build();
-        assert_eq!(ty, expected);
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_type_and_multiple_negative_subtypes() {
-        let db = setup_db();
-
-        let s1 = Type::IntLiteral(1);
-        let s2 = Type::IntLiteral(2);
-        let t = KnownClass::Int.to_instance(&db);
-
-        let expected = IntersectionBuilder::new(&db).add_negative(t).build();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(s1)
-            .add_negative(s2)
-            .add_negative(t)
-            .build();
-        assert_eq!(ty, expected);
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_type_and_positive_subtype() {
-        let db = setup_db();
-
-        let t = KnownClass::Str.to_instance(&db);
-        let s = Type::LiteralString;
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(t)
-            .add_positive(s)
-            .build();
-        assert_eq!(ty, Type::Never);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(s)
-            .add_negative(t)
-            .build();
-        assert_eq!(ty, Type::Never);
-
-        // This should also work in the presence of additional contributions:
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(KnownClass::Object.to_instance(&db))
-            .add_negative(t)
-            .add_positive(s)
-            .build();
-        assert_eq!(ty, Type::Never);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(s)
-            .add_negative(Type::string_literal(&db, "a"))
-            .add_negative(t)
-            .build();
-        assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_intersection_simplify_disjoint_positive_types() {
-        let db = setup_db();
-
-        let t1 = Type::IntLiteral(1);
-        let t2 = Type::none(&db);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(t1)
-            .add_positive(t2)
-            .build();
-        assert_eq!(ty, Type::Never);
-
-        // If there are any negative contributions, they should
-        // be removed too.
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(KnownClass::Str.to_instance(&db))
-            .add_negative(Type::LiteralString)
-            .add_positive(t2)
-            .build();
-        assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_intersection_simplify_disjoint_positive_and_negative_types() {
-        let db = setup_db();
-
-        let t_p = KnownClass::Int.to_instance(&db);
-        let t_n = Type::string_literal(&db, "t_n");
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(t_p)
-            .add_negative(t_n)
-            .build();
-        assert_eq!(ty, t_p);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(t_n)
-            .add_positive(t_p)
-            .build();
-        assert_eq!(ty, t_p);
-
-        let int_literal = Type::IntLiteral(1);
-        let expected = IntersectionBuilder::new(&db)
-            .add_positive(t_p)
-            .add_negative(int_literal)
-            .build();
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(t_p)
-            .add_negative(int_literal)
-            .add_negative(t_n)
-            .build();
-        assert_eq!(ty, expected);
-
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(t_n)
-            .add_negative(int_literal)
-            .add_positive(t_p)
-            .build();
-        assert_eq!(ty, expected);
+        let intersection = IntersectionBuilder::new(&db).build();
+        assert_eq!(intersection, KnownClass::Object.to_instance(&db));
     }
 
     #[test_case(Type::BooleanLiteral(true))]
@@ -956,86 +478,5 @@ mod tests {
             .add_positive(t_bool)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
-    }
-
-    #[test_case(Type::any())]
-    #[test_case(Type::unknown())]
-    #[test_case(todo_type!())]
-    fn build_intersection_t_and_negative_t_does_not_simplify(ty: Type) {
-        let db = setup_db();
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(ty)
-            .add_negative(ty)
-            .build();
-        assert_eq!(result, ty);
-
-        let result = IntersectionBuilder::new(&db)
-            .add_negative(ty)
-            .add_positive(ty)
-            .build();
-        assert_eq!(result, ty);
-    }
-
-    #[test]
-    fn build_intersection_of_two_unions_simplify() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/module.py",
-            "
-            class A: ...
-            class B: ...
-            a = A()
-            b = B()
-        ",
-        )
-        .unwrap();
-
-        let file = system_path_to_file(&db, "src/module.py").expect("file to exist");
-
-        let a = global_symbol(&db, file, "a").expect_type();
-        let b = global_symbol(&db, file, "b").expect_type();
-        let union = UnionBuilder::new(&db).add(a).add(b).build();
-        assert_eq!(union.display(&db).to_string(), "A | B");
-        let reversed_union = UnionBuilder::new(&db).add(b).add(a).build();
-        assert_eq!(reversed_union.display(&db).to_string(), "B | A");
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(union)
-            .add_positive(reversed_union)
-            .build();
-        assert_eq!(intersection.display(&db).to_string(), "B | A");
-    }
-
-    #[test]
-    fn build_union_of_two_intersections_simplify() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/module.py",
-            "
-            class A: ...
-            class B: ...
-            a = A()
-            b = B()
-        ",
-        )
-        .unwrap();
-
-        let file = system_path_to_file(&db, "src/module.py").expect("file to exist");
-
-        let a = global_symbol(&db, file, "a").expect_type();
-        let b = global_symbol(&db, file, "b").expect_type();
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(a)
-            .add_positive(b)
-            .build();
-        let reversed_intersection = IntersectionBuilder::new(&db)
-            .add_positive(b)
-            .add_positive(a)
-            .build();
-        let union = UnionBuilder::new(&db)
-            .add(intersection)
-            .add(reversed_intersection)
-            .build();
-        assert_eq!(union.display(&db).to_string(), "A & B");
     }
 }

@@ -123,3 +123,21 @@ from knot_extensions import Unknown
 def _(u1: str | Unknown | int | object):
     reveal_type(u1)  # revealed: Unknown | object
 ```
+
+## Union of intersections
+
+We can simplify unions of intersections:
+
+```py
+from knot_extensions import Intersection, Not
+
+class P: ...
+class Q: ...
+
+def _(
+    i1: Intersection[P, Q] | Intersection[P, Q],
+    i2: Intersection[P, Q] | Intersection[Q, P],
+) -> None:
+    reveal_type(i1)  # revealed: P & Q
+    reveal_type(i2)  # revealed: P & Q
+```
