@@ -406,41 +406,49 @@ below.
 
 #### Quotes
 
-Ruff will use the configured quote style for the f-string expression unless doing so would result in
+Ruff will use the [configured quote style] for the f-string expression unless doing so would result in
 invalid syntax for the target Python version or requires more backslash escapes than the original
 expression. Specifically, Ruff will preserve the original quote style for the following cases:
 
 When the target Python version is < 3.12 and a [self-documenting f-string] contains a string
-literal with the configured quote style:
+literal with the [configured quote style]:
 
 ```python
+# format.quote-style = "double"
+
 f'{10 + len("hello")=}'
 # This f-string cannot be formatted as follows when targeting Python < 3.12
 f"{10 + len("hello")=}"
 ```
 
 When the target Python version is < 3.12 and an f-string contains any triple-quoted string, byte
-or f-string literal that contains the configured quote style:
+or f-string literal that contains the [configured quote style]:
 
 ```python
+# format.quote-style = "double"
+
 f'{"""nested " """}'`
 # This f-string cannot be formatted as follows when targeting Python < 3.12
 f"{'''nested " '''}``
 ```
 
 For all target Python versions, when a [self-documenting f-string] contains an expression between
-the curly braces (`{...}`) with a format specifier containing the configured quote style:
+the curly braces (`{...}`) with a format specifier containing the [configured quote style]:
 
 ```python
+# format.quote-style = "double"
+
 f'{1=:"foo}'
 # This f-string cannot be formatted as follows for all target Python versions
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the configured style for the
+For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
 outermost f-string. For example, consider the following f-string:
 
 ```python
+# format.quote-style = "double"
+
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
@@ -491,6 +499,7 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 `{...}` parts of an f-string.
 
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
+[configured quote style]: settings.md/#format_quote-style
 
 ## Sorting imports
 
