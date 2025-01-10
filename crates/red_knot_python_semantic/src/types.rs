@@ -3428,35 +3428,88 @@ impl KnownFunction {
         }
     }
 
-    /// Returns a `u32` bitmask specifying whether or not
-    /// arguments given to a particular function
-    /// should be interpreted as type expressions or value expressions.
-    ///
-    /// The argument is treated as a type expression
-    /// when the corresponding bit is `1`.
-    /// The least-significant (right-most) bit corresponds to
-    /// the argument at the index 0 and so on.
-    ///
-    /// For example, `assert_type()` has the bitmask value of `0b10`.
-    /// This means the second argument is a type expression and the first a value expression.
-    const fn takes_type_expression_arguments(self) -> u32 {
-        const ALL_VALUES: u32 = 0b0;
-        const SINGLE_TYPE: u32 = 0b1;
-        const TYPE_TYPE: u32 = 0b11;
-        const VALUE_TYPE: u32 = 0b10;
-
+    /// Return the [`ParameterExpectations`] for this function.
+    const fn parameter_expectations(self) -> ParameterExpectations {
         match self {
-            KnownFunction::IsEquivalentTo => TYPE_TYPE,
-            KnownFunction::IsSubtypeOf => TYPE_TYPE,
-            KnownFunction::IsAssignableTo => TYPE_TYPE,
-            KnownFunction::IsDisjointFrom => TYPE_TYPE,
-            KnownFunction::IsFullyStatic => SINGLE_TYPE,
-            KnownFunction::IsSingleton => SINGLE_TYPE,
-            KnownFunction::IsSingleValued => SINGLE_TYPE,
-            KnownFunction::AssertType => VALUE_TYPE,
-            _ => ALL_VALUES,
+            Self::IsFullyStatic | Self::IsSingleton | Self::IsSingleValued => {
+                ParameterExpectations::SingleTypeExpression
+            }
+
+            Self::IsEquivalentTo
+            | Self::IsSubtypeOf
+            | Self::IsAssignableTo
+            | Self::IsDisjointFrom => ParameterExpectations::TwoTypeExpressions,
+
+            Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
+
+            Self::ConstraintFunction(_)
+            | Self::Len
+            | Self::Final
+            | Self::NoTypeCheck
+            | Self::RevealType
+            | Self::StaticAssert => ParameterExpectations::AllValueExpressions,
         }
     }
+}
+
+/// Describes whether the parameters in a function expect value expressions or type expressions.
+///
+/// Whether a specific parameter in the function expects a type expression can be queried
+/// using [`ParameterExpectations::expectation_at_index`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+enum ParameterExpectations {
+    /// All parameters in the function expect value expressions
+    #[default]
+    AllValueExpressions,
+    /// The first parameter in the function expects a type expression
+    SingleTypeExpression,
+    /// The first two parameters in the function expect type expressions
+    TwoTypeExpressions,
+    /// The first parameter in the function expects a value expression,
+    /// and the second expects a type expression
+    ValueExpressionAndTypeExpression,
+}
+
+impl ParameterExpectations {
+    /// Query whether the parameter at `parameter_index` expects a value expression or a type expression
+    fn expectation_at_index(self, parameter_index: usize) -> ParameterExpectation {
+        match self {
+            Self::AllValueExpressions => ParameterExpectation::ValueExpression,
+            Self::SingleTypeExpression => {
+                if parameter_index == 0 {
+                    ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
+                }
+            }
+            Self::TwoTypeExpressions => {
+                if parameter_index < 2 {
+                    ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
+                }
+            }
+            Self::ValueExpressionAndTypeExpression => {
+                if parameter_index == 1 {
+                    ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
+                }
+            }
+        }
+    }
+}
+
+/// Whether a single parameter in a given function expects a value expression or a [type expression]
+///
+/// [type expression]: https://typing.readthedocs.io/en/latest/spec/annotations.html#type-and-annotation-expressions
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+enum ParameterExpectation {
+    /// The parameter expects a value expression
+    #[default]
+    ValueExpression,
+    /// The parameter expects a type expression
+    TypeExpression,
 }
 
 #[salsa::interned]
