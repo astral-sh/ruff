@@ -22,9 +22,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<ClassBase<'db>>) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
-            ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => {
-                Type::SubclassOf(Self { subclass_of })
-            }
+            ClassBase::Dynamic(_) => Type::SubclassOf(Self { subclass_of }),
             ClassBase::Class(class) => {
                 if class.is_final(db) {
                     Type::ClassLiteral(ClassLiteralType { class })
@@ -40,14 +38,14 @@ impl<'db> SubclassOfType<'db> {
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
     pub(crate) const fn subclass_of_unknown() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::Unknown,
+            subclass_of: ClassBase::unknown(),
         })
     }
 
     /// Return a [`Type`] instance representing the type `type[Any]`.
     pub(crate) const fn subclass_of_any() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::Any,
+            subclass_of: ClassBase::any(),
         })
     }
 
@@ -77,8 +75,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
             // Non-fully-static types do not participate in subtyping
-            (ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_), _)
-            | (_, ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_)) => false,
+            (ClassBase::Dynamic(_), _) | (_, ClassBase::Dynamic(_)) => false,
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
