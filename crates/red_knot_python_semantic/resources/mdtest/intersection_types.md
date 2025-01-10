@@ -4,7 +4,8 @@
 
 This test suite covers certain properties of intersection types and makes sure that we can apply
 various simplification strategies. We use `Intersection` (`&`) and `Not` (`~`) to construct
-intersection types (note that we display negative contributions at the end; the order does not matter):
+intersection types (note that we display negative contributions at the end; the order does not
+matter):
 
 ```py
 from knot_extensions import Intersection, Not
@@ -45,7 +46,9 @@ static_assert(not is_disjoint_from(P, R))
 static_assert(not is_disjoint_from(Q, R))
 ```
 
-Although `P` is not a subtype of `Q` and `Q` is not a subtype of `P`, the two types are not disjoint because it would be possible to create a class `S` that inherits from both `P` and `Q` using multiple inheritance. An instance of `S` would be a member of the `P` type _and_ the `Q` type.
+Although `P` is not a subtype of `Q` and `Q` is not a subtype of `P`, the two types are not disjoint
+because it would be possible to create a class `S` that inherits from both `P` and `Q` using
+multiple inheritance. An instance of `S` would be a member of the `P` type _and_ the `Q` type.
 
 ### Disjoint types
 
@@ -191,8 +194,8 @@ def nested(
 
 ### Union of intersections
 
-We always normalize our representation to a *union of intersections*, so when we add a *union to an
-intersection*, we distribute the union over the respective elements:
+We always normalize our representation to a _union of intersections_, so when we add a _union to an
+intersection_, we distribute the union over the respective elements:
 
 ```py
 from knot_extensions import Intersection, Not
@@ -364,6 +367,13 @@ def _(
     reveal_type(i06)  # revealed: Never
     reveal_type(i07)  # revealed: Never
     reveal_type(i08)  # revealed: Never
+
+# `bool` is final and can not be subclassed, so `type[bool]` is equivalent to `Literal[bool]`, which
+# is disjoint from `type[str]`:
+def example_type_bool_type_str(
+    i: Intersection[type[bool], type[str]],
+) -> None:
+    reveal_type(i)  # revealed: Never
 ```
 
 #### Positive and negative contributions
@@ -462,7 +472,7 @@ def _(
 #### Negative type and negative subtype
 
 For negative contributions, this property is reversed. Here we can get remove superfluous
-*subtypes*:
+_subtypes_:
 
 ```py
 from knot_extensions import Intersection, Not
