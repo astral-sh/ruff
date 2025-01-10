@@ -66,14 +66,11 @@ def _(a: Unknown, b: Any):
     assert_type(b, Unknown)  # fine
 
 def _(a: type[Unknown], b: type[Any]):
-    # TODO: Should be `type[Unknown]`
-    reveal_type(a)  # revealed: @Todo(unsupported type[X] special form)
-    # TODO: Should be fine
-    assert_type(a, type[Any])  # error: [type-assertion-failure]
+    reveal_type(a)  # revealed: type[Unknown]
+    assert_type(a, type[Any])  # fine
 
     reveal_type(b)  # revealed: type[Any]
-    # TODO: Should be fine
-    assert_type(b, type[Unknown])  # error: [type-assertion-failure]
+    assert_type(b, type[Unknown])  # fine
 ```
 
 ## Tuples

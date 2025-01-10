@@ -5066,6 +5066,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::KnownInstance(KnownInstanceType::Any) => {
                         SubclassOfType::subclass_of_any()
                     }
+                    Type::KnownInstance(KnownInstanceType::Unknown) => {
+                        SubclassOfType::subclass_of_unknown()
+                    }
                     _ => todo_type!("unsupported type[X] special form"),
                 }
             }
