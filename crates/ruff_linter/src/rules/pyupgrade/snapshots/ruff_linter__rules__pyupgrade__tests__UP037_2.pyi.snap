@@ -1,0 +1,162 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
+---
+UP037_2.pyi:3:14: UP037 [*] Remove quotes from type annotation
+  |
+1 | # https://github.com/astral-sh/ruff/issues/7102
+2 | 
+3 | def f(a: Foo['SingleLine  # Comment']): ...
+  |              ^^^^^^^^^^^^^^^^^^^^^^^ UP037
+  |
+  = help: Remove quotes
+
+ℹ Safe fix
+1 1 | # https://github.com/astral-sh/ruff/issues/7102
+2 2 | 
+3   |-def f(a: Foo['SingleLine  # Comment']): ...
+  3 |+def f(a: Foo[(SingleLine  # Comment
+  4 |+)]): ...
+4 5 | 
+5 6 | 
+6 7 | def f(a: Foo['''Bar[
+
+UP037_2.pyi:6:14: UP037 [*] Remove quotes from type annotation
+  |
+6 |   def f(a: Foo['''Bar[
+  |  ______________^
+7 | |     Multi |
+8 | |     Line]''']): ...
+  | |____________^ UP037
+  |
+  = help: Remove quotes
+
+ℹ Safe fix
+3 3 | def f(a: Foo['SingleLine  # Comment']): ...
+4 4 | 
+5 5 | 
+6   |-def f(a: Foo['''Bar[
+  6 |+def f(a: Foo[Bar[
+7 7 |     Multi |
+8   |-    Line]''']): ...
+  8 |+    Line]]): ...
+9 9 | 
+10 10 | 
+11 11 | def f(a: Foo['''Bar[
+
+UP037_2.pyi:11:14: UP037 [*] Remove quotes from type annotation
+   |
+11 |   def f(a: Foo['''Bar[
+   |  ______________^
+12 | |     Multi |
+13 | |     Line  # Comment
+14 | | ]''']): ...
+   | |____^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+8  8  |     Line]''']): ...
+9  9  | 
+10 10 | 
+11    |-def f(a: Foo['''Bar[
+   11 |+def f(a: Foo[Bar[
+12 12 |     Multi |
+13 13 |     Line  # Comment
+14    |-]''']): ...
+   14 |+]]): ...
+15 15 | 
+16 16 | 
+17 17 | def f(a: Foo['''Bar[
+
+UP037_2.pyi:17:14: UP037 [*] Remove quotes from type annotation
+   |
+17 |   def f(a: Foo['''Bar[
+   |  ______________^
+18 | |     Multi |
+19 | |     Line]  # Comment''']): ...
+   | |_______________________^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+14 14 | ]''']): ...
+15 15 | 
+16 16 | 
+17    |-def f(a: Foo['''Bar[
+   17 |+def f(a: Foo[(Bar[
+18 18 |     Multi |
+19    |-    Line]  # Comment''']): ...
+   19 |+    Line]  # Comment
+   20 |+)]): ...
+20 21 | 
+21 22 | 
+22 23 | def f(a: Foo['''
+
+UP037_2.pyi:22:14: UP037 [*] Remove quotes from type annotation
+   |
+22 |   def f(a: Foo['''
+   |  ______________^
+23 | | Bar[
+24 | |     Multi |
+25 | |     Line]  # Comment''']): ...
+   | |_______________________^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+19 19 |     Line]  # Comment''']): ...
+20 20 | 
+21 21 | 
+22    |-def f(a: Foo['''
+   22 |+def f(a: Foo[(
+23 23 | Bar[
+24 24 |     Multi |
+25    |-    Line]  # Comment''']): ...
+   25 |+    Line]  # Comment
+   26 |+)]): ...
+26 27 | 
+27 28 | 
+28 29 | def f(a: '''list[int]
+
+UP037_2.pyi:28:10: UP037 [*] Remove quotes from type annotation
+   |
+28 |   def f(a: '''list[int]
+   |  __________^
+29 | |     ''' = []): ...
+   | |_______^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+25 25 |     Line]  # Comment''']): ...
+26 26 | 
+27 27 | 
+28    |-def f(a: '''list[int]
+29    |-	''' = []): ...
+   28 |+def f(a: list[int]
+   29 |+	 = []): ...
+30 30 | 
+31 31 | 
+32 32 | a: '''\\
+
+UP037_2.pyi:32:4: UP037 [*] Remove quotes from type annotation
+   |
+32 |   a: '''\\
+   |  ____^
+33 | | list[int]''' = [42]
+   | |____________^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+29 29 | 	''' = []): ...
+30 30 | 
+31 31 | 
+32    |-a: '''\\
+33    |-list[int]''' = [42]
+   32 |+a: (\
+   33 |+list[int]) = [42]
+34 34 | 
+35 35 | 
+36 36 | # TODO: These are valid too. String annotations are assumed to be enclosed in parentheses.
