@@ -351,13 +351,13 @@ logger.error(
 )
 
 a = (10 +
-     "Exception in {call_back_name} when handling msg on "
-     f"'{msg.topic}': '{msg.payload}'"   # belongs to binary operation
+     "Exception in {call_back_name} "
+     f"'{msg}'"  # belongs to binary operation
 )
 
 a = 10 + (
-    "Exception in {call_back_name} when handling msg on "
-    f"'{msg.topic}': '{msg.payload}'"   # belongs to last-part
+    "Exception in {call_back_name} "
+    f"'{msg}'"  # belongs to f-string
 )
 
 self._attr_unique_id = (
