@@ -313,22 +313,24 @@ def _(
 
 ### Union of a type and its negation
 
-Similarly, if we have both `P` and `~P` in a _union_, we could simplify that to `object`. However,
-this is a rather costly operation which would require us to build the negation of each type that we
-add to a union, so this is not implemented at the moment.
+Similarly, if we have both `P` and `~P` in a _union_, we can simplify that to `object`.
 
 ```py
 from knot_extensions import Intersection, Not
 
 class P: ...
+class Q: ...
 
 def _(
     i1: P | Not[P],
     i2: Not[P] | P,
+    i3: P | Q | Not[P],
+    i4: Not[P] | Q | P,
 ) -> None:
-    # These could be simplified to `object`
-    reveal_type(i1)  # revealed: P | ~P
-    reveal_type(i2)  # revealed: ~P | P
+    reveal_type(i1)  # revealed: object
+    reveal_type(i2)  # revealed: object
+    reveal_type(i3)  # revealed: object
+    reveal_type(i4)  # revealed: object
 ```
 
 ### Negation is an involution

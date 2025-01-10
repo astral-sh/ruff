@@ -21,22 +21,22 @@ else:
 if x and not x:
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[0, "", b"", -1, "foo", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if not (x and not x):
-    reveal_type(x)  # revealed: Literal[0, "", b"", -1, "foo", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, "foo", b"bar", 0, "", b""] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, "foo", b"bar", 0, "", b""] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
     reveal_type(x)  # revealed: Literal[-1, True, "foo"]
@@ -87,10 +87,10 @@ def f(x: A | B):
     if x and not x:
         reveal_type(x)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy | B & ~AlwaysFalsy & ~AlwaysTruthy
     else:
-        reveal_type(x)  # revealed: A & ~AlwaysTruthy | B & ~AlwaysTruthy | A & ~AlwaysFalsy | B & ~AlwaysFalsy
+        reveal_type(x)  # revealed: A | B
 
     if x or not x:
-        reveal_type(x)  # revealed: A & ~AlwaysFalsy | B & ~AlwaysFalsy | A & ~AlwaysTruthy | B & ~AlwaysTruthy
+        reveal_type(x)  # revealed: A | B
     else:
         reveal_type(x)  # revealed: A & ~AlwaysTruthy & ~AlwaysFalsy | B & ~AlwaysTruthy & ~AlwaysFalsy
 ```
@@ -214,10 +214,9 @@ if x and not x:
     reveal_type(y)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy
 else:
     y = x
-    reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
+    reveal_type(y)  # revealed: A
 
-# TODO: It should be A. We should improve UnionBuilder or IntersectionBuilder. (issue #15023)
-reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
+reveal_type(y)  # revealed: A
 ```
 
 ## Truthiness of classes
