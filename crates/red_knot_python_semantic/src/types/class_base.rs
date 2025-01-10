@@ -150,10 +150,9 @@ impl<'db> ClassBase<'db> {
     }
 
     pub(super) fn into_class(self) -> Option<Class<'db>> {
-        #[allow(clippy::match_wildcard_for_single_variants)]
         match self {
             Self::Class(class) => Some(class),
-            _ => None,
+            Self::Dynamic(_) => None,
         }
     }
 

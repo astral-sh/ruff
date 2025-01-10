@@ -2084,7 +2084,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Class(class) => Type::instance(class),
-                ClassBase::Dynamic(gradual) => Type::Dynamic(gradual),
+                ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             },
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             Type::Intersection(_) => todo_type!("Type::Intersection.to_instance()"),
@@ -2331,7 +2331,7 @@ impl<'db> From<&Type<'db>> for Symbol<'db> {
 pub enum DynamicType {
     // An explicitly annotated `typing.Any`
     Any,
-    // An unannotated value, or a gradual type resulting from an error
+    // An unannotated value, or a dynamic type resulting from an error
     Unknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
@@ -2350,7 +2350,7 @@ impl std::fmt::Display for DynamicType {
         match self {
             DynamicType::Any => f.write_str("Any"),
             DynamicType::Unknown => f.write_str("Unknown"),
-            // `[Type::Todo]`'s display should be explicit that is not a valid display of
+            // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
         }
