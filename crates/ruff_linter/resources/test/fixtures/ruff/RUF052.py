@@ -145,3 +145,19 @@ def special_calls():
     _NotADynamicClass = type("_NotADynamicClass")
 
     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+# Do not emit diagnostic if parameter is private
+# even if it is later shadowed in the body of the function
+# see https://github.com/astral-sh/ruff/issues/14968
+class Node:
+
+    connected: list[Node]
+
+    def recurse(self, *, _seen: set[Node] | None = None):
+        if _seen is None:
+            _seen = set()
+        elif self in _seen:
+            return
+        _seen.add(self)
+        for other in self.connected:
+            other.recurse(_seen=_seen)
