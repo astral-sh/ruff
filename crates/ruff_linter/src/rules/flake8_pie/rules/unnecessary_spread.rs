@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -77,42 +77,49 @@ fn unnecessary_spread_fix(
     if let Some(last) = dict.iter_values().last() {
         // Ex) `**{a: 1, b: 2}`
         let mut edits = vec![];
-        let mut delete_token = |token: SimpleToken| edits.push(Edit::range_deletion(token.range()));
-        let mut paren_count = 0;
+        let mut open_parens: u32 = 0;
 
         for tok in SimpleTokenizer::starts_at(doublestar.end(), locator.contents()).skip_trivia() {
             match tok.kind() {
                 SimpleTokenKind::LParen => {
-                    delete_token(tok);
-                    paren_count += 1;
+                    edits.push(Edit::range_deletion(tok.range()));
+                    open_parens += 1;
                 }
                 SimpleTokenKind::LBrace => {
-                    delete_token(tok);
+                    edits.push(Edit::range_deletion(tok.range()));
                     break;
                 }
-                _ => {}
+                _ => {
+                    // Unexpected token, bail
+                    return None;
+                }
             }
         }
 
-        let mut last_ended = false;
+        let mut found_r_curly = false;
         for tok in SimpleTokenizer::starts_at(last.end(), locator.contents()).skip_trivia() {
-            if last_ended && paren_count == 0 {
+            if found_r_curly && open_parens == 0 {
                 break;
             }
 
             match tok.kind() {
                 SimpleTokenKind::Comma => {
-                    delete_token(tok);
+                    edits.push(Edit::range_deletion(tok.range()));
                 }
-                SimpleTokenKind::RParen if last_ended => {
-                    delete_token(tok);
-                    paren_count -= 1;
+                SimpleTokenKind::RParen => {
+                    if found_r_curly {
+                        edits.push(Edit::range_deletion(tok.range()));
+                        open_parens -= 1;
+                    }
                 }
                 SimpleTokenKind::RBrace => {
-                    delete_token(tok);
-                    last_ended = true;
+                    edits.push(Edit::range_deletion(tok.range()));
+                    found_r_curly = true;
                 }
-                _ => {}
+                _ => {
+                    // Unexpected token, bail
+                    return None;
+                }
             }
         }
 
