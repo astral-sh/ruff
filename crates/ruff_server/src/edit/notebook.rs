@@ -138,11 +138,10 @@ impl NotebookDocument {
                 for cell in structure.array.cells.into_iter().flatten().rev() {
                     if let Some(text_document) = deleted_cells.remove(&cell.document) {
                         let version = text_document.version();
-                        self.cells.push(NotebookCell::new(
-                            cell,
-                            text_document.into_contents(),
-                            version,
-                        ));
+                        self.cells.insert(
+                            start,
+                            NotebookCell::new(cell, text_document.into_contents(), version),
+                        );
                     } else {
                         self.cells
                             .insert(start, NotebookCell::new(cell, String::new(), 0));
