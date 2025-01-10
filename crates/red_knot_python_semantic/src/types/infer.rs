@@ -83,6 +83,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
+use super::{ParameterExpectation, ParameterExpectations};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -956,7 +957,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            self.infer_arguments(arguments, 0b0);
+            self.infer_arguments(arguments, ParameterExpectations::default());
         }
     }
 
@@ -2601,18 +2602,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_arguments<'a>(
         &mut self,
         arguments: &'a ast::Arguments,
-        infer_as_type_expressions: u32,
+        parameter_expectations: ParameterExpectations,
     ) -> CallArguments<'a, 'db> {
         arguments
             .arguments_source_order()
             .enumerate()
             .map(|(index, arg_or_keyword)| {
-                let infer_argument_type = if index < u32::BITS as usize
-                    && infer_as_type_expressions & (1 << index) != 0
-                {
-                    Self::infer_type_expression
-                } else {
-                    Self::infer_expression
+                let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
+                    ParameterExpectation::Type => Self::infer_type_expression,
+                    ParameterExpectation::Value => Self::infer_expression,
                 };
 
                 match arg_or_keyword {
@@ -3161,7 +3159,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .into_function_literal()
             .and_then(|f| f.known(self.db()))
             .map(KnownFunction::takes_type_expression_arguments)
-            .unwrap_or(0b0);
+            .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, infer_arguments_as_type_expressions);
         function_type
