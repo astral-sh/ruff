@@ -87,13 +87,13 @@ pub trait System: Debug {
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
-            .map_or(false, |metadata| metadata.file_type.is_directory())
+            .is_ok_and(|metadata| metadata.file_type.is_directory())
     }
 
     /// Returns `true` if `path` exists and is a file.
     fn is_file(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
-            .map_or(false, |metadata| metadata.file_type.is_file())
+            .is_ok_and(|metadata| metadata.file_type.is_file())
     }
 
     /// Returns the current working directory

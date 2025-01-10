@@ -285,7 +285,7 @@ impl Workspace {
             open_files.contains(&file)
         } else if let Some(system_path) = file.path(db).as_system_path() {
             self.package(db, system_path)
-                .map_or(false, |package| package.contains_file(db, file))
+                .is_some_and(|package| package.contains_file(db, file))
         } else {
             file.path(db).is_system_virtual_path()
         }

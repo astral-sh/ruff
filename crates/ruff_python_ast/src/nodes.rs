@@ -1732,7 +1732,7 @@ impl StringLiteralValue {
     pub fn is_unicode(&self) -> bool {
         self.iter()
             .next()
-            .map_or(false, |part| part.flags.prefix().is_unicode())
+            .is_some_and(|part| part.flags.prefix().is_unicode())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.

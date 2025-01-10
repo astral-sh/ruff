@@ -78,11 +78,7 @@ impl<'a> Directive<'a> {
             comment_start = text[..comment_start].trim_end().len();
 
             // The next character has to be the `#` character.
-            if text[..comment_start]
-                .chars()
-                .last()
-                .map_or(true, |c| c != '#')
-            {
+            if !text[..comment_start].ends_with('#') {
                 continue;
             }
             comment_start -= '#'.len_utf8();
