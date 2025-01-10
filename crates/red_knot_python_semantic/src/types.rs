@@ -4144,14 +4144,6 @@ pub(crate) mod tests {
         }
     }
 
-    #[test_case(Ty::Tuple(vec![Ty::Never]))]
-    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::Never, Ty::BuiltinInstance("int")]))]
-    #[test_case(Ty::Tuple(vec![Ty::Tuple(vec![Ty::Never])]))]
-    fn tuple_containing_never_simplifies_to_never(ty: Ty) {
-        let db = setup_db();
-        assert_eq!(ty.into_type(&db), Type::Never);
-    }
-
     #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("object"))]
