@@ -4,7 +4,7 @@
 
 This test suite covers certain properties of intersection types and makes sure that we can apply
 various simplification strategies. We use `Intersection` (`&`) and `Not` (`~`) to construct
-intersection types (note that we display negative contributions at the end, order does not matter):
+intersection types (note that we display negative contributions at the end; the order does not matter):
 
 ```py
 from knot_extensions import Intersection, Not
@@ -31,7 +31,7 @@ classes.
 
 ### Non-disjoint types
 
-We use `P`, `Q`, `R`, … to denote types that non-disjoint:
+We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
 
 ```py
 from knot_extensions import static_assert, is_disjoint_from
@@ -44,6 +44,8 @@ static_assert(not is_disjoint_from(P, Q))
 static_assert(not is_disjoint_from(P, R))
 static_assert(not is_disjoint_from(Q, R))
 ```
+
+Although `P` is not a subtype of `Q` and `Q` is not a subtype of `P`, the two types are not disjoint because it would be possible to create a class `S` that inherits from both `P` and `Q` using multiple inheritance. An instance of `S` would be a member of the `P` type _and_ the `Q` type.
 
 ### Disjoint types
 
@@ -100,7 +102,7 @@ static_assert(not is_subtype_of(B2, B1))
 This section covers structural properties of intersection types and documents some decisions on how
 to represent mixtures of intersections and unions.
 
-### Single element unions
+### Single-element unions
 
 If we have a union of a single element, we can simplify to that element. Similarly, we show an
 intersection with a single negative contribution as just the negation of that element.
@@ -189,7 +191,7 @@ def nested(
 
 ### Union of intersections
 
-We always normalize to a representation as a *union of intersections*, so when we add a *union to an
+We always normalize our representation to a *union of intersections*, so when we add a *union to an
 intersection*, we distribute the union over the respective elements:
 
 ```py
@@ -647,7 +649,7 @@ def unknown(
 
 ### No self-cancellation
 
-Dynamic types do not cancel each other out. Interseccting an unknown set of values with the negation
+Dynamic types do not cancel each other out. Intersecting an unknown set of values with the negation
 of another unknown set of values is not necessarily empty, so we keep the positive contribution:
 
 ```py
