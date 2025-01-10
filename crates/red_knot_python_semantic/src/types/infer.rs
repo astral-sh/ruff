@@ -310,6 +310,18 @@ enum IntersectionOn {
     Right,
 }
 
+/// A helper to track if we already know that declared and inferred types are the same.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DeclaredAndInferredType<'db> {
+    /// We know that both the declared and inferred types are the same.
+    AreTheSame(Type<'db>),
+    /// Declared and inferred types might be different, we need to check assignability.
+    MightBeDifferent {
+        declared_ty: Type<'db>,
+        inferred_ty: Type<'db>,
+    },
+}
+
 /// Builder to infer all types in a region.
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
@@ -895,20 +907,28 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         node: AnyNodeRef,
         definition: Definition<'db>,
-        declared_ty: Type<'db>,
-        inferred_ty: Type<'db>,
+        declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
         debug_assert!(definition.is_binding(self.db()));
         debug_assert!(definition.is_declaration(self.db()));
-        let inferred_ty = if inferred_ty.is_assignable_to(self.db(), declared_ty) {
-            inferred_ty
-        } else {
-            report_invalid_assignment(&self.context, node, declared_ty, inferred_ty);
-            // if the assignment is invalid, fall back to assuming the annotation is correct
-            declared_ty
+
+        let (declared_ty, inferred_ty) = match declared_and_inferred_ty {
+            DeclaredAndInferredType::AreTheSame(ty) => (ty, ty),
+            DeclaredAndInferredType::MightBeDifferent {
+                declared_ty,
+                inferred_ty,
+            } => {
+                if inferred_ty.is_assignable_to(self.db(), *declared_ty) {
+                    (declared_ty, inferred_ty)
+                } else {
+                    report_invalid_assignment(&self.context, node, *declared_ty, *inferred_ty);
+                    // if the assignment is invalid, fall back to assuming the annotation is correct
+                    (declared_ty, declared_ty)
+                }
+            }
         };
-        self.types.declarations.insert(definition, declared_ty);
-        self.types.bindings.insert(definition, inferred_ty);
+        self.types.declarations.insert(definition, *declared_ty);
+        self.types.bindings.insert(definition, *inferred_ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -916,7 +936,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         node: AnyNodeRef,
         definition: Definition<'db>,
     ) {
-        self.add_declaration_with_binding(node, definition, Type::unknown(), Type::unknown());
+        self.add_declaration_with_binding(
+            node,
+            definition,
+            &DeclaredAndInferredType::AreTheSame(Type::unknown()),
+        );
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -1097,7 +1121,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_tys.into_boxed_slice(),
         ));
 
-        self.add_declaration_with_binding(function.into(), definition, function_ty, function_ty);
+        self.add_declaration_with_binding(
+            function.into(),
+            definition,
+            &DeclaredAndInferredType::AreTheSame(function_ty),
+        );
     }
 
     fn infer_parameters(&mut self, parameters: &ast::Parameters) {
@@ -1188,15 +1216,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|default| self.file_expression_ty(default));
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_ty(annotation);
-            let inferred_ty = if let Some(default_ty) = default_ty {
+            let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
-                    UnionType::from_elements(self.db(), [declared_ty, default_ty])
+                    DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty,
+                        inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
+                    }
                 } else if self.in_stub()
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
                 {
-                    declared_ty
+                    DeclaredAndInferredType::AreTheSame(declared_ty)
                 } else {
                     self.context.report_lint(
                         &INVALID_PARAMETER_DEFAULT,
@@ -1205,16 +1236,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                             "Default value of type `{}` is not assignable to annotated parameter type `{}`",
                             default_ty.display(self.db()), declared_ty.display(self.db())),
                     );
-                    declared_ty
+                    DeclaredAndInferredType::AreTheSame(declared_ty)
                 }
             } else {
-                declared_ty
+                DeclaredAndInferredType::AreTheSame(declared_ty)
             };
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
-                declared_ty,
-                inferred_ty,
+                &declared_and_inferred_ty,
             );
         } else {
             let ty = if let Some(default_ty) = default_ty {
@@ -1240,7 +1270,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             let _annotated_ty = self.file_expression_ty(annotation);
             // TODO `tuple[annotated_ty, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db());
-            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                &DeclaredAndInferredType::AreTheSame(ty),
+            );
         } else {
             self.add_binding(
                 parameter.into(),
@@ -1265,7 +1299,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             let _annotated_ty = self.file_expression_ty(annotation);
             // TODO `dict[str, annotated_ty]`
             let ty = KnownClass::Dict.to_instance(self.db());
-            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                &DeclaredAndInferredType::AreTheSame(ty),
+            );
         } else {
             self.add_binding(
                 parameter.into(),
@@ -1308,7 +1346,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let class = Class::new(self.db(), &name.id, body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);
 
-        self.add_declaration_with_binding(class_node.into(), definition, class_ty, class_ty);
+        self.add_declaration_with_binding(
+            class_node.into(),
+            definition,
+            &DeclaredAndInferredType::AreTheSame(class_ty),
+        );
 
         // if there are type parameters, then the keywords and bases are within that scope
         // and we don't need to run inference here
@@ -1365,8 +1407,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.add_declaration_with_binding(
             type_alias.into(),
             definition,
-            type_alias_ty,
-            type_alias_ty,
+            &DeclaredAndInferredType::AreTheSame(type_alias_ty),
         );
     }
 
@@ -1718,7 +1759,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             bound_or_constraint,
             default_ty,
         )));
-        self.add_declaration_with_binding(node.into(), definition, ty, ty);
+        self.add_declaration_with_binding(
+            node.into(),
+            definition,
+            &DeclaredAndInferredType::AreTheSame(ty),
+        );
     }
 
     fn infer_paramspec_definition(
@@ -1733,7 +1778,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = node;
         self.infer_optional_expression(default.as_deref());
         let pep_695_todo = todo_type!("PEP-695 ParamSpec definition types");
-        self.add_declaration_with_binding(node.into(), definition, pep_695_todo, pep_695_todo);
+        self.add_declaration_with_binding(
+            node.into(),
+            definition,
+            &DeclaredAndInferredType::AreTheSame(pep_695_todo),
+        );
     }
 
     fn infer_typevartuple_definition(
@@ -1748,7 +1797,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = node;
         self.infer_optional_expression(default.as_deref());
         let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
-        self.add_declaration_with_binding(node.into(), definition, pep_695_todo, pep_695_todo);
+        self.add_declaration_with_binding(
+            node.into(),
+            definition,
+            &DeclaredAndInferredType::AreTheSame(pep_695_todo),
+        );
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -2006,13 +2059,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        let mut annotation_ty = self.infer_annotation_expression(
+        let mut declared_ty = self.infer_annotation_expression(
             annotation,
             DeferredExpressionState::from(self.are_all_types_deferred()),
         );
 
         // Handle various singletons.
-        if let Type::Instance(InstanceType { class }) = annotation_ty {
+        if let Type::Instance(InstanceType { class }) = declared_ty {
             if class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
@@ -2020,27 +2073,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.file(),
                         &name_expr.id,
                     ) {
-                        annotation_ty = Type::KnownInstance(known_instance);
+                        declared_ty = Type::KnownInstance(known_instance);
                     }
                 }
             }
         }
 
         if let Some(value) = value.as_deref() {
-            let value_ty = self.infer_expression(value);
-            let value_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
-                annotation_ty
+            let inferred_ty = self.infer_expression(value);
+            let inferred_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
+                declared_ty
             } else {
-                value_ty
+                inferred_ty
             };
             self.add_declaration_with_binding(
                 assignment.into(),
                 definition,
-                annotation_ty,
-                value_ty,
+                &DeclaredAndInferredType::MightBeDifferent {
+                    declared_ty,
+                    inferred_ty,
+                },
             );
         } else {
-            self.add_declaration(assignment.into(), definition, annotation_ty);
+            self.add_declaration(assignment.into(), definition, declared_ty);
         }
 
         self.infer_expression(target);
@@ -2294,7 +2349,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             full_module_ty
         };
 
-        self.add_declaration_with_binding(alias.into(), definition, binding_ty, binding_ty);
+        self.add_declaration_with_binding(
+            alias.into(),
+            definition,
+            &DeclaredAndInferredType::AreTheSame(binding_ty),
+        );
     }
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
@@ -2470,7 +2529,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
                 );
             }
-            self.add_declaration_with_binding(alias.into(), definition, ty, ty);
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::AreTheSame(ty),
+            );
             return;
         };
 
@@ -2496,8 +2559,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.add_declaration_with_binding(
                     alias.into(),
                     definition,
-                    submodule_ty,
-                    submodule_ty,
+                    &DeclaredAndInferredType::AreTheSame(submodule_ty),
                 );
                 return;
             }
