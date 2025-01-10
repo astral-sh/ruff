@@ -28,9 +28,6 @@ pub(super) fn place_comment<'a>(
     handle_parenthesized_comment(comment, source)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
         .or_else(|comment| handle_own_line_comment_around_body(comment, source))
-        .or_else(|comment| {
-            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
-        })
         .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
 }
 
@@ -358,6 +355,41 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprGenerator(generator) if generator.parenthesized => {
             handle_bracketed_end_of_line_comment(comment, source)
         }
+        AnyNodeRef::StmtReturn(_) => {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtAssign(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtAnnAssign(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                assignment
+                    .value
+                    .as_deref()
+                    .is_some_and(|value| preceding.ptr_eq(value.into()))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtAugAssign(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtTypeAlias(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+
         _ => CommentPlacement::Default(comment),
     }
 }
@@ -2089,7 +2121,8 @@ fn handle_comprehension_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Handle end-of-line comments for parenthesized implicitly concatenated strings:
+/// Handle end-of-line comments for parenthesized implicitly concatenated strings when used in
+/// a `FormatStatementLastExpression` context:
 ///
 /// ```python
 /// a = (

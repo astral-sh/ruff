@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_assignment.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -307,11 +306,36 @@ a = (
     "b"  # belongs to `b`
 )
 
+a: Literal[str] = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a += (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = (
+    r"a"
+    r"b"  # belongs to `b`
+)
+
 a = (
     "a"
     "b"
 )  # belongs to the assignment
 
+a = (((
+    "a"
+    "b"  # belongs to `b`
+)))
+
+a = (((
+    "a"
+    "b"
+) # belongs to the f-string expression
+))
 
 a = (
     "a" "b"  # belongs to the f-string expression
@@ -341,7 +365,18 @@ a = 10 + (
     "Exception in {call_back_name} when handling msg on "
     f"'{msg.topic}': '{msg.payload}'"   # belongs to last-part
 )
-```
+
+self._attr_unique_id = (
+    f"{self._device.temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address}_"
+    f"{self._device._setpoint_shift.group_address}"  # noqa: SLF001
+)
+
+return (
+    f"Exception in {call_back_name} when handling msg on "
+    f"'{msg.topic}': '{msg.payload}'"  # type: ignore[str-bytes-safe]
+)```
 
 ## Output
 ```python
@@ -672,8 +707,29 @@ a = (
     "b"  # belongs to `b`
 )
 
+a: Literal[str] = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a += (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = (
+    r"a"
+    r"b"  # belongs to `b`
+)
+
 a = "ab"  # belongs to the assignment
 
+a = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = "ab"  # belongs to the f-string expression
 
 a = "ab"  # belongs to the f-string expression
 
@@ -685,8 +741,7 @@ a = (
 a = "abc"  # belongs to the f-string expression
 
 logger.error(
-    f"Failed to run task {task} for job"
-    f"with id {str(job.id)}"  # type: ignore[union-attr]
+    f"Failed to run task {task} for jobwith id {str(job.id)}"  # type: ignore[union-attr]
 )
 
 a = (
@@ -697,5 +752,17 @@ a = (
 a = 10 + (
     "Exception in {call_back_name} when handling msg on "
     f"'{msg.topic}': '{msg.payload}'"  # belongs to last-part
+)
+
+self._attr_unique_id = (
+    f"{self._device.temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address}_"
+    f"{self._device._setpoint_shift.group_address}"  # noqa: SLF001
+)
+
+return (
+    f"Exception in {call_back_name} when handling msg on "
+    f"'{msg.topic}': '{msg.payload}'"  # type: ignore[str-bytes-safe]
 )
 ```

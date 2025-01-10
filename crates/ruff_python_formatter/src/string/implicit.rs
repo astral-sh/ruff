@@ -99,7 +99,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
                 StringLikePart::FString(part) => part.format().fmt(f),
             });
 
-            let part_comments = comments.leading_dangling_trailing(&part);
+            let part_comments = comments.leading_dangling_trailing(part);
             joiner.entry(&format_args![
                 leading_comments(part_comments.leading),
                 format_part,

@@ -300,11 +300,36 @@ a = (
     "b"  # belongs to `b`
 )
 
+a: Literal[str] = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a += (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = (
+    r"a"
+    r"b"  # belongs to `b`
+)
+
 a = (
     "a"
     "b"
 )  # belongs to the assignment
 
+a = (((
+    "a"
+    "b"  # belongs to `b`
+)))
+
+a = (((
+    "a"
+    "b"
+) # belongs to the f-string expression
+))
 
 a = (
     "a" "b"  # belongs to the f-string expression
@@ -333,4 +358,16 @@ a = (10 +
 a = 10 + (
     "Exception in {call_back_name} when handling msg on "
     f"'{msg.topic}': '{msg.payload}'"   # belongs to last-part
+)
+
+self._attr_unique_id = (
+    f"{self._device.temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address}_"
+    f"{self._device._setpoint_shift.group_address}"  # noqa: SLF001
+)
+
+return (
+    f"Exception in {call_back_name} when handling msg on "
+    f"'{msg.topic}': '{msg.payload}'"  # type: ignore[str-bytes-safe]
 )
