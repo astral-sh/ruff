@@ -316,7 +316,10 @@ enum DeclaredAndInferredType<'db> {
     /// We know that both the declared and inferred types are the same.
     AreTheSame(Type<'db>),
     /// Declared and inferred types might be different, we need to check assignability.
-    MightBeDifferent(Type<'db>, Type<'db>),
+    MightBeDifferent {
+        declared_ty: Type<'db>,
+        inferred_ty: Type<'db>,
+    },
 }
 
 /// Builder to infer all types in a region.
@@ -911,7 +914,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let (declared_ty, inferred_ty) = match declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(ty) => (ty, ty),
-            DeclaredAndInferredType::MightBeDifferent(declared_ty, inferred_ty) => {
+            DeclaredAndInferredType::MightBeDifferent {
+                declared_ty,
+                inferred_ty,
+            } => {
                 if inferred_ty.is_assignable_to(self.db(), *declared_ty) {
                     (declared_ty, inferred_ty)
                 } else {
@@ -1212,10 +1218,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             let declared_ty = self.file_expression_ty(annotation);
             let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
-                    DeclaredAndInferredType::MightBeDifferent(
+                    DeclaredAndInferredType::MightBeDifferent {
                         declared_ty,
-                        UnionType::from_elements(self.db(), [declared_ty, default_ty]),
-                    )
+                        inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
+                    }
                 } else if self.in_stub()
                     && default
                         .as_ref()
@@ -2053,13 +2059,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        let mut annotation_ty = self.infer_annotation_expression(
+        let mut declared_ty = self.infer_annotation_expression(
             annotation,
             DeferredExpressionState::from(self.are_all_types_deferred()),
         );
 
         // Handle various singletons.
-        if let Type::Instance(InstanceType { class }) = annotation_ty {
+        if let Type::Instance(InstanceType { class }) = declared_ty {
             if class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
@@ -2067,26 +2073,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.file(),
                         &name_expr.id,
                     ) {
-                        annotation_ty = Type::KnownInstance(known_instance);
+                        declared_ty = Type::KnownInstance(known_instance);
                     }
                 }
             }
         }
 
         if let Some(value) = value.as_deref() {
-            let value_ty = self.infer_expression(value);
-            let value_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
-                annotation_ty
+            let inferred_ty = self.infer_expression(value);
+            let inferred_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
+                declared_ty
             } else {
-                value_ty
+                inferred_ty
             };
             self.add_declaration_with_binding(
                 assignment.into(),
                 definition,
-                &DeclaredAndInferredType::MightBeDifferent(annotation_ty, value_ty),
+                &DeclaredAndInferredType::MightBeDifferent {
+                    declared_ty,
+                    inferred_ty,
+                },
             );
         } else {
-            self.add_declaration(assignment.into(), definition, annotation_ty);
+            self.add_declaration(assignment.into(), definition, declared_ty);
         }
 
         self.infer_expression(target);
