@@ -1140,7 +1140,7 @@ impl<'db> Type<'db> {
                 let second_elements = second.elements(db);
 
                 first_elements.len() == second_elements.len()
-                    && iter::zip(first_elements, first_elements).all(equivalent)
+                    && iter::zip(first_elements, second_elements).all(equivalent)
             }
 
             // TODO: Handle equivalent unions with items in different order

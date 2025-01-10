@@ -96,8 +96,8 @@ def _(a: tuple[Any, ...], b: tuple[Unknown, ...]):
     assert_type(a, tuple[Any, ...])  # fine
     assert_type(a, tuple[Unknown, ...])  # fine
 
-    assert_type(b, tuple[Any, ...])  # fine
     assert_type(b, tuple[Unknown, ...])  # fine
+    assert_type(b, tuple[Any, ...])  # fine
 ```
 
 ## Unions
