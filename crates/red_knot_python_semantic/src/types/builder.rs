@@ -65,6 +65,8 @@ impl<'db> UnionBuilder<'db> {
 
                 let mut to_add = ty;
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
+                let ty_negated = ty.negate(self.db);
+
                 for (index, element) in self.elements.iter().enumerate() {
                     if Some(*element) == bool_pair {
                         to_add = KnownClass::Bool.to_instance(self.db);
@@ -80,6 +82,17 @@ impl<'db> UnionBuilder<'db> {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
+                    } else if ty_negated.is_subtype_of(self.db, *element) {
+                        // We add `ty` to the union. We just checked that `~ty` is a subtype of an existing `element`.
+                        // This also means that `~ty | ty` is a subtype of `element | ty`, because both elements in the
+                        // first union are subtypes of the corresponding elements in the second union. But `~ty | ty` is
+                        // just `object`. Since `object` is a subtype of `element | ty`, we can only conclude that
+                        // `element | ty` must be `object` (object has no other supertypes). This means we can simplify
+                        // the whole union to just `object`, since all other potential elements would also be subtypes of
+                        // `object`.
+                        self.elements.clear();
+                        self.elements.push(KnownClass::Object.to_instance(self.db));
+                        return self;
                     }
                 }
                 match to_remove[..] {
