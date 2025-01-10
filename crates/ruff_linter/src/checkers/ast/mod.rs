@@ -2517,19 +2517,15 @@ impl<'a> Checker<'a> {
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
-                            if self.settings.preview.is_enabled()
-                                || !self.path.ends_with("__init__.py")
-                            {
-                                self.diagnostics.push(
-                                    Diagnostic::new(
-                                        pyflakes::rules::UndefinedExport {
-                                            name: name.to_string(),
-                                        },
-                                        range,
-                                    )
-                                    .with_parent(definition.start()),
-                                );
-                            }
+                            self.diagnostics.push(
+                                Diagnostic::new(
+                                    pyflakes::rules::UndefinedExport {
+                                        name: name.to_string(),
+                                    },
+                                    range,
+                                )
+                                .with_parent(definition.start()),
+                            );
                         }
                     }
                 }

@@ -13,7 +13,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// Including an undefined name in `__all__` is likely to raise `NameError` at
 /// runtime, when the module is imported.
 ///
-/// In [preview], this rule will flag undefined names in `__init__.py` file,
+/// This rule will flag undefined names in `__init__.py` file,
 /// even if those names implicitly refer to other modules in the package. Users
 /// that rely on implicit exports should disable this rule in `__init__.py`
 /// files via [`lint.per-file-ignores`].
@@ -37,7 +37,6 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// ## References
 /// - [Python documentation: `__all__`](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 ///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct UndefinedExport {
     pub name: String,
