@@ -427,9 +427,9 @@ or f-string literal that contains the [configured quote style]:
 ```python
 # format.quote-style = "double"
 
-f'{"""nested " """}'`
+f'{"""nested " """}'
 # This f-string cannot be formatted as follows when targeting Python < 3.12
-f"{'''nested " '''}``
+f"{'''nested " '''}"
 ```
 
 For all target Python versions, when a [self-documenting f-string] contains an expression between
