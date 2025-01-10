@@ -1136,8 +1136,11 @@ impl<'db> Type<'db> {
             }
 
             (Type::Tuple(first), Type::Tuple(second)) => {
-                first.len(db) == second.len(db)
-                    && iter::zip(first.elements(db), second.elements(db)).all(equivalent)
+                let first_elements = first.elements(db);
+                let second_elements = second.elements(db);
+
+                first_elements.len() == second_elements.len()
+                    && iter::zip(first_elements, first_elements).all(equivalent)
             }
 
             // TODO: Handle equivalent unions with items in different order
