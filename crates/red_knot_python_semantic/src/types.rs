@@ -476,12 +476,12 @@ impl std::fmt::Display for TodoType {
 macro_rules! todo_type {
     () => {
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
-            crate::types::TodoType::FileAndLine(file!(), line!()),
+            $crate::types::TodoType::FileAndLine(file!(), line!()),
         ))
     };
     ($message:literal) => {
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
-            crate::types::TodoType::Message($message),
+            $crate::types::TodoType::Message($message),
         ))
     };
 }
