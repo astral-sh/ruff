@@ -1,12 +1,13 @@
 # Tuples containing `Never`
 
-A `tuple` that contains `Never` simplifies to `Never`. One way to think about this is the following:
-in order to construct a tuple, you need to have an object of every element type. But since there is
-no object of type `Never`, you can not construct a tuple that contains `Never`. The tuple type is
-uninhabited and therefore equivalent to `Never`.
+A heterogeneous `tuple[…]` type that contains `Never` as a type argument simplifies to `Never`. One
+way to think about this is the following: in order to construct a tuple, you need to have an object
+of every element type. But since there is no object of type `Never`, you cannot construct the tuple.
+Such a tuple type is therefore uninhabited and equivalent to `Never`.
 
-In the language of algebraic data types, a `tuple` is a product type and `Never` acts like the zero
-element in multiplication, similar to how a Cartesian product with the empty set is the empty set.
+In the language of algebraic data types, a tuple type is a product type and `Never` acts like the
+zero element in multiplication, similar to how a Cartesian product with the empty set is the empty
+set.
 
 ```py
 from knot_extensions import static_assert, is_equivalent_to
