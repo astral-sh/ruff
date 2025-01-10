@@ -49,6 +49,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
@@ -570,6 +571,28 @@ declare_lint! {
     /// ```
     pub(crate) static SUBCLASS_OF_FINAL_CLASS = {
         summary: "detects subclasses of final classes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `assert_type()` calls where the actual type
+    /// is not the same as the asserted type.
+    ///
+    /// ## Why is this bad?
+    /// `assert_type()` allows confirming the inferred type of a certain value.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def _(x: int):
+    ///     assert_type(x, int)  # fine
+    ///     assert_type(x, str)  # error: Actual type does not match asserted type
+    /// ```
+    pub(crate) static TYPE_ASSERTION_FAILURE = {
+        summary: "detects failed type assertions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

@@ -956,7 +956,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            self.infer_arguments(arguments, false);
+            self.infer_arguments(arguments, 0b0);
         }
     }
 
@@ -2601,17 +2601,20 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_arguments<'a>(
         &mut self,
         arguments: &'a ast::Arguments,
-        infer_as_type_expressions: bool,
+        infer_as_type_expressions: u32,
     ) -> CallArguments<'a, 'db> {
-        let infer_argument_type = if infer_as_type_expressions {
-            Self::infer_type_expression
-        } else {
-            Self::infer_expression
-        };
-
         arguments
             .arguments_source_order()
-            .map(|arg_or_keyword| {
+            .enumerate()
+            .map(|(index, arg_or_keyword)| {
+                let infer_argument_type = if index < u32::BITS as usize
+                    && infer_as_type_expressions & (1 << index) != 0
+                {
+                    Self::infer_type_expression
+                } else {
+                    Self::infer_expression
+                };
+
                 match arg_or_keyword {
                     ast::ArgOrKeyword::Arg(arg) => match arg {
                         ast::Expr::Starred(ast::ExprStarred {
@@ -3157,7 +3160,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let infer_arguments_as_type_expressions = function_type
             .into_function_literal()
             .and_then(|f| f.known(self.db()))
-            .is_some_and(KnownFunction::takes_type_expression_arguments);
+            .map(KnownFunction::takes_type_expression_arguments)
+            .unwrap_or(0b0);
 
         let call_arguments = self.infer_arguments(arguments, infer_arguments_as_type_expressions);
         function_type

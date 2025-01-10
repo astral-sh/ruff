@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::diagnostic::CALL_NON_CALLABLE;
+use super::diagnostic::{CALL_NON_CALLABLE, TYPE_ASSERTION_FAILURE};
 use super::{Severity, Signature, Type, TypeArrayDisplay, UnionBuilder};
 use crate::types::diagnostic::STATIC_ASSERT_ERROR;
 use crate::Db;
@@ -44,6 +44,10 @@ pub(super) enum CallOutcome<'db> {
         binding: CallBinding<'db>,
         error_kind: StaticAssertionErrorKind<'db>,
     },
+    AssertType {
+        binding: CallBinding<'db>,
+        asserted_ty: Type<'db>,
+    },
 }
 
 impl<'db> CallOutcome<'db> {
@@ -76,6 +80,14 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
+    /// Create a new `CallOutcome::AssertType` with given revealed and return types.
+    pub(super) fn asserted(binding: CallBinding<'db>, asserted_ty: Type<'db>) -> CallOutcome<'db> {
+        CallOutcome::AssertType {
+            binding,
+            asserted_ty,
+        }
+    }
+
     /// Get the return type of the call, or `None` if not callable.
     pub(super) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -103,6 +115,10 @@ impl<'db> CallOutcome<'db> {
                 .map(UnionBuilder::build),
             Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
             Self::StaticAssertionError { .. } => Some(Type::none(db)),
+            Self::AssertType {
+                binding,
+                asserted_ty: _,
+            } => Some(binding.return_ty()),
         }
     }
 
@@ -308,6 +324,28 @@ impl<'db> CallOutcome<'db> {
                 }
 
                 Ok(Type::unknown())
+            }
+            CallOutcome::AssertType {
+                binding,
+                asserted_ty,
+            } => {
+                let [actual_ty, _asserted] = binding.parameter_tys() else {
+                    return Ok(binding.return_ty());
+                };
+
+                if !actual_ty.is_gradual_equivalent_to(context.db(), *asserted_ty) {
+                    context.report_lint(
+                        &TYPE_ASSERTION_FAILURE,
+                        node,
+                        format_args!(
+                            "Actual type `{}` is not the same as asserted type `{}`",
+                            actual_ty.display(context.db()),
+                            asserted_ty.display(context.db()),
+                        ),
+                    );
+                }
+
+                Ok(binding.return_ty())
             }
         }
     }
