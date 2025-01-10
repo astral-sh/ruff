@@ -311,7 +311,7 @@ enum IntersectionOn {
 }
 
 /// A helper to track if we already know that declared and inferred types are the same.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum DeclaredAndInferredType<'db> {
     /// We know that both the declared and inferred types are the same.
     AreTheSame(Type<'db>),
