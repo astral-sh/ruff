@@ -340,9 +340,13 @@ a = (
     # belongs to the f-string expression
 )
 
+# There's no "right" answer if some parts are on the same line while others are on separate lines.
+# This is likely a comment for one of the last two parts but could also just be a comment for the entire f-string expression.
+# Because there's no right answer, follow what we do elsewhere and associate the comment with the outer-most node which
+# is the f-string expression.
 a = (
     "a"
-    "b" "c"  # belongs to the f-string expression
+    "b" "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # belongs to the f-string expression
 )
 
 logger.error(
