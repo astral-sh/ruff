@@ -153,3 +153,7 @@ print(f"{a}{b}" and "bar")
 print(f"{a}{''}" and "bar")
 print(f"{''}{''}" and "bar")
 print(f"{1}{''}" and "bar")
+
+
+# https://github.com/astral-sh/ruff/issues/7127
+def f(a: "'' and 'b'"): ...
