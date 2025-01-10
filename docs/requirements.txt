@@ -5,6 +5,3 @@ mkdocs-material==9.5.38
 mkdocs-redirects==1.2.2
 mdformat==0.7.21
 mdformat-mkdocs==4.1.1
-# Using a commit from pygments main branch so we get
-# https://github.com/pygments/pygments/pull/2773 before it's been released
-pygments @ git+https://github.com/pygments/pygments.git@67b460fdde6d9a00342b5102b37b3a8399f0e8ef
