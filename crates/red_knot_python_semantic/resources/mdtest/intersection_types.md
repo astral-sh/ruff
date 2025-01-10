@@ -123,25 +123,6 @@ def _(
     reveal_type(i2)  # revealed: ~P
 ```
 
-### Double negation
-
-Negating twice is equivalent to not negating at all:
-
-```py
-from knot_extensions import Not
-
-class P: ...
-
-def _(
-    i1: Not[P],
-    i2: Not[Not[P]],
-    i3: Not[Not[Not[P]]],
-) -> None:
-    reveal_type(i1)  # revealed: ~P
-    reveal_type(i2)  # revealed: P
-    reveal_type(i3)  # revealed: ~P
-```
-
 ### Flattening of nested intersections
 
 We eagerly flatten nested intersections types.
@@ -246,7 +227,8 @@ def simplifications_for_same_elements(
 
 ### Negation distributes over union
 
-Distribution also applies to a negation operation:
+Distribution also applies to a negation operation. This is a manifestation of one of
+[De Morgan's laws], namely `~(P | Q) = ~P & ~Q`:
 
 ```py
 from knot_extensions import Not
@@ -256,22 +238,55 @@ class P: ...
 class Q: ...
 class R: ...
 
-def _(i: Not[P | Q | R]) -> None:
-    reveal_type(i)  # revealed: ~P & ~Q & ~R
+def _(i1: Not[P | Q], i2: Not[P | Q | R]) -> None:
+    reveal_type(i1)  # revealed: ~P & ~Q
+    reveal_type(i2)  # revealed: ~P & ~Q & ~R
 
 def example_literals(i: Not[Literal[1, 2]]) -> None:
     reveal_type(i)  # revealed: ~Literal[1] & ~Literal[2]
 ```
 
-## Simplification strategies
+### Negation of intersections
 
-In this section, we present various simplification strategies that go beyond the structure of the
-representation.
+The other of [De Morgan's laws], `~(P & Q) = ~P | ~Q`, also holds:
 
-### Self-negation
+```py
+from knot_extensions import Intersection, Not
 
-If we see both `P` and `~P` in an intersection, we can simplify to `Never`, even in the presence of
-other types:
+class P: ...
+class Q: ...
+class R: ...
+
+def _(
+    i1: Not[Intersection[P, Q]],
+    i2: Not[Intersection[P, Q, R]],
+) -> None:
+    reveal_type(i1)  # revealed: ~P | ~Q
+    reveal_type(i2)  # revealed: ~P | ~Q | ~R
+```
+
+### `Never` is dual to `object`
+
+`Never` represents the empty set of values, while `object` represents the set of all values, so
+`~Never` is equivalent to `object`, and `~object` is equivalent to `Never`. This is a manifestation
+of the [complement laws] of set theory.
+
+```py
+from knot_extensions import Intersection, Not
+from typing_extensions import Never
+
+def _(
+    not_never: Not[Never],
+    not_object: Not[object],
+) -> None:
+    reveal_type(not_never)  # revealed: object
+    reveal_type(not_object)  # revealed: Never
+```
+
+### Intersection of a type and its negation
+
+Continuing with more [complement laws], if we see both `P` and `~P` in an intersection, we can
+simplify to `Never`, even in the presence of other types:
 
 ```py
 from knot_extensions import Intersection, Not
@@ -296,6 +311,52 @@ def _(
     reveal_type(i6)  # revealed: Never
 ```
 
+### Union of a type and its negation
+
+Similarly, if we have both `P` and `~P` in a _union_, we could simplify that to `object`. However,
+this is a rather costly operation which would require us to build the negation of each type that we
+add to a union, so this is not implemented at the moment.
+
+```py
+from knot_extensions import Intersection, Not
+
+class P: ...
+
+def _(
+    i1: P | Not[P],
+    i2: Not[P] | P,
+) -> None:
+    # These could be simplified to `object`
+    reveal_type(i1)  # revealed: P | ~P
+    reveal_type(i2)  # revealed: ~P | P
+```
+
+### Negation is an involution
+
+The final of the [complement laws] states that negating twice is equivalent to not negating at all:
+
+```py
+from knot_extensions import Not
+
+class P: ...
+
+def _(
+    i1: Not[P],
+    i2: Not[Not[P]],
+    i3: Not[Not[Not[P]]],
+    i4: Not[Not[Not[Not[P]]]],
+) -> None:
+    reveal_type(i1)  # revealed: ~P
+    reveal_type(i2)  # revealed: P
+    reveal_type(i3)  # revealed: ~P
+    reveal_type(i4)  # revealed: P
+```
+
+## Simplification strategies
+
+In this section, we present various simplification strategies that go beyond the structure of the
+representation.
+
 ### `Never` in intersections
 
 If we intersect with `Never`, we can simplify the whole intersection to `Never`, even if there are
@@ -318,23 +379,6 @@ def _(
     reveal_type(i2)  # revealed: Never
     reveal_type(i3)  # revealed: Never
     reveal_type(i4)  # revealed: Never
-```
-
-### `Never` is dual to `object`
-
-`Never` represents the empty set of values, while `object` represents the set of all values, so
-`~Never` is equivalent to `object`, and `~object` is equivalent to `Never`:
-
-```py
-from knot_extensions import Intersection, Not
-from typing_extensions import Never
-
-def _(
-    not_never: Not[Never],
-    not_object: Not[object],
-) -> None:
-    reveal_type(not_never)  # revealed: object
-    reveal_type(not_object)  # revealed: Never
 ```
 
 ### Simplifications using disjointness
@@ -698,3 +742,6 @@ def mixed(
     reveal_type(i3)  # revealed: Any & Unknown
     reveal_type(i4)  # revealed: Any & Unknown
 ```
+
+[complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)
+[de morgan's laws]: https://en.wikipedia.org/wiki/De_Morgan%27s_laws
