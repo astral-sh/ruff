@@ -3429,18 +3429,18 @@ impl KnownFunction {
     }
 
     /// Return the [`ParameterExpectations`] for this function.
-    const fn takes_type_expression_arguments(self) -> ParameterExpectations {
+    const fn parameter_expectations(self) -> ParameterExpectations {
         match self {
             Self::IsFullyStatic | Self::IsSingleton | Self::IsSingleValued => {
-                ParameterExpectations::SINGLE_TYPE_EXPRESSION
+                ParameterExpectations::SingleTypeExpression
             }
 
             Self::IsEquivalentTo
             | Self::IsSubtypeOf
             | Self::IsAssignableTo
-            | Self::IsDisjointFrom => ParameterExpectations::TWO_TYPE_EXPRESSIONS,
+            | Self::IsDisjointFrom => ParameterExpectations::TwoTypeExpressions,
 
-            Self::AssertType => ParameterExpectations::VALUE_EXPRESSION_AND_TYPE_EXPRESSION,
+            Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
 
             Self::ConstraintFunction(_)
             | Self::Len
@@ -3461,28 +3461,41 @@ enum ParameterExpectations {
     /// All parameters in the function expect value expressions
     #[default]
     AllValueExpressions,
-    /// The function is special-cased by the type system: one or more parameters expect type expressions
-    /// rather than value expressions.
-    SpecialCased(&'static [ParameterExpectation]),
+    /// The first parameter in the function expects a type expression
+    SingleTypeExpression,
+    /// The first two parameters in the function expect type expressions
+    TwoTypeExpressions,
+    /// The first parameter in the function expects a value expression,
+    /// and the second expects a type expression
+    ValueExpressionAndTypeExpression,
 }
 
 impl ParameterExpectations {
-    const SINGLE_TYPE_EXPRESSION: Self = Self::SpecialCased(&[ParameterExpectation::Type]);
-
-    const TWO_TYPE_EXPRESSIONS: Self =
-        Self::SpecialCased(&[ParameterExpectation::Type, ParameterExpectation::Type]);
-
-    const VALUE_EXPRESSION_AND_TYPE_EXPRESSION: Self =
-        Self::SpecialCased(&[ParameterExpectation::Value, ParameterExpectation::Type]);
-
     /// Query whether the parameter at `parameter_index` expects a value expression or a type expression
     fn expectation_at_index(self, parameter_index: usize) -> ParameterExpectation {
         match self {
-            Self::AllValueExpressions => ParameterExpectation::Value,
-            Self::SpecialCased(expectations) => expectations
-                .get(parameter_index)
-                .copied()
-                .unwrap_or_default(),
+            Self::AllValueExpressions => ParameterExpectation::ValueExpression,
+            Self::SingleTypeExpression => {
+                if parameter_index == 0 {
+                    ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
+                }
+            }
+            Self::TwoTypeExpressions => {
+                if parameter_index < 2 {
+                    ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
+                }
+            }
+            Self::ValueExpressionAndTypeExpression => {
+                if parameter_index == 1 {
+                    ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
+                }
+            }
         }
     }
 }
@@ -3494,9 +3507,9 @@ impl ParameterExpectations {
 enum ParameterExpectation {
     /// The parameter expects a value expression
     #[default]
-    Value,
+    ValueExpression,
     /// The parameter expects a type expression
-    Type,
+    TypeExpression,
 }
 
 #[salsa::interned]

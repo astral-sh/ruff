@@ -2609,8 +2609,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .enumerate()
             .map(|(index, arg_or_keyword)| {
                 let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
-                    ParameterExpectation::Type => Self::infer_type_expression,
-                    ParameterExpectation::Value => Self::infer_expression,
+                    ParameterExpectation::TypeExpression => Self::infer_type_expression,
+                    ParameterExpectation::ValueExpression => Self::infer_expression,
                 };
 
                 match arg_or_keyword {
@@ -3155,13 +3155,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let function_type = self.infer_expression(func);
 
-        let infer_arguments_as_type_expressions = function_type
+        let parameter_expectations = function_type
             .into_function_literal()
             .and_then(|f| f.known(self.db()))
-            .map(KnownFunction::takes_type_expression_arguments)
+            .map(KnownFunction::parameter_expectations)
             .unwrap_or_default();
 
-        let call_arguments = self.infer_arguments(arguments, infer_arguments_as_type_expressions);
+        let call_arguments = self.infer_arguments(arguments, parameter_expectations);
         function_type
             .call(self.db(), &call_arguments)
             .unwrap_with_diagnostic(&self.context, call_expression.into())
