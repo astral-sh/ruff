@@ -128,7 +128,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
     - id: ruff-format
 ```
 
-To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowed filetypes:
+To avoid running on Jupyter Notebooks, remove `jupyter` from the list of allowed filetypes:
 
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -137,11 +137,11 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
   hooks:
     # Run the linter.
     - id: ruff
-      types_or: [ python, pyi, jupyter ]
+      types_or: [ python, pyi ]
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
-      types_or: [ python, pyi, jupyter ]
+      types_or: [ python, pyi ]
 ```
 
 When running with `--fix`, Ruff's lint hook should be placed _before_ Ruff's formatter hook, and
