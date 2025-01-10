@@ -211,6 +211,9 @@ redundant_clone = "warn"
 debug_assert_with_mut_call = "warn"
 unused_peekable = "warn"
 
+# Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
+large_stack_arrays = "allow"
+
 [profile.release]
 # Note that we set these explicitly, and these values
 # were chosen based on a trade-off between compile times
