@@ -2259,7 +2259,7 @@ impl<'db> Type<'db> {
             },
 
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            Type::Dynamic(gradual) => SubclassOfType::from(db, ClassBase::Dynamic(*gradual)),
+            Type::Dynamic(dynamic) => SubclassOfType::from(db, ClassBase::Dynamic(*dynamic)),
             // TODO intersections
             Type::Intersection(_) => SubclassOfType::from(
                 db,

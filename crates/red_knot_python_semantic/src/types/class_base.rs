@@ -40,7 +40,7 @@ impl<'db> ClassBase<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
-                    ClassBase::Dynamic(gradual) => gradual.fmt(f),
+                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
                     ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
                 }
             }
@@ -64,7 +64,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::Dynamic(gradual) => Some(Self::Dynamic(gradual)),
+            Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -177,7 +177,7 @@ impl<'db> From<Class<'db>> for ClassBase<'db> {
 impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
-            ClassBase::Dynamic(gradual) => Type::Dynamic(gradual),
+            ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => Type::class_literal(class),
         }
     }

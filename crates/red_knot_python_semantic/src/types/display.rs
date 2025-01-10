@@ -65,7 +65,7 @@ struct DisplayRepresentation<'db> {
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(gradual) => gradual.fmt(f),
+            Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::Instance(InstanceType { class }) => {
                 let representation = match class.known(self.db) {
@@ -84,7 +84,7 @@ impl Display for DisplayRepresentation<'_> {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
                 ClassBase::Class(class) => write!(f, "type[{}]", class.name(self.db)),
-                ClassBase::Dynamic(gradual) => write!(f, "type[{gradual}]"),
+                ClassBase::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
