@@ -105,10 +105,10 @@ static_assert(not is_subtype_of(B2, B1))
 This section covers structural properties of intersection types and documents some decisions on how
 to represent mixtures of intersections and unions.
 
-### Single-element unions
+### Single-element intersections
 
-If we have a union of a single element, we can simplify to that element. Similarly, we show an
-intersection with a single negative contribution as just the negation of that element.
+If we have an intersection with a single element, we can simplify to that element. Similarly, we
+show an intersection with a single negative contribution as just the negation of that element.
 
 ```py
 from knot_extensions import Intersection, Not
@@ -422,8 +422,8 @@ def example_type_bool_type_str(
 
 #### Positive and negative contributions
 
-If we intersect a type `X` with the negation of a disjoint type `Y`, we can remove the negative
-contribution `~Y`, as it necessarily overlaps with the positive contribution `X`:
+If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can remove the negative
+contribution `~Y`, as `~Y` must fully contain the positive contribution `X` as a subtype:
 
 ```py
 from knot_extensions import Intersection, Not
@@ -515,8 +515,7 @@ def _(
 
 #### Negative type and negative subtype
 
-For negative contributions, this property is reversed. Here we can get remove superfluous
-_subtypes_:
+For negative contributions, this property is reversed. Here we can remove superfluous _subtypes_:
 
 ```py
 from knot_extensions import Intersection, Not
