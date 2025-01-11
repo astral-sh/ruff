@@ -220,7 +220,12 @@ macro_rules! type_property_test {
 }
 
 mod stable {
-    use crate::types::{KnownClass, Type};
+    use crate::db::tests::TestDb;
+    use crate::types::{KnownClass, Type, UnionType};
+
+    fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+        UnionType::from_elements(db, [s, t])
+    }
 
     // `T` is equivalent to itself.
     type_property_test!(
@@ -305,6 +310,14 @@ mod stable {
         never_subtype_of_every_fully_static_type, db,
         forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
     );
+
+    // For fully static types, they should be subtype of their union.
+    type_property_test!(
+        fully_static_types_are_subtype_of_their_union, db,
+        forall types s, t.
+            s.is_fully_static(db) & t.is_fully_static(db)
+            => s.is_subtype_of(db, union(db, s, t)) & t.is_subtype_of(db, union(db, s, t))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -351,5 +364,19 @@ mod flaky {
     type_property_test!(
         double_negation_is_identity, db,
         forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+    );
+
+    // ~T should be disjoint from T
+    type_property_test!(
+        negation_is_disjoint, db,
+        forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
+    );
+
+    // For fully static types, their intersection should be subtype of them.
+    type_property_test!(
+        fully_static_types_are_supertypes_of_their_intersection, db,
+        forall types s, t.
+            s.is_fully_static(db) & t.is_fully_static(db)
+            => intersection(db, s, t).is_subtype_of(db, s) & intersection(db, s, t).is_subtype_of(db, t)
     );
 }
