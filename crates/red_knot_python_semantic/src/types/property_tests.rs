@@ -315,8 +315,8 @@ mod stable {
     type_property_test!(
         fully_static_types_are_subtype_of_their_union, db,
         forall types s, t.
-            s.is_fully_static(db) & t.is_fully_static(db)
-            => s.is_subtype_of(db, union(db, s, t)) & t.is_subtype_of(db, union(db, s, t))
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
     );
 }
 
@@ -376,7 +376,7 @@ mod flaky {
     type_property_test!(
         fully_static_types_are_supertypes_of_their_intersection, db,
         forall types s, t.
-            s.is_fully_static(db) & t.is_fully_static(db)
-            => intersection(db, s, t).is_subtype_of(db, s) & intersection(db, s, t).is_subtype_of(db, t)
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
     );
 }
