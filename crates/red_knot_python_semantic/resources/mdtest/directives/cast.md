@@ -24,5 +24,5 @@ cast(str)
 cast(str, b"ar", "foo")
 
 # TODO: Better error message
-cast(val="foo", typ=int)  # error: [unresolved-reference]
+cast(val="foo", typ=int)  # error: [unresolved-reference] "Name `foo` used when not defined"
 ```

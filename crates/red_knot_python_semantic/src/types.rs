@@ -2015,7 +2015,8 @@ impl<'db> Type<'db> {
                     }
 
                     Some(KnownFunction::Cast) => {
-                        // TODO: Use `.two_parameter_tys()` excusively when overloads are supported.
+                        // TODO: Use `.two_parameter_tys()` exclusively
+                        // when overloads are supported.
                         if binding.two_parameter_tys().is_none() {
                             return CallOutcome::callable(binding);
                         };
@@ -3495,7 +3496,7 @@ impl ParameterExpectations {
     fn expectation_at_index(self, parameter_index: usize) -> ParameterExpectation {
         match self {
             Self::AllValueExpressions => ParameterExpectation::ValueExpression,
-            Self::SingleTypeExpression => {
+            Self::SingleTypeExpression | Self::TypeExpressionAndValueExpression => {
                 if parameter_index == 0 {
                     ParameterExpectation::TypeExpression
                 } else {
@@ -3511,13 +3512,6 @@ impl ParameterExpectations {
             }
             Self::ValueExpressionAndTypeExpression => {
                 if parameter_index == 1 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-            Self::TypeExpressionAndValueExpression => {
-                if parameter_index == 0 {
                     ParameterExpectation::TypeExpression
                 } else {
                     ParameterExpectation::ValueExpression
