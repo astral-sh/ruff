@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF058.py:4:9: RUF058 Call super methods for unit test methods
+  |
+3 | class MyViolatingTestCase(unittest.TestCase):
+4 |     def setUp(self):
+  |         ^^^^^ RUF058
+5 |         # Missing super().setUp()
+6 |         self.resource = "Test resource"
+  |
+
+RUF058.py:8:9: RUF058 Call super methods for unit test methods
+   |
+ 6 |         self.resource = "Test resource"
+ 7 | 
+ 8 |     def tearDown(self):
+   |         ^^^^^^^^ RUF058
+ 9 |         del self.resource
+10 |         # Missing super().tearDown()
+   |
+
+RUF058.py:12:9: RUF058 Call super methods for unit test methods
+   |
+10 |         # Missing super().tearDown()
+11 | 
+12 |     def setUpClass(cls):
+   |         ^^^^^^^^^^ RUF058
+13 |         # Missing super().setUpClass()
+14 |         cls.shared_resource = "Shared resource"
+   |
+
+RUF058.py:16:9: RUF058 Call super methods for unit test methods
+   |
+14 |         cls.shared_resource = "Shared resource"
+15 | 
+16 |     def tearDownClass(cls):
+   |         ^^^^^^^^^^^^^ RUF058
+17 |         del cls.shared_resource
+18 |         # Missing super().tearDownClass()
+   |
