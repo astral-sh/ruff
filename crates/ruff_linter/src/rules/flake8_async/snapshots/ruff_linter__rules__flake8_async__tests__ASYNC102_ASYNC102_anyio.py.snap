@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
+---
+ASYNC102_anyio.py:18:9: ASYNC102 await inside cancelled must have shielded cancel scope with a timeout
+   |
+16 |         ...
+17 |     except anyio.get_cancelled_exc_class():
+18 |         await foo()  # error: 8, Statement("anyio.get_cancelled_exc_class()", lineno-1)
+   |         ^^^^^^^^^^^ ASYNC102
+19 |     except:
+20 |         await foo()  # safe
+   |
+
+ASYNC102_anyio.py:25:9: ASYNC102 await inside cancelled must have shielded cancel scope with a timeout
+   |
+23 |         ...
+24 |     except anyio.get_cancelled_exc_class():
+25 |         await foo()  # error: 8, Statement("anyio.get_cancelled_exc_class()", lineno-1)
+   |         ^^^^^^^^^^^ ASYNC102
+26 |     except BaseException:
+27 |         await foo()  # safe
+   |
+
+ASYNC102_anyio.py:32:9: ASYNC102 await inside cancelled must have shielded cancel scope with a timeout
+   |
+30 |         ...
+31 |     except get_cancelled_exc_class():
+32 |         await foo()  # error: 8, Statement("get_cancelled_exc_class()", lineno-1)
+   |         ^^^^^^^^^^^ ASYNC102
+33 |     except:
+34 |         await foo()  # safe
+   |
+
+ASYNC102_anyio.py:39:9: ASYNC102 await inside cancelled must have shielded cancel scope with a timeout
+   |
+37 |         ...
+38 |     except anyio.get_cancelled_exc_class():
+39 |         await foo()  # error: 8, Statement("anyio.get_cancelled_exc_class()", lineno-1)
+   |         ^^^^^^^^^^^ ASYNC102
+40 |     except anyio.get_cancelled_exc_class():
+41 |         await foo()
+   |
+
+ASYNC102_anyio.py:64:9: ASYNC102 await inside bare except must have shielded cancel scope with a timeout
+   |
+62 |         await foo()  # not an error
+63 |     except:
+64 |         await foo()  # error: 8, Statement("bare except", lineno-1)
+   |         ^^^^^^^^^^^ ASYNC102
+   |

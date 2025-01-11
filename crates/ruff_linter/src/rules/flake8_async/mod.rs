@@ -16,6 +16,13 @@ mod tests {
     use crate::test::test_path;
 
     #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_aclose_args.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_aclose.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_anyio.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_asyncio.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_ruff.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_trio.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]

@@ -1,6 +1,7 @@
 pub(crate) use async_busy_wait::*;
 pub(crate) use async_function_with_timeout::*;
 pub(crate) use async_zero_sleep::*;
+pub(crate) use await_in_finally_or_cancelled::*;
 pub(crate) use blocking_http_call::*;
 pub(crate) use blocking_open_call::*;
 pub(crate) use blocking_process_invocation::*;
@@ -12,6 +13,7 @@ pub(crate) use sync_call::*;
 mod async_busy_wait;
 mod async_function_with_timeout;
 mod async_zero_sleep;
+mod await_in_finally_or_cancelled;
 mod blocking_http_call;
 mod blocking_open_call;
 mod blocking_process_invocation;
