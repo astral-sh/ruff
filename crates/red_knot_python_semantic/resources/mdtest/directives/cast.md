@@ -9,12 +9,10 @@ from typing import Literal, cast
 
 from knot_extensions import TypeOf
 
-
 reveal_type(True)  # revealed: Literal[True]
 reveal_type(cast(str, True))  # revealed: str
 reveal_type(cast("str", True))  # revealed: str
 
-reveal_type(  # revealed: Unknown
-    cast(Literal, True)  # error: [invalid-type-form]
-)
+# error: [invalid-type-form]
+reveal_type(cast(Literal, True))  # revealed: Unknown
 ```
