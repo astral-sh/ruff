@@ -2,12 +2,10 @@
 
 `cast()` takes two arguments, one type and one value, and returns a value of the given type.
 
-The (inferred) type of the value and the given type do not need to have any correlations.
+The (inferred) type of the value and the given type do not need to have any correlation.
 
 ```py
 from typing import Literal, cast
-
-from knot_extensions import TypeOf
 
 reveal_type(True)  # revealed: Literal[True]
 reveal_type(cast(str, True))  # revealed: str
@@ -23,6 +21,7 @@ cast(1)
 cast(str)
 cast(str, b"ar", "foo")
 
-# TODO: Better error message
+# TODO: Either support keyword arguments properly,
+# or give a comprehensible error message saying they're unsupported
 cast(val="foo", typ=int)  # error: [unresolved-reference] "Name `foo` used when not defined"
 ```
