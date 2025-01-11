@@ -16,8 +16,7 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// ## Example
-///
-/// ``` python
+/// ```python
 /// import unittest
 ///
 /// class MyTestCase(unittest.TestCase):
@@ -26,8 +25,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
-///
-/// ``` python
+/// ```python
 /// import unittest
 ///
 /// class MyTestCase(unittest.TestCase):
