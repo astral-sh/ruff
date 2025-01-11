@@ -48,6 +48,10 @@ pub(super) enum CallOutcome<'db> {
         binding: CallBinding<'db>,
         asserted_ty: Type<'db>,
     },
+    Cast {
+        binding: CallBinding<'db>,
+        casted_ty: Type<'db>,
+    },
 }
 
 impl<'db> CallOutcome<'db> {
@@ -80,12 +84,17 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
-    /// Create a new `CallOutcome::AssertType` with given revealed and return types.
+    /// Create a new `CallOutcome::AssertType` with given asserted and return types.
     pub(super) fn asserted(binding: CallBinding<'db>, asserted_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::AssertType {
             binding,
             asserted_ty,
         }
+    }
+
+    /// Create a new `CallOutcome::Casted` with given casted and return types.
+    pub(super) fn casted(binding: CallBinding<'db>, casted_ty: Type<'db>) -> CallOutcome<'db> {
+        CallOutcome::Cast { binding, casted_ty }
     }
 
     /// Get the return type of the call, or `None` if not callable.
@@ -119,6 +128,10 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 asserted_ty: _,
             } => Some(binding.return_ty()),
+            Self::Cast {
+                binding: _,
+                casted_ty,
+            } => Some(*casted_ty),
         }
     }
 
@@ -280,7 +293,7 @@ impl<'db> CallOutcome<'db> {
                     }),
                 }
             }
-            CallOutcome::StaticAssertionError {
+            Self::StaticAssertionError {
                 binding,
                 error_kind,
             } => {
@@ -325,7 +338,7 @@ impl<'db> CallOutcome<'db> {
 
                 Ok(Type::unknown())
             }
-            CallOutcome::AssertType {
+            Self::AssertType {
                 binding,
                 asserted_ty,
             } => {
@@ -347,6 +360,10 @@ impl<'db> CallOutcome<'db> {
 
                 Ok(binding.return_ty())
             }
+            Self::Cast {
+                binding: _,
+                casted_ty,
+            } => Ok(*casted_ty),
         }
     }
 }
