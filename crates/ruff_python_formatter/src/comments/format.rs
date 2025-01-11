@@ -85,7 +85,7 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        if self.last_node.map_or(false, |preceding| {
+        if self.last_node.is_some_and(|preceding| {
             should_insert_blank_line_after_class_in_stub_file(preceding, None, f.context())
         }) {
             write!(f, [empty_line(), leading_comments(self.comments)])?;

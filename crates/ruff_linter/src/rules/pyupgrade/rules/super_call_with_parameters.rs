@@ -145,7 +145,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
             .resolve_qualified_name(func)
             .is_some_and(|name| name.segments() == ["dataclasses", "dataclass"])
         {
-            arguments.find_keyword("slots").map_or(false, |keyword| {
+            arguments.find_keyword("slots").is_some_and(|keyword| {
                 matches!(
                     keyword.value,
                     Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })

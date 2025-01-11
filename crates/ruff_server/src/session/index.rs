@@ -125,7 +125,7 @@ impl Index {
             DocumentKey::NotebookCell(url)
         } else if Path::new(url.path())
             .extension()
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("ipynb"))
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
         {
             DocumentKey::Notebook(url)
         } else {

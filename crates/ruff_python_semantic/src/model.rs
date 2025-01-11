@@ -1002,24 +1002,21 @@ impl<'a> SemanticModel<'a> {
                 let value_name = UnqualifiedName::from_expr(value)?;
                 let (_, tail) = value_name.segments().split_first()?;
 
-                let resolved: QualifiedName = if qualified_name
-                    .segments()
-                    .first()
-                    .map_or(false, |segment| *segment == ".")
-                {
-                    from_relative_import(
-                        self.module.qualified_name()?,
-                        qualified_name.segments(),
-                        tail,
-                    )?
-                } else {
-                    qualified_name
-                        .segments()
-                        .iter()
-                        .chain(tail)
-                        .copied()
-                        .collect()
-                };
+                let resolved: QualifiedName =
+                    if qualified_name.segments().first().copied() == Some(".") {
+                        from_relative_import(
+                            self.module.qualified_name()?,
+                            qualified_name.segments(),
+                            tail,
+                        )?
+                    } else {
+                        qualified_name
+                            .segments()
+                            .iter()
+                            .chain(tail)
+                            .copied()
+                            .collect()
+                    };
                 Some(resolved)
             }
             BindingKind::Builtin => {

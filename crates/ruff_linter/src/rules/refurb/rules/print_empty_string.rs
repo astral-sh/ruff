@@ -144,7 +144,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
             let empty_separator = call
                 .arguments
                 .find_keyword("sep")
-                .map_or(false, |keyword| is_empty_string(&keyword.value));
+                .is_some_and(|keyword| is_empty_string(&keyword.value));
             if !empty_separator {
                 return;
             }

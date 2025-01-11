@@ -959,7 +959,7 @@ A `--config` flag must either be a path to a `.toml` configuration file
         // We want to display the most helpful error to the user as possible.
         if Path::new(value)
             .extension()
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
         {
             if !value.contains('=') {
                 tip.push_str(&format!(
