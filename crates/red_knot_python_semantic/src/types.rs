@@ -2015,7 +2015,7 @@ impl<'db> Type<'db> {
                     }
 
                     Some(KnownFunction::Cast) => {
-                        // TODO: Use `.two_parameter_tys()` when overloads are supported.
+                        // TODO: Use `.two_parameter_tys()` excusively when overloads are supported.
                         if binding.two_parameter_tys().is_none() {
                             return CallOutcome::callable(binding);
                         };
@@ -3517,10 +3517,10 @@ impl ParameterExpectations {
                 }
             }
             Self::TypeExpressionAndValueExpression => {
-                if parameter_index == 1 {
-                    ParameterExpectation::ValueExpression
-                } else {
+                if parameter_index == 0 {
                     ParameterExpectation::TypeExpression
+                } else {
+                    ParameterExpectation::ValueExpression
                 }
             }
         }

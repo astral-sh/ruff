@@ -17,4 +17,12 @@ reveal_type(cast(int | str, 1))  # revealed: int | str
 
 # error: [invalid-type-form]
 reveal_type(cast(Literal, True))  # revealed: Unknown
+
+# TODO: These should be errors
+cast(1)
+cast(str)
+cast(str, b"ar", "foo")
+
+# TODO: Better error message
+cast(val="foo", typ=int)  # error: [unresolved-reference]
 ```
