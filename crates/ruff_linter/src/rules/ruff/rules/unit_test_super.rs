@@ -57,13 +57,13 @@ pub(crate) fn unit_test_super(checker: &mut Checker, class: &StmtClassDef) {
         return;
     }
 
-    let unit_test_methods = ["setUp", "tearDown", "setUpClass", "tearDownClass"];
-
     for stmt in &class.body {
         if let Stmt::FunctionDef(function_def) = stmt {
             let body = &function_def.body;
             let name = function_def.name.as_str();
-            if matches!(name, "setUp" | "tearDown" | "setUpClass" | "tearDownClass) && !has_super_call(body, name) {
+            if matches!(name, "setUp" | "tearDown" | "setUpClass" | "tearDownClass")
+                && !has_super_call(body, name)
+            {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(UnitTestSuper, stmt.identifier()));
