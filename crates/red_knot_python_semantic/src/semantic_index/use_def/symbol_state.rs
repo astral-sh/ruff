@@ -310,7 +310,7 @@ impl SymbolState {
                 visibility_constraints: VisibilityConstraintPerBinding::default(),
             },
             declarations: SymbolDeclarations {
-                live_declarations: self.declarations.live_declarations.clone(),
+                live_declarations: Declarations::default(),
                 visibility_constraints: VisibilityConstraintPerDeclaration::default(),
             },
         };
