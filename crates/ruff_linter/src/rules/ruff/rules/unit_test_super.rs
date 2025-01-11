@@ -16,8 +16,10 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// ## Example
+///
 /// ```python
 /// import unittest
+///
 ///
 /// class MyTestCase(unittest.TestCase):
 ///     def setUp(self):
@@ -25,8 +27,10 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import unittest
+///
 ///
 /// class MyTestCase(unittest.TestCase):
 ///     def setUp(self):
