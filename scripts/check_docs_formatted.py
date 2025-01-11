@@ -159,7 +159,7 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             case _:
                 # We are only interested in checking the formatting of py or pyi code
                 # blocks so we can return early if the language is not one of these.
-                return f'{match["before"]}{match["code"]}{match["after"]}'
+                return f"{match['before']}{match['code']}{match['after']}"
 
         code = textwrap.dedent(match["code"])
         try:
@@ -170,7 +170,7 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             raise e
 
         code = textwrap.indent(code, match["indent"])
-        return f'{match["before"]}{code}{match["after"]}'
+        return f"{match['before']}{code}{match['after']}"
 
     src = SNIPPED_RE.sub(_snipped_match, src)
     return src, errors

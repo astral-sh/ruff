@@ -104,9 +104,9 @@ class Repository(NamedTuple):
             stdout=PIPE,
         )
         git_sha_stdout, _ = await git_sha_process.communicate()
-        assert (
-            await git_sha_process.wait() == 0
-        ), f"Failed to retrieve commit sha at {checkout_dir}"
+        assert await git_sha_process.wait() == 0, (
+            f"Failed to retrieve commit sha at {checkout_dir}"
+        )
         return git_sha_stdout.decode().strip()
 
 
