@@ -258,7 +258,7 @@ def main() -> None:
         {
             "redirects": {
                 "redirect_maps": {
-                    f'rules/{rule["code"]}.md': f'rules/{rule["name"]}.md'
+                    f"rules/{rule['code']}.md": f"rules/{rule['name']}.md"
                     for rule in rules
                 },
             },
