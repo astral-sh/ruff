@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
+---
+PT030.py:22:23: PT030 `pytest.warns(foo.FooWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+20 |         pass
+21 | 
+22 |     with pytest.warns(FooWarning):
+   |                       ^^^^^^^^^^ PT030
+23 |         pass
+   |
