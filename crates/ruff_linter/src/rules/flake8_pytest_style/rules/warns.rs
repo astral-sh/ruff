@@ -165,7 +165,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
-/// PT029, PT039
+/// PT029, PT030
 pub(crate) fn warns_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_pytest_warns(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestWarnsWithoutWarning) {
