@@ -4539,7 +4539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return dunder_getitem_method
                             .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                            .return_ty_result( &self.context, value_node.into())
+                            .return_ty_result(&self.context, value_node.into())
                             .unwrap_or_else(|err| {
                                 self.context.report_lint(
                                     &CALL_NON_CALLABLE,
@@ -5373,7 +5373,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
-            KnownInstanceType::NoReturn | KnownInstanceType::Never | KnownInstanceType::Any => {
+            KnownInstanceType::NoReturn
+            | KnownInstanceType::Never
+            | KnownInstanceType::Any
+            | KnownInstanceType::AlwaysTruthy
+            | KnownInstanceType::AlwaysFalsy => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript.into(),
