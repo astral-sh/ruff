@@ -96,8 +96,8 @@ u: Unknown[str]
 
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
-`AlwaysTruthy` and `AlwaysFalsy` represent the sets of all possible objects whose truthiness is always truthy
-or falsy, respectively.
+`AlwaysTruthy` and `AlwaysFalsy` represent the sets of all possible objects whose truthiness is
+always truthy or falsy, respectively.
 
 They do not accept any type arguments.
 
