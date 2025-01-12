@@ -287,9 +287,9 @@ impl Dependency {
 
             if dependency.is_some() {
                 return Some(Self::Multiple);
-            } else {
-                dependency = Self::from_depends_call(arguments, semantic);
             }
+
+            dependency = Self::from_depends_call(arguments, semantic);
         }
 
         dependency
