@@ -311,9 +311,9 @@ mod stable {
         forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
     );
 
-    // For fully static types, they should be subtype of their union.
+    // For any two fully static types, each type in the pair must be a subtype of their union.
     type_property_test!(
-        fully_static_types_are_subtype_of_their_union, db,
+        all_fully_static_type_pairs_are_subtype_of_their_union, db,
         forall types s, t.
             s.is_fully_static(db) && t.is_fully_static(db)
             => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
@@ -330,7 +330,7 @@ mod stable {
 mod flaky {
     use crate::{
         db::tests::TestDb,
-        types::{IntersectionBuilder, Type},
+        types::{IntersectionBuilder, Type, UnionType},
     };
 
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
@@ -347,6 +347,10 @@ mod flaky {
             .add_positive(s)
             .add_positive(t)
             .build()
+    }
+
+    fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+        UnionType::from_elements(db, [s, t])
     }
 
     type_property_test!(
@@ -372,11 +376,25 @@ mod flaky {
         forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
     );
 
-    // For fully static types, their intersection should be subtype of them.
+    // For fully static types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
-        fully_static_types_are_supertypes_of_their_intersection, db,
+        all_fully_static_type_pairs_are_supertypes_of_their_union, db,
         forall types s, t.
             s.is_fully_static(db) && t.is_fully_static(db)
             => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
+    );
+
+    // And for non-fully-static types, the intersection of a pair of types
+    // should be assignable to both types of the pair.
+    type_property_test!(
+        all_type_pairs_can_be_assigned_from_their_intersection, db,
+        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
+    );
+
+    // For *any* two types, whether fully static or not,
+    // each of the pair they should be assignable to the union of the two.
+    type_property_test!(
+        all_type_pairs_are_assignable_to_their_union, db,
+        forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
     );
 }
