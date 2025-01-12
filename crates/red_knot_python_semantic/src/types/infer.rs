@@ -5298,39 +5298,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
-            KnownInstanceType::LiteralExt => {
-                let elements = match arguments_slice {
-                    ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
-                    element => Either::Right(std::iter::once(element)),
-                };
-
-                elements
-                    .fold(UnionBuilder::new(self.db()), |builder, element| {
-                        let argument_type = self.infer_expression(element);
-
-                        match argument_type {
-                            Type::ClassLiteral(_)
-                            | Type::FunctionLiteral(_)
-                            | Type::SliceLiteral(_) => {
-                                builder.add(argument_type)
-                            }
-
-                            _ => {
-                                self.context.report_lint(
-                                    &INVALID_TYPE_FORM,
-                                    element.into(),
-                                    format_args!(
-                                        "Special form `{}` expected class, function or slice literals as arguments, got `{}`",
-                                        known_instance.repr(self.db()),
-                                        argument_type.display(self.db()),
-                                    ),
-                                );
-                                builder.add(Type::unknown())
-                            }
-                        }
-                    })
-                    .build()
-            }
 
             // TODO: Generics
             KnownInstanceType::ChainMap => {

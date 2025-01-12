@@ -106,7 +106,6 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf
-                | KnownInstanceType::LiteralExt
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),

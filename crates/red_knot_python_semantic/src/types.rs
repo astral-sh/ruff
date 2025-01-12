@@ -2825,8 +2825,6 @@ pub enum KnownInstanceType<'db> {
     Intersection,
     /// The symbol `knot_extensions.TypeOf`
     TypeOf,
-    /// The symbol `knot_extensions.LiteralExt`
-    LiteralExt,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -2887,7 +2885,6 @@ impl<'db> KnownInstanceType<'db> {
             Self::Not => "Not",
             Self::Intersection => "Intersection",
             Self::TypeOf => "TypeOf",
-            Self::LiteralExt => "LiteralExt",
         }
     }
 
@@ -2932,8 +2929,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
-            | Self::TypeOf
-            | Self::LiteralExt => Truthiness::AlwaysTrue,
+            | Self::TypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2979,7 +2975,6 @@ impl<'db> KnownInstanceType<'db> {
             Self::Not => "knot_extensions.Not",
             Self::Intersection => "knot_extensions.Intersection",
             Self::TypeOf => "knot_extensions.TypeOf",
-            Self::LiteralExt => "knot_extensions.LiteralExt",
         }
     }
 
@@ -3022,7 +3017,6 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeOf => KnownClass::SpecialForm,
             Self::Not => KnownClass::SpecialForm,
             Self::Intersection => KnownClass::SpecialForm,
-            Self::LiteralExt => KnownClass::SpecialForm,
             Self::Unknown => KnownClass::Object,
             Self::AlwaysTruthy => KnownClass::Object,
             Self::AlwaysFalsy => KnownClass::Object,
@@ -3082,7 +3076,6 @@ impl<'db> KnownInstanceType<'db> {
             "Not" => Self::Not,
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
-            "LiteralExt" => Self::LiteralExt,
             _ => return None,
         };
 
@@ -3137,8 +3130,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
-            | Self::TypeOf
-            | Self::LiteralExt => module.is_knot_extensions(),
+            | Self::TypeOf => module.is_knot_extensions(),
         }
     }
 

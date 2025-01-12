@@ -12,7 +12,6 @@ AlwaysFalsy = object()
 Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
-LiteralExt: _SpecialForm
 
 # Predicates on types
 #
