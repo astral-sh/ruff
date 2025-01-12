@@ -49,11 +49,15 @@ impl Violation for UnitTestSuper {
 }
 
 pub(crate) fn unit_test_super(checker: &mut Checker, class: &StmtClassDef) {
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
 
-    if !is_testcase_subclass(bases) {
+    if !is_testcase_subclass(bases, checker) {
         return;
     }
 
@@ -72,10 +76,14 @@ pub(crate) fn unit_test_super(checker: &mut Checker, class: &StmtClassDef) {
     }
 }
 
-fn is_testcase_subclass(bases: &[Expr]) -> bool {
-    bases.iter().any(|base| match base {
-        Expr::Attribute(attr) => attr.attr.as_str() == "TestCase",
-        _ => false,
+fn is_testcase_subclass(bases: &[Expr], checker: &Checker) -> bool {
+    bases.iter().any(|base| {
+        checker
+            .semantic()
+            .resolve_qualified_name(base)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["unittest", "TestCase"])
+            })
     })
 }
 
