@@ -116,10 +116,12 @@ def _(t: AlwaysTruthy, f: AlwaysFalsy):
     reveal_type(t)  # revealed: AlwaysTruthy
     reveal_type(f)  # revealed: AlwaysFalsy
 
-# error: [invalid-type-form]
-a: AlwaysTruthy[int]
-# error: [invalid-type-form]
-b: AlwaysFalsy[str]
+def f(
+    a: AlwaysTruthy[int],  # error: [invalid-type-form]
+    b: AlwaysFalsy[str],  # error: [invalid-type-form]
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
 ```
 
 ## Static assertions
