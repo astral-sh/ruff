@@ -220,7 +220,12 @@ macro_rules! type_property_test {
 }
 
 mod stable {
-    use crate::types::{KnownClass, Type};
+    use crate::db::tests::TestDb;
+    use crate::types::{KnownClass, Type, UnionType};
+
+    fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+        UnionType::from_elements(db, [s, t])
+    }
 
     // `T` is equivalent to itself.
     type_property_test!(
@@ -228,7 +233,7 @@ mod stable {
         forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
     );
 
-    // `T` is a subtype of itself.
+    // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
@@ -305,6 +310,14 @@ mod stable {
         never_subtype_of_every_fully_static_type, db,
         forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
     );
+
+    // For any two fully static types, each type in the pair must be a subtype of their union.
+    type_property_test!(
+        all_fully_static_type_pairs_are_subtype_of_their_union, db,
+        forall types s, t.
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -317,8 +330,19 @@ mod stable {
 mod flaky {
     use crate::{
         db::tests::TestDb,
-        types::{IntersectionBuilder, Type},
+        types::{IntersectionBuilder, Type, UnionType},
     };
+
+    fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(db)
+            .add_positive(s)
+            .add_positive(t)
+            .build()
+    }
+
+    fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+        UnionType::from_elements(db, [s, t])
+    }
 
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     // `T` can be assigned to itself.
@@ -329,13 +353,6 @@ mod flaky {
 
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     // An intersection of two types should be assignable to both of them
-    fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .add_positive(s)
-            .add_positive(t)
-            .build()
-    }
-
     type_property_test!(
         intersection_assignable_to_both, db,
         forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
@@ -351,5 +368,33 @@ mod flaky {
     type_property_test!(
         double_negation_is_identity, db,
         forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+    );
+
+    // ~T should be disjoint from T
+    type_property_test!(
+        negation_is_disjoint, db,
+        forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
+    );
+
+    // For two fully static types, their intersection must be a subtype of each type in the pair.
+    type_property_test!(
+        all_fully_static_type_pairs_are_supertypes_of_their_union, db,
+        forall types s, t.
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
+    );
+
+    // And for non-fully-static types, the intersection of a pair of types
+    // should be assignable to both types of the pair.
+    type_property_test!(
+        all_type_pairs_can_be_assigned_from_their_intersection, db,
+        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
+    );
+
+    // For *any* pair of types, whether fully static or not,
+    // each of the pair should be assignable to the union of the two.
+    type_property_test!(
+        all_type_pairs_are_assignable_to_their_union, db,
+        forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
     );
 }
