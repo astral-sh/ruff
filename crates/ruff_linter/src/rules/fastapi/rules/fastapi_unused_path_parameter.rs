@@ -6,7 +6,7 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
+use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
@@ -224,12 +224,15 @@ enum Dependency {
     Unknown,
     /// A function defined in the same file, whose parameter names are as given.
     Function(Vec<String>),
+    /// There are multiple `Depends()` calls.
+    Multiple,
 }
 
 impl Dependency {
     fn parameter_names(self) -> Option<Vec<String>> {
         match self {
             Self::Unknown => None,
+            Self::Multiple => None,
             Self::Function(parameter_names) => Some(parameter_names),
         }
     }
@@ -256,7 +259,7 @@ impl Dependency {
         } = parameter_with_default;
 
         if let Some(default) = default {
-            if let Some(dependency) = Self::from_call(default.as_ref(), semantic) {
+            if let Some(dependency) = Self::from_default(default, semantic) {
                 return Some(dependency);
             };
         }
@@ -275,25 +278,30 @@ impl Dependency {
             return None;
         };
 
-        tuple
-            .elts
-            .iter()
-            .skip(1)
-            .find_map(|metadata| Self::from_call(metadata, semantic))
-    }
+        let mut dependency = None;
 
-    fn from_call(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
-        let Expr::Call(ExprCall {
-            func, arguments, ..
-        }) = expr
-        else {
-            return None;
-        };
+        for metadata_element in tuple.elts.iter().skip(1) {
+            let Some(arguments) = depends_arguments(metadata_element, semantic) else {
+                continue;
+            };
 
-        if !is_fastapi_depends(func.as_ref(), semantic) {
-            return None;
+            if dependency.is_some() {
+                return Some(Self::Multiple);
+            } else {
+                dependency = Self::from_depends_call(arguments, semantic);
+            }
         }
 
+        dependency
+    }
+
+    fn from_default(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
+        let arguments = depends_arguments(expr, semantic)?;
+
+        Self::from_depends_call(arguments, semantic)
+    }
+
+    fn from_depends_call(arguments: &Arguments, semantic: &SemanticModel) -> Option<Self> {
         let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
             return None;
         };
@@ -318,6 +326,21 @@ impl Dependency {
 
         Some(Self::Function(parameter_names))
     }
+}
+
+fn depends_arguments<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Arguments> {
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
+        return None;
+    };
+
+    if !is_fastapi_depends(func.as_ref(), semantic) {
+        return None;
+    }
+
+    Some(arguments)
 }
 
 fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {

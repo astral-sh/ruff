@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
-snapshot_kind: text
 ---
 FAST003.py:9:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |
@@ -359,17 +358,16 @@ FAST003.py:158:19: FAST003 [*] Parameter `thing_id` appears in route path, but n
 159     |-async def single(other: Annotated[str, Depends(something_else)]): ...
     159 |+async def single(other: Annotated[str, Depends(something_else)], thing_id): ...
 160 160 | @app.get("/things/{thing_id}")
-161 161 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
-162 162 | @app.get("/things/{thing_id}")
+161 161 | async def default(other: str = Depends(something_else)): ...
+162 162 | 
 
-FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `double` signature
+FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
     |
 158 | @app.get("/things/{thing_id}")
 159 | async def single(other: Annotated[str, Depends(something_else)]): ...
 160 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^ FAST003
-161 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
-162 | @app.get("/things/{thing_id}")
+161 | async def default(other: str = Depends(something_else)): ...
     |
     = help: Add `thing_id` to function signature
 
@@ -377,28 +375,8 @@ FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but n
 158 158 | @app.get("/things/{thing_id}")
 159 159 | async def single(other: Annotated[str, Depends(something_else)]): ...
 160 160 | @app.get("/things/{thing_id}")
-161     |-async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
-    161 |+async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)], thing_id): ...
-162 162 | @app.get("/things/{thing_id}")
-163 163 | async def default(other: str = Depends(something_else)): ...
-164 164 | 
-
-FAST003.py:162:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
-    |
-160 | @app.get("/things/{thing_id}")
-161 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
-162 | @app.get("/things/{thing_id}")
-    |                   ^^^^^^^^^^ FAST003
-163 | async def default(other: str = Depends(something_else)): ...
-    |
-    = help: Add `thing_id` to function signature
-
-ℹ Unsafe fix
-160 160 | @app.get("/things/{thing_id}")
-161 161 | async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
-162 162 | @app.get("/things/{thing_id}")
-163     |-async def default(other: str = Depends(something_else)): ...
-    163 |+async def default(thing_id, other: str = Depends(something_else)): ...
-164 164 | 
-165 165 | 
-166 166 | ### No errors
+161     |-async def default(other: str = Depends(something_else)): ...
+    161 |+async def default(thing_id, other: str = Depends(something_else)): ...
+162 162 | 
+163 163 | 
+164 164 | ### No errors
