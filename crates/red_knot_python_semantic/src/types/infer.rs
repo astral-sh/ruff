@@ -5373,7 +5373,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
-            KnownInstanceType::NoReturn | KnownInstanceType::Never | KnownInstanceType::Any => {
+            KnownInstanceType::NoReturn
+            | KnownInstanceType::Never
+            | KnownInstanceType::Any
+            | KnownInstanceType::AlwaysTruthy
+            | KnownInstanceType::AlwaysFalsy => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript.into(),
@@ -5396,22 +5400,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ),
                 );
                 Type::unknown()
-            }
-            KnownInstanceType::AlwaysTruthy | KnownInstanceType::AlwaysFalsy => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    subscript.into(),
-                    format_args!(
-                        "Special form `{}` expected no type parameter",
-                        known_instance.repr(self.db())
-                    ),
-                );
-
-                if matches!(known_instance, KnownInstanceType::AlwaysTruthy) {
-                    Type::AlwaysTruthy
-                } else {
-                    Type::AlwaysFalsy
-                }
             }
             KnownInstanceType::LiteralString => {
                 self.context.report_lint(

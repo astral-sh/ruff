@@ -99,6 +99,8 @@ u: Unknown[str]
 `AlwaysTruthy` and `AlwaysFalsy` represent the sets of all types whose truthiness is always truthy
 or falsy, respectively.
 
+They do not accept any type arguments.
+
 ```py
 from typing_extensions import Literal
 
@@ -113,6 +115,11 @@ static_assert(not is_subtype_of(str, AlwaysFalsy))
 def _(t: AlwaysTruthy, f: AlwaysFalsy):
     reveal_type(t)  # revealed: AlwaysTruthy
     reveal_type(f)  # revealed: AlwaysFalsy
+
+# error: [invalid-type-form]
+a: AlwaysTruthy[int]
+# error: [invalid-type-form]
+b: AlwaysFalsy[str]
 ```
 
 ## Static assertions
