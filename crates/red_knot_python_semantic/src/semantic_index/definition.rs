@@ -4,11 +4,10 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::unpack::Unpack;
-use crate::{Db, KnownModule};
+use crate::Db;
 
 /// A definition of a symbol.
 ///
@@ -60,24 +59,6 @@ impl<'db> Definition<'db> {
 
     pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_binding()
-    }
-
-    pub(crate) fn is_builtin_definition(self, db: &'db dyn Db) -> bool {
-        file_to_module(db, self.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Builtins))
-    }
-
-    /// Return true if this symbol was defined in the `typing` or `typing_extensions` modules
-    pub(crate) fn is_typing_definition(self, db: &'db dyn Db) -> bool {
-        matches!(
-            file_to_module(db, self.file(db)).and_then(|module| module.known()),
-            Some(KnownModule::Typing | KnownModule::TypingExtensions)
-        )
-    }
-
-    pub(crate) fn is_knot_extensions_definition(self, db: &'db dyn Db) -> bool {
-        file_to_module(db, self.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::KnotExtensions))
     }
 }
 

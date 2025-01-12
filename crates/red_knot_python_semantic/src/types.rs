@@ -3401,47 +3401,51 @@ impl KnownFunction {
         definition: Definition<'db>,
         name: &str,
     ) -> Option<Self> {
-        match name {
-            "reveal_type" if definition.is_typing_definition(db) => Some(KnownFunction::RevealType),
-            "isinstance" if definition.is_builtin_definition(db) => Some(
-                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsInstance),
-            ),
-            "issubclass" if definition.is_builtin_definition(db) => Some(
-                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
-            ),
-            "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
-            "final" if definition.is_typing_definition(db) => Some(KnownFunction::Final),
-            "no_type_check" if definition.is_typing_definition(db) => {
-                Some(KnownFunction::NoTypeCheck)
-            }
-            "assert_type" if definition.is_typing_definition(db) => Some(KnownFunction::AssertType),
-            "cast" if definition.is_typing_definition(db) => Some(KnownFunction::Cast),
-            "static_assert" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::StaticAssert)
-            }
-            "is_subtype_of" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsSubtypeOf)
-            }
-            "is_disjoint_from" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsDisjointFrom)
-            }
-            "is_equivalent_to" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsEquivalentTo)
-            }
-            "is_assignable_to" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsAssignableTo)
-            }
-            "is_fully_static" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsFullyStatic)
-            }
-            "is_singleton" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsSingleton)
-            }
-            "is_single_valued" if definition.is_knot_extensions_definition(db) => {
-                Some(KnownFunction::IsSingleValued)
-            }
+        let candidate = match name {
+            "isinstance" => Self::ConstraintFunction(KnownConstraintFunction::IsInstance),
+            "issubclass" => Self::ConstraintFunction(KnownConstraintFunction::IsSubclass),
+            "reveal_type" => Self::RevealType,
+            "len" => Self::Len,
+            "final" => Self::Final,
+            "no_type_check" => Self::NoTypeCheck,
+            "assert_type" => Self::AssertType,
+            "cast" => Self::Cast,
+            "static_assert" => Self::StaticAssert,
+            "is_subtype_of" => Self::IsSubtypeOf,
+            "is_disjoint_from" => Self::IsDisjointFrom,
+            "is_equivalent_to" => Self::IsEquivalentTo,
+            "is_assignable_to" => Self::IsAssignableTo,
+            "is_fully_static" => Self::IsFullyStatic,
+            "is_singleton" => Self::IsSingleton,
+            "is_single_valued" => Self::IsSingleValued,
+            _ => return None,
+        };
 
-            _ => None,
+        candidate
+            .check_module(file_to_module(db, definition.file(db))?.known()?)
+            .then_some(candidate)
+    }
+
+    /// Return `true` if `self` is defined in `module` at runtime.
+    const fn check_module(self, module: KnownModule) -> bool {
+        match self {
+            Self::ConstraintFunction(constraint_function) => match constraint_function {
+                KnownConstraintFunction::IsInstance | KnownConstraintFunction::IsSubclass => {
+                    module.is_builtins()
+                }
+            },
+            Self::Len => module.is_builtins(),
+            Self::AssertType | Self::Cast | Self::RevealType | Self::Final | Self::NoTypeCheck => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+            Self::IsAssignableTo
+            | Self::IsDisjointFrom
+            | Self::IsEquivalentTo
+            | Self::IsFullyStatic
+            | Self::IsSingleValued
+            | Self::IsSingleton
+            | Self::IsSubtypeOf
+            | Self::StaticAssert => module.is_knot_extensions(),
         }
     }
 
