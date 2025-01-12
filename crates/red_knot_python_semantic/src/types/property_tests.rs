@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use super::tests::Ty;
 use crate::db::tests::{setup_db, TestDb};
-use crate::types::KnownClass;
+use crate::types::{IntersectionBuilder, KnownClass, Type, UnionType};
 use quickcheck::{Arbitrary, Gen};
 
 fn arbitrary_core_type(g: &mut Gen) -> Ty {
@@ -219,13 +219,20 @@ macro_rules! type_property_test {
     };
 }
 
-mod stable {
-    use crate::db::tests::TestDb;
-    use crate::types::{KnownClass, Type, UnionType};
+fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+    IntersectionBuilder::new(db)
+        .add_positive(s)
+        .add_positive(t)
+        .build()
+}
 
-    fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-        UnionType::from_elements(db, [s, t])
-    }
+fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+    UnionType::from_elements(db, [s, t])
+}
+
+mod stable {
+    use super::union;
+    use crate::types::{KnownClass, Type};
 
     // `T` is equivalent to itself.
     type_property_test!(
@@ -328,21 +335,7 @@ mod stable {
 /// tests to the `stable` section. In the meantime, it can still be useful to run these
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
-    use crate::{
-        db::tests::TestDb,
-        types::{IntersectionBuilder, Type, UnionType},
-    };
-
-    fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .add_positive(s)
-            .add_positive(t)
-            .build()
-    }
-
-    fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-        UnionType::from_elements(db, [s, t])
-    }
+    use super::{intersection, union};
 
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     // `T` can be assigned to itself.
@@ -359,6 +352,7 @@ mod flaky {
     );
 
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
+    // This very often passes now, but occasionally flakes due to https://github.com/astral-sh/ruff/issues/15380
     type_property_test!(
         subtype_of_is_antisymmetric, db,
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
