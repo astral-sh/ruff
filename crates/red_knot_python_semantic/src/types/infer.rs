@@ -4539,7 +4539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return dunder_getitem_method
                             .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                            .return_ty_result( &self.context, value_node.into())
+                            .return_ty_result(&self.context, value_node.into())
                             .unwrap_or_else(|err| {
                                 self.context.report_lint(
                                     &CALL_NON_CALLABLE,
@@ -5298,6 +5298,39 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
+            KnownInstanceType::LiteralExt => {
+                let elements = match arguments_slice {
+                    ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
+                    element => Either::Right(std::iter::once(element)),
+                };
+
+                elements
+                    .fold(UnionBuilder::new(self.db()), |builder, element| {
+                        let argument_type = self.infer_expression(element);
+
+                        match argument_type {
+                            Type::ClassLiteral(_)
+                            | Type::FunctionLiteral(_)
+                            | Type::SliceLiteral(_) => {
+                                builder.add(argument_type)
+                            }
+
+                            _ => {
+                                self.context.report_lint(
+                                    &INVALID_TYPE_FORM,
+                                    element.into(),
+                                    format_args!(
+                                        "Special form `{}` expected class, function or slice literals as arguments, got `{}`",
+                                        known_instance.repr(self.db()),
+                                        argument_type.display(self.db()),
+                                    ),
+                                );
+                                builder.add(Type::unknown())
+                            }
+                        }
+                    })
+                    .build()
+            }
 
             // TODO: Generics
             KnownInstanceType::ChainMap => {
@@ -5396,6 +5429,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ),
                 );
                 Type::unknown()
+            }
+            KnownInstanceType::AlwaysTruthy | KnownInstanceType::AlwaysFalsy => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    subscript.into(),
+                    format_args!(
+                        "Special form `{}` expected no type parameter",
+                        known_instance.repr(self.db())
+                    ),
+                );
+
+                if matches!(known_instance, KnownInstanceType::AlwaysTruthy) {
+                    Type::AlwaysTruthy
+                } else {
+                    Type::AlwaysFalsy
+                }
             }
             KnownInstanceType::LiteralString => {
                 self.context.report_lint(

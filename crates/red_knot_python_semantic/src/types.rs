@@ -2278,6 +2278,8 @@ impl<'db> Type<'db> {
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
+            Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
+            Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
             )),
@@ -2813,12 +2815,18 @@ pub enum KnownInstanceType<'db> {
     TypeAliasType(TypeAliasType<'db>),
     /// The symbol `knot_extensions.Unknown`
     Unknown,
+    /// The symbol `knot_extensions.AlwaysTruthy`
+    AlwaysTruthy,
+    /// The symbol `knot_extensions.AlwaysFalsy`
+    AlwaysFalsy,
     /// The symbol `knot_extensions.Not`
     Not,
     /// The symbol `knot_extensions.Intersection`
     Intersection,
     /// The symbol `knot_extensions.TypeOf`
     TypeOf,
+    /// The symbol `knot_extensions.LiteralExt`
+    LiteralExt,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -2874,9 +2882,12 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
             Self::Unknown => "Unknown",
+            Self::AlwaysTruthy => "AlwaysTruthy",
+            Self::AlwaysFalsy => "AlwaysFalsy",
             Self::Not => "Not",
             Self::Intersection => "Intersection",
             Self::TypeOf => "TypeOf",
+            Self::LiteralExt => "LiteralExt",
         }
     }
 
@@ -2917,9 +2928,12 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
-            | Self::TypeOf => Truthiness::AlwaysTrue,
+            | Self::TypeOf
+            | Self::LiteralExt => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2960,9 +2974,12 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
             Self::Unknown => "knot_extensions.Unknown",
+            Self::AlwaysTruthy => "knot_extensions.AlwaysTruthy",
+            Self::AlwaysFalsy => "knot_extensions.AlwaysFalsy",
             Self::Not => "knot_extensions.Not",
             Self::Intersection => "knot_extensions.Intersection",
             Self::TypeOf => "knot_extensions.TypeOf",
+            Self::LiteralExt => "knot_extensions.LiteralExt",
         }
     }
 
@@ -3005,7 +3022,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeOf => KnownClass::SpecialForm,
             Self::Not => KnownClass::SpecialForm,
             Self::Intersection => KnownClass::SpecialForm,
+            Self::LiteralExt => KnownClass::SpecialForm,
             Self::Unknown => KnownClass::Object,
+            Self::AlwaysTruthy => KnownClass::Object,
+            Self::AlwaysFalsy => KnownClass::Object,
         }
     }
 
@@ -3057,9 +3077,12 @@ impl<'db> KnownInstanceType<'db> {
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
             "Unknown" => Self::Unknown,
+            "AlwaysTruthy" => Self::AlwaysTruthy,
+            "AlwaysFalsy" => Self::AlwaysFalsy,
             "Not" => Self::Not,
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
+            "LiteralExt" => Self::LiteralExt,
             _ => return None,
         };
 
@@ -3109,9 +3132,13 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
-            Self::Unknown | Self::Not | Self::Intersection | Self::TypeOf => {
-                module.is_knot_extensions()
-            }
+            Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf
+            | Self::LiteralExt => module.is_knot_extensions(),
         }
     }
 

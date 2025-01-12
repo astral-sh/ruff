@@ -94,6 +94,27 @@ reveal_type(C.__mro__)
 u: Unknown[str]
 ```
 
+### `AlwaysTruthy` and `AlwaysFalsy`
+
+`AlwaysTruthy` and `AlwaysFalsy` represent the sets of all types whose truthiness is always truthy
+or falsy, respectively.
+
+```py
+from typing_extensions import Literal
+
+from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_subtype_of, static_assert
+
+static_assert(is_subtype_of(Literal[True], AlwaysTruthy))
+static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
+
+static_assert(not is_subtype_of(int, AlwaysFalsy))
+static_assert(not is_subtype_of(str, AlwaysFalsy))
+
+def _(t: AlwaysTruthy, f: AlwaysFalsy):
+    reveal_type(t)  # revealed: AlwaysTruthy
+    reveal_type(f)  # revealed: AlwaysFalsy
+```
+
 ## Static assertions
 
 ### Basics
@@ -349,4 +370,38 @@ def type_of_annotation() -> None:
 
 # error: "Special form `knot_extensions.TypeOf` expected exactly one type parameter"
 t: TypeOf[int, str, bytes]
+```
+
+## `LiteralExt`
+
+`LiteralExt` creates (unions of) class, function or slice types.
+
+It cannot be nested and does not mix with `Literal`.
+
+```py
+from typing_extensions import Literal
+
+from knot_extensions import LiteralExt, static_assert, is_subtype_of
+
+class C: ...
+class D: ...
+def f(): ...
+def g(): ...
+
+def _(a: LiteralExt[C], b: LiteralExt[f], c: LiteralExt[1:2:3], flag: bool):
+    reveal_type(a)  # revealed: Literal[C]
+    reveal_type(b)  # revealed: Literal[f]
+    reveal_type(c)  # revealed: slice[Literal[1], Literal[2], Literal[3]]
+
+def _(a: LiteralExt[C, D], b: LiteralExt[C, f, g], c: LiteralExt[D, g, ::4]):
+    reveal_type(a)  # revealed: Literal[C, D]
+    reveal_type(b)  # revealed: Literal[C] | Literal[f, g]
+    reveal_type(c)  # revealed: Literal[D] | Literal[g] | slice[None, None, Literal[4]]
+
+# error: [invalid-type-form]
+d: LiteralExt[LiteralExt[f]]
+# error: [invalid-type-form]
+d: LiteralExt[4]
+# error: [invalid-type-form]
+d: LiteralExt[Literal["5"]]
 ```
