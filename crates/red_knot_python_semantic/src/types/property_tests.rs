@@ -233,7 +233,7 @@ mod stable {
         forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
     );
 
-    // `T` is a subtype of itself.
+    // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
@@ -333,15 +333,6 @@ mod flaky {
         types::{IntersectionBuilder, Type, UnionType},
     };
 
-    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
-    // `T` can be assigned to itself.
-    type_property_test!(
-        assignable_to_is_reflexive, db,
-        forall types t. t.is_assignable_to(db, t)
-    );
-
-    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
-    // An intersection of two types should be assignable to both of them
     fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
         IntersectionBuilder::new(db)
             .add_positive(s)
@@ -353,6 +344,15 @@ mod flaky {
         UnionType::from_elements(db, [s, t])
     }
 
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    // `T` can be assigned to itself.
+    type_property_test!(
+        assignable_to_is_reflexive, db,
+        forall types t. t.is_assignable_to(db, t)
+    );
+
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    // An intersection of two types should be assignable to both of them
     type_property_test!(
         intersection_assignable_to_both, db,
         forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
@@ -376,7 +376,7 @@ mod flaky {
         forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
     );
 
-    // For fully static types, their intersection must be a subtype of each type in the pair.
+    // For two fully static types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
         all_fully_static_type_pairs_are_supertypes_of_their_union, db,
         forall types s, t.
@@ -391,8 +391,8 @@ mod flaky {
         forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
     );
 
-    // For *any* two types, whether fully static or not,
-    // each of the pair they should be assignable to the union of the two.
+    // For *any* pair of types, whether fully static or not,
+    // each of the pair should be assignable to the union of the two.
     type_property_test!(
         all_type_pairs_are_assignable_to_their_union, db,
         forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
