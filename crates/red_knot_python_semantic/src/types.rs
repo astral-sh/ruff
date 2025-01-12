@@ -2014,6 +2014,20 @@ impl<'db> Type<'db> {
                         CallOutcome::asserted(binding, asserted_ty)
                     }
 
+                    Some(KnownFunction::Cast) => {
+                        // TODO: Use `.two_parameter_tys()` exclusively
+                        // when overloads are supported.
+                        if binding.two_parameter_tys().is_none() {
+                            return CallOutcome::callable(binding);
+                        };
+
+                        let Some(casted_ty) = arguments.first_argument() else {
+                            return CallOutcome::callable(binding);
+                        };
+
+                        CallOutcome::casted(binding, casted_ty)
+                    }
+
                     _ => CallOutcome::callable(binding),
                 }
             }
@@ -3353,6 +3367,8 @@ pub enum KnownFunction {
 
     /// `typing(_extensions).assert_type`
     AssertType,
+    /// `typing(_extensions).cast`
+    Cast,
 
     /// `knot_extensions.static_assert`
     StaticAssert,
@@ -3399,6 +3415,7 @@ impl KnownFunction {
                 Some(KnownFunction::NoTypeCheck)
             }
             "assert_type" if definition.is_typing_definition(db) => Some(KnownFunction::AssertType),
+            "cast" if definition.is_typing_definition(db) => Some(KnownFunction::Cast),
             "static_assert" if definition.is_knot_extensions_definition(db) => {
                 Some(KnownFunction::StaticAssert)
             }
@@ -3441,6 +3458,7 @@ impl KnownFunction {
             | Self::IsDisjointFrom => ParameterExpectations::TwoTypeExpressions,
 
             Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
+            Self::Cast => ParameterExpectations::TypeExpressionAndValueExpression,
 
             Self::ConstraintFunction(_)
             | Self::Len
@@ -3468,6 +3486,9 @@ enum ParameterExpectations {
     /// The first parameter in the function expects a value expression,
     /// and the second expects a type expression
     ValueExpressionAndTypeExpression,
+    /// The first parameter in the function expects a type expression,
+    /// and the second expects a value expression
+    TypeExpressionAndValueExpression,
 }
 
 impl ParameterExpectations {
@@ -3475,7 +3496,7 @@ impl ParameterExpectations {
     fn expectation_at_index(self, parameter_index: usize) -> ParameterExpectation {
         match self {
             Self::AllValueExpressions => ParameterExpectation::ValueExpression,
-            Self::SingleTypeExpression => {
+            Self::SingleTypeExpression | Self::TypeExpressionAndValueExpression => {
                 if parameter_index == 0 {
                     ParameterExpectation::TypeExpression
                 } else {
@@ -3833,6 +3854,7 @@ impl<'db> Class<'db> {
                 | CallOutcome::RevealType { binding, .. }
                 | CallOutcome::StaticAssertionError { binding, .. }
                 | CallOutcome::AssertType { binding, .. } => Ok(binding.return_ty()),
+                CallOutcome::Cast { casted_ty, .. } => Ok(casted_ty),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));
