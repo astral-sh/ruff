@@ -97,7 +97,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             // PTH205
             ["os", "path", "getctime"] => Some(OsPathGetctime.into()),
             // PTH123
-            ["" | "builtin", "open"] => {
+            ["" | "builtins", "open"] => {
                 // `closefd` and `openener` are not supported by pathlib, so check if they are
                 // are set to non-default values.
                 // https://github.com/astral-sh/ruff/issues/7620
