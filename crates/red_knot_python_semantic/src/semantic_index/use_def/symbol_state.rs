@@ -316,6 +316,9 @@ impl SymbolState {
         };
 
         std::mem::swap(&mut a, self);
+        self.declarations
+            .live_declarations
+            .union(&b.declarations.live_declarations);
 
         let mut a_defs_iter = a.bindings.live_bindings.iter();
         let mut b_defs_iter = b.bindings.live_bindings.iter();
@@ -449,10 +452,8 @@ impl SymbolState {
         let mut opt_a_decl: Option<u32> = a_decls_iter.next();
         let mut opt_b_decl: Option<u32> = b_decls_iter.next();
 
-        let push = |decl,
-                    vis_constraints_iter: &mut VisibilityConstraintsIntoIterator,
+        let push = |vis_constraints_iter: &mut VisibilityConstraintsIntoIterator,
                     merged: &mut Self| {
-            merged.declarations.live_declarations.insert(decl);
             let vis_constraints = vis_constraints_iter
                 .next()
                 .expect("declarations and visibility_constraints length mismatch");
@@ -466,15 +467,15 @@ impl SymbolState {
             match (opt_a_decl, opt_b_decl) {
                 (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
                     std::cmp::Ordering::Less => {
-                        push(a_decl, &mut a_vis_constraints_iter, self);
+                        push(&mut a_vis_constraints_iter, self);
                         opt_a_decl = a_decls_iter.next();
                     }
                     std::cmp::Ordering::Greater => {
-                        push(b_decl, &mut b_vis_constraints_iter, self);
+                        push(&mut b_vis_constraints_iter, self);
                         opt_b_decl = b_decls_iter.next();
                     }
                     std::cmp::Ordering::Equal => {
-                        push(a_decl, &mut b_vis_constraints_iter, self);
+                        push(&mut b_vis_constraints_iter, self);
 
                         let a_vis_constraint = a_vis_constraints_iter
                             .next()
@@ -487,12 +488,12 @@ impl SymbolState {
                         opt_b_decl = b_decls_iter.next();
                     }
                 },
-                (Some(a_decl), None) => {
-                    push(a_decl, &mut a_vis_constraints_iter, self);
+                (Some(_), None) => {
+                    push(&mut a_vis_constraints_iter, self);
                     opt_a_decl = a_decls_iter.next();
                 }
-                (None, Some(b_decl)) => {
-                    push(b_decl, &mut b_vis_constraints_iter, self);
+                (None, Some(_)) => {
+                    push(&mut b_vis_constraints_iter, self);
                     opt_b_decl = b_decls_iter.next();
                 }
                 (None, None) => break,
