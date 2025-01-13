@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
@@ -179,22 +178,30 @@ fn create_diagnostic(
                     checker.semantic(),
                 )?;
 
-                let is_query = checker
+                // Refine the match from `is_fastapi_dependency` to exclude
+                // Depends and Security, which don't have the same argument
+                // structure. The others need to be converted from
+                // `q: str = Query("")` to `q: Annotated[str, Query()] = ""`
+                // for example, but Depends and Security need to stay like
+                // `Annotated[str, Depends(callable)]`
+                let is_dep = checker
                     .semantic()
                     .resolve_qualified_name(map_callable(default))
                     .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["fastapi", "Query"])
+                        !matches!(
+                            qualified_name.segments(),
+                            ["fastapi", "Depends" | "Security"]
+                        )
                     });
 
-                let content = if is_query {
-                    // Should be safe to unwrap because of `map_callable` for
-                    // this branch above
-                    let args = default.as_call_expr().unwrap();
-                    let Some(default_arg) = args.arguments.find_argument("default", 0) else {
-                        return Err(anyhow!("Query called without arguments"));
-                    };
-                    let kwarg_list: Vec<_> = args
-                        .arguments
+                // Each of these classes takes a single, optional default
+                // argument, followed by kw-only arguments
+                let default_arg = default
+                    .as_call_expr()
+                    .and_then(|args| args.arguments.find_argument("default", 0));
+
+                let kwarg_list: Option<Vec<_>> = default.as_call_expr().map(|args| {
+                    args.arguments
                         .keywords
                         .iter()
                         .filter_map(|kwarg| match kwarg.arg.as_ref() {
@@ -202,15 +209,21 @@ fn create_diagnostic(
                             Some(name) if name == "default" => None,
                             Some(_) => Some(checker.locator().slice(kwarg.range())),
                         })
-                        .collect();
+                        .collect()
+                });
 
+                let content = if is_dep && default_arg.is_some() {
+                    let default_arg = default_arg.unwrap();
+                    let kwarg_list = match kwarg_list {
+                        Some(v) => v.join(", "),
+                        None => String::new(),
+                    };
                     format!(
-                        "{}: {}[{}, {}({})] = {}",
+                        "{}: {}[{}, {}({kwarg_list})] = {}",
                         &parameter.parameter.name.id,
                         binding,
                         checker.locator().slice(annotation.range()),
                         checker.locator().slice(map_callable(default).range()),
-                        kwarg_list.join(", "),
                         checker.locator().slice(default_arg.value().range()),
                     )
                 } else {

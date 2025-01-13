@@ -66,8 +66,8 @@ FAST002_0.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
 31 | def do_stuff(
 32 |     some_path_param: str = Path(),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-33 |     some_body_param: str = Body("foo"),
-34 |     some_cookie_param: str = Cookie(),
+33 |     some_cookie_param: str = Cookie(),
+34 |     some_file_param: UploadFile = File(),
    |
    = help: Replace with `typing_extensions.Annotated`
 
@@ -85,18 +85,18 @@ FAST002_0.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
 31 32 | def do_stuff(
 32    |-    some_path_param: str = Path(),
    33 |+    some_path_param: Annotated[str, Path()],
-33 34 |     some_body_param: str = Body("foo"),
-34 35 |     some_cookie_param: str = Cookie(),
-35 36 |     some_header_param: int = Header(default=5),
+33 34 |     some_cookie_param: str = Cookie(),
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
 
 FAST002_0.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 31 | def do_stuff(
 32 |     some_path_param: str = Path(),
-33 |     some_body_param: str = Body("foo"),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-34 |     some_cookie_param: str = Cookie(),
-35 |     some_header_param: int = Header(default=5),
+33 |     some_cookie_param: str = Cookie(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+34 |     some_file_param: UploadFile = File(),
+35 |     some_form_param: str = Form(),
    |
    = help: Replace with `typing_extensions.Annotated`
 
@@ -112,20 +112,20 @@ FAST002_0.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
 30 31 | @app.post("/stuff/")
 31 32 | def do_stuff(
 32 33 |     some_path_param: str = Path(),
-33    |-    some_body_param: str = Body("foo"),
-   34 |+    some_body_param: Annotated[str, Body("foo")],
-34 35 |     some_cookie_param: str = Cookie(),
-35 36 |     some_header_param: int = Header(default=5),
-36 37 |     some_file_param: UploadFile = File(),
+33    |-    some_cookie_param: str = Cookie(),
+   34 |+    some_cookie_param: Annotated[str, Cookie()],
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
 
 FAST002_0.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 32 |     some_path_param: str = Path(),
-33 |     some_body_param: str = Body("foo"),
-34 |     some_cookie_param: str = Cookie(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-35 |     some_header_param: int = Header(default=5),
-36 |     some_file_param: UploadFile = File(),
+33 |     some_cookie_param: str = Cookie(),
+34 |     some_file_param: UploadFile = File(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+35 |     some_form_param: str = Form(),
+36 |     some_query_param: str | None = Query(default=None),
    |
    = help: Replace with `typing_extensions.Annotated`
 
@@ -140,21 +140,21 @@ FAST002_0.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
 --------------------------------------------------------------------------------
 31 32 | def do_stuff(
 32 33 |     some_path_param: str = Path(),
-33 34 |     some_body_param: str = Body("foo"),
-34    |-    some_cookie_param: str = Cookie(),
-   35 |+    some_cookie_param: Annotated[str, Cookie()],
-35 36 |     some_header_param: int = Header(default=5),
-36 37 |     some_file_param: UploadFile = File(),
-37 38 |     some_form_param: str = Form(),
+33 34 |     some_cookie_param: str = Cookie(),
+34    |-    some_file_param: UploadFile = File(),
+   35 |+    some_file_param: Annotated[UploadFile, File()],
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
+37 38 |     some_body_param: str = Body("foo"),
 
 FAST002_0.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-33 |     some_body_param: str = Body("foo"),
-34 |     some_cookie_param: str = Cookie(),
-35 |     some_header_param: int = Header(default=5),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-36 |     some_file_param: UploadFile = File(),
-37 |     some_form_param: str = Form(),
+33 |     some_cookie_param: str = Cookie(),
+34 |     some_file_param: UploadFile = File(),
+35 |     some_form_param: str = Form(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+36 |     some_query_param: str | None = Query(default=None),
+37 |     some_body_param: str = Body("foo"),
    |
    = help: Replace with `typing_extensions.Annotated`
 
@@ -168,22 +168,22 @@ FAST002_0.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 32 33 |     some_path_param: str = Path(),
-33 34 |     some_body_param: str = Body("foo"),
-34 35 |     some_cookie_param: str = Cookie(),
-35    |-    some_header_param: int = Header(default=5),
-   36 |+    some_header_param: Annotated[int, Header(default=5)],
-36 37 |     some_file_param: UploadFile = File(),
-37 38 |     some_form_param: str = Form(),
-38 39 |     some_query_param: str | None = Query(default=None),
+33 34 |     some_cookie_param: str = Cookie(),
+34 35 |     some_file_param: UploadFile = File(),
+35    |-    some_form_param: str = Form(),
+   36 |+    some_form_param: Annotated[str, Form()],
+36 37 |     some_query_param: str | None = Query(default=None),
+37 38 |     some_body_param: str = Body("foo"),
+38 39 |     some_header_param: int = Header(default=5),
 
 FAST002_0.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-34 |     some_cookie_param: str = Cookie(),
-35 |     some_header_param: int = Header(default=5),
-36 |     some_file_param: UploadFile = File(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-37 |     some_form_param: str = Form(),
-38 |     some_query_param: str | None = Query(default=None),
+34 |     some_file_param: UploadFile = File(),
+35 |     some_form_param: str = Form(),
+36 |     some_query_param: str | None = Query(default=None),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+37 |     some_body_param: str = Body("foo"),
+38 |     some_header_param: int = Header(default=5),
    |
    = help: Replace with `typing_extensions.Annotated`
 
@@ -196,22 +196,22 @@ FAST002_0.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
 16 17 | app = FastAPI()
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
-33 34 |     some_body_param: str = Body("foo"),
-34 35 |     some_cookie_param: str = Cookie(),
-35 36 |     some_header_param: int = Header(default=5),
-36    |-    some_file_param: UploadFile = File(),
-   37 |+    some_file_param: Annotated[UploadFile, File()],
-37 38 |     some_form_param: str = Form(),
-38 39 |     some_query_param: str | None = Query(default=None),
+33 34 |     some_cookie_param: str = Cookie(),
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
+36    |-    some_query_param: str | None = Query(default=None),
+   37 |+    some_query_param: Annotated[str | None, Query()] = None,
+37 38 |     some_body_param: str = Body("foo"),
+38 39 |     some_header_param: int = Header(default=5),
 39 40 | ):
 
 FAST002_0.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-35 |     some_header_param: int = Header(default=5),
-36 |     some_file_param: UploadFile = File(),
-37 |     some_form_param: str = Form(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-38 |     some_query_param: str | None = Query(default=None),
+35 |     some_form_param: str = Form(),
+36 |     some_query_param: str | None = Query(default=None),
+37 |     some_body_param: str = Body("foo"),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+38 |     some_header_param: int = Header(default=5),
 39 | ):
    |
    = help: Replace with `typing_extensions.Annotated`
@@ -225,21 +225,21 @@ FAST002_0.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
 16 17 | app = FastAPI()
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
-34 35 |     some_cookie_param: str = Cookie(),
-35 36 |     some_header_param: int = Header(default=5),
-36 37 |     some_file_param: UploadFile = File(),
-37    |-    some_form_param: str = Form(),
-   38 |+    some_form_param: Annotated[str, Form()],
-38 39 |     some_query_param: str | None = Query(default=None),
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
+37    |-    some_body_param: str = Body("foo"),
+   38 |+    some_body_param: Annotated[str, Body()] = "foo",
+38 39 |     some_header_param: int = Header(default=5),
 39 40 | ):
 40 41 |     # do stuff
 
 FAST002_0.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-36 |     some_file_param: UploadFile = File(),
-37 |     some_form_param: str = Form(),
-38 |     some_query_param: str | None = Query(default=None),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+36 |     some_query_param: str | None = Query(default=None),
+37 |     some_body_param: str = Body("foo"),
+38 |     some_header_param: int = Header(default=5),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 39 | ):
 40 |     # do stuff
    |
@@ -254,11 +254,11 @@ FAST002_0.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
 16 17 | app = FastAPI()
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
-35 36 |     some_header_param: int = Header(default=5),
-36 37 |     some_file_param: UploadFile = File(),
-37 38 |     some_form_param: str = Form(),
-38    |-    some_query_param: str | None = Query(default=None),
-   39 |+    some_query_param: Annotated[str | None, Query()] = None,
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
+37 38 |     some_body_param: str = Body("foo"),
+38    |-    some_header_param: int = Header(default=5),
+   39 |+    some_header_param: Annotated[int, Header()] = 5,
 39 40 | ):
 40 41 |     # do stuff
 41 42 |     pass
