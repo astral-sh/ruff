@@ -347,14 +347,3 @@ FAST002_0.py:61:25: FAST002 [*] FastAPI dependency without `Annotated`
 62 63 |     pass
 63 64 | 
 64 65 | # Non fixable errors
-
-FAST002_0.py:70:5: FAST002 FastAPI dependency without `Annotated`
-   |
-68 |     skip: int = 0,
-69 |     limit: int = 10,
-70 |     current_user: User = Depends(get_current_user),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-71 | ):
-72 |     pass
-   |
-   = help: Replace with `typing_extensions.Annotated`
