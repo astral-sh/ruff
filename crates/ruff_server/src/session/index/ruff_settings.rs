@@ -386,8 +386,12 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             );
             match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                Err(err) => {
-                    tracing::error!("Unable to find editor-specified configuration file: {err}");
+                err => {
+                    tracing::error!(
+                        "{:?}",
+                        err.context("Unable to load editor-specified configuration file")
+                            .unwrap_err()
+                    );
                     editor_configuration
                 }
             }
