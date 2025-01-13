@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -110,7 +110,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
     {
         let needs_update = matches!(
             (&parameter.parameter.annotation, &parameter.default),
-            (Some(_annotation), Some(default)) if is_fastapi_dependency(checker, default)
+            (Some(annotation), Some(default)) if is_fastapi_dependency(checker, default) && !already_annotated(checker, annotation)
         );
 
         if needs_update {
@@ -125,6 +125,18 @@ pub(crate) fn fastapi_non_annotated_dependency(
             has_non_updatable_default = true;
         }
     }
+}
+
+fn already_annotated(checker: &Checker, expr: &ast::Expr) -> bool {
+    checker
+        .semantic()
+        .resolve_qualified_name(map_subscript(expr))
+        .is_some_and(|name| {
+            matches!(
+                name.segments(),
+                ["typing", "Annotated"] | ["typing_extensions", "Annotated"],
+            )
+        })
 }
 
 fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> bool {
@@ -177,13 +189,57 @@ fn create_diagnostic(
                     parameter.range.start(),
                     checker.semantic(),
                 )?;
-                let content = format!(
-                    "{}: {}[{}, {}]",
-                    parameter.parameter.name.id,
-                    binding,
-                    checker.locator().slice(annotation.range()),
-                    checker.locator().slice(default.range())
-                );
+
+                let is_query = checker
+                    .semantic()
+                    .resolve_qualified_name(map_callable(default))
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["fastapi", "Query"])
+                    });
+
+                let content = if is_query {
+                    use std::fmt::Write;
+                    let default_arg = if let Some(Some(args)) = default
+                        .as_call_expr()
+                        .map(|args| args.arguments.find_argument("default", 0))
+                    {
+                        checker.locator().slice(args.value().range())
+                    } else {
+                        ""
+                    };
+                    let mut s = format!(
+                        "{}: {}[{}, {}(",
+                        &parameter.parameter.name.id,
+                        binding,
+                        checker.locator().slice(annotation.range()),
+                        checker.locator().slice(map_callable(default).range()),
+                    );
+                    if let Some(args) = default.as_call_expr() {
+                        for (i, kwarg) in args.arguments.keywords.iter().enumerate() {
+                            let Some(name) = kwarg.arg.as_ref() else {
+                                continue;
+                            };
+                            if name == "default" {
+                                continue;
+                            }
+                            write!(s, "{}", checker.locator().slice(kwarg.range())).unwrap();
+                            if i < args.arguments.keywords.len() - 1 {
+                                write!(s, ", ").unwrap();
+                            }
+                        }
+                    }
+                    write!(s, ")] = {}", default_arg).unwrap();
+
+                    s
+                } else {
+                    format!(
+                        "{}: {}[{}, {}]",
+                        parameter.parameter.name.id,
+                        binding,
+                        checker.locator().slice(annotation.range()),
+                        checker.locator().slice(default.range())
+                    )
+                };
                 let parameter_edit = Edit::range_replacement(content, parameter.range);
                 Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
             });
