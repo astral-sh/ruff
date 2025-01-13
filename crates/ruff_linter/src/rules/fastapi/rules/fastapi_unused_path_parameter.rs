@@ -260,10 +260,11 @@ impl<'a> Dependency<'a> {
             parameter, default, ..
         } = parameter_with_default;
 
-        if let Some(default) = default {
-            if let Some(dependency) = Self::from_default(default, semantic) {
-                return Some(dependency);
-            };
+        if let Some(dependency) = default
+            .as_deref()
+            .and_then(|default| Self::from_default(default, semantic))
+        {
+            return Some(dependency);
         }
 
         let Expr::Subscript(ExprSubscript { value, slice, .. }) =
@@ -280,21 +281,19 @@ impl<'a> Dependency<'a> {
             return None;
         };
 
-        let mut dependency = None;
+        let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
+            let arguments = depends_arguments(metadata_element, semantic)?;
 
-        for metadata_element in tuple.elts.iter().skip(1) {
-            let Some(arguments) = depends_arguments(metadata_element, semantic) else {
-                continue;
-            };
+            Self::from_depends_call(arguments, semantic)
+        });
 
-            if dependency.is_some() {
-                return Some(Self::Multiple);
-            }
+        let dependency = dependencies.next()?;
 
-            dependency = Self::from_depends_call(arguments, semantic);
+        if dependencies.next().is_some() {
+            Some(Self::Multiple)
+        } else {
+            Some(dependency)
         }
-
-        dependency
     }
 
     fn from_default(expr: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
