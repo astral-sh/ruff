@@ -72,7 +72,9 @@ pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
-use ruff_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
+use ruff_python_ast::{
+    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -188,6 +190,22 @@ pub fn parse_parenthesized_expression_range(
     let parsed =
         Parser::new_starts_at(source, Mode::ParenthesizedExpression, range.start()).parse();
     parsed.try_into_expression().unwrap().into_result()
+}
+
+pub fn parse_as_string_annotation(
+    source: &str,
+    string: &StringLiteral,
+) -> Result<Parsed<ModExpression>, ParseError> {
+    let range = string
+        .range()
+        .add_start(string.flags.opener_len())
+        .sub_end(string.flags.closer_len());
+    let source = &source[..range.end().to_usize()];
+    if string.flags.is_triple_quoted() {
+        parse_parenthesized_expression_range(source, range)
+    } else {
+        parse_expression_range(source, range)
+    }
 }
 
 /// Parse the given Python source code using the specified [`Mode`].
