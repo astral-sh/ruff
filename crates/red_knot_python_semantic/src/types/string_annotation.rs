@@ -1,6 +1,6 @@
 use ruff_db::source::source_text;
 use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{self as ast, ModExpression, StringFlags};
+use ruff_python_ast::{self as ast, ModExpression};
 use ruff_python_parser::{parse_as_string_annotation, Parsed};
 use ruff_text_size::Ranged;
 
