@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -110,7 +110,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
     {
         let needs_update = matches!(
             (&parameter.parameter.annotation, &parameter.default),
-            (Some(annotation), Some(default)) if is_fastapi_dependency(checker, default) && !already_annotated(checker, annotation)
+            (Some(_annotation), Some(default)) if is_fastapi_dependency(checker, default)
         );
 
         if needs_update {
@@ -125,18 +125,6 @@ pub(crate) fn fastapi_non_annotated_dependency(
             has_non_updatable_default = true;
         }
     }
-}
-
-fn already_annotated(checker: &Checker, expr: &ast::Expr) -> bool {
-    checker
-        .semantic()
-        .resolve_qualified_name(map_subscript(expr))
-        .is_some_and(|name| {
-            matches!(
-                name.segments(),
-                ["typing", "Annotated"] | ["typing_extensions", "Annotated"],
-            )
-        })
 }
 
 fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> bool {
