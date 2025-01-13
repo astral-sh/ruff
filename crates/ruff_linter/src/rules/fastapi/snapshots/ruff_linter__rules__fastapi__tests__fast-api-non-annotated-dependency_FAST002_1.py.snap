@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
+snapshot_kind: text
+---
+FAST002_1.py:10:13: FAST002 [*] FastAPI dependency without `Annotated`
+   |
+ 9 | @app.get("/test")
+10 | def handler(echo: str = Query("")):
+   |             ^^^^^^^^^^^^^^^^^^^^^ FAST002
+11 |     return echo
+   |
+   = help: Replace with `typing.Annotated`
+
+ℹ Unsafe fix
+2  2  | values. See #15043 for more details."""
+3  3  | 
+4  4  | from fastapi import FastAPI, Query
+   5  |+from typing import Annotated
+5  6  | 
+6  7  | app = FastAPI()
+7  8  | 
+8  9  | 
+9  10 | @app.get("/test")
+10    |-def handler(echo: str = Query("")):
+   11 |+def handler(echo: Annotated[str, Query()] = ""):
+11 12 |     return echo
