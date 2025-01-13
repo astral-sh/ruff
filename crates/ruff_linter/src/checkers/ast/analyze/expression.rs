@@ -977,6 +977,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathIsabs,
                 Rule::OsPathJoin,
                 Rule::OsPathBasename,
+                Rule::OsPathDirname,
                 Rule::OsPathSamefile,
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
