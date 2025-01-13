@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
@@ -97,10 +98,9 @@ pub(crate) fn fastapi_non_annotated_dependency(
         return;
     }
 
-    let mut updatable_count = 0;
-    let mut has_non_updatable_default = false;
-    let total_params =
-        function_def.parameters.args.len() + function_def.parameters.kwonlyargs.len();
+    // `create_diagnostic` needs to know if a default argument has been seen to
+    // avoid emitting fixes that would remove defaults and cause a syntax error.
+    let mut seen_default = false;
 
     for parameter in function_def
         .parameters
@@ -114,15 +114,9 @@ pub(crate) fn fastapi_non_annotated_dependency(
         );
 
         if needs_update {
-            updatable_count += 1;
-            // Determine if it's safe to update this parameter:
-            // - if all parameters are updatable its safe.
-            // - if we've encountered a non-updatable parameter with a default value, it's no longer
-            //   safe. (https://github.com/astral-sh/ruff/issues/12982)
-            let safe_to_update = updatable_count == total_params || !has_non_updatable_default;
-            create_diagnostic(checker, parameter, safe_to_update);
+            seen_default = create_diagnostic(checker, parameter, seen_default);
         } else if parameter.default.is_some() {
-            has_non_updatable_default = true;
+            seen_default = true;
         }
     }
 }
@@ -153,8 +147,8 @@ fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> bool {
 fn create_diagnostic(
     checker: &mut Checker,
     parameter: &ast::ParameterWithDefault,
-    safe_to_update: bool,
-) {
+    mut seen_default: bool,
+) -> bool {
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
             py_version: checker.settings.target_version,
@@ -162,86 +156,87 @@ fn create_diagnostic(
         parameter.range,
     );
 
-    if safe_to_update {
-        if let (Some(annotation), Some(default)) =
-            (&parameter.parameter.annotation, &parameter.default)
-        {
-            diagnostic.try_set_fix(|| {
-                let module = if checker.settings.target_version >= PythonVersion::Py39 {
-                    "typing"
-                } else {
-                    "typing_extensions"
-                };
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from(module, "Annotated"),
-                    parameter.range.start(),
-                    checker.semantic(),
-                )?;
+    if let (Some(annotation), Some(default)) = (&parameter.parameter.annotation, &parameter.default)
+    {
+        diagnostic.try_set_fix(|| {
+            let module = if checker.settings.target_version >= PythonVersion::Py39 {
+                "typing"
+            } else {
+                "typing_extensions"
+            };
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(module, "Annotated"),
+                parameter.range.start(),
+                checker.semantic(),
+            )?;
 
-                // Refine the match from `is_fastapi_dependency` to exclude
-                // Depends and Security, which don't have the same argument
-                // structure. The others need to be converted from
-                // `q: str = Query("")` to `q: Annotated[str, Query()] = ""`
-                // for example, but Depends and Security need to stay like
-                // `Annotated[str, Depends(callable)]`
-                let is_dep = checker
-                    .semantic()
-                    .resolve_qualified_name(map_callable(default))
-                    .is_some_and(|qualified_name| {
-                        !matches!(
-                            qualified_name.segments(),
-                            ["fastapi", "Depends" | "Security"]
-                        )
-                    });
-
-                // Each of these classes takes a single, optional default
-                // argument, followed by kw-only arguments
-                let default_arg = default
-                    .as_call_expr()
-                    .and_then(|args| args.arguments.find_argument("default", 0));
-
-                let kwarg_list: Option<Vec<_>> = default.as_call_expr().map(|args| {
-                    args.arguments
-                        .keywords
-                        .iter()
-                        .filter_map(|kwarg| match kwarg.arg.as_ref() {
-                            None => None,
-                            Some(name) if name == "default" => None,
-                            Some(_) => Some(checker.locator().slice(kwarg.range())),
-                        })
-                        .collect()
+            // Refine the match from `is_fastapi_dependency` to exclude Depends
+            // and Security, which don't have the same argument structure. The
+            // others need to be converted from `q: str = Query("")` to `q:
+            // Annotated[str, Query()] = ""` for example, but Depends and
+            // Security need to stay like `Annotated[str, Depends(callable)]`
+            let is_dep = checker
+                .semantic()
+                .resolve_qualified_name(map_callable(default))
+                .is_some_and(|qualified_name| {
+                    !matches!(
+                        qualified_name.segments(),
+                        ["fastapi", "Depends" | "Security"]
+                    )
                 });
 
-                let content = if is_dep && default_arg.is_some() {
-                    let default_arg = default_arg.unwrap();
-                    let kwarg_list = match kwarg_list {
-                        Some(v) => v.join(", "),
-                        None => String::new(),
-                    };
-                    format!(
-                        "{}: {}[{}, {}({kwarg_list})] = {}",
-                        &parameter.parameter.name.id,
-                        binding,
-                        checker.locator().slice(annotation.range()),
-                        checker.locator().slice(map_callable(default).range()),
-                        checker.locator().slice(default_arg.value().range()),
-                    )
-                } else {
-                    format!(
-                        "{}: {}[{}, {}]",
-                        parameter.parameter.name.id,
-                        binding,
-                        checker.locator().slice(annotation.range()),
-                        checker.locator().slice(default.range())
-                    )
-                };
-                let parameter_edit = Edit::range_replacement(content, parameter.range);
-                Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
+            // Each of these classes takes a single, optional default
+            // argument, followed by kw-only arguments
+            let default_arg = default
+                .as_call_expr()
+                .and_then(|args| args.arguments.find_argument("default", 0));
+
+            let kwarg_list: Option<Vec<_>> = default.as_call_expr().map(|args| {
+                args.arguments
+                    .keywords
+                    .iter()
+                    .filter_map(|kwarg| match kwarg.arg.as_ref() {
+                        None => None,
+                        Some(name) if name == "default" => None,
+                        Some(_) => Some(checker.locator().slice(kwarg.range())),
+                    })
+                    .collect()
             });
-        }
-    } else {
-        diagnostic.fix = None;
+
+            let content = if is_dep && default_arg.is_some() {
+                let default_arg = default_arg.unwrap();
+                let kwarg_list = match kwarg_list {
+                    Some(v) => v.join(", "),
+                    None => String::new(),
+                };
+                seen_default = true;
+                format!(
+                    "{}: {}[{}, {}({kwarg_list})] = {}",
+                    &parameter.parameter.name.id,
+                    binding,
+                    checker.locator().slice(annotation.range()),
+                    checker.locator().slice(map_callable(default).range()),
+                    checker.locator().slice(default_arg.value().range()),
+                )
+            } else if !seen_default {
+                format!(
+                    "{}: {}[{}, {}]",
+                    parameter.parameter.name.id,
+                    binding,
+                    checker.locator().slice(annotation.range()),
+                    checker.locator().slice(default.range())
+                )
+            } else {
+                return Err(anyhow!(
+                    "Can't emit fix without default after seeing defaults"
+                ));
+            };
+            let parameter_edit = Edit::range_replacement(content, parameter.range);
+            Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
+        });
     }
 
     checker.diagnostics.push(diagnostic);
+
+    seen_default
 }
