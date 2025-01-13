@@ -174,13 +174,13 @@ pub fn parse_expression_range(
 ///
 /// # Example
 ///
-/// Parsing a parenthesized expression from a larger expression:
+/// Parsing an expression that would be valid within parenthesis:
 ///
 /// ```
 /// use ruff_python_parser::parse_parenthesized_expression_range;
 /// # use ruff_text_size::{TextRange, TextSize};
 ///
-/// let parsed = parse_parenthesized_expression_range("\n int | str", TextRange::new(TextSize::new(4), TextSize::new(11)));
+/// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(15)));
 /// assert!(parsed.is_ok());
 pub fn parse_parenthesized_expression_range(
     source: &str,
