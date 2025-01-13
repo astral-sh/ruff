@@ -180,7 +180,7 @@ pub fn parse_expression_range(
 /// use ruff_python_parser::parse_parenthesized_expression_range;
 /// # use ruff_text_size::{TextRange, TextSize};
 ///
-/// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(15)));
+/// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(14)));
 /// assert!(parsed.is_ok());
 pub fn parse_parenthesized_expression_range(
     source: &str,
