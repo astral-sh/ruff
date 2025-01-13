@@ -6,7 +6,9 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
+use ruff_python_ast::{
+    Arguments, Expr, ExprCall, ExprSubscript, Identifier, Parameter, ParameterWithDefault,
+};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
@@ -143,9 +145,9 @@ pub(crate) fn fastapi_unused_path_parameter(
         let ParameterWithDefault { parameter, .. } = parameter_with_default;
 
         if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
-            named_args.push(alias.to_string());
+            named_args.push(alias);
         } else {
-            named_args.push(parameter.name.to_string());
+            named_args.push(parameter.name.as_str());
         }
 
         let Some(dependency) =
@@ -155,8 +157,9 @@ pub(crate) fn fastapi_unused_path_parameter(
         };
 
         if let Some(parameter_names) = dependency.parameter_names() {
-            named_args.extend(parameter_names);
+            named_args.extend(parameter_names.iter().copied().map(Identifier::as_str));
         } else {
+            // If we can't determine the dependency, we can't really do anything.
             return;
         }
     }
@@ -171,7 +174,7 @@ pub(crate) fn fastapi_unused_path_parameter(
 
         // If the path parameter is already in the function or the dependency signature,
         // we don't need to do anything.
-        if named_args.contains(&path_param.to_string()) {
+        if named_args.contains(&path_param) {
             continue;
         }
 
@@ -208,6 +211,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     checker.diagnostics.extend(diagnostics);
 }
 
+/// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
 fn non_posonly_non_variadic_parameters(
     function_def: &ast::StmtFunctionDef,
 ) -> impl Iterator<Item = &ParameterWithDefault> {
@@ -219,26 +223,26 @@ fn non_posonly_non_variadic_parameters(
 }
 
 #[derive(Debug, is_macro::Is)]
-enum Dependency {
+enum Dependency<'a> {
     /// Not defined in the same file, or otherwise cannot be determined to be a function.
     Unknown,
     /// A function defined in the same file, whose parameter names are as given.
-    Function(Vec<String>),
+    Function(Vec<&'a Identifier>),
     /// There are multiple `Depends()` calls.
     Multiple,
 }
 
-impl Dependency {
-    fn parameter_names(self) -> Option<Vec<String>> {
+impl<'a> Dependency<'a> {
+    fn parameter_names(&self) -> Option<&[&'a Identifier]> {
         match self {
             Self::Unknown => None,
             Self::Multiple => None,
-            Self::Function(parameter_names) => Some(parameter_names),
+            Self::Function(parameter_names) => Some(parameter_names.as_slice()),
         }
     }
 }
 
-impl Dependency {
+impl<'a> Dependency<'a> {
     /// Return `foo` in the first metadata `Depends(foo)`,
     /// or that of the default value:
     ///
@@ -251,8 +255,8 @@ impl Dependency {
     /// ): ...
     /// ```
     fn from_parameter(
-        parameter_with_default: &ParameterWithDefault,
-        semantic: &SemanticModel,
+        parameter_with_default: &'a ParameterWithDefault,
+        semantic: &'a SemanticModel,
     ) -> Option<Self> {
         let ParameterWithDefault {
             parameter, default, ..
@@ -295,13 +299,13 @@ impl Dependency {
         dependency
     }
 
-    fn from_default(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
+    fn from_default(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<Self> {
         let arguments = depends_arguments(expr, semantic)?;
 
         Self::from_depends_call(arguments, semantic)
     }
 
-    fn from_depends_call(arguments: &Arguments, semantic: &SemanticModel) -> Option<Self> {
+    fn from_depends_call(arguments: &'a Arguments, semantic: &'a SemanticModel) -> Option<Self> {
         let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
             return None;
         };
@@ -321,8 +325,8 @@ impl Dependency {
         };
 
         let parameter_names = non_posonly_non_variadic_parameters(function_def)
-            .map(|ParameterWithDefault { parameter, .. }| parameter.name.to_string())
-            .collect::<Vec<_>>();
+            .map(|ParameterWithDefault { parameter, .. }| &parameter.name)
+            .collect();
 
         Some(Self::Function(parameter_names))
     }
