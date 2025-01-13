@@ -1,0 +1,79 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+is_pytest_test.py:3:27: PT028 [*] Test function parameter `a` has default argument
+  |
+1 | # Errors
+2 | 
+3 | def test_this_is_a_test(a=1): ...
+  |                           ^ PT028
+4 | def testThisIsAlsoATest(a=1): ...
+  |
+  = help: Remove default argument
+
+ℹ Unsafe fix
+1 1 | # Errors
+2 2 | 
+3   |-def test_this_is_a_test(a=1): ...
+  3 |+def test_this_is_a_test(a): ...
+4 4 | def testThisIsAlsoATest(a=1): ...
+5 5 | 
+6 6 | class TestClass:
+
+is_pytest_test.py:4:27: PT028 [*] Test function parameter `a` has default argument
+  |
+3 | def test_this_is_a_test(a=1): ...
+4 | def testThisIsAlsoATest(a=1): ...
+  |                           ^ PT028
+5 | 
+6 | class TestClass:
+  |
+  = help: Remove default argument
+
+ℹ Unsafe fix
+1 1 | # Errors
+2 2 | 
+3 3 | def test_this_is_a_test(a=1): ...
+4   |-def testThisIsAlsoATest(a=1): ...
+  4 |+def testThisIsAlsoATest(a): ...
+5 5 | 
+6 6 | class TestClass:
+7 7 |     def test_this_too_is_a_test(self, a=1): ...
+
+is_pytest_test.py:7:41: PT028 [*] Test function parameter `a` has default argument
+  |
+6 | class TestClass:
+7 |     def test_this_too_is_a_test(self, a=1): ...
+  |                                         ^ PT028
+8 |     def testAndOfCourseThis(self, a=1): ...
+  |
+  = help: Remove default argument
+
+ℹ Unsafe fix
+4 4 | def testThisIsAlsoATest(a=1): ...
+5 5 | 
+6 6 | class TestClass:
+7   |-    def test_this_too_is_a_test(self, a=1): ...
+  7 |+    def test_this_too_is_a_test(self, a): ...
+8 8 |     def testAndOfCourseThis(self, a=1): ...
+9 9 | 
+10 10 | 
+
+is_pytest_test.py:8:37: PT028 [*] Test function parameter `a` has default argument
+  |
+6 | class TestClass:
+7 |     def test_this_too_is_a_test(self, a=1): ...
+8 |     def testAndOfCourseThis(self, a=1): ...
+  |                                     ^ PT028
+  |
+  = help: Remove default argument
+
+ℹ Unsafe fix
+5 5 | 
+6 6 | class TestClass:
+7 7 |     def test_this_too_is_a_test(self, a=1): ...
+8   |-    def testAndOfCourseThis(self, a=1): ...
+  8 |+    def testAndOfCourseThis(self, a): ...
+9 9 | 
+10 10 | 
+11 11 | # No errors

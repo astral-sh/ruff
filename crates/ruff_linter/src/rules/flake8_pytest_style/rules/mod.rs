@@ -6,6 +6,7 @@ pub(crate) use marks::*;
 pub(crate) use parametrize::*;
 pub(crate) use patch::*;
 pub(crate) use raises::*;
+pub(crate) use test_functions::*;
 pub(crate) use warns::*;
 
 mod assertion;
@@ -17,5 +18,6 @@ mod marks;
 mod parametrize;
 mod patch;
 mod raises;
+mod test_functions;
 mod unittest_assert;
 mod warns;

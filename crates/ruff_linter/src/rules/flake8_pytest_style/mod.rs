@@ -19,6 +19,12 @@ mod tests {
     use super::types;
 
     #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("is_pytest_test.py"),
+        Settings::default(),
+        "is_pytest_test"
+    )]
+    #[test_case(
         Rule::PytestFixtureIncorrectParenthesesStyle,
         Path::new("PT001.py"),
         Settings::default(),
@@ -274,6 +280,12 @@ mod tests {
         Path::new("PT027_1.py"),
         Settings::default(),
         "PT027_1"
+    )]
+    #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("PT028.py"),
+        Settings::default(),
+        "PT028"
     )]
     #[test_case(
         Rule::PytestWarnsWithoutWarning,
