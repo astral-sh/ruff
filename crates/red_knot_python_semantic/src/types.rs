@@ -2021,11 +2021,11 @@ impl<'db> Type<'db> {
                             return CallOutcome::callable(binding);
                         };
 
-                        let Some(casted_ty) = arguments.first_argument() else {
-                            return CallOutcome::callable(binding);
+                        if let Some(casted_ty) = arguments.first_argument() {
+                            binding.set_return_ty(casted_ty);
                         };
 
-                        CallOutcome::casted(binding, casted_ty)
+                        CallOutcome::callable(binding)
                     }
 
                     _ => CallOutcome::callable(binding),
@@ -3877,7 +3877,6 @@ impl<'db> Class<'db> {
                 | CallOutcome::RevealType { binding, .. }
                 | CallOutcome::StaticAssertionError { binding, .. }
                 | CallOutcome::AssertType { binding, .. } => Ok(binding.return_ty()),
-                CallOutcome::Cast { casted_ty, .. } => Ok(casted_ty),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));
