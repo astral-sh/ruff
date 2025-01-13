@@ -29,13 +29,13 @@ def get_items(
 
 @app.post("/stuff/")
 def do_stuff(
-    some_query_param: str | None = Query(default=None),
     some_path_param: str = Path(),
     some_body_param: str = Body("foo"),
     some_cookie_param: str = Cookie(),
     some_header_param: int = Header(default=5),
     some_file_param: UploadFile = File(),
     some_form_param: str = Form(),
+    some_query_param: str | None = Query(default=None),
 ):
     # do stuff
     pass
