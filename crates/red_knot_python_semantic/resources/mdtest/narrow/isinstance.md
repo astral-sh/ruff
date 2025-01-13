@@ -181,3 +181,29 @@ def _(x: object, y: type[int]):
     if isinstance(x, y):
         reveal_type(x)  # revealed: int
 ```
+
+## Adding a disjoint element to an existing intersection
+
+We used to incorrectly infer `Literal` booleans for some of these.
+
+```py
+from knot_extensions import Not, Intersection, AlwaysTruthy, AlwaysFalsy
+
+def f(
+    a: Intersection[str, AlwaysTruthy],
+    b: Intersection[str, AlwaysFalsy],
+    c: Intersection[str, Not[AlwaysTruthy]],
+    d: Intersection[str, Not[AlwaysFalsy]],
+):
+    if isinstance(a, bool):
+        reveal_type(a)  # revealed: Never
+
+    if isinstance(b, bool):
+        reveal_type(b)  # revealed: Never
+
+    if isinstance(c, bool):
+        reveal_type(c)  # revealed: Never
+
+    if isinstance(d, bool):
+        reveal_type(d)  # revealed: Never
+```

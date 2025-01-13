@@ -635,6 +635,42 @@ def _(
     reveal_type(i8)  # revealed: Never
 ```
 
+### Simplifications of `bool`, `AlwaysTruthy` and `AlwaysFalsy`
+
+In general, intersections with `AlwaysTruthy` and `AlwaysFalsy` cannot be simplified. Naively, you
+might think that `int & AlwaysFalsy` could simplify to `Literal[0]`, but this is not the case: for
+example, the `False` constant inhabits the type `int & AlwaysFalsy` (due to the fact that
+`False.__class__` is `bool` at runtime, and `bool` subclasses `int`), but `False` does not inhabit
+the type `Literal[0]`.
+
+Nonetheless, intersections of `AlwaysFalsy` or `AlwaysTruthy` with `bool` _can_ be simplified, due
+to the fact that `bool` is a `@final` class at runtime that cannot be subclassed.
+
+```py
+from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+
+def f(
+    a: Intersection[bool, AlwaysTruthy],
+    b: Intersection[bool, AlwaysFalsy],
+    c: Intersection[bool, Not[AlwaysTruthy]],
+    d: Intersection[bool, Not[AlwaysFalsy]],
+    e: Intersection[bool, AlwaysTruthy, str],
+    f: Intersection[bool, AlwaysFalsy, str],
+    g: Intersection[bool, Not[AlwaysTruthy], str],
+    h: Intersection[bool, Not[AlwaysFalsy], str],
+):
+    reveal_type(a)  # revealed: Literal[True]
+    reveal_type(b)  # revealed: Literal[False]
+    reveal_type(c)  # revealed: Literal[False]
+    reveal_type(d)  # revealed: Literal[True]
+
+    # `bool & AlwaysTruthy & str` -> `Literal[True] & str` -> `Never`
+    reveal_type(e)  # revealed: Never
+    reveal_type(f)  # revealed: Never
+    reveal_type(g)  # revealed: Never
+    reveal_type(h)  # revealed: Never
+```
+
 ## Non fully-static types
 
 ### Negation of dynamic types

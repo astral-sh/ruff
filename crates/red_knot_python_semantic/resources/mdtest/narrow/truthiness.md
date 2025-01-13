@@ -199,7 +199,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(y)  # revealed: Literal["", "hello"]
 ```
 
-## ControlFlow Merging
+## Control Flow Merging
 
 After merging control flows, when we take the union of all constraints applied in each branch, we
 should return to the original state.
