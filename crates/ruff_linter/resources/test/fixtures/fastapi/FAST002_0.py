@@ -71,16 +71,6 @@ def get_users(
 ):
     pass
 
-# the fix would make the Query a kwarg ahead of Path, which will become a
-# positional arg
-@app.post("/stuff/")
-def do_stuff(
-    some_query_param: str | None = Query(default=None),
-    some_path_param: str = Path(),
-):
-    # do stuff
-    pass
-
 
 # Unchanged
 
