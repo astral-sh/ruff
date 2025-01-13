@@ -60,6 +60,8 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
 /// It is thus prone to both false positives and false negatives.
 ///
 /// [1]: https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery
+///
+/// Reference: [Conventions for Python test discovery](https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery)
 #[allow(dead_code)]
 pub(crate) fn is_likely_pytest_test_file(path: &Path) -> bool {
     if !matches!(path.extension().and_then(OsStr::to_str), Some("py")) {
@@ -80,7 +82,13 @@ pub(crate) fn is_likely_pytest_test_file(path: &Path) -> bool {
 /// * Placed at module-level, or
 /// * Placed within a class whose name starts with `Test` and does not have an `__init__` method.
 ///
+/// During test discovery, Pytest respects a few settings which we do not have access to,
+/// like `testpaths` and `norecursedirs`.
+/// This function is thus prone to both false positives and false negatives.
+///
 /// See also [`is_likely_pytest_test_file`].
+///
+/// Reference: [Conventions for Python test discovery](https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery)
 pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -> bool {
     let semantic = checker.semantic();
 
