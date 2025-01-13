@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
@@ -158,7 +157,7 @@ fn create_diagnostic(
 
     if let (Some(annotation), Some(default)) = (&parameter.parameter.annotation, &parameter.default)
     {
-        diagnostic.try_set_fix(|| {
+        diagnostic.try_set_optional_fix(|| {
             let module = if checker.settings.target_version >= PythonVersion::Py39 {
                 "typing"
             } else {
@@ -227,12 +226,10 @@ fn create_diagnostic(
                     checker.locator().slice(default.range())
                 )
             } else {
-                return Err(anyhow!(
-                    "Can't emit fix without default after seeing defaults"
-                ));
+                return Ok(None);
             };
             let parameter_edit = Edit::range_replacement(content, parameter.range);
-            Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
+            Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
         });
     }
 
