@@ -817,7 +817,7 @@ AIR303.py:255:1: AIR303 Import path `airflow.auth_manager.api.auth.backend.kerbe
     |
     = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
 
-AIR303.py:256:1: AIR303 Import path `airflow.auth.managers.fab.security_managr.override` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:256:1: AIR303 Import path `airflow.auth.managers.fab.security_manager.override` is moved into `fab` provider in Airflow 3.0;
     |
 254 | auth_current_user
 255 | backend_kerberos_auth
