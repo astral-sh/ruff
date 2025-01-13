@@ -810,6 +810,8 @@ fn value_given_to_table_key_is_not_inline_table_1() {
     - `lint.flake8-pytest-style.raises-require-match-for`
     - `lint.flake8-pytest-style.raises-extend-require-match-for`
     - `lint.flake8-pytest-style.mark-parentheses`
+    - `lint.flake8-pytest-style.warns-require-match-for`
+    - `lint.flake8-pytest-style.warns-extend-require-match-for`
 
     For more information, try '--help'.
     "#);

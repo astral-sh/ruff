@@ -1296,6 +1296,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::PytestRaisesWithMultipleStatements) {
                 flake8_pytest_style::rules::complex_raises(checker, stmt, items, body);
             }
+            if checker.enabled(Rule::PytestWarnsWithMultipleStatements) {
+                flake8_pytest_style::rules::complex_warns(checker, stmt, items, body);
+            }
             if checker.enabled(Rule::MultipleWithStatements) {
                 flake8_simplify::rules::multiple_with_statements(
                     checker,

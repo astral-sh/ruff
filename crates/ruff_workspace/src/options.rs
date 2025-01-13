@@ -1564,6 +1564,38 @@ pub struct Flake8PytestStyleOptions {
         example = "mark-parentheses = true"
     )]
     pub mark_parentheses: Option<bool>,
+
+    /// List of warning names that require a match= parameter in a
+    /// `pytest.warns()` call.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"["Warning", "UserWarning", "DeprecationWarning"]"#,
+        value_type = "list[str]",
+        example = "warns-require-match-for = [\"requests.RequestsWarning\"]"
+    )]
+    pub warns_require_match_for: Option<Vec<String>>,
+
+    /// List of additional warning names that require a match= parameter in a
+    /// `pytest.warns()` call. This extends the default list of warnings that
+    /// require a match= parameter.
+    ///
+    /// This option is useful if you want to extend the default list of warnings
+    /// that require a match= parameter without having to specify the entire
+    /// list.
+    ///
+    /// Note that this option does not remove any warnings from the default
+    /// list.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "warns-extend-require-match-for = [\"requests.RequestsWarning\"]"
+    )]
+    pub warns_extend_require_match_for: Option<Vec<String>>,
 }
 
 impl Flake8PytestStyleOptions {
@@ -1596,6 +1628,28 @@ impl Flake8PytestStyleOptions {
                 .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
             mark_parentheses: self.mark_parentheses.unwrap_or_default(),
+            warns_require_match_for: self
+                .warns_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidWarnsRequireMatchFor)?
+                .unwrap_or_else(flake8_pytest_style::settings::default_broad_warnings),
+            warns_extend_require_match_for: self
+                .warns_extend_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidWarnsExtendRequireMatchFor)?
+                .unwrap_or_default(),
         })
     }
 }
