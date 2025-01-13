@@ -13,6 +13,7 @@ use crate::Db;
 pub struct Program {
     pub python_version: PythonVersion,
 
+    #[return_ref]
     pub python_platform: PythonPlatform,
 
     #[return_ref]
