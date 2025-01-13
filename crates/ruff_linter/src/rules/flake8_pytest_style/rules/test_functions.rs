@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::helpers::is_likely_pytest_test;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{ParameterWithDefault, StmtFunctionDef};
 use ruff_text_size::Ranged;
@@ -35,7 +35,7 @@ pub(crate) struct PytestParameterWithDefaultArgument {
     parameter_name: String,
 }
 
-impl AlwaysFixableViolation for PytestParameterWithDefaultArgument {
+impl Violation for PytestParameterWithDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -44,8 +44,8 @@ impl AlwaysFixableViolation for PytestParameterWithDefaultArgument {
         )
     }
 
-    fn fix_title(&self) -> String {
-        "Remove default argument".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove default argument".to_string())
     }
 }
 
@@ -75,7 +75,7 @@ pub(crate) fn parameter_with_default_argument(
         let diagnostic = Diagnostic::new(kind, default.range());
 
         let edit = Edit::deletion(parameter.end(), pwd_range.end());
-        let fix = Fix::unsafe_edit(edit);
+        let fix = Fix::display_only_edit(edit);
 
         checker.diagnostics.push(diagnostic.with_fix(fix));
     }
