@@ -48,14 +48,10 @@ pub(super) enum CallOutcome<'db> {
         binding: CallBinding<'db>,
         asserted_ty: Type<'db>,
     },
-    Cast {
-        binding: CallBinding<'db>,
-        casted_ty: Type<'db>,
-    },
 }
 
 impl<'db> CallOutcome<'db> {
-    /// Create a new `CallOutcome::Callable` with given return type.
+    /// Create a new `CallOutcome::Callable` with given binding.
     pub(super) fn callable(binding: CallBinding<'db>) -> CallOutcome<'db> {
         CallOutcome::Callable { binding }
     }
@@ -92,11 +88,6 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
-    /// Create a new `CallOutcome::Casted` with given casted and return types.
-    pub(super) fn casted(binding: CallBinding<'db>, casted_ty: Type<'db>) -> CallOutcome<'db> {
-        CallOutcome::Cast { binding, casted_ty }
-    }
-
     /// Get the return type of the call, or `None` if not callable.
     pub(super) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -128,10 +119,6 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 asserted_ty: _,
             } => Some(binding.return_ty()),
-            Self::Cast {
-                binding: _,
-                casted_ty,
-            } => Some(*casted_ty),
         }
     }
 
@@ -360,10 +347,6 @@ impl<'db> CallOutcome<'db> {
 
                 Ok(binding.return_ty())
             }
-            Self::Cast {
-                binding: _,
-                casted_ty,
-            } => Ok(*casted_ty),
         }
     }
 }
