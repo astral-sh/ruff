@@ -6,9 +6,7 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::{
-    Arguments, Expr, ExprCall, ExprSubscript, Identifier, Parameter, ParameterWithDefault,
-};
+use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
@@ -157,7 +155,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         };
 
         if let Some(parameter_names) = dependency.parameter_names() {
-            named_args.extend(parameter_names.iter().copied().map(Identifier::as_str));
+            named_args.extend_from_slice(parameter_names);
         } else {
             // If we can't determine the dependency, we can't really do anything.
             return;
@@ -227,13 +225,13 @@ enum Dependency<'a> {
     /// Not defined in the same file, or otherwise cannot be determined to be a function.
     Unknown,
     /// A function defined in the same file, whose parameter names are as given.
-    Function(Vec<&'a Identifier>),
+    Function(Vec<&'a str>),
     /// There are multiple `Depends()` calls.
     Multiple,
 }
 
 impl<'a> Dependency<'a> {
-    fn parameter_names(&self) -> Option<&[&'a Identifier]> {
+    fn parameter_names(&self) -> Option<&[&'a str]> {
         match self {
             Self::Unknown => None,
             Self::Multiple => None,
@@ -325,7 +323,7 @@ impl<'a> Dependency<'a> {
         };
 
         let parameter_names = non_posonly_non_variadic_parameters(function_def)
-            .map(|ParameterWithDefault { parameter, .. }| &parameter.name)
+            .map(|ParameterWithDefault { parameter, .. }| &*parameter.name)
             .collect();
 
         Some(Self::Function(parameter_names))
