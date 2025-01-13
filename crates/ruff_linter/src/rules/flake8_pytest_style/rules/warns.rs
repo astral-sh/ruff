@@ -14,9 +14,10 @@ use super::helpers::is_empty_or_null_string;
 /// Checks for `pytest.warns` context managers with multiple statements.
 ///
 /// ## Why is this bad?
-/// When a `pytest.warns` is used as a context manager and contains multiple
-/// statements, it can lead to the test passing when it actually should fail. To
-/// avoid this, a `pytest.warns` context manager should only contain a single
+/// When `pytest.warns` is used as a context manager and contains multiple
+/// statements, it can lead to the test passing when it should instead fail.
+///
+/// A `pytest.warns` context manager should only contain a single
 /// simple statement that triggers the expected warning.
 ///
 /// ## Example
@@ -147,7 +148,7 @@ pub(crate) struct PytestWarnsWithoutWarning;
 impl Violation for PytestWarnsWithoutWarning {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "set the expected warning in `pytest.warns()`".to_string()
+        "Set the expected warning in `pytest.warns()`".to_string()
     }
 }
 
