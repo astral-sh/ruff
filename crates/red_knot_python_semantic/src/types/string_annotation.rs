@@ -1,7 +1,7 @@
 use ruff_db::source::source_text;
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, ModExpression, StringFlags};
-use ruff_python_parser::{parse_parenthesized_expression_range, Parsed};
+use ruff_python_parser::{parse_expression_range, parse_parenthesized_expression_range, Parsed};
 use ruff_text_size::Ranged;
 
 use crate::declare_lint;
@@ -158,14 +158,13 @@ pub(crate) fn parse_string_annotation(
                 .add_start(string_literal.flags.opener_len())
                 .sub_end(string_literal.flags.closer_len());
 
-            // TODO: Support multiline strings like:
-            // ```py
-            // x: """
-            //     int
-            //     | float
-            // """ = 1
-            // ```
-            match parse_parenthesized_expression_range(source.as_str(), range_excluding_quotes) {
+            let parsed = if string_literal.flags.is_triple_quoted() {
+                parse_parenthesized_expression_range(source.as_str(), range_excluding_quotes)
+            } else {
+                parse_expression_range(source.as_str(), range_excluding_quotes)
+            };
+
+            match parsed {
                 Ok(parsed) => return Some(parsed),
                 Err(parse_error) => context.report_lint(
                     &INVALID_SYNTAX_IN_FORWARD_ANNOTATION,

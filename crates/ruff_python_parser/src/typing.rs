@@ -5,7 +5,10 @@ use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringFlags, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_expression, parse_parenthesized_expression_range, ParseError, Parsed};
+use crate::{
+    parse_expression, parse_expression_range, parse_parenthesized_expression_range, ParseError,
+    Parsed,
+};
 
 type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 
@@ -85,8 +88,13 @@ fn parse_simple_type_annotation(
         .range()
         .add_start(string_literal.flags.opener_len())
         .sub_end(string_literal.flags.closer_len());
+    let parsed = if string_literal.flags.is_triple_quoted() {
+        parse_parenthesized_expression_range(source, range_excluding_quotes)?
+    } else {
+        parse_expression_range(source, range_excluding_quotes)?
+    };
     Ok(ParsedAnnotation {
-        parsed: parse_parenthesized_expression_range(source, range_excluding_quotes)?,
+        parsed,
         kind: AnnotationKind::Simple,
     })
 }

@@ -24,3 +24,6 @@ z: """(
     str
 )
 """
+
+# single quotes are not implicitly parenthesized
+invalid: "\n int"

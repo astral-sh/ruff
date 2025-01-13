@@ -16,3 +16,11 @@ F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
 14 | 
 15 | y: """
    |
+
+F722.py:29:10: F722 Syntax error in forward annotation: `
+ int`
+   |
+28 | # single quotes are not implicitly parenthesized
+29 | invalid: "\n int"
+   |          ^^^^^^^^ F722
+   |
