@@ -256,7 +256,7 @@ impl<'a> Dependency<'a> {
     /// ```
     fn from_parameter(
         parameter_with_default: &'a ParameterWithDefault,
-        semantic: &'a SemanticModel,
+        semantic: &SemanticModel<'a>,
     ) -> Option<Self> {
         let ParameterWithDefault {
             parameter, default, ..
@@ -299,13 +299,13 @@ impl<'a> Dependency<'a> {
         dependency
     }
 
-    fn from_default(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<Self> {
+    fn from_default(expr: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
         let arguments = depends_arguments(expr, semantic)?;
 
         Self::from_depends_call(arguments, semantic)
     }
 
-    fn from_depends_call(arguments: &'a Arguments, semantic: &'a SemanticModel) -> Option<Self> {
+    fn from_depends_call(arguments: &'a Arguments, semantic: &SemanticModel<'a>) -> Option<Self> {
         let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
             return None;
         };
@@ -332,7 +332,7 @@ impl<'a> Dependency<'a> {
     }
 }
 
-fn depends_arguments<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Arguments> {
+fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments> {
     let Expr::Call(ExprCall {
         func, arguments, ..
     }) = expr
