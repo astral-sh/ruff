@@ -216,7 +216,7 @@ fn create_diagnostic(
                             }
                         }
                     }
-                    write!(s, ")] = {}", default_arg).unwrap();
+                    write!(s, ")] = {default_arg}").unwrap();
 
                     s
                 } else {
