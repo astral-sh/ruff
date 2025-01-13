@@ -344,13 +344,6 @@ mod flaky {
         forall types t. t.is_assignable_to(db, t)
     );
 
-    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
-    // An intersection of two types should be assignable to both of them
-    type_property_test!(
-        intersection_assignable_to_both, db,
-        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
-    );
-
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
     // This very often passes now, but occasionally flakes due to https://github.com/astral-sh/ruff/issues/15380
     type_property_test!(
@@ -380,6 +373,7 @@ mod flaky {
 
     // And for non-fully-static types, the intersection of a pair of types
     // should be assignable to both types of the pair.
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     type_property_test!(
         all_type_pairs_can_be_assigned_from_their_intersection, db,
         forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
