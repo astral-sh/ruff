@@ -1,7 +1,7 @@
 use ruff_db::source::source_text;
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, ModExpression, StringFlags};
-use ruff_python_parser::{parse_expression_range, Parsed};
+use ruff_python_parser::{parse_parenthesized_expression_range, Parsed};
 use ruff_text_size::Ranged;
 
 use crate::declare_lint;
@@ -165,7 +165,7 @@ pub(crate) fn parse_string_annotation(
             //     | float
             // """ = 1
             // ```
-            match parse_expression_range(source.as_str(), range_excluding_quotes) {
+            match parse_parenthesized_expression_range(source.as_str(), range_excluding_quotes) {
                 Ok(parsed) => return Some(parsed),
                 Err(parse_error) => context.report_lint(
                     &INVALID_SYNTAX_IN_FORWARD_ANNOTATION,

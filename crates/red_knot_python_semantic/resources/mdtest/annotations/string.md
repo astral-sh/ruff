@@ -173,3 +173,27 @@ p: "call()"
 r: "[1, 2]"
 s: "(1, 2)"
 ```
+
+## Multi line annotation
+
+Quoted type annotations should be parsed as if surrounded by parentheses.
+
+```py
+def f(
+    a1: """Literal[None]""",
+    a2: """(Literal[None])""",
+    a3: """(
+      int |
+      str
+  )
+  """,
+    a4: """
+     int |
+       str
+  """,
+):
+    reveal_type(a1)  # revealed: None
+    reveal_type(a2)  # revealed: None
+    reveal_type(a3)  # revealed: int | str
+    reveal_type(a4)  # revealed: int | str
+```

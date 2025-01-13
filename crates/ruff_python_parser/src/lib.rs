@@ -166,6 +166,20 @@ pub fn parse_expression_range(
         .into_result()
 }
 
+/// Parses a Python expression as if it is parenthesized.
+///
+/// It behaves similarly to [`parse_expression_range`] but allows what would be valid within parenthesis
+///
+/// # Example
+///
+/// Parsing a parenthesized expression from a larger expression:
+///
+/// ```
+/// use ruff_python_parser::parse_parenthesized_expression_range;
+/// # use ruff_text_size::{TextRange, TextSize};
+///
+/// let parsed = parse_parenthesized_expression_range("\n int | str", TextRange::new(TextSize::new(4), TextSize::new(11)));
+/// assert!(parsed.is_ok());
 pub fn parse_parenthesized_expression_range(
     source: &str,
     range: TextRange,
