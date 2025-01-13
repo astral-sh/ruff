@@ -224,9 +224,14 @@ fn non_posonly_non_variadic_parameters(
 enum Dependency<'a> {
     /// Not defined in the same file, or otherwise cannot be determined to be a function.
     Unknown,
+
     /// A function defined in the same file, whose parameter names are as given.
     Function(Vec<&'a str>),
+
     /// There are multiple `Depends()` calls.
+    ///
+    /// Multiple `Depends` annotations aren't supported by fastapi and the exact behavior is
+    /// [unspecified](https://github.com/astral-sh/ruff/pull/15364#discussion_r1912551710).
     Multiple,
 }
 
@@ -246,7 +251,7 @@ impl<'a> Dependency<'a> {
     ///
     /// ```python
     /// def _(
-    ///     a: Annotated[str, Depends(foo), Depends(bar)],
+    ///     a: Annotated[str, Depends(foo)],
     ///     #                 ^^^^^^^^^^^^
     ///     a: str = Depends(foo),
     ///     #        ^^^^^^^^^^^^
