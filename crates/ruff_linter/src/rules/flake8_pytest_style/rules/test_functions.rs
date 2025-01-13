@@ -9,20 +9,19 @@ use ruff_text_size::Ranged;
 /// Checks for parameters of test functions with default arguments.
 ///
 /// ## Why is this bad?
-///
+/// Such a parameter will always have the default value during the test
+/// regardless of whether a fixture with the same name is defined.
 ///
 /// ## Example
 ///
 /// ```python
-/// def test_foo(a=1):
-///     ...
+/// def test_foo(a=1): ...
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// def test_foo(a):
-///     ...
+/// def test_foo(a): ...
 /// ```
 ///
 /// ## Fix safety
