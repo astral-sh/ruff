@@ -1,0 +1,30 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--config"
+    - /tmp/.tmpW5pnSS/ruff.toml
+    - "--select"
+    - "I002,ICN001,F401"
+    - "--stdin-filename"
+    - test.py
+    - "--unsafe-fixes"
+    - "--fix"
+    - "-"
+  stdin: "1"
+snapshot_kind: text
+---
+success: false
+exit_code: 1
+----- stdout -----
+import pandas
+1
+----- stderr -----
+warning: (ICN001) requested alias (`pd`) for `pandas` conflicts with isort required import: `import pandas`
+test.py:1:8: ICN001 `pandas` should be imported as `pd`
+Found 2 errors (1 fixed, 1 remaining).
