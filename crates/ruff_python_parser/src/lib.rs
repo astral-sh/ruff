@@ -624,6 +624,11 @@ pub enum Mode {
     /// The code consists of a single expression.
     Expression,
 
+    /// The code is parsed as if it is parenthesized. The code does not need to contain parenthesis
+    /// at the beginning. And it is assumed by the lexer that there is a parenthesis.
+    /// This allows the lexer to allow certain indentations that are not valid in a python file.
+    ParenthesizedExpression,
+
     /// The code consists of a sequence of statements which can include the
     /// escape commands that are part of IPython syntax.
     ///
@@ -641,8 +646,6 @@ pub enum Mode {
     /// [System shell access]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#system-shell-access
     /// [Automatic parentheses and quotes]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#automatic-parentheses-and-quotes
     Ipython,
-
-    ParenthesizedExpression,
 }
 
 impl std::str::FromStr for Mode {
