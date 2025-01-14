@@ -223,8 +223,20 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
             // We report under-indentation on every line. This isn't great, but enables
             // fix.
             if (is_last || !is_blank) && line_indent_size < docstring_indent_size {
-                let mut diagnostic =
-                    Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
+                // Previously, this used `TextRange::empty(line.start())`,
+                // but this creates an offset immediately after the line
+                // terminator. Probably, our renderer should create an
+                // annotation that points to the beginning of the following
+                // line. But it doesn't at present and this have proved
+                // difficult to fix without regressing other cases. So for now,
+                // we work around this by creating a range that points at the
+                // first codepoint in the corresponding line. This makes the
+                // renderer do what we want. ---AG
+                let start = line.start();
+                let end = checker
+                    .locator()
+                    .ceil_char_boundary(start + TextSize::from(1));
+                let mut diagnostic = Diagnostic::new(UnderIndentation, TextRange::new(start, end));
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     clean_space(docstring.indentation),
                     TextRange::at(line.start(), line_indent.text_len()),
@@ -281,8 +293,16 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
 
                 // We report over-indentation on every line. This isn't great, but
                 // enables the fix capability.
-                let mut diagnostic =
-                    Diagnostic::new(OverIndentation, TextRange::empty(line.start()));
+                //
+                // Also, we ensure that our range points to the first character
+                // of the line instead of the empty spance immediately
+                // preceding the line. See above for how we handle under
+                // indentation for more explanation. ---AG
+                let start = line.start();
+                let end = checker
+                    .locator()
+                    .ceil_char_boundary(start + TextSize::from(1));
+                let mut diagnostic = Diagnostic::new(OverIndentation, TextRange::new(start, end));
 
                 let edit = if indent.is_empty() {
                     // Delete the entire indent.
@@ -324,8 +344,15 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
 
             let is_indent_only = line_indent.len() == last.len();
             if last_line_over_indent > 0 && is_indent_only {
-                let mut diagnostic =
-                    Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
+                // We ensure that our range points to the first character of
+                // the line instead of the empty spance immediately preceding
+                // the line. See above for how we handle under indentation for
+                // more explanation. ---AG
+                let start = last.start();
+                let end = checker
+                    .locator()
+                    .ceil_char_boundary(start + TextSize::from(1));
+                let mut diagnostic = Diagnostic::new(OverIndentation, TextRange::new(start, end));
                 let indent = clean_space(docstring.indentation);
                 let range = TextRange::at(last.start(), line_indent.text_len());
                 let edit = if indent.is_empty() {
