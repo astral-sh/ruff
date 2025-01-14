@@ -3,9 +3,8 @@
 ## Basic types
 
 ```py
-from typing import Any
 from typing_extensions import Literal
-from knot_extensions import Unknown, is_subtype_of, static_assert
+from knot_extensions import is_subtype_of, static_assert
 
 static_assert(is_subtype_of(str, object))
 static_assert(is_subtype_of(int, object))
@@ -19,19 +18,29 @@ static_assert(not is_subtype_of(object, int))
 static_assert(not is_subtype_of(int, str))
 static_assert(not is_subtype_of(int, Literal[1]))
 
+static_assert(not is_subtype_of(Literal[1], str))
+static_assert(not is_subtype_of(Literal[1, 2], Literal[1]))
+static_assert(not is_subtype_of(Literal[1, 2], Literal[1, 3]))
+```
+
+## Non-fully-static types
+
+`Any`, `Unknown`, `Todo` and derivatives thereof do not participate in subtyping.
+
+```py
+from typing import Any
+from typing_extensions import Literal
+from knot_extensions import Unknown, is_subtype_of, static_assert
+
 static_assert(not is_subtype_of(Unknown, Unknown))
 static_assert(not is_subtype_of(Unknown, Literal[1]))
 static_assert(not is_subtype_of(Literal[1], Unknown))
 
 static_assert(not is_subtype_of(Any, Any))
 static_assert(not is_subtype_of(Any, Literal[1]))
+
 static_assert(not is_subtype_of(Literal[1], Any))
-
-static_assert(not is_subtype_of(Literal[1], str))
 static_assert(not is_subtype_of(Literal[1], Unknown | str))
-
-static_assert(not is_subtype_of(Literal[1, 2], Literal[1]))
-static_assert(not is_subtype_of(Literal[1, 2], Literal[1, 3]))
 ```
 
 ## `Never`
