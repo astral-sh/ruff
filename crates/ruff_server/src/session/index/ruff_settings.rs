@@ -336,7 +336,6 @@ struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let ResolvedEditorSettings {
-            configuration,
             format_preview,
             lint_preview,
             select,
@@ -345,17 +344,18 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             exclude,
             line_length,
             configuration_preference,
-        } = self.0.clone();
-
-        let project_root = self.1;
+            ..
+        } = self.0;
 
         let editor_configuration = Configuration {
             lint: LintConfiguration {
                 preview: lint_preview.map(PreviewMode::from),
                 rule_selections: vec![RuleSelection {
-                    select,
-                    extend_select: extend_select.unwrap_or_default(),
-                    ignore: ignore.unwrap_or_default(),
+                    select: select.clone(),
+                    extend_select: extend_select
+                        .as_ref()
+                        .map_or_else(Default::default, Clone::clone),
+                    ignore: ignore.as_ref().map_or_else(Default::default, Clone::clone),
                     ..RuleSelection::default()
                 }],
                 ..LintConfiguration::default()
@@ -364,36 +364,24 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 preview: format_preview.map(PreviewMode::from),
                 ..FormatConfiguration::default()
             },
-            exclude: exclude.map(|exclude| {
+            exclude: exclude.as_ref().map(|exclude| {
                 exclude
-                    .into_iter()
+                    .iter()
                     .map(|pattern| {
-                        let absolute = normalize_path_to(&pattern, project_root);
-                        FilePattern::User(pattern, absolute)
+                        let absolute = normalize_path_to(pattern, self.1);
+                        FilePattern::User(pattern.clone(), absolute)
                     })
                     .collect()
             }),
-            line_length,
+            line_length: *line_length,
             ..Configuration::default()
         };
 
         // Merge in the editor-specified configuration file, if it exists.
-        let editor_configuration = if let Some(config_file_path) = configuration {
-            tracing::debug!(
-                "Combining settings from editor-specified configuration file at: {}",
-                config_file_path.display()
-            );
-            match open_configuration_file(&config_file_path) {
-                Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                err => {
-                    tracing::error!(
-                        "{:?}",
-                        err.context("Unable to load editor-specified configuration file")
-                            .unwrap_err()
-                    );
-                    editor_configuration
-                }
-            }
+        let editor_configuration = if let Some(config) = self.0.configuration() {
+            // TODO(dhruvmanila): This log doesn't make sense without the surrounding context
+            tracing::debug!("Combining settings from editor-specified configuration file");
+            editor_configuration.combine(config)
         } else {
             editor_configuration
         };
@@ -407,21 +395,5 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             }
             ConfigurationPreference::EditorOnly => editor_configuration,
         }
-    }
-}
-
-fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
-    ruff_workspace::resolver::resolve_configuration(
-        config_path,
-        Relativity::Cwd,
-        &IdentityTransformer,
-    )
-}
-
-struct IdentityTransformer;
-
-impl ConfigurationTransformer for IdentityTransformer {
-    fn transform(&self, config: Configuration) -> Configuration {
-        config
     }
 }
