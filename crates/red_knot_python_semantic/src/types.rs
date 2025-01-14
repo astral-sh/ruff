@@ -1953,11 +1953,8 @@ impl<'db> Type<'db> {
                         let (ty_a, ty_b) = binding
                             .two_parameter_tys()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-
-                        let equivalence =
-                            ty_a.is_equivalent_to(db, ty_b) && ty_b.is_equivalent_to(db, ty_a);
-
-                        binding.set_return_ty(Type::BooleanLiteral(equivalence));
+                        binding
+                            .set_return_ty(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSubtypeOf) => {

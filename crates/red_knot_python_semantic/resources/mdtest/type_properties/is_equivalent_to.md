@@ -6,6 +6,8 @@ Two types `A` and `B` are equivalent iff `A` is a subtype of `B` and `B` is a su
 
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
 
+## Basic
+
 ```py
 from typing import Any
 from typing_extensions import Literal
@@ -19,4 +21,12 @@ static_assert(not is_equivalent_to(Unknown, Unknown))
 static_assert(not is_equivalent_to(Any, None))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 0]))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
+```
+
+## Equivalence is commutative
+
+```py
+static_assert(is_equivalent_to(type, type[object]))
+static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
+static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 ```
