@@ -1,8 +1,12 @@
-# Boundness and declaredness: public symbols
+# Boundness and declaredness: public uses
 
-This document demonstrates how type-inference and diagnostics works for public symbols. We test the
-whole matrix of possible boundness and declaredness states. The current behavior is as follows (as
-demonstrated by the tests below):
+This document demonstrates how type-inference and diagnostics works for *public* uses of a symbol,
+that is, a use of a symbol from another scope. If a symbol has a declared type in its local scope
+(e.g. `int`), we use that as the symbol's "public type" (the type of the symbol from the perspective
+of other scopes) even if there is a more precise local inferred type for the symbol (`Literal[1]`):
+
+We test the whole matrix of possible boundness and declaredness states. The current behavior is as
+follows (as demonstrated by the tests below):
 
 | **Public type**  | declared     | possibly-undeclared        | undeclared   |
 | ---------------- | ------------ | -------------------------- | ------------ |
@@ -25,7 +29,7 @@ more information.
 ### Declared and bound
 
 If a symbol has a declared type (`int`), we use that even if there is a more precise inferred type
-(`Literal[1]`), or a conflicting inferred type (`Literal[2]`).
+(`Literal[1]`), or a conflicting inferred type (`Literal[2]`):
 
 ```py path=mod.py
 x: int = 1
@@ -43,8 +47,8 @@ reveal_type(y)  # revealed: str
 
 ### Declared and possibly unbound
 
-If a symbol is declared and *possibly* unbound, we also trust that other module and use the declared
-type without raising an error.
+If a symbol is declared and *possibly* unbound, we trust that other module and use the declared type
+without raising an error.
 
 ```py path=mod.py
 def flag() -> bool: ...
@@ -66,8 +70,8 @@ reveal_type(y)  # revealed: str
 
 ### Declared and unbound
 
-If a symbol is declared but unbound, we do not raise an error. We trust that this symbol is
-available somehow and simply use the declared type.
+Similarly, if a symbol is declared but unbound, we do not raise an error. We trust that this symbol
+is available somehow and simply use the declared type.
 
 ```py path=mod.py
 x: int
