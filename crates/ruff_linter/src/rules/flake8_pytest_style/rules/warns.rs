@@ -25,11 +25,10 @@ use super::helpers::is_empty_or_null_string;
 /// import pytest
 ///
 ///
-/// def test_foo():
-///     with pytest.warns(MyWarning):
-///         setup()
-///         func_to_test()  # not executed if `setup()` triggers `MyWarning`
-///         assert foo()  # not executed
+/// def test_foo_warns():
+///     with pytest.warns(Warning):
+///         setup()  # False negative if setup triggers a warning but foo does not.
+///         foo()
 /// ```
 ///
 /// Use instead:
@@ -37,11 +36,10 @@ use super::helpers::is_empty_or_null_string;
 /// import pytest
 ///
 ///
-/// def test_foo():
+/// def test_foo_warns():
 ///     setup()
-///     with pytest.warning(MyWarning):
-///         func_to_test()
-///     assert foo()
+///     with pytest.warning(Warning):
+///         foo()
 /// ```
 ///
 /// ## References
