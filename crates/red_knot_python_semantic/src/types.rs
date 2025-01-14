@@ -1953,8 +1953,11 @@ impl<'db> Type<'db> {
                         let (ty_a, ty_b) = binding
                             .two_parameter_tys()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_ty(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
+
+                        let equivalence =
+                            ty_a.is_equivalent_to(db, ty_b) && ty_b.is_equivalent_to(db, ty_a);
+
+                        binding.set_return_ty(Type::BooleanLiteral(equivalence));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
@@ -4330,33 +4333,6 @@ pub(crate) mod tests {
                 Ty::AlwaysFalsy => Type::AlwaysFalsy,
             }
         }
-    }
-
-    #[test_case(
-        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
-        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)])
-    )]
-    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
-    fn is_equivalent_to(from: Ty, to: Ty) {
-        let db = setup_db();
-        let from = from.into_type(&db);
-        let to = to.into_type(&db);
-        assert!(from.is_equivalent_to(&db, to));
-        assert!(to.is_equivalent_to(&db, from));
-    }
-
-    #[test_case(Ty::Any, Ty::Any)]
-    #[test_case(Ty::Any, Ty::None)]
-    #[test_case(Ty::Unknown, Ty::Unknown)]
-    #[test_case(Ty::Todo, Ty::Todo)]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
-    fn is_not_equivalent_to(from: Ty, to: Ty) {
-        let db = setup_db();
-        let from = from.into_type(&db);
-        let to = to.into_type(&db);
-        assert!(!from.is_equivalent_to(&db, to));
-        assert!(!to.is_equivalent_to(&db, from));
     }
 
     #[test_case(Ty::Never, Ty::Never)]
