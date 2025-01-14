@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
-    resolve::is_document_excluded,
+    resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
     PositionEncoding,
 };
@@ -33,11 +33,10 @@ pub(crate) fn fix_all(
 
     // If the document is excluded, return an empty list of fixes.
     let package = if let Some(document_path) = document_path.as_ref() {
-        if is_document_excluded(
+        if is_document_excluded_for_linting(
             document_path,
             file_resolver_settings,
-            Some(linter_settings),
-            None,
+            linter_settings,
             query.text_document_language_id(),
         ) {
             return Ok(Fixes::default());

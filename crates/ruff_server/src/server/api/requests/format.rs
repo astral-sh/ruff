@@ -6,7 +6,7 @@ use ruff_source_file::LineIndex;
 
 use crate::edit::{Replacement, ToRangeExt};
 use crate::fix::Fixes;
-use crate::resolve::is_document_excluded;
+use crate::resolve::is_document_excluded_for_formatting;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::{DocumentQuery, DocumentSnapshot};
@@ -87,11 +87,10 @@ fn format_text_document(
 
     // If the document is excluded, return early.
     if let Some(file_path) = query.file_path() {
-        if is_document_excluded(
+        if is_document_excluded_for_formatting(
             &file_path,
             file_resolver_settings,
-            None,
-            Some(formatter_settings),
+            formatter_settings,
             text_document.language_id(),
         ) {
             return Ok(None);
