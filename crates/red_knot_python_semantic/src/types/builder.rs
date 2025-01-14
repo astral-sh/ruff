@@ -290,7 +290,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             Type::AlwaysTruthy => {
                                 new_positive = Type::BooleanLiteral(true);
                             }
-                            // `bool & Falsy` -> `Literal[False]`
+                            // `bool & AlwaysFalsy` -> `Literal[False]`
                             Type::AlwaysFalsy => {
                                 new_positive = Type::BooleanLiteral(false);
                             }

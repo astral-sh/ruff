@@ -649,22 +649,24 @@ to the fact that `bool` is a `@final` class at runtime that cannot be subclassed
 ```py
 from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
 
+class P: ...
+
 def f(
     a: Intersection[bool, AlwaysTruthy],
     b: Intersection[bool, AlwaysFalsy],
     c: Intersection[bool, Not[AlwaysTruthy]],
     d: Intersection[bool, Not[AlwaysFalsy]],
-    e: Intersection[bool, AlwaysTruthy, str],
-    f: Intersection[bool, AlwaysFalsy, str],
-    g: Intersection[bool, Not[AlwaysTruthy], str],
-    h: Intersection[bool, Not[AlwaysFalsy], str],
+    e: Intersection[bool, AlwaysTruthy, P],
+    f: Intersection[bool, AlwaysFalsy, P],
+    g: Intersection[bool, Not[AlwaysTruthy], P],
+    h: Intersection[bool, Not[AlwaysFalsy], P],
 ):
     reveal_type(a)  # revealed: Literal[True]
     reveal_type(b)  # revealed: Literal[False]
     reveal_type(c)  # revealed: Literal[False]
     reveal_type(d)  # revealed: Literal[True]
 
-    # `bool & AlwaysTruthy & str` -> `Literal[True] & str` -> `Never`
+    # `bool & AlwaysTruthy & P` -> `Literal[True] & P` -> `Never`
     reveal_type(e)  # revealed: Never
     reveal_type(f)  # revealed: Never
     reveal_type(g)  # revealed: Never
