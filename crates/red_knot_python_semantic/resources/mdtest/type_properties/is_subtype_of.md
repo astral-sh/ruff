@@ -84,7 +84,7 @@ static_assert(is_subtype_of(Literal[b"foo"], object))
 ## Tuple types
 
 ```py
-from typing_extensions import Literal
+from typing_extensions import Literal, Any
 from knot_extensions import is_subtype_of, static_assert
 
 static_assert(is_subtype_of(tuple[()], tuple[()]))
@@ -96,8 +96,8 @@ static_assert(is_subtype_of(tuple[Literal[42], str], tuple[int, str]))
 static_assert(not is_subtype_of(tuple[()], tuple[Literal[1]]))
 static_assert(not is_subtype_of(tuple[Literal[42]], tuple[str]))
 
-static_assert(not is_subtype_of(tuple[tuple[Any, ...]], tuple[Literal[2]]))
-static_assert(not is_subtype_of(tuple[Literal[2]], tuple[tuple[Any, ...]]))
+static_assert(not is_subtype_of(tuple[Any], tuple[Literal[2]]))
+static_assert(not is_subtype_of(tuple[Literal[2]], tuple[Any]))
 ```
 
 ## Union types
