@@ -4,8 +4,6 @@
 
 Two types `A` and `B` are equivalent iff `A` is a subtype of `B` and `B` is a subtype of `A`.
 
-[the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
-
 ## Basic
 
 ```py
@@ -26,7 +24,12 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 ## Equivalence is commutative
 
 ```py
+from typing_extensions import Literal
+from knot_extensions import is_equivalent_to, static_assert
+
 static_assert(is_equivalent_to(type, type[object]))
 static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 ```
+
+[the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
