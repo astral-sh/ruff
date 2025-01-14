@@ -2160,3 +2160,30 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
         "#);});
     Ok(())
 }
+
+#[test]
+fn flake8_import_convention_unused_aliased_import() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"lint.isort.required-imports = ["import pandas"]"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+        );
+    });
+    Ok(())
+}
