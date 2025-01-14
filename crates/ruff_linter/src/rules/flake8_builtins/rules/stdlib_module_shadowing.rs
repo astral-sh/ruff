@@ -27,6 +27,20 @@ use crate::settings::types::PythonVersion;
 /// of the control of the author of the stub file. Instead, a stub should aim to
 /// faithfully emulate the runtime module it is stubbing.
 ///
+/// As of Python 3.13, errors from modules that use the same name as
+/// standard-library modules now display a custom message.
+///
+/// ## Example
+///
+/// ```console
+/// $ touch random.py
+/// $ python3 -c 'from random import choice'
+/// Traceback (most recent call last):
+///   File "<string>", line 1, in <module>
+///     from random import choice
+/// ImportError: cannot import name 'choice' from 'random' (consider renaming '/random.py' since it has the same name as the standard library module named 'random' and prevents importing that standard library module)
+/// ```
+///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
 #[derive(ViolationMetadata)]
