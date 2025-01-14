@@ -625,34 +625,19 @@ def write_astnode(out: list[str], groups: list[Group]) -> None:
         if group.name != "ungrouped":
             out.append(f"""
             impl crate::AstNode for {group.owned_enum_ty} {{
-                fn can_cast(kind: NodeKind) -> bool {{
-                    matches!(kind,
-            """)
-            for i, node in enumerate(group.nodes):
-                if i > 0:
-                    out.append("|")
-                out.append(f"""NodeKind::{node.name}""")
-            out.append("""
-                    )
-                }
-
-                fn as_any_node_ref(&self) -> AnyNodeRef {
+                fn as_any_node_ref(&self) -> AnyNodeRef {{
                     AnyNodeRef::from(self)
-                }
+                }}
 
-                fn into_any_node(self) -> AnyNode {
+                fn into_any_node(self) -> AnyNode {{
                     AnyNode::from(self)
-                }
-            }
+                }}
+            }}
             """)
 
         for node in group.nodes:
             out.append(f"""
             impl crate::AstNode for {node.ty} {{
-                fn can_cast(kind: NodeKind) -> bool {{
-                    matches!(kind, NodeKind::{node.name})
-                }}
-
                 fn as_any_node_ref(&self) -> AnyNodeRef {{
                     AnyNodeRef::from(self)
                 }}

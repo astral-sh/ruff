@@ -1,13 +1,11 @@
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
-    self as ast, Alias, AnyNode, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, NodeKind,
+    self as ast, Alias, AnyNode, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase,
     PatternArguments, PatternKeyword,
 };
 use ruff_text_size::Ranged;
 
 pub trait AstNode: Ranged {
-    fn can_cast(kind: NodeKind) -> bool;
-
     /// Returns the [`AnyNodeRef`] referencing this node.
     fn as_any_node_ref(&self) -> AnyNodeRef;
 
