@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 use crate::renamer::Renamer;
+use crate::warn_user_once_by_message;
 
 /// ## What it does
 /// Checks for imports that are typically imported using a common convention,
@@ -72,11 +73,27 @@ pub(crate) fn unconventional_import_alias(
 
     let mut diagnostic = Diagnostic::new(
         UnconventionalImportAlias {
-            name: qualified_name,
+            name: qualified_name.clone(),
             asname: expected_alias.to_string(),
         },
         binding.range(),
     );
+
+    if let Some(required_import) = checker
+        .settings
+        .isort
+        .required_imports
+        .iter()
+        .find(|name| name.matches(&qualified_name, &import))
+    {
+        warn_user_once_by_message!(
+            "(ICN001) requested alias (`{expected_alias}`) for \
+            `{qualified_name}` conflicts with isort required import: \
+            `{required_import}`"
+        );
+        return Some(diagnostic);
+    }
+
     if !import.is_submodule_import() {
         if checker.semantic().is_available(expected_alias) {
             diagnostic.try_set_fix(|| {
