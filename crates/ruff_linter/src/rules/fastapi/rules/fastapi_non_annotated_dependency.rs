@@ -202,30 +202,35 @@ fn create_diagnostic(
                     .collect()
             });
 
-            let content = if is_dep && default_arg.is_some() {
-                let default_arg = default_arg.unwrap();
-                let kwarg_list = match kwarg_list {
-                    Some(v) => v.join(", "),
-                    None => String::new(),
-                };
-                seen_default = true;
-                format!(
-                    "{parameter_name}: {binding}[{annotation}, {default}({kwarg_list})] = {default_value}",
-                    parameter_name = &parameter.parameter.name.id,
-                    annotation = checker.locator().slice(annotation.range()),
-                    metadata = checker.locator().slice(map_callable(default).range()),
-                    default_valuechecker.locator().slice(default_arg.value().range()),
-                )
-            } else if !seen_default {
-                format!(
-                    "{}: {}[{}, {}]",
-                    parameter.parameter.name.id,
-                    binding,
-                    checker.locator().slice(annotation.range()),
-                    checker.locator().slice(default.range())
-                )
-            } else {
-                return Ok(None);
+            let content = match default_arg {
+                Some(default_arg) if is_dep => {
+                    let kwarg_list = match kwarg_list {
+                        Some(v) => v.join(", "),
+                        None => String::new(),
+                    };
+                    seen_default = true;
+                    format!(
+                        "{parameter_name}: {binding}[{annotation}, {default_}({kwarg_list})] \
+                            = {default_value}",
+                        parameter_name = &parameter.parameter.name.id,
+                        annotation = checker.locator().slice(annotation.range()),
+                        default_ = checker.locator().slice(map_callable(default).range()),
+                        default_value = checker.locator().slice(default_arg.value().range()),
+                    )
+                }
+                _ => {
+                    if !seen_default {
+                        format!(
+                            "{}: {}[{}, {}]",
+                            parameter.parameter.name.id,
+                            binding,
+                            checker.locator().slice(annotation.range()),
+                            checker.locator().slice(default.range())
+                        )
+                    } else {
+                        return Ok(None);
+                    }
+                }
             };
             let parameter_edit = Edit::range_replacement(content, parameter.range);
             Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
