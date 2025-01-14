@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E11.py:9:1: E112 Expected an indented block
    |
  7 | #: E112
  8 | if False:
  9 | print()
-   |  E112
+   | ^ E112
 10 | #: E113
 11 | print()
    |
@@ -47,7 +46,7 @@ E11.py:45:1: E112 Expected an indented block
 43 | #: E112
 44 | if False:  #
 45 | print()
-   |  E112
+   | ^ E112
 46 | #:
 47 | if False:
    |

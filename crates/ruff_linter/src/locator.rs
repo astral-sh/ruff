@@ -118,6 +118,86 @@ impl<'a> Locator<'a> {
         }
     }
 
+    /// Finds the closest [`TextSize`] not less than the offset given for which
+    /// `is_char_boundary` is `true`. Unless the offset given is greater than
+    /// the length of the underlying contents, in which case, the length of the
+    /// contents is returned.
+    ///
+    /// Can be replaced with `str::ceil_char_boundary` once it's stable.
+    ///
+    /// # Examples
+    ///
+    /// From `std`:
+    ///
+    /// ```
+    /// use ruff_text_size::{Ranged, TextSize};
+    /// use ruff_linter::Locator;
+    ///
+    /// let locator = Locator::new("❤️🧡💛💚💙💜");
+    /// assert_eq!(locator.text_len(), TextSize::from(26));
+    /// assert!(!locator.contents().is_char_boundary(13));
+    ///
+    /// let closest = locator.ceil_char_boundary(TextSize::from(13));
+    /// assert_eq!(closest, TextSize::from(14));
+    /// assert_eq!(&locator.contents()[..closest.to_usize()], "❤️🧡💛");
+    /// ```
+    ///
+    /// Additional examples:
+    ///
+    /// ```
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
+    /// use ruff_linter::Locator;
+    ///
+    /// let locator = Locator::new("Hello");
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(0)),
+    ///     TextSize::from(0)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(5)),
+    ///     TextSize::from(5)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(6)),
+    ///     TextSize::from(5)
+    /// );
+    ///
+    /// let locator = Locator::new("α");
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(0)),
+    ///     TextSize::from(0)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(1)),
+    ///     TextSize::from(2)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(2)),
+    ///     TextSize::from(2)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     locator.ceil_char_boundary(TextSize::from(3)),
+    ///     TextSize::from(2)
+    /// );
+    /// ```
+    pub fn ceil_char_boundary(&self, offset: TextSize) -> TextSize {
+        let upper_bound = offset
+            .to_u32()
+            .saturating_add(4)
+            .min(self.text_len().to_u32());
+        (offset.to_u32()..upper_bound)
+            .map(TextSize::from)
+            .find(|offset| self.contents.is_char_boundary(offset.to_usize()))
+            .unwrap_or_else(|| TextSize::from(upper_bound))
+    }
+
     /// Take the source code between the given [`TextRange`].
     #[inline]
     pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
