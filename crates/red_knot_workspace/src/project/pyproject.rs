@@ -4,9 +4,7 @@ use pep440_rs::{Version, VersionSpecifiers};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::workspace::metadata::WorkspaceDiscoveryError;
 pub(crate) use package_name::PackageName;
-use ruff_db::system::SystemPath;
 
 /// A `pyproject.toml` as specified in PEP 517.
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -19,11 +17,8 @@ pub(crate) struct PyProject {
 }
 
 impl PyProject {
-    pub(crate) fn workspace(&self) -> Option<&Workspace> {
-        self.tool
-            .as_ref()
-            .and_then(|tool| tool.knot.as_ref())
-            .and_then(|knot| knot.workspace.as_ref())
+    pub(crate) fn knot(&self) -> Option<&Knot> {
+        self.tool.as_ref().and_then(|tool| tool.knot.as_ref())
     }
 }
 
@@ -62,47 +57,9 @@ pub(crate) struct Tool {
     pub knot: Option<Knot>,
 }
 
+// TODO(micha): Remove allow once we add knot settings.
+//  We can't use a unit struct here or deserializing `[tool.knot]` fails.
+#[allow(clippy::empty_structs_with_brackets)]
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct Knot {
-    pub(crate) workspace: Option<Workspace>,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct Workspace {
-    pub(crate) members: Option<Vec<String>>,
-    pub(crate) exclude: Option<Vec<String>>,
-}
-
-impl Workspace {
-    pub(crate) fn members(&self) -> &[String] {
-        self.members.as_deref().unwrap_or_default()
-    }
-
-    pub(crate) fn exclude(&self) -> &[String] {
-        self.exclude.as_deref().unwrap_or_default()
-    }
-
-    pub(crate) fn is_excluded(
-        &self,
-        path: &SystemPath,
-        workspace_root: &SystemPath,
-    ) -> Result<bool, WorkspaceDiscoveryError> {
-        for exclude in self.exclude() {
-            let full_glob =
-                glob::Pattern::new(workspace_root.join(exclude).as_str()).map_err(|error| {
-                    WorkspaceDiscoveryError::InvalidMembersPattern {
-                        raw_glob: exclude.clone(),
-                        source: error,
-                    }
-                })?;
-
-            if full_glob.matches_path(path.as_std_path()) {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-}
+pub(crate) struct Knot {}

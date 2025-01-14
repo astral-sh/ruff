@@ -86,13 +86,11 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
             return Box::new(|_, _| {});
         };
         let db = match path {
-            AnySystemPath::System(path) => {
-                match session.workspace_db_for_path(path.as_std_path()) {
-                    Some(db) => db.clone(),
-                    None => session.default_workspace_db().clone(),
-                }
-            }
-            AnySystemPath::SystemVirtual(_) => session.default_workspace_db().clone(),
+            AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
+                Some(db) => db.clone(),
+                None => session.default_project_db().clone(),
+            },
+            AnySystemPath::SystemVirtual(_) => session.default_project_db().clone(),
         };
 
         let Some(snapshot) = session.take_snapshot(url) else {

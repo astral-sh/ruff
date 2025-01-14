@@ -38,7 +38,7 @@ impl Db {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(db.workspace_root.clone()),

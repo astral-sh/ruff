@@ -8,11 +8,11 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::{Db as _, Upcast};
 
-use crate::db::{Db, RootDatabase};
+use crate::db::{Db, ProjectDatabase};
 use crate::watch::Watcher;
 
-/// Wrapper around a [`Watcher`] that watches the relevant paths of a workspace.
-pub struct WorkspaceWatcher {
+/// Wrapper around a [`Watcher`] that watches the relevant paths of a project.
+pub struct ProjectWatcher {
     watcher: Watcher,
 
     /// The paths that need to be watched. This includes paths for which setting up file watching failed.
@@ -25,9 +25,9 @@ pub struct WorkspaceWatcher {
     cache_key: Option<u64>,
 }
 
-impl WorkspaceWatcher {
-    /// Create a new workspace watcher.
-    pub fn new(watcher: Watcher, db: &RootDatabase) -> Self {
+impl ProjectWatcher {
+    /// Create a new project watcher.
+    pub fn new(watcher: Watcher, db: &ProjectDatabase) -> Self {
         let mut watcher = Self {
             watcher,
             watched_paths: Vec::new(),
@@ -40,11 +40,11 @@ impl WorkspaceWatcher {
         watcher
     }
 
-    pub fn update(&mut self, db: &RootDatabase) {
+    pub fn update(&mut self, db: &ProjectDatabase) {
         let search_paths: Vec<_> = system_module_search_paths(db.upcast()).collect();
-        let workspace_path = db.workspace().root(db).to_path_buf();
+        let project_path = db.project().root(db).to_path_buf();
 
-        let new_cache_key = Self::compute_cache_key(&workspace_path, &search_paths);
+        let new_cache_key = Self::compute_cache_key(&project_path, &search_paths);
 
         if self.cache_key == Some(new_cache_key) {
             return;
@@ -56,7 +56,7 @@ impl WorkspaceWatcher {
         // ```text
         // - bar
         //   - baz.py
-        // - workspace
+        // - project
         //   - bar -> /bar
         //   - foo.py
         // ```
@@ -68,23 +68,23 @@ impl WorkspaceWatcher {
 
         self.has_errored_paths = false;
 
-        let workspace_path = db
+        let project_path = db
             .system()
-            .canonicalize_path(&workspace_path)
-            .unwrap_or(workspace_path);
+            .canonicalize_path(&project_path)
+            .unwrap_or(project_path);
 
-        // Find the non-overlapping module search paths and filter out paths that are already covered by the workspace.
+        // Find the non-overlapping module search paths and filter out paths that are already covered by the project.
         // Module search paths are already canonicalized.
         let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
             search_paths
                 .into_iter()
-                .filter(|path| !path.starts_with(&workspace_path)),
+                .filter(|path| !path.starts_with(&project_path)),
         )
         .map(SystemPath::to_path_buf);
 
-        // Now add the new paths, first starting with the workspace path and then
+        // Now add the new paths, first starting with the project path and then
         // adding the library search paths.
-        for path in std::iter::once(workspace_path).chain(unique_module_paths) {
+        for path in std::iter::once(project_path).chain(unique_module_paths) {
             // Log a warning. It's not worth aborting if registering a single folder fails because
             // Ruff otherwise stills works as expected.
             if let Err(error) = self.watcher.watch(&path) {
@@ -106,10 +106,10 @@ impl WorkspaceWatcher {
         self.cache_key = Some(new_cache_key);
     }
 
-    fn compute_cache_key(workspace_root: &SystemPath, search_paths: &[&SystemPath]) -> u64 {
+    fn compute_cache_key(project_root: &SystemPath, search_paths: &[&SystemPath]) -> u64 {
         let mut cache_key_hasher = CacheKeyHasher::new();
         search_paths.cache_key(&mut cache_key_hasher);
-        workspace_root.cache_key(&mut cache_key_hasher);
+        project_root.cache_key(&mut cache_key_hasher);
 
         cache_key_hasher.finish()
     }

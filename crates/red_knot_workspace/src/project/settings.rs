@@ -1,4 +1,3 @@
-use crate::workspace::PackageMetadata;
 use red_knot_python_semantic::{
     ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
 };
@@ -9,17 +8,17 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 /// The main difference to [`Configuration`] is that default values are filled in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
-pub struct WorkspaceSettings {
+pub struct ProjectSettings {
     pub(super) program: ProgramSettings,
 }
 
-impl WorkspaceSettings {
+impl ProjectSettings {
     pub fn program(&self) -> &ProgramSettings {
         &self.program
     }
 }
 
-/// The configuration for the workspace or a package.
+/// The configuration for the project or a package.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct Configuration {
@@ -34,17 +33,11 @@ impl Configuration {
         self.search_paths.extend(with.search_paths);
     }
 
-    pub fn to_workspace_settings(
-        &self,
-        workspace_root: &SystemPath,
-        _packages: &[PackageMetadata],
-    ) -> WorkspaceSettings {
-        WorkspaceSettings {
-            program: ProgramSettings {
-                python_version: self.python_version.unwrap_or_default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: self.search_paths.to_settings(workspace_root),
-            },
+    pub(super) fn to_program_settings(&self, first_party_root: &SystemPath) -> ProgramSettings {
+        ProgramSettings {
+            python_version: self.python_version.unwrap_or_default(),
+            python_platform: PythonPlatform::default(),
+            search_paths: self.search_paths.to_settings(first_party_root),
         }
     }
 }
@@ -57,7 +50,7 @@ pub struct SearchPathConfiguration {
     /// or pyright's stubPath configuration setting.
     pub extra_paths: Option<Vec<SystemPathBuf>>,
 
-    /// The root of the workspace, used for finding first-party modules.
+    /// The root of the project, used for finding first-party modules.
     pub src_root: Option<SystemPathBuf>,
 
     /// Optional path to a "typeshed" directory on disk for us to use for standard-library types.

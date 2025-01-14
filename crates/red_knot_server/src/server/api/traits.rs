@@ -5,7 +5,7 @@ use crate::session::{DocumentSnapshot, Session};
 
 use lsp_types::notification::Notification as LSPNotification;
 use lsp_types::request::Request;
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::ProjectDatabase;
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {
@@ -34,7 +34,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: RootDatabase,
+        db: ProjectDatabase,
         notifier: Notifier,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
