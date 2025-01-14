@@ -1314,9 +1314,11 @@ impl<'src> Lexer<'src> {
     }
 
     fn consume_end(&mut self) -> TokenKind {
-        // For Mode::ParenthesizedExpression we start with nesting level 1.
-        // So we check if we end with
+        // We reached end of file.
+        // First of all, we need all nestings to be finished.
         match self.mode {
+            // For Mode::ParenthesizedExpression we start with nesting level 1.
+            // So we check if we end with that level.
             Mode::ParenthesizedExpression => {
                 if self.nesting != 1 {
                     // Reset the nesting to avoid going into infinite loop.
@@ -1326,8 +1328,6 @@ impl<'src> Lexer<'src> {
                 }
             }
             _ => {
-                // We reached end of file.
-                // First of all, we need all nestings to be finished.
                 if self.nesting > 0 {
                     // Reset the nesting to avoid going into infinite loop.
                     self.nesting = 0;
