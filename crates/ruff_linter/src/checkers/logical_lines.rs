@@ -3,7 +3,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::line_width::IndentWidth;
 use crate::registry::{AsRule, Rule};
@@ -161,7 +161,13 @@ pub(crate) fn check_logical_lines(
         let range = if first_token.kind() == TokenKind::Indent {
             first_token.range()
         } else {
-            TextRange::new(locator.line_start(first_token.start()), first_token.start())
+            let mut range =
+                TextRange::new(locator.line_start(first_token.start()), first_token.start());
+            if range.is_empty() {
+                let end = locator.ceil_char_boundary(range.start() + TextSize::from(1));
+                range = TextRange::new(range.start(), end);
+            }
+            range
         };
 
         let indent_level = expand_indent(locator.slice(range), settings.tab_size);
