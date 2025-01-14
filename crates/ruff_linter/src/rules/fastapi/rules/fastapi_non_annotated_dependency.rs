@@ -210,12 +210,11 @@ fn create_diagnostic(
                 };
                 seen_default = true;
                 format!(
-                    "{}: {}[{}, {}({kwarg_list})] = {}",
-                    &parameter.parameter.name.id,
-                    binding,
-                    checker.locator().slice(annotation.range()),
-                    checker.locator().slice(map_callable(default).range()),
-                    checker.locator().slice(default_arg.value().range()),
+                    "{parameter_name}: {binding}[{annotation}, {default}({kwarg_list})] = {default_value}",
+                    parameter_name = &parameter.parameter.name.id,
+                    annotation = checker.locator().slice(annotation.range()),
+                    metadata = checker.locator().slice(map_callable(default).range()),
+                    default_valuechecker.locator().slice(default_arg.value().range()),
                 )
             } else if !seen_default {
                 format!(
