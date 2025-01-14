@@ -1,5 +1,11 @@
 # Equivalence relation
 
+`is_equivalent_to` implements [the equivalence relation] for fully static types.
+
+Two types `A` and `B` are equivalent iff `A` is a subtype of `B` and `B` is a subtype of `A`.
+
+[the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
+
 ```py
 from typing import Any
 from typing_extensions import Literal
