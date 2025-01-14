@@ -143,6 +143,25 @@ fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> bool {
         })
 }
 
+/// Create a [`Diagnostic`] for `parameter` and return an updated value of `seen_default`.
+///
+/// While all of the *input* `parameter` values have default values (see the `needs_update` match in
+/// [`fastapi_non_annotated_dependency`]), some of the fixes remove default values. For example,
+///
+/// ```python
+/// def handler(some_path_param: str = Path()): pass
+/// ```
+///
+/// Gets fixed to
+///
+/// ```python
+/// def handler(some_path_param: Annotated[str, Path()]): pass
+/// ```
+///
+/// Causing it to lose its default value. That's fine in this example but causes a syntax error if
+/// `some_path_param` comes after another argument with a default. We only compute the information
+/// necessary to determine this while generating the fix, thus the need to return an updated
+/// `seen_default` here.
 fn create_diagnostic(
     checker: &mut Checker,
     parameter: &ast::ParameterWithDefault,
