@@ -16,8 +16,9 @@ use super::helpers::is_empty_or_null_string;
 /// ## Why is this bad?
 /// When a `pytest.raises` is used as a context manager and contains multiple
 /// statements, it can lead to the test passing when it actually should fail.
-/// To avoid this, a `pytest.raises` context manager should only contain
-/// a single simple statement that raises the expected exception.
+///
+/// A `pytest.raises` context manager should only contain a single simple
+/// statement that raises the expected exception.
 ///
 /// ## Example
 /// ```python
@@ -147,7 +148,7 @@ pub(crate) struct PytestRaisesWithoutException;
 impl Violation for PytestRaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "set the expected exception in `pytest.raises()`".to_string()
+        "Set the expected exception in `pytest.raises()`".to_string()
     }
 }
 
