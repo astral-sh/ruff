@@ -36,11 +36,16 @@ static_assert(not is_subtype_of(Literal[1, 2], Literal[1, 3]))
 
 ## `Never`
 
+`Never` is a subtype of all types.
+
 ```py
 from typing_extensions import Literal, Never
-from knot_extensions import is_subtype_of, static_assert
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Never, Literal[1]))
+
+static_assert(is_subtype_of(Never, AlwaysTruthy))
+static_assert(is_subtype_of(Never, AlwaysFalsy))
 ```
 
 ## Literal types
@@ -82,8 +87,8 @@ static_assert(is_subtype_of(tuple[Literal[42], str], tuple[int, str]))
 static_assert(not is_subtype_of(tuple[()], tuple[Literal[1]]))
 static_assert(not is_subtype_of(tuple[Literal[42]], tuple[str]))
 
-static_assert(not is_subtype_of(tuple[tuple[int, ...]], tuple[Literal[2]]))
-static_assert(not is_subtype_of(tuple[Literal[2]], tuple[tuple[int, ...]]))
+static_assert(not is_subtype_of(tuple[tuple[Any, ...]], tuple[Literal[2]]))
+static_assert(not is_subtype_of(tuple[Literal[2]], tuple[tuple[Any, ...]]))
 ```
 
 ## Union types
@@ -104,32 +109,34 @@ from typing_extensions import Literal, LiteralString
 from knot_extensions import Intersection, Not, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Intersection[int, Not[Literal[2]]], int))
-static_assert(is_subtype_of(Intersection[int, Not[Literal[2]]], Intersection[Not[Literal[2]]]))
-static_assert(is_subtype_of(Intersection[Not[int]], Intersection[Not[Literal[2]]]))
+static_assert(is_subtype_of(Intersection[int, Not[Literal[2]]], Not[Literal[2]]))
+static_assert(is_subtype_of(Not[int], Not[Literal[2]]))
 static_assert(is_subtype_of(Literal[1], Intersection[int, Not[Literal[2]]]))
-static_assert(is_subtype_of(Intersection[str, Not[Literal["foo"]]], Intersection[Not[Literal[2]]]))
-static_assert(is_subtype_of(Intersection[Not[LiteralString]], object))
+static_assert(is_subtype_of(Intersection[str, Not[Literal["foo"]]], Not[Literal[2]]))
+static_assert(is_subtype_of(Not[LiteralString], object))
 
-static_assert(is_subtype_of(type[str], Intersection[Not[None]]))
-static_assert(is_subtype_of(Intersection[Not[LiteralString]], object))
+static_assert(is_subtype_of(type[str], Not[None]))
+static_assert(is_subtype_of(Not[LiteralString], object))
 
 static_assert(not is_subtype_of(Intersection[int, Not[Literal[2]]], Intersection[int, Not[Literal[3]]]))
-static_assert(not is_subtype_of(Intersection[Not[2]], Intersection[Not[3]]))
-static_assert(not is_subtype_of(Intersection[Not[2]], Intersection[Not[int]]))
+static_assert(not is_subtype_of(Not[Literal[2]], Not[Literal[3]]))
+static_assert(not is_subtype_of(Not[Literal[2]], Not[int]))
 
-static_assert(not is_subtype_of(int, Intersection[Not[3]]))
-static_assert(not is_subtype_of(Literal[1], Intersection[int, Not[1]]))
+static_assert(not is_subtype_of(int, Not[Literal[3]]))
+static_assert(not is_subtype_of(Literal[1], Intersection[int, Not[Literal[1]]]))
 ```
 
 ## Class literal types
 
 ```py
-from abc import ABC, ABCMeta
 from types import ModuleType
 from typing import _SpecialForm
 from typing_extensions import Literal, LiteralString
 import typing
 from knot_extensions import TypeOf, is_subtype_of, static_assert
+
+class Meta(type): ...
+class HasCustomMetaclass(metaclass=Meta): ...
 
 static_assert(is_subtype_of(TypeOf[bool], type[int]))
 static_assert(is_subtype_of(TypeOf[int], TypeOf[int]))
@@ -138,8 +145,9 @@ static_assert(is_subtype_of(TypeOf[int], object))
 static_assert(is_subtype_of(TypeOf[Literal], _SpecialForm))
 static_assert(is_subtype_of(TypeOf[Literal], object))
 
-static_assert(is_subtype_of(TypeOf[ABC], ABCMeta))
-static_assert(is_subtype_of(ABCMeta, type[object]))
+static_assert(is_subtype_of(TypeOf[HasCustomMetaclass], Meta))
+static_assert(is_subtype_of(Meta, type[object]))
+static_assert(not is_subtype_of(Meta, type[type]))
 
 static_assert(is_subtype_of(tuple[int], tuple))
 static_assert(is_subtype_of(TypeOf[str], type))
@@ -155,13 +163,11 @@ static_assert(not is_subtype_of(TypeOf[int], TypeOf[object]))
 static_assert(not is_subtype_of(TypeOf[int], int))
 
 static_assert(not is_subtype_of(_SpecialForm, TypeOf[Literal]))
-static_assert(not is_subtype_of(ABCMeta, type[type]))
 ```
 
 ## `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from typing_extensions import Never
 from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
@@ -170,9 +176,6 @@ static_assert(is_subtype_of(Literal[0], AlwaysFalsy))
 static_assert(is_subtype_of(AlwaysTruthy, object))
 static_assert(is_subtype_of(AlwaysFalsy, object))
 
-static_assert(is_subtype_of(Never, AlwaysTruthy))
-static_assert(is_subtype_of(Never, AlwaysFalsy))
-
 static_assert(not is_subtype_of(Literal[1], AlwaysFalsy))
 static_assert(not is_subtype_of(Literal[0], AlwaysTruthy))
 
@@ -180,51 +183,45 @@ static_assert(not is_subtype_of(str, AlwaysTruthy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
 ```
 
-## User-defined classes
+## Unions
 
-```py path="unions.py"
+```py
+from typing_extensions import assert_type
 from knot_extensions import TypeOf, is_subtype_of, static_assert
 
 class Base: ...
 class Derived(Base): ...
 class Unrelated: ...
 
-reveal_type(Base)  # revealed: Literal[Base]
-reveal_type(Derived)  # revealed: Literal[Derived]
+type LiteralBase = TypeOf[Base]
+type LiteralDerived = TypeOf[Derived]
+type LiteralUnrelated = TypeOf[Unrelated]
 
-static_assert(is_subtype_of(TypeOf[Base], type))
-static_assert(is_subtype_of(TypeOf[Base], object))
+assert_type(Base, LiteralBase)
+assert_type(Derived, LiteralDerived)
+assert_type(Unrelated, LiteralUnrelated)
 
-static_assert(is_subtype_of(TypeOf[Base], type[Base]))
-static_assert(is_subtype_of(TypeOf[Derived], type[Base]))
-static_assert(is_subtype_of(TypeOf[Derived], type[Derived]))
+static_assert(is_subtype_of(LiteralBase, type))
+static_assert(is_subtype_of(LiteralBase, object))
 
-static_assert(not is_subtype_of(TypeOf[Base], type[Derived]))
+static_assert(is_subtype_of(LiteralBase, type[Base]))
+static_assert(is_subtype_of(LiteralDerived, type[Base]))
+static_assert(is_subtype_of(LiteralDerived, type[Derived]))
+
+static_assert(not is_subtype_of(LiteralBase, type[Derived]))
 static_assert(is_subtype_of(type[Derived], type[Base]))
 
-def _(flag: bool):
-    U = Base if flag else Unrelated
-
-    reveal_type(U)  # revealed: Literal[Base, Unrelated]
-
-    static_assert(is_subtype_of(TypeOf[U], type))
-    static_assert(is_subtype_of(TypeOf[U], object))
+static_assert(is_subtype_of(LiteralBase | LiteralUnrelated, type))
+static_assert(is_subtype_of(LiteralBase | LiteralUnrelated, object))
 ```
 
-```py path="intersections.py"
+## Intersections
+
+```py
 from knot_extensions import Intersection, is_subtype_of, static_assert
 
 class A: ...
 class B: ...
-
-a = A()
-b = B()
-
-reveal_type(a)  # revealed: A
-reveal_type(b)  # revealed: B
-
-def _(x: Intersection[A, B]):
-    reveal_type(x)  # revealed: A & B
 
 static_assert(not is_subtype_of(A, B))
 static_assert(is_subtype_of(Intersection[A, B], A))
