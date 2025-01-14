@@ -176,7 +176,7 @@ fn create_diagnostic(
 
     if let (Some(annotation), Some(default)) = (&parameter.parameter.annotation, &parameter.default)
     {
-        diagnostic.try_set_optional_fix(|| {
+        let mut try_generate_fix = || {
             let module = if checker.settings.target_version >= PythonVersion::Py39 {
                 "typing"
             } else {
@@ -251,7 +251,16 @@ fn create_diagnostic(
             };
             let parameter_edit = Edit::range_replacement(content, parameter.range);
             Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
-        });
+        };
+
+        // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
+        // `match` on the result directly, but still calling `try_set_optional_fix` avoids
+        // duplicating the debug logging here
+        let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
+        if fix.is_err() {
+            seen_default = true;
+        }
+        diagnostic.try_set_optional_fix(|| fix);
     }
 
     checker.diagnostics.push(diagnostic);
