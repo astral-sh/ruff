@@ -221,15 +221,14 @@ fn create_diagnostic(
                 _ => {
                     if seen_default {
                         return Ok(None);
-                    } else {
-                        format!(
-                            "{}: {}[{}, {}]",
-                            parameter.parameter.name.id,
-                            binding,
-                            checker.locator().slice(annotation.range()),
-                            checker.locator().slice(default.range())
-                        )
                     }
+                    format!(
+                        "{}: {}[{}, {}]",
+                        parameter.parameter.name.id,
+                        binding,
+                        checker.locator().slice(annotation.range()),
+                        checker.locator().slice(default.range())
+                    )
                 }
             };
             let parameter_edit = Edit::range_replacement(content, parameter.range);
