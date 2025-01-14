@@ -32,7 +32,7 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 ///
-/// ```sh
+/// ```console
 /// $ touch random.py
 /// $ python3 -c 'from random import choice'
 /// Traceback (most recent call last):
