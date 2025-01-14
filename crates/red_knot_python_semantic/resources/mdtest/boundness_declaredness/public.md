@@ -1,4 +1,4 @@
-# Boundness and declaredness
+# Boundness and declaredness: public symbols
 
 This document demonstrates how type-inference and diagnostics works for public symbols. We test the
 whole matrix of possible boundness and declaredness states. The current behavior is as follows (as
@@ -20,11 +20,9 @@ Note: Some of this behavior is questionable and might change in the future. See 
 `symbol_by_id` (`types.rs`) and [this issue](https://github.com/astral-sh/ruff/issues/14297) for
 more information.
 
-## Public symbols
+## Declared
 
-### Declared
-
-#### Declared and bound
+### Declared and bound
 
 If a symbol has a declared type (`int`), we use that even if there is a more precise inferred type
 (`Literal[1]`), or a conflicting inferred type (`Literal[2]`).
@@ -43,7 +41,7 @@ reveal_type(x)  # revealed: int
 reveal_type(y)  # revealed: str
 ```
 
-#### Declared and possibly unbound
+### Declared and possibly unbound
 
 If a symbol is declared and *possibly* unbound, we also trust that other module and use the declared
 type without raising an error.
@@ -66,7 +64,7 @@ reveal_type(x)  # revealed: int
 reveal_type(y)  # revealed: str
 ```
 
-#### Declared and unbound
+### Declared and unbound
 
 If a symbol is declared but unbound, we do not raise an error. We trust that this symbol is
 available somehow and simply use the declared type.
@@ -81,9 +79,9 @@ from mod import x
 reveal_type(x)  # revealed: int
 ```
 
-### Possibly undeclared
+## Possibly undeclared
 
-#### Possibly undeclared and bound
+### Possibly undeclared and bound
 
 If a symbol is possibly undeclared but definitely bound, we use the union of the declared and
 inferred types.
@@ -108,7 +106,7 @@ reveal_type(x)  # revealed: Literal[1] | Any
 reveal_type(y)  # revealed: Literal[2] | Unknown
 ```
 
-#### Possibly undeclared and possibly unbound
+### Possibly undeclared and possibly unbound
 
 If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
 inferred types. This case is interesting because the "possibly declared" definition might not be the
@@ -133,7 +131,7 @@ reveal_type(x)  # revealed: Literal[1] | Any
 reveal_type(y)  # revealed: Literal[2] | str
 ```
 
-#### Possibly undeclared and unbound
+### Possibly undeclared and unbound
 
 If a symbol is possibly undeclared and definitely unbound, we also don't raise an error:
 
@@ -150,9 +148,9 @@ from mod import x
 reveal_type(x)  # revealed: int
 ```
 
-### Undeclared
+## Undeclared
 
-#### Undeclared but bound
+### Undeclared but bound
 
 We use the inferred type as the public type, if a symbol has no declared type.
 
@@ -166,7 +164,7 @@ from mod import x
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-#### Undeclared and possibly unbound
+### Undeclared and possibly unbound
 
 If a symbol is undeclared and *possibly* unbound, we trust that other module (the control flow path
 that leads to unbound could be ruled out for some reason that we can't see statically) and pretend
@@ -185,7 +183,7 @@ from mod import x
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-#### Undeclared and unbound
+### Undeclared and unbound
 
 If a symbol is undeclared *and* unbound, we infer `Unknown` and raise an error.
 
