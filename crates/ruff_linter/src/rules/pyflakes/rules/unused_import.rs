@@ -293,7 +293,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     // Collect all unused imports by statement.
     let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
-    let mut already_checked_imports: HashSet<String> = HashSet::new();
+    let mut already_checked_imports: HashSet<&str> = HashSet::new();
 
     for binding_id in scope.binding_ids() {
         let top_binding = checker.semantic().binding(binding_id);
@@ -314,11 +314,11 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         {
             let name = binding.name(checker.source());
 
-            if already_checked_imports.contains(name) {
+            if already_checked_imports.contains(&name) {
                 continue;
             }
             {
-                already_checked_imports.insert(name.to_string());
+                already_checked_imports.insert(name);
             }
 
             if binding.is_used()

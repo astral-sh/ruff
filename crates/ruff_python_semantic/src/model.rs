@@ -522,31 +522,30 @@ impl<'a> SemanticModel<'a> {
 
     /// Resolve a `load` reference to an [`ast::ExprAttribute`].
     pub fn resolve_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> ReadResult {
-        let name_expr;
-
-        let mut full_name = format!("{}", attribute.attr.id);
+        let mut name_segments = vec![attribute.attr.id.as_str()];
         let mut current_expr = &*attribute.value;
         let mut result = None;
         let mut is_name_exist = false;
         let mut already_checked_imports: HashSet<String> = HashSet::new();
 
-        while let Expr::Attribute(expr_attr) = &current_expr {
-            full_name = format!("{}.{}", expr_attr.attr.id, full_name);
-            current_expr = &*expr_attr.value;
+        while let Expr::Attribute(expr_attr) = current_expr {
+            name_segments.push(expr_attr.attr.id.as_str());
+            current_expr = &expr_attr.value;
         }
 
-        if let Expr::Name(ref expr_name) = current_expr {
-            full_name = format!("{}.{}", expr_name.id, full_name);
-            name_expr = Some(expr_name);
+        let name_expr = if let Expr::Name(ref expr_name) = current_expr {
+            name_segments.push(expr_name.id.as_str());
+            Some(expr_name)
         } else {
             return ReadResult::NotFound;
-        }
+        };
 
         if name_expr.is_none() {
             return ReadResult::NotFound;
         }
 
-        full_name = full_name.trim_end_matches('.').to_string();
+        name_segments.reverse();
+        let full_name = name_segments.join(".");
 
         let ancestor_scope_ids: Vec<_> = self.scopes.ancestor_ids(self.scope_id).collect();
         let mut binding_ids: Vec<(BindingId, ScopeId)> = vec![];
@@ -1065,8 +1064,7 @@ impl<'a> SemanticModel<'a> {
 
         if !submodule
             .qualified_name()
-            .to_string()
-            .starts_with(&import.qualified_name().to_string())
+            .starts_with(import.qualified_name())
         {
             return None;
         }
