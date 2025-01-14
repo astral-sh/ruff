@@ -326,15 +326,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     break;
                 }
             } else if new_positive.is_literal_string() {
-                if let Some(removable) = self
-                    .negative
-                    .iter()
-                    .enumerate()
-                    .find(|(_, element)| **element == Type::AlwaysTruthy)
-                    .map(|(index, _)| index)
-                {
+                if self.negative.swap_remove(&Type::AlwaysTruthy) {
                     new_positive = Type::string_literal(db, "");
-                    self.negative.swap_remove_index(removable);
                 }
             }
 
