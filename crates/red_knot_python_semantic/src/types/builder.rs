@@ -248,7 +248,7 @@ struct InnerIntersectionBuilder<'db> {
 
 impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
-    fn add_positive(&mut self, db: &'db dyn Db, new_positive: Type<'db>) {
+    fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
         if let Type::Intersection(other) = new_positive {
             for pos in other.positive(db) {
                 self.add_positive(db, *pos);
@@ -257,29 +257,67 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, *neg);
             }
         } else {
-            // ~Literal[True] & bool = Literal[False]
-            // ~AlwaysTruthy & bool = Literal[False]
-            if let Type::Instance(InstanceType { class }) = new_positive {
-                if class.is_known(db, KnownClass::Bool) {
-                    if let Some(new_type) = self
-                        .negative
-                        .iter()
-                        .find(|element| {
-                            element.is_boolean_literal()
-                                | matches!(element, Type::AlwaysFalsy | Type::AlwaysTruthy)
-                        })
-                        .map(|element| {
-                            Type::BooleanLiteral(element.bool(db) != Truthiness::AlwaysTrue)
-                        })
-                    {
-                        *self = Self::default();
-                        self.positive.insert(new_type);
-                        return;
+            let addition_is_bool_instance = new_positive
+                .into_instance()
+                .and_then(|instance| instance.class.known(db))
+                .is_some_and(KnownClass::is_bool);
+
+            let mut to_remove = SmallVec::<[usize; 1]>::new();
+
+            for (index, existing_positive) in self.positive.iter().enumerate() {
+                match existing_positive {
+                    // `AlwaysTruthy & bool` -> `Literal[True]`
+                    Type::AlwaysTruthy if addition_is_bool_instance => {
+                        new_positive = Type::BooleanLiteral(true);
                     }
+                    // `AlwaysFalsy & bool` -> `Literal[False]`
+                    Type::AlwaysFalsy if addition_is_bool_instance => {
+                        new_positive = Type::BooleanLiteral(false);
+                    }
+                    Type::Instance(InstanceType { class })
+                        if class.is_known(db, KnownClass::Bool) =>
+                    {
+                        match new_positive {
+                            // `bool & AlwaysTruthy` -> `Literal[True]`
+                            Type::AlwaysTruthy => {
+                                new_positive = Type::BooleanLiteral(true);
+                            }
+                            // `bool & Falsy` -> `Literal[False]`
+                            Type::AlwaysFalsy => {
+                                new_positive = Type::BooleanLiteral(false);
+                            }
+                            _ => continue,
+                        }
+                    }
+                    _ => continue,
+                }
+                to_remove.push(index);
+                break;
+            }
+
+            if addition_is_bool_instance {
+                for (index, existing_negative) in self.negative.iter().enumerate() {
+                    match existing_negative {
+                        // `bool & ~Literal[False]` -> `Literal[True]`
+                        // `bool & ~Literal[True]` -> `Literal[False]`
+                        Type::BooleanLiteral(bool_value) => {
+                            new_positive = Type::BooleanLiteral(!bool_value);
+                        }
+                        // `bool & ~AlwaysTruthy` -> `Literal[False]`
+                        Type::AlwaysTruthy => {
+                            new_positive = Type::BooleanLiteral(false);
+                        }
+                        // `bool & ~AlwaysFalsy` -> `Literal[True]`
+                        Type::AlwaysFalsy => {
+                            new_positive = Type::BooleanLiteral(true);
+                        }
+                        _ => continue,
+                    }
+                    to_remove.push(index);
+                    break;
                 }
             }
 
-            let mut to_remove = SmallVec::<[usize; 1]>::new();
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 // S & T = S    if S <: T
                 if existing_positive.is_subtype_of(db, new_positive)
@@ -298,8 +336,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     return;
                 }
             }
-            for index in to_remove.iter().rev() {
-                self.positive.swap_remove_index(*index);
+            for index in to_remove.into_iter().rev() {
+                self.positive.swap_remove_index(index);
             }
 
             let mut to_remove = SmallVec::<[usize; 1]>::new();
@@ -315,8 +353,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     to_remove.push(index);
                 }
             }
-            for index in to_remove.iter().rev() {
-                self.negative.swap_remove_index(*index);
+            for index in to_remove.into_iter().rev() {
+                self.negative.swap_remove_index(index);
             }
 
             self.positive.insert(new_positive);
