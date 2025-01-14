@@ -28,7 +28,6 @@
 
 use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
-use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 pub(crate) struct UnionBuilder<'db> {
@@ -266,8 +265,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 .and_then(|instance| instance.class.known(db))
                 .is_some_and(KnownClass::is_bool);
 
-            let mut to_remove: FxHashSet<usize> = FxHashSet::default();
-
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 match existing_positive {
                     // `AlwaysTruthy & bool` -> `Literal[True]`
@@ -303,7 +300,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     }
                     _ => continue,
                 }
-                to_remove.insert(index);
+                self.positive.swap_remove_index(index);
                 break;
             }
 
@@ -325,7 +322,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         }
                         _ => continue,
                     }
-                    to_remove.insert(index);
+                    self.negative.swap_remove_index(index);
                     break;
                 }
             } else if new_positive.is_literal_string() {
@@ -337,10 +334,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .map(|(index, _)| index)
                 {
                     new_positive = Type::string_literal(db, "");
-                    to_remove.insert(removable);
+                    self.negative.swap_remove_index(removable);
                 }
             }
 
+            let mut to_remove = SmallVec::<[usize; 1]>::new();
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 // S & T = S    if S <: T
                 if existing_positive.is_subtype_of(db, new_positive)
@@ -350,7 +348,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 // same rule, reverse order
                 if new_positive.is_subtype_of(db, *existing_positive) {
-                    to_remove.insert(index);
+                    to_remove.push(index);
                 }
                 // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
@@ -359,7 +357,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     return;
                 }
             }
-            for index in to_remove {
+            for index in to_remove.into_iter().rev() {
                 self.positive.swap_remove_index(index);
             }
 

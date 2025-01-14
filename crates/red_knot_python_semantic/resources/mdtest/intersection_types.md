@@ -699,6 +699,19 @@ def f(
     reveal_type(f)  # revealed: Literal[""]
 ```
 
+## Addition of a type to an intersection with many non-disjoint types
+
+This slightly strange-looking test is a regression test for a mistake that was nearly made in a PR:
+<https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
+
+```py
+from knot_extensions import AlwaysFalsy, Intersection, Unknown
+from typing_extensions import Literal
+
+def _(x: Intersection[str, Unknown, AlwaysFalsy, Literal[""]]):
+    reveal_type(x)  # revealed: Unknown & Literal[""]
+```
+
 ## Non fully-static types
 
 ### Negation of dynamic types
