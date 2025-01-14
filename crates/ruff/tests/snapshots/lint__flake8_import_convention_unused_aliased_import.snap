@@ -8,7 +8,7 @@ info:
     - "--output-format"
     - concise
     - "--config"
-    - /tmp/.tmpW5pnSS/ruff.toml
+    - "lint.isort.required-imports = [\"import pandas\"]"
     - "--select"
     - "I002,ICN001,F401"
     - "--stdin-filename"
