@@ -242,11 +242,10 @@ fn create_diagnostic(
                         return Ok(None);
                     }
                     format!(
-                        "{}: {}[{}, {}]",
-                        parameter.parameter.name.id,
-                        binding,
-                        checker.locator().slice(annotation.range()),
-                        checker.locator().slice(default.range())
+                        "{parameter_name}: {binding}[{annotation}, {default_}]",
+                        parameter_name = parameter.parameter.name.id,
+                        annotation = checker.locator().slice(annotation.range()),
+                        default_ = checker.locator().slice(default.range())
                     )
                 }
             };
