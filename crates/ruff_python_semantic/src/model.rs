@@ -1505,7 +1505,7 @@ impl<'a> SemanticModel<'a> {
                     kind: BindingKind::Assignment,
                     range: *range,
                     references: Vec::new(),
-                    scope: self.scope_id,
+                    scope: ScopeId::global(),
                     source: self.node_id,
                     context: self.execution_context(),
                     exceptions: self.exceptions(),
