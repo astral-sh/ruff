@@ -625,8 +625,6 @@ def write_astnode(out: list[str], groups: list[Group]) -> None:
         if group.name != "ungrouped":
             out.append(f"""
             impl crate::AstNode for {group.owned_enum_ty} {{
-                type Ref<'a> = {group.ref_enum_ty}<'a>;
-
                 fn can_cast(kind: NodeKind) -> bool {{
                     matches!(kind,
             """)
@@ -651,8 +649,6 @@ def write_astnode(out: list[str], groups: list[Group]) -> None:
         for node in group.nodes:
             out.append(f"""
             impl crate::AstNode for {node.ty} {{
-                type Ref<'a> = &'a Self;
-
                 fn can_cast(kind: NodeKind) -> bool {{
                     matches!(kind, NodeKind::{node.name})
                 }}

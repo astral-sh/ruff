@@ -6,8 +6,6 @@ use crate::{
 use ruff_text_size::Ranged;
 
 pub trait AstNode: Ranged {
-    type Ref<'a>;
-
     fn can_cast(kind: NodeKind) -> bool;
 
     /// Returns the [`AnyNodeRef`] referencing this node.
