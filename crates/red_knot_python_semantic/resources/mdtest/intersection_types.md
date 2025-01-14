@@ -671,6 +671,32 @@ def f(
     reveal_type(h)  # revealed: Never
 ```
 
+## Simplification of `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy`
+
+Similarly, intersections between `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy` can be
+simplified, due to the fact that a `LiteralString` inhabitant is known to have `__class__` set to
+exactly `str` (and not a subclass of `str`):
+
+```py
+from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from typing_extensions import LiteralString
+
+def f(
+    a: Intersection[LiteralString, AlwaysTruthy],
+    b: Intersection[LiteralString, AlwaysFalsy],
+    c: Intersection[LiteralString, Not[AlwaysTruthy]],
+    d: Intersection[LiteralString, Not[AlwaysFalsy]],
+    e: Intersection[AlwaysFalsy, LiteralString],
+    f: Intersection[Not[AlwaysTruthy], LiteralString],
+):
+    reveal_type(a)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(b)  # revealed: Literal[""]
+    reveal_type(c)  # revealed: Literal[""]
+    reveal_type(d)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(e)  # revealed: Literal[""]
+    reveal_type(f)  # revealed: Literal[""]
+```
+
 ## Non fully-static types
 
 ### Negation of dynamic types

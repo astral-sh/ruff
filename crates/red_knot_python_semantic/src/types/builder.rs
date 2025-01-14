@@ -28,9 +28,8 @@
 
 use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
-
-use super::Truthiness;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -249,6 +248,11 @@ struct InnerIntersectionBuilder<'db> {
 impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
+        if new_positive == Type::AlwaysTruthy && self.positive.contains(&Type::LiteralString) {
+            self.add_negative(db, Type::string_literal(db, ""));
+            return;
+        }
+
         if let Type::Intersection(other) = new_positive {
             for pos in other.positive(db) {
                 self.add_positive(db, *pos);
@@ -262,7 +266,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 .and_then(|instance| instance.class.known(db))
                 .is_some_and(KnownClass::is_bool);
 
-            let mut to_remove = SmallVec::<[usize; 1]>::new();
+            let mut to_remove: FxHashSet<usize> = FxHashSet::default();
 
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 match existing_positive {
@@ -273,6 +277,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     // `AlwaysFalsy & bool` -> `Literal[False]`
                     Type::AlwaysFalsy if addition_is_bool_instance => {
                         new_positive = Type::BooleanLiteral(false);
+                    }
+                    // `AlwaysFalsy & LiteralString` -> `Literal[""]`
+                    Type::AlwaysFalsy if new_positive.is_literal_string() => {
+                        new_positive = Type::string_literal(db, "");
                     }
                     Type::Instance(InstanceType { class })
                         if class.is_known(db, KnownClass::Bool) =>
@@ -289,9 +297,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             _ => continue,
                         }
                     }
+                    // `LiteralString & AlwaysFalsy` -> `Literal[""]`
+                    Type::LiteralString if new_positive == Type::AlwaysFalsy => {
+                        new_positive = Type::string_literal(db, "");
+                    }
                     _ => continue,
                 }
-                to_remove.push(index);
+                to_remove.insert(index);
                 break;
             }
 
@@ -313,8 +325,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         }
                         _ => continue,
                     }
-                    to_remove.push(index);
+                    to_remove.insert(index);
                     break;
+                }
+            } else if new_positive.is_literal_string() {
+                if let Some(removable) = self
+                    .negative
+                    .iter()
+                    .enumerate()
+                    .find(|(_, element)| **element == Type::AlwaysTruthy)
+                    .map(|(index, _)| index)
+                {
+                    new_positive = Type::string_literal(db, "");
+                    to_remove.insert(removable);
                 }
             }
 
@@ -327,7 +350,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 // same rule, reverse order
                 if new_positive.is_subtype_of(db, *existing_positive) {
-                    to_remove.push(index);
+                    to_remove.insert(index);
                 }
                 // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
@@ -336,7 +359,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     return;
                 }
             }
-            for index in to_remove.into_iter().rev() {
+            for index in to_remove {
                 self.positive.swap_remove_index(index);
             }
 
@@ -363,6 +386,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
+        let contains_bool = || {
+            self.positive
+                .iter()
+                .filter_map(|ty| ty.into_instance())
+                .filter_map(|instance| instance.class.known(db))
+                .any(KnownClass::is_bool)
+        };
+
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
@@ -386,15 +417,23 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // simplify the representation.
                 self.add_positive(db, ty);
             }
-            // bool & ~Literal[True] = Literal[False]
-            // bool & ~AlwaysTruthy = Literal[False]
-            Type::BooleanLiteral(_) | Type::AlwaysFalsy | Type::AlwaysTruthy
-                if self.positive.contains(&KnownClass::Bool.to_instance(db)) =>
-            {
-                *self = Self::default();
-                self.positive.insert(Type::BooleanLiteral(
-                    new_negative.bool(db) != Truthiness::AlwaysTrue,
-                ));
+            // `bool & ~AlwaysTruthy` -> `bool & Literal[False]`
+            // `bool & ~Literal[True]` -> `bool & Literal[False]`
+            Type::AlwaysTruthy | Type::BooleanLiteral(true) if contains_bool() => {
+                self.add_positive(db, Type::BooleanLiteral(false));
+            }
+            // `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
+            Type::AlwaysTruthy if self.positive.contains(&Type::LiteralString) => {
+                self.add_positive(db, Type::string_literal(db, ""));
+            }
+            // `bool & ~AlwaysFalsy` -> `bool & Literal[True]`
+            // `bool & ~Literal[False]` -> `bool & Literal[True]`
+            Type::AlwaysFalsy | Type::BooleanLiteral(false) if contains_bool() => {
+                self.add_positive(db, Type::BooleanLiteral(true));
+            }
+            // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+            Type::AlwaysFalsy if self.positive.contains(&Type::LiteralString) => {
+                self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
