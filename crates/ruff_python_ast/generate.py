@@ -627,34 +627,7 @@ def write_astnode(out: list[str], groups: list[Group]) -> None:
             impl crate::AstNode for {group.owned_enum_ty} {{
                 type Ref<'a> = {group.ref_enum_ty}<'a>;
 
-                fn cast(node: AnyNode) -> Option<Self>
-                where
-                    Self: Sized,
-                {{
-                    match node {{
-            """)
-            for node in group.nodes:
-                out.append(
-                    f"""AnyNode::{node.name}(node) => Some({group.owned_enum_ty}::{node.variant}(node)),"""
-                )
-            out.append("""
-                        _ => None,
-                    }
-                }
-
-                fn cast_ref(node: AnyNodeRef) -> Option<Self::Ref<'_>> {
-                    match node {
-            """)
-            for node in group.nodes:
-                out.append(
-                    f"""AnyNodeRef::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"""
-                )
-            out.append("""
-                        _ => None,
-                    }
-                }
-
-                fn can_cast(kind: NodeKind) -> bool {
+                fn can_cast(kind: NodeKind) -> bool {{
                     matches!(kind,
             """)
             for i, node in enumerate(group.nodes):
@@ -679,25 +652,6 @@ def write_astnode(out: list[str], groups: list[Group]) -> None:
             out.append(f"""
             impl crate::AstNode for {node.ty} {{
                 type Ref<'a> = &'a Self;
-
-                fn cast(kind: AnyNode) -> Option<Self>
-                where
-                    Self: Sized,
-                {{
-                    if let AnyNode::{node.name}(node) = kind {{
-                        Some(node)
-                    }} else {{
-                        None
-                    }}
-                }}
-
-                fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {{
-                    if let AnyNodeRef::{node.name}(node) = kind {{
-                        Some(node)
-                    }} else {{
-                        None
-                    }}
-                }}
 
                 fn can_cast(kind: NodeKind) -> bool {{
                     matches!(kind, NodeKind::{node.name})
