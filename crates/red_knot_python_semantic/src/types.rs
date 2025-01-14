@@ -4220,7 +4220,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::stdlib::typing_symbol;
-    use crate::{resolve_module, PythonVersion};
+    use crate::PythonVersion;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
@@ -4244,7 +4244,6 @@ pub(crate) mod tests {
         BytesLiteral(&'static str),
         // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
-        TypingInstance(&'static str),
         /// Members of the `abc` stdlib module
         AbcInstance(&'static str),
         AbcClassLiteral(&'static str),
@@ -4261,7 +4260,6 @@ pub(crate) mod tests {
         SubclassOfAny,
         SubclassOfBuiltinClass(&'static str),
         SubclassOfAbcClass(&'static str),
-        StdlibModule(KnownModule),
         SliceLiteral(i32, i32, i32),
         AlwaysTruthy,
         AlwaysFalsy,
@@ -4287,7 +4285,6 @@ pub(crate) mod tests {
                 Ty::AbcClassLiteral(s) => {
                     known_module_symbol(db, KnownModule::Abc, s).expect_type()
                 }
-                Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
                 Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
                 Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
@@ -4323,10 +4320,6 @@ pub(crate) mod tests {
                         .expect_class_literal()
                         .class,
                 ),
-                Ty::StdlibModule(module) => {
-                    let module = resolve_module(db, &module.name()).unwrap();
-                    Type::module_literal(db, module.file(), module)
-                }
                 Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
                     db,
                     Some(start),
@@ -4337,178 +4330,6 @@ pub(crate) mod tests {
                 Ty::AlwaysFalsy => Type::AlwaysFalsy,
             }
         }
-    }
-
-    #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::Never, Ty::IntLiteral(1))]
-    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("bool"))]
-    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
-    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
-    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
-    #[test_case(Ty::BuiltinInstance("TypeError"), Ty::BuiltinInstance("Exception"))]
-    #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![]))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("int")]))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::BuiltinInstance("str")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
-    #[test_case(
-        Ty::BuiltinInstance("FloatingPointError"),
-        Ty::BuiltinInstance("Exception")
-    )]
-    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]}, Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
-    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
-    #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]})]
-    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
-    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("int"))]
-    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::TypingLiteral, Ty::TypingInstance("_SpecialForm"))]
-    #[test_case(Ty::TypingLiteral, Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
-    #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("object"))]
-    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("tuple"))]
-    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
-    #[test_case(
-        Ty::StdlibModule(KnownModule::Typing),
-        Ty::KnownClassInstance(KnownClass::ModuleType)
-    )]
-    #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::Intersection{pos: vec![], neg: vec![Ty::None]})]
-    #[test_case(Ty::IntLiteral(1), Ty::AlwaysTruthy)]
-    #[test_case(Ty::IntLiteral(0), Ty::AlwaysFalsy)]
-    #[test_case(Ty::AlwaysTruthy, Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::AlwaysFalsy, Ty::BuiltinInstance("object"))]
-    #[test_case(Ty::Never, Ty::AlwaysTruthy)]
-    #[test_case(Ty::Never, Ty::AlwaysFalsy)]
-    #[test_case(Ty::BuiltinClassLiteral("bool"), Ty::SubclassOfBuiltinClass("int"))]
-    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::LiteralString]}, Ty::BuiltinInstance("object"))]
-    fn is_subtype_of(from: Ty, to: Ty) {
-        let db = setup_db();
-        assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
-    }
-
-    #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::Unknown, Ty::Unknown)]
-    #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
-    #[test_case(Ty::Any, Ty::Any)]
-    #[test_case(Ty::Any, Ty::IntLiteral(1))]
-    #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
-    #[test_case(Ty::IntLiteral(1), Ty::Any)]
-    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(1))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
-    #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("str")]))]
-    #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
-    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(3)]})]
-    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(3)]})]
-    #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]})]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(3)]})]
-    #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
-    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
-    #[test_case(Ty::TypingInstance("_SpecialForm"), Ty::TypingLiteral)]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
-    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
-    #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
-    #[test_case(Ty::IntLiteral(1), Ty::AlwaysFalsy)]
-    #[test_case(Ty::IntLiteral(0), Ty::AlwaysTruthy)]
-    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
-    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
-    fn is_not_subtype_of(from: Ty, to: Ty) {
-        let db = setup_db();
-        assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
-    }
-
-    #[test]
-    fn is_subtype_of_class_literals() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/module.py",
-            "
-            class Base: ...
-            class Derived(Base): ...
-            class Unrelated: ...
-            U = Base if flag else Unrelated
-        ",
-        )
-        .unwrap();
-        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
-
-        // `literal_base` represents `Literal[Base]`.
-        let literal_base = super::global_symbol(&db, module, "Base").expect_type();
-        let literal_derived = super::global_symbol(&db, module, "Derived").expect_type();
-        let u = super::global_symbol(&db, module, "U").expect_type();
-
-        assert!(literal_base.is_class_literal());
-        assert!(literal_base.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
-        assert!(literal_base.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
-
-        assert!(literal_derived.is_class_literal());
-
-        // `subclass_of_base` represents `Type[Base]`.
-        let subclass_of_base = SubclassOfType::from(&db, literal_base.expect_class_literal().class);
-        assert!(literal_base.is_subtype_of(&db, subclass_of_base));
-        assert!(literal_derived.is_subtype_of(&db, subclass_of_base));
-
-        let subclass_of_derived =
-            SubclassOfType::from(&db, literal_derived.expect_class_literal().class);
-        assert!(literal_derived.is_subtype_of(&db, subclass_of_derived));
-        assert!(!literal_base.is_subtype_of(&db, subclass_of_derived));
-
-        // Type[Derived] <: Type[Base]
-        assert!(subclass_of_derived.is_subtype_of(&db, subclass_of_base));
-
-        assert!(u.is_union());
-        assert!(u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
-        assert!(u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
-    }
-
-    #[test]
-    fn is_subtype_of_intersection_of_class_instances() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/module.py",
-            "
-            class A: ...
-            a = A()
-            class B: ...
-            b = B()
-        ",
-        )
-        .unwrap();
-        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
-
-        let a_ty = super::global_symbol(&db, module, "a").expect_type();
-        let b_ty = super::global_symbol(&db, module, "b").expect_type();
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(a_ty)
-            .add_positive(b_ty)
-            .build();
-
-        assert_eq!(intersection.display(&db).to_string(), "A & B");
-        assert!(!a_ty.is_subtype_of(&db, b_ty));
-        assert!(intersection.is_subtype_of(&db, b_ty));
-        assert!(intersection.is_subtype_of(&db, a_ty));
     }
 
     #[test_case(
