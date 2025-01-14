@@ -635,6 +635,83 @@ def _(
     reveal_type(i8)  # revealed: Never
 ```
 
+### Simplifications of `bool`, `AlwaysTruthy` and `AlwaysFalsy`
+
+In general, intersections with `AlwaysTruthy` and `AlwaysFalsy` cannot be simplified. Naively, you
+might think that `int & AlwaysFalsy` could simplify to `Literal[0]`, but this is not the case: for
+example, the `False` constant inhabits the type `int & AlwaysFalsy` (due to the fact that
+`False.__class__` is `bool` at runtime, and `bool` subclasses `int`), but `False` does not inhabit
+the type `Literal[0]`.
+
+Nonetheless, intersections of `AlwaysFalsy` or `AlwaysTruthy` with `bool` _can_ be simplified, due
+to the fact that `bool` is a `@final` class at runtime that cannot be subclassed.
+
+```py
+from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+
+class P: ...
+
+def f(
+    a: Intersection[bool, AlwaysTruthy],
+    b: Intersection[bool, AlwaysFalsy],
+    c: Intersection[bool, Not[AlwaysTruthy]],
+    d: Intersection[bool, Not[AlwaysFalsy]],
+    e: Intersection[bool, AlwaysTruthy, P],
+    f: Intersection[bool, AlwaysFalsy, P],
+    g: Intersection[bool, Not[AlwaysTruthy], P],
+    h: Intersection[bool, Not[AlwaysFalsy], P],
+):
+    reveal_type(a)  # revealed: Literal[True]
+    reveal_type(b)  # revealed: Literal[False]
+    reveal_type(c)  # revealed: Literal[False]
+    reveal_type(d)  # revealed: Literal[True]
+
+    # `bool & AlwaysTruthy & P` -> `Literal[True] & P` -> `Never`
+    reveal_type(e)  # revealed: Never
+    reveal_type(f)  # revealed: Never
+    reveal_type(g)  # revealed: Never
+    reveal_type(h)  # revealed: Never
+```
+
+## Simplification of `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy`
+
+Similarly, intersections between `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy` can be
+simplified, due to the fact that a `LiteralString` inhabitant is known to have `__class__` set to
+exactly `str` (and not a subclass of `str`):
+
+```py
+from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from typing_extensions import LiteralString
+
+def f(
+    a: Intersection[LiteralString, AlwaysTruthy],
+    b: Intersection[LiteralString, AlwaysFalsy],
+    c: Intersection[LiteralString, Not[AlwaysTruthy]],
+    d: Intersection[LiteralString, Not[AlwaysFalsy]],
+    e: Intersection[AlwaysFalsy, LiteralString],
+    f: Intersection[Not[AlwaysTruthy], LiteralString],
+):
+    reveal_type(a)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(b)  # revealed: Literal[""]
+    reveal_type(c)  # revealed: Literal[""]
+    reveal_type(d)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(e)  # revealed: Literal[""]
+    reveal_type(f)  # revealed: Literal[""]
+```
+
+## Addition of a type to an intersection with many non-disjoint types
+
+This slightly strange-looking test is a regression test for a mistake that was nearly made in a PR:
+<https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
+
+```py
+from knot_extensions import AlwaysFalsy, Intersection, Unknown
+from typing_extensions import Literal
+
+def _(x: Intersection[str, Unknown, AlwaysFalsy, Literal[""]]):
+    reveal_type(x)  # revealed: Unknown & Literal[""]
+```
+
 ## Non fully-static types
 
 ### Negation of dynamic types

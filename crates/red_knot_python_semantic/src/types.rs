@@ -671,6 +671,13 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
+    pub const fn into_instance(self) -> Option<InstanceType<'db>> {
+        match self {
+            Type::Instance(instance_type) => Some(instance_type),
+            _ => None,
+        }
+    }
+
     pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
         match self {
             Type::KnownInstance(known_instance) => Some(known_instance),
@@ -2557,6 +2564,10 @@ pub enum KnownClass {
 }
 
 impl<'db> KnownClass {
+    pub const fn is_bool(self) -> bool {
+        matches!(self, Self::Bool)
+    }
+
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Bool => "bool",

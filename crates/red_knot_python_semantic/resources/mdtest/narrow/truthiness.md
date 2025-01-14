@@ -199,7 +199,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(y)  # revealed: Literal["", "hello"]
 ```
 
-## ControlFlow Merging
+## Control Flow Merging
 
 After merging control flows, when we take the union of all constraints applied in each branch, we
 should return to the original state.
@@ -311,4 +311,21 @@ class TruthyClass(metaclass=MetaTruthy): ...
 def _(x: type[FalsyClass] | type[TruthyClass]):
     reveal_type(x or A())  # revealed: type[TruthyClass] | A
     reveal_type(x and A())  # revealed: type[FalsyClass] | A
+```
+
+## Truthiness narrowing for `LiteralString`
+
+```py
+from typing_extensions import LiteralString
+
+def _(x: LiteralString):
+    if x:
+        reveal_type(x)  # revealed: LiteralString & ~Literal[""]
+    else:
+        reveal_type(x)  # revealed: Literal[""]
+
+    if not x:
+        reveal_type(x)  # revealed: Literal[""]
+    else:
+        reveal_type(x)  # revealed: LiteralString & ~Literal[""]
 ```
