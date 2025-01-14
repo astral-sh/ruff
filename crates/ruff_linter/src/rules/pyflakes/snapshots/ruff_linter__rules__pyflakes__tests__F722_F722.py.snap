@@ -24,3 +24,33 @@ F722.py:29:10: F722 Syntax error in forward annotation: `
 29 | invalid: "\n int"
    |          ^^^^^^^^ F722
    |
+
+F722.py:32:11: F722 Syntax error in forward annotation: `
+		int |
+str)
+`
+   |
+32 |   invalid2: """
+   |  ___________^
+33 | |         int |
+34 | | str)
+35 | | """
+   | |___^ F722
+36 |   
+37 |   invalid3: """
+   |
+
+F722.py:37:11: F722 Syntax error in forward annotation: `
+		int) |
+str
+`
+   |
+35 |   """
+36 |   
+37 |   invalid3: """
+   |  ___________^
+38 | |         int) |
+39 | | str
+40 | | """
+   | |___^ F722
+   |

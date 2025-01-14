@@ -27,3 +27,14 @@ z: """(
 
 # single quotes are not implicitly parenthesized
 invalid: "\n int"
+
+
+invalid2: """
+		int |
+str)
+"""
+
+invalid3: """
+		int) |
+str
+"""
