@@ -1127,7 +1127,7 @@ pub struct Flake8BuiltinsOptions {
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = "builtins-allowed-modules = [\"id\"]"
+        example = "builtins-allowed-modules = [\"secrets\"]"
     )]
     /// List of builtin module names to allow.
     pub builtins_allowed_modules: Option<Vec<String>>,
