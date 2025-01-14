@@ -219,7 +219,9 @@ fn create_diagnostic(
                     )
                 }
                 _ => {
-                    if !seen_default {
+                    if seen_default {
+                        return Ok(None);
+                    } else {
                         format!(
                             "{}: {}[{}, {}]",
                             parameter.parameter.name.id,
@@ -227,8 +229,6 @@ fn create_diagnostic(
                             checker.locator().slice(annotation.range()),
                             checker.locator().slice(default.range())
                         )
-                    } else {
-                        return Ok(None);
                     }
                 }
             };
