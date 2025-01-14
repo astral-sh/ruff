@@ -28,11 +28,11 @@ nodes_file = (
     .read_text()
 )
 node_lines = (
-    nodes_file.split("pub enum AnyNode {")[1].split("}")[0].strip().splitlines()
+    nodes_file.split("pub enum AnyNodeRef<'a> {")[1].split("}")[0].strip().splitlines()
 )
 nodes = []
 for node_line in node_lines:
-    node = node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
+    node = node_line.split("(")[1].split(")")[0].split("::")[-1].removeprefix("&'a ")
     # `FString` has a custom implementation while the formatting for
     # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are handled by the `FString`
     # implementation.
