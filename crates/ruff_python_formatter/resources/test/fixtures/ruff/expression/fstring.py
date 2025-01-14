@@ -710,3 +710,11 @@ f'{x:a{y=:{z:hy "user"}}} \'\'\''
 f"""{1=: "this" is fine}"""
 f'''{1=: "this" is fine}'''  # Change quotes to double quotes because they're preferred
 f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/15459
+print(f"{ {1, 2, 3} - {2} }")
+print(f"{ {1: 2}.keys() }")
+print(f"{({1, 2, 3}) - ({2})}")
+print(f"{1, 2, {3} }")
+print(f"{(1, 2, {3})}")
