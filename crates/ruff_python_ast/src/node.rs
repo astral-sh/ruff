@@ -27,10 +27,6 @@ pub trait AstNode: Ranged {
 
     /// Consumes `self` and returns its [`AnyNode`] representation.
     fn into_any_node(self) -> AnyNode;
-
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized;
 }
 
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
@@ -682,8 +678,10 @@ impl AstNode for ast::ModModule {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ModModule {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -725,8 +723,10 @@ impl AstNode for ast::ModExpression {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ModExpression {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -734,6 +734,7 @@ impl AstNode for ast::ModExpression {
         visitor.visit_expr(body);
     }
 }
+
 impl AstNode for ast::StmtFunctionDef {
     type Ref<'a> = &'a Self;
 
@@ -767,8 +768,10 @@ impl AstNode for ast::StmtFunctionDef {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtFunctionDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -798,6 +801,7 @@ impl AstNode for ast::StmtFunctionDef {
         visitor.visit_body(body);
     }
 }
+
 impl AstNode for ast::StmtClassDef {
     type Ref<'a> = &'a Self;
 
@@ -831,8 +835,10 @@ impl AstNode for ast::StmtClassDef {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtClassDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -859,6 +865,7 @@ impl AstNode for ast::StmtClassDef {
         visitor.visit_body(body);
     }
 }
+
 impl AstNode for ast::StmtReturn {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -891,8 +898,10 @@ impl AstNode for ast::StmtReturn {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtReturn {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -902,6 +911,7 @@ impl AstNode for ast::StmtReturn {
         }
     }
 }
+
 impl AstNode for ast::StmtDelete {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -934,8 +944,10 @@ impl AstNode for ast::StmtDelete {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtDelete {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -945,6 +957,7 @@ impl AstNode for ast::StmtDelete {
         }
     }
 }
+
 impl AstNode for ast::StmtTypeAlias {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -977,8 +990,10 @@ impl AstNode for ast::StmtTypeAlias {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtTypeAlias {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -996,6 +1011,7 @@ impl AstNode for ast::StmtTypeAlias {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::StmtAssign {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1028,8 +1044,10 @@ impl AstNode for ast::StmtAssign {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1046,6 +1064,7 @@ impl AstNode for ast::StmtAssign {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::StmtAugAssign {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1078,8 +1097,10 @@ impl AstNode for ast::StmtAugAssign {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtAugAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1095,6 +1116,7 @@ impl AstNode for ast::StmtAugAssign {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::StmtAnnAssign {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1127,8 +1149,10 @@ impl AstNode for ast::StmtAnnAssign {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtAnnAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1147,6 +1171,7 @@ impl AstNode for ast::StmtAnnAssign {
         }
     }
 }
+
 impl AstNode for ast::StmtFor {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1179,8 +1204,10 @@ impl AstNode for ast::StmtFor {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtFor {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1198,6 +1225,7 @@ impl AstNode for ast::StmtFor {
         visitor.visit_body(orelse);
     }
 }
+
 impl AstNode for ast::StmtWhile {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1230,8 +1258,10 @@ impl AstNode for ast::StmtWhile {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtWhile {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1247,6 +1277,7 @@ impl AstNode for ast::StmtWhile {
         visitor.visit_body(orelse);
     }
 }
+
 impl AstNode for ast::StmtIf {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1279,8 +1310,10 @@ impl AstNode for ast::StmtIf {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtIf {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1298,6 +1331,7 @@ impl AstNode for ast::StmtIf {
         }
     }
 }
+
 impl AstNode for ast::ElifElseClause {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1330,8 +1364,10 @@ impl AstNode for ast::ElifElseClause {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ElifElseClause {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1346,6 +1382,7 @@ impl AstNode for ast::ElifElseClause {
         visitor.visit_body(body);
     }
 }
+
 impl AstNode for ast::StmtWith {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1378,8 +1415,10 @@ impl AstNode for ast::StmtWith {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtWith {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1396,6 +1435,7 @@ impl AstNode for ast::StmtWith {
         visitor.visit_body(body);
     }
 }
+
 impl AstNode for ast::StmtMatch {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1428,8 +1468,10 @@ impl AstNode for ast::StmtMatch {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtMatch {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1445,6 +1487,7 @@ impl AstNode for ast::StmtMatch {
         }
     }
 }
+
 impl AstNode for ast::StmtRaise {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1477,8 +1520,10 @@ impl AstNode for ast::StmtRaise {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtRaise {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1496,6 +1541,7 @@ impl AstNode for ast::StmtRaise {
         };
     }
 }
+
 impl AstNode for ast::StmtTry {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1528,8 +1574,10 @@ impl AstNode for ast::StmtTry {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtTry {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1550,6 +1598,7 @@ impl AstNode for ast::StmtTry {
         visitor.visit_body(finalbody);
     }
 }
+
 impl AstNode for ast::StmtAssert {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1582,8 +1631,10 @@ impl AstNode for ast::StmtAssert {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtAssert {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1598,6 +1649,7 @@ impl AstNode for ast::StmtAssert {
         }
     }
 }
+
 impl AstNode for ast::StmtImport {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1630,8 +1682,10 @@ impl AstNode for ast::StmtImport {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtImport {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1642,6 +1696,7 @@ impl AstNode for ast::StmtImport {
         }
     }
 }
+
 impl AstNode for ast::StmtImportFrom {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1674,8 +1729,10 @@ impl AstNode for ast::StmtImportFrom {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtImportFrom {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -1691,6 +1748,7 @@ impl AstNode for ast::StmtImportFrom {
         }
     }
 }
+
 impl AstNode for ast::StmtGlobal {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1723,14 +1781,18 @@ impl AstNode for ast::StmtGlobal {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::StmtGlobal {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StmtGlobal { range: _, names: _ } = self;
     }
 }
+
 impl AstNode for ast::StmtNonlocal {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1763,14 +1825,18 @@ impl AstNode for ast::StmtNonlocal {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::StmtNonlocal {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StmtNonlocal { range: _, names: _ } = self;
     }
 }
+
 impl AstNode for ast::StmtExpr {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1803,16 +1869,18 @@ impl AstNode for ast::StmtExpr {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::StmtExpr {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::StmtExpr { value, range: _ } = self;
-
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::StmtPass {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1845,14 +1913,18 @@ impl AstNode for ast::StmtPass {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::StmtPass {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StmtPass { range: _ } = self;
     }
 }
+
 impl AstNode for ast::StmtBreak {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1885,14 +1957,18 @@ impl AstNode for ast::StmtBreak {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::StmtBreak {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StmtBreak { range: _ } = self;
     }
 }
+
 impl AstNode for ast::StmtContinue {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1925,14 +2001,18 @@ impl AstNode for ast::StmtContinue {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::StmtContinue {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StmtContinue { range: _ } = self;
     }
 }
+
 impl AstNode for ast::StmtIpyEscapeCommand {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1965,14 +2045,22 @@ impl AstNode for ast::StmtIpyEscapeCommand {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::StmtIpyEscapeCommand {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StmtIpyEscapeCommand {
+            range: _,
+            kind: _,
+            value: _,
+        } = self;
     }
 }
+
 impl AstNode for ast::ExprBoolOp {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2005,8 +2093,10 @@ impl AstNode for ast::ExprBoolOp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprBoolOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2029,6 +2119,7 @@ impl AstNode for ast::ExprBoolOp {
         }
     }
 }
+
 impl AstNode for ast::ExprNamed {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2061,8 +2152,10 @@ impl AstNode for ast::ExprNamed {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprNamed {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2075,6 +2168,7 @@ impl AstNode for ast::ExprNamed {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::ExprBinOp {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2107,8 +2201,10 @@ impl AstNode for ast::ExprBinOp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprBinOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2123,6 +2219,7 @@ impl AstNode for ast::ExprBinOp {
         visitor.visit_expr(right);
     }
 }
+
 impl AstNode for ast::ExprUnaryOp {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2155,8 +2252,10 @@ impl AstNode for ast::ExprUnaryOp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprUnaryOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2170,6 +2269,7 @@ impl AstNode for ast::ExprUnaryOp {
         visitor.visit_expr(operand);
     }
 }
+
 impl AstNode for ast::ExprLambda {
     type Ref<'a> = &'a Self;
 
@@ -2203,8 +2303,10 @@ impl AstNode for ast::ExprLambda {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprLambda {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2220,6 +2322,7 @@ impl AstNode for ast::ExprLambda {
         visitor.visit_expr(body);
     }
 }
+
 impl AstNode for ast::ExprIf {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2252,8 +2355,10 @@ impl AstNode for ast::ExprIf {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprIf {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2270,6 +2375,7 @@ impl AstNode for ast::ExprIf {
         visitor.visit_expr(orelse);
     }
 }
+
 impl AstNode for ast::ExprDict {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2302,8 +2408,10 @@ impl AstNode for ast::ExprDict {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprDict {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2317,6 +2425,7 @@ impl AstNode for ast::ExprDict {
         }
     }
 }
+
 impl AstNode for ast::ExprSet {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2349,8 +2458,10 @@ impl AstNode for ast::ExprSet {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprSet {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2361,6 +2472,7 @@ impl AstNode for ast::ExprSet {
         }
     }
 }
+
 impl AstNode for ast::ExprListComp {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2393,8 +2505,10 @@ impl AstNode for ast::ExprListComp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprListComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2410,6 +2524,7 @@ impl AstNode for ast::ExprListComp {
         }
     }
 }
+
 impl AstNode for ast::ExprSetComp {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2442,8 +2557,10 @@ impl AstNode for ast::ExprSetComp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprSetComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2459,6 +2576,7 @@ impl AstNode for ast::ExprSetComp {
         }
     }
 }
+
 impl AstNode for ast::ExprDictComp {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2491,8 +2609,10 @@ impl AstNode for ast::ExprDictComp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprDictComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2511,6 +2631,7 @@ impl AstNode for ast::ExprDictComp {
         }
     }
 }
+
 impl AstNode for ast::ExprGenerator {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2543,8 +2664,10 @@ impl AstNode for ast::ExprGenerator {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprGenerator {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2560,6 +2683,7 @@ impl AstNode for ast::ExprGenerator {
         }
     }
 }
+
 impl AstNode for ast::ExprAwait {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2592,8 +2716,10 @@ impl AstNode for ast::ExprAwait {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprAwait {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2601,6 +2727,7 @@ impl AstNode for ast::ExprAwait {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::ExprYield {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2633,8 +2760,10 @@ impl AstNode for ast::ExprYield {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprYield {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2644,6 +2773,7 @@ impl AstNode for ast::ExprYield {
         }
     }
 }
+
 impl AstNode for ast::ExprYieldFrom {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2676,8 +2806,10 @@ impl AstNode for ast::ExprYieldFrom {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprYieldFrom {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2685,6 +2817,7 @@ impl AstNode for ast::ExprYieldFrom {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::ExprCompare {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2717,8 +2850,10 @@ impl AstNode for ast::ExprCompare {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprCompare {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2737,6 +2872,7 @@ impl AstNode for ast::ExprCompare {
         }
     }
 }
+
 impl AstNode for ast::ExprCall {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2769,8 +2905,10 @@ impl AstNode for ast::ExprCall {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprCall {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2783,6 +2921,7 @@ impl AstNode for ast::ExprCall {
         visitor.visit_arguments(arguments);
     }
 }
+
 impl AstNode for ast::FStringFormatSpec {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2815,8 +2954,10 @@ impl AstNode for ast::FStringFormatSpec {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::FStringFormatSpec {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2825,6 +2966,7 @@ impl AstNode for ast::FStringFormatSpec {
         }
     }
 }
+
 impl AstNode for ast::FStringExpressionElement {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2857,8 +2999,10 @@ impl AstNode for ast::FStringExpressionElement {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::FStringExpressionElement {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2876,6 +3020,7 @@ impl AstNode for ast::FStringExpressionElement {
         }
     }
 }
+
 impl AstNode for ast::FStringLiteralElement {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2908,13 +3053,17 @@ impl AstNode for ast::FStringLiteralElement {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::FStringLiteralElement {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::FStringLiteralElement { range: _, value: _ } = self;
     }
 }
+
 impl AstNode for ast::ExprFString {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2947,8 +3096,10 @@ impl AstNode for ast::ExprFString {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprFString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -2966,6 +3117,7 @@ impl AstNode for ast::ExprFString {
         }
     }
 }
+
 impl AstNode for ast::ExprStringLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2998,8 +3150,10 @@ impl AstNode for ast::ExprStringLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprStringLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3010,6 +3164,7 @@ impl AstNode for ast::ExprStringLiteral {
         }
     }
 }
+
 impl AstNode for ast::ExprBytesLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3042,8 +3197,10 @@ impl AstNode for ast::ExprBytesLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprBytesLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3054,6 +3211,7 @@ impl AstNode for ast::ExprBytesLiteral {
         }
     }
 }
+
 impl AstNode for ast::ExprNumberLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3086,13 +3244,18 @@ impl AstNode for ast::ExprNumberLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::ExprNumberLiteral {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::ExprNumberLiteral { range: _, value: _ } = self;
     }
 }
+
 impl AstNode for ast::ExprBooleanLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3125,13 +3288,18 @@ impl AstNode for ast::ExprBooleanLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::ExprBooleanLiteral {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::ExprBooleanLiteral { range: _, value: _ } = self;
     }
 }
+
 impl AstNode for ast::ExprNoneLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3164,13 +3332,18 @@ impl AstNode for ast::ExprNoneLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::ExprNoneLiteral {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::ExprNoneLiteral { range: _ } = self;
     }
 }
+
 impl AstNode for ast::ExprEllipsisLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3203,13 +3376,18 @@ impl AstNode for ast::ExprEllipsisLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::ExprEllipsisLiteral {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::ExprEllipsisLiteral { range: _ } = self;
     }
 }
+
 impl AstNode for ast::ExprAttribute {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3242,8 +3420,10 @@ impl AstNode for ast::ExprAttribute {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprAttribute {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3257,6 +3437,7 @@ impl AstNode for ast::ExprAttribute {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::ExprSubscript {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3289,8 +3470,10 @@ impl AstNode for ast::ExprSubscript {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprSubscript {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3304,6 +3487,7 @@ impl AstNode for ast::ExprSubscript {
         visitor.visit_expr(slice);
     }
 }
+
 impl AstNode for ast::ExprStarred {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3336,8 +3520,10 @@ impl AstNode for ast::ExprStarred {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprStarred {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3350,6 +3536,7 @@ impl AstNode for ast::ExprStarred {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::ExprName {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3382,19 +3569,22 @@ impl AstNode for ast::ExprName {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::ExprName {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprName {
+            range: _,
             id: _,
             ctx: _,
-            range: _,
         } = self;
     }
 }
+
 impl AstNode for ast::ExprList {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3427,8 +3617,10 @@ impl AstNode for ast::ExprList {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprList {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3443,6 +3635,7 @@ impl AstNode for ast::ExprList {
         }
     }
 }
+
 impl AstNode for ast::ExprTuple {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3475,8 +3668,10 @@ impl AstNode for ast::ExprTuple {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExprTuple {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3492,6 +3687,7 @@ impl AstNode for ast::ExprTuple {
         }
     }
 }
+
 impl AstNode for ast::ExprSlice {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3524,7 +3720,10 @@ impl AstNode for ast::ExprSlice {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+}
+
+impl ast::ExprSlice {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3546,6 +3745,7 @@ impl AstNode for ast::ExprSlice {
         }
     }
 }
+
 impl AstNode for ast::ExprIpyEscapeCommand {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3578,9 +3778,11 @@ impl AstNode for ast::ExprIpyEscapeCommand {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::ExprIpyEscapeCommand {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3591,6 +3793,7 @@ impl AstNode for ast::ExprIpyEscapeCommand {
         } = self;
     }
 }
+
 impl AstNode for ast::ExceptHandlerExceptHandler {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3623,8 +3826,10 @@ impl AstNode for ast::ExceptHandlerExceptHandler {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ExceptHandlerExceptHandler {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3640,6 +3845,7 @@ impl AstNode for ast::ExceptHandlerExceptHandler {
         visitor.visit_body(body);
     }
 }
+
 impl AstNode for ast::PatternMatchValue {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3672,8 +3878,10 @@ impl AstNode for ast::PatternMatchValue {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchValue {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3681,6 +3889,7 @@ impl AstNode for ast::PatternMatchValue {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for ast::PatternMatchSingleton {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3713,8 +3922,10 @@ impl AstNode for ast::PatternMatchSingleton {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchSingleton {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3722,6 +3933,7 @@ impl AstNode for ast::PatternMatchSingleton {
         visitor.visit_singleton(value);
     }
 }
+
 impl AstNode for ast::PatternMatchSequence {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3754,8 +3966,10 @@ impl AstNode for ast::PatternMatchSequence {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchSequence {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3765,6 +3979,7 @@ impl AstNode for ast::PatternMatchSequence {
         }
     }
 }
+
 impl AstNode for ast::PatternMatchMapping {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3797,8 +4012,10 @@ impl AstNode for ast::PatternMatchMapping {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchMapping {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3814,6 +4031,7 @@ impl AstNode for ast::PatternMatchMapping {
         }
     }
 }
+
 impl AstNode for ast::PatternMatchClass {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3846,8 +4064,10 @@ impl AstNode for ast::PatternMatchClass {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchClass {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3860,6 +4080,7 @@ impl AstNode for ast::PatternMatchClass {
         visitor.visit_pattern_arguments(parameters);
     }
 }
+
 impl AstNode for ast::PatternMatchStar {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3892,15 +4113,18 @@ impl AstNode for ast::PatternMatchStar {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::PatternMatchStar {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::PatternMatchStar { range: _, name: _ } = self;
     }
 }
+
 impl AstNode for ast::PatternMatchAs {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3933,8 +4157,10 @@ impl AstNode for ast::PatternMatchAs {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchAs {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3948,6 +4174,7 @@ impl AstNode for ast::PatternMatchAs {
         }
     }
 }
+
 impl AstNode for ast::PatternMatchOr {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3980,8 +4207,10 @@ impl AstNode for ast::PatternMatchOr {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternMatchOr {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -3991,6 +4220,7 @@ impl AstNode for ast::PatternMatchOr {
         }
     }
 }
+
 impl AstNode for PatternArguments {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4023,8 +4253,10 @@ impl AstNode for PatternArguments {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternArguments {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4043,6 +4275,7 @@ impl AstNode for PatternArguments {
         }
     }
 }
+
 impl AstNode for PatternKeyword {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4075,8 +4308,10 @@ impl AstNode for PatternKeyword {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::PatternKeyword {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4122,8 +4357,10 @@ impl AstNode for Comprehension {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::Comprehension {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4142,6 +4379,7 @@ impl AstNode for Comprehension {
         }
     }
 }
+
 impl AstNode for Arguments {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4174,8 +4412,10 @@ impl AstNode for Arguments {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::Arguments {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4187,6 +4427,7 @@ impl AstNode for Arguments {
         }
     }
 }
+
 impl AstNode for Parameters {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4219,8 +4460,10 @@ impl AstNode for Parameters {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::Parameters {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4234,6 +4477,7 @@ impl AstNode for Parameters {
         }
     }
 }
+
 impl AstNode for Parameter {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4266,8 +4510,10 @@ impl AstNode for Parameter {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::Parameter {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4282,6 +4528,7 @@ impl AstNode for Parameter {
         }
     }
 }
+
 impl AstNode for ParameterWithDefault {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4314,8 +4561,10 @@ impl AstNode for ParameterWithDefault {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::ParameterWithDefault {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4330,6 +4579,7 @@ impl AstNode for ParameterWithDefault {
         }
     }
 }
+
 impl AstNode for Keyword {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4362,8 +4612,10 @@ impl AstNode for Keyword {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::Keyword {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4376,6 +4628,7 @@ impl AstNode for Keyword {
         visitor.visit_expr(value);
     }
 }
+
 impl AstNode for Alias {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4408,9 +4661,11 @@ impl AstNode for Alias {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl Alias {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4421,6 +4676,7 @@ impl AstNode for Alias {
         } = self;
     }
 }
+
 impl AstNode for WithItem {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4453,8 +4709,10 @@ impl AstNode for WithItem {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::WithItem {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4471,6 +4729,7 @@ impl AstNode for WithItem {
         }
     }
 }
+
 impl AstNode for MatchCase {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4503,8 +4762,10 @@ impl AstNode for MatchCase {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::MatchCase {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4555,8 +4816,10 @@ impl AstNode for Decorator {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::Decorator {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4568,6 +4831,7 @@ impl AstNode for Decorator {
         visitor.visit_expr(expression);
     }
 }
+
 impl AstNode for ast::TypeParams {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4600,8 +4864,10 @@ impl AstNode for ast::TypeParams {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::TypeParams {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4615,6 +4881,7 @@ impl AstNode for ast::TypeParams {
         }
     }
 }
+
 impl AstNode for ast::TypeParamTypeVar {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4647,8 +4914,10 @@ impl AstNode for ast::TypeParamTypeVar {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::TypeParamTypeVar {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4667,6 +4936,7 @@ impl AstNode for ast::TypeParamTypeVar {
         }
     }
 }
+
 impl AstNode for ast::TypeParamTypeVarTuple {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4699,9 +4969,11 @@ impl AstNode for ast::TypeParamTypeVarTuple {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::TypeParamTypeVarTuple {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4715,6 +4987,7 @@ impl AstNode for ast::TypeParamTypeVarTuple {
         }
     }
 }
+
 impl AstNode for ast::TypeParamParamSpec {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4747,9 +5020,11 @@ impl AstNode for ast::TypeParamParamSpec {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
+impl ast::TypeParamParamSpec {
     #[inline]
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4763,6 +5038,7 @@ impl AstNode for ast::TypeParamParamSpec {
         }
     }
 }
+
 impl AstNode for ast::FString {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4795,8 +5071,10 @@ impl AstNode for ast::FString {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl ast::FString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -4811,6 +5089,7 @@ impl AstNode for ast::FString {
         }
     }
 }
+
 impl AstNode for ast::StringLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4843,13 +5122,22 @@ impl AstNode for ast::StringLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::StringLiteral {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::StringLiteral {
+            range: _,
+            value: _,
+            flags: _,
+        } = self;
     }
 }
+
 impl AstNode for ast::BytesLiteral {
     type Ref<'a> = &'a Self;
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4882,11 +5170,19 @@ impl AstNode for ast::BytesLiteral {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::BytesLiteral {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::BytesLiteral {
+            range: _,
+            value: _,
+            flags: _,
+        } = self;
     }
 }
 
@@ -4923,11 +5219,15 @@ impl AstNode for ast::Identifier {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+impl ast::Identifier {
+    #[inline]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
+        let ast::Identifier { range: _, id: _ } = self;
     }
 }
 
@@ -5290,8 +5590,10 @@ impl AstNode for Stmt {
             Stmt::IpyEscapeCommand(stmt) => stmt.into_any_node(),
         }
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl Stmt {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
@@ -5373,8 +5675,10 @@ impl AstNode for TypeParam {
             TypeParam::ParamSpec(node) => node.into_any_node(),
         }
     }
+}
 
-    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+impl TypeParam {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
