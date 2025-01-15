@@ -106,7 +106,7 @@ pub(crate) struct MissingTodoLink;
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Missing issue link on the line following this TODO".to_string()
+        "Missing issue link for this TODO".to_string()
     }
 }
 
