@@ -91,6 +91,12 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
+/// # TODO(charlie): https://github.com/astral-sh/ruff/issues/3870
+/// # this comment has an issue link
+///
+/// # TODO(charlie): #003 this comment has a 3-digit issue code
+/// # with leading character `#`
+///
 /// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
 /// ```
