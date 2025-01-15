@@ -152,6 +152,8 @@ C.pure_instance_variable = "overwritten on class"
 Class variables annotated with the [`typing.ClassVar`] type qualifier are pure class variables. They
 cannot be overwritten on instances, but they can be accessed on instances.
 
+For more details, see the [typing documentation on `ClassVar`].
+
 ```py
 from typing import ClassVar
 
@@ -488,4 +490,5 @@ Some of the tests in the *Class and instance variables* section draw inspiration
 [pyright's documentation] on this topic.
 
 [pyright's documentation]: https://microsoft.github.io/pyright/#/type-concepts-advanced?id=class-and-instance-variables
+[typing documentation on `classvar`]: https://typing.readthedocs.io/en/latest/spec/class-compat.html#classvar
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar
