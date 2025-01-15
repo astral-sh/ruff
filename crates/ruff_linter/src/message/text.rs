@@ -15,6 +15,7 @@ use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::settings::types::UnsafeFixes;
+use crate::Locator;
 
 bitflags! {
     #[derive(Default)]
@@ -247,7 +248,8 @@ impl Display for MessageCodeFrame<'_> {
         let source = replace_whitespace_and_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
             self.message.range() - start_offset,
-        );
+        )
+        .fix_up_empty_spans_after_line_terminator();
 
         let label = self
             .message
@@ -363,6 +365,41 @@ fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange)
 struct SourceCode<'a> {
     text: Cow<'a, str>,
     annotation_range: TextRange,
+}
+
+impl<'a> SourceCode<'a> {
+    /// This attempts to "fix up" the span on `SourceCode` in the case where
+    /// it's an empty span immediately following a line terminator.
+    ///
+    /// At present, `annotate-snippets` (both upstream and our vendored copy)
+    /// will render annotations of such spans to point to the space immediately
+    /// following the previous line. But ideally, this should point to the space
+    /// immediately preceding the next line.
+    ///
+    /// After attempting to fix `annotate-snippets` and giving up after a couple
+    /// hours, this routine takes a different tact: it adjusts the span to be
+    /// non-empty and it will cover the first codepoint of the following line.
+    /// This forces `annotate-snippets` to point to the right place.
+    ///
+    /// See also: <https://github.com/astral-sh/ruff/issues/15509>
+    fn fix_up_empty_spans_after_line_terminator(self) -> SourceCode<'a> {
+        if !self.annotation_range.is_empty()
+            || self.annotation_range.start() == TextSize::from(0)
+            || self.annotation_range.start() >= self.text.text_len()
+        {
+            return self;
+        }
+        if self.text.as_bytes()[self.annotation_range.start().to_usize() - 1] != b'\n' {
+            return self;
+        }
+        let locator = Locator::new(&self.text);
+        let start = self.annotation_range.start();
+        let end = locator.ceil_char_boundary(start + TextSize::from(1));
+        SourceCode {
+            annotation_range: TextRange::new(start, end),
+            ..self
+        }
+    }
 }
 
 #[cfg(test)]
