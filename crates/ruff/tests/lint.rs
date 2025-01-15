@@ -2162,7 +2162,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 }
 
 #[test]
-fn pyflakes_unused_lazy_import() -> Result<()> {
+fn pyflakes_unused_local_import() -> Result<()> {
     let tempdir = TempDir::new()?;
     // adapted from report in #12897
     let bug = "
