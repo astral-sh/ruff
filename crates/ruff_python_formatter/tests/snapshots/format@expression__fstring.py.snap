@@ -1504,7 +1504,7 @@ f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
 print(f"{ {1, 2, 3} - {2} }")
 print(f"{ {1: 2}.keys() }")
 print(f"{({1, 2, 3}) - ({2})}")
-print(f"{ 1, 2, {3} }")
+print(f"{1, 2, {3}}")
 print(f"{(1, 2, {3})}")
 ```
 
@@ -2286,6 +2286,6 @@ f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
 print(f"{ {1, 2, 3} - {2} }")
 print(f"{ {1: 2}.keys() }")
 print(f"{({1, 2, 3}) - ({2})}")
-print(f"{ 1, 2, {3} }")
+print(f"{1, 2, {3}}")
 print(f"{(1, 2, {3})}")
 ```

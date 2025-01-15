@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextSlice};
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
 use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
-use crate::expression::{left_most, right_most};
+use crate::expression::left_most;
 use crate::prelude::*;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
@@ -203,20 +203,16 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             // We need to preserve the space highlighted by `^`. The whitespace
             // before the closing curly brace is not strictly necessary, but it's
             // added to maintain consistency.
-            let bracket_spacing = if has_curly_parentheses(left_most(
-                expression,
-                comments.ranges(),
-                f.context().source(),
-            )) || has_curly_parentheses(right_most(
-                expression,
-                comments.ranges(),
-                f.context().source(),
-            )) {
-                Some(format_with(|f| {
-                    if self.context.can_contain_line_breaks() {
-                        soft_line_break_or_space().fmt(f)
-                    } else {
-                        space().fmt(f)
+            let bracket_spacing =
+                match left_most(expression, comments.ranges(), f.context().source()) {
+                    Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_) => {
+                        Some(format_with(|f| {
+                            if self.context.can_contain_line_breaks() {
+                                soft_line_break_or_space().fmt(f)
+                            } else {
+                                space().fmt(f)
+                            }
+                        }))
                     }
                     _ => None,
                 };
