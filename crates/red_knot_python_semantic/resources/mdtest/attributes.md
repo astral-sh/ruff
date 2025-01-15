@@ -13,7 +13,7 @@ class itself.
 
 ```py
 class C:
-    def __init__(self, value2: int) -> None:
+    def __init__(self, value2: int, flag: bool = False) -> None:
         # bound but not declared
         self.pure_instance_variable1 = "value set in __init__"
 
@@ -25,6 +25,10 @@ class C:
 
         # declared and bound
         self.pure_instance_variable4: bool = True
+
+        # possibly unbdeclared/unbound
+        if flag:
+            self.pure_instance_variable5: str = "possibly set in __init__"
 
 c_instance = C(1)
 
@@ -39,6 +43,11 @@ reveal_type(c_instance.pure_instance_variable3)  # revealed: @Todo(instance attr
 
 # TODO: should be `Literal[True]` (or `bool`)
 reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
+
+# TODO: should be `Literal["possibly set in __init__"]` (or `str`)
+# We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
+# mypy and pyright do not show an error here.
+reveal_type(c_instance.pure_instance_variable5)  # revealed: @Todo(instance attributes)
 
 c_instance.pure_instance_variable1 = "value set on instance"
 
