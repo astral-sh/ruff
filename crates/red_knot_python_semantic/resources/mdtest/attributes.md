@@ -32,7 +32,8 @@ class C:
 
 c_instance = C(1)
 
-# TODO: should be `Literal["value set in __init__"]` (or `str` which would probably be more generally useful)
+# TODO: should be `Literal["value set in __init__"]`, or `Unknown | Literal[…]` to allow
+# assignments to this unannotated attribute from other scopes.
 reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(instance attributes)
 
 # TODO: should be `int`
@@ -41,14 +42,17 @@ reveal_type(c_instance.pure_instance_variable2)  # revealed: @Todo(instance attr
 # TODO: should be `bytes`
 reveal_type(c_instance.pure_instance_variable3)  # revealed: @Todo(instance attributes)
 
-# TODO: should be `Literal[True]` (or `bool`)
+# TODO: should be `bool`
 reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
 
-# TODO: should be `Literal["possibly set in __init__"]` (or `str`)
+# TODO: should be `str`
 # We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
 # mypy and pyright do not show an error here.
 reveal_type(c_instance.pure_instance_variable5)  # revealed: @Todo(instance attributes)
 
+# TODO: If we choose to infer a precise `Literal[…]` type for the instance attribute (see
+# above), this should be an error: incompatible types in assignment. If we choose to infer
+# a gradual `Unknown | Literal[…]` type, this assignment is fine.
 c_instance.pure_instance_variable1 = "value set on instance"
 
 # TODO: this should be an error (incompatible types in assignment)
@@ -63,9 +67,14 @@ reveal_type(C.pure_instance_variable1)  # revealed: Unknown
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 C.pure_instance_variable1 = "overwritten on class"
 
-# TODO: should ideally be `Literal["value set on instance"]`
-# (due to earlier assignment of the attribute from the global scope)
-reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(instance attributes)
+c_instance.pure_instance_variable4 = False
+
+# TODO: After this assignment to the attribute within this scope, we may eventually want to narrow
+# the `bool` type (see above) for this instance variable to `Literal[False]` here. This is unsound
+# in general (we don't know what else happened to `c_instance` between the assignment and the use
+# here), but mypy and pyright support this. In conclusion, this could be `bool` but should probably
+# be `Literal[False]`.
+reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
 ```
 
 #### Variable declared in class body and declared/bound in `__init__`
@@ -109,10 +118,11 @@ class C:
 
 c_instance = C()
 
-# for a more realistic example, let's actually call the method
+# Not that we would use this in static analysis, but for a more realistic example, let's actually
+# call the method, so that the attribute is bound if this example is actually run.
 c_instance.set_instance_variable()
 
-# TODO: should be `Literal["value set in method"]` or `str`
+# TODO: should be `Literal["value set in method"]` or `Unknown | Literal[…]` (see above).
 reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
 
 # TODO: We already show an error here, but the message might be improved?
@@ -163,7 +173,7 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-# TODO: this should be `Literal[1]`, `int`, or maybe `Unknown | Literal[1]` / `Unknown | int`
+# TODO: this should be `Literal[1]`, or `Unknown | Literal[1]`.
 reveal_type(C.pure_class_variable2)  # revealed: @Todo(Unsupported or invalid type in a type expression)
 
 c_instance = C()
@@ -175,9 +185,6 @@ reveal_type(c_instance.pure_class_variable1)  # revealed: @Todo(instance attribu
 c_instance.pure_class_variable1 = "value set on instance"
 
 C.pure_class_variable1 = "overwritten on class"
-
-# TODO: should ideally be `Literal["overwritten on class"]`, but not a priority
-reveal_type(C.pure_class_variable1)  # revealed: str
 
 # TODO: should raise an error (incompatible types in assignment)
 C.pure_class_variable1 = 1
@@ -214,7 +221,7 @@ C.pure_class_variable = "overwritten on class"
 reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 c_instance = C()
-# TODO: should be `Literal["overwritten on class"]` or `str`
+# TODO: should be `Literal["overwritten on class"]`
 reveal_type(c_instance.pure_class_variable)  # revealed: @Todo(instance attributes)
 
 # TODO: should raise an error.
@@ -248,15 +255,17 @@ c_instance.variable_with_class_default = "value set on instance"
 
 reveal_type(C.variable_with_class_default)  # revealed: str
 
-# TODO: should ideally be Literal["value set on instance"], or still `str`
+# TODO: Could be Literal["value set on instance"], or still `str` if we choose not to
+# narrow the type.
 reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
 
 C.variable_with_class_default = "overwritten on class"
 
-# TODO: should ideally be `Literal["overwritten on class"]`
+# TODO: Could be `Literal["overwritten on class"]`, or still `str` if we choose not to
+# narrow the type.
 reveal_type(C.variable_with_class_default)  # revealed: str
 
-# TODO: should still be `Literal["value set on instance"]`
+# TODO: should still be `Literal["value set on instance"]`, or `str`.
 reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
 ```
 
