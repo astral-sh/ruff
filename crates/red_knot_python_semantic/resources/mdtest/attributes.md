@@ -168,7 +168,7 @@ c_instance.pure_class_variable = "value set on instance"
 
 ### "Regular" class variables
 
-These are instance attributes, but the fact that we can see that they have a definition (not just a
+These are instance attributes, but the fact that we can see that they have a binding (not a
 declaration) in the class body means that reading the value from the class body is also permitted.
 This is the only difference for these attributes as opposed to "pure" instance attributes.
 
