@@ -84,11 +84,10 @@ impl<'src> Lexer<'src> {
             "Lexer only supports files with a size up to 4GB"
         );
 
-        let nesting = u32::from(mode == Mode::ParenthesizedExpression);
-        let state = if mode == Mode::ParenthesizedExpression {
-            State::Other
+        let (state, nesting) = if mode == Mode::ParenthesizedExpression {
+            (State::Other, 1)
         } else {
-            State::AfterNewline
+            (State::AfterNewline, 0)
         };
 
         let mut lexer = Lexer {
