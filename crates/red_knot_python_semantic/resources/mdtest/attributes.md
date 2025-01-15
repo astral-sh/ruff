@@ -193,42 +193,43 @@ reveal_type(c_instance.pure_class_variable)  # revealed: @Todo(instance attribut
 c_instance.pure_class_variable = "value set on instance"
 ```
 
-### "Regular" class variables
+### Instance variables with class-level default values
 
 These are instance attributes, but the fact that we can see that they have a binding (not a
-declaration) in the class body means that reading the value from the class body is also permitted.
-This is the only difference for these attributes as opposed to "pure" instance attributes.
+declaration) in the class body means that reading the value from the class directly is also
+permitted. This is the only difference for these attributes as opposed to "pure" instance
+attributes.
 
 #### Basic
 
 ```py
 class C:
-    regular_class_variable: str = "value in class body"
+    variable_with_class_default: str = "value in class body"
 
     def instance_method(self):
-        self.regular_class_variable = "value set in instance method"
+        self.variable_with_class_default = "value set in instance method"
 
-reveal_type(C.regular_class_variable)  # revealed: str
+reveal_type(C.variable_with_class_default)  # revealed: str
 
 c_instance = C()
 
 # TODO: should be `str`
-reveal_type(c_instance.regular_class_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
 
-c_instance.regular_class_variable = "value set on instance"
+c_instance.variable_with_class_default = "value set on instance"
 
-reveal_type(C.regular_class_variable)  # revealed: str
+reveal_type(C.variable_with_class_default)  # revealed: str
 
 # TODO: should ideally be Literal["value set on instance"], or still `str`
-reveal_type(c_instance.regular_class_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
 
-C.regular_class_variable = "overwritten on class"
+C.variable_with_class_default = "overwritten on class"
 
 # TODO: should ideally be `Literal["overwritten on class"]`
-reveal_type(C.regular_class_variable)  # revealed: str
+reveal_type(C.variable_with_class_default)  # revealed: str
 
 # TODO: should still be `Literal["value set on instance"]`
-reveal_type(c_instance.regular_class_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
 ```
 
 ## Union of attributes
