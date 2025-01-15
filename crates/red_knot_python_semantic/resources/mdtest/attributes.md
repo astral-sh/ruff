@@ -153,6 +153,11 @@ reveal_type(C.pure_class_variable)  # revealed: str
 
 # TODO: should raise an error (incompatible types in assignment)
 C.pure_class_variable = 1
+
+class Subclass(C):
+    pure_class_variable: ClassVar[str] = "overwritten on subclass"
+
+reveal_type(Subclass.pure_class_variable)  # revealed: str
 ```
 
 #### Variable only mentioned in a class method
