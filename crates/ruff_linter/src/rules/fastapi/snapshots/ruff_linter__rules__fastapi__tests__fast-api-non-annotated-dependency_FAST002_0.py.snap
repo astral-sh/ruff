@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
 snapshot_kind: text
 ---
-FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 22 | @app.get("/items/")
 23 | def get_items(
@@ -31,7 +31,7 @@ FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
 26 27 | ):
 27 28 |     pass
 
-FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 23 | def get_items(
 24 |     current_user: User = Depends(get_current_user),
@@ -60,14 +60,14 @@ FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
 27 28 |     pass
 28 29 | 
 
-FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 30 | @app.post("/stuff/")
 31 | def do_stuff(
-32 |     some_query_param: str | None = Query(default=None),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-33 |     some_path_param: str = Path(),
-34 |     some_body_param: str = Body("foo"),
+32 |     some_path_param: str = Path(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+33 |     some_cookie_param: str = Cookie(),
+34 |     some_file_param: UploadFile = File(),
    |
    = help: Replace with `typing.Annotated`
 
@@ -83,20 +83,20 @@ FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
 29 30 | 
 30 31 | @app.post("/stuff/")
 31 32 | def do_stuff(
-32    |-    some_query_param: str | None = Query(default=None),
-   33 |+    some_query_param: Annotated[str | None, Query(default=None)],
-33 34 |     some_path_param: str = Path(),
-34 35 |     some_body_param: str = Body("foo"),
-35 36 |     some_cookie_param: str = Cookie(),
+32    |-    some_path_param: str = Path(),
+   33 |+    some_path_param: Annotated[str, Path()],
+33 34 |     some_cookie_param: str = Cookie(),
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
 
-FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 31 | def do_stuff(
-32 |     some_query_param: str | None = Query(default=None),
-33 |     some_path_param: str = Path(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-34 |     some_body_param: str = Body("foo"),
-35 |     some_cookie_param: str = Cookie(),
+32 |     some_path_param: str = Path(),
+33 |     some_cookie_param: str = Cookie(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+34 |     some_file_param: UploadFile = File(),
+35 |     some_form_param: str = Form(),
    |
    = help: Replace with `typing.Annotated`
 
@@ -111,21 +111,21 @@ FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
 --------------------------------------------------------------------------------
 30 31 | @app.post("/stuff/")
 31 32 | def do_stuff(
-32 33 |     some_query_param: str | None = Query(default=None),
-33    |-    some_path_param: str = Path(),
-   34 |+    some_path_param: Annotated[str, Path()],
-34 35 |     some_body_param: str = Body("foo"),
-35 36 |     some_cookie_param: str = Cookie(),
-36 37 |     some_header_param: int = Header(default=5),
+32 33 |     some_path_param: str = Path(),
+33    |-    some_cookie_param: str = Cookie(),
+   34 |+    some_cookie_param: Annotated[str, Cookie()],
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
 
-FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-32 |     some_query_param: str | None = Query(default=None),
-33 |     some_path_param: str = Path(),
-34 |     some_body_param: str = Body("foo"),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-35 |     some_cookie_param: str = Cookie(),
-36 |     some_header_param: int = Header(default=5),
+32 |     some_path_param: str = Path(),
+33 |     some_cookie_param: str = Cookie(),
+34 |     some_file_param: UploadFile = File(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+35 |     some_form_param: str = Form(),
+36 |     some_query_param: str | None = Query(default=None),
    |
    = help: Replace with `typing.Annotated`
 
@@ -139,51 +139,22 @@ FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 31 32 | def do_stuff(
-32 33 |     some_query_param: str | None = Query(default=None),
-33 34 |     some_path_param: str = Path(),
-34    |-    some_body_param: str = Body("foo"),
-   35 |+    some_body_param: Annotated[str, Body("foo")],
-35 36 |     some_cookie_param: str = Cookie(),
-36 37 |     some_header_param: int = Header(default=5),
-37 38 |     some_file_param: UploadFile = File(),
+32 33 |     some_path_param: str = Path(),
+33 34 |     some_cookie_param: str = Cookie(),
+34    |-    some_file_param: UploadFile = File(),
+   35 |+    some_file_param: Annotated[UploadFile, File()],
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
+37 38 |     some_body_param: str = Body("foo"),
 
-FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-33 |     some_path_param: str = Path(),
-34 |     some_body_param: str = Body("foo"),
-35 |     some_cookie_param: str = Cookie(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-36 |     some_header_param: int = Header(default=5),
-37 |     some_file_param: UploadFile = File(),
-   |
-   = help: Replace with `typing.Annotated`
-
-ℹ Unsafe fix
-12 12 |     Security,
-13 13 | )
-14 14 | from pydantic import BaseModel
-   15 |+from typing import Annotated
-15 16 | 
-16 17 | app = FastAPI()
-17 18 | router = APIRouter()
---------------------------------------------------------------------------------
-32 33 |     some_query_param: str | None = Query(default=None),
-33 34 |     some_path_param: str = Path(),
-34 35 |     some_body_param: str = Body("foo"),
-35    |-    some_cookie_param: str = Cookie(),
-   36 |+    some_cookie_param: Annotated[str, Cookie()],
-36 37 |     some_header_param: int = Header(default=5),
-37 38 |     some_file_param: UploadFile = File(),
-38 39 |     some_form_param: str = Form(),
-
-FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
-   |
-34 |     some_body_param: str = Body("foo"),
-35 |     some_cookie_param: str = Cookie(),
-36 |     some_header_param: int = Header(default=5),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-37 |     some_file_param: UploadFile = File(),
-38 |     some_form_param: str = Form(),
+33 |     some_cookie_param: str = Cookie(),
+34 |     some_file_param: UploadFile = File(),
+35 |     some_form_param: str = Form(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+36 |     some_query_param: str | None = Query(default=None),
+37 |     some_body_param: str = Body("foo"),
    |
    = help: Replace with `typing.Annotated`
 
@@ -196,22 +167,51 @@ FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
 16 17 | app = FastAPI()
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
-33 34 |     some_path_param: str = Path(),
-34 35 |     some_body_param: str = Body("foo"),
-35 36 |     some_cookie_param: str = Cookie(),
-36    |-    some_header_param: int = Header(default=5),
-   37 |+    some_header_param: Annotated[int, Header(default=5)],
-37 38 |     some_file_param: UploadFile = File(),
-38 39 |     some_form_param: str = Form(),
+32 33 |     some_path_param: str = Path(),
+33 34 |     some_cookie_param: str = Cookie(),
+34 35 |     some_file_param: UploadFile = File(),
+35    |-    some_form_param: str = Form(),
+   36 |+    some_form_param: Annotated[str, Form()],
+36 37 |     some_query_param: str | None = Query(default=None),
+37 38 |     some_body_param: str = Body("foo"),
+38 39 |     some_header_param: int = Header(default=5),
+
+FAST002_0.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
+   |
+34 |     some_file_param: UploadFile = File(),
+35 |     some_form_param: str = Form(),
+36 |     some_query_param: str | None = Query(default=None),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+37 |     some_body_param: str = Body("foo"),
+38 |     some_header_param: int = Header(default=5),
+   |
+   = help: Replace with `typing.Annotated`
+
+ℹ Unsafe fix
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
+--------------------------------------------------------------------------------
+33 34 |     some_cookie_param: str = Cookie(),
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
+36    |-    some_query_param: str | None = Query(default=None),
+   37 |+    some_query_param: Annotated[str | None, Query()] = None,
+37 38 |     some_body_param: str = Body("foo"),
+38 39 |     some_header_param: int = Header(default=5),
 39 40 | ):
 
-FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-35 |     some_cookie_param: str = Cookie(),
-36 |     some_header_param: int = Header(default=5),
-37 |     some_file_param: UploadFile = File(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-38 |     some_form_param: str = Form(),
+35 |     some_form_param: str = Form(),
+36 |     some_query_param: str | None = Query(default=None),
+37 |     some_body_param: str = Body("foo"),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+38 |     some_header_param: int = Header(default=5),
 39 | ):
    |
    = help: Replace with `typing.Annotated`
@@ -225,21 +225,21 @@ FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
 16 17 | app = FastAPI()
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
-34 35 |     some_body_param: str = Body("foo"),
-35 36 |     some_cookie_param: str = Cookie(),
-36 37 |     some_header_param: int = Header(default=5),
-37    |-    some_file_param: UploadFile = File(),
-   38 |+    some_file_param: Annotated[UploadFile, File()],
-38 39 |     some_form_param: str = Form(),
+34 35 |     some_file_param: UploadFile = File(),
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
+37    |-    some_body_param: str = Body("foo"),
+   38 |+    some_body_param: Annotated[str, Body()] = "foo",
+38 39 |     some_header_param: int = Header(default=5),
 39 40 | ):
 40 41 |     # do stuff
 
-FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
-36 |     some_header_param: int = Header(default=5),
-37 |     some_file_param: UploadFile = File(),
-38 |     some_form_param: str = Form(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+36 |     some_query_param: str | None = Query(default=None),
+37 |     some_body_param: str = Body("foo"),
+38 |     some_header_param: int = Header(default=5),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 39 | ):
 40 |     # do stuff
    |
@@ -254,16 +254,16 @@ FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
 16 17 | app = FastAPI()
 17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
-35 36 |     some_cookie_param: str = Cookie(),
-36 37 |     some_header_param: int = Header(default=5),
-37 38 |     some_file_param: UploadFile = File(),
-38    |-    some_form_param: str = Form(),
-   39 |+    some_form_param: Annotated[str, Form()],
+35 36 |     some_form_param: str = Form(),
+36 37 |     some_query_param: str | None = Query(default=None),
+37 38 |     some_body_param: str = Body("foo"),
+38    |-    some_header_param: int = Header(default=5),
+   39 |+    some_header_param: Annotated[int, Header()] = 5,
 39 40 | ):
 40 41 |     # do stuff
 41 42 |     pass
 
-FAST002.py:47:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:47:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 45 |     skip: int,
 46 |     limit: int,
@@ -292,7 +292,7 @@ FAST002.py:47:5: FAST002 [*] FastAPI dependency without `Annotated`
 49 50 |     pass
 50 51 | 
 
-FAST002.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 51 | @app.get("/users/")
 52 | def get_users(
@@ -321,7 +321,7 @@ FAST002.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
 55 56 |     limit: int = 10,
 56 57 | ):
 
-FAST002.py:61:25: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:61:25: FAST002 [*] FastAPI dependency without `Annotated`
    |
 60 | @app.get("/items/{item_id}")
 61 | async def read_items(*, item_id: int = Path(title="The ID of the item to get"), q: str):
@@ -348,7 +348,7 @@ FAST002.py:61:25: FAST002 [*] FastAPI dependency without `Annotated`
 63 64 | 
 64 65 | # Non fixable errors
 
-FAST002.py:70:5: FAST002 FastAPI dependency without `Annotated`
+FAST002_0.py:70:5: FAST002 FastAPI dependency without `Annotated`
    |
 68 |     skip: int = 0,
 69 |     limit: int = 10,
