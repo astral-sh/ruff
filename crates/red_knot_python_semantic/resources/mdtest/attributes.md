@@ -6,10 +6,10 @@ Tests for attribute access on various kinds of types.
 
 ### Pure instance variables
 
-#### Variable only declared/defined in `__init__`
+#### Variable only declared/bound in `__init__`
 
-Variables only defined in `__init__` are pure instance variables. They cannot be accessed on the
-class itself.
+Variables only declared and/or bound in `__init__` are pure instance variables. They cannot be
+accessed on the class itself.
 
 ```py
 class C:
@@ -68,10 +68,10 @@ C.pure_instance_variable1 = "overwritten on class"
 reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(instance attributes)
 ```
 
-#### Variable declared in class body and defined in `__init__`
+#### Variable declared in class body and declared/bound in `__init__`
 
-The same rule applies even if the variable is *declared* (not defined!) in the class body: it is
-still a pure instance variable.
+The same rule applies even if the variable is *declared* (not bound!) in the class body: it is still
+a pure instance variable.
 
 ```py
 class C:
@@ -98,16 +98,14 @@ C.pure_instance_variable = "overwritten on class"
 c_instance.pure_instance_variable = 1
 ```
 
-#### Variable declared in class body and defined in unrelated method
+#### Variable only defined in unrelated method
 
 We also recognize pure instance variables if they are defined in a method that is not `__init__`.
 
 ```py
 class C:
-    pure_instance_variable: str
-
     def set_instance_variable(self) -> None:
-        self.pure_instance_variable = "value set in method"
+        self.pure_instance_variable: str = "value set in method"
 
 c_instance = C()
 
@@ -117,9 +115,33 @@ c_instance.set_instance_variable()
 # TODO: should be `str`
 reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
 
-# TODO: See above, we currently plan to emit diagnostics for both of these lines,
-# even if mypy/pyright do not.
+# TODO: We already show an error here, but the message might be improved?
+# error: [unresolved-attribute]
+reveal_type(C.pure_instance_variable)  # revealed: Unknown
+
+# TODO: this should be an error
+C.pure_instance_variable = "overwritten on class"
+```
+
+#### Variable declared in class body and not bound anywhere
+
+If a variable is declared in the class body but not bound anywhere, we still consider it a pure
+instance variable and allow access to it via instances.
+
+```py
+class C:
+    pure_instance_variable: str
+
+c_instance = C()
+
+# TODO: should be 'str'
+reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
+
+# TODO: mypy and pyright do not show an error here, but we plan to emit a diagnostic.
+# The type could be changed to 'Unknown' if we decide to emit an error?
 reveal_type(C.pure_instance_variable)  # revealed: str
+
+# TODO: mypy and pyright do not show an error here, but we plan to emit one.
 C.pure_instance_variable = "overwritten on class"
 ```
 
