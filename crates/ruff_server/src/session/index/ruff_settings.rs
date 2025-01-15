@@ -115,6 +115,8 @@ impl RuffSettingsIndex {
         editor_settings: &ResolvedEditorSettings,
         is_default_workspace: bool,
     ) -> Self {
+        tracing::debug!("Indexing settings for workspace: {}", root.display());
+
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;

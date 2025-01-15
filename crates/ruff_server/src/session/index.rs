@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
-use lsp_types::Url;
-use rustc_hash::FxHashMap;
+use lsp_types::{FileEvent, Url};
+use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 
 pub(crate) use ruff_settings::RuffSettings;
@@ -264,31 +264,43 @@ impl Index {
         Some(controller.make_ref(cell_url, url, document_settings))
     }
 
-    /// Reloads relevant existing settings files based on a changed settings file path.
-    pub(super) fn reload_settings(&mut self, changed_url: &Url) {
-        let Ok(changed_path) = changed_url.to_file_path() else {
-            // Files that don't map to a path can't be a workspace configuration file.
-            return;
-        };
+    /// Reload the settings for all the workspace folders that contain the changed files.
+    ///
+    /// This method avoids re-indexing the same workspace multiple times if multiple files
+    /// belonging to the same workspace have been changed.
+    pub(super) fn reload_settings(&mut self, changes: &[FileEvent]) {
+        let mut indexed = FxHashSet::default();
 
-        let Some(enclosing_folder) = changed_path.parent() else {
-            return;
-        };
+        for change in changes {
+            let Ok(changed_path) = change.uri.to_file_path() else {
+                // Files that don't map to a path can't be a workspace configuration file.
+                return;
+            };
 
-        for (root, settings) in self
-            .settings
-            .range_mut(..=enclosing_folder.to_path_buf())
-            .rev()
-        {
-            if !enclosing_folder.starts_with(root) {
-                break;
+            let Some(enclosing_folder) = changed_path.parent() else {
+                return;
+            };
+
+            for (root, settings) in self
+                .settings
+                .range_mut(..=enclosing_folder.to_path_buf())
+                .rev()
+            {
+                if !enclosing_folder.starts_with(root) {
+                    break;
+                }
+
+                if indexed.contains(root) {
+                    continue;
+                }
+                indexed.insert(root.clone());
+
+                settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
+                    root,
+                    settings.client_settings.editor_settings(),
+                    false,
+                );
             }
-
-            settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
-                root,
-                settings.client_settings.editor_settings(),
-                false,
-            );
         }
     }
 
