@@ -14,9 +14,17 @@ class itself.
 ```py
 class C:
     def __init__(self, value2: int) -> None:
+        # bound but not declared
         self.pure_instance_variable1 = "value set in __init__"
+
+        # bound but not declared - with type inferred from parameter
         self.pure_instance_variable2 = value2
+
+        # declared but not bound
         self.pure_instance_variable3: bytes
+
+        # declared and bound
+        self.pure_instance_variable4: bool = True
 
 c_instance = C(1)
 
@@ -28,6 +36,9 @@ reveal_type(c_instance.pure_instance_variable2)  # revealed: @Todo(instance attr
 
 # TODO: should be `bytes`
 reveal_type(c_instance.pure_instance_variable3)  # revealed: @Todo(instance attributes)
+
+# TODO: should be `Literal[True]` (or `bool`)
+reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
 
 c_instance.pure_instance_variable1 = "value set on instance"
 
