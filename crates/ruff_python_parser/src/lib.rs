@@ -624,9 +624,9 @@ pub enum Mode {
     /// The code consists of a single expression.
     Expression,
 
-    /// The code is parsed as if it is parenthesized. The code does not need to contain parenthesis
-    /// at the beginning. And it is assumed by the lexer that there is a parenthesis.
-    /// This allows the lexer to allow certain indentations that are not valid in a python file.
+    /// The code consists of a single expression and is parsed as if it is parenthesized. The parentheses themselves aren't required.
+    /// This allows for having valid multiline expression without the need of parentheses
+    /// and is specifically useful for parsing string annotations.
     ParenthesizedExpression,
 
     /// The code consists of a sequence of statements which can include the
