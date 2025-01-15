@@ -8,8 +8,8 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 
-use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::workspace::WorkspaceMetadata;
+use red_knot_workspace::db::ProjectDatabase;
+use red_knot_workspace::project::ProjectMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
 use ruff_db::Db;
@@ -28,7 +28,7 @@ pub(crate) mod index;
 mod settings;
 
 // TODO(dhruvmanila): In general, the server shouldn't use any salsa queries directly and instead
-// should use methods on `RootDatabase`.
+// should use methods on `ProjectDatabase`.
 
 /// The global state for the LSP
 pub struct Session {
@@ -41,8 +41,9 @@ pub struct Session {
     /// [`index_mut`]: Session::index_mut
     index: Option<Arc<index::Index>>,
 
-    /// Maps workspace root paths to their respective databases.
-    workspaces: BTreeMap<PathBuf, RootDatabase>,
+    /// Maps workspace folders to their respective project databases.
+    projects_by_workspace_folder: BTreeMap<PathBuf, ProjectDatabase>,
+
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
     /// Tracks what LSP features the client supports and doesn't support.
@@ -68,14 +69,14 @@ impl Session {
             let system = LSPSystem::new(index.clone());
 
             // TODO(dhruvmanila): Get the values from the client settings
-            let metadata = WorkspaceMetadata::discover(system_path, &system, None)?;
+            let metadata = ProjectMetadata::discover(system_path, &system, None)?;
             // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
-            workspaces.insert(path, RootDatabase::new(metadata, system)?);
+            workspaces.insert(path, ProjectDatabase::new(metadata, system)?);
         }
 
         Ok(Self {
             position_encoding,
-            workspaces,
+            projects_by_workspace_folder: workspaces,
             index: Some(index),
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
@@ -87,38 +88,41 @@ impl Session {
     // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
     // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
 
-    /// Returns a reference to the workspace [`RootDatabase`] corresponding to the given path, if
+    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
     /// any.
-    pub(crate) fn workspace_db_for_path(&self, path: impl AsRef<Path>) -> Option<&RootDatabase> {
-        self.workspaces
+    pub(crate) fn project_db_for_path(&self, path: impl AsRef<Path>) -> Option<&ProjectDatabase> {
+        self.projects_by_workspace_folder
             .range(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
     }
 
-    /// Returns a mutable reference to the workspace [`RootDatabase`] corresponding to the given
+    /// Returns a mutable reference to the project [`ProjectDatabase`] corresponding to the given
     /// path, if any.
-    pub(crate) fn workspace_db_for_path_mut(
+    pub(crate) fn project_db_for_path_mut(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Option<&mut RootDatabase> {
-        self.workspaces
+    ) -> Option<&mut ProjectDatabase> {
+        self.projects_by_workspace_folder
             .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
     }
 
-    /// Returns a reference to the default workspace [`RootDatabase`]. The default workspace is the
-    /// minimum root path in the workspace map.
-    pub(crate) fn default_workspace_db(&self) -> &RootDatabase {
-        // SAFETY: Currently, red knot only support a single workspace.
-        self.workspaces.values().next().unwrap()
+    /// Returns a reference to the default project [`ProjectDatabase`]. The default project is the
+    /// minimum root path in the project map.
+    pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
+        // SAFETY: Currently, red knot only support a single project.
+        self.projects_by_workspace_folder.values().next().unwrap()
     }
 
-    /// Returns a mutable reference to the default workspace [`RootDatabase`].
-    pub(crate) fn default_workspace_db_mut(&mut self) -> &mut RootDatabase {
-        // SAFETY: Currently, red knot only support a single workspace.
-        self.workspaces.values_mut().next().unwrap()
+    /// Returns a mutable reference to the default project [`ProjectDatabase`].
+    pub(crate) fn default_project_db_mut(&mut self) -> &mut ProjectDatabase {
+        // SAFETY: Currently, red knot only support a single project.
+        self.projects_by_workspace_folder
+            .values_mut()
+            .next()
+            .unwrap()
     }
 
     pub fn key_from_url(&self, url: Url) -> DocumentKey {
@@ -187,7 +191,7 @@ impl Session {
     fn index_mut(&mut self) -> MutIndexGuard {
         let index = self.index.take().unwrap();
 
-        for db in self.workspaces.values_mut() {
+        for db in self.projects_by_workspace_folder.values_mut() {
             // Remove the `index` from each database. This drops the count of `Arc<Index>` down to 1
             db.system_mut()
                 .as_any_mut()
@@ -232,7 +236,7 @@ impl Drop for MutIndexGuard<'_> {
     fn drop(&mut self) {
         if let Some(index) = self.index.take() {
             let index = Arc::new(index);
-            for db in self.session.workspaces.values_mut() {
+            for db in self.session.projects_by_workspace_folder.values_mut() {
                 db.system_mut()
                     .as_any_mut()
                     .downcast_mut::<LSPSystem>()
@@ -267,7 +271,7 @@ impl DocumentSnapshot {
         self.position_encoding
     }
 
-    pub(crate) fn file(&self, db: &RootDatabase) -> Option<File> {
+    pub(crate) fn file(&self, db: &ProjectDatabase) -> Option<File> {
         match url_to_any_system_path(self.document_ref.file_url()).ok()? {
             AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
             AnySystemPath::SystemVirtual(virtual_path) => db

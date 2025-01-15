@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::error;
+use log::debug;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -56,7 +56,7 @@ impl Diagnostic {
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.kind.name, err),
         }
     }
 
@@ -67,7 +67,7 @@ impl Diagnostic {
         match func() {
             Ok(None) => {}
             Ok(Some(fix)) => self.fix = Some(fix),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.kind.name, err),
         }
     }
 

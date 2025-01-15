@@ -435,7 +435,7 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: Tex
             version: "1.0.0"
         },
         ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Replacement::ImportPathMoved{
-                original_path: "airflow.auth.managers.fab.security_managr.override",
+                original_path: "airflow.auth.managers.fab.security_manager.override",
                 new_path: "airflow.providers.fab.auth_manager.security_manager.override",
             provider: "fab",
             version: "1.0.0"

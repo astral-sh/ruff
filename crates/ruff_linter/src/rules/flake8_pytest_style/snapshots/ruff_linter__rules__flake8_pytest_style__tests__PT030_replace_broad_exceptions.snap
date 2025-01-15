@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
+---
+PT030.py:11:23: PT030 `pytest.warns(EncodingWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+10 | def test_ok_different_error_from_config():
+11 |     with pytest.warns(EncodingWarning):
+   |                       ^^^^^^^^^^^^^^^ PT030
+12 |         pass
+   |

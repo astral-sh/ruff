@@ -8,8 +8,8 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
-    SubclassOfType, Type, UnionType,
+    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType, Type,
+    UnionType,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -65,9 +65,8 @@ struct DisplayRepresentation<'db> {
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
-            Type::Any => f.write_str("Any"),
+            Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Unknown => f.write_str("Unknown"),
             Type::Instance(InstanceType { class }) => {
                 let representation = match class.known(self.db) {
                     Some(KnownClass::NoneType) => "None",
@@ -76,24 +75,17 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 f.write_str(representation)
             }
-            // `[Type::Todo]`'s display should be explicit that is not a valid display of
-            // any other type
-            Type::Todo(todo) => write!(f, "@Todo{todo}"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
-            Type::SubclassOf(SubclassOfType {
-                base: ClassBase::Class(class),
-            }) => {
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
-                write!(f, "type[{}]", class.name(self.db))
-            }
-            Type::SubclassOf(SubclassOfType { base }) => {
-                write!(f, "type[{}]", base.display(self.db))
-            }
+                ClassBase::Class(class) => write!(f, "type[{}]", class.name(self.db)),
+                ClassBase::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
+            },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
@@ -177,12 +169,9 @@ impl Display for DisplayUnionType<'_> {
 
         for element in elements {
             if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
-                let Some(mut condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
+                let Some(condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
                     continue;
                 };
-                if kind == CondensedDisplayTypeKind::Int {
-                    condensed_kind.sort_unstable_by_key(|ty| ty.expect_int_literal());
-                }
                 join.entry(&DisplayLiteralGroup {
                     literals: condensed_kind,
                     db: self.db,
@@ -223,17 +212,12 @@ impl Display for DisplayLiteralGroup<'_> {
 
 /// Enumeration of literal types that are displayed in a "condensed way" inside `Literal` slices.
 ///
-/// For example, `Literal[1] | Literal[2]` is displayed as `"Literal[1, 2]"`.
-/// Not all `Literal` types are displayed using `Literal` slices
-/// (e.g. it would be inappropriate to display `LiteralString`
-/// as `Literal[LiteralString]`).
+/// For example, `Literal[1] | Literal[2] | Literal["s"]` is displayed as `"Literal[1, 2, "s"]"`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum CondensedDisplayTypeKind {
     Class,
     Function,
-    Int,
-    String,
-    Bytes,
+    LiteralExpression,
 }
 
 impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
@@ -243,9 +227,10 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
         match value {
             Type::ClassLiteral(_) => Ok(Self::Class),
             Type::FunctionLiteral(_) => Ok(Self::Function),
-            Type::IntLiteral(_) => Ok(Self::Int),
-            Type::StringLiteral(_) => Ok(Self::String),
-            Type::BytesLiteral(_) => Ok(Self::Bytes),
+            Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::BooleanLiteral(_) => Ok(Self::LiteralExpression),
             _ => Err(()),
         }
     }
@@ -372,64 +357,8 @@ impl Display for DisplayStringLiteralType<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithTestSystem;
-
     use crate::db::tests::setup_db;
-    use crate::types::{global_symbol, SliceLiteralType, StringLiteralType, Type, UnionType};
-
-    #[test]
-    fn test_condense_literal_display_by_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/main.py",
-            "
-            def foo(x: int) -> int:
-                return x + 1
-
-            def bar(s: str) -> str:
-                return s
-
-            class A: ...
-            class B: ...
-            ",
-        )?;
-        let mod_file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-
-        let union_elements = &[
-            Type::Unknown,
-            Type::IntLiteral(-1),
-            global_symbol(&db, mod_file, "A").expect_type(),
-            Type::string_literal(&db, "A"),
-            Type::bytes_literal(&db, &[0u8]),
-            Type::bytes_literal(&db, &[7u8]),
-            Type::IntLiteral(0),
-            Type::IntLiteral(1),
-            Type::string_literal(&db, "B"),
-            global_symbol(&db, mod_file, "foo").expect_type(),
-            global_symbol(&db, mod_file, "bar").expect_type(),
-            global_symbol(&db, mod_file, "B").expect_type(),
-            Type::BooleanLiteral(true),
-            Type::none(&db),
-        ];
-        let union = UnionType::from_elements(&db, union_elements).expect_union();
-        let display = format!("{}", union.display(&db));
-        assert_eq!(
-            display,
-            concat!(
-                "Unknown | ",
-                "Literal[-1, 0, 1] | ",
-                "Literal[A, B] | ",
-                "Literal[\"A\", \"B\"] | ",
-                "Literal[b\"\\x00\", b\"\\x07\"] | ",
-                "Literal[foo, bar] | ",
-                "Literal[True] | ",
-                "None"
-            )
-        );
-        Ok(())
-    }
+    use crate::types::{SliceLiteralType, StringLiteralType, Type};
 
     #[test]
     fn test_slice_literal_display() {

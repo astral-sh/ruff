@@ -29,7 +29,6 @@ pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
-mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;

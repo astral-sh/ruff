@@ -407,13 +407,13 @@ pub enum StringLike<'a> {
     FString(&'a ast::ExprFString),
 }
 
-impl StringLike<'_> {
+impl<'a> StringLike<'a> {
     pub const fn is_fstring(self) -> bool {
         matches!(self, Self::FString(_))
     }
 
     /// Returns an iterator over the [`StringLikePart`] contained in this string-like expression.
-    pub fn parts(&self) -> StringLikePartIter<'_> {
+    pub fn parts(&self) -> StringLikePartIter<'a> {
         match self {
             StringLike::String(expr) => StringLikePartIter::String(expr.value.iter()),
             StringLike::Bytes(expr) => StringLikePartIter::Bytes(expr.value.iter()),
@@ -427,6 +427,14 @@ impl StringLike<'_> {
             Self::String(ExprStringLiteral { value, .. }) => value.is_implicit_concatenated(),
             Self::Bytes(ExprBytesLiteral { value, .. }) => value.is_implicit_concatenated(),
             Self::FString(ExprFString { value, .. }) => value.is_implicit_concatenated(),
+        }
+    }
+
+    pub const fn as_expression_ref(self) -> ExpressionRef<'a> {
+        match self {
+            StringLike::String(expr) => ExpressionRef::StringLiteral(expr),
+            StringLike::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
+            StringLike::FString(expr) => ExpressionRef::FString(expr),
         }
     }
 }
@@ -483,6 +491,19 @@ impl<'a> TryFrom<&'a Expr> for StringLike<'a> {
             Expr::StringLiteral(value) => Ok(Self::String(value)),
             Expr::BytesLiteral(value) => Ok(Self::Bytes(value)),
             Expr::FString(value) => Ok(Self::FString(value)),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryFrom<AnyNodeRef<'a>> for StringLike<'a> {
+    type Error = ();
+
+    fn try_from(value: AnyNodeRef<'a>) -> Result<Self, Self::Error> {
+        match value {
+            AnyNodeRef::ExprStringLiteral(value) => Ok(Self::String(value)),
+            AnyNodeRef::ExprBytesLiteral(value) => Ok(Self::Bytes(value)),
+            AnyNodeRef::ExprFString(value) => Ok(Self::FString(value)),
             _ => Err(()),
         }
     }
@@ -561,6 +582,12 @@ impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
 
 impl<'a> From<&StringLikePart<'a>> for AnyNodeRef<'a> {
     fn from(value: &StringLikePart<'a>) -> Self {
+        AnyNodeRef::from(*value)
+    }
+}
+
+impl<'a> From<StringLikePart<'a>> for AnyNodeRef<'a> {
+    fn from(value: StringLikePart<'a>) -> Self {
         match value {
             StringLikePart::String(part) => AnyNodeRef::StringLiteral(part),
             StringLikePart::Bytes(part) => AnyNodeRef::BytesLiteral(part),

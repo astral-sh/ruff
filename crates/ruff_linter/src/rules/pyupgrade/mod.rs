@@ -39,7 +39,8 @@ mod tests {
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_1.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_2.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_3.py"))]
-    #[test_case(Rule::NonPEP604Annotation, Path::new("UP007.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP045.py"))]
     #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"))]
@@ -57,6 +58,7 @@ mod tests {
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
@@ -111,18 +113,16 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_0.py"))]
-    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_1.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("preview__{}", path.to_string_lossy());
+    #[test]
+    fn up007_preview() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pyupgrade").join(path).as_path(),
+            Path::new("pyupgrade/UP045.py"),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -216,7 +216,10 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rules([
+                    Rule::NonPEP604AnnotationUnion,
+                    Rule::NonPEP604AnnotationOptional,
+                ])
             },
         )?;
         assert_messages!(diagnostics);
@@ -229,7 +232,10 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py310,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rules([
+                    Rule::NonPEP604AnnotationUnion,
+                    Rule::NonPEP604AnnotationOptional,
+                ])
             },
         )?;
         assert_messages!(diagnostics);

@@ -1,10 +1,11 @@
-use std::fmt;
-
+use crate::checkers::ast::Checker;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
+use std::fmt;
 
 pub(super) fn get_mark_decorators(
     decorators: &[Decorator],
@@ -44,6 +45,47 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
         })
+}
+
+/// Whether the currently checked `func` is likely to be a Pytest test.
+///
+/// A normal Pytest test function is one whose name starts with `test` and is either:
+///
+/// * Placed at module-level, or
+/// * Placed within a class whose name starts with `Test` and does not have an `__init__` method.
+///
+/// During test discovery, Pytest respects a few settings which we do not have access to.
+/// This function is thus prone to both false positives and false negatives.
+///
+/// References:
+/// - [`pytest` documentation: Conventions for Python test discovery](https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery)
+/// - [`pytest` documentation: Changing naming conventions](https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions)
+pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -> bool {
+    let semantic = checker.semantic();
+
+    if !func.name.starts_with("test") {
+        return false;
+    }
+
+    if semantic.scope_id.is_global() {
+        return true;
+    }
+
+    let ScopeKind::Class(class) = semantic.current_scope().kind else {
+        return false;
+    };
+
+    if !class.name.starts_with("Test") {
+        return false;
+    }
+
+    class.body.iter().all(|stmt| {
+        let Stmt::FunctionDef(function) = stmt else {
+            return true;
+        };
+
+        !visibility::is_init(&function.name)
+    })
 }
 
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {

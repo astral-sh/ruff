@@ -27,7 +27,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             // Ex) Optional[...], Union[...]
             if checker.any_enabled(&[
                 Rule::FutureRewritableTypeAnnotation,
-                Rule::NonPEP604Annotation,
+                Rule::NonPEP604AnnotationUnion,
+                Rule::NonPEP604AnnotationOptional,
             ]) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
@@ -43,7 +44,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
-                    if checker.enabled(Rule::NonPEP604Annotation) {
+                    if checker.any_enabled(&[
+                        Rule::NonPEP604AnnotationUnion,
+                        Rule::NonPEP604AnnotationOptional,
+                    ]) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
@@ -51,7 +55,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
-                            pyupgrade::rules::use_pep604_annotation(checker, expr, slice, operator);
+                            pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
                         }
                     }
                 }
@@ -875,13 +879,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.settings.preview.is_enabled()
-                && checker.any_enabled(&[
-                    Rule::PytestParametrizeNamesWrongType,
-                    Rule::PytestParametrizeValuesWrongType,
-                    Rule::PytestDuplicateParametrizeTestCases,
-                ])
-            {
+            if checker.any_enabled(&[
+                Rule::PytestParametrizeNamesWrongType,
+                Rule::PytestParametrizeValuesWrongType,
+                Rule::PytestDuplicateParametrizeTestCases,
+            ]) {
                 flake8_pytest_style::rules::parametrize(checker, call);
             }
             if checker.enabled(Rule::PytestUnittestAssertion) {
@@ -912,6 +914,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::PytestRaisesTooBroad,
             ]) {
                 flake8_pytest_style::rules::raises_call(checker, call);
+            }
+            if checker.any_enabled(&[Rule::PytestWarnsWithoutWarning, Rule::PytestWarnsTooBroad]) {
+                flake8_pytest_style::rules::warns_call(checker, call);
             }
             if checker.enabled(Rule::PytestFailWithoutMessage) {
                 flake8_pytest_style::rules::fail_call(checker, call);
@@ -972,6 +977,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathIsabs,
                 Rule::OsPathJoin,
                 Rule::OsPathBasename,
+                Rule::OsPathDirname,
                 Rule::OsPathSamefile,
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,

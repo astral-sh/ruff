@@ -28,7 +28,7 @@ to see a few differences on the margins, but the vast majority of your code shou
 When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
 and so more deviations should be expected, especially around the treatment of end-of-line comments.
 
-See [_Black compatibility_](formatter.md#black-compatibility) for more.
+See [_Style Guide_](formatter.md#style-guide) for more.
 
 ## How does Ruff's linter compare to Flake8?
 
@@ -220,19 +220,39 @@ Ruff is installable under any Python version from 3.7 onwards.
 
 ## Do I need to install Rust to use Ruff?
 
-Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/),
+though it's also installable with `pip`, `pipx`, and a [variety of other package managers](installation.md):
 
 ```console
-# With uv.
-$ uv add --dev ruff     # to add ruff to your project
-$ uv tool install ruff  # to install ruff globally
+$ # Install Ruff globally.
+$ uv tool install ruff@latest
 
-# With pip
+$ # Or add Ruff to your project.
+$ uv add --dev ruff
+
+$ # With pip.
 $ pip install ruff
+
+$ # With pipx.
+$ pipx install ruff
 ```
 
-Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
-on Rust at all.
+Starting with version `0.5.0`, Ruff can also be installed with our standalone installers:
+
+```console
+$ # On macOS and Linux.
+$ curl -LsSf https://astral.sh/ruff/install.sh | sh
+
+$ # On Windows.
+$ powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
+
+$ # For a specific version.
+$ curl -LsSf https://astral.sh/ruff/0.5.0/install.sh | sh
+$ powershell -c "irm https://astral.sh/ruff/0.5.0/install.ps1 | iex"
+```
+
+Ruff ships with wheels for all major platforms, which enables `uv`, `pip`, and other tools to install Ruff without
+relying on a Rust toolchain at all.
 
 ## Can I write my own linter plugins for Ruff?
 

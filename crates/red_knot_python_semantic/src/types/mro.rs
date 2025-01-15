@@ -34,7 +34,7 @@ impl<'db> Mro<'db> {
     pub(super) fn from_error(db: &'db dyn Db, class: Class<'db>) -> Self {
         Self::from([
             ClassBase::Class(class),
-            ClassBase::Unknown,
+            ClassBase::unknown(),
             ClassBase::object(db),
         ])
     }

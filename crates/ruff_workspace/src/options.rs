@@ -439,7 +439,11 @@ pub struct Options {
 /// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[serde(
+    from = "LintOptionsWire",
+    deny_unknown_fields,
+    rename_all = "kebab-case"
+)]
 pub struct LintOptions {
     #[serde(flatten)]
     pub common: LintCommonOptions,
@@ -1124,7 +1128,7 @@ pub struct Flake8BuiltinsOptions {
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = "builtins-allowed-modules = [\"id\"]"
+        example = "builtins-allowed-modules = [\"secrets\"]"
     )]
     /// List of builtin module names to allow.
     pub builtins_allowed_modules: Option<Vec<String>>,
@@ -1561,6 +1565,38 @@ pub struct Flake8PytestStyleOptions {
         example = "mark-parentheses = true"
     )]
     pub mark_parentheses: Option<bool>,
+
+    /// List of warning names that require a match= parameter in a
+    /// `pytest.warns()` call.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"["Warning", "UserWarning", "DeprecationWarning"]"#,
+        value_type = "list[str]",
+        example = "warns-require-match-for = [\"requests.RequestsWarning\"]"
+    )]
+    pub warns_require_match_for: Option<Vec<String>>,
+
+    /// List of additional warning names that require a match= parameter in a
+    /// `pytest.warns()` call. This extends the default list of warnings that
+    /// require a match= parameter.
+    ///
+    /// This option is useful if you want to extend the default list of warnings
+    /// that require a match= parameter without having to specify the entire
+    /// list.
+    ///
+    /// Note that this option does not remove any warnings from the default
+    /// list.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "warns-extend-require-match-for = [\"requests.RequestsWarning\"]"
+    )]
+    pub warns_extend_require_match_for: Option<Vec<String>>,
 }
 
 impl Flake8PytestStyleOptions {
@@ -1593,6 +1629,28 @@ impl Flake8PytestStyleOptions {
                 .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
             mark_parentheses: self.mark_parentheses.unwrap_or_default(),
+            warns_require_match_for: self
+                .warns_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidWarnsRequireMatchFor)?
+                .unwrap_or_else(flake8_pytest_style::settings::default_broad_warnings),
+            warns_extend_require_match_for: self
+                .warns_extend_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidWarnsExtendRequireMatchFor)?
+                .unwrap_or_default(),
         })
     }
 }
@@ -3655,6 +3713,172 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+}
+
+/// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
+/// far better error messages when deserializing.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct LintOptionsWire {
+    // common: LintCommonOptions
+    allowed_confusables: Option<Vec<char>>,
+    dummy_variable_rgx: Option<String>,
+    extend_ignore: Option<Vec<RuleSelector>>,
+    extend_select: Option<Vec<RuleSelector>>,
+    extend_fixable: Option<Vec<RuleSelector>>,
+    extend_unfixable: Option<Vec<RuleSelector>>,
+    external: Option<Vec<String>>,
+    fixable: Option<Vec<RuleSelector>>,
+    ignore: Option<Vec<RuleSelector>>,
+    extend_safe_fixes: Option<Vec<RuleSelector>>,
+    extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    ignore_init_module_imports: Option<bool>,
+    logger_objects: Option<Vec<String>>,
+    select: Option<Vec<RuleSelector>>,
+    explicit_preview_rules: Option<bool>,
+    task_tags: Option<Vec<String>>,
+    typing_modules: Option<Vec<String>>,
+    unfixable: Option<Vec<RuleSelector>>,
+    flake8_annotations: Option<Flake8AnnotationsOptions>,
+    flake8_bandit: Option<Flake8BanditOptions>,
+    flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
+    flake8_bugbear: Option<Flake8BugbearOptions>,
+    flake8_builtins: Option<Flake8BuiltinsOptions>,
+    flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
+    flake8_copyright: Option<Flake8CopyrightOptions>,
+    flake8_errmsg: Option<Flake8ErrMsgOptions>,
+    flake8_quotes: Option<Flake8QuotesOptions>,
+    flake8_self: Option<Flake8SelfOptions>,
+    flake8_tidy_imports: Option<Flake8TidyImportsOptions>,
+    flake8_type_checking: Option<Flake8TypeCheckingOptions>,
+    flake8_gettext: Option<Flake8GetTextOptions>,
+    flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
+    flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
+    flake8_pytest_style: Option<Flake8PytestStyleOptions>,
+    flake8_unused_arguments: Option<Flake8UnusedArgumentsOptions>,
+    isort: Option<IsortOptions>,
+    mccabe: Option<McCabeOptions>,
+    pep8_naming: Option<Pep8NamingOptions>,
+    pycodestyle: Option<PycodestyleOptions>,
+    pydocstyle: Option<PydocstyleOptions>,
+    pyflakes: Option<PyflakesOptions>,
+    pylint: Option<PylintOptions>,
+    pyupgrade: Option<PyUpgradeOptions>,
+    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+
+    exclude: Option<Vec<String>>,
+    ruff: Option<RuffOptions>,
+    preview: Option<bool>,
+}
+
+impl From<LintOptionsWire> for LintOptions {
+    fn from(value: LintOptionsWire) -> LintOptions {
+        let LintOptionsWire {
+            allowed_confusables,
+            dummy_variable_rgx,
+            extend_ignore,
+            extend_select,
+            extend_fixable,
+            extend_unfixable,
+            external,
+            fixable,
+            ignore,
+            extend_safe_fixes,
+            extend_unsafe_fixes,
+            ignore_init_module_imports,
+            logger_objects,
+            select,
+            explicit_preview_rules,
+            task_tags,
+            typing_modules,
+            unfixable,
+            flake8_annotations,
+            flake8_bandit,
+            flake8_boolean_trap,
+            flake8_bugbear,
+            flake8_builtins,
+            flake8_comprehensions,
+            flake8_copyright,
+            flake8_errmsg,
+            flake8_quotes,
+            flake8_self,
+            flake8_tidy_imports,
+            flake8_type_checking,
+            flake8_gettext,
+            flake8_implicit_str_concat,
+            flake8_import_conventions,
+            flake8_pytest_style,
+            flake8_unused_arguments,
+            isort,
+            mccabe,
+            pep8_naming,
+            pycodestyle,
+            pydocstyle,
+            pyflakes,
+            pylint,
+            pyupgrade,
+            per_file_ignores,
+            extend_per_file_ignores,
+            exclude,
+            ruff,
+            preview,
+        } = value;
+
+        LintOptions {
+            #[allow(deprecated)]
+            common: LintCommonOptions {
+                allowed_confusables,
+                dummy_variable_rgx,
+                extend_ignore,
+                extend_select,
+                extend_fixable,
+                extend_unfixable,
+                external,
+                fixable,
+                ignore,
+                extend_safe_fixes,
+                extend_unsafe_fixes,
+                ignore_init_module_imports,
+                logger_objects,
+                select,
+                explicit_preview_rules,
+                task_tags,
+                typing_modules,
+                unfixable,
+                flake8_annotations,
+                flake8_bandit,
+                flake8_boolean_trap,
+                flake8_bugbear,
+                flake8_builtins,
+                flake8_comprehensions,
+                flake8_copyright,
+                flake8_errmsg,
+                flake8_quotes,
+                flake8_self,
+                flake8_tidy_imports,
+                flake8_type_checking,
+                flake8_gettext,
+                flake8_implicit_str_concat,
+                flake8_import_conventions,
+                flake8_pytest_style,
+                flake8_unused_arguments,
+                isort,
+                mccabe,
+                pep8_naming,
+                pycodestyle,
+                pydocstyle,
+                pyflakes,
+                pylint,
+                pyupgrade,
+                per_file_ignores,
+                extend_per_file_ignores,
+            },
+            exclude,
+            ruff,
+            preview,
+        }
+    }
 }
 
 #[cfg(test)]

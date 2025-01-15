@@ -11,10 +11,10 @@ use crate::server::Server;
 mod message;
 
 mod edit;
+mod logging;
 mod server;
 mod session;
 mod system;
-mod trace;
 
 pub(crate) const SERVER_NAME: &str = "red-knot";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Red Knot";

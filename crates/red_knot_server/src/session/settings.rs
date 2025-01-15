@@ -24,7 +24,7 @@ pub struct ClientSettings {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TracingSettings {
-    pub(crate) log_level: Option<crate::trace::LogLevel>,
+    pub(crate) log_level: Option<crate::logging::LogLevel>,
     /// Path to the log file - tildes and environment variables are supported.
     pub(crate) log_file: Option<PathBuf>,
 }

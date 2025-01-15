@@ -309,21 +309,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     body,
                 );
             }
-            // In preview mode, calls are analyzed. To avoid duplicate diagnostics,
-            // skip analyzing the decorators.
-            if !checker.settings.preview.is_enabled()
-                && checker.any_enabled(&[
-                    Rule::PytestParametrizeNamesWrongType,
-                    Rule::PytestParametrizeValuesWrongType,
-                    Rule::PytestDuplicateParametrizeTestCases,
-                ])
-            {
-                for decorator in decorator_list {
-                    if let Some(call) = decorator.expression.as_call_expr() {
-                        flake8_pytest_style::rules::parametrize(checker, call);
-                    }
-                }
-            }
+
             if checker.any_enabled(&[
                 Rule::PytestIncorrectMarkParenthesesStyle,
                 Rule::PytestUseFixturesWithoutParameters,
@@ -366,6 +352,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::AsyncFunctionWithTimeout) {
                 flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
+            #[cfg(any(feature = "test-rules", test))]
             if checker.enabled(Rule::UnreachableCode) {
                 checker
                     .diagnostics
@@ -385,6 +372,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PostInitDefault) {
                 ruff::rules::post_init_default(checker, function_def);
+            }
+            if checker.enabled(Rule::PytestParameterWithDefaultArgument) {
+                flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -430,6 +420,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::EqWithoutHash) {
                 pylint::rules::object_without_hash_method(checker, class_def);
+            }
+            if checker.enabled(Rule::ClassAsDataStructure) {
+                flake8_bugbear::rules::class_as_data_structure(checker, class_def);
             }
             if checker.enabled(Rule::TooManyPublicMethods) {
                 pylint::rules::too_many_public_methods(
@@ -554,6 +547,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SubclassBuiltin) {
                 refurb::rules::subclass_builtin(checker, class_def);
+            }
+            if checker.enabled(Rule::DataclassEnum) {
+                ruff::rules::dataclass_enum(checker, class_def);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
@@ -1206,40 +1202,38 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder]) {
-                if checker.source_type.is_stub() || checker.settings.preview.is_enabled() {
-                    fn bad_version_info_comparison(
-                        checker: &mut Checker,
-                        test: &Expr,
-                        has_else_clause: bool,
-                    ) {
-                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
-                            for value in values {
-                                flake8_pyi::rules::bad_version_info_comparison(
-                                    checker,
-                                    value,
-                                    has_else_clause,
-                                );
-                            }
-                        } else {
+                fn bad_version_info_comparison(
+                    checker: &mut Checker,
+                    test: &Expr,
+                    has_else_clause: bool,
+                ) {
+                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
+                        for value in values {
                             flake8_pyi::rules::bad_version_info_comparison(
                                 checker,
-                                test,
+                                value,
                                 has_else_clause,
                             );
                         }
+                    } else {
+                        flake8_pyi::rules::bad_version_info_comparison(
+                            checker,
+                            test,
+                            has_else_clause,
+                        );
                     }
+                }
 
-                    let has_else_clause =
-                        elif_else_clauses.iter().any(|clause| clause.test.is_none());
+                let has_else_clause = elif_else_clauses.iter().any(|clause| clause.test.is_none());
 
-                    bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
-                    for clause in elif_else_clauses {
-                        if let Some(test) = clause.test.as_ref() {
-                            bad_version_info_comparison(checker, test, has_else_clause);
-                        }
+                bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
+                for clause in elif_else_clauses {
+                    if let Some(test) = clause.test.as_ref() {
+                        bad_version_info_comparison(checker, test, has_else_clause);
                     }
                 }
             }
+
             if checker.enabled(Rule::IfKeyInDictDel) {
                 ruff::rules::if_key_in_dict_del(checker, if_);
             }
@@ -1304,6 +1298,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PytestRaisesWithMultipleStatements) {
                 flake8_pytest_style::rules::complex_raises(checker, stmt, items, body);
+            }
+            if checker.enabled(Rule::PytestWarnsWithMultipleStatements) {
+                flake8_pytest_style::rules::complex_warns(checker, stmt, items, body);
             }
             if checker.enabled(Rule::MultipleWithStatements) {
                 flake8_simplify::rules::multiple_with_statements(

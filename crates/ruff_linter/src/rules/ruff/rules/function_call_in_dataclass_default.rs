@@ -77,18 +77,14 @@ pub(crate) fn function_call_in_dataclass_default(
 ) {
     let semantic = checker.semantic();
 
-    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
-
-    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
-        return;
-    }
 
     let attrs_auto_attribs = match dataclass_kind {
         DataclassKind::Stdlib => None,
 
-        DataclassKind::Attrs(attrs_auto_attribs) => match attrs_auto_attribs {
+        DataclassKind::Attrs(auto_attribs) => match auto_attribs {
             AttrsAutoAttribs::Unknown => return,
 
             AttrsAutoAttribs::None => {
@@ -99,12 +95,13 @@ pub(crate) fn function_call_in_dataclass_default(
                 }
             }
 
-            _ => Some(attrs_auto_attribs),
+            _ => Some(auto_attribs),
         },
     };
+
     let dataclass_kind = match attrs_auto_attribs {
         None => DataclassKind::Stdlib,
-        Some(attrs_auto_attribs) => DataclassKind::Attrs(attrs_auto_attribs),
+        Some(auto_attribs) => DataclassKind::Attrs(auto_attribs),
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker

@@ -136,17 +136,15 @@ impl NotebookDocument {
                 // provide the actual contents of the cells, so we'll initialize them with empty
                 // contents.
                 for cell in structure.array.cells.into_iter().flatten().rev() {
-                    if let Some(text_document) = deleted_cells.remove(&cell.document) {
-                        let version = text_document.version();
-                        self.cells.push(NotebookCell::new(
-                            cell,
-                            text_document.into_contents(),
-                            version,
-                        ));
-                    } else {
-                        self.cells
-                            .insert(start, NotebookCell::new(cell, String::new(), 0));
-                    }
+                    let (content, version) =
+                        if let Some(text_document) = deleted_cells.remove(&cell.document) {
+                            let version = text_document.version();
+                            (text_document.into_contents(), version)
+                        } else {
+                            (String::new(), 0)
+                        };
+                    self.cells
+                        .insert(start, NotebookCell::new(cell, content, version));
                 }
 
                 // Third, register the new cells in the index and update existing ones that came
@@ -241,5 +239,117 @@ impl NotebookCell {
             kind: cell.kind,
             document: TextDocument::new(contents, version),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NotebookDocument;
+
+    enum TestCellContent {
+        #[allow(dead_code)]
+        Markup(String),
+        Code(String),
+    }
+
+    fn create_test_url(index: usize) -> lsp_types::Url {
+        lsp_types::Url::parse(&format!("cell:/test.ipynb#{index}")).unwrap()
+    }
+
+    fn create_test_notebook(test_cells: Vec<TestCellContent>) -> NotebookDocument {
+        let mut cells = Vec::with_capacity(test_cells.len());
+        let mut cell_documents = Vec::with_capacity(test_cells.len());
+
+        for (index, test_cell) in test_cells.into_iter().enumerate() {
+            let url = create_test_url(index);
+            match test_cell {
+                TestCellContent::Markup(content) => {
+                    cells.push(lsp_types::NotebookCell {
+                        kind: lsp_types::NotebookCellKind::Markup,
+                        document: url.clone(),
+                        metadata: None,
+                        execution_summary: None,
+                    });
+                    cell_documents.push(lsp_types::TextDocumentItem {
+                        uri: url,
+                        language_id: "markdown".to_owned(),
+                        version: 0,
+                        text: content,
+                    });
+                }
+                TestCellContent::Code(content) => {
+                    cells.push(lsp_types::NotebookCell {
+                        kind: lsp_types::NotebookCellKind::Code,
+                        document: url.clone(),
+                        metadata: None,
+                        execution_summary: None,
+                    });
+                    cell_documents.push(lsp_types::TextDocumentItem {
+                        uri: url,
+                        language_id: "python".to_owned(),
+                        version: 0,
+                        text: content,
+                    });
+                }
+            }
+        }
+
+        NotebookDocument::new(0, cells, serde_json::Map::default(), cell_documents).unwrap()
+    }
+
+    /// This test case checks that for a notebook with three code cells, when the client sends a
+    /// change request to swap the first two cells, the notebook document is updated correctly.
+    ///
+    /// The swap operation as a change request is represented as deleting the first two cells and
+    /// adding them back in the reverse order.
+    #[test]
+    fn swap_cells() {
+        let mut notebook = create_test_notebook(vec![
+            TestCellContent::Code("cell = 0".to_owned()),
+            TestCellContent::Code("cell = 1".to_owned()),
+            TestCellContent::Code("cell = 2".to_owned()),
+        ]);
+
+        notebook
+            .update(
+                Some(lsp_types::NotebookDocumentCellChange {
+                    structure: Some(lsp_types::NotebookDocumentCellChangeStructure {
+                        array: lsp_types::NotebookCellArrayChange {
+                            start: 0,
+                            delete_count: 2,
+                            cells: Some(vec![
+                                lsp_types::NotebookCell {
+                                    kind: lsp_types::NotebookCellKind::Code,
+                                    document: create_test_url(1),
+                                    metadata: None,
+                                    execution_summary: None,
+                                },
+                                lsp_types::NotebookCell {
+                                    kind: lsp_types::NotebookCellKind::Code,
+                                    document: create_test_url(0),
+                                    metadata: None,
+                                    execution_summary: None,
+                                },
+                            ]),
+                        },
+                        did_open: None,
+                        did_close: None,
+                    }),
+                    data: None,
+                    text_content: None,
+                }),
+                None,
+                1,
+                crate::PositionEncoding::default(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            notebook.make_ruff_notebook().source_code(),
+            "cell = 1
+cell = 0
+cell = 2
+"
+        );
     }
 }

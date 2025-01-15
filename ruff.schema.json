@@ -1243,6 +1243,26 @@
           "items": {
             "type": "string"
           }
+        },
+        "warns-extend-require-match-for": {
+          "description": "List of additional warning names that require a match= parameter in a `pytest.warns()` call. This extends the default list of warnings that require a match= parameter.\n\nThis option is useful if you want to extend the default list of warnings that require a match= parameter without having to specify the entire list.\n\nNote that this option does not remove any warnings from the default list.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "warns-require-match-for": {
+          "description": "List of warning names that require a match= parameter in a `pytest.warns()` call.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -2950,6 +2970,7 @@
         "B9",
         "B90",
         "B901",
+        "B903",
         "B904",
         "B905",
         "B909",
@@ -3738,6 +3759,11 @@
         "PT025",
         "PT026",
         "PT027",
+        "PT028",
+        "PT029",
+        "PT03",
+        "PT030",
+        "PT031",
         "PTH",
         "PTH1",
         "PTH10",
@@ -3893,7 +3919,6 @@
         "RUF022",
         "RUF023",
         "RUF024",
-        "RUF025",
         "RUF026",
         "RUF027",
         "RUF028",
@@ -3906,6 +3931,7 @@
         "RUF034",
         "RUF035",
         "RUF036",
+        "RUF037",
         "RUF038",
         "RUF039",
         "RUF04",
@@ -3914,6 +3940,7 @@
         "RUF043",
         "RUF046",
         "RUF048",
+        "RUF049",
         "RUF05",
         "RUF051",
         "RUF052",
@@ -4176,6 +4203,7 @@
         "UP042",
         "UP043",
         "UP044",
+        "UP045",
         "W",
         "W1",
         "W19",

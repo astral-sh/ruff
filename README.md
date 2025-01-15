@@ -116,12 +116,21 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 ### Installation
 
-Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
+
+Invoke Ruff directly with [`uvx`](https://docs.astral.sh/uv/):
+
+```shell
+uvx ruff check   # Lint all files in the current directory.
+uvx ruff format  # Format all files in the current directory.
+```
+
+Or install Ruff with `uv` (recommended), `pip`, or `pipx`:
 
 ```shell
 # With uv.
-uv add --dev ruff     # to add ruff to your project
-uv tool install ruff  # to install ruff globally
+uv tool install ruff@latest  # Install Ruff globally.
+uv add --dev ruff            # Or add Ruff to your project.
 
 # With pip.
 pip install ruff
@@ -140,8 +149,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.8.5/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.8.5/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.9.1/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.9.1/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -174,7 +183,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.8.5
+  rev: v0.9.1
   hooks:
     # Run the linter.
     - id: ruff

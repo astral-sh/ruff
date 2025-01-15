@@ -145,3 +145,12 @@ def bokeh2(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
             port += 1
 
     self.thread = threading.Thread(target=self._run_web_server)
+
+def func():
+    while T:
+        try:
+            while():
+                if 3:
+                    break
+        finally:
+            return

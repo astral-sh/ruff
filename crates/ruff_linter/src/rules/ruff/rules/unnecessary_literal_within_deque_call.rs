@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for UnnecessaryEmptyIterableWithinDequeCall {
     }
 }
 
-/// RUF025
+/// RUF037
 pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque: &ast::ExprCall) {
     let ast::ExprCall {
         func, arguments, ..

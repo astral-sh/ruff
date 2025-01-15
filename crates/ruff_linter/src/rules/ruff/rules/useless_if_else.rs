@@ -9,20 +9,15 @@ use ruff_python_ast::comparable::ComparableExpr;
 ///
 /// ## Why is this bad?
 /// Useless `if`-`else` conditions add unnecessary complexity to the code without
-/// providing any logical benefit.
-///
-/// Assigning the value directly is clearer and more explicit, and
-/// should be preferred.
+/// providing any logical benefit. Assigning the value directly is clearer.
 ///
 /// ## Example
 /// ```python
-/// # Bad
 /// foo = x if y else x
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// # Good
 /// foo = x
 /// ```
 #[derive(ViolationMetadata)]

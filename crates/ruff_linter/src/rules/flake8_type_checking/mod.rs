@@ -68,6 +68,7 @@ mod tests {
     // so we want to make sure their fixes are not going around in circles.
     #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_typing_execution_context.py"))]
     fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -76,6 +77,24 @@ mod tests {
                 Rule::UnquotedTypeAlias,
                 Rule::QuotedTypeAlias,
             ]),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.py"))]
+    fn type_alias_rules_pre_py310(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "pre_py310_{}_{}",
+            rule_code.as_ref(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                target_version: settings::types::PythonVersion::Py39,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
