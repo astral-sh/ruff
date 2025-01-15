@@ -4,9 +4,9 @@ use std::slice;
 use ruff_formatter::{
     write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
-use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
+use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -1241,5 +1241,73 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
                 context.source(),
             ) || is_splittable_expression(expression.as_ref(), context)
         }
+    }
+}
+
+/// Returns the sub-expression to which the left-most character in expression belongs.
+///
+/// For example, in the expression `a + b * c`, the left-most subexpression is `a`. But for
+/// the expression `{ "a": 1 }`, the left-most subexpression is the dictionary, and not `"a"` because
+/// the `{` belongs to the dictionary.
+///
+/// Parenthesized expressions are treated as belonging to the enclosing expression. Therefore, the left
+/// most expression for `(a + b) * c` is `a + b` and not `a`.
+pub(crate) fn left_most<'expr>(
+    expression: &'expr Expr,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> &'expr Expr {
+    let mut current = expression;
+    loop {
+        let left = match current {
+            Expr::BinOp(ast::ExprBinOp { left, .. })
+            | Expr::If(ast::ExprIf { body: left, .. })
+            | Expr::Call(ast::ExprCall { func: left, .. })
+            | Expr::Attribute(ast::ExprAttribute { value: left, .. })
+            | Expr::Subscript(ast::ExprSubscript { value: left, .. }) => Some(&**left),
+
+            Expr::BoolOp(expr_bool_op) => expr_bool_op.values.first(),
+            Expr::Compare(compare) => Some(&*compare.left),
+
+            Expr::Generator(generator) if !generator.parenthesized => Some(&*generator.elt),
+
+            Expr::Tuple(tuple) if !tuple.parenthesized => tuple.elts.first(),
+            Expr::Slice(slice) => slice.lower.as_deref(),
+
+            Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Name(_)
+            | Expr::Starred(_)
+            | Expr::FString(_)
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::Await(_)
+            | Expr::DictComp(_)
+            | Expr::SetComp(_)
+            | Expr::ListComp(_)
+            | Expr::Set(_)
+            | Expr::Dict(_)
+            | Expr::UnaryOp(_)
+            | Expr::Lambda(_)
+            | Expr::Named(_)
+            | Expr::IpyEscapeCommand(_)
+            | Expr::Generator(_) => None,
+        };
+
+        let Some(left) = left else {
+            break current;
+        };
+
+        if is_expression_parenthesized(left.into(), comment_ranges, source) {
+            break current;
+        }
+
+        current = left;
     }
 }

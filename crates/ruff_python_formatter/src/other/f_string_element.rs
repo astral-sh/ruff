@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextSlice};
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
 use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
+use crate::expression::left_most;
 use crate::prelude::*;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
@@ -190,20 +191,20 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             let comments = f.context().comments().clone();
             let dangling_item_comments = comments.dangling(self.element);
 
-            let item = format_with(|f| {
-                let bracket_spacing = match expression.as_ref() {
-                    // If an expression starts with a `{`, we need to add a space before the
-                    // curly brace to avoid turning it into a literal curly with `{{`.
-                    //
-                    // For example,
-                    // ```python
-                    // f"{ {'x': 1, 'y': 2} }"
-                    // #  ^                ^
-                    // ```
-                    //
-                    // We need to preserve the space highlighted by `^`. The whitespace
-                    // before the closing curly brace is not strictly necessary, but it's
-                    // added to maintain consistency.
+            // If an expression starts with a `{`, we need to add a space before the
+            // curly brace to avoid turning it into a literal curly with `{{`.
+            //
+            // For example,
+            // ```python
+            // f"{ {'x': 1, 'y': 2} }"
+            // #  ^                ^
+            // ```
+            //
+            // We need to preserve the space highlighted by `^`. The whitespace
+            // before the closing curly brace is not strictly necessary, but it's
+            // added to maintain consistency.
+            let bracket_spacing =
+                match left_most(expression, comments.ranges(), f.context().source()) {
                     Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_) => {
                         Some(format_with(|f| {
                             if self.context.can_contain_line_breaks() {
@@ -216,6 +217,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     _ => None,
                 };
 
+            let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
                 let f = &mut WithFStringState::new(
                     FStringState::InsideExpressionElement(self.context),
