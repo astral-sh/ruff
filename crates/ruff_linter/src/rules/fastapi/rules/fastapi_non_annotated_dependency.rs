@@ -252,13 +252,13 @@ fn create_diagnostic(
         // others need to be converted from `q: str = Query("")` to `q:
         // Annotated[str, Query()] = ""` for example, but Depends and
         // Security need to stay like `Annotated[str, Depends(callable)]`
-        let is_dep = !matches!(
+        let is_route_param = !matches!(
             parameter.kind,
             FastApiDependency::Depends | FastApiDependency::Security
         );
 
         let content = match dependency_call {
-            Some(dependency_call) if is_dep => {
+            Some(dependency_call) if is_route_param => {
                 let kwarg_list = dependency_call
                     .keyword_arguments
                     .iter()
