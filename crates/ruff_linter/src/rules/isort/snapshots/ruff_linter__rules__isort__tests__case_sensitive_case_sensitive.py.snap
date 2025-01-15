@@ -12,7 +12,7 @@ case_sensitive.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 7 | | import f
 8 | | from g import a, B, c
 9 | | from h import A, b, C
-  | |______________________^ I001
+  | |_____________________^ I001
   |
   = help: Organize imports
 

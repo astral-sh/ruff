@@ -12,7 +12,7 @@ no_standard_library.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 7 | |
 8 | | from . import local
 9 | | import sys
-  | |___________^ I001
+  | |__________^ I001
   |
   = help: Organize imports
 

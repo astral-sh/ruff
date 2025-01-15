@@ -14,7 +14,7 @@ preserve_comment_order.py:1:1: I001 [*] Import block is un-sorted or un-formatte
  9 | | # EIEIO
 10 | | from errno import EIO
 11 | | import abc
-   | |___________^ I001
+   | |__________^ I001
    |
    = help: Organize imports
 
