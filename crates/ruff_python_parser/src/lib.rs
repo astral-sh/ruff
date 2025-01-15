@@ -194,9 +194,6 @@ pub fn parse_parenthesized_expression_range(
 
 /// Parses a Python expression from a string annotation.
 ///
-/// This function parses the content of a string literal as a Python expression, handling both
-/// single-quoted and triple-quoted strings appropriately.
-///
 /// # Example
 ///
 /// Parsing a string annotation:
