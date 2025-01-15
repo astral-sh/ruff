@@ -1,0 +1,142 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF058.py:6:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+  |
+4 | # Errors
+5 | 
+6 | starmap(func, zip())
+  | ^^^^^^^^^^^^^^^^^^^^ RUF058
+7 | starmap(func, zip([]))
+8 | starmap(func, zip(*args))
+  |
+  = help: Use `map` instead
+
+ℹ Safe fix
+3 3 | 
+4 4 | # Errors
+5 5 | 
+6   |-starmap(func, zip())
+  6 |+map(func, [])
+7 7 | starmap(func, zip([]))
+8 8 | starmap(func, zip(*args))
+9 9 | 
+
+RUF058.py:7:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+  |
+6 | starmap(func, zip())
+7 | starmap(func, zip([]))
+  | ^^^^^^^^^^^^^^^^^^^^^^ RUF058
+8 | starmap(func, zip(*args))
+  |
+  = help: Use `map` instead
+
+ℹ Safe fix
+4 4 | # Errors
+5 5 | 
+6 6 | starmap(func, zip())
+7   |-starmap(func, zip([]))
+  7 |+map(func, [])
+8 8 | starmap(func, zip(*args))
+9 9 | 
+10 10 | starmap(func, zip(a, b, c,),)
+
+RUF058.py:8:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+   |
+ 6 | starmap(func, zip())
+ 7 | starmap(func, zip([]))
+ 8 | starmap(func, zip(*args))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058
+ 9 | 
+10 | starmap(func, zip(a, b, c,),)
+   |
+   = help: Use `map` instead
+
+ℹ Safe fix
+5 5 | 
+6 6 | starmap(func, zip())
+7 7 | starmap(func, zip([]))
+8   |-starmap(func, zip(*args))
+  8 |+map(func, *args)
+9 9 | 
+10 10 | starmap(func, zip(a, b, c,),)
+11 11 | 
+
+RUF058.py:10:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+   |
+ 8 | starmap(func, zip(*args))
+ 9 | 
+10 | starmap(func, zip(a, b, c,),)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058
+11 | 
+12 | (  # Foobar
+   |
+   = help: Use `map` instead
+
+ℹ Safe fix
+7  7  | starmap(func, zip([]))
+8  8  | starmap(func, zip(*args))
+9  9  | 
+10    |-starmap(func, zip(a, b, c,),)
+   10 |+map(func, a, b, c,)
+11 11 | 
+12 12 | (  # Foobar
+13 13 |   (  starmap  )
+
+RUF058.py:12:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+   |
+10 |   starmap(func, zip(a, b, c,),)
+11 |   
+12 | / (  # Foobar
+13 | |   (  starmap  )
+14 | |     # Bazqux
+15 | | ) \
+16 | | (func,
+17 | |  ( (
+18 | |      (  # Zip
+19 | |     (
+20 | |         (  zip
+21 | |            # Zip
+22 | |            )
+23 | |     )
+24 | |   )
+25 | |      (a,  # A
+26 | |          b,  # B
+27 | |          c,  # C
+28 | |    )      )
+29 | |    ),
+30 | | )
+   | |_^ RUF058
+   |
+   = help: Use `map` instead
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | starmap(func, zip(a, b, c,),)
+11 11 | 
+12    |-(  # Foobar
+13    |-  (  starmap  )
+14    |-    # Bazqux
+15    |-) \
+16    |-(func,
+17    |- ( (
+18    |-     (  # Zip
+19    |-    (
+20    |-        (  zip
+21    |-           # Zip
+22    |-           )
+23    |-    )
+24    |-  )
+25    |-     (a,  # A
+   12 |+map(func,
+   13 |+  
+   14 |+     a,  # A
+26 15 |          b,  # B
+27 16 |          c,  # C
+28    |-   )      )
+29    |-   ),
+   17 |+         
+   18 |+   
+30 19 | )
+31 20 | 
+32 21 |
