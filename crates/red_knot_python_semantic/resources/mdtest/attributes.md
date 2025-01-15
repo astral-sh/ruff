@@ -163,7 +163,7 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-# TODO: this should be `Literal[1]`
+# TODO: this should be `Literal[1]`, `int`, or maybe `Unknown | Literal[1]` / `Unknown | int`
 reveal_type(C.pure_class_variable2)  # revealed: @Todo(Unsupported or invalid type in a type expression)
 
 c_instance = C()
