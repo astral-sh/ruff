@@ -174,7 +174,8 @@ class C:
 # for a more realistic example, let's actually call the method
 C.class_method()
 
-# TODO: mypy shows an error here, pyright does not. What should we do?
+# TODO: We currently plan to support this and show no error here.
+# mypy shows an error here, pyright does not.
 # error: [unresolved-attribute]
 reveal_type(C.pure_class_variable)  # revealed: Unknown
 
