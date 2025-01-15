@@ -120,11 +120,15 @@ pub(crate) fn fastapi_non_annotated_dependency(
                 annotation,
                 default,
                 kind: dependency,
-                name: &*parameter.parameter.name,
+                name: &parameter.parameter.name,
                 range: parameter.range,
             };
-            seen_default =
-                create_diagnostic(checker, dependency_parameter, dependency_call, seen_default);
+            seen_default = create_diagnostic(
+                checker,
+                &dependency_parameter,
+                dependency_call,
+                seen_default,
+            );
         } else {
             seen_default |= parameter.default.is_some();
         }
@@ -186,7 +190,7 @@ impl<'a> DependencyCall<'a> {
             .arguments
             .keywords
             .iter()
-            .filter(|kwarg| kwarg.arg.as_ref().map_or(false, |name| name != "default"))
+            .filter(|kwarg| kwarg.arg.as_ref().is_some_and(|name| name != "default"))
             .collect();
 
         Some(Self {
@@ -217,7 +221,7 @@ impl<'a> DependencyCall<'a> {
 /// `seen_default` here.
 fn create_diagnostic(
     checker: &mut Checker,
-    parameter: DependencyParameter,
+    parameter: &DependencyParameter,
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
 ) -> bool {
@@ -228,7 +232,7 @@ fn create_diagnostic(
         parameter.range,
     );
 
-    let mut try_generate_fix = || {
+    let try_generate_fix = || {
         let module = if checker.settings.target_version >= PythonVersion::Py39 {
             "typing"
         } else {
