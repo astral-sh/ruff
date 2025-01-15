@@ -156,30 +156,34 @@ cannot be overwritten on instances.
 from typing import ClassVar
 
 class C:
-    pure_class_variable: ClassVar[str] = "value in class body"
+    pure_class_variable1: ClassVar[str] = "value in class body"
+    pure_class_variable2: ClassVar = 1
 
-reveal_type(C.pure_class_variable)  # revealed: str
+reveal_type(C.pure_class_variable1)  # revealed: str
+
+# TODO: this should be `Literal[1]`
+reveal_type(C.pure_class_variable2)  # revealed: @Todo(Unsupported or invalid type in a type expression)
 
 c_instance = C()
 
 # TODO: This should be `str`. It is okay to access a pure class variable on an instance.
-reveal_type(c_instance.pure_class_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_class_variable1)  # revealed: @Todo(instance attributes)
 
 # TODO: should raise an error. It is not allowed to reassign a pure class variable on an instance.
-c_instance.pure_class_variable = "value set on instance"
+c_instance.pure_class_variable1 = "value set on instance"
 
-C.pure_class_variable = "overwritten on class"
+C.pure_class_variable1 = "overwritten on class"
 
 # TODO: should ideally be `Literal["overwritten on class"]`, but not a priority
-reveal_type(C.pure_class_variable)  # revealed: str
+reveal_type(C.pure_class_variable1)  # revealed: str
 
 # TODO: should raise an error (incompatible types in assignment)
-C.pure_class_variable = 1
+C.pure_class_variable1 = 1
 
 class Subclass(C):
-    pure_class_variable: ClassVar[str] = "overwritten on subclass"
+    pure_class_variable1: ClassVar[str] = "overwritten on subclass"
 
-reveal_type(Subclass.pure_class_variable)  # revealed: str
+reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
 #### Variable only mentioned in a class method
