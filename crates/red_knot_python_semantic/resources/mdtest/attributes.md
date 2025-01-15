@@ -69,12 +69,11 @@ C.pure_instance_variable1 = "overwritten on class"
 
 c_instance.pure_instance_variable4 = False
 
-# TODO: After this assignment to the attribute within this scope, we may eventually want to
-# narrow the `bool` type (see above) for this instance variable to `Literal[False]` here.
-# This is unsound in general (we don't know what else happened to `c_instance` between the
-# assignment and the use here), but pyright supports this, presumably to provide features
-# like type-narrowing in the local scope. In conclusion, this should be `Literal[False]` or
-# `bool`.
+# TODO: After this assignment to the attribute within this scope, we may eventually want to narrow
+# the `bool` type (see above) for this instance variable to `Literal[False]` here. This is unsound
+# in general (we don't know what else happened to `c_instance` between the assignment and the use
+# here), but mypy and pyright support this. In conclusion, this could be `bool` but should probably
+# be `Literal[False]`.
 reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
 ```
 
@@ -119,7 +118,7 @@ class C:
 
 c_instance = C()
 
-# Not that we would use this in static analysis, but for a more realistic example,, let's actually
+# Not that we would use this in static analysis, but for a more realistic example, let's actually
 # call the method, so that the attribute is bound if this example is actually run.
 c_instance.set_instance_variable()
 
