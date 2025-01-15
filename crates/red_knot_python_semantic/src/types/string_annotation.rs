@@ -1,7 +1,7 @@
 use ruff_db::source::source_text;
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, ModExpression};
-use ruff_python_parser::{parse_string_annotation, Parsed};
+use ruff_python_parser::Parsed;
 use ruff_text_size::Ranged;
 
 use crate::declare_lint;
@@ -153,7 +153,8 @@ pub(crate) fn parse_string_annotation(
         } else if raw_contents(node_text)
             .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
         {
-            let parsed = parse_string_annotation(source.as_str(), string_literal);
+            let parsed =
+                ruff_python_parser::parse_string_annotation(source.as_str(), string_literal);
             match parsed {
                 Ok(parsed) => return Some(parsed),
                 Err(parse_error) => context.report_lint(

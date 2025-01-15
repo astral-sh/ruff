@@ -1317,11 +1317,7 @@ impl<'src> Lexer<'src> {
         // First of all, we need all nestings to be finished.
         // For Mode::ParenthesizedExpression we start with nesting level 1.
         // So we check if we end with that level.
-        let init_nesting = if self.mode == Mode::ParenthesizedExpression {
-            1
-        } else {
-            0
-        };
+        let init_nesting = u32::from(self.mode == Mode::ParenthesizedExpression);
 
         if self.nesting > init_nesting {
             // Reset the nesting to avoid going into infinite loop.
