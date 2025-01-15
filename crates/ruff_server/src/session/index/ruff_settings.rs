@@ -186,10 +186,9 @@ impl RuffSettingsIndex {
         // means for different editors.
         if is_default_workspace {
             if has_error {
-                let root = root.display();
                 show_err_msg!(
-                    "Error while resolving settings from workspace {root}. \
-                    Please refer to the logs for more details.",
+                    "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
+                    root.display()
                 );
             }
 
@@ -300,9 +299,9 @@ impl RuffSettingsIndex {
         });
 
         if has_error.load(Ordering::Relaxed) {
-            let root = root.display();
             show_err_msg!(
-                "Error while resolving settings from workspace {root}. Please refer to the logs for more details.",
+                "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
+                root.display()
             );
         }
 
