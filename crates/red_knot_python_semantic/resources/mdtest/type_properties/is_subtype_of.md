@@ -2,7 +2,7 @@
 
 The `is_subtype_of(S, T)` relation below checks if type `S` is a subtype of type `T`.
 
-A fully static type `T` is a subtype of another fully static type `S` iff the set of values
+A fully static type `S` is a subtype of another fully static type `T` iff the set of values
 represented by `S` is a subset of the set of values represented by `T`.
 
 See the [typing documentation] for more information.
