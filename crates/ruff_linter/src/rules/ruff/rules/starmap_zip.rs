@@ -3,14 +3,15 @@ use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_python_parser::TokenKind;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::{smallvec, SmallVec};
 
 /// ## What it does
 /// Checks for `itertools.starmap` calls where the second argument is a `zip` call.
 ///
 /// ## Why is this bad?
-/// `starmap` should only be used for pre-zipped iterables.
+/// `zip`-ping iterables only to unpack them later from within `starmap` is unnecessary.
+/// For such cases, `map()` should be used instead.
 ///
 /// ## Example
 ///
@@ -46,14 +47,6 @@ impl AlwaysFixableViolation for StarmapZip {
 pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
-
-    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
-        return;
-    }
-
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -62,12 +55,20 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if !semantic.match_builtin_expr(&iterable_call.func, "zip") {
+    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
         return;
-    }
+    };
 
     if !iterable_call.arguments.keywords.is_empty() {
         // TODO: Pass `strict=` to `map` too when 3.14 is supported.
+        return;
+    }
+
+    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
+        return;
+    }
+
+    if !semantic.match_builtin_expr(&iterable_call.func, "zip") {
         return;
     }
 
@@ -78,15 +79,11 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
 }
 
 fn replace_with_map(starmap: &ExprCall, map_func: &Expr, zip: &ExprCall, checker: &Checker) -> Fix {
-    let starmap_func_range = TextRange::new(starmap.start(), starmap.arguments.start());
-    let change_func_to_map = Edit::range_replacement("map".to_string(), starmap_func_range);
+    let change_func_to_map = Edit::range_replacement("map".to_string(), starmap.func.range());
 
     let mut remove_zip: SmallVec<[Edit; 4]> = smallvec![];
 
-    let zip_start_range = TextRange::new(
-        zip.start(),
-        zip.arguments.start() + TextSize::try_from("(".len()).unwrap(),
-    );
+    let zip_start_range = TextRange::new(zip.start(), zip.arguments.start() + "(".text_len());
     remove_zip.push(Edit::range_deletion(zip_start_range));
 
     if zip.arguments.is_empty() {
@@ -100,6 +97,46 @@ fn replace_with_map(starmap: &ExprCall, map_func: &Expr, zip: &ExprCall, checker
         .find(|token| matches!(token.kind(), TokenKind::Comma))
         .unwrap()
         .end();
+
+    let open_parens = remove_open_parens(zip, map_func_end, &mut remove_zip, checker);
+
+    let zip_end = zip.arguments.end();
+    remove_zip.push(Edit::deletion(zip_end - ")".text_len(), zip_end));
+
+    remove_closing_parens(zip_end, open_parens, &mut remove_zip, checker);
+
+    let comment_ranges = checker.comment_ranges();
+    let applicability = if comment_ranges.intersects(starmap.func.range())
+        || comment_ranges.intersects(zip_start_range)
+    {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Fix::applicable_edits(change_func_to_map, remove_zip, applicability)
+}
+
+/// For each pair of parentheses surrounding the `zip()` call,
+/// add an [`Edit`] to remove the opening one to `remove_zip`.
+///
+/// ```python
+///   starmap(
+///      func,  # Comment
+/// #         ^^^^^^^^^^^  | Checked
+/// # vvvvvvvvvvvv         | range
+///       (   (   zip()))
+/// #     ^1  ^2
+///   )
+/// ```
+///
+/// Return the number of opening parentheses encountered.
+fn remove_open_parens(
+    zip: &ExprCall,
+    map_func_end: TextSize,
+    remove_zip: &mut SmallVec<[Edit; 4]>,
+    checker: &Checker,
+) -> usize {
     let mut open_parens = 0_usize;
 
     for token in checker
@@ -113,20 +150,29 @@ fn replace_with_map(starmap: &ExprCall, map_func: &Expr, zip: &ExprCall, checker
                 open_parens += 1;
             }
             _ => {
-                break;
+                return open_parens;
             }
         }
     }
 
-    let zip_end = zip.arguments.end();
-    let before_zip_end = zip_end - TextSize::try_from(")".len()).unwrap();
-    remove_zip.push(Edit::deletion(before_zip_end, zip_end));
+    open_parens
+}
+
+/// For each open parenthesis, find its counterpart
+/// and add an [`Edit`] to remove that to `remove_zip`.
+fn remove_closing_parens(
+    zip_end: TextSize,
+    open_parens: usize,
+    remove_zip: &mut SmallVec<[Edit; 4]>,
+    checker: &Checker,
+) {
+    let mut closing_parens = open_parens;
 
     for token in checker.tokens().after(zip_end) {
         match token.kind() {
-            TokenKind::Rpar if open_parens > 0 => {
+            TokenKind::Rpar if closing_parens > 0 => {
                 remove_zip.push(Edit::range_deletion(token.range()));
-                open_parens -= 1;
+                closing_parens -= 1;
             }
             TokenKind::Rpar => {
                 break;
@@ -138,16 +184,4 @@ fn replace_with_map(starmap: &ExprCall, map_func: &Expr, zip: &ExprCall, checker
             _ => {}
         }
     }
-
-    let comment_ranges = checker.comment_ranges();
-
-    let applicability = if comment_ranges.intersects(starmap_func_range)
-        || comment_ranges.intersects(zip_start_range)
-    {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    Fix::applicable_edits(change_func_to_map, remove_zip, applicability)
 }

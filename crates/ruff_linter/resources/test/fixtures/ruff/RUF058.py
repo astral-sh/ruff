@@ -1,4 +1,5 @@
 from itertools import starmap
+import itertools
 
 
 # Errors
@@ -8,6 +9,24 @@ starmap(func, zip([]))
 starmap(func, zip(*args))
 
 starmap(func, zip(a, b, c,),)
+
+
+starmap(
+    func,  # Foo
+    zip(
+        # Foo
+
+    )
+)
+
+(  # Foo
+    itertools
+    ) . starmap (
+
+    func,  zip (
+        a, b, c,
+    ),
+)
 
 (  # Foobar
   (  starmap  )
@@ -28,6 +47,9 @@ starmap(func, zip(a, b, c,),)
    )      )
    ),
 )
+
+
+
 
 
 # No errors
