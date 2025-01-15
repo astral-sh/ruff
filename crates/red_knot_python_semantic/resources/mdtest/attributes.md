@@ -105,14 +105,14 @@ We also recognize pure instance variables if they are defined in a method that i
 ```py
 class C:
     def set_instance_variable(self) -> None:
-        self.pure_instance_variable: str = "value set in method"
+        self.pure_instance_variable = "value set in method"
 
 c_instance = C()
 
 # for a more realistic example, let's actually call the method
 c_instance.set_instance_variable()
 
-# TODO: should be `str`
+# TODO: should be `Literal["value set in method"]` or `str`
 reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
 
 # TODO: We already show an error here, but the message might be improved?
