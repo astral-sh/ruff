@@ -27,7 +27,7 @@ use smallvec::{smallvec, SmallVec};
 ///
 /// ```python
 /// map(func, a, b)
-/// map(func, a, b, strict=True)
+/// map(func, a, b, strict=True)  # 3.14+
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct StarmapZip;
@@ -55,16 +55,15 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
-
     if !iterable_call.arguments.keywords.is_empty() {
         // TODO: Pass `strict=` to `map` too when 3.14 is supported.
         return;
     }
 
-    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
+    if semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|it| matches!(it.segments(), ["itertools", "starmap"]))
+    {
         return;
     }
 
