@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC008_union_syntax_pre_py310.py:10:20: TC008 [*] Remove quotes from type alias
+   |
+ 8 | if TYPE_CHECKING:
+ 9 |     c: TypeAlias = 'int | None'  # OK
+10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^ TC008
+11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+7  7  | 
+8  8  | if TYPE_CHECKING:
+9  9  |     c: TypeAlias = 'int | None'  # OK
+10    |-    d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
+   10 |+    d: TypeAlias = Annotated[int, 1 | 2]  # TC008
+11 11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+12 12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
+
+TC008_union_syntax_pre_py310.py:11:20: TC008 [*] Remove quotes from type alias
+   |
+ 9 |     c: TypeAlias = 'int | None'  # OK
+10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
+11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^ TC008
+12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+8  8  | if TYPE_CHECKING:
+9  9  |     c: TypeAlias = 'int | None'  # OK
+10 10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
+11    |-    e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
+   11 |+    e: TypeAlias = Annotated[int, 1 + 2]  # TC008
+12 12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
