@@ -150,7 +150,7 @@ C.pure_instance_variable = "overwritten on class"
 #### Annotated with `ClassVar` type qualifier
 
 Class variables annotated with the [`typing.ClassVar`] type qualifier are pure class variables. They
-cannot be overwritten on instances.
+cannot be overwritten on instances, but they can be accessed on instances.
 
 ```py
 from typing import ClassVar
