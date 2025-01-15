@@ -93,20 +93,76 @@ fn extract_name_from_slice(slice: &Expr) -> Option<String> {
     }
 }
 
-pub(crate) fn removed_context_variable(checker: &mut Checker, expr: &Expr) {
+/// Checks for the use of deprecated Airflow context variables.
+///
+/// The function handles context keys accessed:
+/// - Directly using `context["key"]` or context.get("key").
+/// - Using `.get()` with variables derived from `get_current_context()`.
+/// - In custom operators, task decorators, and within templates or macros.
+///
+/// ## Examples
+///
+/// The following Python code would raise lint errors:
+///
+/// ```python
+/// @task
+/// def access_invalid_key_task(**context):
+///     print("access invalid key", context.get("execution_date"))  # Deprecated
+///
+/// @task
+/// def print_config(**context):
+///     execution_date = context["execution_date"]  # Deprecated
+///     prev_ds = context["prev_ds"]  # Deprecated
+///
+/// @task
+/// def print_config_from_context():
+///     context = get_current_context()
+///     execution_date = context["execution_date"]  # Deprecated
+/// ```
+/// In templates or custom plugins:
+///
+/// ```python
+/// task1 = DummyOperator(
+///     task_id="example_task",
+///     params={
+///         "execution_date": "{{ execution_date }}",  # Deprecated
+///     },
+/// )
+///
+/// class CustomMacrosPlugin(AirflowPlugin):
+///     name = "custom_macros"
+///     macros = {
+///         "execution_date_macro": lambda context: context["execution_date"],  # Deprecated
+///     }
+/// ```
+fn removed_context_variable(checker: &mut Checker, expr: &Expr) {
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
-        if let Expr::Name(ExprName { id, .. }) = &**value {
-            if id.as_str() == "context" {
-                if let Some(key) = extract_name_from_slice(slice) {
-                    if REMOVED_CONTEXT_KEYS.contains(&key.as_str()) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            Airflow3Removal {
-                                deprecated: key,
-                                replacement: Replacement::None,
-                            },
-                            slice.range(),
-                        ));
-                    }
+        let is_context_arg = if let Expr::Name(ExprName { id, .. }) = &**value {
+            id.as_str() == "context" || id.as_str().starts_with("**")
+        } else {
+            false
+        };
+
+        let is_current_context =
+            if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
+                matches!(
+                    qualname.segments(),
+                    ["airflow", "utils", "context", "get_current_context"]
+                )
+            } else {
+                false
+            };
+
+        if is_context_arg || is_current_context {
+            if let Some(key) = extract_name_from_slice(slice) {
+                if REMOVED_CONTEXT_KEYS.contains(&key.as_str()) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        Airflow3Removal {
+                            deprecated: key,
+                            replacement: Replacement::None,
+                        },
+                        slice.range(),
+                    ));
                 }
             }
         }
@@ -319,7 +375,7 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
 ///     print("access invalid key", context.get("conf"))
 /// ```
 fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
-    add_context_diagnostics(checker, &call_expr.func);
+    detect_removed_context_keys_in_task_decorators(checker);
 
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
         return;
@@ -958,7 +1014,28 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
     }
 }
 
-fn uses_removed_context_keys(checker: &mut Checker) -> bool {
+/// Check for the usage of removed Airflow context keys and deprecated arguments in decorator-based functions.
+///
+/// This function scans the current scope for functions decorated with the `@task` decorator
+/// and examines their arguments and context keys. If any deprecated arguments or context keys
+/// listed in `REMOVED_CONTEXT_KEYS` are found, it emits a diagnostic error.
+///
+/// ### Example
+/// ```python
+/// from airflow.decorators import task
+///
+/// @task
+/// def access_invalid_argument_task_out_of_dag(execution_date, **context):  # Deprecated argument
+///     print("execution date", execution_date)
+///     print("access invalid key", context.get("conf"))  # Deprecated context key
+///
+/// @task(task_id="print_the_context")
+/// def print_context(ds=None, **kwargs):
+///     """Print the Airflow context and ds variable from the context."""
+///     print(ds)
+///     print(kwargs.get("tomorrow_ds"))  # Deprecated context key
+/// ```
+fn detect_removed_context_keys_in_task_decorators(checker: &mut Checker) -> bool {
     let parents: Vec<_> = checker.semantic().current_statements().collect();
 
     for stmt in parents {
@@ -972,29 +1049,20 @@ fn uses_removed_context_keys(checker: &mut Checker) -> bool {
 
         let arguments = extract_task_function_arguments(function_def);
 
-        if arguments
-            .iter()
-            .any(|arg| REMOVED_CONTEXT_KEYS.contains(&arg.as_str()))
-        {
-            return true;
+        for arg in arguments {
+            if REMOVED_CONTEXT_KEYS.contains(&arg.as_str()) {
+                checker.diagnostics.push(Diagnostic::new(
+                    Airflow3Removal {
+                        deprecated: arg,
+                        replacement: Replacement::None,
+                    },
+                    function_def.name.range(),
+                ));
+            }
         }
     }
 
     false
-}
-
-fn add_context_diagnostics(checker: &mut Checker, expr: &Expr) {
-    if uses_removed_context_keys(checker) {
-        for removed_key in REMOVED_CONTEXT_KEYS {
-            checker.diagnostics.push(Diagnostic::new(
-                Airflow3Removal {
-                    deprecated: removed_key.to_string(),
-                    replacement: Replacement::None,
-                },
-                expr.range(),
-            ));
-        }
-    }
 }
 
 fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
