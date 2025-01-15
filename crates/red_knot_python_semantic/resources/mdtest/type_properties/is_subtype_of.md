@@ -9,6 +9,11 @@ See the [typing documentation] for more information.
 
 ## Basic builtin types
 
+- `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
+    supertype of `bool` (present in `bool`s bases and MRO).
+- `int` is not a subtype of `float`/`complex`, even though `float`/`complex` can be used in place of
+    `int` in some contexts (see [special case for float and complex]).
+
 ```py
 from knot_extensions import is_subtype_of, static_assert
 
@@ -25,7 +30,6 @@ static_assert(not is_subtype_of(int, bool))
 static_assert(not is_subtype_of(int, str))
 static_assert(not is_subtype_of(object, int))
 
-# See: [special case for float and complex]
 static_assert(not is_subtype_of(int, float))
 static_assert(not is_subtype_of(int, complex))
 
@@ -445,4 +449,5 @@ static_assert(not is_subtype_of(Intersection[Unknown, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Unknown]))
 ```
 
+[special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
