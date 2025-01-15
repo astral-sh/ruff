@@ -319,18 +319,15 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
 ///     print("access invalid key", context.get("conf"))
 /// ```
 fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
-    if is_task_context_referenced(checker, &call_expr.func) {
-        return;
-    }
+    add_context_diagnostics(checker, &call_expr.func);
 
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
         return;
     };
 
-    if !value
-        .as_name_expr()
-        .is_some_and(|name| matches!(name.id.as_str(), "context" | "kwargs"))
-    {
+    if !value.as_name_expr().is_some_and(|name| {
+        matches!(name.id.as_str(), "context" | "kwargs") || name.id.as_str().starts_with("**")
+    }) {
         return;
     }
 
@@ -961,31 +958,43 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
     }
 }
 
-fn is_task_context_referenced(checker: &mut Checker, expr: &Expr) -> bool {
+fn uses_removed_context_keys(checker: &mut Checker) -> bool {
     let parents: Vec<_> = checker.semantic().current_statements().collect();
 
     for stmt in parents {
-        if let Stmt::FunctionDef(function_def) = stmt {
-            if is_decorated_with(checker, function_def) {
-                let arguments = extract_task_function_arguments(function_def);
+        let Stmt::FunctionDef(function_def) = stmt else {
+            continue;
+        };
 
-                for deprecated_arg in REMOVED_CONTEXT_KEYS {
-                    if arguments.contains(&deprecated_arg.to_string()) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            Airflow3Removal {
-                                deprecated: deprecated_arg.to_string(),
-                                replacement: Replacement::None,
-                            },
-                            expr.range(),
-                        ));
-                        return true;
-                    }
-                }
-            }
+        if !has_task_decorator(checker, function_def) {
+            continue;
+        }
+
+        let arguments = extract_task_function_arguments(function_def);
+
+        if arguments
+            .iter()
+            .any(|arg| REMOVED_CONTEXT_KEYS.contains(&arg.as_str()))
+        {
+            return true;
         }
     }
 
     false
+}
+
+fn add_context_diagnostics(checker: &mut Checker, expr: &Expr) {
+    if uses_removed_context_keys(checker) {
+        for removed_key in REMOVED_CONTEXT_KEYS {
+            checker.diagnostics.push(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: removed_key.to_string(),
+                    replacement: Replacement::None,
+                },
+                expr.range(),
+            ));
+        }
+    }
 }
 
 fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
@@ -1002,7 +1011,7 @@ fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
     arguments
 }
 
-fn is_decorated_with(checker: &mut Checker, stmt: &StmtFunctionDef) -> bool {
+fn has_task_decorator(checker: &mut Checker, stmt: &StmtFunctionDef) -> bool {
     stmt.decorator_list.iter().any(|decorator| {
         checker
             .semantic()
