@@ -4,7 +4,7 @@ use tracing::Level;
 pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::{AnyNodeRef, Mod};
+use ruff_python_ast::{AnyNodeRef, Mod, ModId};
 use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -119,7 +119,7 @@ pub fn format_module_source(
 }
 
 pub fn format_module_ast<'a>(
-    parsed: &'a Parsed<Mod>,
+    parsed: &'a Parsed<ModId>,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
     options: PyFormatOptions,

@@ -1,4 +1,4 @@
-use ruff_python_ast::ModExpression;
+use ruff_python_ast::{ModExpression, Node};
 
 use crate::prelude::*;
 

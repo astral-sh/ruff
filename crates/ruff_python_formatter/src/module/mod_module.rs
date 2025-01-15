@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::ModModule;
+use ruff_python_ast::{ModModule, Node};
 use ruff_python_trivia::lines_after;
 
 use crate::prelude::*;

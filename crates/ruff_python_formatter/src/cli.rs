@@ -71,7 +71,8 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
     }
     if cli.print_comments {
         // Print preceding, following and enclosing nodes
-        let decorated_comments = collect_comments(parsed.syntax(), source_code, &comment_ranges);
+        let decorated_comments =
+            collect_comments(parsed.syntax().node(), source_code, &comment_ranges);
         if !decorated_comments.is_empty() {
             println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
         }

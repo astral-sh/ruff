@@ -1,7 +1,8 @@
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
+    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Node, Parameter, Parameters,
+    StringLike,
 };
 use ruff_python_trivia::{
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset, BackwardsTokenizer,
@@ -966,7 +967,7 @@ fn handle_trailing_binary_like_comment<'a>(
 ///
 /// Comments of an all empty module are leading module comments
 fn handle_trailing_module_comment<'a>(
-    module: &'a ModModule,
+    module: Node<'a, &'a ModModule>,
     comment: DecoratedComment<'a>,
 ) -> CommentPlacement<'a> {
     if comment.preceding_node().is_none() && comment.following_node().is_none() {

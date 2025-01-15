@@ -304,15 +304,20 @@ pub struct Parsed<T> {
     errors: Vec<ParseError>,
 }
 
+impl<T> Parsed<T>
+where
+    T: Clone,
+{
+    /// Returns the syntax node represented by this parsed output.
+    pub fn syntax(&self) -> Node<T> {
+        self.ast.wrap(self.syntax.clone())
+    }
+}
+
 impl<T> Parsed<T> {
     /// Returns the AST for the parsed output.
     pub fn ast(&self) -> &Ast {
         &self.ast
-    }
-
-    /// Returns the syntax node represented by this parsed output.
-    pub fn syntax(&self) -> &T {
-        &self.syntax
     }
 
     /// Returns all the tokens for the parsed output.
@@ -323,11 +328,6 @@ impl<T> Parsed<T> {
     /// Returns a list of syntax errors found during parsing.
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
-    }
-
-    /// Consumes the [`Parsed`] output and returns the contained syntax node.
-    pub fn into_syntax(self) -> T {
-        self.syntax
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.

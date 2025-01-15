@@ -18,7 +18,7 @@ use crate::comments::{CommentsMap, SourceComment};
 /// Collect the preceding, following and enclosing node for each comment without applying
 /// [`place_comment`] for debugging.
 pub(crate) fn collect_comments<'a>(
-    root: &'a Mod,
+    root: Mod,
     source_code: SourceCode<'a>,
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {

@@ -15,6 +15,13 @@ def rustfmt(code: str) -> str:
     return check_output(["rustfmt", "--emit=stdout"], input=code, text=True)
 
 
+# Which nodes have been migrated over to the new IndexVec representation?
+indexed_nodes = {
+    "ModModule",
+    "ModExpression",
+}
+
+
 # %%
 # Read nodes
 
@@ -130,14 +137,18 @@ use ruff_python_ast as ast;
 
 """
 for node in nodes:
+    if node in indexed_nodes:
+        node_type = f"ast::Node<&ast::{node}>"
+    else:
+        node_type = f"ast::{node}"
     text = f"""
-        impl FormatRule<ast::{node}, PyFormatContext<'_>>
+        impl FormatRule<{node_type}, PyFormatContext<'_>>
             for crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}
         {{
             #[inline]
             fn fmt(
                 &self,
-                node: &ast::{node},
+                node: &{node_type},
                 f: &mut PyFormatter,
             ) -> FormatResult<()> {{
                 FormatNodeRule::<ast::{node}>::fmt(self, node, f)
