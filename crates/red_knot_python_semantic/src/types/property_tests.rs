@@ -234,10 +234,23 @@ mod stable {
     use super::union;
     use crate::types::{KnownClass, Type};
 
-    // `T` is equivalent to itself.
+    // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
+    );
+
+    // Symmetry: If `S` is equivalent to `T`, then `T` must be equivalent to `S`.
+    // Note that this (trivially) holds true for gradual types as well.
+    type_property_test!(
+        equivalent_to_is_symmetric, db,
+        forall types s, t. s.is_equivalent_to(db, t) => t.is_equivalent_to(db, s)
+    );
+
+    // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.
+    type_property_test!(
+        equivalent_to_is_transitive, db,
+        forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
     );
 
     // A fully static type `T` is a subtype of itself.
@@ -365,7 +378,7 @@ mod flaky {
 
     // For two fully static types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
-        all_fully_static_type_pairs_are_supertypes_of_their_union, db,
+        all_fully_static_type_pairs_are_supertypes_of_their_intersection, db,
         forall types s, t.
             s.is_fully_static(db) && t.is_fully_static(db)
             => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
