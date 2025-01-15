@@ -1,0 +1,11 @@
+---
+source: crates/ruff/tests/lint.rs
+expression: "fs::read_to_string(bug_mod.join(\"__init__.py\"))?"
+snapshot_kind: text
+---
+__all__ = ('Spam',)
+
+
+class Spam:
+    def __init__(self) -> None:
+        pass

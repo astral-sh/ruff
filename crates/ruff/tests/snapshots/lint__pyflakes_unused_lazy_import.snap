@@ -15,21 +15,9 @@ info:
     - bug/
 snapshot_kind: text
 ---
-success: false
-exit_code: 1
+success: true
+exit_code: 0
 ----- stdout -----
-bug/__init__.py:7:43: F401 `bug.lobster_thermidor.Ham` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
-Found 101 errors (100 fixed, 1 remaining).
-[*] 1 fixable with the --fix option.
+Found 1 error (1 fixed, 0 remaining).
 
 ----- stderr -----
-debug error: Failed to converge after 100 iterations in `bug/__init__.py` with rule codes F401:---
-
-__all__ = ('Spam', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham', 'Ham',)
-
-
-class Spam:
-    def __init__(self) -> None:
-        from bug.lobster_thermidor import Ham
-
----

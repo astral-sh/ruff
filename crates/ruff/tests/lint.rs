@@ -2188,5 +2188,7 @@ class Spam:
         .arg("bug/")
         .current_dir(&tempdir));
 
+    insta::assert_snapshot!(fs::read_to_string(bug_mod.join("__init__.py"))?);
+
     Ok(())
 }

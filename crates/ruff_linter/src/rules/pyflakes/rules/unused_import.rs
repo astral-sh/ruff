@@ -366,7 +366,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .map(|binding| {
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
-                } else if in_init && is_first_party(&binding.import, checker) {
+                } else if in_init
+                    && is_first_party(&binding.import, checker)
+                    && checker
+                        .semantic()
+                        .global_scope()
+                        .get(&binding.import.qualified_name().to_string())
+                        .is_some()
+                {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
                         submodule_import: binding.import.is_submodule_import(),
