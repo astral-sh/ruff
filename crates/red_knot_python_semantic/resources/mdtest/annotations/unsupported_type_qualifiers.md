@@ -6,13 +6,10 @@ Several type qualifiers are unsupported by red-knot currently. However, we also 
 false-positive errors if you use one in an annotation:
 
 ```py
-from typing_extensions import Final, ClassVar, Required, NotRequired, ReadOnly, TypedDict
+from typing_extensions import Final, Required, NotRequired, ReadOnly, TypedDict
 
 X: Final = 42
 Y: Final[int] = 42
-
-class Foo:
-    A: ClassVar[int] = 42
 
 # TODO: `TypedDict` is actually valid as a base
 # error: [invalid-base]

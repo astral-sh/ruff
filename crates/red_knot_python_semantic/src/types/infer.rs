@@ -5346,8 +5346,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("`NotRequired[]` type qualifier")
             }
             KnownInstanceType::ClassVar => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`ClassVar[]` type qualifier")
+                let ty = self.infer_type_expression(arguments_slice);
+                ty
             }
             KnownInstanceType::Final => {
                 self.infer_type_expression(arguments_slice);
