@@ -205,7 +205,6 @@ impl serde::Serialize for NameImport {
 impl<'de> serde::de::Deserialize<'de> for NameImports {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use ruff_python_ast::{self as ast, Stmt};
-        use ruff_python_parser::Parsed;
 
         struct AnyNameImportsVisitor;
 
@@ -217,10 +216,8 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
             }
 
             fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                let body = ruff_python_parser::parse_module(value)
-                    .map(Parsed::into_suite)
-                    .map_err(E::custom)?;
-                let [stmt] = body.as_slice() else {
+                let body = ruff_python_parser::parse_module(value).map_err(E::custom)?;
+                let [stmt] = body.suite().as_slice() else {
                     return Err(E::custom("Expected a single statement"));
                 };
 
