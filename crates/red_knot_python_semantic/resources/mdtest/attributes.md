@@ -26,7 +26,7 @@ class C:
         # declared and bound
         self.pure_instance_variable4: bool = True
 
-        # possibly unbdeclared/unbound
+        # possibly undeclared/unbound
         if flag:
             self.pure_instance_variable5: str = "possibly set in __init__"
 
