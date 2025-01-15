@@ -1,5 +1,4 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AstNode;
 use ruff_python_ast::StmtGlobal;
 
 use crate::comments::SourceComment;
@@ -14,7 +13,7 @@ impl FormatNodeRule<StmtGlobal> for FormatStmtGlobal {
         // Join the `global` names, breaking across continuation lines if necessary, unless the
         // `global` statement has a trailing comment, in which case, breaking the names would
         // move the comment "off" of the `global` statement.
-        if f.context().comments().has_trailing(item.as_any_node_ref()) {
+        if f.context().comments().has_trailing(item) {
             let joined = format_with(|f| {
                 f.join_with(format_args![token(","), space()])
                     .entries(item.names.iter().formatted())

@@ -1,5 +1,4 @@
 use ruff_formatter::write;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::{Pattern, PatternArguments};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -63,7 +62,7 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
         // )
         // ```
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item);
 
         write!(
             f,

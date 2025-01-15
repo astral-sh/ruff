@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -36,7 +36,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         // to handle newlines and spacing, or the node is None and we insert the corresponding
         // slice of dangling comments
         let comments = f.context().comments().clone();
-        let slice_dangling_comments = comments.dangling(item.as_any_node_ref());
+        let slice_dangling_comments = comments.dangling(item);
         // Put the dangling comments (where the nodes are missing) into buckets
         let first_colon_partition_index =
             slice_dangling_comments.partition_point(|x| x.start() < first_colon.start());

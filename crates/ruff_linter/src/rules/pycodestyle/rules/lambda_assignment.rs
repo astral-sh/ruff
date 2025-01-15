@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
@@ -263,7 +263,7 @@ fn replace_trailing_ellipsis_with_original_expr(
 ) -> String {
     let original_expr_range = parenthesized_range(
         (&lambda.body).into(),
-        lambda.as_any_node_ref(),
+        lambda.into(),
         checker.comment_ranges(),
         checker.source(),
     )

@@ -611,45 +611,6 @@ def write_nodekind(out: list[str], groups: list[Group]) -> None:
 
 
 # ------------------------------------------------------------------------------
-# AstNode
-
-
-def write_astnode(out: list[str], groups: list[Group]) -> None:
-    """
-    Creates AstNode trait impls:
-    - `impl AstNode for TypeParam`
-    - `impl AstNode for TypeParamTypeVar`
-    """
-
-    for group in groups:
-        if group.name != "ungrouped":
-            out.append(f"""
-            impl crate::AstNode for {group.owned_enum_ty} {{
-                fn as_any_node_ref(&self) -> AnyNodeRef {{
-                    AnyNodeRef::from(self)
-                }}
-
-                fn into_any_node(self) -> AnyNode {{
-                    AnyNode::from(self)
-                }}
-            }}
-            """)
-
-        for node in group.nodes:
-            out.append(f"""
-            impl crate::AstNode for {node.ty} {{
-                fn as_any_node_ref(&self) -> AnyNodeRef {{
-                    AnyNodeRef::from(self)
-                }}
-
-                fn into_any_node(self) -> AnyNode {{
-                    AnyNode::from(self)
-                }}
-            }}
-            """)
-
-
-# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -661,7 +622,6 @@ def generate(groups: list[Group]) -> list[str]:
     write_anynode(out, groups)
     write_anynoderef(out, groups)
     write_nodekind(out, groups)
-    write_astnode(out, groups)
     return out
 
 
