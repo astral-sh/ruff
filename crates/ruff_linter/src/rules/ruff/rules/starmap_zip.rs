@@ -60,7 +60,7 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    if semantic
+    if !semantic
         .resolve_qualified_name(&call.func)
         .is_some_and(|it| matches!(it.segments(), ["itertools", "starmap"]))
     {
