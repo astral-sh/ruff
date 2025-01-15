@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -107,40 +107,93 @@ pub(crate) fn fastapi_non_annotated_dependency(
         .iter()
         .chain(&function_def.parameters.kwonlyargs)
     {
-        let needs_update = matches!(
-            (&parameter.parameter.annotation, &parameter.default),
-            (Some(_annotation), Some(default)) if is_fastapi_dependency(checker, default)
-        );
+        let (Some(annotation), Some(default)) =
+            (&parameter.parameter.annotation, &parameter.default)
+        else {
+            seen_default |= parameter.default.is_some();
+            continue;
+        };
 
-        if needs_update {
-            seen_default = create_diagnostic(checker, parameter, seen_default);
-        } else if parameter.default.is_some() {
-            seen_default = true;
+        if let Some(dependency) = is_fastapi_dependency(checker, default) {
+            let dependency_call = DependencyCall::from_expression(default);
+            let dependency_parameter = DependencyParameter {
+                annotation,
+                default,
+                kind: dependency,
+                name: &*parameter.parameter.name,
+                range: parameter.range,
+            };
+            seen_default =
+                create_diagnostic(checker, dependency_parameter, dependency_call, seen_default);
+        } else {
+            seen_default |= parameter.default.is_some();
         }
     }
 }
 
-fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> bool {
+fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> Option<FastApiDependency> {
     checker
         .semantic()
         .resolve_qualified_name(map_callable(expr))
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                [
-                    "fastapi",
-                    "Query"
-                        | "Path"
-                        | "Body"
-                        | "Cookie"
-                        | "Header"
-                        | "File"
-                        | "Form"
-                        | "Depends"
-                        | "Security"
-                ]
-            )
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["fastapi", dependency_name] => match *dependency_name {
+                "Query" => Some(FastApiDependency::Query),
+                "Path" => Some(FastApiDependency::Path),
+                "Body" => Some(FastApiDependency::Body),
+                "Cookie" => Some(FastApiDependency::Cookie),
+                "Header" => Some(FastApiDependency::Header),
+                "File" => Some(FastApiDependency::File),
+                "Form" => Some(FastApiDependency::Form),
+                "Depends" => Some(FastApiDependency::Depends),
+                "Security" => Some(FastApiDependency::Security),
+                _ => None,
+            },
+            _ => None,
         })
+}
+
+#[derive(Debug, Copy, Clone)]
+enum FastApiDependency {
+    Query,
+    Path,
+    Body,
+    Cookie,
+    Header,
+    File,
+    Form,
+    Depends,
+    Security,
+}
+
+struct DependencyParameter<'a> {
+    annotation: &'a ast::Expr,
+    default: &'a ast::Expr,
+    range: TextRange,
+    name: &'a str,
+    kind: FastApiDependency,
+}
+
+struct DependencyCall<'a> {
+    default_argument: ast::ArgOrKeyword<'a>,
+    keyword_arguments: Vec<&'a ast::Keyword>,
+}
+
+impl<'a> DependencyCall<'a> {
+    fn from_expression(expr: &'a ast::Expr) -> Option<Self> {
+        let call = expr.as_call_expr()?;
+        let default_argument = call.arguments.find_argument("default", 0)?;
+        let keyword_arguments = call
+            .arguments
+            .keywords
+            .iter()
+            .filter(|kwarg| kwarg.arg.as_ref().map_or(false, |name| name != "default"))
+            .collect();
+
+        Some(Self {
+            default_argument,
+            keyword_arguments,
+        })
+    }
 }
 
 /// Create a [`Diagnostic`] for `parameter` and return an updated value of `seen_default`.
@@ -164,7 +217,8 @@ fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> bool {
 /// `seen_default` here.
 fn create_diagnostic(
     checker: &mut Checker,
-    parameter: &ast::ParameterWithDefault,
+    parameter: DependencyParameter,
+    dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
 ) -> bool {
     let mut diagnostic = Diagnostic::new(
@@ -174,94 +228,78 @@ fn create_diagnostic(
         parameter.range,
     );
 
-    if let (Some(annotation), Some(default)) = (&parameter.parameter.annotation, &parameter.default)
-    {
-        let mut try_generate_fix = || {
-            let module = if checker.settings.target_version >= PythonVersion::Py39 {
-                "typing"
-            } else {
-                "typing_extensions"
-            };
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, "Annotated"),
-                parameter.range.start(),
-                checker.semantic(),
-            )?;
-
-            // Refine the match from `is_fastapi_dependency` to exclude Depends
-            // and Security, which don't have the same argument structure. The
-            // others need to be converted from `q: str = Query("")` to `q:
-            // Annotated[str, Query()] = ""` for example, but Depends and
-            // Security need to stay like `Annotated[str, Depends(callable)]`
-            let is_dep = checker
-                .semantic()
-                .resolve_qualified_name(map_callable(default))
-                .is_some_and(|qualified_name| {
-                    !matches!(
-                        qualified_name.segments(),
-                        ["fastapi", "Depends" | "Security"]
-                    )
-                });
-
-            // Each of these classes takes a single, optional default
-            // argument, followed by kw-only arguments
-            let default_arg = default
-                .as_call_expr()
-                .and_then(|args| args.arguments.find_argument("default", 0));
-
-            let kwarg_list: Option<Vec<_>> = default.as_call_expr().map(|args| {
-                args.arguments
-                    .keywords
-                    .iter()
-                    .filter_map(|kwarg| match kwarg.arg.as_ref() {
-                        None => None,
-                        Some(name) if name == "default" => None,
-                        Some(_) => Some(checker.locator().slice(kwarg.range())),
-                    })
-                    .collect()
-            });
-
-            let content = match default_arg {
-                Some(default_arg) if is_dep => {
-                    let kwarg_list = match kwarg_list {
-                        Some(v) => v.join(", "),
-                        None => String::new(),
-                    };
-                    seen_default = true;
-                    format!(
-                        "{parameter_name}: {binding}[{annotation}, {default_}({kwarg_list})] \
-                            = {default_value}",
-                        parameter_name = &parameter.parameter.name.id,
-                        annotation = checker.locator().slice(annotation.range()),
-                        default_ = checker.locator().slice(map_callable(default).range()),
-                        default_value = checker.locator().slice(default_arg.value().range()),
-                    )
-                }
-                _ => {
-                    if seen_default {
-                        return Ok(None);
-                    }
-                    format!(
-                        "{parameter_name}: {binding}[{annotation}, {default_}]",
-                        parameter_name = parameter.parameter.name.id,
-                        annotation = checker.locator().slice(annotation.range()),
-                        default_ = checker.locator().slice(default.range())
-                    )
-                }
-            };
-            let parameter_edit = Edit::range_replacement(content, parameter.range);
-            Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
+    let mut try_generate_fix = || {
+        let module = if checker.settings.target_version >= PythonVersion::Py39 {
+            "typing"
+        } else {
+            "typing_extensions"
         };
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from(module, "Annotated"),
+            parameter.range.start(),
+            checker.semantic(),
+        )?;
 
-        // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
-        // `match` on the result directly, but still calling `try_set_optional_fix` avoids
-        // duplicating the debug logging here
-        let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
-        if fix.is_err() {
-            seen_default = true;
-        }
-        diagnostic.try_set_optional_fix(|| fix);
+        // Each of these classes takes a single, optional default
+        // argument, followed by kw-only arguments
+
+        // Refine the match from `is_fastapi_dependency` to exclude Depends
+        // and Security, which don't have the same argument structure. The
+        // others need to be converted from `q: str = Query("")` to `q:
+        // Annotated[str, Query()] = ""` for example, but Depends and
+        // Security need to stay like `Annotated[str, Depends(callable)]`
+        let is_dep = !matches!(
+            parameter.kind,
+            FastApiDependency::Depends | FastApiDependency::Security
+        );
+
+        let content = match dependency_call {
+            Some(dependency_call) if is_dep => {
+                let kwarg_list = dependency_call
+                    .keyword_arguments
+                    .iter()
+                    .map(|kwarg| checker.locator().slice(kwarg.range()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                seen_default = true;
+                format!(
+                    "{parameter_name}: {binding}[{annotation}, {default_}({kwarg_list})] \
+                            = {default_value}",
+                    parameter_name = parameter.name,
+                    annotation = checker.locator().slice(parameter.annotation.range()),
+                    default_ = checker
+                        .locator()
+                        .slice(map_callable(parameter.default).range()),
+                    default_value = checker
+                        .locator()
+                        .slice(dependency_call.default_argument.value().range()),
+                )
+            }
+            _ => {
+                if seen_default {
+                    return Ok(None);
+                }
+                format!(
+                    "{parameter_name}: {binding}[{annotation}, {default_}]",
+                    parameter_name = parameter.name,
+                    annotation = checker.locator().slice(parameter.annotation.range()),
+                    default_ = checker.locator().slice(parameter.default.range())
+                )
+            }
+        };
+        let parameter_edit = Edit::range_replacement(content, parameter.range);
+        Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
+    };
+
+    // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
+    // `match` on the result directly, but still calling `try_set_optional_fix` avoids
+    // duplicating the debug logging here
+    let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
+    if fix.is_err() {
+        seen_default = true;
     }
+    diagnostic.try_set_optional_fix(|| fix);
 
     checker.diagnostics.push(diagnostic);
 
