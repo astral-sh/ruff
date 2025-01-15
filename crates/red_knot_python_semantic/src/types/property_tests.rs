@@ -376,6 +376,12 @@ mod flaky {
         forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
     );
 
+    // If `S <: T`, then `~T <: ~S`.
+    type_property_test!(
+        negation_reverses_subtype_order, db,
+        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+    );
+
     // For two fully static types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
         all_fully_static_type_pairs_are_supertypes_of_their_intersection, db,
