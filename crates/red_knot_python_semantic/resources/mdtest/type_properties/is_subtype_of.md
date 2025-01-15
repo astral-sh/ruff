@@ -92,7 +92,7 @@ static_assert(is_subtype_of(Literal[1], object))
 
 static_assert(not is_subtype_of(Literal[1], bool))
 
-# See: [special case for float and complex]
+# See the note above (or link below) concerning int and float/complex
 static_assert(not is_subtype_of(Literal[1], float))
 
 # String literals
