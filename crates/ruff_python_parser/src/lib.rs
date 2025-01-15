@@ -192,6 +192,30 @@ pub fn parse_parenthesized_expression_range(
     parsed.try_into_expression().unwrap().into_result()
 }
 
+/// Parses a Python expression from a string annotation.
+///
+/// This function parses the content of a string literal as a Python expression, handling both
+/// single-quoted and triple-quoted strings appropriately.
+///
+/// # Example
+///
+/// Parsing a string annotation:
+///
+/// ```
+/// use ruff_python_parser::parse_as_string_annotation;
+/// # use ruff_python_ast::StringLiteral;
+/// # use ruff_text_size::{TextRange, TextSize};
+///
+/// let source = "'\n int | str'";
+/// let string = StringLiteral::new(TextRange::new(TextSize::new(0), TextSize::new(9)));
+/// let parsed = parse_as_string_annotation(source, &string);
+/// assert!(!parsed.is_ok());
+///
+/// let source = "'''\n int | str'''";
+/// let string = StringLiteral::new_triple_quoted(TextRange::new(TextSize::new(0), TextSize::new(16)));
+/// let parsed = parse_as_string_annotation(source, &string);
+/// assert!(parsed.is_ok());
+/// ```
 pub fn parse_as_string_annotation(
     source: &str,
     string: &StringLiteral,

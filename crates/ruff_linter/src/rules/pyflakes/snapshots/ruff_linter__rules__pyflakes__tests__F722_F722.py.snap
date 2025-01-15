@@ -14,43 +14,67 @@ F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
 13 | X: """List[int]"""'☃' = []
    |    ^^^^^^^^^^^^^^^^^^ F722
 14 | 
-15 | y: """
+15 | # Type annotations with triple quotes can contain newlines and indentation
    |
 
-F722.py:29:10: F722 Syntax error in forward annotation: `
- int`
-   |
-28 | # single quotes are not implicitly parenthesized
-29 | invalid: "\n int"
-   |          ^^^^^^^^ F722
-   |
-
-F722.py:32:11: F722 Syntax error in forward annotation: `
+F722.py:30:11: F722 Syntax error in forward annotation: `
 		int |
 str)
 `
    |
-32 |   invalid2: """
+28 |   """
+29 |   
+30 |   invalid1: """
    |  ___________^
-33 | |         int |
-34 | | str)
-35 | | """
+31 | |         int |
+32 | | str)
+33 | | """
    | |___^ F722
-36 |   
-37 |   invalid3: """
+34 |   
+35 |   invalid2: """
    |
 
-F722.py:37:11: F722 Syntax error in forward annotation: `
+F722.py:35:11: F722 Syntax error in forward annotation: `
 		int) |
 str
 `
    |
-35 |   """
-36 |   
-37 |   invalid3: """
+33 |   """
+34 |   
+35 |   invalid2: """
    |  ___________^
-38 | |         int) |
-39 | | str
-40 | | """
+36 | |         int) |
+37 | | str
+38 | | """
+   | |___^ F722
+39 |   invalid3: """
+40 |           ((int)
+   |
+
+F722.py:39:11: F722 Syntax error in forward annotation: `
+		((int)
+`
+   |
+37 |   str
+38 |   """
+39 |   invalid3: """
+   |  ___________^
+40 | |         ((int)
+41 | | """
+   | |___^ F722
+42 |   invalid4: """
+43 |           (int
+   |
+
+F722.py:42:11: F722 Syntax error in forward annotation: `
+		(int
+`
+   |
+40 |           ((int)
+41 |   """
+42 |   invalid4: """
+   |  ___________^
+43 | |         (int
+44 | | """
    | |___^ F722
    |
