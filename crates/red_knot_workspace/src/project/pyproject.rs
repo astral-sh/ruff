@@ -30,7 +30,7 @@ pub enum PyProjectError {
 }
 
 impl PyProject {
-    pub(crate) fn from_str(content: &str) -> Result<Self, PyProjectError> {
+    pub(crate) fn from_toml_str(content: &str) -> Result<Self, PyProjectError> {
         toml::from_str(content).map_err(PyProjectError::TomlSyntax)
     }
 }
