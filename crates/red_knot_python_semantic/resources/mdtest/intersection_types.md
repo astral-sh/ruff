@@ -283,6 +283,21 @@ def _(
     reveal_type(not_object)  # revealed: Never
 ```
 
+### `object & ~T` is equivalent to `~T`
+
+A second consequence of the fact that `object` is the top type is that `object` is always redundant
+in intersections, and can be eagerly simplified out. `object & P` is equivalent to `P`;
+`object & ~P` is equivalent to `~P` for any type `P`.
+
+```py
+from knot_extensions import Intersection, Not, is_equivalent_to, static_assert
+
+class P: ...
+
+static_assert(is_equivalent_to(Intersection[object, P], P))
+static_assert(is_equivalent_to(Intersection[object, Not[P]], Not[P]))
+```
+
 ### Intersection of a type and its negation
 
 Continuing with more [complement laws], if we see both `P` and `~P` in an intersection, we can

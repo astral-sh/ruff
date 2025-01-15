@@ -288,12 +288,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .into_instance()
                     .and_then(|instance| instance.class.known(db));
 
-                let addition_is_bool_instance = match known_instance {
-                    // `object & T` -> `T`
-                    Some(KnownClass::Object) => return,
-                    Some(KnownClass::Bool) => true,
-                    _ => false,
-                };
+                if known_instance == Some(KnownClass::Object) {
+                    // `object & T` -> `T`; it is always redundant to add `object` to an intersection
+                    return;
+                }
+
+                let addition_is_bool_instance = known_instance == Some(KnownClass::Bool);
 
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     match existing_positive {

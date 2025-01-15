@@ -32,14 +32,4 @@ static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 ```
 
-## `object & ~T` is equivalent to `~T`
-
-```py
-from knot_extensions import Intersection, Not, is_equivalent_to, static_assert
-
-class P: ...
-
-static_assert(is_equivalent_to(Intersection[object, Not[P]], Not[P]))
-```
-
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
