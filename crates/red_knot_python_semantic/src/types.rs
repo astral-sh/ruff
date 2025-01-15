@@ -54,6 +54,7 @@ mod signatures;
 mod slots;
 mod string_annotation;
 mod subclass_of;
+mod type_ordering;
 mod unpacker;
 
 #[cfg(test)]
@@ -621,6 +622,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Union(..))
     }
 
+    pub const fn is_intersection(&self) -> bool {
+        matches!(self, Type::Intersection(..))
+    }
+
     pub const fn into_intersection(self) -> Option<IntersectionType<'db>> {
         match self {
             Type::Intersection(intersection_type) => Some(intersection_type),
@@ -1077,8 +1082,7 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        // TODO equivalent but not identical structural types, differently-ordered unions and
-        // intersections, other cases?
+        // TODO equivalent but not identical structural types
 
         // For all other cases, types are equivalent iff they have the same internal
         // representation.

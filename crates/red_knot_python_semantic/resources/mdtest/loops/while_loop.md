@@ -41,7 +41,7 @@ def _(flag: bool, flag2: bool):
         x = 3
 
     reveal_type(x)  # revealed: Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[4, 1, 2]
+    reveal_type(y)  # revealed: Literal[1, 2, 4]
 ```
 
 ## Nested `while` loops

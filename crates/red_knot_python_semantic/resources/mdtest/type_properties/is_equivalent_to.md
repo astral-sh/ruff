@@ -32,4 +32,22 @@ static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 ```
 
+## Differently ordered intersections and unions are equivalent
+
+```py
+from knot_extensions import is_equivalent_to, static_assert, Intersection, Not
+
+class P: ...
+class Q: ...
+class R: ...
+class S: ...
+
+static_assert(is_equivalent_to(int | str, str | int))
+static_assert(is_equivalent_to(Intersection[P, Q], Intersection[Q, P]))
+static_assert(is_equivalent_to(Intersection[Q, Not[P]], Intersection[Not[P], Q]))
+static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], R, Q]))
+static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
+static_assert(is_equivalent_to(str | None, None | str))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent

@@ -167,10 +167,10 @@ a = (A(), A())
 
 reveal_type(a == a)  # revealed: bool
 reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: float | Literal[False]
-reveal_type(a <= a)  # revealed: complex | Literal[True]
-reveal_type(a > a)  # revealed: tuple | Literal[False]
-reveal_type(a >= a)  # revealed: list | Literal[True]
+reveal_type(a < a)  # revealed: Literal[False] | float
+reveal_type(a <= a)  # revealed: Literal[True] | complex
+reveal_type(a > a)  # revealed: Literal[False] | tuple
+reveal_type(a >= a)  # revealed: Literal[True] | list
 
 # If lexicographic comparison is finished before comparing A()
 b = ("1_foo", A())
@@ -187,7 +187,7 @@ class B:
     def __lt__(self, o: B) -> set:
         return set()
 
-reveal_type((A(), B()) < (A(), B()))  # revealed: float | set | Literal[False]
+reveal_type((A(), B()) < (A(), B()))  # revealed: Literal[False] | float | set
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons

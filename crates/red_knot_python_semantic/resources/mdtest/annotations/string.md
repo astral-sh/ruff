@@ -50,7 +50,7 @@ def f(v: "Foo"):
 
 ```py
 def f(v: int | "Foo"):
-    reveal_type(v)  # revealed: int | Foo
+    reveal_type(v)  # revealed: Foo | int
 
 class Foo: ...
 ```
@@ -61,8 +61,8 @@ class Foo: ...
 from typing import Literal
 
 def f1(v: Literal["Foo", "Bar"], w: 'Literal["Foo", "Bar"]'):
-    reveal_type(v)  # revealed: Literal["Foo", "Bar"]
-    reveal_type(w)  # revealed: Literal["Foo", "Bar"]
+    reveal_type(v)  # revealed: Literal["Bar", "Foo"]
+    reveal_type(w)  # revealed: Literal["Bar", "Foo"]
 
 class Foo: ...
 ```
@@ -105,7 +105,7 @@ def f1(
 from typing import Literal
 
 def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):
-    reveal_type(v)  # revealed: Literal["a", "b", b"c", "de", "f", "g", "h"]
+    reveal_type(v)  # revealed: Literal["a", "b", "de", "f", "g", "h", b"c"]
 ```
 
 ## Class variables

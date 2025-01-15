@@ -52,7 +52,7 @@ type IntOrStrOrBytes = IntOrStr | bytes
 x: IntOrStrOrBytes = 1
 
 def f() -> None:
-    reveal_type(x)  # revealed: int | str | bytes
+    reveal_type(x)  # revealed: bytes | int | str
 ```
 
 ## Aliased type aliases

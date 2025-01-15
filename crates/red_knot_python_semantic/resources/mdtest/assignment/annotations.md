@@ -56,8 +56,8 @@ reveal_type(g)  # revealed: @Todo(full tuple[...] support)
 # TODO: support more kinds of type expressions in annotations
 reveal_type(h)  # revealed: @Todo(full tuple[...] support)
 
-reveal_type(i)  # revealed: tuple[str | int, str | int]
-reveal_type(j)  # revealed: tuple[str | int]
+reveal_type(i)  # revealed: tuple[int | str, int | str]
+reveal_type(j)  # revealed: tuple[int | str]
 ```
 
 ## Incorrect tuple assignments are complained about
@@ -69,7 +69,7 @@ a: tuple[()] = (1, 2)
 # error: [invalid-assignment] "Object of type `tuple[Literal["foo"]]` is not assignable to `tuple[int]`"
 b: tuple[int] = ("foo",)
 
-# error: [invalid-assignment] "Object of type `tuple[list, Literal["foo"]]` is not assignable to `tuple[str | int, str]`"
+# error: [invalid-assignment] "Object of type `tuple[list, Literal["foo"]]` is not assignable to `tuple[int | str, str]`"
 c: tuple[str | int, str] = ([], "foo")
 ```
 
@@ -77,7 +77,7 @@ c: tuple[str | int, str] = ([], "foo")
 
 ```py
 def foo(v: str | int | None, w: str | str | None, x: str | str):
-    reveal_type(v)  # revealed: str | int | None
+    reveal_type(v)  # revealed: int | str | None
     reveal_type(w)  # revealed: str | None
     reveal_type(x)  # revealed: str
 ```

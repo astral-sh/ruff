@@ -10,7 +10,7 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Literal[1]
     else:
         # TODO should be None
-        reveal_type(x)  # revealed: None | Literal[1]
+        reveal_type(x)  # revealed: Literal[1] | None
 ```
 
 ## `!=` for other singleton types

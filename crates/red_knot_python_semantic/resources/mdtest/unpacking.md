@@ -339,7 +339,7 @@ Union of two tuples of equal length and both the element types are different.
 def _(arg: tuple[int, str] | tuple[str, int]):
     a, b = arg
     reveal_type(a)  # revealed: int | str
-    reveal_type(b)  # revealed: str | int
+    reveal_type(b)  # revealed: int | str
 ```
 
 ### Mixed types (3)
@@ -355,7 +355,7 @@ def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str])
     a, b, c = arg
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: int | str
-    reveal_type(c)  # revealed: int | bytes | str
+    reveal_type(c)  # revealed: bytes | int | str
 ```
 
 ### Nested
@@ -363,9 +363,9 @@ def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str])
 ```py
 def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"]]):
     a, (b, c) = arg
-    reveal_type(a)  # revealed: int | tuple[int, bytes]
+    reveal_type(a)  # revealed: tuple[int, bytes] | int
     reveal_type(b)  # revealed: str
-    reveal_type(c)  # revealed: bytes | LiteralString
+    reveal_type(c)  # revealed: LiteralString | bytes
 ```
 
 ### Starred expression
@@ -376,7 +376,7 @@ def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
     reveal_type(a)  # revealed: int
     # TODO: Should be `list[bytes | int | str]`
     reveal_type(b)  # revealed: @Todo(starred unpacking)
-    reveal_type(c)  # revealed: int | bytes
+    reveal_type(c)  # revealed: bytes | int
 ```
 
 ### Size mismatch (1)
@@ -437,8 +437,8 @@ from typing import Literal
 
 def _(arg: tuple[int, int] | Literal["ab"]):
     a, b = arg
-    reveal_type(a)  # revealed: int | LiteralString
-    reveal_type(b)  # revealed: int | LiteralString
+    reveal_type(a)  # revealed: LiteralString | int
+    reveal_type(b)  # revealed: LiteralString | int
 ```
 
 ### Custom iterator (1)
@@ -471,8 +471,8 @@ class Iterable:
 
 def _(arg: tuple[int, str] | Iterable):
     a, b = arg
-    reveal_type(a)  # revealed: int | bytes
-    reveal_type(b)  # revealed: str | bytes
+    reveal_type(a)  # revealed: bytes | int
+    reveal_type(b)  # revealed: bytes | str
 ```
 
 ## For statement
@@ -503,7 +503,7 @@ def _(arg: tuple[tuple[int, int], tuple[int, str]]):
 def _(arg: tuple[tuple[int, str], tuple[str, int]]):
     for a, b in arg:
         reveal_type(a)  # revealed: int | str
-        reveal_type(b)  # revealed: str | int
+        reveal_type(b)  # revealed: int | str
 ```
 
 ### Mixed types (3)
@@ -513,7 +513,7 @@ def _(arg: tuple[tuple[int, int, int], tuple[int, str, bytes], tuple[int, int, s
     for a, b, c in arg:
         reveal_type(a)  # revealed: int
         reveal_type(b)  # revealed: int | str
-        reveal_type(c)  # revealed: int | bytes | str
+        reveal_type(c)  # revealed: bytes | int | str
 ```
 
 ### Same literal values
@@ -540,8 +540,8 @@ for a, b in ((1, 2), ("a", "b")):
 # error: "Object of type `Literal[4]` is not iterable"
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 for a, b in (1, 2, (3, "a"), 4, (5, "b"), "c"):
-    reveal_type(a)  # revealed: Unknown | Literal[3, 5] | LiteralString
-    reveal_type(b)  # revealed: Unknown | Literal["a", "b"]
+    reveal_type(a)  # revealed: LiteralString | Literal[3, 5] | Unknown
+    reveal_type(b)  # revealed: Literal["a", "b"] | Unknown
 ```
 
 ### Custom iterator (1)
@@ -573,6 +573,6 @@ class Iterable:
 
 def _(arg: tuple[tuple[int, str], Iterable]):
     for a, b in arg:
-        reveal_type(a)  # revealed: int | bytes
-        reveal_type(b)  # revealed: str | bytes
+        reveal_type(a)  # revealed: bytes | int
+        reveal_type(b)  # revealed: bytes | str
 ```

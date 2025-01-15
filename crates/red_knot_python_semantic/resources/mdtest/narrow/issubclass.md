@@ -36,7 +36,7 @@ def _(flag1: bool, flag2: bool):
     if issubclass(t, int):
         reveal_type(t)  # revealed: Literal[int]
     else:
-        reveal_type(t)  # revealed: Literal[str, bytes]
+        reveal_type(t)  # revealed: Literal[bytes, str]
 
     if issubclass(t, int):
         reveal_type(t)  # revealed: Literal[int]
@@ -68,7 +68,7 @@ def _(flag1: bool, flag2: bool, flag3: bool):
     t2 = Derived1 if flag2 else Base
 
     if issubclass(t2, Base):
-        reveal_type(t2)  # revealed: Literal[Derived1, Base]
+        reveal_type(t2)  # revealed: Literal[Base, Derived1]
 
     t3 = Derived1 if flag3 else Unrelated
 
@@ -127,7 +127,7 @@ def _(flag1: bool, flag2: bool):
     t = int if flag1 else str if flag2 else bytes
 
     if issubclass(t, (int, (Unrelated, (bytes,)))):
-        reveal_type(t)  # revealed: Literal[int, bytes]
+        reveal_type(t)  # revealed: Literal[bytes, int]
     else:
         reveal_type(t)  # revealed: Literal[str]
 ```

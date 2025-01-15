@@ -110,10 +110,8 @@ python-version = "3.10"
 from typing_extensions import assert_type
 
 def _(a: str | int):
-    assert_type(a, str | int)  # fine
-
-    # TODO: Order-independent union handling in type equivalence
-    assert_type(a, int | str)  # error: [type-assertion-failure]
+    assert_type(a, str | int)
+    assert_type(a, int | str)
 ```
 
 ## Intersections
@@ -135,8 +133,6 @@ def _(a: A):
     if isinstance(a, B) and not isinstance(a, C) and not isinstance(a, D):
         reveal_type(a)  # revealed: A & B & ~C & ~D
 
-        assert_type(a, Intersection[A, B, Not[C], Not[D]])  # fine
-
-        # TODO: Order-independent intersection handling in type equivalence
-        assert_type(a, Intersection[B, A, Not[D], Not[C]])  # error: [type-assertion-failure]
+        assert_type(a, Intersection[A, B, Not[C], Not[D]])
+        assert_type(a, Intersection[B, A, Not[D], Not[C]])
 ```

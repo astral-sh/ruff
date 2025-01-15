@@ -119,7 +119,7 @@ class ZeroOrStr:
 reveal_type(len(Zero()))  # revealed: Literal[0]
 reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
 reveal_type(len(ZeroOrTrue()))  # revealed: Literal[0, 1]
-reveal_type(len(OneOrFalse()))  # revealed: Literal[1, 0]
+reveal_type(len(OneOrFalse()))  # revealed: Literal[0, 1]
 
 # TODO: Emit a diagnostic
 reveal_type(len(OneOrFoo()))  # revealed: int

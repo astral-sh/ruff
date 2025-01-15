@@ -77,9 +77,9 @@ No narrowing should occur if `type` is used to dynamically create a class:
 ```py
 def _(x: str | int):
     if type(x, (), {}) is str:
-        reveal_type(x)  # revealed: str | int
+        reveal_type(x)  # revealed: int | str
     else:
-        reveal_type(x)  # revealed: str | int
+        reveal_type(x)  # revealed: int | str
 ```
 
 ## No narrowing for keyword arguments
@@ -90,7 +90,7 @@ def _(x: str | int):
 def _(x: str | int):
     # TODO: we could issue a diagnostic here
     if type(object=x) is str:
-        reveal_type(x)  # revealed: str | int
+        reveal_type(x)  # revealed: int | str
 ```
 
 ## Narrowing if `type` is aliased

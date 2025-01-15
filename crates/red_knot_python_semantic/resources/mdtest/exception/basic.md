@@ -33,7 +33,7 @@ EXCEPTIONS = (AttributeError, TypeError)
 try:
     help()
 except (RuntimeError, OSError) as e:
-    reveal_type(e)  # revealed: RuntimeError | OSError
+    reveal_type(e)  # revealed: OSError | RuntimeError
 except EXCEPTIONS as f:
     reveal_type(f)  # revealed: AttributeError | TypeError
 ```
@@ -71,7 +71,7 @@ try:
 # error: [invalid-exception-caught] "Cannot catch object of type `Literal["foo"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
 # error: [invalid-exception-caught] "Cannot catch object of type `Literal[b"bar"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
 except (ValueError, OSError, "foo", b"bar") as e:
-    reveal_type(e)  # revealed: ValueError | OSError | Unknown
+    reveal_type(e)  # revealed: OSError | ValueError | Unknown
 
 def foo(
     x: type[str],

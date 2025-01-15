@@ -94,7 +94,7 @@ def _(flag: bool):
     bar_1: LiteralString = foo_1  # fine
 
     foo_2 = "foo" if flag else "bar"
-    reveal_type(foo_2)  # revealed: Literal["foo", "bar"]
+    reveal_type(foo_2)  # revealed: Literal["bar", "foo"]
     bar_2: LiteralString = foo_2  # fine
 
     foo_3: LiteralString = "foo" * 1_000_000_000
@@ -107,7 +107,7 @@ def _(flag: bool):
     qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
 
     baz_3 = "foo" if flag else 1
-    reveal_type(baz_3)  # revealed: Literal["foo", 1]
+    reveal_type(baz_3)  # revealed: Literal[1, "foo"]
     qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 ```
 

@@ -10,8 +10,8 @@ def _(foo: str):
     reveal_type(False or "z")  # revealed: Literal["z"]
     reveal_type(False or True)  # revealed: Literal[True]
     reveal_type(False or False)  # revealed: Literal[False]
-    reveal_type(foo or False)  # revealed: str & ~AlwaysFalsy | Literal[False]
-    reveal_type(foo or True)  # revealed: str & ~AlwaysFalsy | Literal[True]
+    reveal_type(foo or False)  # revealed: Literal[False] | str & ~AlwaysFalsy
+    reveal_type(foo or True)  # revealed: Literal[True] | str & ~AlwaysFalsy
 ```
 
 ## AND
@@ -20,8 +20,8 @@ def _(foo: str):
 def _(foo: str):
     reveal_type(True and False)  # revealed: Literal[False]
     reveal_type(False and True)  # revealed: Literal[False]
-    reveal_type(foo and False)  # revealed: str & ~AlwaysTruthy | Literal[False]
-    reveal_type(foo and True)  # revealed: str & ~AlwaysTruthy | Literal[True]
+    reveal_type(foo and False)  # revealed: Literal[False] | str & ~AlwaysTruthy
+    reveal_type(foo and True)  # revealed: Literal[True] | str & ~AlwaysTruthy
     reveal_type("x" and "y" and "z")  # revealed: Literal["z"]
     reveal_type("x" and "y" and "")  # revealed: Literal[""]
     reveal_type("" and "y")  # revealed: Literal[""]

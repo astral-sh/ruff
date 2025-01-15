@@ -84,7 +84,7 @@ impl ToOwned for VendoredPath {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
 pub struct VendoredPathBuf(Utf8PathBuf);
 
 impl Default for VendoredPathBuf {
