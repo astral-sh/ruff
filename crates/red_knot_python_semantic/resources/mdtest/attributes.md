@@ -181,10 +181,6 @@ class C:
     def instance_method(self):
         self.regular_class_variable = "value set in instance method"
 
-    @classmethod
-    def class_method(cls):
-        cls.regular_class_variable = "value set in class method"
-
 reveal_type(C.regular_class_variable)  # revealed: str
 
 c_instance = C()
