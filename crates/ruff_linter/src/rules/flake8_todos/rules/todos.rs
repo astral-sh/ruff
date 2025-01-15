@@ -224,11 +224,19 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-static ISSUE_LINK_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
+static ISSUE_LINK_OWN_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"^#\s*(http|https)://.*", // issue link
         r"^#\s*\d+$",              // issue code - like "003"
         r"^#\s*[A-Z]+\-?\d+$",     // issue code - like "TD003"
+    ])
+    .unwrap()
+});
+
+static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
+    RegexSet::new([
+        r"\s*(http|https)://.*", // issue link
+        r"\s*#\d+.*",            // issue code - like "#003"
     ])
     .unwrap()
 });
@@ -257,6 +265,13 @@ pub(crate) fn todos(
         static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
+        // VSCode recommended links on same line are ok:
+        // `# TODO(dylan): #1234`
+        if ISSUE_LINK_TODO_LINE_REGEX_SET
+            .is_match(locator.slice(TextRange::new(directive.range.end(), range.end())))
+        {
+            continue;
+        }
         let mut curr_range = range;
         for next_range in comment_ranges.iter().skip(range_index + 1).copied() {
             // Ensure that next_comment_range is in the same multiline comment "block" as
@@ -274,7 +289,7 @@ pub(crate) fn todos(
                 break;
             }
 
-            if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+            if ISSUE_LINK_OWN_LINE_REGEX_SET.is_match(next_comment) {
                 has_issue_link = true;
             }
 
