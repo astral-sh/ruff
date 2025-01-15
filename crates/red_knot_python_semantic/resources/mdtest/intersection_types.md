@@ -680,7 +680,7 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy, Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -690,6 +690,10 @@ def f(
     d: Intersection[LiteralString, Not[AlwaysFalsy]],
     e: Intersection[AlwaysFalsy, LiteralString],
     f: Intersection[Not[AlwaysTruthy], LiteralString],
+    g: Intersection[AlwaysTruthy, LiteralString],
+    h: Intersection[Not[AlwaysFalsy], LiteralString],
+    i: Intersection[Unknown, LiteralString, AlwaysFalsy],
+    j: Intersection[Not[AlwaysTruthy], Unknown, LiteralString],
 ):
     reveal_type(a)  # revealed: LiteralString & ~Literal[""]
     reveal_type(b)  # revealed: Literal[""]
@@ -697,6 +701,10 @@ def f(
     reveal_type(d)  # revealed: LiteralString & ~Literal[""]
     reveal_type(e)  # revealed: Literal[""]
     reveal_type(f)  # revealed: Literal[""]
+    reveal_type(g)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(h)  # revealed: LiteralString & ~Literal[""]
+    reveal_type(i)  # revealed: Unknown & Literal[""]
+    reveal_type(j)  # revealed: Unknown & Literal[""]
 ```
 
 ## Addition of a type to an intersection with many non-disjoint types
