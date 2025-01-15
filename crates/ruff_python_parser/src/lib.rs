@@ -202,21 +202,19 @@ pub fn parse_parenthesized_expression_range(
 /// Parsing a string annotation:
 ///
 /// ```
-/// use ruff_python_parser::parse_as_string_annotation;
-/// # use ruff_python_ast::StringLiteral;
-/// # use ruff_text_size::{TextRange, TextSize};
+/// use ruff_python_parser::parse_string_annotation;
+/// use ruff_python_ast::{StringLiteral, StringLiteralFlags};
+/// use ruff_text_size::{TextRange, TextSize};
 ///
-/// let source = "'\n int | str'";
-/// let string = StringLiteral::new(TextRange::new(TextSize::new(0), TextSize::new(9)));
-/// let parsed = parse_as_string_annotation(source, &string);
+/// let string = StringLiteral {
+///     value: "'''\n int | str'''".to_string().into_boxed_str(),
+///     flags: StringLiteralFlags::default(),
+///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
+/// };
+/// let parsed = parse_string_annotation("'''\n int | str'''", &string);
 /// assert!(!parsed.is_ok());
-///
-/// let source = "'''\n int | str'''";
-/// let string = StringLiteral::new_triple_quoted(TextRange::new(TextSize::new(0), TextSize::new(16)));
-/// let parsed = parse_as_string_annotation(source, &string);
-/// assert!(parsed.is_ok());
 /// ```
-pub fn parse_as_string_annotation(
+pub fn parse_string_annotation(
     source: &str,
     string: &StringLiteral,
 ) -> Result<Parsed<ModExpression>, ParseError> {

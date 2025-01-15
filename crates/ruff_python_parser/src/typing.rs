@@ -5,7 +5,7 @@ use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_as_string_annotation, parse_expression, ParseError, Parsed};
+use crate::{parse_expression, parse_string_annotation, ParseError, Parsed};
 
 type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 
@@ -82,7 +82,7 @@ fn parse_simple_type_annotation(
     source: &str,
 ) -> AnnotationParseResult {
     Ok(ParsedAnnotation {
-        parsed: parse_as_string_annotation(source, string_literal)?,
+        parsed: parse_string_annotation(source, string_literal)?,
         kind: AnnotationKind::Simple,
     })
 }
