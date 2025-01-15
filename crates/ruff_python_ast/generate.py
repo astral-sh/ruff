@@ -67,6 +67,7 @@ class Ast:
 class Group:
     name: str
     nodes: list[Node]
+    id_enum_ty: str
     owned_enum_ty: str
 
     add_suffix_to_is_methods: bool
@@ -75,6 +76,7 @@ class Group:
 
     def __init__(self, group_name: str, group: dict[str, Any]) -> None:
         self.name = group_name
+        self.id_enum_ty = group_name + "Id"
         self.owned_enum_ty = group_name
         self.ref_enum_ty = group_name + "Ref"
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
@@ -89,12 +91,16 @@ class Group:
 class Node:
     name: str
     variant: str
+    id_ty: str
     ty: str
+    storage_field: str
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
+        self.id_ty = node_name + "Id"
         self.ty = f"crate::{node_name}"
+        self.storage_field = to_snake_case(node_name)
 
 
 # ------------------------------------------------------------------------------
@@ -106,6 +112,75 @@ def write_preamble(out: list[str]) -> None:
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
     """)
+
+
+# ------------------------------------------------------------------------------
+# ID enum
+
+
+def write_ids(out: list[str], ast: Ast) -> None:
+    """
+    Create an ID type for each syntax node, and a per-group enum that contains a
+    syntax node ID.
+
+    ```rust
+    #[newindex_type]
+    pub struct TypeParamTypeVarId;
+    #[newindex_type]
+    pub struct TypeParamTypeVarTuple;
+    ...
+
+    pub enum TypeParamId {
+        TypeVar(TypeParamTypeVarId),
+        TypeVarTuple(TypeParamTypeVarTupleId),
+        ...
+    }
+    ```
+
+    Also creates:
+    - `impl From<TypeParamTypeVarId> for TypeParamId`
+    - `impl Ranged for TypeParamTypeVar`
+    - `fn TypeParamId::is_type_var() -> bool`
+
+    If the `add_suffix_to_is_methods` group option is true, then the
+    `is_type_var` method will be named `is_type_var_type_param`.
+    """
+
+    for node in ast.all_nodes:
+        out.append("")
+        out.append("#[ruff_index::newtype_index]")
+        out.append(f"pub struct {node.id_ty};")
+
+        out.append(f"""
+            impl ruff_text_size::Ranged for {node.ty} {{
+                fn range(&self) -> ruff_text_size::TextRange {{
+                    self.range
+                }}
+            }}
+        """)
+
+    for group in ast.groups:
+        out.append("")
+        if group.rustdoc is not None:
+            out.append(group.rustdoc)
+        out.append("#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]")
+        out.append(f"pub enum {group.id_enum_ty} {{")
+        for node in group.nodes:
+            if group.add_suffix_to_is_methods:
+                is_name = to_snake_case(node.variant + group.name)
+                out.append(f'#[is(name = "{is_name}")]')
+            out.append(f"{node.variant}({node.id_ty}),")
+        out.append("}")
+
+        for node in group.nodes:
+            out.append(f"""
+            impl From<{node.id_ty}> for {group.id_enum_ty} {{
+                fn from(id: {node.id_ty}) -> Self {{
+                    Self::{node.variant}(id)
+                }}
+            }}
+            """)
+
 
 
 # ------------------------------------------------------------------------------
@@ -126,7 +201,6 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     Also creates:
     - `impl Ranged for TypeParam`
-    - `TypeParam::visit_source_order`
     - `impl From<TypeParamTypeVar> for TypeParam`
     - `impl Ranged for TypeParamTypeVar`
     - `fn TypeParam::is_type_var() -> bool`
@@ -170,15 +244,6 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         }
         """)
 
-    for node in ast.all_nodes:
-        out.append(f"""
-            impl ruff_text_size::Ranged for {node.ty} {{
-                fn range(&self) -> ruff_text_size::TextRange {{
-                    self.range
-                }}
-            }}
-        """)
-
     for group in ast.groups:
         out.append(f"""
             impl {group.owned_enum_ty} {{
@@ -210,17 +275,18 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
     ```rust
     pub enum TypeParamRef<'a> {
-        TypeVar(&'a TypeParamTypeVar),
-        TypeVarTuple(&'a TypeParamTypeVarTuple),
+        TypeVar(Node<'a, &'a TypeParamTypeVar>),
+        TypeVarTuple(Node<'a, &'a TypeParamTypeVarTuple>),
         ...
     }
     ```
 
     Also creates:
-    - `impl<'a> From<&'a TypeParam> for TypeParamRef<'a>`
-    - `impl<'a> From<&'a TypeParamTypeVar> for TypeParamRef<'a>`
+    - `impl<'a> From<Node<'a, &'a TypeParam>> for TypeParamRef<'a>`
+    - `impl<'a> From<Node<'a, &'a TypeParamTypeVar>> for TypeParamRef<'a>`
     - `impl Ranged for TypeParamRef<'_>`
     - `fn TypeParamRef::is_type_var() -> bool`
+    - `TypeParamRef::visit_source_order`
 
     The name of each variant can be customized via the `variant` node option. If
     the `add_suffix_to_is_methods` group option is true, then the `is_type_var`
@@ -237,17 +303,17 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
             if group.add_suffix_to_is_methods:
                 is_name = to_snake_case(node.variant + group.name)
                 out.append(f'#[is(name = "{is_name}")]')
-            out.append(f"""{node.variant}(&'a {node.ty}),""")
+            out.append(f"""{node.variant}(crate::Node<'a, &'a {node.ty}>),""")
         out.append("}")
 
         out.append(f"""
-            impl<'a> From<&'a {group.owned_enum_ty}> for {group.ref_enum_ty}<'a> {{
-                fn from(node: &'a {group.owned_enum_ty}) -> Self {{
-                    match node {{
+            impl<'a> From<crate::Node<'a, &'a {group.owned_enum_ty}>> for {group.ref_enum_ty}<'a> {{
+                fn from(node: crate::Node<'a, &'a {group.owned_enum_ty}>) -> Self {{
+                    match node.node {{
         """)
         for node in group.nodes:
             out.append(
-                f"{group.owned_enum_ty}::{node.variant}(node) => {group.ref_enum_ty}::{node.variant}(node),"
+                f"""{group.owned_enum_ty}::{node.variant}(n) => {group.ref_enum_ty}::{node.variant}(node.ast.wrap(n)),"""
             )
         out.append("""
                     }
@@ -257,8 +323,8 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
         for node in group.nodes:
             out.append(f"""
-            impl<'a> From<&'a {node.ty}> for {group.ref_enum_ty}<'a> {{
-                fn from(node: &'a {node.ty}) -> Self {{
+            impl<'a> From<crate::Node<'a, &'a {node.ty}>> for {group.ref_enum_ty}<'a> {{
+                fn from(node: crate::Node<'a, &'a {node.ty}>) -> Self {{
                     Self::{node.variant}(node)
                 }}
             }}
@@ -277,6 +343,112 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
         }
         """)
 
+    for group in ast.groups:
+        out.append(f"""
+            impl<'a> {group.ref_enum_ty}<'a> {{
+                #[allow(unused)]
+                pub(crate) fn visit_source_order<V>(self, visitor: &mut V)
+                where
+                    V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+                {{
+                    match self {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"""{group.ref_enum_ty}::{node.variant}(node) => node.visit_source_order(visitor),"""
+            )
+        out.append("""
+                    }
+                }
+            }
+        """)
+
+
+# ------------------------------------------------------------------------------
+# AST storage
+
+
+def write_storage(out: list[str], ast: Ast) -> None:
+    """
+    Create the storage struct for all of the syntax nodes.
+
+    ```rust
+    pub(crate) struct Storage {
+        ...
+        pub(crate) type_param_type_var_id: IndexVec<TypeParamTypeVarId, TypeParamTypeVar>,
+        pub(crate) type_param_type_var_tuple_id: IndexVec<TypeParamTypeVarTupleId, TypeParamTypeVarTuple>,
+        ...
+    }
+    ```
+
+    Also creates:
+    - `impl AstId for TypeParamTypeVarId for Ast`
+    - `impl AstIdMut for TypeParamTypeVarId for Ast`
+    """
+
+    out.append("")
+    out.append("#[derive(Clone, Default, PartialEq)]")
+    out.append("pub(crate) struct Storage {")
+    for node in ast.all_nodes:
+        out.append(f"""pub(crate) {node.storage_field}: ruff_index::IndexVec<{node.id_ty}, {node.ty}>,""")
+    out.append("}")
+
+    for node in ast.all_nodes:
+        out.append(f"""
+            impl crate::ast::AstId for {node.id_ty} {{
+                type Output<'a> = crate::Node<'a, &'a {node.ty}>;
+                #[inline]
+                fn node<'a>(self, ast: &'a crate::Ast) -> Self::Output<'a> {{
+                    ast.wrap(&ast.storage.{node.storage_field}[self])
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl crate::ast::AstIdMut for {node.id_ty} {{
+                type Output<'a> = crate::Node<'a, &'a mut {node.ty}>;
+                #[inline]
+                fn node_mut<'a>(self, ast: &'a mut crate::Ast) -> Self::Output<'a> {{
+                    ast.wrap(&mut ast.storage.{node.storage_field}[self])
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl<'a> crate::Node<'a, {node.id_ty}> {{
+                #[inline]
+                pub fn node(self) -> crate::Node<'a, &'a {node.ty}> {{
+                    self.ast.node(self.node)
+                }}
+            }}
+        """)
+
+    for group in ast.groups:
+        out.append(f"""
+            impl crate::ast::AstId for {group.id_enum_ty} {{
+                type Output<'a> = {group.ref_enum_ty}<'a>;
+                #[inline]
+                fn node<'a>(self, ast: &'a crate::Ast) -> Self::Output<'a> {{
+                    match self {{
+        """)
+        for node in group.nodes:
+            out.append(f"""{group.id_enum_ty}::{node.variant}(node) => {group.ref_enum_ty}::{node.variant}(ast.node(node)),""")
+        out.append(f"""
+                    }}
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl<'a> crate::Node<'a, {group.id_enum_ty}> {{
+                #[inline]
+                pub fn node(self) -> crate::Node<'a, &'a {node.ty}> {{
+                    self.ast.node(self.node)
+                }}
+            }}
+        """)
+
+
 
 # ------------------------------------------------------------------------------
 # AnyNodeRef
@@ -289,16 +461,16 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     ```rust
     pub enum AnyNodeRef<'a> {
         ...
-        TypeParamTypeVar(&'a TypeParamTypeVar),
-        TypeParamTypeVarTuple(&'a TypeParamTypeVarTuple),
+        TypeParamTypeVar(Node<'a, &'a TypeParamTypeVar>),
+        TypeParamTypeVarTuple(Node<'a, &'a TypeParamTypeVarTuple>),
         ...
     }
     ```
 
     Also creates:
-    - `impl<'a> From<&'a TypeParam> for AnyNodeRef<'a>`
     - `impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a>`
-    - `impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a>`
+    - `impl<'a> From<Node<'a, &'a TypeParam>> for AnyNodeRef<'a>`
+    - `impl<'a> From<Node<'a, &'a TypeParamTypeVarTuple>> for AnyNodeRef<'a>`
     - `impl Ranged for AnyNodeRef<'_>`
     - `fn AnyNodeRef::as_ptr(&self) -> std::ptr::NonNull<()>`
     - `fn AnyNodeRef::visit_preorder(self, visitor &mut impl SourceOrderVisitor)`
@@ -309,20 +481,20 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     pub enum AnyNodeRef<'a> {
     """)
     for node in ast.all_nodes:
-        out.append(f"""{node.name}(&'a {node.ty}),""")
+        out.append(f"""{node.name}(crate::Node<'a, &'a {node.ty}>),""")
     out.append("""
     }
     """)
 
     for group in ast.groups:
         out.append(f"""
-            impl<'a> From<&'a {group.owned_enum_ty}> for AnyNodeRef<'a> {{
-                fn from(node: &'a {group.owned_enum_ty}) -> AnyNodeRef<'a> {{
-                    match node {{
+            impl<'a> From<crate::Node<'a, &'a {group.owned_enum_ty}>> for AnyNodeRef<'a> {{
+                fn from(node: crate::Node<'a, &'a {group.owned_enum_ty}>) -> AnyNodeRef<'a> {{
+                    match node.node {{
         """)
         for node in group.nodes:
             out.append(
-                f"{group.owned_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"
+                f"{group.owned_enum_ty}::{node.variant}(n) => AnyNodeRef::{node.name}(node.ast.wrap(n)),"
             )
         out.append("""
                     }
@@ -347,8 +519,8 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     for node in ast.all_nodes:
         out.append(f"""
-            impl<'a> From<&'a {node.ty}> for AnyNodeRef<'a> {{
-                fn from(node: &'a {node.ty}) -> AnyNodeRef<'a> {{
+            impl<'a> From<crate::Node<'a, &'a {node.ty}>> for AnyNodeRef<'a> {{
+                fn from(node: crate::Node<'a, &'a {node.ty}>) -> AnyNodeRef<'a> {{
                     AnyNodeRef::{node.name}(node)
                 }}
             }}
@@ -374,7 +546,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     """)
     for node in ast.all_nodes:
         out.append(
-            f"AnyNodeRef::{node.name}(node) => std::ptr::NonNull::from(*node).cast(),"
+            f"AnyNodeRef::{node.name}(node) => std::ptr::NonNull::from(node.as_ref()).cast(),"
         )
     out.append("""
                 }
@@ -470,8 +642,10 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 def generate(ast: Ast) -> list[str]:
     out = []
     write_preamble(out)
+    write_ids(out, ast)
     write_owned_enum(out, ast)
     write_ref_enum(out, ast)
+    write_storage(out, ast)
     write_anynoderef(out, ast)
     write_nodekind(out, ast)
     return out

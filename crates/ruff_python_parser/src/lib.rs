@@ -73,7 +73,8 @@ pub use crate::token::{Token, TokenKind};
 use crate::parser::Parser;
 
 use ruff_python_ast::{
-    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+    Ast, Expr, Mod, ModExpression, ModId, ModModule, ModModuleId, PySourceType, StringFlags,
+    StringLiteral, Suite,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -109,7 +110,7 @@ pub mod typing;
 /// let module = parse_module(source);
 /// assert!(module.is_ok());
 /// ```
-pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
+pub fn parse_module(source: &str) -> Result<Parsed<ModModuleId>, ParseError> {
     Parser::new(source, Mode::Module)
         .parse()
         .try_into_module()
@@ -132,7 +133,7 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// let expr = parse_expression("1 + 2");
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
+pub fn parse_expression(source: &str) -> Result<Parsed<ModExpressionId>, ParseError> {
     Parser::new(source, Mode::Expression)
         .parse()
         .try_into_expression()
@@ -159,7 +160,7 @@ pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseErro
 pub fn parse_expression_range(
     source: &str,
     range: TextRange,
-) -> Result<Parsed<ModExpression>, ParseError> {
+) -> Result<Parsed<ModExpressionId>, ParseError> {
     let source = &source[..range.end().to_usize()];
     Parser::new_starts_at(source, Mode::Expression, range.start())
         .parse()
@@ -273,7 +274,7 @@ pub fn parse_string_annotation(
 /// let parsed = parse(source, Mode::Ipython);
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
+pub fn parse(source: &str, mode: Mode) -> Result<Parsed<ModId>, ParseError> {
     parse_unchecked(source, mode).into_result()
 }
 
@@ -281,12 +282,12 @@ pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
-pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
+pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<ModId> {
     Parser::new(source, mode).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
-pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
+pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModuleId> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
     Parser::new(source, source_type.as_mode())
         .parse()
@@ -297,12 +298,18 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 /// Represents the parsed source code.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Parsed<T> {
+    ast: Ast,
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
 }
 
 impl<T> Parsed<T> {
+    /// Returns the AST for the parsed output.
+    pub fn ast(&self) -> &Ast {
+        &self.ast
+    }
+
     /// Returns the syntax node represented by this parsed output.
     pub fn syntax(&self) -> &T {
         &self.syntax
@@ -354,7 +361,7 @@ impl<T> Parsed<T> {
     }
 }
 
-impl Parsed<Mod> {
+impl Parsed<ModId> {
     /// Attempts to convert the [`Parsed<Mod>`] into a [`Parsed<ModModule>`].
     ///
     /// This method checks if the `syntax` field of the output is a [`Mod::Module`]. If it is, the
@@ -362,14 +369,15 @@ impl Parsed<Mod> {
     /// returns [`None`].
     ///
     /// [`Some(Parsed<ModModule>)`]: Some
-    pub fn try_into_module(self) -> Option<Parsed<ModModule>> {
+    pub fn try_into_module(self) -> Option<Parsed<ModModuleId>> {
         match self.syntax {
-            Mod::Module(module) => Some(Parsed {
+            ModId::Module(module) => Some(Parsed {
+                ast: self.ast,
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
             }),
-            Mod::Expression(_) => None,
+            ModId::Expression(_) => None,
         }
     }
 
@@ -380,10 +388,11 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    pub fn try_into_expression(self) -> Option<Parsed<ModExpressionId>> {
         match self.syntax {
-            Mod::Module(_) => None,
-            Mod::Expression(expression) => Some(Parsed {
+            ModId::Module(_) => None,
+            ModId::Expression(expression) => Some(Parsed {
+                ast: self.ast,
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
@@ -392,32 +401,22 @@ impl Parsed<Mod> {
     }
 }
 
-impl Parsed<ModModule> {
+impl Parsed<ModModuleId> {
     /// Returns the module body contained in this parsed output as a [`Suite`].
     pub fn suite(&self) -> &Suite {
-        &self.syntax.body
-    }
-
-    /// Consumes the [`Parsed`] output and returns the module body as a [`Suite`].
-    pub fn into_suite(self) -> Suite {
-        self.syntax.body
+        &self.ast[self.syntax].body
     }
 }
 
-impl Parsed<ModExpression> {
+impl Parsed<ModExpressionId> {
     /// Returns the expression contained in this parsed output.
     pub fn expr(&self) -> &Expr {
-        &self.syntax.body
+        &self.ast[self.syntax].body
     }
 
     /// Returns a mutable reference to the expression contained in this parsed output.
     pub fn expr_mut(&mut self) -> &mut Expr {
-        &mut self.syntax.body
-    }
-
-    /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
-    pub fn into_expr(self) -> Expr {
-        *self.syntax.body
+        &mut self.ast[self.syntax].body
     }
 }
 

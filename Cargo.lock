@@ -2917,6 +2917,7 @@ dependencies = [
  "itertools 0.14.0",
  "memchr",
  "ruff_cache",
+ "ruff_index",
  "ruff_macros",
  "ruff_python_trivia",
  "ruff_source_file",

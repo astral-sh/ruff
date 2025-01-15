@@ -13,27 +13,89 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::ast::AstId;
 use crate::name::Name;
 use crate::{
     int,
     str::Quote,
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
-    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam,
+    Ast, DecoratorId, ExceptHandler, Expr, ExprId, FStringElement, IdentifierId,
+    LiteralExpressionRef, Node, ParametersId, Pattern, Stmt, StmtId, TypeParam, TypeParamsId,
 };
+
+macro_rules! accessor {
+    ($ty:ty, $field:ident, $ref_ty:ty) => {
+        impl $ty {
+            pub fn $field<'a>(&'a self, ast: &'a Ast) -> Node<'a, <$ref_ty as AstId>::Output<'a>> {
+                ast.wrap(ast.node(self.$field))
+            }
+        }
+
+        impl<'a> Node<'a, &'a $ty> {
+            pub fn $field(self) -> Node<'a, <$ref_ty as AstId>::Output<'a>> {
+                self.node.$field(self.ast)
+            }
+        }
+    };
+}
+
+macro_rules! option_accessor {
+    ($ty:ty, $field:ident, $ref_ty:ty) => {
+        impl $ty {
+            pub fn $field<'a>(
+                &'a self,
+                ast: &'a Ast,
+            ) -> Option<Node<'a, <$ref_ty as AstId>::Output<'a>>> {
+                self.$field.map(|id| ast.wrap(ast.node(*id)))
+            }
+        }
+
+        impl<'a> Node<'a, &'a $ty> {
+            pub fn $field(self) -> Option<Node<'a, <$ref_ty as AstId>::Output<'a>>> {
+                self.node.$field(self.ast)
+            }
+        }
+    };
+}
+
+macro_rules! vec_accessor {
+    ($ty:ty, $field:ident, $ref_ty:ty) => {
+        impl $ty {
+            pub fn $field<'a>(
+                &'a self,
+                ast: &'a Ast,
+            ) -> impl Iterator<Item = Node<'a, <$ref_ty as AstId>::Output<'a>>> + 'a {
+                self.$field.iter().map(|id| ast.wrap(ast.node(*id)))
+            }
+        }
+
+        impl<'a> Node<'a, &'a $ty> {
+            pub fn $field(
+                self,
+            ) -> impl Iterator<Item = Node<'a, <$ref_ty as AstId>::Output<'a>>> + 'a {
+                self.node.$field(self.ast)
+            }
+        }
+    };
+}
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModModule {
     pub range: TextRange,
-    pub body: Vec<Stmt>,
+    pub body: Vec<StmtId>,
 }
+
+vec_accessor!(ModModule, body, StmtId);
 
 /// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModExpression {
     pub range: TextRange,
-    pub body: Box<Expr>,
+    pub body: ExprId,
 }
+
+accessor!(ModExpression, body, ExprId);
 
 /// An AST node used to represent a IPython escape command at the statement level.
 ///
@@ -104,20 +166,27 @@ pub struct StmtIpyEscapeCommand {
 pub struct StmtFunctionDef {
     pub range: TextRange,
     pub is_async: bool,
-    pub decorator_list: Vec<Decorator>,
-    pub name: Identifier,
-    pub type_params: Option<Box<TypeParams>>,
-    pub parameters: Box<Parameters>,
-    pub returns: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub decorator_list: Vec<DecoratorId>,
+    pub name: IdentifierId,
+    pub type_params: Option<TypeParamsId>,
+    pub parameters: ParametersId,
+    pub returns: Option<ExprId>,
+    pub body: Vec<StmtId>,
 }
+
+vec_accessor!(StmtFunctionDef, decorator_list, DecoratorId);
+accessor!(StmtFunctionDef, name, IdentifierId);
+option_accessor!(StmtFunctionDef, type_params, TypeParamsId);
+accessor!(StmtFunctionDef, parameters, ParametersId);
+option_accessor!(StmtFunctionDef, returns, ExprId);
+vec_accessor!(StmtFunctionDef, body, StmtId);
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtClassDef {
     pub range: TextRange,
     pub decorator_list: Vec<Decorator>,
-    pub name: Identifier,
+    pub name: IdentifierId,
     pub type_params: Option<Box<TypeParams>>,
     pub arguments: Option<Box<Arguments>>,
     pub body: Vec<Stmt>,

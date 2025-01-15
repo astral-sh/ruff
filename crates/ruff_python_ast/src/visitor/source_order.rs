@@ -1,9 +1,9 @@
 use crate::AnyNodeRef;
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
+    ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, ModId, Node, Operator,
+    Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword,
+    Singleton, Stmt, StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in the order they appear in the source.
@@ -20,8 +20,8 @@ pub trait SourceOrderVisitor<'a> {
     fn leave_node(&mut self, _node: AnyNodeRef<'a>) {}
 
     #[inline]
-    fn visit_mod(&mut self, module: &'a Mod) {
-        walk_module(self, module);
+    fn visit_mod(&mut self, module: Node<'a, ModId>) {
+        walk_module(self, module.node());
     }
 
     #[inline]
@@ -172,7 +172,7 @@ pub trait SourceOrderVisitor<'a> {
     }
 }
 
-pub fn walk_module<'a, V>(visitor: &mut V, module: &'a Mod)
+pub fn walk_module<'a, V>(visitor: &mut V, module: Node<'a, &'a Mod>)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
 {

@@ -1,11 +1,13 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
+pub use ast::{Ast, Node};
 pub use expression::*;
 pub use generated::*;
 pub use int::*;
 pub use nodes::*;
 
+pub mod ast;
 pub mod comparable;
 pub mod docstrings;
 mod expression;

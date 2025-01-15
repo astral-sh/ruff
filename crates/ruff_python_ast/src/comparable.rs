@@ -16,7 +16,7 @@
 //! have the same shape in that they evaluate to the same value.
 
 use crate as ast;
-use crate::{Expr, Number};
+use crate::{Expr, Node, Number};
 use std::borrow::Cow;
 use std::hash::Hash;
 
@@ -593,18 +593,14 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
         match literal {
             ast::LiteralExpressionRef::NoneLiteral(_) => Self::None,
             ast::LiteralExpressionRef::EllipsisLiteral(_) => Self::Ellipsis,
-            ast::LiteralExpressionRef::BooleanLiteral(ast::ExprBooleanLiteral {
-                value, ..
-            }) => Self::Bool(value),
-            ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                Self::Str(value.iter().map(Into::into).collect())
+            ast::LiteralExpressionRef::BooleanLiteral(node) => Self::Bool(&node.value),
+            ast::LiteralExpressionRef::StringLiteral(node) => {
+                Self::Str(node.value.iter().map(Into::into).collect())
             }
-            ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                Self::Bytes(value.iter().map(Into::into).collect())
+            ast::LiteralExpressionRef::BytesLiteral(node) => {
+                Self::Bytes(node.value.iter().map(Into::into).collect())
             }
-            ast::LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-                Self::Number(value.into())
-            }
+            ast::LiteralExpressionRef::NumberLiteral(node) => Self::Number((&node.value).into()),
         }
     }
 }
@@ -1437,9 +1433,9 @@ pub enum ComparableStmt<'a> {
     Continue,
 }
 
-impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
-    fn from(stmt: &'a ast::Stmt) -> Self {
-        match stmt {
+impl<'a> From<Node<'a, ast::StmtRef<'a>>> for ComparableStmt<'a> {
+    fn from(stmt: Node<'a, ast::StmtRef<'a>>) -> Self {
+        match stmt.node {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async,
                 name,
@@ -1451,7 +1447,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 range: _,
             }) => Self::FunctionDef(StmtFunctionDef {
                 is_async: *is_async,
-                name: name.as_str(),
+                name: stmt.name().as_str(),
                 parameters: parameters.into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),

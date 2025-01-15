@@ -2,7 +2,7 @@
 
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
+use ruff_python_ast::{Expr, ExprStringLiteral, ModExpressionId, StringLiteral};
 use ruff_text_size::Ranged;
 
 use crate::{parse_expression, parse_string_annotation, ParseError, Parsed};
@@ -11,12 +11,12 @@ type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 
 #[derive(Debug)]
 pub struct ParsedAnnotation {
-    parsed: Parsed<ModExpression>,
+    parsed: Parsed<ModExpressionId>,
     kind: AnnotationKind,
 }
 
 impl ParsedAnnotation {
-    pub fn parsed(&self) -> &Parsed<ModExpression> {
+    pub fn parsed(&self) -> &Parsed<ModExpressionId> {
         &self.parsed
     }
 

@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_ast::{ModModuleId, PySourceType};
 use ruff_python_parser::{parse_unchecked_source, Parsed};
 
 use crate::files::{File, FilePath};
@@ -43,24 +43,24 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
 /// Cheap cloneable wrapper around the parsed module.
 #[derive(Clone)]
 pub struct ParsedModule {
-    inner: Arc<Parsed<ModModule>>,
+    inner: Arc<Parsed<ModModuleId>>,
 }
 
 impl ParsedModule {
-    pub fn new(parsed: Parsed<ModModule>) -> Self {
+    pub fn new(parsed: Parsed<ModModuleId>) -> Self {
         Self {
             inner: Arc::new(parsed),
         }
     }
 
     /// Consumes `self` and returns the Arc storing the parsed module.
-    pub fn into_arc(self) -> Arc<Parsed<ModModule>> {
+    pub fn into_arc(self) -> Arc<Parsed<ModModuleId>> {
         self.inner
     }
 }
 
 impl Deref for ParsedModule {
-    type Target = Parsed<ModModule>;
+    type Target = Parsed<ModModuleId>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
