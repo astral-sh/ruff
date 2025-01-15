@@ -13,7 +13,7 @@ F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
    |
 13 | X: """List[int]"""'☃' = []
    |    ^^^^^^^^^^^^^^^^^^ F722
-14 | 
+14 |
 15 | # Type annotations with triple quotes can contain newlines and indentation
    |
 
@@ -23,14 +23,14 @@ str)
 `
    |
 28 |   """
-29 |   
+29 |
 30 |   invalid1: """
    |  ___________^
 31 | |         int |
 32 | | str)
 33 | | """
    | |___^ F722
-34 |   
+34 |
 35 |   invalid2: """
    |
 
@@ -40,7 +40,7 @@ str
 `
    |
 33 |   """
-34 |   
+34 |
 35 |   invalid2: """
    |  ___________^
 36 | |         int) |
