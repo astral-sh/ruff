@@ -1,15 +1,16 @@
 mod package_name;
 
 use pep440_rs::{Version, VersionSpecifiers};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::project::options::Options;
 pub(crate) use package_name::PackageName;
 
 /// A `pyproject.toml` as specified in PEP 517.
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct PyProject {
+pub struct PyProject {
     /// PEP 621-compliant project metadata.
     pub project: Option<Project>,
     /// Tool-specific metadata.
@@ -17,7 +18,7 @@ pub(crate) struct PyProject {
 }
 
 impl PyProject {
-    pub(crate) fn knot(&self) -> Option<&Knot> {
+    pub(crate) fn knot(&self) -> Option<&Options> {
         self.tool.as_ref().and_then(|tool| tool.knot.as_ref())
     }
 }
@@ -37,10 +38,9 @@ impl PyProject {
 /// PEP 621 project metadata (`project`).
 ///
 /// See <https://packaging.python.org/en/latest/specifications/pyproject-toml>.
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct Project {
+pub struct Project {
     /// The name of the project
     ///
     /// Note: Intentionally option to be more permissive during deserialization.
@@ -52,14 +52,8 @@ pub(crate) struct Project {
     pub requires_python: Option<VersionSpecifiers>,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Tool {
-    pub knot: Option<Knot>,
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub struct Tool {
+    pub knot: Option<Options>,
 }
-
-// TODO(micha): Remove allow once we add knot settings.
-//  We can't use a unit struct here or deserializing `[tool.knot]` fails.
-#[allow(clippy::empty_structs_with_brackets)]
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct Knot {}

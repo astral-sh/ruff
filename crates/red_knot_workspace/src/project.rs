@@ -21,10 +21,11 @@ use salsa::{Durability, Setter as _};
 use std::borrow::Cow;
 use std::sync::Arc;
 
+pub mod combine;
 mod files;
 mod metadata;
-mod pyproject;
-pub mod settings;
+pub mod options;
+pub mod pyproject;
 
 /// The project as a Salsa ingredient.
 ///
@@ -52,7 +53,7 @@ pub struct Project {
     #[return_ref]
     file_set: IndexedFiles,
 
-    /// The metadata describing the project, including the unresolved configuration.
+    /// The metadata describing the project, including the unresolved options.
     #[return_ref]
     pub metadata: ProjectMetadata,
 }

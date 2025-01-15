@@ -4,7 +4,7 @@ use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
 use red_knot_workspace::db::{Db, ProjectDatabase};
-use red_knot_workspace::project::settings::Configuration;
+use red_knot_workspace::project::options::{EnvironmentOptions, Options};
 use red_knot_workspace::project::ProjectMetadata;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
@@ -42,15 +42,17 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace = ProjectMetadata::discover(
-            SystemPath::new(root),
-            &system,
-            Some(&Configuration {
+
+        let mut workspace =
+            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
+
+        workspace.apply_cli_options(Options {
+            environment: Some(EnvironmentOptions {
                 python_version: Some(settings.python_version.into()),
-                ..Configuration::default()
+                ..EnvironmentOptions::default()
             }),
-        )
-        .map_err(into_error)?;
+            ..Options::default()
+        });
 
         let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
 

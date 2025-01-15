@@ -9,9 +9,9 @@ use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{self as ast, Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 
-fn setup_db(workspace_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
-    let workspace = ProjectMetadata::discover(workspace_root, &system, None)?;
-    ProjectDatabase::new(workspace, system)
+fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
+    let project = ProjectMetadata::discover(project_root, &system)?;
+    ProjectDatabase::new(project, system)
 }
 
 fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {

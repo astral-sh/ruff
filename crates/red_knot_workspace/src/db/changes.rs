@@ -1,7 +1,8 @@
 use crate::db::{Db, ProjectDatabase};
-use crate::project::settings::Configuration;
+use crate::project::options::Options;
 use crate::project::{Project, ProjectMetadata};
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
+
 use red_knot_python_semantic::Program;
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::walk_directory::WalkState;
@@ -10,12 +11,8 @@ use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
 
 impl ProjectDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes, base_configuration))]
-    pub fn apply_changes(
-        &mut self,
-        changes: Vec<ChangeEvent>,
-        base_configuration: Option<&Configuration>,
-    ) {
+    #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]
+    pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, cli_options: Option<&Options>) {
         let mut project = self.project();
         let project_path = project.root(self).to_path_buf();
         let program = Program::get(self);
@@ -141,9 +138,13 @@ impl ProjectDatabase {
         }
 
         if project_changed {
-            match ProjectMetadata::discover(&project_path, self.system(), base_configuration) {
-                Ok(metadata) => {
-                    let program_settings = metadata.to_program_settings();
+            match ProjectMetadata::discover(&project_path, self.system()) {
+                Ok(mut metadata) => {
+                    if let Some(cli_options) = cli_options {
+                        metadata.apply_cli_options(cli_options.clone());
+                    }
+
+                    let program_settings = metadata.to_program_settings(self.system());
 
                     let program = Program::get(self);
                     if let Err(error) = program.update_from_settings(self, program_settings) {
@@ -168,7 +169,10 @@ impl ProjectDatabase {
 
             return;
         } else if custom_stdlib_change {
-            let search_paths = project.metadata(self).to_program_settings().search_paths;
+            let search_paths = project
+                .metadata(self)
+                .to_program_settings(self.system())
+                .search_paths;
 
             if let Err(error) = program.update_search_paths(self, &search_paths) {
                 tracing::error!("Failed to set the new search paths: {error}");

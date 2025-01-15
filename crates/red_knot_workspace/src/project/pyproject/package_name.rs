@@ -9,7 +9,7 @@ use thiserror::Error;
 ///
 /// See: <https://packaging.python.org/en/latest/specifications/name-normalization/>
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub(crate) struct PackageName(String);
+pub struct PackageName(String);
 
 impl PackageName {
     /// Create a validated, normalized package name.
