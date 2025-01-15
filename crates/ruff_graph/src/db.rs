@@ -50,7 +50,7 @@ impl ModuleDb {
         let db = Self::default();
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version,
                 python_platform: PythonPlatform::default(),
                 search_paths,

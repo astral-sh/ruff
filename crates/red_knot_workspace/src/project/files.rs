@@ -8,12 +8,12 @@ use salsa::Setter;
 use ruff_db::files::File;
 
 use crate::db::Db;
-use crate::workspace::Package;
+use crate::project::Project;
 
 /// Cheap cloneable hash set of files.
 type FileSet = Arc<FxHashSet<File>>;
 
-/// The indexed files of a package.
+/// The indexed files of a project.
 ///
 /// The indexing happens lazily, but the files are then cached for subsequent reads.
 ///
@@ -24,11 +24,11 @@ type FileSet = Arc<FxHashSet<File>>;
 /// the indexed files must go through `IndexedMut`, which uses the Salsa setter `package.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
 #[derive(Debug)]
-pub struct PackageFiles {
+pub struct IndexedFiles {
     state: std::sync::Mutex<State>,
 }
 
-impl PackageFiles {
+impl IndexedFiles {
     pub fn lazy() -> Self {
         Self {
             state: std::sync::Mutex::new(State::Lazy),
@@ -60,7 +60,7 @@ impl PackageFiles {
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.
-    pub(super) fn indexed_mut(db: &mut dyn Db, package: Package) -> Option<IndexedMut> {
+    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut> {
         // Calling `zalsa_mut` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set.
         // TODO: Use a non-internal API instead https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
@@ -79,7 +79,7 @@ impl PackageFiles {
         //   all clones must have been dropped at this point and the `Indexed`
         //   can't outlive the database (constrained by the `db` lifetime).
         let state = {
-            let files = package.file_set(db);
+            let files = project.file_set(db);
             let mut locked = files.state.lock().unwrap();
             std::mem::replace(&mut *locked, State::Lazy)
         };
@@ -93,14 +93,14 @@ impl PackageFiles {
 
         Some(IndexedMut {
             db: Some(db),
-            package,
+            project,
             files: indexed,
             did_change: false,
         })
     }
 }
 
-impl Default for PackageFiles {
+impl Default for IndexedFiles {
     fn default() -> Self {
         Self::lazy()
     }
@@ -142,7 +142,7 @@ impl<'db> LazyFiles<'db> {
 /// The indexed files of a package.
 ///
 /// Note: This type is intentionally non-cloneable. Making it cloneable requires
-/// revisiting the locking behavior in [`PackageFiles::indexed_mut`].
+/// revisiting the locking behavior in [`IndexedFiles::indexed_mut`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct Indexed<'db> {
     files: FileSet,
@@ -169,13 +169,13 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
     }
 }
 
-/// A Mutable view of a package's indexed files.
+/// A Mutable view of a project's indexed files.
 ///
 /// Allows in-place mutation of the files without deep cloning the hash set.
 /// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
-    package: Package,
+    project: Project,
     files: FileSet,
     did_change: bool,
 }
@@ -212,12 +212,12 @@ impl IndexedMut<'_> {
 
         if self.did_change {
             // If there are changes, set the new file_set to trigger a salsa revision change.
-            self.package
+            self.project
                 .set_file_set(db)
-                .to(PackageFiles::indexed(files));
+                .to(IndexedFiles::indexed(files));
         } else {
             // The `indexed_mut` replaced the `state` with Lazy. Restore it back to the indexed state.
-            *self.package.file_set(db).state.lock().unwrap() = State::Indexed(files);
+            *self.project.file_set(db).state.lock().unwrap() = State::Indexed(files);
         }
     }
 }
@@ -234,30 +234,24 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::db::Db;
-    use crate::workspace::files::Index;
-    use crate::workspace::WorkspaceMetadata;
+    use crate::project::files::Index;
+    use crate::project::ProjectMetadata;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_ast::name::Name;
 
     #[test]
     fn re_entrance() -> anyhow::Result<()> {
-        let metadata = WorkspaceMetadata::single_package(
-            Name::new_static("test"),
-            SystemPathBuf::from("/test"),
-        );
+        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/test"));
         let mut db = TestDb::new(metadata);
 
         db.write_file("test.py", "")?;
 
-        let package = db
-            .workspace()
-            .package(&db, "/test")
-            .expect("test package to exist");
+        let project = db.project();
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
-        let files = match package.file_set(&db).get() {
+        let files = match project.file_set(&db).get() {
             Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file])),
             Index::Indexed(files) => files,
         };
@@ -265,7 +259,7 @@ mod tests {
         // Calling files a second time should not dead-lock.
         // This can e.g. happen when `check_file` iterates over all files and
         // `is_file_open` queries the open files.
-        let files_2 = package.file_set(&db).get();
+        let files_2 = project.file_set(&db).get();
 
         match files_2 {
             Index::Lazy(_) => {
