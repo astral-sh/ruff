@@ -1315,25 +1315,21 @@ impl<'src> Lexer<'src> {
     fn consume_end(&mut self) -> TokenKind {
         // We reached end of file.
         // First of all, we need all nestings to be finished.
-        match self.mode {
-            // For Mode::ParenthesizedExpression we start with nesting level 1.
-            // So we check if we end with that level.
-            Mode::ParenthesizedExpression => {
-                if self.nesting != 1 {
-                    // Reset the nesting to avoid going into infinite loop.
-                    self.nesting = 1;
-                    return self
-                        .push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
-                }
-            }
-            _ => {
-                if self.nesting > 0 {
-                    // Reset the nesting to avoid going into infinite loop.
-                    self.nesting = 0;
-                    return self
-                        .push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
-                }
-            }
+				// For Mode::ParenthesizedExpression we start with nesting level 1.
+        // So we check if we end with that level.
+				let init_nesting = if self.mode == Mode::ParenthesizedExpression {
+					1
+				} else {
+					0
+				};
+
+        if self.nesting > init_nesting {
+            // Reset the nesting to avoid going into infinite loop.
+            self.nesting = 0;
+            return self
+                .push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
+        }
+            
         }
 
         // Next, insert a trailing newline, if required.
