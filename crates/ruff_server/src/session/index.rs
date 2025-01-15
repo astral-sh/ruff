@@ -268,6 +268,11 @@ impl Index {
     ///
     /// This method avoids re-indexing the same workspace multiple times if multiple files
     /// belonging to the same workspace have been changed.
+    ///
+    /// The file events are expected to only contain paths that map to configuration files. This is
+    /// registered in [`try_register_capabilities`] method.
+    ///
+    /// [`try_register_capabilities`]: crate::server::Server::try_register_capabilities
     pub(super) fn reload_settings(&mut self, changes: &[FileEvent]) {
         let mut indexed = FxHashSet::default();
 
