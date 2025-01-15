@@ -8,7 +8,7 @@ Tests for attribute access on various kinds of types.
 
 #### Variable only declared/defined in `__init__`
 
-Variables only defined in `__init__` are pure instance variables. They can not be accessed on the
+Variables only defined in `__init__` are pure instance variables. They cannot be accessed on the
 class itself.
 
 ```py
@@ -59,7 +59,7 @@ c_instance.pure_instance_variable2 = "incompatible"
 # error: [unresolved-attribute] "Type `Literal[C]` has no attribute `pure_instance_variable1`"
 reveal_type(C.pure_instance_variable1)  # revealed: Unknown
 
-# TODO: this should be an error (pure instance variables can not be accessed on the class)
+# TODO: this should be an error (pure instance variables cannot be accessed on the class)
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 C.pure_instance_variable1 = "overwritten on class"
 
@@ -127,7 +127,7 @@ C.pure_instance_variable = "overwritten on class"
 #### Annotated with `ClassVar` type qualifier
 
 Class variables annotated with the [`typing.ClassVar`] type qualifier are pure class variables. They
-can not be accessed on instances.
+cannot be overwritten on instances.
 
 ```py
 from typing import ClassVar
