@@ -64,6 +64,7 @@ reveal_type(C.pure_instance_variable1)  # revealed: Unknown
 C.pure_instance_variable1 = "overwritten on class"
 
 # TODO: should ideally be `Literal["value set on instance"]`
+# (due to earlier assignment of the attribute from the global scope)
 reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(instance attributes)
 ```
 
@@ -81,7 +82,7 @@ class C:
 
 c_instance = C()
 
-# TODO: should be `Literal["value set in __init__"]` (or `str` which would probably be more generally useful)
+# TODO: should be `str`
 reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
 
 # TODO: we currently plan to emit a diagnostic here. Note that both mypy
