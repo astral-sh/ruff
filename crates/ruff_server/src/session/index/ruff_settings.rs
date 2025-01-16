@@ -213,8 +213,13 @@ impl RuffSettingsIndex {
         let index = std::sync::RwLock::new(index);
         let has_error = AtomicBool::new(has_error);
 
+        let index_span = tracing::debug_span!("walk_dir");
+
         walker.run(|| {
             Box::new(|result| {
+                let index_span = index_span.clone();
+                let _span = index_span.entered();
+
                 let Ok(entry) = result else {
                     return WalkState::Continue;
                 };
