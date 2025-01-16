@@ -1278,14 +1278,9 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
 
-            (Type::SubclassOf(_), Type::Instance(instance))
-            | (Type::Instance(instance), Type::SubclassOf(_)) => {
-                // TODO this should be `true` if the instance is of a final type which is not a
-                // subclass of type. (With non-final types, we never know whether a subclass might
-                // multiply-inherit `type` or a subclass of it, and thus not be disjoint with
-                // `type[...]`.) Until we support finality, hardcode None, which is known to be
-                // final.
-                instance.class.is_known(db, KnownClass::NoneType)
+            (Type::SubclassOf(_), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::SubclassOf(_)) => {
+                class.is_final(db) && !KnownClass::Type.is_superclass_of(db, class)
             }
 
             (
@@ -1337,24 +1332,6 @@ impl<'db> Type<'db> {
             (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(_))
             | (Type::Tuple(_), known_instance_ty @ Type::KnownInstance(_)) => {
                 known_instance_ty.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
-            }
-
-            (
-                Type::Instance(InstanceType { class: class_none }),
-                Type::Instance(InstanceType { class: class_other }),
-            )
-            | (
-                Type::Instance(InstanceType { class: class_other }),
-                Type::Instance(InstanceType { class: class_none }),
-            ) if class_none.is_known(db, KnownClass::NoneType) => {
-                !class_none.is_subclass_of(db, class_other)
-            }
-
-            (Type::Instance(InstanceType { class: class_none }), _)
-            | (_, Type::Instance(InstanceType { class: class_none }))
-                if class_none.is_known(db, KnownClass::NoneType) =>
-            {
-                true
             }
 
             (Type::BooleanLiteral(..), Type::Instance(InstanceType { class }))
@@ -1430,15 +1407,12 @@ impl<'db> Type<'db> {
                 other.is_disjoint_from(db, KnownClass::ModuleType.to_instance(db))
             }
 
-            (Type::Instance(..), Type::Instance(..)) => {
-                // TODO: once we have support for `final`, there might be some cases where
-                // we can determine that two types are disjoint. Once we do this, some cases
-                // above (e.g. NoneType) can be removed. For non-final classes, we return
-                // false (multiple inheritance).
-
-                // TODO: is there anything specific to do for instances of KnownClass::Type?
-
-                false
+            (
+                Type::Instance(InstanceType { class: left_class }),
+                Type::Instance(InstanceType { class: right_class }),
+            ) => {
+                (left_class.is_final(db) && !left_class.is_subclass_of(db, right_class))
+                    || (right_class.is_final(db) && !right_class.is_subclass_of(db, left_class))
             }
 
             (Type::Tuple(tuple), Type::Tuple(other_tuple)) => {
@@ -1451,7 +1425,8 @@ impl<'db> Type<'db> {
                         .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
             }
 
-            (Type::Tuple(..), Type::Instance(..)) | (Type::Instance(..), Type::Tuple(..)) => {
+            (Type::Tuple(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::Tuple(..)) => {
                 // We cannot be sure if the tuple is disjoint from the instance because:
                 //   - 'other' might be the homogeneous arbitrary-length tuple type
                 //     tuple[T, ...] (which we don't have support for yet); if all of
@@ -1460,7 +1435,7 @@ impl<'db> Type<'db> {
                 //     over the same or compatible *Ts, would overlap with tuple.
                 //
                 // TODO: add checks for the above cases once we support them
-                false
+                class.is_final(db) && !KnownClass::Tuple.is_superclass_of(db, class)
             }
         }
     }
@@ -2633,6 +2608,15 @@ impl<'db> KnownClass {
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
             .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
+    }
+
+    /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
+    /// *and* `other` is a subclass of `class`.
+    pub fn is_superclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+        known_module_symbol(db, self.canonical_module(db), self.as_str())
+            .ignore_possibly_unbound()
+            .and_then(Type::into_class_literal)
+            .is_some_and(|ClassLiteralType { class }| other.is_subclass_of(db, class))
     }
 
     /// Return the module in which we should look up the definition for this class
@@ -4377,7 +4361,8 @@ pub(crate) mod tests {
     #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     #[test_case(Ty::Tuple(vec![]), Ty::TypingLiteral)]
     #[test_case(Ty::TypingLiteral, Ty::SubclassOfBuiltinClass("object"))]
-    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("type"))]  // bool is `@final`
+    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("type"))] // bool is `@final`
+    #[test_case(Ty::SubclassOfAbcClass("ABCMeta"), Ty::BuiltinInstance("bool"))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
