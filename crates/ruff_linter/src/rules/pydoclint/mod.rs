@@ -88,7 +88,10 @@ mod tests {
                 pydoclint: Settings {
                     ignore_one_line_docstrings: true,
                 },
-                pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Google), [], []),
+                pydocstyle: pydocstyle::settings::Settings {
+                    convention: Some(Convention::Google),
+                    ..pydocstyle::settings::Settings::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
