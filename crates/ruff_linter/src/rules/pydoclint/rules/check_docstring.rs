@@ -9,6 +9,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
+use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -843,6 +844,19 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
+fn is_one_line(docstring: &Docstring) -> bool {
+    let mut non_empty_line_count = 0;
+    for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {
+        if !line.trim().is_empty() {
+            non_empty_line_count += 1;
+        }
+        if non_empty_line_count > 1 {
+            return false;
+        }
+    }
+    true
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
@@ -857,6 +871,10 @@ pub(crate) fn check_docstring(
     let Some(function_def) = definition.as_function_def() else {
         return;
     };
+
+    if checker.settings.pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
+        return;
+    }
 
     let semantic = checker.semantic();
 
