@@ -200,6 +200,32 @@ out.append("""
 }
 """)
 
+for group in groups:
+    if group.name != "ungrouped":
+        out.append(f"""
+        impl From<{group.owned_enum_ty}> for AnyNode {{
+            fn from(node: {group.owned_enum_ty}) -> AnyNode {{
+                match node {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"""{group.owned_enum_ty}::{node.variant}(node) => AnyNode::{node.name}(node),"""
+            )
+        out.append("""
+                }
+            }
+        }
+        """)
+
+    for node in group.nodes:
+        out.append(f"""
+        impl From<{node.ty}> for AnyNode {{
+            fn from(node: {node.ty}) -> AnyNode {{
+                AnyNode::{node.name}(node)
+            }}
+        }}
+        """)
+
 out.append("""
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNodeRef<'a> {
@@ -210,6 +236,47 @@ for group in groups:
 out.append("""
 }
 """)
+
+for group in groups:
+    if group.name != "ungrouped":
+        out.append(f"""
+        impl<'a> From<&'a {group.owned_enum_ty}> for AnyNodeRef<'a> {{
+            fn from(node: &'a {group.owned_enum_ty}) -> AnyNodeRef<'a> {{
+                match node {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"""{group.owned_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"""
+            )
+        out.append("""
+                }
+            }
+        }
+        """)
+
+        out.append(f"""
+        impl<'a> From<{group.ref_enum_ty}<'a>> for AnyNodeRef<'a> {{
+            fn from(node: {group.ref_enum_ty}<'a>) -> AnyNodeRef<'a> {{
+                match node {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"""{group.ref_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"""
+            )
+        out.append("""
+                }
+            }
+        }
+        """)
+
+    for node in group.nodes:
+        out.append(f"""
+        impl<'a> From<&'a {node.ty}> for AnyNodeRef<'a> {{
+            fn from(node: &'a {node.ty}) -> AnyNodeRef<'a> {{
+                AnyNodeRef::{node.name}(node)
+            }}
+        }}
+        """)
 
 # ------------------------------------------------------------------------------
 # AstNode

@@ -2219,6 +2219,680 @@ pub enum AnyNode {
     Identifier(crate::Identifier),
 }
 
+impl From<Mod> for AnyNode {
+    fn from(node: Mod) -> AnyNode {
+        match node {
+            Mod::Module(node) => AnyNode::ModModule(node),
+            Mod::Expression(node) => AnyNode::ModExpression(node),
+        }
+    }
+}
+
+impl From<crate::ModModule> for AnyNode {
+    fn from(node: crate::ModModule) -> AnyNode {
+        AnyNode::ModModule(node)
+    }
+}
+
+impl From<crate::ModExpression> for AnyNode {
+    fn from(node: crate::ModExpression) -> AnyNode {
+        AnyNode::ModExpression(node)
+    }
+}
+
+impl From<Stmt> for AnyNode {
+    fn from(node: Stmt) -> AnyNode {
+        match node {
+            Stmt::FunctionDef(node) => AnyNode::StmtFunctionDef(node),
+            Stmt::ClassDef(node) => AnyNode::StmtClassDef(node),
+            Stmt::Return(node) => AnyNode::StmtReturn(node),
+            Stmt::Delete(node) => AnyNode::StmtDelete(node),
+            Stmt::TypeAlias(node) => AnyNode::StmtTypeAlias(node),
+            Stmt::Assign(node) => AnyNode::StmtAssign(node),
+            Stmt::AugAssign(node) => AnyNode::StmtAugAssign(node),
+            Stmt::AnnAssign(node) => AnyNode::StmtAnnAssign(node),
+            Stmt::For(node) => AnyNode::StmtFor(node),
+            Stmt::While(node) => AnyNode::StmtWhile(node),
+            Stmt::If(node) => AnyNode::StmtIf(node),
+            Stmt::With(node) => AnyNode::StmtWith(node),
+            Stmt::Match(node) => AnyNode::StmtMatch(node),
+            Stmt::Raise(node) => AnyNode::StmtRaise(node),
+            Stmt::Try(node) => AnyNode::StmtTry(node),
+            Stmt::Assert(node) => AnyNode::StmtAssert(node),
+            Stmt::Import(node) => AnyNode::StmtImport(node),
+            Stmt::ImportFrom(node) => AnyNode::StmtImportFrom(node),
+            Stmt::Global(node) => AnyNode::StmtGlobal(node),
+            Stmt::Nonlocal(node) => AnyNode::StmtNonlocal(node),
+            Stmt::Expr(node) => AnyNode::StmtExpr(node),
+            Stmt::Pass(node) => AnyNode::StmtPass(node),
+            Stmt::Break(node) => AnyNode::StmtBreak(node),
+            Stmt::Continue(node) => AnyNode::StmtContinue(node),
+            Stmt::IpyEscapeCommand(node) => AnyNode::StmtIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl From<crate::StmtFunctionDef> for AnyNode {
+    fn from(node: crate::StmtFunctionDef) -> AnyNode {
+        AnyNode::StmtFunctionDef(node)
+    }
+}
+
+impl From<crate::StmtClassDef> for AnyNode {
+    fn from(node: crate::StmtClassDef) -> AnyNode {
+        AnyNode::StmtClassDef(node)
+    }
+}
+
+impl From<crate::StmtReturn> for AnyNode {
+    fn from(node: crate::StmtReturn) -> AnyNode {
+        AnyNode::StmtReturn(node)
+    }
+}
+
+impl From<crate::StmtDelete> for AnyNode {
+    fn from(node: crate::StmtDelete) -> AnyNode {
+        AnyNode::StmtDelete(node)
+    }
+}
+
+impl From<crate::StmtTypeAlias> for AnyNode {
+    fn from(node: crate::StmtTypeAlias) -> AnyNode {
+        AnyNode::StmtTypeAlias(node)
+    }
+}
+
+impl From<crate::StmtAssign> for AnyNode {
+    fn from(node: crate::StmtAssign) -> AnyNode {
+        AnyNode::StmtAssign(node)
+    }
+}
+
+impl From<crate::StmtAugAssign> for AnyNode {
+    fn from(node: crate::StmtAugAssign) -> AnyNode {
+        AnyNode::StmtAugAssign(node)
+    }
+}
+
+impl From<crate::StmtAnnAssign> for AnyNode {
+    fn from(node: crate::StmtAnnAssign) -> AnyNode {
+        AnyNode::StmtAnnAssign(node)
+    }
+}
+
+impl From<crate::StmtFor> for AnyNode {
+    fn from(node: crate::StmtFor) -> AnyNode {
+        AnyNode::StmtFor(node)
+    }
+}
+
+impl From<crate::StmtWhile> for AnyNode {
+    fn from(node: crate::StmtWhile) -> AnyNode {
+        AnyNode::StmtWhile(node)
+    }
+}
+
+impl From<crate::StmtIf> for AnyNode {
+    fn from(node: crate::StmtIf) -> AnyNode {
+        AnyNode::StmtIf(node)
+    }
+}
+
+impl From<crate::StmtWith> for AnyNode {
+    fn from(node: crate::StmtWith) -> AnyNode {
+        AnyNode::StmtWith(node)
+    }
+}
+
+impl From<crate::StmtMatch> for AnyNode {
+    fn from(node: crate::StmtMatch) -> AnyNode {
+        AnyNode::StmtMatch(node)
+    }
+}
+
+impl From<crate::StmtRaise> for AnyNode {
+    fn from(node: crate::StmtRaise) -> AnyNode {
+        AnyNode::StmtRaise(node)
+    }
+}
+
+impl From<crate::StmtTry> for AnyNode {
+    fn from(node: crate::StmtTry) -> AnyNode {
+        AnyNode::StmtTry(node)
+    }
+}
+
+impl From<crate::StmtAssert> for AnyNode {
+    fn from(node: crate::StmtAssert) -> AnyNode {
+        AnyNode::StmtAssert(node)
+    }
+}
+
+impl From<crate::StmtImport> for AnyNode {
+    fn from(node: crate::StmtImport) -> AnyNode {
+        AnyNode::StmtImport(node)
+    }
+}
+
+impl From<crate::StmtImportFrom> for AnyNode {
+    fn from(node: crate::StmtImportFrom) -> AnyNode {
+        AnyNode::StmtImportFrom(node)
+    }
+}
+
+impl From<crate::StmtGlobal> for AnyNode {
+    fn from(node: crate::StmtGlobal) -> AnyNode {
+        AnyNode::StmtGlobal(node)
+    }
+}
+
+impl From<crate::StmtNonlocal> for AnyNode {
+    fn from(node: crate::StmtNonlocal) -> AnyNode {
+        AnyNode::StmtNonlocal(node)
+    }
+}
+
+impl From<crate::StmtExpr> for AnyNode {
+    fn from(node: crate::StmtExpr) -> AnyNode {
+        AnyNode::StmtExpr(node)
+    }
+}
+
+impl From<crate::StmtPass> for AnyNode {
+    fn from(node: crate::StmtPass) -> AnyNode {
+        AnyNode::StmtPass(node)
+    }
+}
+
+impl From<crate::StmtBreak> for AnyNode {
+    fn from(node: crate::StmtBreak) -> AnyNode {
+        AnyNode::StmtBreak(node)
+    }
+}
+
+impl From<crate::StmtContinue> for AnyNode {
+    fn from(node: crate::StmtContinue) -> AnyNode {
+        AnyNode::StmtContinue(node)
+    }
+}
+
+impl From<crate::StmtIpyEscapeCommand> for AnyNode {
+    fn from(node: crate::StmtIpyEscapeCommand) -> AnyNode {
+        AnyNode::StmtIpyEscapeCommand(node)
+    }
+}
+
+impl From<Expr> for AnyNode {
+    fn from(node: Expr) -> AnyNode {
+        match node {
+            Expr::BoolOp(node) => AnyNode::ExprBoolOp(node),
+            Expr::Named(node) => AnyNode::ExprNamed(node),
+            Expr::BinOp(node) => AnyNode::ExprBinOp(node),
+            Expr::UnaryOp(node) => AnyNode::ExprUnaryOp(node),
+            Expr::Lambda(node) => AnyNode::ExprLambda(node),
+            Expr::If(node) => AnyNode::ExprIf(node),
+            Expr::Dict(node) => AnyNode::ExprDict(node),
+            Expr::Set(node) => AnyNode::ExprSet(node),
+            Expr::ListComp(node) => AnyNode::ExprListComp(node),
+            Expr::SetComp(node) => AnyNode::ExprSetComp(node),
+            Expr::DictComp(node) => AnyNode::ExprDictComp(node),
+            Expr::Generator(node) => AnyNode::ExprGenerator(node),
+            Expr::Await(node) => AnyNode::ExprAwait(node),
+            Expr::Yield(node) => AnyNode::ExprYield(node),
+            Expr::YieldFrom(node) => AnyNode::ExprYieldFrom(node),
+            Expr::Compare(node) => AnyNode::ExprCompare(node),
+            Expr::Call(node) => AnyNode::ExprCall(node),
+            Expr::FString(node) => AnyNode::ExprFString(node),
+            Expr::StringLiteral(node) => AnyNode::ExprStringLiteral(node),
+            Expr::BytesLiteral(node) => AnyNode::ExprBytesLiteral(node),
+            Expr::NumberLiteral(node) => AnyNode::ExprNumberLiteral(node),
+            Expr::BooleanLiteral(node) => AnyNode::ExprBooleanLiteral(node),
+            Expr::NoneLiteral(node) => AnyNode::ExprNoneLiteral(node),
+            Expr::EllipsisLiteral(node) => AnyNode::ExprEllipsisLiteral(node),
+            Expr::Attribute(node) => AnyNode::ExprAttribute(node),
+            Expr::Subscript(node) => AnyNode::ExprSubscript(node),
+            Expr::Starred(node) => AnyNode::ExprStarred(node),
+            Expr::Name(node) => AnyNode::ExprName(node),
+            Expr::List(node) => AnyNode::ExprList(node),
+            Expr::Tuple(node) => AnyNode::ExprTuple(node),
+            Expr::Slice(node) => AnyNode::ExprSlice(node),
+            Expr::IpyEscapeCommand(node) => AnyNode::ExprIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl From<crate::ExprBoolOp> for AnyNode {
+    fn from(node: crate::ExprBoolOp) -> AnyNode {
+        AnyNode::ExprBoolOp(node)
+    }
+}
+
+impl From<crate::ExprNamed> for AnyNode {
+    fn from(node: crate::ExprNamed) -> AnyNode {
+        AnyNode::ExprNamed(node)
+    }
+}
+
+impl From<crate::ExprBinOp> for AnyNode {
+    fn from(node: crate::ExprBinOp) -> AnyNode {
+        AnyNode::ExprBinOp(node)
+    }
+}
+
+impl From<crate::ExprUnaryOp> for AnyNode {
+    fn from(node: crate::ExprUnaryOp) -> AnyNode {
+        AnyNode::ExprUnaryOp(node)
+    }
+}
+
+impl From<crate::ExprLambda> for AnyNode {
+    fn from(node: crate::ExprLambda) -> AnyNode {
+        AnyNode::ExprLambda(node)
+    }
+}
+
+impl From<crate::ExprIf> for AnyNode {
+    fn from(node: crate::ExprIf) -> AnyNode {
+        AnyNode::ExprIf(node)
+    }
+}
+
+impl From<crate::ExprDict> for AnyNode {
+    fn from(node: crate::ExprDict) -> AnyNode {
+        AnyNode::ExprDict(node)
+    }
+}
+
+impl From<crate::ExprSet> for AnyNode {
+    fn from(node: crate::ExprSet) -> AnyNode {
+        AnyNode::ExprSet(node)
+    }
+}
+
+impl From<crate::ExprListComp> for AnyNode {
+    fn from(node: crate::ExprListComp) -> AnyNode {
+        AnyNode::ExprListComp(node)
+    }
+}
+
+impl From<crate::ExprSetComp> for AnyNode {
+    fn from(node: crate::ExprSetComp) -> AnyNode {
+        AnyNode::ExprSetComp(node)
+    }
+}
+
+impl From<crate::ExprDictComp> for AnyNode {
+    fn from(node: crate::ExprDictComp) -> AnyNode {
+        AnyNode::ExprDictComp(node)
+    }
+}
+
+impl From<crate::ExprGenerator> for AnyNode {
+    fn from(node: crate::ExprGenerator) -> AnyNode {
+        AnyNode::ExprGenerator(node)
+    }
+}
+
+impl From<crate::ExprAwait> for AnyNode {
+    fn from(node: crate::ExprAwait) -> AnyNode {
+        AnyNode::ExprAwait(node)
+    }
+}
+
+impl From<crate::ExprYield> for AnyNode {
+    fn from(node: crate::ExprYield) -> AnyNode {
+        AnyNode::ExprYield(node)
+    }
+}
+
+impl From<crate::ExprYieldFrom> for AnyNode {
+    fn from(node: crate::ExprYieldFrom) -> AnyNode {
+        AnyNode::ExprYieldFrom(node)
+    }
+}
+
+impl From<crate::ExprCompare> for AnyNode {
+    fn from(node: crate::ExprCompare) -> AnyNode {
+        AnyNode::ExprCompare(node)
+    }
+}
+
+impl From<crate::ExprCall> for AnyNode {
+    fn from(node: crate::ExprCall) -> AnyNode {
+        AnyNode::ExprCall(node)
+    }
+}
+
+impl From<crate::ExprFString> for AnyNode {
+    fn from(node: crate::ExprFString) -> AnyNode {
+        AnyNode::ExprFString(node)
+    }
+}
+
+impl From<crate::ExprStringLiteral> for AnyNode {
+    fn from(node: crate::ExprStringLiteral) -> AnyNode {
+        AnyNode::ExprStringLiteral(node)
+    }
+}
+
+impl From<crate::ExprBytesLiteral> for AnyNode {
+    fn from(node: crate::ExprBytesLiteral) -> AnyNode {
+        AnyNode::ExprBytesLiteral(node)
+    }
+}
+
+impl From<crate::ExprNumberLiteral> for AnyNode {
+    fn from(node: crate::ExprNumberLiteral) -> AnyNode {
+        AnyNode::ExprNumberLiteral(node)
+    }
+}
+
+impl From<crate::ExprBooleanLiteral> for AnyNode {
+    fn from(node: crate::ExprBooleanLiteral) -> AnyNode {
+        AnyNode::ExprBooleanLiteral(node)
+    }
+}
+
+impl From<crate::ExprNoneLiteral> for AnyNode {
+    fn from(node: crate::ExprNoneLiteral) -> AnyNode {
+        AnyNode::ExprNoneLiteral(node)
+    }
+}
+
+impl From<crate::ExprEllipsisLiteral> for AnyNode {
+    fn from(node: crate::ExprEllipsisLiteral) -> AnyNode {
+        AnyNode::ExprEllipsisLiteral(node)
+    }
+}
+
+impl From<crate::ExprAttribute> for AnyNode {
+    fn from(node: crate::ExprAttribute) -> AnyNode {
+        AnyNode::ExprAttribute(node)
+    }
+}
+
+impl From<crate::ExprSubscript> for AnyNode {
+    fn from(node: crate::ExprSubscript) -> AnyNode {
+        AnyNode::ExprSubscript(node)
+    }
+}
+
+impl From<crate::ExprStarred> for AnyNode {
+    fn from(node: crate::ExprStarred) -> AnyNode {
+        AnyNode::ExprStarred(node)
+    }
+}
+
+impl From<crate::ExprName> for AnyNode {
+    fn from(node: crate::ExprName) -> AnyNode {
+        AnyNode::ExprName(node)
+    }
+}
+
+impl From<crate::ExprList> for AnyNode {
+    fn from(node: crate::ExprList) -> AnyNode {
+        AnyNode::ExprList(node)
+    }
+}
+
+impl From<crate::ExprTuple> for AnyNode {
+    fn from(node: crate::ExprTuple) -> AnyNode {
+        AnyNode::ExprTuple(node)
+    }
+}
+
+impl From<crate::ExprSlice> for AnyNode {
+    fn from(node: crate::ExprSlice) -> AnyNode {
+        AnyNode::ExprSlice(node)
+    }
+}
+
+impl From<crate::ExprIpyEscapeCommand> for AnyNode {
+    fn from(node: crate::ExprIpyEscapeCommand) -> AnyNode {
+        AnyNode::ExprIpyEscapeCommand(node)
+    }
+}
+
+impl From<ExceptHandler> for AnyNode {
+    fn from(node: ExceptHandler) -> AnyNode {
+        match node {
+            ExceptHandler::ExceptHandler(node) => AnyNode::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl From<crate::ExceptHandlerExceptHandler> for AnyNode {
+    fn from(node: crate::ExceptHandlerExceptHandler) -> AnyNode {
+        AnyNode::ExceptHandlerExceptHandler(node)
+    }
+}
+
+impl From<FStringElement> for AnyNode {
+    fn from(node: FStringElement) -> AnyNode {
+        match node {
+            FStringElement::Expression(node) => AnyNode::FStringExpressionElement(node),
+            FStringElement::Literal(node) => AnyNode::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl From<crate::FStringExpressionElement> for AnyNode {
+    fn from(node: crate::FStringExpressionElement) -> AnyNode {
+        AnyNode::FStringExpressionElement(node)
+    }
+}
+
+impl From<crate::FStringLiteralElement> for AnyNode {
+    fn from(node: crate::FStringLiteralElement) -> AnyNode {
+        AnyNode::FStringLiteralElement(node)
+    }
+}
+
+impl From<Pattern> for AnyNode {
+    fn from(node: Pattern) -> AnyNode {
+        match node {
+            Pattern::MatchValue(node) => AnyNode::PatternMatchValue(node),
+            Pattern::MatchSingleton(node) => AnyNode::PatternMatchSingleton(node),
+            Pattern::MatchSequence(node) => AnyNode::PatternMatchSequence(node),
+            Pattern::MatchMapping(node) => AnyNode::PatternMatchMapping(node),
+            Pattern::MatchClass(node) => AnyNode::PatternMatchClass(node),
+            Pattern::MatchStar(node) => AnyNode::PatternMatchStar(node),
+            Pattern::MatchAs(node) => AnyNode::PatternMatchAs(node),
+            Pattern::MatchOr(node) => AnyNode::PatternMatchOr(node),
+        }
+    }
+}
+
+impl From<crate::PatternMatchValue> for AnyNode {
+    fn from(node: crate::PatternMatchValue) -> AnyNode {
+        AnyNode::PatternMatchValue(node)
+    }
+}
+
+impl From<crate::PatternMatchSingleton> for AnyNode {
+    fn from(node: crate::PatternMatchSingleton) -> AnyNode {
+        AnyNode::PatternMatchSingleton(node)
+    }
+}
+
+impl From<crate::PatternMatchSequence> for AnyNode {
+    fn from(node: crate::PatternMatchSequence) -> AnyNode {
+        AnyNode::PatternMatchSequence(node)
+    }
+}
+
+impl From<crate::PatternMatchMapping> for AnyNode {
+    fn from(node: crate::PatternMatchMapping) -> AnyNode {
+        AnyNode::PatternMatchMapping(node)
+    }
+}
+
+impl From<crate::PatternMatchClass> for AnyNode {
+    fn from(node: crate::PatternMatchClass) -> AnyNode {
+        AnyNode::PatternMatchClass(node)
+    }
+}
+
+impl From<crate::PatternMatchStar> for AnyNode {
+    fn from(node: crate::PatternMatchStar) -> AnyNode {
+        AnyNode::PatternMatchStar(node)
+    }
+}
+
+impl From<crate::PatternMatchAs> for AnyNode {
+    fn from(node: crate::PatternMatchAs) -> AnyNode {
+        AnyNode::PatternMatchAs(node)
+    }
+}
+
+impl From<crate::PatternMatchOr> for AnyNode {
+    fn from(node: crate::PatternMatchOr) -> AnyNode {
+        AnyNode::PatternMatchOr(node)
+    }
+}
+
+impl From<TypeParam> for AnyNode {
+    fn from(node: TypeParam) -> AnyNode {
+        match node {
+            TypeParam::TypeVar(node) => AnyNode::TypeParamTypeVar(node),
+            TypeParam::TypeVarTuple(node) => AnyNode::TypeParamTypeVarTuple(node),
+            TypeParam::ParamSpec(node) => AnyNode::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl From<crate::TypeParamTypeVar> for AnyNode {
+    fn from(node: crate::TypeParamTypeVar) -> AnyNode {
+        AnyNode::TypeParamTypeVar(node)
+    }
+}
+
+impl From<crate::TypeParamTypeVarTuple> for AnyNode {
+    fn from(node: crate::TypeParamTypeVarTuple) -> AnyNode {
+        AnyNode::TypeParamTypeVarTuple(node)
+    }
+}
+
+impl From<crate::TypeParamParamSpec> for AnyNode {
+    fn from(node: crate::TypeParamParamSpec) -> AnyNode {
+        AnyNode::TypeParamParamSpec(node)
+    }
+}
+
+impl From<crate::FStringFormatSpec> for AnyNode {
+    fn from(node: crate::FStringFormatSpec) -> AnyNode {
+        AnyNode::FStringFormatSpec(node)
+    }
+}
+
+impl From<crate::PatternArguments> for AnyNode {
+    fn from(node: crate::PatternArguments) -> AnyNode {
+        AnyNode::PatternArguments(node)
+    }
+}
+
+impl From<crate::PatternKeyword> for AnyNode {
+    fn from(node: crate::PatternKeyword) -> AnyNode {
+        AnyNode::PatternKeyword(node)
+    }
+}
+
+impl From<crate::Comprehension> for AnyNode {
+    fn from(node: crate::Comprehension) -> AnyNode {
+        AnyNode::Comprehension(node)
+    }
+}
+
+impl From<crate::Arguments> for AnyNode {
+    fn from(node: crate::Arguments) -> AnyNode {
+        AnyNode::Arguments(node)
+    }
+}
+
+impl From<crate::Parameters> for AnyNode {
+    fn from(node: crate::Parameters) -> AnyNode {
+        AnyNode::Parameters(node)
+    }
+}
+
+impl From<crate::Parameter> for AnyNode {
+    fn from(node: crate::Parameter) -> AnyNode {
+        AnyNode::Parameter(node)
+    }
+}
+
+impl From<crate::ParameterWithDefault> for AnyNode {
+    fn from(node: crate::ParameterWithDefault) -> AnyNode {
+        AnyNode::ParameterWithDefault(node)
+    }
+}
+
+impl From<crate::Keyword> for AnyNode {
+    fn from(node: crate::Keyword) -> AnyNode {
+        AnyNode::Keyword(node)
+    }
+}
+
+impl From<crate::Alias> for AnyNode {
+    fn from(node: crate::Alias) -> AnyNode {
+        AnyNode::Alias(node)
+    }
+}
+
+impl From<crate::WithItem> for AnyNode {
+    fn from(node: crate::WithItem) -> AnyNode {
+        AnyNode::WithItem(node)
+    }
+}
+
+impl From<crate::MatchCase> for AnyNode {
+    fn from(node: crate::MatchCase) -> AnyNode {
+        AnyNode::MatchCase(node)
+    }
+}
+
+impl From<crate::Decorator> for AnyNode {
+    fn from(node: crate::Decorator) -> AnyNode {
+        AnyNode::Decorator(node)
+    }
+}
+
+impl From<crate::ElifElseClause> for AnyNode {
+    fn from(node: crate::ElifElseClause) -> AnyNode {
+        AnyNode::ElifElseClause(node)
+    }
+}
+
+impl From<crate::TypeParams> for AnyNode {
+    fn from(node: crate::TypeParams) -> AnyNode {
+        AnyNode::TypeParams(node)
+    }
+}
+
+impl From<crate::FString> for AnyNode {
+    fn from(node: crate::FString) -> AnyNode {
+        AnyNode::FString(node)
+    }
+}
+
+impl From<crate::StringLiteral> for AnyNode {
+    fn from(node: crate::StringLiteral) -> AnyNode {
+        AnyNode::StringLiteral(node)
+    }
+}
+
+impl From<crate::BytesLiteral> for AnyNode {
+    fn from(node: crate::BytesLiteral) -> AnyNode {
+        AnyNode::BytesLiteral(node)
+    }
+}
+
+impl From<crate::Identifier> for AnyNode {
+    fn from(node: crate::Identifier) -> AnyNode {
+        AnyNode::Identifier(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNodeRef<'a> {
     ModModule(&'a crate::ModModule),
@@ -2313,6 +2987,802 @@ pub enum AnyNodeRef<'a> {
     StringLiteral(&'a crate::StringLiteral),
     BytesLiteral(&'a crate::BytesLiteral),
     Identifier(&'a crate::Identifier),
+}
+
+impl<'a> From<&'a Mod> for AnyNodeRef<'a> {
+    fn from(node: &'a Mod) -> AnyNodeRef<'a> {
+        match node {
+            Mod::Module(node) => AnyNodeRef::ModModule(node),
+            Mod::Expression(node) => AnyNodeRef::ModExpression(node),
+        }
+    }
+}
+
+impl<'a> From<ModRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: ModRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            ModRef::Module(node) => AnyNodeRef::ModModule(node),
+            ModRef::Expression(node) => AnyNodeRef::ModExpression(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ModModule> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ModModule) -> AnyNodeRef<'a> {
+        AnyNodeRef::ModModule(node)
+    }
+}
+
+impl<'a> From<&'a crate::ModExpression> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ModExpression) -> AnyNodeRef<'a> {
+        AnyNodeRef::ModExpression(node)
+    }
+}
+
+impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
+    fn from(node: &'a Stmt) -> AnyNodeRef<'a> {
+        match node {
+            Stmt::FunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
+            Stmt::ClassDef(node) => AnyNodeRef::StmtClassDef(node),
+            Stmt::Return(node) => AnyNodeRef::StmtReturn(node),
+            Stmt::Delete(node) => AnyNodeRef::StmtDelete(node),
+            Stmt::TypeAlias(node) => AnyNodeRef::StmtTypeAlias(node),
+            Stmt::Assign(node) => AnyNodeRef::StmtAssign(node),
+            Stmt::AugAssign(node) => AnyNodeRef::StmtAugAssign(node),
+            Stmt::AnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
+            Stmt::For(node) => AnyNodeRef::StmtFor(node),
+            Stmt::While(node) => AnyNodeRef::StmtWhile(node),
+            Stmt::If(node) => AnyNodeRef::StmtIf(node),
+            Stmt::With(node) => AnyNodeRef::StmtWith(node),
+            Stmt::Match(node) => AnyNodeRef::StmtMatch(node),
+            Stmt::Raise(node) => AnyNodeRef::StmtRaise(node),
+            Stmt::Try(node) => AnyNodeRef::StmtTry(node),
+            Stmt::Assert(node) => AnyNodeRef::StmtAssert(node),
+            Stmt::Import(node) => AnyNodeRef::StmtImport(node),
+            Stmt::ImportFrom(node) => AnyNodeRef::StmtImportFrom(node),
+            Stmt::Global(node) => AnyNodeRef::StmtGlobal(node),
+            Stmt::Nonlocal(node) => AnyNodeRef::StmtNonlocal(node),
+            Stmt::Expr(node) => AnyNodeRef::StmtExpr(node),
+            Stmt::Pass(node) => AnyNodeRef::StmtPass(node),
+            Stmt::Break(node) => AnyNodeRef::StmtBreak(node),
+            Stmt::Continue(node) => AnyNodeRef::StmtContinue(node),
+            Stmt::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<StatementRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: StatementRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            StatementRef::FunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
+            StatementRef::ClassDef(node) => AnyNodeRef::StmtClassDef(node),
+            StatementRef::Return(node) => AnyNodeRef::StmtReturn(node),
+            StatementRef::Delete(node) => AnyNodeRef::StmtDelete(node),
+            StatementRef::TypeAlias(node) => AnyNodeRef::StmtTypeAlias(node),
+            StatementRef::Assign(node) => AnyNodeRef::StmtAssign(node),
+            StatementRef::AugAssign(node) => AnyNodeRef::StmtAugAssign(node),
+            StatementRef::AnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
+            StatementRef::For(node) => AnyNodeRef::StmtFor(node),
+            StatementRef::While(node) => AnyNodeRef::StmtWhile(node),
+            StatementRef::If(node) => AnyNodeRef::StmtIf(node),
+            StatementRef::With(node) => AnyNodeRef::StmtWith(node),
+            StatementRef::Match(node) => AnyNodeRef::StmtMatch(node),
+            StatementRef::Raise(node) => AnyNodeRef::StmtRaise(node),
+            StatementRef::Try(node) => AnyNodeRef::StmtTry(node),
+            StatementRef::Assert(node) => AnyNodeRef::StmtAssert(node),
+            StatementRef::Import(node) => AnyNodeRef::StmtImport(node),
+            StatementRef::ImportFrom(node) => AnyNodeRef::StmtImportFrom(node),
+            StatementRef::Global(node) => AnyNodeRef::StmtGlobal(node),
+            StatementRef::Nonlocal(node) => AnyNodeRef::StmtNonlocal(node),
+            StatementRef::Expr(node) => AnyNodeRef::StmtExpr(node),
+            StatementRef::Pass(node) => AnyNodeRef::StmtPass(node),
+            StatementRef::Break(node) => AnyNodeRef::StmtBreak(node),
+            StatementRef::Continue(node) => AnyNodeRef::StmtContinue(node),
+            StatementRef::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::StmtFunctionDef> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtFunctionDef) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtFunctionDef(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtClassDef> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtClassDef) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtClassDef(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtReturn> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtReturn) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtReturn(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtDelete> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtDelete) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtDelete(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtTypeAlias> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtTypeAlias) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtTypeAlias(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAssign> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtAssign) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtAssign(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAugAssign> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtAugAssign) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtAugAssign(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAnnAssign> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtAnnAssign) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtAnnAssign(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtFor> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtFor) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtFor(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtWhile> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtWhile) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtWhile(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtIf> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtIf) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtIf(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtWith> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtWith) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtWith(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtMatch> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtMatch) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtMatch(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtRaise> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtRaise) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtRaise(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtTry> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtTry) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtTry(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAssert> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtAssert) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtAssert(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtImport> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtImport) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtImport(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtImportFrom> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtImportFrom) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtImportFrom(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtGlobal> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtGlobal) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtGlobal(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtNonlocal> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtNonlocal) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtNonlocal(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtExpr> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtExpr) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtExpr(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtPass> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtPass) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtPass(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtBreak> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtBreak) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtBreak(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtContinue> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtContinue) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtContinue(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtIpyEscapeCommand> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StmtIpyEscapeCommand) -> AnyNodeRef<'a> {
+        AnyNodeRef::StmtIpyEscapeCommand(node)
+    }
+}
+
+impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
+    fn from(node: &'a Expr) -> AnyNodeRef<'a> {
+        match node {
+            Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
+            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
+            Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
+            Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
+            Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
+            Expr::If(node) => AnyNodeRef::ExprIf(node),
+            Expr::Dict(node) => AnyNodeRef::ExprDict(node),
+            Expr::Set(node) => AnyNodeRef::ExprSet(node),
+            Expr::ListComp(node) => AnyNodeRef::ExprListComp(node),
+            Expr::SetComp(node) => AnyNodeRef::ExprSetComp(node),
+            Expr::DictComp(node) => AnyNodeRef::ExprDictComp(node),
+            Expr::Generator(node) => AnyNodeRef::ExprGenerator(node),
+            Expr::Await(node) => AnyNodeRef::ExprAwait(node),
+            Expr::Yield(node) => AnyNodeRef::ExprYield(node),
+            Expr::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
+            Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
+            Expr::Call(node) => AnyNodeRef::ExprCall(node),
+            Expr::FString(node) => AnyNodeRef::ExprFString(node),
+            Expr::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
+            Expr::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
+            Expr::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
+            Expr::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
+            Expr::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
+            Expr::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
+            Expr::Attribute(node) => AnyNodeRef::ExprAttribute(node),
+            Expr::Subscript(node) => AnyNodeRef::ExprSubscript(node),
+            Expr::Starred(node) => AnyNodeRef::ExprStarred(node),
+            Expr::Name(node) => AnyNodeRef::ExprName(node),
+            Expr::List(node) => AnyNodeRef::ExprList(node),
+            Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
+            Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
+            Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: ExpressionRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            ExpressionRef::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
+            ExpressionRef::Named(node) => AnyNodeRef::ExprNamed(node),
+            ExpressionRef::BinOp(node) => AnyNodeRef::ExprBinOp(node),
+            ExpressionRef::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
+            ExpressionRef::Lambda(node) => AnyNodeRef::ExprLambda(node),
+            ExpressionRef::If(node) => AnyNodeRef::ExprIf(node),
+            ExpressionRef::Dict(node) => AnyNodeRef::ExprDict(node),
+            ExpressionRef::Set(node) => AnyNodeRef::ExprSet(node),
+            ExpressionRef::ListComp(node) => AnyNodeRef::ExprListComp(node),
+            ExpressionRef::SetComp(node) => AnyNodeRef::ExprSetComp(node),
+            ExpressionRef::DictComp(node) => AnyNodeRef::ExprDictComp(node),
+            ExpressionRef::Generator(node) => AnyNodeRef::ExprGenerator(node),
+            ExpressionRef::Await(node) => AnyNodeRef::ExprAwait(node),
+            ExpressionRef::Yield(node) => AnyNodeRef::ExprYield(node),
+            ExpressionRef::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
+            ExpressionRef::Compare(node) => AnyNodeRef::ExprCompare(node),
+            ExpressionRef::Call(node) => AnyNodeRef::ExprCall(node),
+            ExpressionRef::FString(node) => AnyNodeRef::ExprFString(node),
+            ExpressionRef::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
+            ExpressionRef::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
+            ExpressionRef::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
+            ExpressionRef::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
+            ExpressionRef::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
+            ExpressionRef::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
+            ExpressionRef::Attribute(node) => AnyNodeRef::ExprAttribute(node),
+            ExpressionRef::Subscript(node) => AnyNodeRef::ExprSubscript(node),
+            ExpressionRef::Starred(node) => AnyNodeRef::ExprStarred(node),
+            ExpressionRef::Name(node) => AnyNodeRef::ExprName(node),
+            ExpressionRef::List(node) => AnyNodeRef::ExprList(node),
+            ExpressionRef::Tuple(node) => AnyNodeRef::ExprTuple(node),
+            ExpressionRef::Slice(node) => AnyNodeRef::ExprSlice(node),
+            ExpressionRef::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ExprBoolOp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprBoolOp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprBoolOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNamed> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprNamed) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprNamed(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBinOp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprBinOp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprBinOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprUnaryOp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprUnaryOp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprUnaryOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprLambda> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprLambda) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprLambda(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprIf> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprIf) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprIf(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprDict> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprDict) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprDict(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSet> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprSet) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprSet(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprListComp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprListComp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprListComp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSetComp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprSetComp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprSetComp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprDictComp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprDictComp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprDictComp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprGenerator> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprGenerator) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprGenerator(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprAwait> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprAwait) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprAwait(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprYield> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprYield) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprYield(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprYieldFrom> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprYieldFrom) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprYieldFrom(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprCompare> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprCompare) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprCompare(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprCall> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprCall) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprCall(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprFString> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprFString) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprFString(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprStringLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprStringLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprStringLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBytesLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprBytesLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprBytesLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNumberLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprNumberLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprNumberLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBooleanLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprBooleanLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprBooleanLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNoneLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprNoneLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprNoneLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprEllipsisLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprEllipsisLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprEllipsisLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprAttribute> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprAttribute) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprAttribute(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSubscript> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprSubscript) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprSubscript(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprStarred> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprStarred) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprStarred(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprName> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprName) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprName(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprList> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprList) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprList(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprTuple> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprTuple) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprTuple(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSlice> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprSlice) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprSlice(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprIpyEscapeCommand) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprIpyEscapeCommand(node)
+    }
+}
+
+impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
+    fn from(node: &'a ExceptHandler) -> AnyNodeRef<'a> {
+        match node {
+            ExceptHandler::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: ExceptHandlerRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            ExceptHandlerRef::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExceptHandlerExceptHandler) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExceptHandlerExceptHandler(node)
+    }
+}
+
+impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
+    fn from(node: &'a FStringElement) -> AnyNodeRef<'a> {
+        match node {
+            FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
+            FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl<'a> From<FStringElementRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: FStringElementRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            FStringElementRef::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
+            FStringElementRef::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::FStringExpressionElement> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::FStringExpressionElement) -> AnyNodeRef<'a> {
+        AnyNodeRef::FStringExpressionElement(node)
+    }
+}
+
+impl<'a> From<&'a crate::FStringLiteralElement> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::FStringLiteralElement) -> AnyNodeRef<'a> {
+        AnyNodeRef::FStringLiteralElement(node)
+    }
+}
+
+impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
+    fn from(node: &'a Pattern) -> AnyNodeRef<'a> {
+        match node {
+            Pattern::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
+            Pattern::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
+            Pattern::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
+            Pattern::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
+            Pattern::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
+            Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
+            Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
+            Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: PatternRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            PatternRef::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
+            PatternRef::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
+            PatternRef::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
+            PatternRef::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
+            PatternRef::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
+            PatternRef::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
+            PatternRef::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
+            PatternRef::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchValue> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchValue) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchValue(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchSingleton> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchSingleton) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchSingleton(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchSequence> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchSequence) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchSequence(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchMapping> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchMapping) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchMapping(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchClass> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchClass) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchClass(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchStar> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchStar) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchStar(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchAs> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchAs) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchAs(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchOr> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternMatchOr) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternMatchOr(node)
+    }
+}
+
+impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
+        match node {
+            TypeParam::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            TypeParam::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            TypeParam::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: TypeParamRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::TypeParamTypeVar> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::TypeParamTypeVar) -> AnyNodeRef<'a> {
+        AnyNodeRef::TypeParamTypeVar(node)
+    }
+}
+
+impl<'a> From<&'a crate::TypeParamTypeVarTuple> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::TypeParamTypeVarTuple) -> AnyNodeRef<'a> {
+        AnyNodeRef::TypeParamTypeVarTuple(node)
+    }
+}
+
+impl<'a> From<&'a crate::TypeParamParamSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::TypeParamParamSpec) -> AnyNodeRef<'a> {
+        AnyNodeRef::TypeParamParamSpec(node)
+    }
+}
+
+impl<'a> From<&'a crate::FStringFormatSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::FStringFormatSpec) -> AnyNodeRef<'a> {
+        AnyNodeRef::FStringFormatSpec(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternArguments> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternArguments) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternArguments(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternKeyword> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::PatternKeyword) -> AnyNodeRef<'a> {
+        AnyNodeRef::PatternKeyword(node)
+    }
+}
+
+impl<'a> From<&'a crate::Comprehension> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Comprehension) -> AnyNodeRef<'a> {
+        AnyNodeRef::Comprehension(node)
+    }
+}
+
+impl<'a> From<&'a crate::Arguments> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Arguments) -> AnyNodeRef<'a> {
+        AnyNodeRef::Arguments(node)
+    }
+}
+
+impl<'a> From<&'a crate::Parameters> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Parameters) -> AnyNodeRef<'a> {
+        AnyNodeRef::Parameters(node)
+    }
+}
+
+impl<'a> From<&'a crate::Parameter> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Parameter) -> AnyNodeRef<'a> {
+        AnyNodeRef::Parameter(node)
+    }
+}
+
+impl<'a> From<&'a crate::ParameterWithDefault> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ParameterWithDefault) -> AnyNodeRef<'a> {
+        AnyNodeRef::ParameterWithDefault(node)
+    }
+}
+
+impl<'a> From<&'a crate::Keyword> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Keyword) -> AnyNodeRef<'a> {
+        AnyNodeRef::Keyword(node)
+    }
+}
+
+impl<'a> From<&'a crate::Alias> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Alias) -> AnyNodeRef<'a> {
+        AnyNodeRef::Alias(node)
+    }
+}
+
+impl<'a> From<&'a crate::WithItem> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::WithItem) -> AnyNodeRef<'a> {
+        AnyNodeRef::WithItem(node)
+    }
+}
+
+impl<'a> From<&'a crate::MatchCase> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::MatchCase) -> AnyNodeRef<'a> {
+        AnyNodeRef::MatchCase(node)
+    }
+}
+
+impl<'a> From<&'a crate::Decorator> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Decorator) -> AnyNodeRef<'a> {
+        AnyNodeRef::Decorator(node)
+    }
+}
+
+impl<'a> From<&'a crate::ElifElseClause> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ElifElseClause) -> AnyNodeRef<'a> {
+        AnyNodeRef::ElifElseClause(node)
+    }
+}
+
+impl<'a> From<&'a crate::TypeParams> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::TypeParams) -> AnyNodeRef<'a> {
+        AnyNodeRef::TypeParams(node)
+    }
+}
+
+impl<'a> From<&'a crate::FString> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::FString) -> AnyNodeRef<'a> {
+        AnyNodeRef::FString(node)
+    }
+}
+
+impl<'a> From<&'a crate::StringLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::StringLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::StringLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::BytesLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::BytesLiteral) -> AnyNodeRef<'a> {
+        AnyNodeRef::BytesLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::Identifier> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::Identifier) -> AnyNodeRef<'a> {
+        AnyNodeRef::Identifier(node)
+    }
 }
 
 impl crate::AstNode for crate::ModModule {

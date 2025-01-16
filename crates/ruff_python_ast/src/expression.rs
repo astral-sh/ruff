@@ -13,49 +13,6 @@ impl<'a> From<&'a Box<Expr>> for ExpressionRef<'a> {
     }
 }
 
-impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
-    fn from(value: ExpressionRef<'a>) -> Self {
-        match value {
-            ExpressionRef::BoolOp(expression) => AnyNodeRef::ExprBoolOp(expression),
-            ExpressionRef::Named(expression) => AnyNodeRef::ExprNamed(expression),
-            ExpressionRef::BinOp(expression) => AnyNodeRef::ExprBinOp(expression),
-            ExpressionRef::UnaryOp(expression) => AnyNodeRef::ExprUnaryOp(expression),
-            ExpressionRef::Lambda(expression) => AnyNodeRef::ExprLambda(expression),
-            ExpressionRef::If(expression) => AnyNodeRef::ExprIf(expression),
-            ExpressionRef::Dict(expression) => AnyNodeRef::ExprDict(expression),
-            ExpressionRef::Set(expression) => AnyNodeRef::ExprSet(expression),
-            ExpressionRef::ListComp(expression) => AnyNodeRef::ExprListComp(expression),
-            ExpressionRef::SetComp(expression) => AnyNodeRef::ExprSetComp(expression),
-            ExpressionRef::DictComp(expression) => AnyNodeRef::ExprDictComp(expression),
-            ExpressionRef::Generator(expression) => AnyNodeRef::ExprGenerator(expression),
-            ExpressionRef::Await(expression) => AnyNodeRef::ExprAwait(expression),
-            ExpressionRef::Yield(expression) => AnyNodeRef::ExprYield(expression),
-            ExpressionRef::YieldFrom(expression) => AnyNodeRef::ExprYieldFrom(expression),
-            ExpressionRef::Compare(expression) => AnyNodeRef::ExprCompare(expression),
-            ExpressionRef::Call(expression) => AnyNodeRef::ExprCall(expression),
-            ExpressionRef::FString(expression) => AnyNodeRef::ExprFString(expression),
-            ExpressionRef::StringLiteral(expression) => AnyNodeRef::ExprStringLiteral(expression),
-            ExpressionRef::BytesLiteral(expression) => AnyNodeRef::ExprBytesLiteral(expression),
-            ExpressionRef::NumberLiteral(expression) => AnyNodeRef::ExprNumberLiteral(expression),
-            ExpressionRef::BooleanLiteral(expression) => AnyNodeRef::ExprBooleanLiteral(expression),
-            ExpressionRef::NoneLiteral(expression) => AnyNodeRef::ExprNoneLiteral(expression),
-            ExpressionRef::EllipsisLiteral(expression) => {
-                AnyNodeRef::ExprEllipsisLiteral(expression)
-            }
-            ExpressionRef::Attribute(expression) => AnyNodeRef::ExprAttribute(expression),
-            ExpressionRef::Subscript(expression) => AnyNodeRef::ExprSubscript(expression),
-            ExpressionRef::Starred(expression) => AnyNodeRef::ExprStarred(expression),
-            ExpressionRef::Name(expression) => AnyNodeRef::ExprName(expression),
-            ExpressionRef::List(expression) => AnyNodeRef::ExprList(expression),
-            ExpressionRef::Tuple(expression) => AnyNodeRef::ExprTuple(expression),
-            ExpressionRef::Slice(expression) => AnyNodeRef::ExprSlice(expression),
-            ExpressionRef::IpyEscapeCommand(expression) => {
-                AnyNodeRef::ExprIpyEscapeCommand(expression)
-            }
-        }
-    }
-}
-
 /// Unowned pendant to all the literal variants of [`ast::Expr`] that stores a
 /// reference instead of an owned value.
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
