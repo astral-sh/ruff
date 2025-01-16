@@ -1278,9 +1278,17 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
 
-            (Type::SubclassOf(_), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::SubclassOf(_)) => {
-                class.is_final(db) && !KnownClass::Type.is_superclass_of(db, class)
+            (Type::SubclassOf(subclass_of_ty), instance @ Type::Instance(_))
+            | (instance @ Type::Instance(_), Type::SubclassOf(subclass_of_ty)) => {
+                // `type[T]` is disjoint from `S`, where `S` is an instance type,
+                // if `U` is disjoint from `S`,
+                // where `U` represents all instances of `T`'s metaclass
+                let metaclass_instance = subclass_of_ty
+                    .subclass_of()
+                    .into_class()
+                    .map(|class| class.metaclass(db).to_instance(db))
+                    .unwrap_or_else(|| KnownClass::Type.to_instance(db));
+                instance.is_disjoint_from(db, metaclass_instance)
             }
 
             (
@@ -1425,8 +1433,8 @@ impl<'db> Type<'db> {
                         .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
             }
 
-            (Type::Tuple(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::Tuple(..)) => {
+            (Type::Tuple(..), instance @ Type::Instance(_))
+            | (instance @ Type::Instance(_), Type::Tuple(..)) => {
                 // We cannot be sure if the tuple is disjoint from the instance because:
                 //   - 'other' might be the homogeneous arbitrary-length tuple type
                 //     tuple[T, ...] (which we don't have support for yet); if all of
@@ -1435,7 +1443,7 @@ impl<'db> Type<'db> {
                 //     over the same or compatible *Ts, would overlap with tuple.
                 //
                 // TODO: add checks for the above cases once we support them
-                class.is_final(db) && !KnownClass::Tuple.is_superclass_of(db, class)
+                instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
         }
     }
@@ -2608,15 +2616,6 @@ impl<'db> KnownClass {
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
             .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
-    }
-
-    /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
-    /// *and* `other` is a subclass of `class`.
-    pub fn is_superclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
-        known_module_symbol(db, self.canonical_module(db), self.as_str())
-            .ignore_possibly_unbound()
-            .and_then(Type::into_class_literal)
-            .is_some_and(|ClassLiteralType { class }| other.is_subclass_of(db, class))
     }
 
     /// Return the module in which we should look up the definition for this class
@@ -4361,8 +4360,6 @@ pub(crate) mod tests {
     #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     #[test_case(Ty::Tuple(vec![]), Ty::TypingLiteral)]
     #[test_case(Ty::TypingLiteral, Ty::SubclassOfBuiltinClass("object"))]
-    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("type"))] // bool is `@final`
-    #[test_case(Ty::SubclassOfAbcClass("ABCMeta"), Ty::BuiltinInstance("bool"))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
