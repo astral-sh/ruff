@@ -7,8 +7,8 @@ TODO: Most of our disjointness tests are still Rust tests; they should be moved 
 
 ## Instance types versus `type[T]` types
 
-An instance type is disjoint from a `type[T]` type if the instance type is `@final` and the
-class of the instance type is not a subclass of `T`'s metaclass.
+An instance type is disjoint from a `type[T]` type if the instance type is `@final` and the class of
+the instance type is not a subclass of `T`'s metaclass.
 
 ```py
 from typing import final
