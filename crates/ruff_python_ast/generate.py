@@ -127,6 +127,31 @@ for group in groups:
         """)
 
 # ------------------------------------------------------------------------------
+# AnyNode and AnyNodeRef
+
+out.append("""
+#[derive(Clone, Debug, is_macro::Is, PartialEq)]
+pub enum AnyNode {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"{node.name}({node.ty}),")
+out.append("""
+}
+""")
+
+out.append("""
+#[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
+pub enum AnyNodeRef<'a> {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""{node.name}(&'a {node.ty}),""")
+out.append("""
+}
+""")
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 out_path.write_text(rustfmt("\n".join(out)))
