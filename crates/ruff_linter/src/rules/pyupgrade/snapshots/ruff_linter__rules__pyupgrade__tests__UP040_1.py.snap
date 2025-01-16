@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
+---
+UP040_1.py:6:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+  |
+6 | class A(Generic[T]):
+  |       ^^^^^^^^^^^^^ UP040
+7 |     pass
+  |
+  = help: Use type parameters
+
+ℹ Safe fix
+3 3 | T = TypeVar("T", bound=float)
+4 4 | 
+5 5 | 
+6   |-class A(Generic[T]):
+  6 |+class A[T: float]:
+7 7 |     pass
+8 8 | 
+9 9 |
