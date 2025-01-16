@@ -547,6 +547,10 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
         }
 
+        // airflow.utils.dag_parsing_context
+        ["airflow", "utils", "dag_parsing_context", "get_parsing_context"] => {
+            Replacement::Name("airflow.sdk.get_parsing_context")
+        }
         // airflow.utils.dates
         ["airflow", "utils", "dates", "date_range"] => Replacement::None,
         ["airflow", "utils", "dates", "days_ago"] => {
