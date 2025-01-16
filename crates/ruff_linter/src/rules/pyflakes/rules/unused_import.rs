@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::iter;
 
 use anyhow::{anyhow, bail, Result};
-use itertools::Itertools;
 use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
@@ -10,7 +9,8 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel, SubmoduleImport,
+    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
+    SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -299,12 +299,6 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         let name = binding.name(checker.source());
 
-        let in_global_scope = checker
-            .semantic()
-            .global_scope()
-            .binding_ids()
-            .contains(&binding_id);
-
         // If an import is marked as required, avoid treating it as unused, regardless of whether
         // it was _actually_ used.
         if checker
@@ -336,7 +330,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
-            in_global_scope,
+            scope: binding.scope,
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.start())
@@ -375,7 +369,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
                 } else if in_init
-                    && binding.in_global_scope
+                    && binding.scope.is_global()
                     && is_first_party(&binding.import, checker)
                 {
                     UnusedImportContext::DunderInitFirstParty {
@@ -471,8 +465,8 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
-    /// The binding is in the global scope (i.e. in the same scope as `__all__`)
-    in_global_scope: bool,
+    /// The [`ScopeId`] of the scope in which the [`ImportBinding`] was defined.
+    scope: ScopeId,
 }
 
 impl ImportBinding<'_> {
