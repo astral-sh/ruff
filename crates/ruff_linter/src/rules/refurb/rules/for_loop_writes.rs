@@ -7,10 +7,10 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks use of `IOBase.write` in a for loop.
+/// Checks for the use of `IOBase.write` in a for loop.
 ///
 /// ## Why is this bad?
-/// When writing a batch of elements, it's more idiomatic to use a single method call,
+/// When writing a batch of elements, it's more idiomatic to use a single method call to
 /// `IOBase.writelines`, rather than write elements one by one.
 ///
 /// ## Example
