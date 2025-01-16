@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `io.IOBase.writelines`](https://docs.python.org/3/library/io.html#io.IOBase.writelines)
-#[violation]
-pub struct ForLoopWrites {
+#[derive(ViolationMetadata)]
+pub(crate) struct ForLoopWrites {
     name: String,
 }
 
@@ -109,7 +109,7 @@ pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
     checker.diagnostics.push(
         Diagnostic::new(
             ForLoopWrites {
-                name: io_object_name.id.clone(),
+                name: io_object_name.id.to_string(),
             },
             for_stmt.range,
         )
