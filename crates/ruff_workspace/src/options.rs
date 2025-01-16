@@ -469,6 +469,10 @@ pub struct LintOptions {
     )]
     pub exclude: Option<Vec<String>>,
 
+    /// Options for the `pydoclint` plugin.
+    #[option_group]
+    pub pydoclint: Option<PydoclintOptions>,
+
     /// Options for the `ruff` plugin
     #[option_group]
     pub ruff: Option<RuffOptions>,
@@ -886,10 +890,6 @@ pub struct LintCommonOptions {
     /// Options for the `pycodestyle` plugin.
     #[option_group]
     pub pycodestyle: Option<PycodestyleOptions>,
-
-    /// Options for the `pydoclint` plugin.
-    #[option_group]
-    pub pydoclint: Option<PydoclintOptions>,
 
     /// Options for the `pydocstyle` plugin.
     #[option_group]
@@ -2949,6 +2949,9 @@ impl PydocstyleOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PydoclintOptions {
     /// Skip docstrings which fit on a single line.
+    ///
+    /// Note: The corresponding setting in `pydoclint`
+    /// is named `skip-checking-short-docstrings`.
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -3676,6 +3679,7 @@ pub struct LintOptionsWire {
     extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 
     exclude: Option<Vec<String>>,
+    pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
 }
@@ -3729,6 +3733,7 @@ impl From<LintOptionsWire> for LintOptions {
             per_file_ignores,
             extend_per_file_ignores,
             exclude,
+            pydoclint,
             ruff,
             preview,
         } = value;
@@ -3783,6 +3788,7 @@ impl From<LintOptionsWire> for LintOptions {
                 extend_per_file_ignores,
             },
             exclude,
+            pydoclint,
             ruff,
             preview,
         }

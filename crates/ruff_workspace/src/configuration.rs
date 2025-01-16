@@ -752,7 +752,7 @@ impl LintConfiguration {
             mccabe: options.common.mccabe,
             pep8_naming: options.common.pep8_naming,
             pycodestyle: options.common.pycodestyle,
-            pydoclint: options.common.pydoclint,
+            pydoclint: options.pydoclint,
             pydocstyle: options.common.pydocstyle,
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
@@ -1359,7 +1359,6 @@ fn warn_about_deprecated_top_level_lint_options(
         mccabe,
         pep8_naming,
         pycodestyle,
-        pydoclint,
         pydocstyle,
         pyflakes,
         pylint,
@@ -1523,10 +1522,6 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if pycodestyle.is_some() {
         used_options.push("pycodestyle");
-    }
-
-    if pydoclint.is_some() {
-        used_options.push("pydoclint");
     }
 
     if pydocstyle.is_some() {
