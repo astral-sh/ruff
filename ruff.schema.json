@@ -597,18 +597,6 @@
         }
       ]
     },
-    "pydoclint": {
-      "description": "Options for the `pydoclint` plugin.",
-      "deprecated": true,
-      "anyOf": [
-        {
-          "$ref": "#/definitions/PydoclintOptions"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "pydocstyle": {
       "description": "Options for the `pydocstyle` plugin.",
       "deprecated": true,
@@ -2572,7 +2560,7 @@
       "type": "object",
       "properties": {
         "ignore-one-line-docstrings": {
-          "description": "Skip docstrings which fit on a single line.",
+          "description": "Skip docstrings which fit on a single line.\n\nNote: The corresponding setting in `pydoclint` is named `skip-checking-short-docstrings`.",
           "type": [
             "boolean",
             "null"
@@ -3664,7 +3652,6 @@
         "PLW0",
         "PLW01",
         "PLW010",
-        "PLW0101",
         "PLW0108",
         "PLW012",
         "PLW0120",
