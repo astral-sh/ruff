@@ -94,6 +94,15 @@ for group in groups:
         out.append(f"{node.variant}({node.ty}),")
     out.append("}")
 
+    for node in group.nodes:
+        out.append(f"""
+        impl From<{node.ty}> for {group.owned_enum_ty} {{
+            fn from(node: {node.ty}) -> Self {{
+                Self::{node.variant}(node)
+            }}
+        }}
+        """)
+
 # ------------------------------------------------------------------------------
 # Format and write output
 

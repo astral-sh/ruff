@@ -18,7 +18,7 @@ use crate::{
     int,
     str::Quote,
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
-    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Mod, Pattern, Stmt, TypeParam,
+    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam,
 };
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -28,23 +28,11 @@ pub struct ModModule {
     pub body: Vec<Stmt>,
 }
 
-impl From<ModModule> for Mod {
-    fn from(payload: ModModule) -> Self {
-        Mod::Module(payload)
-    }
-}
-
 /// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModExpression {
     pub range: TextRange,
     pub body: Box<Expr>,
-}
-
-impl From<ModExpression> for Mod {
-    fn from(payload: ModExpression) -> Self {
-        Mod::Expression(payload)
-    }
 }
 
 /// An AST node used to represent a IPython escape command at the statement level.
@@ -107,12 +95,6 @@ pub struct StmtIpyEscapeCommand {
     pub value: Box<str>,
 }
 
-impl From<StmtIpyEscapeCommand> for Stmt {
-    fn from(payload: StmtIpyEscapeCommand) -> Self {
-        Stmt::IpyEscapeCommand(payload)
-    }
-}
-
 /// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef) and
 /// [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
 ///
@@ -128,12 +110,6 @@ pub struct StmtFunctionDef {
     pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
-}
-
-impl From<StmtFunctionDef> for Stmt {
-    fn from(payload: StmtFunctionDef) -> Self {
-        Stmt::FunctionDef(payload)
-    }
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
@@ -165,12 +141,6 @@ impl StmtClassDef {
     }
 }
 
-impl From<StmtClassDef> for Stmt {
-    fn from(payload: StmtClassDef) -> Self {
-        Stmt::ClassDef(payload)
-    }
-}
-
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtReturn {
@@ -178,23 +148,11 @@ pub struct StmtReturn {
     pub value: Option<Box<Expr>>,
 }
 
-impl From<StmtReturn> for Stmt {
-    fn from(payload: StmtReturn) -> Self {
-        Stmt::Return(payload)
-    }
-}
-
 /// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtDelete {
     pub range: TextRange,
     pub targets: Vec<Expr>,
-}
-
-impl From<StmtDelete> for Stmt {
-    fn from(payload: StmtDelete) -> Self {
-        Stmt::Delete(payload)
-    }
 }
 
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
@@ -206,24 +164,12 @@ pub struct StmtTypeAlias {
     pub value: Box<Expr>,
 }
 
-impl From<StmtTypeAlias> for Stmt {
-    fn from(payload: StmtTypeAlias) -> Self {
-        Stmt::TypeAlias(payload)
-    }
-}
-
 /// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssign {
     pub range: TextRange,
     pub targets: Vec<Expr>,
     pub value: Box<Expr>,
-}
-
-impl From<StmtAssign> for Stmt {
-    fn from(payload: StmtAssign) -> Self {
-        Stmt::Assign(payload)
-    }
 }
 
 /// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
@@ -235,12 +181,6 @@ pub struct StmtAugAssign {
     pub value: Box<Expr>,
 }
 
-impl From<StmtAugAssign> for Stmt {
-    fn from(payload: StmtAugAssign) -> Self {
-        Stmt::AugAssign(payload)
-    }
-}
-
 /// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAnnAssign {
@@ -249,12 +189,6 @@ pub struct StmtAnnAssign {
     pub annotation: Box<Expr>,
     pub value: Option<Box<Expr>>,
     pub simple: bool,
-}
-
-impl From<StmtAnnAssign> for Stmt {
-    fn from(payload: StmtAnnAssign) -> Self {
-        Stmt::AnnAssign(payload)
-    }
 }
 
 /// See also [For](https://docs.python.org/3/library/ast.html#ast.For) and
@@ -272,12 +206,6 @@ pub struct StmtFor {
     pub orelse: Vec<Stmt>,
 }
 
-impl From<StmtFor> for Stmt {
-    fn from(payload: StmtFor) -> Self {
-        Stmt::For(payload)
-    }
-}
-
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While) and
 /// [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
 #[derive(Clone, Debug, PartialEq)]
@@ -288,12 +216,6 @@ pub struct StmtWhile {
     pub orelse: Vec<Stmt>,
 }
 
-impl From<StmtWhile> for Stmt {
-    fn from(payload: StmtWhile) -> Self {
-        Stmt::While(payload)
-    }
-}
-
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtIf {
@@ -301,12 +223,6 @@ pub struct StmtIf {
     pub test: Box<Expr>,
     pub body: Vec<Stmt>,
     pub elif_else_clauses: Vec<ElifElseClause>,
-}
-
-impl From<StmtIf> for Stmt {
-    fn from(payload: StmtIf) -> Self {
-        Stmt::If(payload)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -329,12 +245,6 @@ pub struct StmtWith {
     pub body: Vec<Stmt>,
 }
 
-impl From<StmtWith> for Stmt {
-    fn from(payload: StmtWith) -> Self {
-        Stmt::With(payload)
-    }
-}
-
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtMatch {
@@ -343,24 +253,12 @@ pub struct StmtMatch {
     pub cases: Vec<MatchCase>,
 }
 
-impl From<StmtMatch> for Stmt {
-    fn from(payload: StmtMatch) -> Self {
-        Stmt::Match(payload)
-    }
-}
-
 /// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtRaise {
     pub range: TextRange,
     pub exc: Option<Box<Expr>>,
     pub cause: Option<Box<Expr>>,
-}
-
-impl From<StmtRaise> for Stmt {
-    fn from(payload: StmtRaise) -> Self {
-        Stmt::Raise(payload)
-    }
 }
 
 /// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try) and
@@ -375,12 +273,6 @@ pub struct StmtTry {
     pub is_star: bool,
 }
 
-impl From<StmtTry> for Stmt {
-    fn from(payload: StmtTry) -> Self {
-        Stmt::Try(payload)
-    }
-}
-
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssert {
@@ -389,23 +281,11 @@ pub struct StmtAssert {
     pub msg: Option<Box<Expr>>,
 }
 
-impl From<StmtAssert> for Stmt {
-    fn from(payload: StmtAssert) -> Self {
-        Stmt::Assert(payload)
-    }
-}
-
 /// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtImport {
     pub range: TextRange,
     pub names: Vec<Alias>,
-}
-
-impl From<StmtImport> for Stmt {
-    fn from(payload: StmtImport) -> Self {
-        Stmt::Import(payload)
-    }
 }
 
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
@@ -417,23 +297,11 @@ pub struct StmtImportFrom {
     pub level: u32,
 }
 
-impl From<StmtImportFrom> for Stmt {
-    fn from(payload: StmtImportFrom) -> Self {
-        Stmt::ImportFrom(payload)
-    }
-}
-
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtGlobal {
     pub range: TextRange,
     pub names: Vec<Identifier>,
-}
-
-impl From<StmtGlobal> for Stmt {
-    fn from(payload: StmtGlobal) -> Self {
-        Stmt::Global(payload)
-    }
 }
 
 /// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
@@ -443,23 +311,11 @@ pub struct StmtNonlocal {
     pub names: Vec<Identifier>,
 }
 
-impl From<StmtNonlocal> for Stmt {
-    fn from(payload: StmtNonlocal) -> Self {
-        Stmt::Nonlocal(payload)
-    }
-}
-
 /// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtExpr {
     pub range: TextRange,
     pub value: Box<Expr>,
-}
-
-impl From<StmtExpr> for Stmt {
-    fn from(payload: StmtExpr) -> Self {
-        Stmt::Expr(payload)
-    }
 }
 
 /// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
@@ -468,34 +324,16 @@ pub struct StmtPass {
     pub range: TextRange,
 }
 
-impl From<StmtPass> for Stmt {
-    fn from(payload: StmtPass) -> Self {
-        Stmt::Pass(payload)
-    }
-}
-
 /// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtBreak {
     pub range: TextRange,
 }
 
-impl From<StmtBreak> for Stmt {
-    fn from(payload: StmtBreak) -> Self {
-        Stmt::Break(payload)
-    }
-}
-
 /// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtContinue {
     pub range: TextRange,
-}
-
-impl From<StmtContinue> for Stmt {
-    fn from(payload: StmtContinue) -> Self {
-        Stmt::Continue(payload)
-    }
 }
 
 impl Expr {
@@ -547,12 +385,6 @@ pub struct ExprIpyEscapeCommand {
     pub value: Box<str>,
 }
 
-impl From<ExprIpyEscapeCommand> for Expr {
-    fn from(payload: ExprIpyEscapeCommand) -> Self {
-        Expr::IpyEscapeCommand(payload)
-    }
-}
-
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBoolOp {
@@ -561,24 +393,12 @@ pub struct ExprBoolOp {
     pub values: Vec<Expr>,
 }
 
-impl From<ExprBoolOp> for Expr {
-    fn from(payload: ExprBoolOp) -> Self {
-        Expr::BoolOp(payload)
-    }
-}
-
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
-}
-
-impl From<ExprNamed> for Expr {
-    fn from(payload: ExprNamed) -> Self {
-        Expr::Named(payload)
-    }
 }
 
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
@@ -590,24 +410,12 @@ pub struct ExprBinOp {
     pub right: Box<Expr>,
 }
 
-impl From<ExprBinOp> for Expr {
-    fn from(payload: ExprBinOp) -> Self {
-        Expr::BinOp(payload)
-    }
-}
-
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprUnaryOp {
     pub range: TextRange,
     pub op: UnaryOp,
     pub operand: Box<Expr>,
-}
-
-impl From<ExprUnaryOp> for Expr {
-    fn from(payload: ExprUnaryOp) -> Self {
-        Expr::UnaryOp(payload)
-    }
 }
 
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
@@ -618,12 +426,6 @@ pub struct ExprLambda {
     pub body: Box<Expr>,
 }
 
-impl From<ExprLambda> for Expr {
-    fn from(payload: ExprLambda) -> Self {
-        Expr::Lambda(payload)
-    }
-}
-
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIf {
@@ -631,12 +433,6 @@ pub struct ExprIf {
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
-}
-
-impl From<ExprIf> for Expr {
-    fn from(payload: ExprIf) -> Self {
-        Expr::If(payload)
-    }
 }
 
 /// Represents an item in a [dictionary literal display][1].
@@ -742,12 +538,6 @@ impl<'a> IntoIterator for &'a ExprDict {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl From<ExprDict> for Expr {
-    fn from(payload: ExprDict) -> Self {
-        Expr::Dict(payload)
     }
 }
 
@@ -865,12 +655,6 @@ impl<'a> IntoIterator for &'a ExprSet {
     }
 }
 
-impl From<ExprSet> for Expr {
-    fn from(payload: ExprSet) -> Self {
-        Expr::Set(payload)
-    }
-}
-
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprListComp {
@@ -879,24 +663,12 @@ pub struct ExprListComp {
     pub generators: Vec<Comprehension>,
 }
 
-impl From<ExprListComp> for Expr {
-    fn from(payload: ExprListComp) -> Self {
-        Expr::ListComp(payload)
-    }
-}
-
 /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSetComp {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
-}
-
-impl From<ExprSetComp> for Expr {
-    fn from(payload: ExprSetComp) -> Self {
-        Expr::SetComp(payload)
-    }
 }
 
 /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
@@ -908,12 +680,6 @@ pub struct ExprDictComp {
     pub generators: Vec<Comprehension>,
 }
 
-impl From<ExprDictComp> for Expr {
-    fn from(payload: ExprDictComp) -> Self {
-        Expr::DictComp(payload)
-    }
-}
-
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprGenerator {
@@ -923,23 +689,11 @@ pub struct ExprGenerator {
     pub parenthesized: bool,
 }
 
-impl From<ExprGenerator> for Expr {
-    fn from(payload: ExprGenerator) -> Self {
-        Expr::Generator(payload)
-    }
-}
-
 /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAwait {
     pub range: TextRange,
     pub value: Box<Expr>,
-}
-
-impl From<ExprAwait> for Expr {
-    fn from(payload: ExprAwait) -> Self {
-        Expr::Await(payload)
-    }
 }
 
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
@@ -949,23 +703,11 @@ pub struct ExprYield {
     pub value: Option<Box<Expr>>,
 }
 
-impl From<ExprYield> for Expr {
-    fn from(payload: ExprYield) -> Self {
-        Expr::Yield(payload)
-    }
-}
-
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYieldFrom {
     pub range: TextRange,
     pub value: Box<Expr>,
-}
-
-impl From<ExprYieldFrom> for Expr {
-    fn from(payload: ExprYieldFrom) -> Self {
-        Expr::YieldFrom(payload)
-    }
 }
 
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
@@ -977,24 +719,12 @@ pub struct ExprCompare {
     pub comparators: Box<[Expr]>,
 }
 
-impl From<ExprCompare> for Expr {
-    fn from(payload: ExprCompare) -> Self {
-        Expr::Compare(payload)
-    }
-}
-
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCall {
     pub range: TextRange,
     pub func: Box<Expr>,
     pub arguments: Arguments,
-}
-
-impl From<ExprCall> for Expr {
-    fn from(payload: ExprCall) -> Self {
-        Expr::Call(payload)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1098,12 +828,6 @@ pub struct DebugText {
 pub struct ExprFString {
     pub range: TextRange,
     pub value: FStringValue,
-}
-
-impl From<ExprFString> for Expr {
-    fn from(payload: ExprFString) -> Self {
-        Expr::FString(payload)
-    }
 }
 
 /// The value representing an [`ExprFString`].
@@ -1536,12 +1260,6 @@ pub struct ExprStringLiteral {
     pub value: StringLiteralValue,
 }
 
-impl From<ExprStringLiteral> for Expr {
-    fn from(payload: ExprStringLiteral) -> Self {
-        Expr::StringLiteral(payload)
-    }
-}
-
 impl Ranged for ExprStringLiteral {
     fn range(&self) -> TextRange {
         self.range
@@ -1936,12 +1654,6 @@ impl Debug for ConcatenatedStringLiteral {
 pub struct ExprBytesLiteral {
     pub range: TextRange,
     pub value: BytesLiteralValue,
-}
-
-impl From<ExprBytesLiteral> for Expr {
-    fn from(payload: ExprBytesLiteral) -> Self {
-        Expr::BytesLiteral(payload)
-    }
 }
 
 impl Ranged for ExprBytesLiteral {
@@ -2545,12 +2257,6 @@ pub struct ExprNumberLiteral {
     pub value: Number,
 }
 
-impl From<ExprNumberLiteral> for Expr {
-    fn from(payload: ExprNumberLiteral) -> Self {
-        Expr::NumberLiteral(payload)
-    }
-}
-
 impl Ranged for ExprNumberLiteral {
     fn range(&self) -> TextRange {
         self.range
@@ -2570,12 +2276,6 @@ pub struct ExprBooleanLiteral {
     pub value: bool,
 }
 
-impl From<ExprBooleanLiteral> for Expr {
-    fn from(payload: ExprBooleanLiteral) -> Self {
-        Expr::BooleanLiteral(payload)
-    }
-}
-
 impl Ranged for ExprBooleanLiteral {
     fn range(&self) -> TextRange {
         self.range
@@ -2587,12 +2287,6 @@ pub struct ExprNoneLiteral {
     pub range: TextRange,
 }
 
-impl From<ExprNoneLiteral> for Expr {
-    fn from(payload: ExprNoneLiteral) -> Self {
-        Expr::NoneLiteral(payload)
-    }
-}
-
 impl Ranged for ExprNoneLiteral {
     fn range(&self) -> TextRange {
         self.range
@@ -2602,12 +2296,6 @@ impl Ranged for ExprNoneLiteral {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprEllipsisLiteral {
     pub range: TextRange,
-}
-
-impl From<ExprEllipsisLiteral> for Expr {
-    fn from(payload: ExprEllipsisLiteral) -> Self {
-        Expr::EllipsisLiteral(payload)
-    }
 }
 
 impl Ranged for ExprEllipsisLiteral {
@@ -2625,12 +2313,6 @@ pub struct ExprAttribute {
     pub ctx: ExprContext,
 }
 
-impl From<ExprAttribute> for Expr {
-    fn from(payload: ExprAttribute) -> Self {
-        Expr::Attribute(payload)
-    }
-}
-
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSubscript {
@@ -2640,24 +2322,12 @@ pub struct ExprSubscript {
     pub ctx: ExprContext,
 }
 
-impl From<ExprSubscript> for Expr {
-    fn from(payload: ExprSubscript) -> Self {
-        Expr::Subscript(payload)
-    }
-}
-
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStarred {
     pub range: TextRange,
     pub value: Box<Expr>,
     pub ctx: ExprContext,
-}
-
-impl From<ExprStarred> for Expr {
-    fn from(payload: ExprStarred) -> Self {
-        Expr::Starred(payload)
-    }
 }
 
 /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
@@ -2671,12 +2341,6 @@ pub struct ExprName {
 impl ExprName {
     pub fn id(&self) -> &Name {
         &self.id
-    }
-}
-
-impl From<ExprName> for Expr {
-    fn from(payload: ExprName) -> Self {
-        Expr::Name(payload)
     }
 }
 
@@ -2708,12 +2372,6 @@ impl<'a> IntoIterator for &'a ExprList {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl From<ExprList> for Expr {
-    fn from(payload: ExprList) -> Self {
-        Expr::List(payload)
     }
 }
 
@@ -2751,12 +2409,6 @@ impl<'a> IntoIterator for &'a ExprTuple {
     }
 }
 
-impl From<ExprTuple> for Expr {
-    fn from(payload: ExprTuple) -> Self {
-        Expr::Tuple(payload)
-    }
-}
-
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSlice {
@@ -2764,12 +2416,6 @@ pub struct ExprSlice {
     pub lower: Option<Box<Expr>>,
     pub upper: Option<Box<Expr>>,
     pub step: Option<Box<Expr>>,
-}
-
-impl From<ExprSlice> for Expr {
-    fn from(payload: ExprSlice) -> Self {
-        Expr::Slice(payload)
-    }
 }
 
 /// See also [expr_context](https://docs.python.org/3/library/ast.html#ast.expr_context)
@@ -3003,12 +2649,6 @@ pub struct ExceptHandlerExceptHandler {
     pub body: Vec<Stmt>,
 }
 
-impl From<ExceptHandlerExceptHandler> for ExceptHandler {
-    fn from(payload: ExceptHandlerExceptHandler) -> Self {
-        ExceptHandler::ExceptHandler(payload)
-    }
-}
-
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
@@ -3095,12 +2735,6 @@ pub struct PatternMatchValue {
     pub value: Box<Expr>,
 }
 
-impl From<PatternMatchValue> for Pattern {
-    fn from(payload: PatternMatchValue) -> Self {
-        Pattern::MatchValue(payload)
-    }
-}
-
 /// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton {
@@ -3108,23 +2742,11 @@ pub struct PatternMatchSingleton {
     pub value: Singleton,
 }
 
-impl From<PatternMatchSingleton> for Pattern {
-    fn from(payload: PatternMatchSingleton) -> Self {
-        Pattern::MatchSingleton(payload)
-    }
-}
-
 /// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSequence {
     pub range: TextRange,
     pub patterns: Vec<Pattern>,
-}
-
-impl From<PatternMatchSequence> for Pattern {
-    fn from(payload: PatternMatchSequence) -> Self {
-        Pattern::MatchSequence(payload)
-    }
 }
 
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
@@ -3136,24 +2758,12 @@ pub struct PatternMatchMapping {
     pub rest: Option<Identifier>,
 }
 
-impl From<PatternMatchMapping> for Pattern {
-    fn from(payload: PatternMatchMapping) -> Self {
-        Pattern::MatchMapping(payload)
-    }
-}
-
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchClass {
     pub range: TextRange,
     pub cls: Box<Expr>,
     pub arguments: PatternArguments,
-}
-
-impl From<PatternMatchClass> for Pattern {
-    fn from(payload: PatternMatchClass) -> Self {
-        Pattern::MatchClass(payload)
-    }
 }
 
 /// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
@@ -3185,12 +2795,6 @@ pub struct PatternMatchStar {
     pub name: Option<Identifier>,
 }
 
-impl From<PatternMatchStar> for Pattern {
-    fn from(payload: PatternMatchStar) -> Self {
-        Pattern::MatchStar(payload)
-    }
-}
-
 /// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchAs {
@@ -3199,23 +2803,11 @@ pub struct PatternMatchAs {
     pub name: Option<Identifier>,
 }
 
-impl From<PatternMatchAs> for Pattern {
-    fn from(payload: PatternMatchAs) -> Self {
-        Pattern::MatchAs(payload)
-    }
-}
-
 /// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchOr {
     pub range: TextRange,
     pub patterns: Vec<Pattern>,
-}
-
-impl From<PatternMatchOr> for Pattern {
-    fn from(payload: PatternMatchOr) -> Self {
-        Pattern::MatchOr(payload)
-    }
 }
 
 impl TypeParam {
@@ -3245,12 +2837,6 @@ pub struct TypeParamTypeVar {
     pub default: Option<Box<Expr>>,
 }
 
-impl From<TypeParamTypeVar> for TypeParam {
-    fn from(payload: TypeParamTypeVar) -> Self {
-        TypeParam::TypeVar(payload)
-    }
-}
-
 /// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamParamSpec {
@@ -3259,24 +2845,12 @@ pub struct TypeParamParamSpec {
     pub default: Option<Box<Expr>>,
 }
 
-impl From<TypeParamParamSpec> for TypeParam {
-    fn from(payload: TypeParamParamSpec) -> Self {
-        TypeParam::ParamSpec(payload)
-    }
-}
-
 /// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub name: Identifier,
     pub default: Option<Box<Expr>>,
-}
-
-impl From<TypeParamTypeVarTuple> for TypeParam {
-    fn from(payload: TypeParamTypeVarTuple) -> Self {
-        TypeParam::TypeVarTuple(payload)
-    }
 }
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
@@ -4466,6 +4040,8 @@ impl Ranged for crate::nodes::ParameterWithDefault {
 mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
+
+    use crate::Mod;
 
     #[test]
     #[cfg(target_pointer_width = "64")]
