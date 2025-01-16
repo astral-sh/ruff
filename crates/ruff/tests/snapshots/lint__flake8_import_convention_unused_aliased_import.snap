@@ -25,5 +25,7 @@ exit_code: 2
 
 ----- stderr -----
 ruff failed
-  Cause: isort required import (I002) conflicts with unconventional import alias (ICN001):
+  Cause: Required import specified in `lint.isort.required-imports` (I002) conflicts with the required import alias specified in either `lint.flake8-import-conventions.aliases` or `lint.flake8-import-conventions.extend-aliases`(ICN001):
     - pandas -> pd
+
+Help: Remove the required import or alias from your configuration.

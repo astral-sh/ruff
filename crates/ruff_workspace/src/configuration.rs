@@ -1577,8 +1577,12 @@ fn conflicting_import_settings(
 
     if !err_body.is_empty() {
         return Err(anyhow!(
-            "isort required import (I002) conflicts with unconventional import alias (ICN001):\
-                \n{err_body}"
+            "Required import specified in `lint.isort.required-imports` (I002) \
+            conflicts with the required import alias specified in either \
+            `lint.flake8-import-conventions.aliases` or \
+            `lint.flake8-import-conventions.extend-aliases`(ICN001):\
+                \n{err_body}\n\
+            Help: Remove the required import or alias from your configuration."
         ));
     }
 
