@@ -36,6 +36,7 @@ class Group:
     name: str
     nodes: list[Node]
     owned_enum_ty: str
+    ref_enum_ty: str
 
     add_suffix_to_is_methods: bool
     comment: Optional[str]
@@ -43,6 +44,7 @@ class Group:
     def __init__(self, group_name, group):
         self.name = group_name
         self.owned_enum_ty = group_name
+        self.ref_enum_ty = group.get("ref_enum_ty", group_name + "Ref")
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
         self.comment = group.get("comment")
         self.nodes = [
@@ -125,6 +127,64 @@ for group in groups:
             }}
         }}
         """)
+
+# ------------------------------------------------------------------------------
+# Ref enum
+#
+# For each group, we create an enum that contains a reference to a syntax node.
+
+for group in groups:
+    if group.name == "ungrouped":
+        continue
+
+    out.append("")
+    if group.comment is not None:
+        out.append(group.comment)
+    out.append("""#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]""")
+    out.append(f"""pub enum {group.ref_enum_ty}<'a> {{""")
+    for node in group.nodes:
+        if group.add_suffix_to_is_methods:
+            is_name = to_snake_case(node.variant + group.name)
+            out.append(f'#[is(name = "{is_name}")]')
+        out.append(f"""{node.variant}(&'a {node.ty}),""")
+    out.append("}")
+
+    out.append(f"""
+        impl<'a> From<&'a {group.owned_enum_ty}> for {group.ref_enum_ty}<'a> {{
+            fn from(node: &'a {group.owned_enum_ty}) -> Self {{
+                match node {{
+    """)
+    for node in group.nodes:
+        out.append(
+            f"""{group.owned_enum_ty}::{node.variant}(node) => {group.ref_enum_ty}::{node.variant}(node),"""
+        )
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    for node in group.nodes:
+        out.append(f"""
+        impl<'a> From<&'a {node.ty}> for {group.ref_enum_ty}<'a> {{
+            fn from(node: &'a {node.ty}) -> Self {{
+                Self::{node.variant}(node)
+            }}
+        }}
+        """)
+
+    out.append(f"""
+    impl ruff_text_size::Ranged for {group.ref_enum_ty}<'_> {{
+        fn range(&self) -> ruff_text_size::TextRange {{
+            match self {{
+    """)
+    for node in group.nodes:
+        out.append(f"Self::{node.variant}(node) => node.range(),")
+    out.append("""
+            }
+        }
+    }
+    """)
 
 # ------------------------------------------------------------------------------
 # AnyNode and AnyNodeRef

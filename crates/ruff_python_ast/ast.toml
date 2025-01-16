@@ -10,6 +10,7 @@ ModExpression = {}
 [Stmt]
 add_suffix_to_is_methods = true
 comment = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+ref_enum_ty = "StatementRef"
 
 [Stmt.nodes]
 StmtFunctionDef = {}
@@ -41,6 +42,7 @@ StmtIpyEscapeCommand = {}
 [Expr]
 add_suffix_to_is_methods = true
 comment = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
+ref_enum_ty = "ExpressionRef"
 
 [Expr.nodes]
 ExprBoolOp = {}

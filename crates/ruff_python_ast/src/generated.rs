@@ -1277,6 +1277,852 @@ impl ruff_text_size::Ranged for crate::Identifier {
     }
 }
 
+/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum ModRef<'a> {
+    Module(&'a crate::ModModule),
+    Expression(&'a crate::ModExpression),
+}
+
+impl<'a> From<&'a Mod> for ModRef<'a> {
+    fn from(node: &'a Mod) -> Self {
+        match node {
+            Mod::Module(node) => ModRef::Module(node),
+            Mod::Expression(node) => ModRef::Expression(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ModModule> for ModRef<'a> {
+    fn from(node: &'a crate::ModModule) -> Self {
+        Self::Module(node)
+    }
+}
+
+impl<'a> From<&'a crate::ModExpression> for ModRef<'a> {
+    fn from(node: &'a crate::ModExpression) -> Self {
+        Self::Expression(node)
+    }
+}
+
+impl ruff_text_size::Ranged for ModRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::Module(node) => node.range(),
+            Self::Expression(node) => node.range(),
+        }
+    }
+}
+
+/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum StatementRef<'a> {
+    #[is(name = "function_def_stmt")]
+    FunctionDef(&'a crate::StmtFunctionDef),
+    #[is(name = "class_def_stmt")]
+    ClassDef(&'a crate::StmtClassDef),
+    #[is(name = "return_stmt")]
+    Return(&'a crate::StmtReturn),
+    #[is(name = "delete_stmt")]
+    Delete(&'a crate::StmtDelete),
+    #[is(name = "type_alias_stmt")]
+    TypeAlias(&'a crate::StmtTypeAlias),
+    #[is(name = "assign_stmt")]
+    Assign(&'a crate::StmtAssign),
+    #[is(name = "aug_assign_stmt")]
+    AugAssign(&'a crate::StmtAugAssign),
+    #[is(name = "ann_assign_stmt")]
+    AnnAssign(&'a crate::StmtAnnAssign),
+    #[is(name = "for_stmt")]
+    For(&'a crate::StmtFor),
+    #[is(name = "while_stmt")]
+    While(&'a crate::StmtWhile),
+    #[is(name = "if_stmt")]
+    If(&'a crate::StmtIf),
+    #[is(name = "with_stmt")]
+    With(&'a crate::StmtWith),
+    #[is(name = "match_stmt")]
+    Match(&'a crate::StmtMatch),
+    #[is(name = "raise_stmt")]
+    Raise(&'a crate::StmtRaise),
+    #[is(name = "try_stmt")]
+    Try(&'a crate::StmtTry),
+    #[is(name = "assert_stmt")]
+    Assert(&'a crate::StmtAssert),
+    #[is(name = "import_stmt")]
+    Import(&'a crate::StmtImport),
+    #[is(name = "import_from_stmt")]
+    ImportFrom(&'a crate::StmtImportFrom),
+    #[is(name = "global_stmt")]
+    Global(&'a crate::StmtGlobal),
+    #[is(name = "nonlocal_stmt")]
+    Nonlocal(&'a crate::StmtNonlocal),
+    #[is(name = "expr_stmt")]
+    Expr(&'a crate::StmtExpr),
+    #[is(name = "pass_stmt")]
+    Pass(&'a crate::StmtPass),
+    #[is(name = "break_stmt")]
+    Break(&'a crate::StmtBreak),
+    #[is(name = "continue_stmt")]
+    Continue(&'a crate::StmtContinue),
+    #[is(name = "ipy_escape_command_stmt")]
+    IpyEscapeCommand(&'a crate::StmtIpyEscapeCommand),
+}
+
+impl<'a> From<&'a Stmt> for StatementRef<'a> {
+    fn from(node: &'a Stmt) -> Self {
+        match node {
+            Stmt::FunctionDef(node) => StatementRef::FunctionDef(node),
+            Stmt::ClassDef(node) => StatementRef::ClassDef(node),
+            Stmt::Return(node) => StatementRef::Return(node),
+            Stmt::Delete(node) => StatementRef::Delete(node),
+            Stmt::TypeAlias(node) => StatementRef::TypeAlias(node),
+            Stmt::Assign(node) => StatementRef::Assign(node),
+            Stmt::AugAssign(node) => StatementRef::AugAssign(node),
+            Stmt::AnnAssign(node) => StatementRef::AnnAssign(node),
+            Stmt::For(node) => StatementRef::For(node),
+            Stmt::While(node) => StatementRef::While(node),
+            Stmt::If(node) => StatementRef::If(node),
+            Stmt::With(node) => StatementRef::With(node),
+            Stmt::Match(node) => StatementRef::Match(node),
+            Stmt::Raise(node) => StatementRef::Raise(node),
+            Stmt::Try(node) => StatementRef::Try(node),
+            Stmt::Assert(node) => StatementRef::Assert(node),
+            Stmt::Import(node) => StatementRef::Import(node),
+            Stmt::ImportFrom(node) => StatementRef::ImportFrom(node),
+            Stmt::Global(node) => StatementRef::Global(node),
+            Stmt::Nonlocal(node) => StatementRef::Nonlocal(node),
+            Stmt::Expr(node) => StatementRef::Expr(node),
+            Stmt::Pass(node) => StatementRef::Pass(node),
+            Stmt::Break(node) => StatementRef::Break(node),
+            Stmt::Continue(node) => StatementRef::Continue(node),
+            Stmt::IpyEscapeCommand(node) => StatementRef::IpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::StmtFunctionDef> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtFunctionDef) -> Self {
+        Self::FunctionDef(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtClassDef> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtClassDef) -> Self {
+        Self::ClassDef(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtReturn> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtReturn) -> Self {
+        Self::Return(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtDelete> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtDelete) -> Self {
+        Self::Delete(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtTypeAlias> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtTypeAlias) -> Self {
+        Self::TypeAlias(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAssign> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtAssign) -> Self {
+        Self::Assign(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAugAssign> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtAugAssign) -> Self {
+        Self::AugAssign(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAnnAssign> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtAnnAssign) -> Self {
+        Self::AnnAssign(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtFor> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtFor) -> Self {
+        Self::For(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtWhile> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtWhile) -> Self {
+        Self::While(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtIf> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtIf) -> Self {
+        Self::If(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtWith> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtWith) -> Self {
+        Self::With(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtMatch> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtMatch) -> Self {
+        Self::Match(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtRaise> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtRaise) -> Self {
+        Self::Raise(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtTry> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtTry) -> Self {
+        Self::Try(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtAssert> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtAssert) -> Self {
+        Self::Assert(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtImport> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtImport) -> Self {
+        Self::Import(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtImportFrom> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtImportFrom) -> Self {
+        Self::ImportFrom(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtGlobal> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtGlobal) -> Self {
+        Self::Global(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtNonlocal> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtNonlocal) -> Self {
+        Self::Nonlocal(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtExpr> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtExpr) -> Self {
+        Self::Expr(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtPass> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtPass) -> Self {
+        Self::Pass(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtBreak> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtBreak) -> Self {
+        Self::Break(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtContinue> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtContinue) -> Self {
+        Self::Continue(node)
+    }
+}
+
+impl<'a> From<&'a crate::StmtIpyEscapeCommand> for StatementRef<'a> {
+    fn from(node: &'a crate::StmtIpyEscapeCommand) -> Self {
+        Self::IpyEscapeCommand(node)
+    }
+}
+
+impl ruff_text_size::Ranged for StatementRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::FunctionDef(node) => node.range(),
+            Self::ClassDef(node) => node.range(),
+            Self::Return(node) => node.range(),
+            Self::Delete(node) => node.range(),
+            Self::TypeAlias(node) => node.range(),
+            Self::Assign(node) => node.range(),
+            Self::AugAssign(node) => node.range(),
+            Self::AnnAssign(node) => node.range(),
+            Self::For(node) => node.range(),
+            Self::While(node) => node.range(),
+            Self::If(node) => node.range(),
+            Self::With(node) => node.range(),
+            Self::Match(node) => node.range(),
+            Self::Raise(node) => node.range(),
+            Self::Try(node) => node.range(),
+            Self::Assert(node) => node.range(),
+            Self::Import(node) => node.range(),
+            Self::ImportFrom(node) => node.range(),
+            Self::Global(node) => node.range(),
+            Self::Nonlocal(node) => node.range(),
+            Self::Expr(node) => node.range(),
+            Self::Pass(node) => node.range(),
+            Self::Break(node) => node.range(),
+            Self::Continue(node) => node.range(),
+            Self::IpyEscapeCommand(node) => node.range(),
+        }
+    }
+}
+
+/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum ExpressionRef<'a> {
+    #[is(name = "bool_op_expr")]
+    BoolOp(&'a crate::ExprBoolOp),
+    #[is(name = "named_expr")]
+    Named(&'a crate::ExprNamed),
+    #[is(name = "bin_op_expr")]
+    BinOp(&'a crate::ExprBinOp),
+    #[is(name = "unary_op_expr")]
+    UnaryOp(&'a crate::ExprUnaryOp),
+    #[is(name = "lambda_expr")]
+    Lambda(&'a crate::ExprLambda),
+    #[is(name = "if_expr")]
+    If(&'a crate::ExprIf),
+    #[is(name = "dict_expr")]
+    Dict(&'a crate::ExprDict),
+    #[is(name = "set_expr")]
+    Set(&'a crate::ExprSet),
+    #[is(name = "list_comp_expr")]
+    ListComp(&'a crate::ExprListComp),
+    #[is(name = "set_comp_expr")]
+    SetComp(&'a crate::ExprSetComp),
+    #[is(name = "dict_comp_expr")]
+    DictComp(&'a crate::ExprDictComp),
+    #[is(name = "generator_expr")]
+    Generator(&'a crate::ExprGenerator),
+    #[is(name = "await_expr")]
+    Await(&'a crate::ExprAwait),
+    #[is(name = "yield_expr")]
+    Yield(&'a crate::ExprYield),
+    #[is(name = "yield_from_expr")]
+    YieldFrom(&'a crate::ExprYieldFrom),
+    #[is(name = "compare_expr")]
+    Compare(&'a crate::ExprCompare),
+    #[is(name = "call_expr")]
+    Call(&'a crate::ExprCall),
+    #[is(name = "f_string_expr")]
+    FString(&'a crate::ExprFString),
+    #[is(name = "string_literal_expr")]
+    StringLiteral(&'a crate::ExprStringLiteral),
+    #[is(name = "bytes_literal_expr")]
+    BytesLiteral(&'a crate::ExprBytesLiteral),
+    #[is(name = "number_literal_expr")]
+    NumberLiteral(&'a crate::ExprNumberLiteral),
+    #[is(name = "boolean_literal_expr")]
+    BooleanLiteral(&'a crate::ExprBooleanLiteral),
+    #[is(name = "none_literal_expr")]
+    NoneLiteral(&'a crate::ExprNoneLiteral),
+    #[is(name = "ellipsis_literal_expr")]
+    EllipsisLiteral(&'a crate::ExprEllipsisLiteral),
+    #[is(name = "attribute_expr")]
+    Attribute(&'a crate::ExprAttribute),
+    #[is(name = "subscript_expr")]
+    Subscript(&'a crate::ExprSubscript),
+    #[is(name = "starred_expr")]
+    Starred(&'a crate::ExprStarred),
+    #[is(name = "name_expr")]
+    Name(&'a crate::ExprName),
+    #[is(name = "list_expr")]
+    List(&'a crate::ExprList),
+    #[is(name = "tuple_expr")]
+    Tuple(&'a crate::ExprTuple),
+    #[is(name = "slice_expr")]
+    Slice(&'a crate::ExprSlice),
+    #[is(name = "ipy_escape_command_expr")]
+    IpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
+}
+
+impl<'a> From<&'a Expr> for ExpressionRef<'a> {
+    fn from(node: &'a Expr) -> Self {
+        match node {
+            Expr::BoolOp(node) => ExpressionRef::BoolOp(node),
+            Expr::Named(node) => ExpressionRef::Named(node),
+            Expr::BinOp(node) => ExpressionRef::BinOp(node),
+            Expr::UnaryOp(node) => ExpressionRef::UnaryOp(node),
+            Expr::Lambda(node) => ExpressionRef::Lambda(node),
+            Expr::If(node) => ExpressionRef::If(node),
+            Expr::Dict(node) => ExpressionRef::Dict(node),
+            Expr::Set(node) => ExpressionRef::Set(node),
+            Expr::ListComp(node) => ExpressionRef::ListComp(node),
+            Expr::SetComp(node) => ExpressionRef::SetComp(node),
+            Expr::DictComp(node) => ExpressionRef::DictComp(node),
+            Expr::Generator(node) => ExpressionRef::Generator(node),
+            Expr::Await(node) => ExpressionRef::Await(node),
+            Expr::Yield(node) => ExpressionRef::Yield(node),
+            Expr::YieldFrom(node) => ExpressionRef::YieldFrom(node),
+            Expr::Compare(node) => ExpressionRef::Compare(node),
+            Expr::Call(node) => ExpressionRef::Call(node),
+            Expr::FString(node) => ExpressionRef::FString(node),
+            Expr::StringLiteral(node) => ExpressionRef::StringLiteral(node),
+            Expr::BytesLiteral(node) => ExpressionRef::BytesLiteral(node),
+            Expr::NumberLiteral(node) => ExpressionRef::NumberLiteral(node),
+            Expr::BooleanLiteral(node) => ExpressionRef::BooleanLiteral(node),
+            Expr::NoneLiteral(node) => ExpressionRef::NoneLiteral(node),
+            Expr::EllipsisLiteral(node) => ExpressionRef::EllipsisLiteral(node),
+            Expr::Attribute(node) => ExpressionRef::Attribute(node),
+            Expr::Subscript(node) => ExpressionRef::Subscript(node),
+            Expr::Starred(node) => ExpressionRef::Starred(node),
+            Expr::Name(node) => ExpressionRef::Name(node),
+            Expr::List(node) => ExpressionRef::List(node),
+            Expr::Tuple(node) => ExpressionRef::Tuple(node),
+            Expr::Slice(node) => ExpressionRef::Slice(node),
+            Expr::IpyEscapeCommand(node) => ExpressionRef::IpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ExprBoolOp> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprBoolOp) -> Self {
+        Self::BoolOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNamed> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprNamed) -> Self {
+        Self::Named(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBinOp> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprBinOp) -> Self {
+        Self::BinOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprUnaryOp> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprUnaryOp) -> Self {
+        Self::UnaryOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprLambda> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprLambda) -> Self {
+        Self::Lambda(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprIf> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprIf) -> Self {
+        Self::If(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprDict> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprDict) -> Self {
+        Self::Dict(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSet> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprSet) -> Self {
+        Self::Set(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprListComp> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprListComp) -> Self {
+        Self::ListComp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSetComp> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprSetComp) -> Self {
+        Self::SetComp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprDictComp> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprDictComp) -> Self {
+        Self::DictComp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprGenerator> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprGenerator) -> Self {
+        Self::Generator(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprAwait> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprAwait) -> Self {
+        Self::Await(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprYield> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprYield) -> Self {
+        Self::Yield(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprYieldFrom> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprYieldFrom) -> Self {
+        Self::YieldFrom(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprCompare> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprCompare) -> Self {
+        Self::Compare(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprCall> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprCall) -> Self {
+        Self::Call(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprFString> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprFString) -> Self {
+        Self::FString(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprStringLiteral> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprStringLiteral) -> Self {
+        Self::StringLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBytesLiteral> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprBytesLiteral) -> Self {
+        Self::BytesLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNumberLiteral> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprNumberLiteral) -> Self {
+        Self::NumberLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBooleanLiteral> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprBooleanLiteral) -> Self {
+        Self::BooleanLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNoneLiteral> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprNoneLiteral) -> Self {
+        Self::NoneLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprEllipsisLiteral> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprEllipsisLiteral) -> Self {
+        Self::EllipsisLiteral(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprAttribute> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprAttribute) -> Self {
+        Self::Attribute(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSubscript> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprSubscript) -> Self {
+        Self::Subscript(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprStarred> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprStarred) -> Self {
+        Self::Starred(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprName> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprName) -> Self {
+        Self::Name(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprList> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprList) -> Self {
+        Self::List(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprTuple> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprTuple) -> Self {
+        Self::Tuple(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprSlice> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprSlice) -> Self {
+        Self::Slice(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprIpyEscapeCommand> for ExpressionRef<'a> {
+    fn from(node: &'a crate::ExprIpyEscapeCommand) -> Self {
+        Self::IpyEscapeCommand(node)
+    }
+}
+
+impl ruff_text_size::Ranged for ExpressionRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::BoolOp(node) => node.range(),
+            Self::Named(node) => node.range(),
+            Self::BinOp(node) => node.range(),
+            Self::UnaryOp(node) => node.range(),
+            Self::Lambda(node) => node.range(),
+            Self::If(node) => node.range(),
+            Self::Dict(node) => node.range(),
+            Self::Set(node) => node.range(),
+            Self::ListComp(node) => node.range(),
+            Self::SetComp(node) => node.range(),
+            Self::DictComp(node) => node.range(),
+            Self::Generator(node) => node.range(),
+            Self::Await(node) => node.range(),
+            Self::Yield(node) => node.range(),
+            Self::YieldFrom(node) => node.range(),
+            Self::Compare(node) => node.range(),
+            Self::Call(node) => node.range(),
+            Self::FString(node) => node.range(),
+            Self::StringLiteral(node) => node.range(),
+            Self::BytesLiteral(node) => node.range(),
+            Self::NumberLiteral(node) => node.range(),
+            Self::BooleanLiteral(node) => node.range(),
+            Self::NoneLiteral(node) => node.range(),
+            Self::EllipsisLiteral(node) => node.range(),
+            Self::Attribute(node) => node.range(),
+            Self::Subscript(node) => node.range(),
+            Self::Starred(node) => node.range(),
+            Self::Name(node) => node.range(),
+            Self::List(node) => node.range(),
+            Self::Tuple(node) => node.range(),
+            Self::Slice(node) => node.range(),
+            Self::IpyEscapeCommand(node) => node.range(),
+        }
+    }
+}
+
+/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum ExceptHandlerRef<'a> {
+    ExceptHandler(&'a crate::ExceptHandlerExceptHandler),
+}
+
+impl<'a> From<&'a ExceptHandler> for ExceptHandlerRef<'a> {
+    fn from(node: &'a ExceptHandler) -> Self {
+        match node {
+            ExceptHandler::ExceptHandler(node) => ExceptHandlerRef::ExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ExceptHandlerExceptHandler> for ExceptHandlerRef<'a> {
+    fn from(node: &'a crate::ExceptHandlerExceptHandler) -> Self {
+        Self::ExceptHandler(node)
+    }
+}
+
+impl ruff_text_size::Ranged for ExceptHandlerRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::ExceptHandler(node) => node.range(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum FStringElementRef<'a> {
+    Expression(&'a crate::FStringExpressionElement),
+    Literal(&'a crate::FStringLiteralElement),
+}
+
+impl<'a> From<&'a FStringElement> for FStringElementRef<'a> {
+    fn from(node: &'a FStringElement) -> Self {
+        match node {
+            FStringElement::Expression(node) => FStringElementRef::Expression(node),
+            FStringElement::Literal(node) => FStringElementRef::Literal(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::FStringExpressionElement> for FStringElementRef<'a> {
+    fn from(node: &'a crate::FStringExpressionElement) -> Self {
+        Self::Expression(node)
+    }
+}
+
+impl<'a> From<&'a crate::FStringLiteralElement> for FStringElementRef<'a> {
+    fn from(node: &'a crate::FStringLiteralElement) -> Self {
+        Self::Literal(node)
+    }
+}
+
+impl ruff_text_size::Ranged for FStringElementRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::Expression(node) => node.range(),
+            Self::Literal(node) => node.range(),
+        }
+    }
+}
+
+/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum PatternRef<'a> {
+    MatchValue(&'a crate::PatternMatchValue),
+    MatchSingleton(&'a crate::PatternMatchSingleton),
+    MatchSequence(&'a crate::PatternMatchSequence),
+    MatchMapping(&'a crate::PatternMatchMapping),
+    MatchClass(&'a crate::PatternMatchClass),
+    MatchStar(&'a crate::PatternMatchStar),
+    MatchAs(&'a crate::PatternMatchAs),
+    MatchOr(&'a crate::PatternMatchOr),
+}
+
+impl<'a> From<&'a Pattern> for PatternRef<'a> {
+    fn from(node: &'a Pattern) -> Self {
+        match node {
+            Pattern::MatchValue(node) => PatternRef::MatchValue(node),
+            Pattern::MatchSingleton(node) => PatternRef::MatchSingleton(node),
+            Pattern::MatchSequence(node) => PatternRef::MatchSequence(node),
+            Pattern::MatchMapping(node) => PatternRef::MatchMapping(node),
+            Pattern::MatchClass(node) => PatternRef::MatchClass(node),
+            Pattern::MatchStar(node) => PatternRef::MatchStar(node),
+            Pattern::MatchAs(node) => PatternRef::MatchAs(node),
+            Pattern::MatchOr(node) => PatternRef::MatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchValue> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchValue) -> Self {
+        Self::MatchValue(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchSingleton> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchSingleton) -> Self {
+        Self::MatchSingleton(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchSequence> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchSequence) -> Self {
+        Self::MatchSequence(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchMapping> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchMapping) -> Self {
+        Self::MatchMapping(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchClass> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchClass) -> Self {
+        Self::MatchClass(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchStar> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchStar) -> Self {
+        Self::MatchStar(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchAs> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchAs) -> Self {
+        Self::MatchAs(node)
+    }
+}
+
+impl<'a> From<&'a crate::PatternMatchOr> for PatternRef<'a> {
+    fn from(node: &'a crate::PatternMatchOr) -> Self {
+        Self::MatchOr(node)
+    }
+}
+
+impl ruff_text_size::Ranged for PatternRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::MatchValue(node) => node.range(),
+            Self::MatchSingleton(node) => node.range(),
+            Self::MatchSequence(node) => node.range(),
+            Self::MatchMapping(node) => node.range(),
+            Self::MatchClass(node) => node.range(),
+            Self::MatchStar(node) => node.range(),
+            Self::MatchAs(node) => node.range(),
+            Self::MatchOr(node) => node.range(),
+        }
+    }
+}
+
+/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum TypeParamRef<'a> {
+    TypeVar(&'a crate::TypeParamTypeVar),
+    TypeVarTuple(&'a crate::TypeParamTypeVarTuple),
+    ParamSpec(&'a crate::TypeParamParamSpec),
+}
+
+impl<'a> From<&'a TypeParam> for TypeParamRef<'a> {
+    fn from(node: &'a TypeParam) -> Self {
+        match node {
+            TypeParam::TypeVar(node) => TypeParamRef::TypeVar(node),
+            TypeParam::TypeVarTuple(node) => TypeParamRef::TypeVarTuple(node),
+            TypeParam::ParamSpec(node) => TypeParamRef::ParamSpec(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::TypeParamTypeVar> for TypeParamRef<'a> {
+    fn from(node: &'a crate::TypeParamTypeVar) -> Self {
+        Self::TypeVar(node)
+    }
+}
+
+impl<'a> From<&'a crate::TypeParamTypeVarTuple> for TypeParamRef<'a> {
+    fn from(node: &'a crate::TypeParamTypeVarTuple) -> Self {
+        Self::TypeVarTuple(node)
+    }
+}
+
+impl<'a> From<&'a crate::TypeParamParamSpec> for TypeParamRef<'a> {
+    fn from(node: &'a crate::TypeParamParamSpec) -> Self {
+        Self::ParamSpec(node)
+    }
+}
+
+impl ruff_text_size::Ranged for TypeParamRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            Self::TypeVar(node) => node.range(),
+            Self::TypeVarTuple(node) => node.range(),
+            Self::ParamSpec(node) => node.range(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNode {
     ModModule(crate::ModModule),
