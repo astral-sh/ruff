@@ -1,10 +1,9 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{parenthesize::parenthesized_range, Expr, ExprCall};
 use ruff_python_parser::TokenKind;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use smallvec::{smallvec, SmallVec};
+use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
 /// Checks for `itertools.starmap` calls where the second argument is a `zip` call.
@@ -51,7 +50,7 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let [map_func, Expr::Call(iterable_call)] = call.arguments.args.as_ref() else {
+    let [_map_func, Expr::Call(iterable_call)] = &*call.arguments.args else {
         return;
     };
 
@@ -71,42 +70,72 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let fix = replace_with_map(call, map_func, iterable_call, checker);
+    let fix = replace_with_map(call, iterable_call, checker);
     let diagnostic = Diagnostic::new(StarmapZip, call.range);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
-fn replace_with_map(starmap: &ExprCall, map_func: &Expr, zip: &ExprCall, checker: &Checker) -> Fix {
+fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Fix {
     let change_func_to_map = Edit::range_replacement("map".to_string(), starmap.func.range());
 
-    let mut remove_zip: SmallVec<[Edit; 4]> = smallvec![];
+    let mut remove_zip = vec![];
 
-    let zip_start_range = TextRange::new(zip.start(), zip.arguments.start() + "(".text_len());
-    remove_zip.push(Edit::range_deletion(zip_start_range));
+    let full_zip_range = parenthesized_range(
+        zip.into(),
+        starmap.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(zip.range());
 
+    // Delete any parentheses around the `zip` call to prevent that the arguemnt turns into a tuple.
+    remove_zip.push(Edit::range_deletion(TextRange::new(
+        full_zip_range.start(),
+        zip.start(),
+    )));
+
+    let full_zip_func_range = parenthesized_range(
+        (&zip.func).into(),
+        zip.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(zip.func.range());
+
+    // Delete the `zip` callee
+    remove_zip.push(Edit::range_deletion(full_zip_func_range));
+
+    // Delete the `(` from the `zip(...)` call
+    remove_zip.push(Edit::range_deletion(zip.arguments.l_paren_range()));
+
+    // `zip` can be called without arguments but `map` can't.
     if zip.arguments.is_empty() {
-        remove_zip.push(Edit::insertion("[]".to_string(), zip_start_range.end()));
+        remove_zip.push(Edit::insertion("[]".to_string(), zip.arguments.start()));
     }
 
-    let map_func_end = checker
-        .tokens()
-        .after(map_func.end())
-        .iter()
-        .find(|token| matches!(token.kind(), TokenKind::Comma))
-        .unwrap()
-        .end();
+    let after_zip = checker.tokens().after(full_zip_range.end());
 
-    let open_parens = remove_open_parens(zip, map_func_end, &mut remove_zip, checker);
+    // Remove any trailing commas after the `zip` call to avoid multiple trailing commas
+    // if the iterable has a trailing comma.
+    if let Some(trailing_comma) = after_zip.iter().find(|token| !token.kind().is_trivia()) {
+        if trailing_comma.kind() == TokenKind::Comma {
+            remove_zip.push(Edit::range_deletion(trailing_comma.range()));
+        }
+    }
 
-    let zip_end = zip.arguments.end();
-    remove_zip.push(Edit::deletion(zip_end - ")".text_len(), zip_end));
+    // Delete the `)` from the `zip(...)` call
+    remove_zip.push(Edit::range_deletion(zip.arguments.r_paren_range()));
 
-    remove_closing_parens(zip_end, open_parens, &mut remove_zip, checker);
+    // Delete any trailing parentheses wrapping the `zip` call.
+    remove_zip.push(Edit::range_deletion(TextRange::new(
+        zip.end(),
+        full_zip_range.end(),
+    )));
 
     let comment_ranges = checker.comment_ranges();
     let applicability = if comment_ranges.intersects(starmap.func.range())
-        || comment_ranges.intersects(zip_start_range)
+        || comment_ranges.intersects(full_zip_range)
     {
         Applicability::Unsafe
     } else {
@@ -114,73 +143,4 @@ fn replace_with_map(starmap: &ExprCall, map_func: &Expr, zip: &ExprCall, checker
     };
 
     Fix::applicable_edits(change_func_to_map, remove_zip, applicability)
-}
-
-/// For each pair of parentheses surrounding the `zip()` call,
-/// add an [`Edit`] to remove the opening one to `remove_zip`.
-///
-/// ```python
-///   starmap(
-///      func,  # Comment
-/// #         ^^^^^^^^^^^  | Checked
-/// # vvvvvvvvvvvv         | range
-///       (   (   zip()))
-/// #     ^1  ^2
-///   )
-/// ```
-///
-/// Return the number of opening parentheses encountered.
-fn remove_open_parens(
-    zip: &ExprCall,
-    map_func_end: TextSize,
-    remove_zip: &mut SmallVec<[Edit; 4]>,
-    checker: &Checker,
-) -> usize {
-    let mut open_parens = 0_usize;
-
-    for token in checker
-        .tokens()
-        .in_range(TextRange::new(map_func_end, zip.start()))
-    {
-        match token.kind() {
-            kind if kind.is_trivia() => {}
-            TokenKind::Lpar => {
-                remove_zip.push(Edit::range_deletion(token.range()));
-                open_parens += 1;
-            }
-            _ => {
-                return open_parens;
-            }
-        }
-    }
-
-    open_parens
-}
-
-/// For each open parenthesis, find its counterpart
-/// and add an [`Edit`] to remove that to `remove_zip`.
-fn remove_closing_parens(
-    zip_end: TextSize,
-    open_parens: usize,
-    remove_zip: &mut SmallVec<[Edit; 4]>,
-    checker: &Checker,
-) {
-    let mut closing_parens = open_parens;
-
-    for token in checker.tokens().after(zip_end) {
-        match token.kind() {
-            TokenKind::Rpar if closing_parens > 0 => {
-                remove_zip.push(Edit::range_deletion(token.range()));
-                closing_parens -= 1;
-            }
-            TokenKind::Rpar => {
-                break;
-            }
-            TokenKind::Comma => {
-                remove_zip.push(Edit::range_deletion(token.range()));
-                break;
-            }
-            _ => {}
-        }
-    }
 }

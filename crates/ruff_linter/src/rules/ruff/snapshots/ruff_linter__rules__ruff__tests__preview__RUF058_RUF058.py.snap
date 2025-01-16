@@ -96,7 +96,7 @@ RUF058.py:14:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
    |
    = help: Use `map` instead
 
-ℹ Safe fix
+ℹ Unsafe fix
 11 11 | starmap(func, zip(a, b, c,),)
 12 12 | 
 13 13 | 
@@ -141,7 +141,7 @@ RUF058.py:22:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
    22 |+map (
 25 23 | 
 26    |-    func,  zip (
-   24 |+    func,  
+   24 |+    func,   
 27 25 |         a, b, c,
 28    |-    ),
    26 |+    
@@ -194,14 +194,13 @@ RUF058.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 42    |-    )
 43    |-  )
 44    |-     (a,  # A
-   36 |+  
+   36 |+ 
    37 |+     a,  # A
 45 38 |          b,  # B
 46 39 |          c,  # C
 47    |-   )      )
 48    |-   ),
-   40 |+         
-   41 |+   
-49 42 | )
-50 43 | 
-51 44 |
+   40 |+   
+49 41 | )
+50 42 | 
+51 43 |
