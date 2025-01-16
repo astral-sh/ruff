@@ -1571,7 +1571,7 @@ fn conflicting_import_settings(
     for required_import in &isort.required_imports {
         let name = required_import.qualified_name().to_string();
         if let Some(alias) = flake8_import_conventions.aliases.get(&name) {
-            writeln!(err_body, "    - {name} -> {alias}").unwrap();
+            writeln!(err_body, "    - `{name}` -> `{alias}`").unwrap();
         }
     }
 
