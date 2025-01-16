@@ -4377,6 +4377,7 @@ pub(crate) mod tests {
     #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     #[test_case(Ty::Tuple(vec![]), Ty::TypingLiteral)]
     #[test_case(Ty::TypingLiteral, Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("type"))]  // bool is `@final`
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
