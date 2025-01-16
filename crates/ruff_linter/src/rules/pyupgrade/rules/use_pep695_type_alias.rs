@@ -3,6 +3,7 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
+use ruff_python_ast::StmtClassDef;
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -59,6 +60,7 @@ pub(crate) struct NonPEP695TypeAlias {
 enum TypeAliasKind {
     TypeAlias,
     TypeAliasType,
+    GenericClass,
 }
 
 impl Violation for NonPEP695TypeAlias {
@@ -73,12 +75,25 @@ impl Violation for NonPEP695TypeAlias {
         let type_alias_method = match type_alias_kind {
             TypeAliasKind::TypeAlias => "`TypeAlias` annotation",
             TypeAliasKind::TypeAliasType => "`TypeAliasType` assignment",
+            TypeAliasKind::GenericClass => "`Generic` subclass",
         };
-        format!("Type alias `{name}` uses {type_alias_method} instead of the `type` keyword")
+        match type_alias_kind {
+            TypeAliasKind::TypeAlias | TypeAliasKind::TypeAliasType => format!(
+                "Type alias `{name}` uses {type_alias_method} instead of the `type` keyword"
+            ),
+            TypeAliasKind::GenericClass => format!(
+                "Generic class `{name}` uses {type_alias_method} instead of type parameters"
+            ),
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use the `type` keyword".to_string())
+        match self.type_alias_kind {
+            TypeAliasKind::TypeAlias | TypeAliasKind::TypeAliasType => {
+                Some("Use the `type` keyword".to_string())
+            }
+            TypeAliasKind::GenericClass => Some("Use type parameters".to_string()),
+        }
     }
 }
 
@@ -214,6 +229,84 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     ));
 }
 
+/// UP040
+pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtClassDef) {
+    if checker.settings.target_version < PythonVersion::Py312 {
+        return;
+    }
+
+    let StmtClassDef {
+        range,
+        decorator_list,
+        name,
+        type_params,
+        arguments,
+        body,
+    } = class_def;
+
+    // it's a runtime error to mix type_params and Generic, so bail out early if we see existing
+    // type_params
+    if type_params.is_some() {
+        return;
+    }
+
+    let Some(arguments) = arguments.as_ref() else {
+        return;
+    };
+
+    let [Expr::Subscript(ExprSubscript { value, slice, .. })] = arguments.args.as_ref() else {
+        return;
+    };
+
+    if !checker.semantic().match_typing_expr(value, "Generic") {
+        return;
+    }
+
+    let vars = {
+        let mut visitor = TypeVarReferenceVisitor {
+            vars: vec![],
+            semantic: checker.semantic(),
+        };
+        visitor.visit_expr(slice);
+        visitor.vars
+    };
+
+    // Type variables must be unique; filter while preserving order.
+    let vars = vars
+        .into_iter()
+        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .collect::<Vec<_>>();
+
+    let generator = checker.generator();
+    checker.diagnostics.push(
+        Diagnostic::new(
+            NonPEP695TypeAlias {
+                name: name.to_string(),
+                type_alias_kind: TypeAliasKind::GenericClass,
+            },
+            TextRange::new(name.range().start(), arguments.range().end()),
+        )
+        .with_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                generator.stmt(&Stmt::from(StmtClassDef {
+                    range: TextRange::default(),
+                    decorator_list: decorator_list.clone(),
+                    name: name.clone(),
+                    type_params: create_type_params(&vars).map(Box::new),
+                    // checked for a single argument above, so this is always None
+                    arguments: None,
+                    body: body.clone(),
+                })),
+                *range,
+            ),
+            // The fix should be safe given the assumptions here:
+            // 1. No existing type_params to conflict with
+            // 2. A single, Generic argument to the class
+            Applicability::Safe,
+        )),
+    );
+}
+
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
 fn create_diagnostic(
     generator: Generator,
@@ -224,6 +317,34 @@ fn create_diagnostic(
     applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
+    let type_params = create_type_params(vars);
+
+    Diagnostic::new(
+        NonPEP695TypeAlias {
+            name: name.to_string(),
+            type_alias_kind,
+        },
+        stmt_range,
+    )
+    .with_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            generator.stmt(&Stmt::from(StmtTypeAlias {
+                range: TextRange::default(),
+                name: Box::new(Expr::Name(ExprName {
+                    range: TextRange::default(),
+                    id: name,
+                    ctx: ast::ExprContext::Load,
+                })),
+                type_params,
+                value: Box::new(value.clone()),
+            })),
+            stmt_range,
+        ),
+        applicability,
+    ))
+}
+
+fn create_type_params(vars: &[TypeVar]) -> Option<ruff_python_ast::TypeParams> {
     let type_params = if vars.is_empty() {
         None
     } else {
@@ -257,30 +378,7 @@ fn create_diagnostic(
                 .collect(),
         })
     };
-
-    Diagnostic::new(
-        NonPEP695TypeAlias {
-            name: name.to_string(),
-            type_alias_kind,
-        },
-        stmt_range,
-    )
-    .with_fix(Fix::applicable_edit(
-        Edit::range_replacement(
-            generator.stmt(&Stmt::from(StmtTypeAlias {
-                range: TextRange::default(),
-                name: Box::new(Expr::Name(ExprName {
-                    range: TextRange::default(),
-                    id: name,
-                    ctx: ast::ExprContext::Load,
-                })),
-                type_params,
-                value: Box::new(value.clone()),
-            })),
-            stmt_range,
-        ),
-        applicability,
-    ))
+    type_params
 }
 
 #[derive(Debug)]
