@@ -109,7 +109,7 @@ impl<'a> TypingTarget<'a> {
             Expr::NoneLiteral(_) => Some(TypingTarget::None),
             Expr::StringLiteral(string_expr) => checker
                 .parse_type_annotation(string_expr)
-                .as_ref()
+                .ok()
                 .map(|parsed_annotation| {
                     TypingTarget::ForwardReference(parsed_annotation.expression())
                 }),

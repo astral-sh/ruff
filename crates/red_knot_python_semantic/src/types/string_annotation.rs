@@ -153,9 +153,7 @@ pub(crate) fn parse_string_annotation(
         } else if raw_contents(node_text)
             .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
         {
-            let parsed =
-                ruff_python_parser::parse_string_annotation(source.as_str(), string_literal);
-            match parsed {
+            match ruff_python_parser::parse_string_annotation(source.as_str(), string_literal) {
                 Ok(parsed) => return Some(parsed),
                 Err(parse_error) => context.report_lint(
                     &INVALID_SYNTAX_IN_FORWARD_ANNOTATION,

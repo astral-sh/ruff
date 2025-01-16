@@ -24,13 +24,13 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 #[derive(ViolationMetadata)]
 pub(crate) struct ForwardAnnotationSyntaxError {
-    pub body: String,
+    pub parse_error: String,
 }
 
 impl Violation for ForwardAnnotationSyntaxError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ForwardAnnotationSyntaxError { body } = self;
-        format!("Syntax error in forward annotation: `{body}`")
+        let ForwardAnnotationSyntaxError { parse_error } = self;
+        format!("Syntax error in forward annotation: {parse_error}")
     }
 }
