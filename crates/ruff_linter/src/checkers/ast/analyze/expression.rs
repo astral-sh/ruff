@@ -1126,6 +1126,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryEmptyIterableWithinDequeCall) {
                 ruff::rules::unnecessary_literal_within_deque_call(checker, call);
             }
+            if checker.enabled(Rule::StarmapZip) {
+                ruff::rules::starmap_zip(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
