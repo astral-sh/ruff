@@ -1580,7 +1580,7 @@ fn conflicting_import_settings(
             "Required import specified in `lint.isort.required-imports` (I002) \
             conflicts with the required import alias specified in either \
             `lint.flake8-import-conventions.aliases` or \
-            `lint.flake8-import-conventions.extend-aliases`(ICN001):\
+            `lint.flake8-import-conventions.extend-aliases` (ICN001):\
                 \n{err_body}\n\
             Help: Remove the required import or alias from your configuration."
         ));
