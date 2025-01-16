@@ -89,7 +89,7 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Fi
     )
     .unwrap_or(zip.range());
 
-    // Delete any parentheses around the `zip` call to prevent that the arguemnt turns into a tuple.
+    // Delete any parentheses around the `zip` call to prevent that the argument turns into a tuple.
     remove_zip.push(Edit::range_deletion(TextRange::new(
         full_zip_range.start(),
         zip.start(),
