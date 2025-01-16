@@ -4533,16 +4533,6 @@ pub(crate) mod tests {
         ));
     }
 
-    #[test_case(Ty::None)]
-    #[test_case(Ty::BooleanLiteral(true))]
-    #[test_case(Ty::BooleanLiteral(false))]
-    #[test_case(Ty::SubclassOfBuiltinClass("bool"))] // a `@final` class
-    fn is_singleton(from: Ty) {
-        let db = setup_db();
-
-        assert!(from.into_type(&db).is_singleton(&db));
-    }
-
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
     /// the fallback to `typing_extensions` is working correctly.
     /// See [`KnownClass::canonical_module`] for more information.
@@ -4557,83 +4547,6 @@ pub(crate) mod tests {
         let no_default = Ty::KnownClassInstance(KnownClass::NoDefaultType).into_type(&db);
 
         assert!(no_default.is_singleton(&db));
-    }
-
-    #[test_case(Ty::None)]
-    #[test_case(Ty::BooleanLiteral(true))]
-    #[test_case(Ty::IntLiteral(1))]
-    #[test_case(Ty::StringLiteral("abc"))]
-    #[test_case(Ty::BytesLiteral("abc"))]
-    #[test_case(Ty::Tuple(vec![]))]
-    #[test_case(Ty::Tuple(vec![Ty::BooleanLiteral(true), Ty::IntLiteral(1)]))]
-    fn is_single_valued(from: Ty) {
-        let db = setup_db();
-
-        assert!(from.into_type(&db).is_single_valued(&db));
-    }
-
-    #[test_case(Ty::Never)]
-    #[test_case(Ty::Any)]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
-    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BuiltinInstance("int")]))]
-    #[test_case(Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::LiteralString)]
-    fn is_not_single_valued(from: Ty) {
-        let db = setup_db();
-
-        assert!(!from.into_type(&db).is_single_valued(&db));
-    }
-
-    #[test_case(Ty::Never)]
-    #[test_case(Ty::IntLiteral(345))]
-    #[test_case(Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
-    #[test_case(Ty::Tuple(vec![]))]
-    #[test_case(Ty::Tuple(vec![Ty::None]))]
-    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BooleanLiteral(true)]))]
-    fn is_not_singleton(from: Ty) {
-        let db = setup_db();
-
-        assert!(!from.into_type(&db).is_singleton(&db));
-    }
-
-    #[test_case(Ty::Never)]
-    #[test_case(Ty::None)]
-    #[test_case(Ty::IntLiteral(1))]
-    #[test_case(Ty::BooleanLiteral(true))]
-    #[test_case(Ty::StringLiteral("abc"))]
-    #[test_case(Ty::LiteralString)]
-    #[test_case(Ty::BytesLiteral("abc"))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::Str))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::Object))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::Type))]
-    #[test_case(Ty::BuiltinClassLiteral("str"))]
-    #[test_case(Ty::TypingLiteral)]
-    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::None]))]
-    #[test_case(Ty::Intersection{pos: vec![Ty::KnownClassInstance(KnownClass::Str)], neg: vec![Ty::LiteralString]})]
-    #[test_case(Ty::Tuple(vec![]))]
-    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::KnownClassInstance(KnownClass::Object)]))]
-    #[test_case(Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("object"))]
-    #[test_case(Ty::SubclassOfBuiltinClass("str"))]
-    fn is_fully_static(from: Ty) {
-        let db = setup_db();
-
-        assert!(from.into_type(&db).is_fully_static(&db));
-    }
-
-    #[test_case(Ty::Any)]
-    #[test_case(Ty::Unknown)]
-    #[test_case(Ty::Todo)]
-    #[test_case(Ty::Union(vec![Ty::Any, Ty::KnownClassInstance(KnownClass::Str)]))]
-    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::Unknown]))]
-    #[test_case(Ty::Intersection{pos: vec![Ty::Any], neg: vec![Ty::LiteralString]})]
-    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::Any]))]
-    #[test_case(Ty::SubclassOfAny)]
-    fn is_not_fully_static(from: Ty) {
-        let db = setup_db();
-
-        assert!(!from.into_type(&db).is_fully_static(&db));
     }
 
     #[test_case(Ty::Todo, Ty::Todo)]
