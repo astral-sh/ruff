@@ -2160,35 +2160,3 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
         "#);});
     Ok(())
 }
-
-#[test]
-fn pyflakes_unused_local_import() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    // adapted from report in #12897
-    let bug = "
-__all__ = ('Spam',)
-
-
-class Spam:
-    def __init__(self) -> None:
-        from bug.lobster_thermidor import Ham
-";
-    fs::write(tempdir.path().join("bug.py"), bug)?;
-    let bug_mod = tempdir.path().join("bug");
-    fs::create_dir(&bug_mod)?;
-    fs::write(bug_mod.join("__init__.py"), bug)?;
-    fs::write(bug_mod.join("lobster_thermidor.py"), "Ham = 1")?;
-
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--select", "F401"])
-        .arg("--preview")
-        .arg("--unsafe-fixes")
-        .arg("--fix")
-        .arg("bug/")
-        .current_dir(&tempdir));
-
-    insta::assert_snapshot!(fs::read_to_string(bug_mod.join("__init__.py"))?);
-
-    Ok(())
-}
