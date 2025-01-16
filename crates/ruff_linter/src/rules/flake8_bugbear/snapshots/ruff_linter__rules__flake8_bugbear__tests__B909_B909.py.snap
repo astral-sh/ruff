@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B909.py:12:5: B909 Mutation to loop iterable `some_list` during iteration
    |
@@ -97,7 +96,7 @@ B909.py:21:5: B909 Mutation to loop iterable `some_list` during iteration
 20 |     some_list.pop(1)
 21 |     some_list.pop()
    |     ^^^^^^^^^^^^^ B909
-22 | 
+22 |
 23 |     # conditional break should error
    |
 
@@ -136,7 +135,7 @@ B909.py:49:5: B909 Mutation to loop iterable `mydicts` during iteration
 48 |     mydicts.setdefault("foo", 1)
 49 |     mydicts.update({"foo": "bar"})
    |     ^^^^^^^^^^^^^^ B909
-50 | 
+50 |
 51 |     # no errors
    |
 
@@ -195,7 +194,7 @@ B909.py:67:5: B909 Mutation to loop iterable `myset` during iteration
 66 |     myset.add(4)
 67 |     myset.discard(3)
    |     ^^^^^^^^^^^^^ B909
-68 | 
+68 |
 69 |     # no errors
    |
 
@@ -261,7 +260,7 @@ B909.py:97:5: B909 Mutation to loop iterable `foo` during iteration
 96 |     foo[1:2] = bar
 97 |     foo[1:2:3] = bar
    |     ^^^^^^^^^^^^^^^^ B909
-98 | 
+98 |
 99 | foo = {1, 2, 3}
    |
 
@@ -318,7 +317,7 @@ B909.py:136:9: B909 Mutation to loop iterable `foo` during iteration
 135 |     else:
 136 |         foo.remove(1)
     |         ^^^^^^^^^^ B909
-137 | 
+137 |
 138 | # should error
     |
 
@@ -366,7 +365,7 @@ B909.py:159:5: B909 Mutation to loop iterable `some_list` during iteration
 158 |     some_list.remove(elem)
 159 |     some_list.discard(elem)
     |     ^^^^^^^^^^^^^^^^^ B909
-160 | 
+160 |
 161 | # should not error
     |
 
@@ -376,6 +375,6 @@ B909.py:167:5: B909 Mutation to loop iterable `some_list` during iteration
 166 | for i, elem in enumerate(some_list):
 167 |     some_list.pop(0)
     |     ^^^^^^^^^^^^^ B909
-168 | 
+168 |
 169 | # should not error (list)
     |

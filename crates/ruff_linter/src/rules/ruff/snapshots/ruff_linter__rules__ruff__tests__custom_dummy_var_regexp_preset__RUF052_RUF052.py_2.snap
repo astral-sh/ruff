@@ -102,7 +102,7 @@ RUF052.py:145:9: RUF052 Local dummy variable `_local` is accessed
 RUF052.py:153:5: RUF052 Local dummy variable `_P` is accessed
     |
 151 |     from collections import namedtuple
-152 | 
+152 |
 153 |     _P = ParamSpec("_P")
     |     ^^ RUF052
 154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
@@ -180,7 +180,7 @@ RUF052.py:160:5: RUF052 Local dummy variable `_NotADynamicClass` is accessed
 159 |     _DynamicClass = type("_DynamicClass", (), {})
 160 |     _NotADynamicClass = type("_NotADynamicClass")
     |     ^^^^^^^^^^^^^^^^^ RUF052
-161 | 
+161 |
 162 |     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     |
     = help: Remove leading underscores

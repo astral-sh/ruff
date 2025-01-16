@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N814.py:2:8: N814 Camelcase `StillBad` imported as constant `STILLBAD`
   |
 1 | import mod.BadAllowed as BADALLOWED
 2 | import mod.StillBad as STILLBAD
   |        ^^^^^^^^^^^^^^^^^^^^^^^^ N814
-3 | 
+3 |
 4 | from mod import BadAllowed as BADALLOWED
   |
 
@@ -16,7 +15,7 @@ N814.py:5:17: N814 Camelcase `StillBad` imported as constant `STILLBAD`
 4 | from mod import BadAllowed as BADALLOWED
 5 | from mod import StillBad as STILLBAD
   |                 ^^^^^^^^^^^^^^^^^^^^ N814
-6 | 
+6 |
 7 | from mod import BadAllowed as BAD_ALLOWED
   |
 

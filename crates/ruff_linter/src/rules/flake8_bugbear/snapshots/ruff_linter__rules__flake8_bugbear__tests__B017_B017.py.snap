@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B017.py:23:14: B017 Do not assert blind exception: `Exception`
    |
@@ -30,7 +29,7 @@ B017.py:45:10: B017 Do not assert blind exception: `Exception`
 B017.py:48:10: B017 Do not assert blind exception: `Exception`
    |
 46 |         raise ValueError("Hello")
-47 | 
+47 |
 48 |     with pytest.raises(Exception), pytest.raises(ValueError):
    |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
 49 |         raise ValueError("Hello")
@@ -39,7 +38,7 @@ B017.py:48:10: B017 Do not assert blind exception: `Exception`
 B017.py:57:36: B017 Do not assert blind exception: `Exception`
    |
 55 |         raise ValueError("This is also fine")
-56 | 
+56 |
 57 |     with contextlib.nullcontext(), pytest.raises(Exception):
    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ B017
 58 |         raise ValueError("Multiple context managers")

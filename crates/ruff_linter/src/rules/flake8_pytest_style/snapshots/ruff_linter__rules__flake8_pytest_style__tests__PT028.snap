@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 PT028.py:3:16: PT028 Test function parameter `a` has default argument
   |
 1 | # Errors
-2 | 
+2 |
 3 | def test_foo(a=1): ...
   |                ^ PT028
 4 | def test_foo(a = 1): ...

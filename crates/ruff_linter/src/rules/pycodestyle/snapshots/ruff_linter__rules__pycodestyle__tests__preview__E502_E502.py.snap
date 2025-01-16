@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E502.py:9:9: E502 [*] Redundant backslash
    |
  7 |     + 4
- 8 | 
+ 8 |
  9 | a = (3 -\
    |         ^ E502
 10 |     2 +   \
@@ -247,7 +246,7 @@ E502.py:61:9: E502 [*] Redundant backslash
 E502.py:82:12: E502 [*] Redundant backslash
    |
 80 |     "xyz"
-81 | 
+81 |
 82 | x = ("abc" \
    |            ^ E502
 83 |     "xyz")

@@ -4,11 +4,10 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB188.py:7:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    |
  6 |   def remove_extension_via_slice(filename: str) -> str:
- 7 |       if filename.endswith(".txt"):
-   |  _____^
+ 7 | /     if filename.endswith(".txt"):
  8 | |         filename = filename[:-4]
    | |________________________________^ FURB188
- 9 |   
+ 9 |
 10 |       return filename
    |
    = help: Use removesuffix instead of assignment conditional upon endswith.
@@ -27,11 +26,10 @@ FURB188.py:7:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally repla
 FURB188.py:14:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    |
 13 |   def remove_extension_via_slice_len(filename: str, extension: str) -> str:
-14 |       if filename.endswith(extension):
-   |  _____^
+14 | /     if filename.endswith(extension):
 15 | |         filename = filename[:-len(extension)]
    | |_____________________________________________^ FURB188
-16 |   
+16 |
 17 |       return filename
    |
    = help: Use removesuffix instead of assignment conditional upon endswith.
@@ -122,10 +120,10 @@ FURB188.py:33:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
 FURB188.py:146:9: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
     |
 144 |     SUFFIX = "suffix"
-145 | 
+145 |
 146 |     x = foo.bar.baz[:-len(SUFFIX)] if foo.bar.baz.endswith(SUFFIX) else foo.bar.baz
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
-147 | 
+147 |
 148 | def remove_prefix_comparable_literal_expr() -> None:
     |
     = help: Use removesuffix instead of ternary expression conditional upon endswith.
@@ -145,7 +143,7 @@ FURB188.py:149:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally re
 148 | def remove_prefix_comparable_literal_expr() -> None:
 149 |     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
-150 | 
+150 |
 151 | def shadow_builtins(filename: str, extension: str) -> None:
     |
     = help: Use removeprefix instead of ternary expression conditional upon startswith.
@@ -163,10 +161,10 @@ FURB188.py:149:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally re
 FURB188.py:154:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
     |
 152 |     from builtins import len as builtins_len
-153 | 
+153 |
 154 |     return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
-155 | 
+155 |
 156 | def okay_steps():
     |
     = help: Use removesuffix instead of ternary expression conditional upon endswith.
@@ -185,8 +183,7 @@ FURB188.py:158:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
     |
 156 |   def okay_steps():
 157 |       text = "!x!y!z"
-158 |       if text.startswith("!"):
-    |  _____^
+158 | /     if text.startswith("!"):
 159 | |         text = text[1::1]
     | |_________________________^ FURB188
 160 |       if text.startswith("!"):
@@ -209,8 +206,7 @@ FURB188.py:160:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
     |
 158 |       if text.startswith("!"):
 159 |           text = text[1::1]
-160 |       if text.startswith("!"):
-    |  _____^
+160 | /     if text.startswith("!"):
 161 | |         text = text[1::True]
     | |____________________________^ FURB188
 162 |       if text.startswith("!"):
@@ -233,8 +229,7 @@ FURB188.py:162:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
     |
 160 |       if text.startswith("!"):
 161 |           text = text[1::True]
-162 |       if text.startswith("!"):
-    |  _____^
+162 | /     if text.startswith("!"):
 163 | |         text = text[1::None]
     | |____________________________^ FURB188
 164 |       print(text)
@@ -256,8 +251,7 @@ FURB188.py:183:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
     |
 181 |       # with fix `text = text.removeprefix("ř")`
 182 |       text = "řetězec"
-183 |       if text.startswith("ř"): 
-    |  _____^
+183 | /     if text.startswith("ř"): 
 184 | |         text = text[1:]
     | |_______________________^ FURB188
     |
@@ -278,8 +272,7 @@ FURB188.py:190:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
     |
 188 |       # should be linted
 189 |       text = "\ud800\udc00heythere"
-190 |       if text.startswith("\ud800\udc00"):
-    |  _____^
+190 | /     if text.startswith("\ud800\udc00"):
 191 | |         text = text[2:]
     | |_______________________^ FURB188
 192 |       text = "\U00010000heythere"
@@ -302,8 +295,7 @@ FURB188.py:193:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
     |
 191 |           text = text[2:]
 192 |       text = "\U00010000heythere"
-193 |       if text.startswith("\U00010000"):
-    |  _____^
+193 | /     if text.startswith("\U00010000"):
 194 | |         text = text[1:]
     | |_______________________^ FURB188
 195 |       

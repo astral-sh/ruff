@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 nested_min_max.py:2:1: PLW3301 [*] Nested `min` calls can be flattened
   |
@@ -148,7 +147,7 @@ nested_min_max.py:9:1: PLW3301 [*] Nested `max` calls can be flattened
  8 | max(1, max(2, max(3, 4)))
  9 | max(1, foo("a", "b"), max(3, 4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
-10 | 
+10 |
 11 | # These should not trigger; we do not flag cases with keyword args.
    |
    = help: Flatten nested `max` calls
@@ -169,7 +168,7 @@ nested_min_max.py:15:1: PLW3301 [*] Nested `min` calls can be flattened
 14 | # This will still trigger, to merge the calls without keyword args.
 15 | min(1, min(2, 3, key=test), min(4, 5))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
-16 | 
+16 |
 17 | # Don't provide a fix if there are comments within the call.
    |
    = help: Flatten nested `min` calls
@@ -192,7 +191,7 @@ nested_min_max.py:18:1: PLW3301 Nested `min` calls can be flattened
 20 | |     min(2, 3),
 21 | | )
    | |_^ PLW3301
-22 |   
+22 |
 23 |   # Handle iterable expressions.
    |
    = help: Flatten nested `min` calls
@@ -264,7 +263,7 @@ nested_min_max.py:27:1: PLW3301 [*] Nested `max` calls can be flattened
 26 | max(1, max(a))
 27 | max(1, max(i for i in range(10)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
-28 | 
+28 |
 29 | tuples_list = [
    |
    = help: Flatten nested `max` calls
@@ -284,7 +283,7 @@ nested_min_max.py:41:1: PLW3301 [*] Nested `max` calls can be flattened
 40 | # Starred argument should be copied as it is.
 41 | max(1, max(*a))
    | ^^^^^^^^^^^^^^^ PLW3301
-42 | 
+42 |
 43 | import builtins
    |
    = help: Flatten nested `max` calls
@@ -326,7 +325,7 @@ nested_min_max.py:48:16: PLW3301 [*] Nested `max` calls can be flattened
 50 | |     len("Done!"),
 51 | | )
    | |_^ PLW3301
-52 |   
+52 |
 53 |   # OK
    |
    = help: Flatten nested `max` calls

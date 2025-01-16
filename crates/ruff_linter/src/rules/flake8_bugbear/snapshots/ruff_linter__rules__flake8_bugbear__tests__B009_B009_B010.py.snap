@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B009_B010.py:19:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -322,7 +321,7 @@ B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute valu
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 58 | assert getattr(func, '_rpc')is True
    |        ^^^^^^^^^^^^^^^^^^^^^ B009
-59 | 
+59 |
 60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
    |
    = help: Replace `getattr` with attribute access
@@ -343,7 +342,7 @@ B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute valu
 65 | / getattr(self.
 66 | |    registration.registry, '__name__')
    | |_____________________________________^ B009
-67 |   
+67 |
 68 |   import builtins
    |
    = help: Replace `getattr` with attribute access

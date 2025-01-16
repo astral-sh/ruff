@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/if/recover.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -330,7 +329,7 @@ Module(
 4 | x if yield x else y
 5 | x if yield from x else y
   |      ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
-6 | 
+6 |
 7 | # Invalid orelse expression
   |
 

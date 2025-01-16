@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
-snapshot_kind: text
 ---
 application.py:3:8: TID251 `attrs` is banned: The attrs module is deprecated.
   |
 1 | from typing import TYPE_CHECKING, Any, ClassVar
-2 | 
+2 |
 3 | import attrs
   |        ^^^^^ TID251
-4 | 
+4 |
 5 | from ....import unknown
   |
 

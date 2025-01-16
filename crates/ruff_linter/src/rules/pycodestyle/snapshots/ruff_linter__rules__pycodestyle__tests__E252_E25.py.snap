@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E25.py:46:15: E252 [*] Missing whitespace around parameter equals
    |
@@ -279,7 +278,7 @@ E25.py:64:96: E252 [*] Missing whitespace around parameter equals
 E25.py:67:18: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                  ^ E252
 68 |     pass
@@ -299,7 +298,7 @@ E25.py:67:18: E252 [*] Missing whitespace around parameter equals
 E25.py:67:18: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                  ^ E252
 68 |     pass
@@ -319,7 +318,7 @@ E25.py:67:18: E252 [*] Missing whitespace around parameter equals
 E25.py:67:26: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                          ^ E252
 68 |     pass
@@ -339,7 +338,7 @@ E25.py:67:26: E252 [*] Missing whitespace around parameter equals
 E25.py:67:33: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                 ^ E252
 68 |     pass
@@ -359,7 +358,7 @@ E25.py:67:33: E252 [*] Missing whitespace around parameter equals
 E25.py:67:49: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                                 ^ E252
 68 |     pass
@@ -379,7 +378,7 @@ E25.py:67:49: E252 [*] Missing whitespace around parameter equals
 E25.py:67:49: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                                 ^ E252
 68 |     pass
@@ -399,7 +398,7 @@ E25.py:67:49: E252 [*] Missing whitespace around parameter equals
 E25.py:67:64: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                                                ^ E252
 68 |     pass
@@ -419,7 +418,7 @@ E25.py:67:64: E252 [*] Missing whitespace around parameter equals
 E25.py:67:64: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                                                ^ E252
 68 |     pass
@@ -439,7 +438,7 @@ E25.py:67:64: E252 [*] Missing whitespace around parameter equals
 E25.py:67:80: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                                                                ^ E252
 68 |     pass
@@ -459,7 +458,7 @@ E25.py:67:80: E252 [*] Missing whitespace around parameter equals
 E25.py:67:96: E252 [*] Missing whitespace around parameter equals
    |
 65 |     pass
-66 | 
+66 |
 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
    |                                                                                                ^ E252
 68 |     pass

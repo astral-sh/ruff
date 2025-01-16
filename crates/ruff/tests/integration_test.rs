@@ -623,7 +623,7 @@ fn stdin_override_parser_py() {
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r"
+        .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -636,14 +636,14 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
     -:3:4: F634 If test is a tuple, which is always `True`
       |
     1 | import sys
-    2 | 
+    2 |
     3 | if (1, 2):
       |    ^^^^^^ F634
     4 |      print(sys.version)
       |
 
     Found 2 errors (1 fixed, 1 remaining).
-    ");
+    "###);
 }
 
 #[test]

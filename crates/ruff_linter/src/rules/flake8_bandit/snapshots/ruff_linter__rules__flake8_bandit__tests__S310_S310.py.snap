@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S310.py:6:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   |
@@ -37,7 +36,7 @@ S310.py:11:1: S310 Audit URL open for permitted schemes. Allowing use of `file:`
 10 | urllib.request.urlopen('file:///foo/bar/baz')
 11 | urllib.request.urlopen(url)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
-12 | 
+12 |
 13 | urllib.request.Request(url='http://www.google.com')
    |
 
@@ -76,14 +75,14 @@ S310.py:21:1: S310 Audit URL open for permitted schemes. Allowing use of `file:`
 20 | urllib.request.Request('file:///foo/bar/baz')
 21 | urllib.request.Request(url)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
-22 | 
+22 |
 23 | urllib.request.URLopener().open(fullurl='http://www.google.com')
    |
 
 S310.py:23:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 21 | urllib.request.Request(url)
-22 | 
+22 |
 23 | urllib.request.URLopener().open(fullurl='http://www.google.com')
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
 24 | urllib.request.URLopener().open(fullurl=f'http://www.google.com')
@@ -174,7 +173,7 @@ S310.py:32:1: S310 Audit URL open for permitted schemes. Allowing use of `file:`
 31 | urllib.request.URLopener().open('file:///foo/bar/baz')
 32 | urllib.request.URLopener().open(url)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
-33 | 
+33 |
 34 | urllib.request.urlopen(url=urllib.request.Request('http://www.google.com'))
    |
 

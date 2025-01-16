@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/yield/named_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -104,14 +103,14 @@ Module(
 1 | # Unparenthesized named expressions are not allowed
 2 | yield x := 1
   |         ^^ Syntax Error: Expected a statement
-3 | 
+3 |
 4 | yield 1, x := 2, 3
   |
 
 
   |
 2 | yield x := 1
-3 | 
+3 |
 4 | yield 1, x := 2, 3
   |            ^^ Syntax Error: Expected ',', found ':='
   |

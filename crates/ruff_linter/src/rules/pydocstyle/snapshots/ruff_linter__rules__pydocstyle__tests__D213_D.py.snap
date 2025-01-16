@@ -1,15 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:200:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 198 |   @expect('D213: Multi-line docstring summary should start at the second line')
 199 |   def multi_line_zero_separating_blanks():
-200 |       """Summary.
-    |  _____^
+200 | /     """Summary.
 201 | |     Description.
-202 | | 
+202 | |
 203 | |     """
     | |_______^ D213
     |
@@ -30,12 +28,11 @@ D.py:210:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 208 |   @expect('D213: Multi-line docstring summary should start at the second line')
 209 |   def multi_line_two_separating_blanks():
-210 |       """Summary.
-    |  _____^
-211 | | 
-212 | | 
+210 | /     """Summary.
+211 | |
+212 | |
 213 | |     Description.
-214 | | 
+214 | |
 215 | |     """
     | |_______^ D213
     |
@@ -56,11 +53,10 @@ D.py:220:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 218 |   @expect('D213: Multi-line docstring summary should start at the second line')
 219 |   def multi_line_one_separating_blanks():
-220 |       """Summary.
-    |  _____^
-221 | | 
+220 | /     """Summary.
+221 | |
 222 | |     Description.
-223 | | 
+223 | |
 224 | |     """
     | |_______^ D213
     |
@@ -81,11 +77,10 @@ D.py:230:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 228 |   @expect('D213: Multi-line docstring summary should start at the second line')
 229 |   def asdfsdf():
-230 |       """Summary.
-    |  _____^
-231 | | 
+230 | /     """Summary.
+231 | |
 232 | | Description.
-233 | | 
+233 | |
 234 | |     """
     | |_______^ D213
     |
@@ -106,11 +101,10 @@ D.py:240:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 238 |   @expect('D213: Multi-line docstring summary should start at the second line')
 239 |   def asdsdfsdffsdf():
-240 |       """Summary.
-    |  _____^
-241 | | 
+240 | /     """Summary.
+241 | |
 242 | |     Description.
-243 | | 
+243 | |
 244 | | """
     | |___^ D213
     |
@@ -131,11 +125,10 @@ D.py:250:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 248 |   @expect('D213: Multi-line docstring summary should start at the second line')
 249 |   def asdfsdsdf24():
-250 |       """Summary.
-    |  _____^
-251 | | 
+250 | /     """Summary.
+251 | |
 252 | |        Description.
-253 | | 
+253 | |
 254 | |     """
     | |_______^ D213
     |
@@ -156,11 +149,10 @@ D.py:260:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 258 |   @expect('D213: Multi-line docstring summary should start at the second line')
 259 |   def asdfsdsdfsdf24():
-260 |       """Summary.
-    |  _____^
-261 | | 
+260 | /     """Summary.
+261 | |
 262 | |     Description.
-263 | | 
+263 | |
 264 | |         """
     | |___________^ D213
     |
@@ -181,11 +173,10 @@ D.py:270:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 268 |   @expect('D213: Multi-line docstring summary should start at the second line')
 269 |   def asdfsdfsdsdsdfsdf24():
-270 |       """Summary.
-    |  _____^
-271 | | 
+270 | /     """Summary.
+271 | |
 272 | |         Description.
-273 | | 
+273 | |
 274 | |     """
     | |_______^ D213
     |
@@ -206,9 +197,8 @@ D.py:281:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 279 |   @expect('D213: Multi-line docstring summary should start at the second line')
 280 |   def asdfljdf24():
-281 |       """Summary.
-    |  _____^
-282 | | 
+281 | /     """Summary.
+282 | |
 283 | |     Description."""
     | |___________________^ D213
     |
@@ -229,9 +219,8 @@ D.py:299:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 297 |   @expect('D213: Multi-line docstring summary should start at the second line')
 298 |   def multiline():
-299 |       """ Whitespace at the beginning.
-    |  _____^
-300 | | 
+299 | /     """ Whitespace at the beginning.
+300 | |
 301 | |     This is the end.
 302 | |     """
     | |_______^ D213
@@ -253,9 +242,8 @@ D.py:343:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 341 |   @expect('D213: Multi-line docstring summary should start at the second line')
 342 |   def exceptions_of_D301():
-343 |       """Exclude some backslashes from D301.
-    |  _____^
-344 | | 
+343 | /     """Exclude some backslashes from D301.
+344 | |
 345 | |     In particular, line continuations \
 346 | |     and unicode literals \u0394 and \N{GREEK CAPITAL LETTER DELTA}.
 347 | |     They are considered to be intentionally unescaped.
@@ -279,9 +267,8 @@ D.py:383:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 381 |   @expect('D213: Multi-line docstring summary should start at the second line')
 382 |   def new_209():
-383 |       """First line.
-    |  _____^
-384 | | 
+383 | /     """First line.
+384 | |
 385 | |     More lines.
 386 | |     """
     | |_______^ D213
@@ -304,11 +291,10 @@ D.py:392:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 390 |   @expect('D213: Multi-line docstring summary should start at the second line')
 391 |   def old_209():
-392 |       """One liner.
-    |  _____^
-393 | | 
+392 | /     """One liner.
+393 | |
 394 | |     Multi-line comments. OK to have extra blank line
-395 | | 
+395 | |
 396 | |     """
     | |_______^ D213
     |
@@ -331,7 +317,7 @@ D.py:438:37: D213 [*] Multi-line docstring summary should start at the second li
 437 |   @expect('D213: Multi-line docstring summary should start at the second line')
 438 |   def docstring_start_in_same_line(): """First Line.
     |  _____________________________________^
-439 | | 
+439 | |
 440 | |     Second Line
 441 | |     """
     | |_______^ D213
@@ -353,11 +339,10 @@ D.py:450:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 448 |   @expect('D213: Multi-line docstring summary should start at the second line')
 449 |   def a_following_valid_function(x=None):
-450 |       """Check for a bug where the previous function caused an assertion.
-    |  _____^
-451 | | 
+450 | /     """Check for a bug where the previous function caused an assertion.
+451 | |
 452 | |     The assertion was caused in the next function, so this one is necessary.
-453 | | 
+453 | |
 454 | |     """
     | |_______^ D213
     |
@@ -378,16 +363,15 @@ D.py:526:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 524 |   # parameters as functions for Google / Numpy conventions.
 525 |   class Blah:  # noqa: D203,D213
-526 |       """A Blah.
-    |  _____^
-527 | | 
+526 | /     """A Blah.
+527 | |
 528 | |     Parameters
 529 | |     ----------
 530 | |     x : int
-531 | | 
+531 | |
 532 | |     """
     | |_______^ D213
-533 |   
+533 |
 534 |       def __init__(self, x):
     |
     = help: Insert line break and indentation after opening quotes
@@ -406,10 +390,9 @@ D.py:526:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:546:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 544 |   def multiline_leading_space():
-545 |   
-546 |       """Leading space.
-    |  _____^
-547 | | 
+545 |
+546 | /     """Leading space.
+547 | |
 548 | |     More content.
 549 | |     """
     | |_______^ D213
@@ -431,13 +414,12 @@ D.py:555:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 553 |   @expect('D213: Multi-line docstring summary should start at the second line')
 554 |   def multiline_trailing_space():
-555 |       """Leading space.
-    |  _____^
-556 | | 
+555 | /     """Leading space.
+556 | |
 557 | |     More content.
 558 | |     """
     | |_______^ D213
-559 |   
+559 |
 560 |       pass
     |
     = help: Insert line break and indentation after opening quotes
@@ -456,14 +438,13 @@ D.py:555:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:568:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 566 |   def multiline_trailing_and_leading_space():
-567 |   
-568 |       """Trailing and leading space.
-    |  _____^
-569 | | 
+567 |
+568 | /     """Trailing and leading space.
+569 | |
 570 | |     More content.
 571 | |     """
     | |_______^ D213
-572 |   
+572 |
 573 |       pass
     |
     = help: Insert line break and indentation after opening quotes
@@ -483,9 +464,8 @@ D.py:588:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 586 |   @expect('D213: Multi-line docstring summary should start at the second line')
 587 |   def asdfljdjgf24():
-588 |       """Summary.
-    |  _____^
-589 | | 
+588 | /     """Summary.
+589 | |
 590 | |     Description.  """
     | |_____________________^ D213
     |
@@ -506,9 +486,8 @@ D.py:606:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 604 |   @expect('D212: Multi-line docstring summary should start at the first line')
 605 |   def one_liner():
-606 |       r"""Wrong.
-    |  _____^
-607 | | 
+606 | /     r"""Wrong.
+607 | |
 608 | |     """
     | |_______^ D213
     |
@@ -529,9 +508,8 @@ D.py:615:5: D213 [*] Multi-line docstring summary should start at the second lin
     |
 613 |   @expect('D212: Multi-line docstring summary should start at the first line')
 614 |   def one_liner():
-615 |       """Wrong."
-    |  _____^
-616 | | 
+615 | /     """Wrong."
+616 | |
 617 | |     """
     | |_______^ D213
     |
@@ -551,9 +529,8 @@ D.py:615:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:671:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 670 |   def retain_extra_whitespace():
-671 |       """Summary.
-    |  _____^
-672 | | 
+671 | /     """Summary.
+672 | |
 673 | |         This is overindented
 674 | |             And so is this, but it we should preserve the extra space on this line relative
 675 | |             to the one before
@@ -576,9 +553,8 @@ D.py:671:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:680:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 679 |   def retain_extra_whitespace_multiple():
-680 |       """Summary.
-    |  _____^
-681 | | 
+680 | /     """Summary.
+681 | |
 682 | |         This is overindented
 683 | |             And so is this, but it we should preserve the extra space on this line relative
 684 | |             to the one before
@@ -604,16 +580,15 @@ D.py:680:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:693:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 692 |   def retain_extra_whitespace_deeper():
-693 |       """Summary.
-    |  _____^
-694 | | 
+693 | /     """Summary.
+694 | |
 695 | |         This is overindented
 696 | |             And so is this, but it we should preserve the extra space on this line relative
 697 | |             to the one before
 698 | |                 And the relative indent here should be preserved too
 699 | |     """
     | |_______^ D213
-700 |   
+700 |
 701 |   def retain_extra_whitespace_followed_by_same_offset():
     |
     = help: Insert line break and indentation after opening quotes
@@ -632,9 +607,8 @@ D.py:693:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:702:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 701 |   def retain_extra_whitespace_followed_by_same_offset():
-702 |       """Summary.
-    |  _____^
-703 | | 
+702 | /     """Summary.
+703 | |
 704 | |         This is overindented
 705 | |             And so is this, but it we should preserve the extra space on this line relative
 706 | |         This is overindented
@@ -658,9 +632,8 @@ D.py:702:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:712:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 711 |   def retain_extra_whitespace_not_overindented():
-712 |       """Summary.
-    |  _____^
-713 | | 
+712 | /     """Summary.
+713 | |
 714 | |     This is not overindented
 715 | |         This is overindented, but since one line is not overindented this should not raise
 716 | |             And so is this, but it we should preserve the extra space on this line relative
@@ -683,9 +656,8 @@ D.py:712:5: D213 [*] Multi-line docstring summary should start at the second lin
 D.py:721:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 720 |   def inconsistent_indent_byte_size():
-721 |       """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
-    |  _____^
-722 | | 
+721 | /     """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+722 | |
 723 | |        Returns:
 724 | |     """
     | |_______^ D213

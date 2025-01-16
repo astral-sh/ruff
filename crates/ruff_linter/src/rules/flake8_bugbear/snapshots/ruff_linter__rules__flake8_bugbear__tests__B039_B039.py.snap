@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B039.py:21:26: B039 Do not use mutable data structures for `ContextVar` defaults
    |
@@ -116,7 +115,7 @@ B039.py:31:36: B039 Do not use mutable data structures for `ContextVar` defaults
 30 | ContextVar("cv", default=set[str]())
 31 | ContextVar[set[str]]("cv", default=set[str]())
    |                                    ^^^^^^^^^^ B039
-32 | 
+32 |
 33 | def bar() -> list[int]:
    |
    = help: Replace with `None`; initialize with `.set()``
@@ -124,7 +123,7 @@ B039.py:31:36: B039 Do not use mutable data structures for `ContextVar` defaults
 B039.py:36:26: B039 Do not use mutable data structures for `ContextVar` defaults
    |
 34 |     return [1, 2, 3]
-35 | 
+35 |
 36 | ContextVar("cv", default=bar())
    |                          ^^^^^ B039
 37 | ContextVar("cv", default=time.time())
@@ -136,7 +135,7 @@ B039.py:37:26: B039 Do not use mutable data structures for `ContextVar` defaults
 36 | ContextVar("cv", default=bar())
 37 | ContextVar("cv", default=time.time())
    |                          ^^^^^^^^^^^ B039
-38 | 
+38 |
 39 | def baz(): ...
    |
    = help: Replace with `None`; initialize with `.set()``

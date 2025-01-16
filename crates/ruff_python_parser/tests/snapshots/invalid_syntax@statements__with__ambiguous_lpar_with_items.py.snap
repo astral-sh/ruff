@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/with/ambiguous_lpar_with_items.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -1362,7 +1361,7 @@ Module(
 
   |
 2 | # These cases should raise the correct syntax error and recover properly.
-3 | 
+3 |
 4 | with (item1, item2),: ...
   |                    ^ Syntax Error: Trailing comma not allowed
 5 | with (item1, item2), as f: ...
@@ -1452,7 +1451,7 @@ Module(
 11 | with (x for x in range(10), item): ...
 12 | with (item, x for x in range(10)): ...
    |               ^^^ Syntax Error: Expected ')', found 'for'
-13 | 
+13 |
 14 | # Make sure the parser doesn't report the same error twice
    |
 
@@ -1462,7 +1461,7 @@ Module(
 11 | with (x for x in range(10), item): ...
 12 | with (item, x for x in range(10)): ...
    |                                 ^ Syntax Error: Expected ':', found ')'
-13 | 
+13 |
 14 | # Make sure the parser doesn't report the same error twice
    |
 
@@ -1472,7 +1471,7 @@ Module(
 11 | with (x for x in range(10), item): ...
 12 | with (item, x for x in range(10)): ...
    |                                  ^ Syntax Error: Expected a statement
-13 | 
+13 |
 14 | # Make sure the parser doesn't report the same error twice
    |
 
@@ -1481,14 +1480,14 @@ Module(
 14 | # Make sure the parser doesn't report the same error twice
 15 | with ((*item)): ...
    |        ^^^^^ Syntax Error: Starred expression cannot be used here
-16 | 
+16 |
 17 | with (*x for x in iter, item): ...
    |
 
 
    |
 15 | with ((*item)): ...
-16 | 
+16 |
 17 | with (*x for x in iter, item): ...
    |       ^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
 18 | with (item1, *x for x in iter, item2): ...
@@ -1498,7 +1497,7 @@ Module(
 
    |
 15 | with ((*item)): ...
-16 | 
+16 |
 17 | with (*x for x in iter, item): ...
    |                       ^ Syntax Error: Expected ')', found ','
 18 | with (item1, *x for x in iter, item2): ...
@@ -1508,7 +1507,7 @@ Module(
 
    |
 15 | with ((*item)): ...
-16 | 
+16 |
 17 | with (*x for x in iter, item): ...
    |                             ^ Syntax Error: Expected ',', found ')'
 18 | with (item1, *x for x in iter, item2): ...
@@ -1607,7 +1606,7 @@ Module(
 24 | with (x as f, y) as f: ...
 25 | with (x for x in iter as y): ...
    |                       ^^ Syntax Error: Expected ')', found 'as'
-26 | 
+26 |
 27 | # The inner `(...)` is parsed as parenthesized expression
    |
 
@@ -1617,7 +1616,7 @@ Module(
 24 | with (x as f, y) as f: ...
 25 | with (x for x in iter as y): ...
    |                           ^ Syntax Error: Expected ',', found ')'
-26 | 
+26 |
 27 | # The inner `(...)` is parsed as parenthesized expression
    |
 
@@ -1626,7 +1625,7 @@ Module(
 27 | # The inner `(...)` is parsed as parenthesized expression
 28 | with ((item as f)): ...
    |             ^^ Syntax Error: Expected ')', found 'as'
-29 | 
+29 |
 30 | with (item as f), x: ...
    |
 
@@ -1635,7 +1634,7 @@ Module(
 27 | # The inner `(...)` is parsed as parenthesized expression
 28 | with ((item as f)): ...
    |                  ^ Syntax Error: Expected ':', found ')'
-29 | 
+29 |
 30 | with (item as f), x: ...
    |
 
@@ -1644,14 +1643,14 @@ Module(
 27 | # The inner `(...)` is parsed as parenthesized expression
 28 | with ((item as f)): ...
    |                   ^ Syntax Error: Expected a statement
-29 | 
+29 |
 30 | with (item as f), x: ...
    |
 
 
    |
 28 | with ((item as f)): ...
-29 | 
+29 |
 30 | with (item as f), x: ...
    |                 ^ Syntax Error: Expected ':', found ','
 31 | with (item as f1) as f2: ...

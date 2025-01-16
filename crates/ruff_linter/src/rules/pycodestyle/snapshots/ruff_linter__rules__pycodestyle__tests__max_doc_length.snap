@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 W505.py:2:51: W505 Doc line too long (57 > 50)
   |
@@ -14,17 +13,17 @@ W505.py:6:51: W505 Doc line too long (56 > 50)
 5 | def f1():
 6 |     """Here's a docstring that's also over the limit."""
   |                                                   ^^^^^^ W505
-7 | 
+7 |
 8 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
   |
 
 W505.py:10:51: W505 Doc line too long (56 > 50)
    |
  8 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
- 9 | 
+ 9 |
 10 |     # Here's a standalone comment that's over the limit.
    |                                                   ^^^^^^ W505
-11 | 
+11 |
 12 |     x = 2
    |
 
@@ -33,7 +32,7 @@ W505.py:13:51: W505 Doc line too long (94 > 50)
 12 |     x = 2
 13 |     # Another standalone that is preceded by a newline and indent token and is over the limit.
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
-14 | 
+14 |
 15 |     print("Here's a string that's over the limit, but it's not a docstring.")
    |
 
@@ -46,7 +45,7 @@ W505.py:18:51: W505 Doc line too long (61 > 50)
 W505.py:24:51: W505 Doc line too long (82 > 50)
    |
 22 |     """Here's a multi-line docstring.
-23 | 
+23 |
 24 |     It's over the limit on this line, which isn't the first line in the docstring.
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
 25 |     """
@@ -55,7 +54,7 @@ W505.py:24:51: W505 Doc line too long (82 > 50)
 W505.py:31:51: W505 Doc line too long (85 > 50)
    |
 29 |     """Here's a multi-line docstring.
-30 | 
+30 |
 31 |     It's over the limit on this line, which isn't the first line in the docstring."""
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
    |

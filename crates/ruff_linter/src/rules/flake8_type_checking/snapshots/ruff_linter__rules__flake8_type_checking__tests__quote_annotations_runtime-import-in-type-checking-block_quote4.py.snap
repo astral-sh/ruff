@@ -6,7 +6,7 @@ quote4.py:12:28: TC004 [*] Quote references to `pandas.DataFrame`. Import is in 
 11 |     if TYPE_CHECKING:
 12 |         from pandas import DataFrame
    |                            ^^^^^^^^^ TC004
-13 | 
+13 |
 14 |     def baz() -> DataFrame[int]:
    |
    = help: Quote references
@@ -26,7 +26,7 @@ quote4.py:22:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking b
 21 |     if TYPE_CHECKING:
 22 |         from pandas import DataFrame
    |                            ^^^^^^^^^ TC004
-23 | 
+23 |
 24 |     x: TypeAlias = DataFrame | None
    |
    = help: Move out of type-checking block
@@ -51,7 +51,7 @@ quote4.py:41:28: TC004 [*] Quote references to `pandas.DataFrame`. Import is in 
 40 |     if TYPE_CHECKING:
 41 |         from pandas import DataFrame
    |                            ^^^^^^^^^ TC004
-42 | 
+42 |
 43 |     foo = cast(DataFrame, get_foo())
    |
    = help: Quote references
@@ -71,7 +71,7 @@ quote4.py:60:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking b
 59 |     if TYPE_CHECKING:
 60 |         from pandas import DataFrame
    |                            ^^^^^^^^^ TC004
-61 | 
+61 |
 62 |     x: TypeAlias = DataFrame | dict
    |
    = help: Move out of type-checking block

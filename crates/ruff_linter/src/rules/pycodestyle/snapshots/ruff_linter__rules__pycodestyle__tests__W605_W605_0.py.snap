@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 W605_0.py:2:10: W605 [*] Invalid escape sequence: `\.`
   |
 1 | #: W605:1:10
 2 | regex = '\.png$'
   |          ^^ W605
-3 | 
+3 |
 4 | #: W605:2:1
   |
   = help: Use a raw string literal
@@ -105,7 +104,7 @@ W605_0.py:28:12: W605 [*] Invalid escape sequence: `\.`
 27 |     #: W605:1:11
 28 |     return'\.png$'
    |            ^^ W605
-29 | 
+29 |
 30 | #: Okay
    |
    = help: Use a raw string literal
@@ -123,10 +122,10 @@ W605_0.py:28:12: W605 [*] Invalid escape sequence: `\.`
 W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
    |
 43 | '''  # noqa
-44 | 
+44 |
 45 | regex = '\\\_'
    |            ^^ W605
-46 | 
+46 |
 47 | #: W605:1:7
    |
    = help: Add backslash to escape sequence
@@ -146,7 +145,7 @@ W605_0.py:48:6: W605 [*] Invalid escape sequence: `\ `
 47 | #: W605:1:7
 48 | u'foo\ bar'
    |      ^^ W605
-49 | 
+49 |
 50 | #: W605:1:13
    |
    = help: Use a raw string literal
@@ -186,7 +185,7 @@ W605_0.py:57:6: W605 [*] Invalid escape sequence: `\.`
 56 | #: W605:1:6
 57 | "foo \. bar \t"
    |      ^^ W605
-58 | 
+58 |
 59 | #: W605:1:13
    |
    = help: Add backslash to escape sequence

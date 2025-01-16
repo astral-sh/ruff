@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/missing_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -162,6 +161,6 @@ Module(
 2 | call(x = )
 3 | call(*, y)
   |       ^ Syntax Error: Expected an expression
-4 | 
+4 |
 5 | foo
   |

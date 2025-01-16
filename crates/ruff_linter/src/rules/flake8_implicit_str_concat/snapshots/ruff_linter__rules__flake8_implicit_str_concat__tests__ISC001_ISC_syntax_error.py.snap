@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
-snapshot_kind: text
 ---
 ISC_syntax_error.py:2:5: SyntaxError: missing closing quote in string literal
   |
@@ -59,7 +58,7 @@ ISC_syntax_error.py:4:1: ISC001 Implicitly concatenated string literals on one l
 4 | / "a" """b
 5 | | c""" "d
   | |____^ ISC001
-6 |   
+6 |
 7 |   # For f-strings, the `FStringRanges` won't contain the range for
   |
   = help: Combine string literals
@@ -70,7 +69,7 @@ ISC_syntax_error.py:5:6: SyntaxError: missing closing quote in string literal
 4 | "a" """b
 5 | c""" "d
   |      ^
-6 | 
+6 |
 7 | # For f-strings, the `FStringRanges` won't contain the range for
   |
 
@@ -80,7 +79,7 @@ ISC_syntax_error.py:5:8: SyntaxError: Expected a statement
 4 | "a" """b
 5 | c""" "d
   |        ^
-6 | 
+6 |
 7 | # For f-strings, the `FStringRanges` won't contain the range for
 8 | # unterminated f-strings.
   |
@@ -144,7 +143,7 @@ ISC_syntax_error.py:11:1: ISC001 Implicitly concatenated string literals on one 
 11 | / f"a" f"""b
 12 | | c""" f"d {e
    | |____^ ISC001
-13 |   
+13 |
 14 |   (
    |
    = help: Combine string literals
@@ -173,10 +172,12 @@ ISC_syntax_error.py:30:1: SyntaxError: unexpected EOF while parsing
    |
 28 |     "i" "j"
 29 | )
+   |  ^
    |
 
 ISC_syntax_error.py:30:1: SyntaxError: f-string: unterminated string
    |
 28 |     "i" "j"
 29 | )
+   |  ^
    |

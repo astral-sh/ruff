@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
-snapshot_kind: text
 ---
 import_from_as.py:14:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
    |
 12 | q = "bar"
-13 | 
+13 |
 14 | a = xabspath(p)
    |     ^^^^^^^^ PTH100
 15 | aa = xchmod(p)

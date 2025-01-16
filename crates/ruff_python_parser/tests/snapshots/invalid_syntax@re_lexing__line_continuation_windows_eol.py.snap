@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_windows_eol.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -82,10 +81,9 @@ Module(
 ## Errors
 
   |
-1 |   call(a, b, # comment \
-  |  _______________________^
-2 | | 
-  | |_^ Syntax Error: Expected ')', found newline
-3 |   def bar():
-4 |       pass
+1 | call(a, b, # comment \
+  |                       ^ Syntax Error: Expected ')', found newline
+2 |
+3 | def bar():
+4 |     pass
   |

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:161:5: D203 [*] 1 blank line required before class docstring
     |
@@ -41,16 +40,15 @@ D.py:526:5: D203 [*] 1 blank line required before class docstring
     |
 524 |   # parameters as functions for Google / Numpy conventions.
 525 |   class Blah:  # noqa: D203,D213
-526 |       """A Blah.
-    |  _____^
-527 | | 
+526 | /     """A Blah.
+527 | |
 528 | |     Parameters
 529 | |     ----------
 530 | |     x : int
-531 | | 
+531 | |
 532 | |     """
     | |_______^ D203
-533 |   
+533 |
 534 |       def __init__(self, x):
     |
     = help: Insert 1 blank line before class docstring

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S501.py:5:47: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
   |
@@ -67,7 +66,7 @@ S501.py:17:48: S501 Probable use of `requests` call with `verify=False` disablin
 16 | requests.head('https://gmail.com', timeout=30, verify=True)
 17 | requests.head('https://gmail.com', timeout=30, verify=False)
    |                                                ^^^^^^^^^^^^ S501
-18 | 
+18 |
 19 | httpx.request('GET', 'https://gmail.com', verify=True)
    |
 

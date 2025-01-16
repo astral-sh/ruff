@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB189.py:17:9: FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` instead
    |
@@ -32,7 +31,7 @@ FURB189.py:17:9: FURB189 [*] Subclassing `dict` can be error prone, use `collect
 FURB189.py:20:9: FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead
    |
 18 |     pass
-19 | 
+19 |
 20 | class L(list):
    |         ^^^^ FURB189
 21 |     pass
@@ -52,7 +51,7 @@ FURB189.py:20:9: FURB189 [*] Subclassing `list` can be error prone, use `collect
 FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collections.UserString` instead
    |
 21 |     pass
-22 | 
+22 |
 23 | class S(str):
    |         ^^^ FURB189
 24 |     pass

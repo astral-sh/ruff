@@ -50,7 +50,7 @@ C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
 5 | )
 6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
-7 | 
+7 |
 8 | def f(x):
   |
   = help: Rewrite as a set comprehension
@@ -68,7 +68,7 @@ C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
 C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
  9 |     return x
-10 | 
+10 |
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
    |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")

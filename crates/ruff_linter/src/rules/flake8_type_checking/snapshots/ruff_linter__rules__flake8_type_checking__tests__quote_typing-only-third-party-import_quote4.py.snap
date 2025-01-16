@@ -6,7 +6,7 @@ quote4.py:2:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 1 | def f():
 2 |     from pandas import DataFrame
   |                        ^^^^^^^^^ TC002
-3 | 
+3 |
 4 |     def baz() -> DataFrame[int]:
   |
   = help: Move into type-checking block
@@ -28,10 +28,10 @@ quote4.py:2:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 quote4.py:30:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 28 |     from typing import TypeAlias
-29 | 
+29 |
 30 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TC002
-31 | 
+31 |
 32 |     x: TypeAlias = DataFrame | None
    |
    = help: Move into type-checking block
@@ -59,10 +59,10 @@ quote4.py:30:24: TC002 [*] Move third-party import `pandas.DataFrame` into a typ
 quote4.py:49:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 47 |     from typing import cast
-48 | 
+48 |
 49 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TC002
-50 | 
+50 |
 51 |     from .foo import get_foo
    |
    = help: Move into type-checking block

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
-snapshot_kind: text
 ---
 RET503.py:20:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -47,7 +46,7 @@ RET503.py:33:1: RET503 [*] Missing explicit `return` at the end of function able
 33 | / def x(y):
 34 | |     if not y:
 35 | |         return 1
-36 | | 
+36 | |
 37 | |     print()  # error
    | |___________^ RET503
    |
@@ -257,7 +256,7 @@ RET503.py:271:1: RET503 [*] Missing explicit `return` at the end of function abl
 271 | / def nested(values):
 272 | |     if not values:
 273 | |         return False
-274 | | 
+274 | |
 275 | |     for value in values:
 276 | |         print(value)
     | |____________________^ RET503
@@ -298,8 +297,7 @@ RET503.py:287:1: RET503 [*] Missing explicit `return` at the end of function abl
 RET503.py:300:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 299 |   def end_of_statement():
-300 |       def example():
-    |  _____^
+300 | /     def example():
 301 | |         if True:
 302 | |             return ""
     | |_____________________^ RET503
@@ -317,8 +315,7 @@ RET503.py:300:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:305:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-305 |       def example():
-    |  _____^
+305 | /     def example():
 306 | |         if True:
 307 | |             return ""
     | |_____________________^ RET503
@@ -336,8 +333,7 @@ RET503.py:305:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:310:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-310 |       def example():
-    |  _____^
+310 | /     def example():
 311 | |         if True:
 312 | |             return ""  # type: ignore
     | |_____________________^ RET503
@@ -355,8 +351,7 @@ RET503.py:310:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:315:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-315 |       def example():
-    |  _____^
+315 | /     def example():
 316 | |         if True:
 317 | |             return ""  ;
     | |_____________________^ RET503
@@ -374,8 +369,7 @@ RET503.py:315:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:320:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-320 |       def example():
-    |  _____^
+320 | /     def example():
 321 | |         if True:
 322 | |             return "" \
     | |_____________________^ RET503

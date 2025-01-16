@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
-snapshot_kind: text
 ---
 TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -8,7 +7,7 @@ TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 12 |     except Exception:
 13 |         logging.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-14 | 
+14 |
 15 |         if True:
    |
    = help: Replace with `exception`
@@ -47,7 +46,7 @@ TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 26 |     except Exception:
 27 |         logger.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-28 | 
+28 |
 29 |         if True:
    |
    = help: Replace with `exception`
@@ -86,7 +85,7 @@ TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 36 |     except Exception:
 37 |         log.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-38 | 
+38 |
 39 |         if True:
    |
    = help: Replace with `exception`
@@ -125,7 +124,7 @@ TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 46 |     except Exception:
 47 |         self.logger.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-48 | 
+48 |
 49 |         if True:
    |
    = help: Replace with `exception`
@@ -164,7 +163,7 @@ TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
  99 |     except Exception:
 100 |         error("Context message here")
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-101 | 
+101 |
 102 |         if True:
     |
     = help: Replace with `exception`

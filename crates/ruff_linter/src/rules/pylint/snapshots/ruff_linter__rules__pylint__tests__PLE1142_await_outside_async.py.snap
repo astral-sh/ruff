@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 await_outside_async.py:15:11: PLE1142 `await` should be used within an async function
    |
@@ -20,8 +19,7 @@ await_outside_async.py:29:9: PLE1142 `await` should be used within an async func
 await_outside_async.py:38:5: PLE1142 `await` should be used within an async function
    |
 37 |   def async_for_loop():
-38 |       async for x in foo():
-   |  _____^
+38 | /     async for x in foo():
 39 | |         pass
    | |____________^ PLE1142
    |
@@ -29,8 +27,7 @@ await_outside_async.py:38:5: PLE1142 `await` should be used within an async func
 await_outside_async.py:43:5: PLE1142 `await` should be used within an async function
    |
 42 |   def async_with():
-43 |       async with foo():
-   |  _____^
+43 | /     async with foo():
 44 | |         pass
    | |____________^ PLE1142
    |

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/emoji_identifiers.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -89,7 +88,7 @@ Module(
 2 |     # comment 🐶
 3 | )
   | ^ Syntax Error: Expected a statement
-4 | 
+4 |
 5 | a = (🐶 +
   |
 
@@ -99,7 +98,7 @@ Module(
 2 |     # comment 🐶
 3 | )
   |  ^ Syntax Error: Expected a statement
-4 | 
+4 |
 5 | a = (🐶 +
 6 |     # comment
   |
@@ -107,7 +106,7 @@ Module(
 
   |
 3 | )
-4 | 
+4 |
 5 | a = (🐶 +
   |      ^^ Syntax Error: Got unexpected token 🐶
 6 |     # comment

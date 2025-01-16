@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB145.py:4:5: FURB145 [*] Prefer `copy` method over slicing
   |
@@ -111,7 +110,7 @@ FURB145.py:9:7: FURB145 [*] Prefer `copy` method over slicing
  8 | l[:]
  9 | print(l[:])
    |       ^^^^ FURB145
-10 | 
+10 |
 11 | # False negatives.
    |
    = help: Replace with `copy()`

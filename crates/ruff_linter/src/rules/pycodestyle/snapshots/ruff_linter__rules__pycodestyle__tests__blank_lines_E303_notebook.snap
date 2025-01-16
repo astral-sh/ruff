@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30.ipynb:29:5: E303 [*] Too many blank lines (2)
    |
 29 |     # arbitrary comment
    |     ^^^^^^^^^^^^^^^^^^^ E303
-30 | 
+30 |
 31 |     def inner():  # E306 not expected (pycodestyle detects E306)
    |
    = help: Remove extraneous blank line(s)

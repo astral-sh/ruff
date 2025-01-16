@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
 2 | from typing import Union
-3 | 
+3 |
 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
 5 | t: type[int] | type[str] | type[float]
@@ -152,7 +152,7 @@ PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them int
 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-12 | 
+12 |
 13 | def func(arg: type[int] | str | type[float]) -> None: ...
    |
    = help: Combine multiple `type` members
@@ -170,10 +170,10 @@ PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them int
 PYI055.pyi:13:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
    |
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
-12 | 
+12 |
 13 | def func(arg: type[int] | str | type[float]) -> None: ...
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-14 | 
+14 |
 15 | # OK
    |
    = help: Combine multiple `type` members
@@ -193,7 +193,7 @@ PYI055.pyi:23:7: PYI055 [*] Multiple `type` members in a union. Combine them int
 22 | # PYI055
 23 | item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-24 | 
+24 |
 25 | def func():
    |
    = help: Combine multiple `type` members

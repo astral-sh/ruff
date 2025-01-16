@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/mccabe/mod.rs
-snapshot_kind: text
 ---
 C901.py:2:5: C901 `trivial` is too complex (1 > 0)
   |
@@ -156,7 +155,7 @@ C901.py:118:17: C901 `a` is too complex (1 > 0)
 C901.py:121:17: C901 `b` is too complex (2 > 0)
     |
 119 |                 pass
-120 | 
+120 |
 121 |             def b(self, data):
     |                 ^ C901
 122 |                 if not args:
@@ -174,7 +173,7 @@ C901.py:126:17: C901 `c` is too complex (1 > 0)
 C901.py:129:17: C901 `error` is too complex (1 > 0)
     |
 127 |                 pass
-128 | 
+128 |
 129 |             def error(self, message):
     |                 ^^^^^ C901
 130 |                 pass
@@ -183,7 +182,7 @@ C901.py:129:17: C901 `error` is too complex (1 > 0)
 C901.py:132:17: C901 `info` is too complex (1 > 0)
     |
 130 |                 pass
-131 | 
+131 |
 132 |             def info(self, message):
     |                 ^^^^ C901
 133 |                 pass
@@ -192,7 +191,7 @@ C901.py:132:17: C901 `info` is too complex (1 > 0)
 C901.py:135:17: C901 `exception` is too complex (1 > 0)
     |
 133 |                 pass
-134 | 
+134 |
 135 |             def exception(self):
     |                 ^^^^^^^^^ C901
 136 |                 pass

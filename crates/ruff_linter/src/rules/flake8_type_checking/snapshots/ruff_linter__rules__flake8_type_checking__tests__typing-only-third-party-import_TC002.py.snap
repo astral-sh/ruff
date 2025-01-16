@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 TC002.py:5:22: TC002 [*] Move third-party import `pandas` into a type-checking block
   |
 4 | def f():
 5 |     import pandas as pd  # TC002
   |                      ^^ TC002
-6 | 
+6 |
 7 |     x: pd.DataFrame
   |
   = help: Move into type-checking block
@@ -31,7 +30,7 @@ TC002.py:11:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 10 | def f():
 11 |     from pandas import DataFrame  # TC002
    |                        ^^^^^^^^^ TC002
-12 | 
+12 |
 13 |     x: DataFrame
    |
    = help: Move into type-checking block
@@ -59,7 +58,7 @@ TC002.py:17:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 16 | def f():
 17 |     from pandas import DataFrame as df  # TC002
    |                                     ^^ TC002
-18 | 
+18 |
 19 |     x: df
    |
    = help: Move into type-checking block
@@ -87,7 +86,7 @@ TC002.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 22 | def f():
 23 |     import pandas as pd  # TC002
    |                      ^^ TC002
-24 | 
+24 |
 25 |     x: pd.DataFrame = 1
    |
    = help: Move into type-checking block
@@ -115,7 +114,7 @@ TC002.py:29:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 28 | def f():
 29 |     from pandas import DataFrame  # TC002
    |                        ^^^^^^^^^ TC002
-30 | 
+30 |
 31 |     x: DataFrame = 2
    |
    = help: Move into type-checking block
@@ -143,7 +142,7 @@ TC002.py:35:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 34 | def f():
 35 |     from pandas import DataFrame as df  # TC002
    |                                     ^^ TC002
-36 | 
+36 |
 37 |     x: df = 3
    |
    = help: Move into type-checking block
@@ -171,7 +170,7 @@ TC002.py:41:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 40 | def f():
 41 |     import pandas as pd  # TC002
    |                      ^^ TC002
-42 | 
+42 |
 43 |     x: "pd.DataFrame" = 1
    |
    = help: Move into type-checking block
@@ -199,7 +198,7 @@ TC002.py:47:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 46 | def f():
 47 |     import pandas as pd  # TC002
    |                      ^^ TC002
-48 | 
+48 |
 49 |     x = dict["pd.DataFrame", "pd.DataFrame"]
    |
    = help: Move into type-checking block
@@ -225,10 +224,10 @@ TC002.py:47:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 TC002.py:172:24: TC002 [*] Move third-party import `module.Member` into a type-checking block
     |
 170 |     global Member
-171 | 
+171 |
 172 |     from module import Member
     |                        ^^^^^^ TC002
-173 | 
+173 |
 174 |     x: Member = 1
     |
     = help: Move into type-checking block
