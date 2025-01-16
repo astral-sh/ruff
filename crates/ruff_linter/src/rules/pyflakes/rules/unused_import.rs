@@ -9,7 +9,8 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel, SubmoduleImport,
+    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
+    SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -329,6 +330,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
+            scope: binding.scope,
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.start())
@@ -366,7 +368,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .map(|binding| {
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
-                } else if in_init && is_first_party(&binding.import, checker) {
+                } else if in_init
+                    && binding.scope.is_global()
+                    && is_first_party(&binding.import, checker)
+                {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
                         submodule_import: binding.import.is_submodule_import(),
@@ -460,6 +465,8 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
+    /// The [`ScopeId`] of the scope in which the [`ImportBinding`] was defined.
+    scope: ScopeId,
 }
 
 impl ImportBinding<'_> {
