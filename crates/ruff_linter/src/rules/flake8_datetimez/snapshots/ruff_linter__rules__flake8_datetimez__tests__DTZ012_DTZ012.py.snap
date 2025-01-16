@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
-snapshot_kind: text
 ---
 DTZ012.py:4:1: DTZ012 `datetime.date.fromtimestamp()` used
   |
 3 | # qualified
 4 | datetime.date.fromtimestamp(1234)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012
-5 | 
+5 |
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...).date()` instead

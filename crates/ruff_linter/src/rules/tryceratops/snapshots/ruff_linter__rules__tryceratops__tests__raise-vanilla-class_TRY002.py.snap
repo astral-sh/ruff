@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
-snapshot_kind: text
 ---
 TRY002.py:13:15: TRY002 Create your own exception
    |
@@ -8,7 +7,7 @@ TRY002.py:13:15: TRY002 Create your own exception
 12 |     if a == 1:
 13 |         raise Exception("Custom message")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY002
-14 | 
+14 |
 15 |     b = 1
    |
 
@@ -26,7 +25,7 @@ TRY002.py:37:15: TRY002 Create your own exception
 36 |     if a == 1:
 37 |         raise BaseException("Custom message")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY002
-38 | 
+38 |
 39 |     b = 1
    |
 

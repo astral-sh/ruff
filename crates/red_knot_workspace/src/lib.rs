@@ -2,8 +2,8 @@ use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder};
 use red_knot_python_semantic::register_lints;
 
 pub mod db;
+pub mod project;
 pub mod watch;
-pub mod workspace;
 
 pub static DEFAULT_LINT_REGISTRY: std::sync::LazyLock<LintRegistry> =
     std::sync::LazyLock::new(default_lints_registry);

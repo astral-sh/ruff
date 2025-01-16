@@ -8,11 +8,11 @@ use crossbeam::channel as crossbeam_channel;
 use python_version::PythonVersion;
 use red_knot_python_semantic::SitePackages;
 use red_knot_server::run_server;
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::ProjectDatabase;
+use red_knot_workspace::project::settings::Configuration;
+use red_knot_workspace::project::ProjectMetadata;
 use red_knot_workspace::watch;
-use red_knot_workspace::watch::WorkspaceWatcher;
-use red_knot_workspace::workspace::settings::Configuration;
-use red_knot_workspace::workspace::WorkspaceMetadata;
+use red_knot_workspace::watch::ProjectWatcher;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
@@ -165,7 +165,7 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     let system = OsSystem::new(cwd.clone());
     let cli_configuration = args.to_configuration(&cwd);
-    let workspace_metadata = WorkspaceMetadata::discover(
+    let workspace_metadata = ProjectMetadata::discover(
         system.current_directory(),
         &system,
         Some(&cli_configuration),
@@ -173,7 +173,7 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
-    let mut db = RootDatabase::new(workspace_metadata, system)?;
+    let mut db = ProjectDatabase::new(workspace_metadata, system)?;
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_configuration);
 
@@ -226,7 +226,7 @@ struct MainLoop {
     receiver: crossbeam_channel::Receiver<MainLoopMessage>,
 
     /// The file system watcher, if running in watch mode.
-    watcher: Option<WorkspaceWatcher>,
+    watcher: Option<ProjectWatcher>,
 
     cli_configuration: Configuration,
 }
@@ -246,21 +246,21 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<ExitStatus> {
+    fn watch(mut self, db: &mut ProjectDatabase) -> anyhow::Result<ExitStatus> {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
         })?;
 
-        self.watcher = Some(WorkspaceWatcher::new(watcher, db));
+        self.watcher = Some(ProjectWatcher::new(watcher, db));
 
         self.run(db);
 
         Ok(ExitStatus::Success)
     }
 
-    fn run(mut self, db: &mut RootDatabase) -> ExitStatus {
+    fn run(mut self, db: &mut ProjectDatabase) -> ExitStatus {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
         let result = self.main_loop(db);
@@ -270,7 +270,7 @@ impl MainLoop {
         result
     }
 
-    fn main_loop(&mut self, db: &mut RootDatabase) -> ExitStatus {
+    fn main_loop(&mut self, db: &mut ProjectDatabase) -> ExitStatus {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -282,7 +282,7 @@ impl MainLoop {
                     let db = db.clone();
                     let sender = self.sender.clone();
 
-                    // Spawn a new task that checks the workspace. This needs to be done in a separate thread
+                    // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         if let Ok(result) = db.check() {

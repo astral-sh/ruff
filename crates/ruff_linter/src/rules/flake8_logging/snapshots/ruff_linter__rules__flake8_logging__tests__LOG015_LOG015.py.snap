@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
-snapshot_kind: text
 ---
 LOG015.py:4:1: LOG015 `debug()` call on root logger
   |
 2 | import logging
-3 | 
+3 |
 4 | logging.debug("Lorem")
   | ^^^^^^^^^^^^^^^^^^^^^^ LOG015
 5 | logging.info("ipsum")
@@ -89,7 +88,7 @@ LOG015.py:11:1: LOG015 `exception()` call on root logger
 LOG015.py:26:1: LOG015 `debug()` call on root logger
    |
 24 | )
-25 | 
+25 |
 26 | debug("Lorem")
    | ^^^^^^^^^^^^^^ LOG015
 27 | info("ipsum")

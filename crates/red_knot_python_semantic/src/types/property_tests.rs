@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use super::tests::Ty;
 use crate::db::tests::{setup_db, TestDb};
-use crate::types::KnownClass;
+use crate::types::{IntersectionBuilder, KnownClass, Type, UnionType};
 use quickcheck::{Arbitrary, Gen};
 
 fn arbitrary_core_type(g: &mut Gen) -> Ty {
@@ -219,16 +219,41 @@ macro_rules! type_property_test {
     };
 }
 
+fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+    IntersectionBuilder::new(db)
+        .add_positive(s)
+        .add_positive(t)
+        .build()
+}
+
+fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+    UnionType::from_elements(db, [s, t])
+}
+
 mod stable {
+    use super::union;
     use crate::types::{KnownClass, Type};
 
-    // `T` is equivalent to itself.
+    // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
     );
 
-    // `T` is a subtype of itself.
+    // Symmetry: If `S` is equivalent to `T`, then `T` must be equivalent to `S`.
+    // Note that this (trivially) holds true for gradual types as well.
+    type_property_test!(
+        equivalent_to_is_symmetric, db,
+        forall types s, t. s.is_equivalent_to(db, t) => t.is_equivalent_to(db, s)
+    );
+
+    // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.
+    type_property_test!(
+        equivalent_to_is_transitive, db,
+        forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
+    );
+
+    // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
@@ -305,6 +330,14 @@ mod stable {
         never_subtype_of_every_fully_static_type, db,
         forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
     );
+
+    // For any two fully static types, each type in the pair must be a subtype of their union.
+    type_property_test!(
+        all_fully_static_type_pairs_are_subtype_of_their_union, db,
+        forall types s, t.
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -315,10 +348,7 @@ mod stable {
 /// tests to the `stable` section. In the meantime, it can still be useful to run these
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
-    use crate::{
-        db::tests::TestDb,
-        types::{IntersectionBuilder, Type},
-    };
+    use super::{intersection, union};
 
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     // `T` can be assigned to itself.
@@ -327,21 +357,8 @@ mod flaky {
         forall types t. t.is_assignable_to(db, t)
     );
 
-    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
-    // An intersection of two types should be assignable to both of them
-    fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .add_positive(s)
-            .add_positive(t)
-            .build()
-    }
-
-    type_property_test!(
-        intersection_assignable_to_both, db,
-        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
-    );
-
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
+    // This very often passes now, but occasionally flakes due to https://github.com/astral-sh/ruff/issues/15380
     type_property_test!(
         subtype_of_is_antisymmetric, db,
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
@@ -351,5 +368,40 @@ mod flaky {
     type_property_test!(
         double_negation_is_identity, db,
         forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+    );
+
+    // ~T should be disjoint from T
+    type_property_test!(
+        negation_is_disjoint, db,
+        forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
+    );
+
+    // If `S <: T`, then `~T <: ~S`.
+    type_property_test!(
+        negation_reverses_subtype_order, db,
+        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+    );
+
+    // For two fully static types, their intersection must be a subtype of each type in the pair.
+    type_property_test!(
+        all_fully_static_type_pairs_are_supertypes_of_their_intersection, db,
+        forall types s, t.
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
+    );
+
+    // And for non-fully-static types, the intersection of a pair of types
+    // should be assignable to both types of the pair.
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    type_property_test!(
+        all_type_pairs_can_be_assigned_from_their_intersection, db,
+        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
+    );
+
+    // For *any* pair of types, whether fully static or not,
+    // each of the pair should be assignable to the union of the two.
+    type_property_test!(
+        all_type_pairs_are_assignable_to_their_union, db,
+        forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
     );
 }

@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF034.py:5:5: RUF034 Useless `if`-`else` condition
   |
 4 | # Invalid
 5 | x = 1 if True else 1
   |     ^^^^^^^^^^^^^^^^ RUF034
-6 | 
+6 |
 7 | # Invalid
   |
 
@@ -16,7 +15,7 @@ RUF034.py:8:5: RUF034 Useless `if`-`else` condition
  7 | # Invalid
  8 | x = "a" if True else "a"
    |     ^^^^^^^^^^^^^^^^^^^^ RUF034
- 9 | 
+ 9 |
 10 | # Invalid
    |
 

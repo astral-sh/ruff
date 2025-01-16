@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/comprehension.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -749,7 +748,7 @@ Module(
 4 | {x: y for call() in y}
 5 | {x: y for {a, b} in y}
   |           ^^^^^^ Syntax Error: Invalid assignment target
-6 | 
+6 |
 7 | # Invalid iter
   |
 
@@ -787,7 +786,7 @@ Module(
 10 | {x: y for x in yield from y}
 11 | {x: y for x in lambda y: y}
    |                ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
-12 | 
+12 |
 13 | # Invalid if
    |
 

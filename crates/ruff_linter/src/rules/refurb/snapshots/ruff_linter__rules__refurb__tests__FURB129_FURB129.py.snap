@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB129.py:7:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
   |
@@ -70,7 +69,7 @@ FURB129.py:11:49: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 10 |     b = {line.upper() for line in f.readlines()}
 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
    |                                                 ^^^^^^^^^^^^^ FURB129
-12 | 
+12 |
 13 | with Path("FURB129.py").open() as f:
    |
    = help: Remove `readlines()`
@@ -107,7 +106,7 @@ FURB129.py:14:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 FURB129.py:17:14: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 15 |         pass
-16 | 
+16 |
 17 | for _line in open("FURB129.py").readlines():
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB129
 18 |     pass
@@ -127,7 +126,7 @@ FURB129.py:17:14: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 FURB129.py:20:14: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 18 |     pass
-19 | 
+19 |
 20 | for _line in Path("FURB129.py").open().readlines():
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB129
 21 |     pass

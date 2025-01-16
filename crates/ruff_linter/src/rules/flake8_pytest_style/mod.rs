@@ -19,6 +19,12 @@ mod tests {
     use super::types;
 
     #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("is_pytest_test.py"),
+        Settings::default(),
+        "is_pytest_test"
+    )]
+    #[test_case(
         Rule::PytestFixtureIncorrectParenthesesStyle,
         Path::new("PT001.py"),
         Settings::default(),
@@ -274,6 +280,66 @@ mod tests {
         Path::new("PT027_1.py"),
         Settings::default(),
         "PT027_1"
+    )]
+    #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("PT028.py"),
+        Settings::default(),
+        "PT028"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithoutWarning,
+        Path::new("PT029.py"),
+        Settings::default(),
+        "PT029"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings::default(),
+        "PT030_default"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_extend_require_match_for: vec![IdentifierPattern::new("EncodingWarning").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_extend_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("EncodingWarning").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_replace_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("*").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_glob_all"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("foo.*").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_glob_prefix"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithMultipleStatements,
+        Path::new("PT031.py"),
+        Settings::default(),
+        "PT031"
     )]
     fn test_pytest_style(
         rule_code: Rule,

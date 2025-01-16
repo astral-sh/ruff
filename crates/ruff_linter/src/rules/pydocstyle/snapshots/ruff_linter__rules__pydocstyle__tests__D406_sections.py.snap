@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
    |
 30 |     """Toggle the gizmo.
-31 | 
+31 |
 32 |     Returns:
    |     ^^^^^^^ D406
 33 |     -------
@@ -45,7 +45,7 @@ sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
 sections.py:601:5: D406 [*] Section name should end with a newline ("Parameters")
     |
 599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
-600 | 
+600 |
 601 |     Parameters:
     |     ^^^^^^^^^^ D406
 602 |     ----------

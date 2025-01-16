@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB131.py:11:1: FURB131 [*] Prefer `clear` over deleting a full slice
    |
@@ -136,7 +135,7 @@ FURB131.py:48:5: FURB131 [*] Prefer `clear` over deleting a full slice
 47 |     # FURB131
 48 |     del x[:]
    |     ^^^^^^^^ FURB131
-49 | 
+49 |
 50 |     x = 1
    |
    = help: Replace with `clear()`
@@ -157,7 +156,7 @@ FURB131.py:58:1: FURB131 [*] Prefer `clear` over deleting a full slice
 57 | # FURB131
 58 | del sneaky[:]
    | ^^^^^^^^^^^^^ FURB131
-59 | 
+59 |
 60 | # these should not
    |
    = help: Replace with `clear()`

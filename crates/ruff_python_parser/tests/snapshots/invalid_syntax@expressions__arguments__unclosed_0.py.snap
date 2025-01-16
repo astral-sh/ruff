@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/unclosed_0.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -69,7 +68,7 @@ Module(
   |
 1 | call(
   |      ^ Syntax Error: Expected ')', found newline
-2 | 
+2 |
 3 | def foo():
 4 |     pass
   |

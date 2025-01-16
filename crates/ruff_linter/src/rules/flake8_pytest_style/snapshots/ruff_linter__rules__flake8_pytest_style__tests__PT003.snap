@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT003.py:14:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
@@ -142,8 +141,7 @@ PT003.py:66:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 64 |       # another comment ,)
 65 |       
-66 |       scope=\
-   |  _____^
+66 | /     scope=\
 67 | |         "function"  # some comment ),
    | |__________________^ PT003
 68 |       ,

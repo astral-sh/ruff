@@ -236,7 +236,7 @@ C417.py:14:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehen
 13 | filter(func, map(lambda v: v, nums))
 14 | list(map(lambda x, y: x * y, nums))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-15 | 
+15 |
 16 | # When inside f-string, then the fix should be surrounded by whitespace
    |
    = help: Replace `map()` with a list comprehension
@@ -276,7 +276,7 @@ C417.py:18:8: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehen
 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
 18 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-19 | 
+19 |
 20 | # False negatives.
    |
    = help: Replace `map()` with a dict comprehension
@@ -296,7 +296,7 @@ C417.py:36:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expr
 35 | # Error: the `x` is overridden by the inner lambda.
 36 | map(lambda x: lambda x: x, range(4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-37 | 
+37 |
 38 | # Ok because of the default parameters, and variadic arguments.
    |
    = help: Replace `map()` with a generator expression
@@ -357,7 +357,7 @@ C417.py:49:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expr
 48 | map(lambda x: x, (y if y else z))
 49 | map(lambda x: x, (x, y, z))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-50 | 
+50 |
 51 | # See https://github.com/astral-sh/ruff/issues/14808
    |
    = help: Replace `map()` with a generator expression

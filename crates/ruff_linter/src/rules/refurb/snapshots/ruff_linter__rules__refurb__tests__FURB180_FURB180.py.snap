@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   |
 5 | # Errors
-6 | 
+6 |
 7 | class A0(metaclass=abc.ABCMeta):
   |          ^^^^^^^^^^^^^^^^^^^^^ FURB180
 8 |     @abstractmethod

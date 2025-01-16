@@ -94,6 +94,36 @@ reveal_type(C.__mro__)
 u: Unknown[str]
 ```
 
+### `AlwaysTruthy` and `AlwaysFalsy`
+
+`AlwaysTruthy` and `AlwaysFalsy` represent the sets of all possible objects whose truthiness is
+always truthy or falsy, respectively.
+
+They do not accept any type arguments.
+
+```py
+from typing_extensions import Literal
+
+from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_subtype_of, static_assert
+
+static_assert(is_subtype_of(Literal[True], AlwaysTruthy))
+static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
+
+static_assert(not is_subtype_of(int, AlwaysFalsy))
+static_assert(not is_subtype_of(str, AlwaysFalsy))
+
+def _(t: AlwaysTruthy, f: AlwaysFalsy):
+    reveal_type(t)  # revealed: AlwaysTruthy
+    reveal_type(f)  # revealed: AlwaysFalsy
+
+def f(
+    a: AlwaysTruthy[int],  # error: [invalid-type-form]
+    b: AlwaysFalsy[str],  # error: [invalid-type-form]
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+```
+
 ## Static assertions
 
 ### Basics

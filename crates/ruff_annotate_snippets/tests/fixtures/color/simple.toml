@@ -1,0 +1,22 @@
+[message]
+level = "Error"
+title = "expected one of `.`, `;`, `?`, or an operator, found `for`"
+
+[[message.snippets]]
+source = """
+        })
+
+        for line in &self.body {"""
+line_start = 169
+origin = "src/format_color.rs"
+[[message.snippets.annotations]]
+label = "unexpected token"
+level = "Error"
+range = [20, 23]
+[[message.snippets.annotations]]
+label = "expected one of `.`, `;`, `?`, or an operator here"
+level = "Warning"
+range = [10, 11]
+
+[renderer]
+color = true

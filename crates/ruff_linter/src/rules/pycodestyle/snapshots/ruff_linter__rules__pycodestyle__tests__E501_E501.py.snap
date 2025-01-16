@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E501.py:5:89: E501 Line too long (123 > 88)
   |
 3 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
-4 | 
+4 |
 5 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
 6 | """
@@ -50,9 +49,9 @@ E501.py:43:89: E501 Line too long (105 > 88)
 
 E501.py:83:89: E501 Line too long (147 > 88)
    |
-81 | class Bar:
-82 |     """
-83 |     This is a long sentence that ends with a shortened URL and, therefore, could easily be broken across multiple lines ([source](https://ruff.rs))
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-84 |     """
+81 | …
+82 | …
+83 | … URL and, therefore, could easily be broken across multiple lines ([source](https://ruff.rs))
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+84 | …
    |

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E20.py:51:10: E203 [*] Whitespace before ':'
    |
@@ -192,7 +191,7 @@ E20.py:126:16: E203 [*] Whitespace before ':'
 125 | #: E203:1:19
 126 | {lower + offset : upper + offset}
     |                ^ E203
-127 | 
+127 |
 128 | #: E203:1:19
     |
     = help: Remove whitespace before ':'
@@ -212,7 +211,7 @@ E20.py:129:19: E203 [*] Whitespace before ':'
 128 | #: E203:1:19
 129 | ham[lower + offset  : upper + offset]
     |                   ^^ E203
-130 | 
+130 |
 131 | #: Okay
     |
     = help: Remove whitespace before ':'
@@ -232,7 +231,7 @@ E20.py:157:21: E203 [*] Whitespace before ':'
 156 | #: E203:1:21
 157 | ham[lower + offset : : upper + offset]
     |                     ^ E203
-158 | 
+158 |
 159 | #: E203:1:20
     |
     = help: Remove whitespace before ':'
@@ -252,7 +251,7 @@ E20.py:160:20: E203 [*] Whitespace before ':'
 159 | #: E203:1:20
 160 | ham[lower + offset: :upper + offset]
     |                    ^ E203
-161 | 
+161 |
 162 | #: E203:1:20
     |
     = help: Remove whitespace before ':'
@@ -272,7 +271,7 @@ E20.py:163:20: E203 [*] Whitespace before ':'
 162 | #: E203:1:20
 163 | ham[{lower + offset : upper + offset} : upper + offset]
     |                    ^ E203
-164 | 
+164 |
 165 | #: Okay
     |
     = help: Remove whitespace before ':'
@@ -292,7 +291,7 @@ E20.py:175:10: E203 [*] Whitespace before ':'
 174 | #: E203:1:10
 175 | ham[upper  :]
     |          ^^ E203
-176 | 
+176 |
 177 | #: Okay
     |
     = help: Remove whitespace before ':'
@@ -312,7 +311,7 @@ E20.py:181:14: E203 [*] Whitespace before ':'
 180 | #: E203:1:13
 181 | ham[lower + 1  :, "columnname"]
     |              ^^ E203
-182 | 
+182 |
 183 | #: Okay
     |
     = help: Remove whitespace before ':'
@@ -332,7 +331,7 @@ E20.py:187:17: E203 [*] Whitespace before ':'
 186 | #: E203:1:13
 187 | f"{ham[lower + 1  :, "columnname"]}"
     |                 ^^ E203
-188 | 
+188 |
 189 | #: Okay: https://github.com/astral-sh/ruff/issues/12023
     |
     = help: Remove whitespace before ':'

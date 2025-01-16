@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP037_2.pyi:3:14: UP037 [*] Remove quotes from type annotation
   |
 1 | # https://github.com/astral-sh/ruff/issues/7102
-2 | 
+2 |
 3 | def f(a: Foo['SingleLine  # Comment']): ...
   |              ^^^^^^^^^^^^^^^^^^^^^^^ UP037
   |

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
@@ -27,7 +26,7 @@ UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
 5 | x: typing.TypeAlias = int
 6 | x: TypeAlias = int
   | ^^^^^^^^^^^^^^^^^^ UP040
-7 | 
+7 |
 8 | # UP040 simple generic
   |
   = help: Use the `type` keyword
@@ -48,7 +47,7 @@ UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
  9 | T = typing.TypeVar["T"]
 10 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-11 | 
+11 |
 12 | # UP040 call style generic
    |
    = help: Use the `type` keyword
@@ -69,7 +68,7 @@ UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 13 | T = typing.TypeVar("T")
 14 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-15 | 
+15 |
 16 | # UP040 bounded generic
    |
    = help: Use the `type` keyword
@@ -90,7 +89,7 @@ UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 17 | T = typing.TypeVar("T", bound=int)
 18 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-19 | 
+19 |
 20 | # UP040 constrained generic
    |
    = help: Use the `type` keyword
@@ -111,7 +110,7 @@ UP040.py:22:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 21 | T = typing.TypeVar("T", int, str)
 22 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-23 | 
+23 |
 24 | # UP040 contravariant generic
    |
    = help: Use the `type` keyword
@@ -132,7 +131,7 @@ UP040.py:26:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 25 | T = typing.TypeVar("T", contravariant=True)
 26 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-27 | 
+27 |
 28 | # UP040 covariant generic
    |
    = help: Use the `type` keyword
@@ -153,7 +152,7 @@ UP040.py:30:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 29 | T = typing.TypeVar("T", covariant=True)
 30 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-31 | 
+31 |
 32 | # UP040 in class scope
    |
    = help: Use the `type` keyword
@@ -174,7 +173,7 @@ UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 35 |     # reference to global variable
 36 |     x: typing.TypeAlias = list[T]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-37 | 
+37 |
 38 |     # reference to class variable
    |
    = help: Use the `type` keyword
@@ -195,7 +194,7 @@ UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of t
 39 |     TCLS = typing.TypeVar["TCLS"]
 40 |     y: typing.TypeAlias = list[TCLS]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-41 | 
+41 |
 42 | # UP040 won't add generics in fix
    |
    = help: Use the `type` keyword
@@ -216,7 +215,7 @@ UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 43 | T = typing.TypeVar(*args)
 44 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-45 | 
+45 |
 46 | # OK
    |
    = help: Use the `type` keyword
@@ -258,7 +257,7 @@ UP040.py:63:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignme
 64 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 65 | | )
    | |_^ UP040
-66 |   
+66 |
 67 |   # Bound
    |
    = help: Use the `type` keyword
@@ -283,7 +282,7 @@ UP040.py:69:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignme
 70 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 71 | | )
    | |_^ UP040
-72 |   
+72 |
 73 |   # Multiple bounds
    |
    = help: Use the `type` keyword
@@ -306,7 +305,7 @@ UP040.py:77:1: UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment ins
 76 | T3 = TypeVar("T3")
 77 | Tuple3 = TypeAliasType("Tuple3", tuple[T1, T2, T3], type_params=(T1, T2, T3))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-78 | 
+78 |
 79 | # No type_params
    |
    = help: Use the `type` keyword
@@ -346,7 +345,7 @@ UP040.py:81:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignmen
 80 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
 81 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-82 | 
+82 |
 83 | # OK: Other name
    |
    = help: Use the `type` keyword

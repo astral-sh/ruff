@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF046.py:10:1: RUF046 [*] Value being cast to `int` is already an integer
    |
  8 | ### Safely fixable
- 9 | 
+ 9 |
 10 | int(id())
    | ^^^^^^^^^ RUF046
 11 | int(len([]))
@@ -89,7 +89,7 @@ RUF046.py:14:1: RUF046 [*] Value being cast to `int` is already an integer
 13 | int(hash(foo, bar))
 14 | int(int(''))
    | ^^^^^^^^^^^^ RUF046
-15 | 
+15 |
 16 | int(math.comb())
    |
    = help: Remove unnecessary `int` call
@@ -107,7 +107,7 @@ RUF046.py:14:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:16:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 14 | int(int(''))
-15 | 
+15 |
 16 | int(math.comb())
    | ^^^^^^^^^^^^^^^^ RUF046
 17 | int(math.factorial())
@@ -213,7 +213,7 @@ RUF046.py:21:1: RUF046 [*] Value being cast to `int` is already an integer
 20 | int(math.isqrt())
 21 | int(math.perm())
    | ^^^^^^^^^^^^^^^^ RUF046
-22 | 
+22 |
 23 | int(round(1, 0))
    |
    = help: Remove unnecessary `int` call
@@ -231,7 +231,7 @@ RUF046.py:21:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:23:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 21 | int(math.perm())
-22 | 
+22 |
 23 | int(round(1, 0))
    | ^^^^^^^^^^^^^^^^ RUF046
 24 | int(round(1, 10))
@@ -253,7 +253,7 @@ RUF046.py:24:1: RUF046 [*] Value being cast to `int` is already an integer
 23 | int(round(1, 0))
 24 | int(round(1, 10))
    | ^^^^^^^^^^^^^^^^^ RUF046
-25 | 
+25 |
 26 | int(round(1))
    |
    = help: Remove unnecessary `int` call
@@ -271,7 +271,7 @@ RUF046.py:24:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:26:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 24 | int(round(1, 10))
-25 | 
+25 |
 26 | int(round(1))
    | ^^^^^^^^^^^^^ RUF046
 27 | int(round(1, None))
@@ -293,7 +293,7 @@ RUF046.py:27:1: RUF046 [*] Value being cast to `int` is already an integer
 26 | int(round(1))
 27 | int(round(1, None))
    | ^^^^^^^^^^^^^^^^^^^ RUF046
-28 | 
+28 |
 29 | int(round(1.))
    |
    = help: Remove unnecessary `int` call
@@ -311,7 +311,7 @@ RUF046.py:27:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:29:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 27 | int(round(1, None))
-28 | 
+28 |
 29 | int(round(1.))
    | ^^^^^^^^^^^^^^ RUF046
 30 | int(round(1., None))
@@ -333,7 +333,7 @@ RUF046.py:30:1: RUF046 [*] Value being cast to `int` is already an integer
 29 | int(round(1.))
 30 | int(round(1., None))
    | ^^^^^^^^^^^^^^^^^^^^ RUF046
-31 | 
+31 |
 32 | int(1)
    |
    = help: Remove unnecessary `int` call
@@ -351,7 +351,7 @@ RUF046.py:30:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:32:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 30 | int(round(1., None))
-31 | 
+31 |
 32 | int(1)
    | ^^^^^^ RUF046
 33 | int(v := 1)
@@ -436,7 +436,7 @@ RUF046.py:36:1: RUF046 [*] Value being cast to `int` is already an integer
 35 | int(-1)
 36 | int(+1)
    | ^^^^^^^ RUF046
-37 | 
+37 |
 38 | int(1 + 1)
    |
    = help: Remove unnecessary `int` call
@@ -454,7 +454,7 @@ RUF046.py:36:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:38:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 36 | int(+1)
-37 | 
+37 |
 38 | int(1 + 1)
    | ^^^^^^^^^^ RUF046
 39 | int(1 - 1)
@@ -665,7 +665,7 @@ RUF046.py:48:1: RUF046 [*] Value being cast to `int` is already an integer
 47 | int(1 & 1)
 48 | int(1 // 1)
    | ^^^^^^^^^^^ RUF046
-49 | 
+49 |
 50 | int(1 if ... else 2)
    |
    = help: Remove unnecessary `int` call
@@ -683,10 +683,10 @@ RUF046.py:48:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:50:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 48 | int(1 // 1)
-49 | 
+49 |
 50 | int(1 if ... else 2)
    | ^^^^^^^^^^^^^^^^^^^^ RUF046
-51 | 
+51 |
 52 | int(1 and 0)
    |
    = help: Remove unnecessary `int` call
@@ -704,7 +704,7 @@ RUF046.py:50:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:52:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 50 | int(1 if ... else 2)
-51 | 
+51 |
 52 | int(1 and 0)
    | ^^^^^^^^^^^^ RUF046
 53 | int(0 or -1)
@@ -760,7 +760,7 @@ RUF046.py:56:4: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:62:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 60 | ### Unsafe
-61 | 
+61 |
 62 | int(math.ceil())
    | ^^^^^^^^^^^^^^^^ RUF046
 63 | int(math.floor())
@@ -803,7 +803,7 @@ RUF046.py:64:1: RUF046 [*] Value being cast to `int` is already an integer
 63 | int(math.floor())
 64 | int(math.trunc())
    | ^^^^^^^^^^^^^^^^^ RUF046
-65 | 
+65 |
 66 | int(round(inferred_int, 0))
    |
    = help: Remove unnecessary `int` call
@@ -821,7 +821,7 @@ RUF046.py:64:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:66:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 64 | int(math.trunc())
-65 | 
+65 |
 66 | int(round(inferred_int, 0))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
 67 | int(round(inferred_int, 10))
@@ -843,7 +843,7 @@ RUF046.py:67:1: RUF046 [*] Value being cast to `int` is already an integer
 66 | int(round(inferred_int, 0))
 67 | int(round(inferred_int, 10))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
-68 | 
+68 |
 69 | int(round(inferred_int))
    |
    = help: Remove unnecessary `int` call
@@ -861,7 +861,7 @@ RUF046.py:67:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:69:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 67 | int(round(inferred_int, 10))
-68 | 
+68 |
 69 | int(round(inferred_int))
    | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
 70 | int(round(inferred_int, None))
@@ -883,7 +883,7 @@ RUF046.py:70:1: RUF046 [*] Value being cast to `int` is already an integer
 69 | int(round(inferred_int))
 70 | int(round(inferred_int, None))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
-71 | 
+71 |
 72 | int(round(inferred_float))
    |
    = help: Remove unnecessary `int` call
@@ -901,7 +901,7 @@ RUF046.py:70:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:72:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 70 | int(round(inferred_int, None))
-71 | 
+71 |
 72 | int(round(inferred_float))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
 73 | int(round(inferred_float, None))
@@ -923,7 +923,7 @@ RUF046.py:73:1: RUF046 [*] Value being cast to `int` is already an integer
 72 | int(round(inferred_float))
 73 | int(round(inferred_float, None))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
-74 | 
+74 |
 75 | int(round(unknown))
    |
    = help: Remove unnecessary `int` call
@@ -941,7 +941,7 @@ RUF046.py:73:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:75:1: RUF046 [*] Value being cast to `int` is already an integer
    |
 73 | int(round(inferred_float, None))
-74 | 
+74 |
 75 | int(round(unknown))
    | ^^^^^^^^^^^^^^^^^^^ RUF046
 76 | int(round(unknown, None))
@@ -979,11 +979,11 @@ RUF046.py:76:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:158:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 156 |   int(1. if ... else .2)
-157 |   
+157 |
 158 | / int(1 +
 159 | |     1)
     | |______^ RUF046
-160 |   
+160 |
 161 |   int(round(1,
     |
     = help: Remove unnecessary `int` call
@@ -1001,11 +1001,11 @@ RUF046.py:158:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:161:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 159 |       1)
-160 |   
+160 |
 161 | / int(round(1,
 162 | |           0))
     | |_____________^ RUF046
-163 |   
+163 |
 164 |   # function calls may need to retain parentheses
     |
     = help: Remove unnecessary `int` call
@@ -1029,7 +1029,7 @@ RUF046.py:168:1: RUF046 [*] Value being cast to `int` is already an integer
 168 | / int(round
 169 | | (1))
     | |____^ RUF046
-170 |   
+170 |
 171 |   int(round # a comment
     |
     = help: Remove unnecessary `int` call
@@ -1047,13 +1047,13 @@ RUF046.py:168:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:171:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 169 |   (1))
-170 |   
+170 |
 171 | / int(round # a comment
 172 | | # and another comment
 173 | | (10)
 174 | | )
     | |_^ RUF046
-175 |   
+175 |
 176 |   int(round (17)) # this is safe without parens
     |
     = help: Remove unnecessary `int` call
@@ -1075,10 +1075,10 @@ RUF046.py:171:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:176:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 174 | )
-175 | 
+175 |
 176 | int(round (17)) # this is safe without parens
     | ^^^^^^^^^^^^^^^ RUF046
-177 | 
+177 |
 178 | int( round (
     |
     = help: Remove unnecessary `int` call
@@ -1096,12 +1096,12 @@ RUF046.py:176:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:178:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 176 |   int(round (17)) # this is safe without parens
-177 |   
+177 |
 178 | / int( round (
 179 | |                 17
 180 | |             )) # this is also safe without parens
     | |______________^ RUF046
-181 |   
+181 |
 182 |   int((round)  # Comment
     |
     = help: Remove unnecessary `int` call
@@ -1122,12 +1122,12 @@ RUF046.py:178:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:182:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 180 |               )) # this is also safe without parens
-181 |   
+181 |
 182 | / int((round)  # Comment
 183 | | (42)
 184 | | )
     | |_^ RUF046
-185 |   
+185 |
 186 |   int((round  # Comment
     |
     = help: Remove unnecessary `int` call
@@ -1148,12 +1148,12 @@ RUF046.py:182:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:186:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 184 |   )
-185 |   
+185 |
 186 | / int((round  # Comment
 187 | | )(42)
 188 | | )
     | |_^ RUF046
-189 |   
+189 |
 190 |   int(  # Unsafe fix because of this comment
     |
     = help: Remove unnecessary `int` call
@@ -1173,7 +1173,7 @@ RUF046.py:186:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:190:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 188 |   )
-189 |   
+189 |
 190 | / int(  # Unsafe fix because of this comment
 191 | | (  # Comment
 192 | |     (round
@@ -1181,7 +1181,7 @@ RUF046.py:190:1: RUF046 [*] Value being cast to `int` is already an integer
 194 | | )(42)
 195 | | )
     | |_^ RUF046
-196 |   
+196 |
 197 |   int(
     |
     = help: Remove unnecessary `int` call
@@ -1203,14 +1203,14 @@ RUF046.py:190:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:197:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 195 |   )
-196 |   
+196 |
 197 | / int(
 198 | |     round(
 199 | |         42
 200 | |     ) # unsafe fix because of this comment
 201 | | )
     | |_^ RUF046
-202 |   
+202 |
 203 |   int(
     |
     = help: Remove unnecessary `int` call
@@ -1233,7 +1233,7 @@ RUF046.py:197:1: RUF046 [*] Value being cast to `int` is already an integer
 RUF046.py:203:1: RUF046 [*] Value being cast to `int` is already an integer
     |
 201 |   )
-202 |   
+202 |
 203 | / int(
 204 | |     round(
 205 | |         42

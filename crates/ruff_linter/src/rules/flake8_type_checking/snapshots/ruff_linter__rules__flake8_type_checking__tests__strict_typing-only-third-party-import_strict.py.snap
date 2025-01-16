@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 strict.py:27:21: TC002 [*] Move third-party import `pkg.A` into a type-checking block
    |
@@ -8,7 +7,7 @@ strict.py:27:21: TC002 [*] Move third-party import `pkg.A` into a type-checking 
 26 |     import pkg
 27 |     from pkg import A
    |                     ^ TC002
-28 | 
+28 |
 29 |     def test(value: A):
    |
    = help: Move into type-checking block
@@ -37,7 +36,7 @@ strict.py:35:21: TC002 [*] Move third-party import `pkg.A` into a type-checking 
 34 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 35 |     from pkg import A, B
    |                     ^ TC002
-36 | 
+36 |
 37 |     def test(value: A):
    |
    = help: Move into type-checking block
@@ -67,7 +66,7 @@ strict.py:54:25: TC002 [*] Move third-party import `pkg.bar.A` into a type-check
 53 |     import pkg
 54 |     from pkg.bar import A
    |                         ^ TC002
-55 | 
+55 |
 56 |     def test(value: A):
    |
    = help: Move into type-checking block
@@ -208,7 +207,7 @@ strict.py:101:23: TC002 [*] Move third-party import `pkg.foo` into a type-checki
 100 |     import pkg.bar as B
 101 |     import pkg.foo as F
     |                       ^ TC002
-102 | 
+102 |
 103 |     def test(value: F.Foo):
     |
     = help: Move into type-checking block

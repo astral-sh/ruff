@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_0.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -30,7 +29,7 @@ Module(
 
   |
 1 | # There are no parentheses, so this isn't parsed as named expression.
-2 | 
+2 |
 3 | x :=
   |   ^^ Syntax Error: Expected a statement
   |
@@ -38,7 +37,7 @@ Module(
 
   |
 1 | # There are no parentheses, so this isn't parsed as named expression.
-2 | 
+2 |
 3 | x :=
-  |      Syntax Error: Expected a statement
+  |     ^ Syntax Error: Expected a statement
   |

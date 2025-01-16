@@ -154,6 +154,10 @@ impl KnownModule {
         }
     }
 
+    pub const fn is_builtins(self) -> bool {
+        matches!(self, Self::Builtins)
+    }
+
     pub const fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
     }

@@ -247,7 +247,7 @@ C405.py:21:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
 20 | f"{set(['a', 'b'])}"
 21 | f'{set(["a", "b"])}'
    |    ^^^^^^^^^^^^^^^ C405
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    |
    = help: Rewrite as a set literal
@@ -265,7 +265,7 @@ C405.py:21:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
 C405.py:23:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    |    ^^^^^^^^^^^^^^^ C405
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -286,7 +286,7 @@ C405.py:23:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
 C405.py:23:22: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    |                      ^^^^^^^^^^ C405
 24 | f"{ set(['a', 'b']) - set(['a']) }"

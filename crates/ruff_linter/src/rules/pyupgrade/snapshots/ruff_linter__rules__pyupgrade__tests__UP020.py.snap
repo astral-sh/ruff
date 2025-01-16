@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP020.py:3:6: UP020 [*] Use builtin `open`
   |
 1 | import io
-2 | 
+2 |
 3 | with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP020
 4 |     print(f.read())
@@ -24,7 +23,7 @@ UP020.py:3:6: UP020 [*] Use builtin `open`
 UP020.py:8:6: UP020 [*] Use builtin `open`
   |
 6 | from io import open
-7 | 
+7 |
 8 | with open("f.txt") as f:
   |      ^^^^^^^^^^^^^ UP020
 9 |     print(f.read())

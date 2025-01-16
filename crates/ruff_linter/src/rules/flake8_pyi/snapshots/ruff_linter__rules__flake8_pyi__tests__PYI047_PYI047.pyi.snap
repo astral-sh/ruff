@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI047.pyi:6:1: PYI047 Private TypeAlias `_UnusedPrivateTypeAlias` is never used
   |
@@ -14,14 +13,14 @@ PYI047.pyi:7:1: PYI047 Private TypeAlias `_T` is never used
 6 | _UnusedPrivateTypeAlias: TypeAlias = int | None
 7 | _T: typing.TypeAlias = str
   | ^^ PYI047
-8 | 
+8 |
 9 | # OK
   |
 
 PYI047.pyi:24:6: PYI047 Private TypeAlias `_UnusedPEP695` is never used
    |
 22 | def func2(arg: _PrivateTypeAlias) -> None: ...
-23 | 
+23 |
 24 | type _UnusedPEP695 = int
    |      ^^^^^^^^^^^^^ PYI047
 25 | type _UnusedGeneric695[T] = list[T]
@@ -32,6 +31,6 @@ PYI047.pyi:25:6: PYI047 Private TypeAlias `_UnusedGeneric695` is never used
 24 | type _UnusedPEP695 = int
 25 | type _UnusedGeneric695[T] = list[T]
    |      ^^^^^^^^^^^^^^^^^ PYI047
-26 | 
+26 |
 27 | type _UsedPEP695 = str
    |

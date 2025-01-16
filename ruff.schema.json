@@ -1243,6 +1243,26 @@
           "items": {
             "type": "string"
           }
+        },
+        "warns-extend-require-match-for": {
+          "description": "List of additional warning names that require a match= parameter in a `pytest.warns()` call. This extends the default list of warnings that require a match= parameter.\n\nThis option is useful if you want to extend the default list of warnings that require a match= parameter without having to specify the entire list.\n\nNote that this option does not remove any warnings from the default list.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "warns-require-match-for": {
+          "description": "List of warning names that require a match= parameter in a `pytest.warns()` call.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -3695,6 +3715,11 @@
         "PT025",
         "PT026",
         "PT027",
+        "PT028",
+        "PT029",
+        "PT03",
+        "PT030",
+        "PT031",
         "PTH",
         "PTH1",
         "PTH10",

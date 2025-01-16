@@ -1,13 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:129:5: D200 [*] One-line docstring should fit on one line
     |
 127 |   @expect('D212: Multi-line docstring summary should start at the first line')
 128 |   def asdlkfasd():
-129 |       """
-    |  _____^
+129 | /     """
 130 | |     Wrong.
 131 | |     """
     | |_______^ D200
@@ -30,9 +28,8 @@ D.py:597:5: D200 [*] One-line docstring should fit on one line
     |
 595 |   @expect('D212: Multi-line docstring summary should start at the first line')
 596 |   def one_liner():
-597 |       """
-    |  _____^
-598 | | 
+597 | /     """
+598 | |
 599 | |     Wrong."""
     | |_____________^ D200
     |
@@ -54,9 +51,8 @@ D.py:606:5: D200 [*] One-line docstring should fit on one line
     |
 604 |   @expect('D212: Multi-line docstring summary should start at the first line')
 605 |   def one_liner():
-606 |       r"""Wrong.
-    |  _____^
-607 | | 
+606 | /     r"""Wrong.
+607 | |
 608 | |     """
     | |_______^ D200
     |
@@ -78,9 +74,8 @@ D.py:615:5: D200 One-line docstring should fit on one line
     |
 613 |   @expect('D212: Multi-line docstring summary should start at the first line')
 614 |   def one_liner():
-615 |       """Wrong."
-    |  _____^
-616 | | 
+615 | /     """Wrong."
+616 | |
 617 | |     """
     | |_______^ D200
     |
@@ -90,9 +85,8 @@ D.py:624:5: D200 One-line docstring should fit on one line
     |
 622 |   @expect('D212: Multi-line docstring summary should start at the first line')
 623 |   def one_liner():
-624 |       """
-    |  _____^
-625 | | 
+624 | /     """
+625 | |
 626 | |     "Wrong."""
     | |______________^ D200
     |
@@ -101,11 +95,10 @@ D.py:624:5: D200 One-line docstring should fit on one line
 D.py:645:5: D200 One-line docstring should fit on one line
     |
 644 |   def single_line_docstring_with_an_escaped_backslash():
-645 |       "\
-    |  _____^
+645 | /     "\
 646 | |     "
     | |_____^ D200
-647 |   
+647 |
 648 |   class StatementOnSameLineAsDocstring:
     |
     = help: Reformat to one line

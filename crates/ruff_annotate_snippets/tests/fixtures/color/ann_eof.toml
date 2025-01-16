@@ -1,0 +1,15 @@
+[message]
+level = "Error"
+title = "expected `.`, `=`"
+
+[[message.snippets]]
+source = "asdf"
+line_start = 1
+origin = "Cargo.toml"
+[[message.snippets.annotations]]
+label = ""
+level = "Error"
+range = [4, 4]
+
+[renderer]
+color = true

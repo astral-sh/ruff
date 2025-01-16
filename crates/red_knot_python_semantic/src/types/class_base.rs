@@ -105,7 +105,9 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Optional
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
-                | KnownInstanceType::TypeOf => None,
+                | KnownInstanceType::TypeOf
+                | KnownInstanceType::AlwaysTruthy
+                | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
                 KnownInstanceType::Any => Some(Self::any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO

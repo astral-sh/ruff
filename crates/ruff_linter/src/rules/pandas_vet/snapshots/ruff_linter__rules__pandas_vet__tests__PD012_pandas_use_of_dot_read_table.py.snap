@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
-snapshot_kind: text
 ---
 pandas_use_of_dot_read_table.py:4:6: PD012 Use `.read_csv` instead of `.read_table` to read CSV files
   |
@@ -36,6 +35,6 @@ pandas_use_of_dot_read_table.py:8:6: PD012 Use `.read_csv` instead of `.read_tab
  7 | df = pd.read_table(filename, sep=",")
  8 | df = pd.read_table(filename, sep=",", header=0)
    |      ^^^^^^^^^^^^^ PD012
- 9 | 
+ 9 |
 10 | # Non-errors.
    |

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_print/mod.rs
-snapshot_kind: text
 ---
 T201.py:4:1: T201 [*] `print` found
   |
 2 | import tempfile
-3 | 
+3 |
 4 | print("Hello, world!")  # T201
   | ^^^^^ T201
 5 | print("Hello, world!", file=None)  # T201
@@ -66,7 +65,7 @@ T201.py:7:1: T201 [*] `print` found
 6 | print("Hello, world!", file=sys.stdout)  # T201
 7 | print("Hello, world!", file=sys.stderr)  # T201
   | ^^^^^ T201
-8 | 
+8 |
 9 | with tempfile.NamedTemporaryFile() as fp:
   |
   = help: Remove `print`

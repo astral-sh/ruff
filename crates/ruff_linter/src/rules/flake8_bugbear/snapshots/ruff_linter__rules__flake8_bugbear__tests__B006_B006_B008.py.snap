@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B006_B008.py:63:25: B006 [*] Do not use mutable data structures for argument defaults
    |
@@ -62,7 +61,7 @@ B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument def
    |
 77 |   def multiline_arg_wrong(value={
    |  _______________________________^
-78 | | 
+78 | |
 79 | | }):
    | |_^ B006
 80 |       ...
@@ -84,7 +83,7 @@ B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument def
 B006_B008.py:82:36: B006 Do not use mutable data structures for argument defaults
    |
 80 |     ...
-81 | 
+81 |
 82 | def single_line_func_wrong(value = {}): ...
    |                                    ^^ B006
    |

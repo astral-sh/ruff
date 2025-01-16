@@ -169,6 +169,15 @@ def f(*args: int) -> int:
 reveal_type(f(1, 2, 3))  # revealed: int
 ```
 
+### Multiple keyword arguments map to keyword variadic parameter
+
+```py
+def f(**kwargs: int) -> int:
+    return 1
+
+reveal_type(f(foo=1, bar=2))  # revealed: int
+```
+
 ## Missing arguments
 
 ### No defaults or variadic

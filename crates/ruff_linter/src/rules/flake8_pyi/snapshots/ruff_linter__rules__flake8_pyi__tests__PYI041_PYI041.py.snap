@@ -193,8 +193,7 @@ PYI041.py:67:9: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 65 |   def f10(
 66 |       arg: (
-67 |           int | # comment
-   |  _________^
+67 | /         int | # comment
 68 | |         float |  # another
 69 | |         complex
    | |_______________^ PYI041
@@ -216,7 +215,7 @@ PYI041.py:67:9: PYI041 [*] Use `complex` instead of `int | float | complex`
 PYI041.py:79:24: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 77 |         ...
-78 | 
+78 |
 79 |     def bad(self, arg: int | float | complex) -> None:
    |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
 80 |         ...
@@ -236,7 +235,7 @@ PYI041.py:79:24: PYI041 [*] Use `complex` instead of `int | float | complex`
 PYI041.py:82:25: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 80 |         ...
-81 | 
+81 |
 82 |     def bad2(self, arg: int | Union[float, complex]) -> None: 
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 83 |         ...
@@ -256,7 +255,7 @@ PYI041.py:82:25: PYI041 [*] Use `complex` instead of `int | float | complex`
 PYI041.py:85:25: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 83 |         ...
-84 | 
+84 |
 85 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: 
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 86 |         ...
@@ -276,7 +275,7 @@ PYI041.py:85:25: PYI041 [*] Use `complex` instead of `int | float | complex`
 PYI041.py:88:25: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 86 |         ...
-87 | 
+87 |
 88 |     def bad4(self, arg: Union[float | complex, int]) -> None: 
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 89 |         ...
@@ -296,7 +295,7 @@ PYI041.py:88:25: PYI041 [*] Use `complex` instead of `int | float | complex`
 PYI041.py:91:25: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 89 |         ...
-90 | 
+90 |
 91 |     def bad5(self, arg: int | (float | complex)) -> None: 
    |                         ^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 92 |         ...

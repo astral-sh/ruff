@@ -1294,7 +1294,7 @@ mod tests {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::PY38,
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
@@ -1800,7 +1800,7 @@ not_a_directory
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {

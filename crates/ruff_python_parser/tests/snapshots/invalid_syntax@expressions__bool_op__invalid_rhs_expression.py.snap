@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/invalid_rhs_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -108,14 +107,14 @@ Module(
   |
 1 | x and lambda y: y
   |       ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
-2 | 
+2 |
 3 | x or yield y
   |
 
 
   |
 1 | x and lambda y: y
-2 | 
+2 |
 3 | x or yield y
   |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
   |

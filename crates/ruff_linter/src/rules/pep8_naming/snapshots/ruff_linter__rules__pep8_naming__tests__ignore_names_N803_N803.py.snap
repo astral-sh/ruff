@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N803.py:4:16: N803 Argument name `stillBad` should be lowercase
   |
 2 |     return _, a, badAllowed
-3 | 
+3 |
 4 | def func(_, a, stillBad):
   |                ^^^^^^^^ N803
 5 |     return _, a, stillBad
@@ -14,7 +13,7 @@ N803.py:4:16: N803 Argument name `stillBad` should be lowercase
 N803.py:11:28: N803 Argument name `stillBad` should be lowercase
    |
  9 |         return _, a, badAllowed
-10 | 
+10 |
 11 |     def method(self, _, a, stillBad):
    |                            ^^^^^^^^ N803
 12 |         return _, a, stillBad

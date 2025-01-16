@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
    |
@@ -196,7 +195,7 @@ PT006.py:74:39: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
    |
 74 | parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
    |                                       ^^^^^^^^^^^^^^^^^ PT006
-75 | 
+75 |
 76 | @parametrize
    |
    = help: Use a `list` for the first argument
@@ -291,8 +290,7 @@ PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
     |
 101 |   # Unsafe fix
 102 |   @pytest.mark.parametrize(
-103 |       (
-    |  _____^
+103 | /     (
 104 | |         # comment
 105 | |         "param",
 106 | |     ),

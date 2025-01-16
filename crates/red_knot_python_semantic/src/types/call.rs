@@ -51,7 +51,7 @@ pub(super) enum CallOutcome<'db> {
 }
 
 impl<'db> CallOutcome<'db> {
-    /// Create a new `CallOutcome::Callable` with given return type.
+    /// Create a new `CallOutcome::Callable` with given binding.
     pub(super) fn callable(binding: CallBinding<'db>) -> CallOutcome<'db> {
         CallOutcome::Callable { binding }
     }
@@ -80,7 +80,7 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
-    /// Create a new `CallOutcome::AssertType` with given revealed and return types.
+    /// Create a new `CallOutcome::AssertType` with given asserted and return types.
     pub(super) fn asserted(binding: CallBinding<'db>, asserted_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::AssertType {
             binding,
@@ -280,7 +280,7 @@ impl<'db> CallOutcome<'db> {
                     }),
                 }
             }
-            CallOutcome::StaticAssertionError {
+            Self::StaticAssertionError {
                 binding,
                 error_kind,
             } => {
@@ -325,7 +325,7 @@ impl<'db> CallOutcome<'db> {
 
                 Ok(Type::unknown())
             }
-            CallOutcome::AssertType {
+            Self::AssertType {
                 binding,
                 asserted_ty,
             } => {

@@ -497,12 +497,7 @@ impl<'a> Printer<'a> {
             dest: self.state.buffer.text_len(),
         };
 
-        if self
-            .state
-            .source_markers
-            .last()
-            .map_or(true, |last| last != &marker)
-        {
+        if self.state.source_markers.last() != Some(&marker) {
             self.state.source_markers.push(marker);
         }
     }

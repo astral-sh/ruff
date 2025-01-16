@@ -66,10 +66,10 @@ PYI053.pyi:25:16: PYI053 [*] String and bytes literals longer than 50 characters
 PYI053.pyi:30:12: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
 28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
-29 | 
+29 |
 30 | bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-31 | 
+31 |
 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
    |
    = help: Replace with `...`
@@ -87,10 +87,10 @@ PYI053.pyi:30:12: PYI053 [*] String and bytes literals longer than 50 characters
 PYI053.pyi:34:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
-33 | 
+33 |
 34 | qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-35 | 
+35 |
 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
    |
    = help: Replace with `...`
@@ -108,10 +108,10 @@ PYI053.pyi:34:14: PYI053 [*] String and bytes literals longer than 50 characters
 PYI053.pyi:38:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
-37 | 
+37 |
 38 | fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-39 | 
+39 |
 40 | class Demo:
    |
    = help: Replace with `...`
@@ -149,10 +149,10 @@ PYI053.pyi:64:5: PYI053 [*] String and bytes literals longer than 50 characters 
 PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
 66 | def not_a_deprecated_function() -> None: ...
-67 | 
+67 |
 68 | fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-69 | 
+69 |
 70 | from typing import TypeAlias, Literal, Annotated
    |
    = help: Replace with `...`

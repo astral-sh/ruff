@@ -1,9 +1,7 @@
-use std::cmp::Ordering;
-
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters,
+    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset, BackwardsTokenizer,
@@ -11,9 +9,11 @@ use ruff_python_trivia::{
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
+use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
+use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
@@ -355,6 +355,41 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprGenerator(generator) if generator.parenthesized => {
             handle_bracketed_end_of_line_comment(comment, source)
         }
+        AnyNodeRef::StmtReturn(_) => {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtAssign(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtAnnAssign(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                assignment
+                    .value
+                    .as_deref()
+                    .is_some_and(|value| preceding.ptr_eq(value.into()))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtAugAssign(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+        AnyNodeRef::StmtTypeAlias(assignment)
+            if comment.preceding_node().is_some_and(|preceding| {
+                preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
+            }) =>
+        {
+            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+        }
+
         _ => CommentPlacement::Default(comment),
     }
 }
@@ -2081,6 +2116,75 @@ fn handle_comprehension_comment<'a>(
             return CommentPlacement::dangling(comprehension, comment);
         }
         last_end = if_node.end();
+    }
+
+    CommentPlacement::Default(comment)
+}
+
+/// Handle end-of-line comments for parenthesized implicitly concatenated strings when used in
+/// a `FormatStatementLastExpression` context:
+///
+/// ```python
+/// a = (
+///     "a"
+///     "b"
+///     "c"  # comment
+/// )
+/// ```
+///
+/// `# comment` is a trailing comment of the last part and not a trailing comment of the entire f-string.
+/// Associating the comment with the last part is important or the assignment formatting might move
+/// the comment at the end of the assignment, making it impossible to suppress an error for the last part.
+///
+/// On the other hand, `# comment` is a trailing end-of-line f-string comment for:
+///
+/// ```python
+/// a = (
+///     "a" "b" "c"  # comment
+/// )
+///
+/// a = (
+///     "a"
+///     "b"
+///     "c"
+/// )  # comment
+/// ```
+///
+/// Associating the comment with the f-string is desired in those cases because it allows
+/// joining the string literals into a single string literal if it fits on the line.
+fn handle_trailing_implicit_concatenated_string_comment<'a>(
+    comment: DecoratedComment<'a>,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> CommentPlacement<'a> {
+    if !comment.line_position().is_end_of_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let Some(string_like) = comment
+        .preceding_node()
+        .and_then(|preceding| StringLike::try_from(preceding).ok())
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let mut parts = string_like.parts();
+
+    let (Some(last), Some(second_last)) = (parts.next_back(), parts.next_back()) else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if source.contains_line_break(TextRange::new(second_last.end(), last.start()))
+        && is_expression_parenthesized(string_like.as_expression_ref(), comment_ranges, source)
+    {
+        let range = TextRange::new(last.end(), comment.start());
+
+        if !SimpleTokenizer::new(source, range)
+            .skip_trivia()
+            .any(|token| token.kind() == SimpleTokenKind::RParen)
+        {
+            return CommentPlacement::trailing(AnyNodeRef::from(last), comment);
+        }
     }
 
     CommentPlacement::Default(comment)

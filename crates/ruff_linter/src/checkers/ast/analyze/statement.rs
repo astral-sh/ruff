@@ -373,6 +373,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::PostInitDefault) {
                 ruff::rules::post_init_default(checker, function_def);
             }
+            if checker.enabled(Rule::PytestParameterWithDefaultArgument) {
+                flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
@@ -1295,6 +1298,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PytestRaisesWithMultipleStatements) {
                 flake8_pytest_style::rules::complex_raises(checker, stmt, items, body);
+            }
+            if checker.enabled(Rule::PytestWarnsWithMultipleStatements) {
+                flake8_pytest_style::rules::complex_warns(checker, stmt, items, body);
             }
             if checker.enabled(Rule::MultipleWithStatements) {
                 flake8_simplify::rules::multiple_with_statements(

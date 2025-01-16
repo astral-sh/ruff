@@ -84,7 +84,7 @@ pub(crate) fn bind_call<'db>(
             }
         }
         if let Some(existing) = parameter_tys[index].replace(*argument_ty) {
-            if parameter.is_variadic() {
+            if parameter.is_variadic() || parameter.is_keyword_variadic() {
                 let union = UnionType::from_elements(db, [existing, *argument_ty]);
                 parameter_tys[index].replace(union);
             } else {

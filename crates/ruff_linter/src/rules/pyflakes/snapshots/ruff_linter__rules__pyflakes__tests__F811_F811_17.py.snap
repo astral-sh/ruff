@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F811_17.py:6:12: F811 [*] Redefinition of unused `fu` from line 2
   |
 5 | def bar():
 6 |     import fu
   |            ^^ F811
-7 | 
+7 |
 8 |     def baz():
   |
   = help: Remove definition: `fu`

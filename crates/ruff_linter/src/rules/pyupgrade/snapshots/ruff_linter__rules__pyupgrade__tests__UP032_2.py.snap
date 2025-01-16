@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP032_2.py:2:1: UP032 [*] Use f-string instead of `format` call
   |
@@ -45,7 +44,7 @@ UP032_2.py:4:1: UP032 [*] Use f-string instead of `format` call
 3 | "{0.real}".format(1)
 4 | "{a.real}".format(a=1)
   | ^^^^^^^^^^^^^^^^^^^^^^ UP032
-5 | 
+5 |
 6 | "{.real}".format(1.0)
   |
   = help: Convert to f-string
@@ -63,7 +62,7 @@ UP032_2.py:4:1: UP032 [*] Use f-string instead of `format` call
 UP032_2.py:6:1: UP032 [*] Use f-string instead of `format` call
   |
 4 | "{a.real}".format(a=1)
-5 | 
+5 |
 6 | "{.real}".format(1.0)
   | ^^^^^^^^^^^^^^^^^^^^^ UP032
 7 | "{0.real}".format(1.0)
@@ -106,7 +105,7 @@ UP032_2.py:8:1: UP032 [*] Use f-string instead of `format` call
  7 | "{0.real}".format(1.0)
  8 | "{a.real}".format(a=1.0)
    | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
- 9 | 
+ 9 |
 10 | "{.real}".format(1j)
    |
    = help: Convert to f-string
@@ -124,7 +123,7 @@ UP032_2.py:8:1: UP032 [*] Use f-string instead of `format` call
 UP032_2.py:10:1: UP032 [*] Use f-string instead of `format` call
    |
  8 | "{a.real}".format(a=1.0)
- 9 | 
+ 9 |
 10 | "{.real}".format(1j)
    | ^^^^^^^^^^^^^^^^^^^^ UP032
 11 | "{0.real}".format(1j)
@@ -167,7 +166,7 @@ UP032_2.py:12:1: UP032 [*] Use f-string instead of `format` call
 11 | "{0.real}".format(1j)
 12 | "{a.real}".format(a=1j)
    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
-13 | 
+13 |
 14 | "{.real}".format(0b01)
    |
    = help: Convert to f-string
@@ -185,7 +184,7 @@ UP032_2.py:12:1: UP032 [*] Use f-string instead of `format` call
 UP032_2.py:14:1: UP032 [*] Use f-string instead of `format` call
    |
 12 | "{a.real}".format(a=1j)
-13 | 
+13 |
 14 | "{.real}".format(0b01)
    | ^^^^^^^^^^^^^^^^^^^^^^ UP032
 15 | "{0.real}".format(0b01)
@@ -228,7 +227,7 @@ UP032_2.py:16:1: UP032 [*] Use f-string instead of `format` call
 15 | "{0.real}".format(0b01)
 16 | "{a.real}".format(a=0b01)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
-17 | 
+17 |
 18 | "{}".format(1 + 2)
    |
    = help: Convert to f-string
@@ -246,7 +245,7 @@ UP032_2.py:16:1: UP032 [*] Use f-string instead of `format` call
 UP032_2.py:18:1: UP032 [*] Use f-string instead of `format` call
    |
 16 | "{a.real}".format(a=0b01)
-17 | 
+17 |
 18 | "{}".format(1 + 2)
    | ^^^^^^^^^^^^^^^^^^ UP032
 19 | "{}".format([1, 2])
@@ -331,7 +330,7 @@ UP032_2.py:22:1: UP032 [*] Use f-string instead of `format` call
 21 | "{}".format({1: 2, 3: 4})
 22 | "{}".format((i for i in range(2)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
-23 | 
+23 |
 24 | "{.real}".format(1 + 2)
    |
    = help: Convert to f-string
@@ -349,7 +348,7 @@ UP032_2.py:22:1: UP032 [*] Use f-string instead of `format` call
 UP032_2.py:24:1: UP032 [*] Use f-string instead of `format` call
    |
 22 | "{}".format((i for i in range(2)))
-23 | 
+23 |
 24 | "{.real}".format(1 + 2)
    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
 25 | "{.real}".format([1, 2])

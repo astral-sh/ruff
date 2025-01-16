@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D200.py:2:5: D200 One-line docstring should fit on one line
   |
 1 |   def func():
-2 |       """\
-  |  _____^
+2 | /     """\
 3 | |     """
   | |_______^ D200
   |
@@ -15,8 +13,7 @@ D200.py:2:5: D200 One-line docstring should fit on one line
 D200.py:7:5: D200 [*] One-line docstring should fit on one line
   |
 6 |   def func():
-7 |       """\\
-  |  _____^
+7 | /     """\\
 8 | |     """
   | |_______^ D200
   |
@@ -36,8 +33,7 @@ D200.py:7:5: D200 [*] One-line docstring should fit on one line
 D200.py:12:5: D200 One-line docstring should fit on one line
    |
 11 |   def func():
-12 |       """\ \
-   |  _____^
+12 | /     """\ \
 13 | |     """
    | |_______^ D200
    |

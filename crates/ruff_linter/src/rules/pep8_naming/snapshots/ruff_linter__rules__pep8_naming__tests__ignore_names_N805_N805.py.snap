@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N805.py:7:20: N805 [*] First argument of a method should be named `self`
   |
@@ -24,7 +23,7 @@ N805.py:7:20: N805 [*] First argument of a method should be named `self`
 N805.py:10:18: N805 [*] First argument of a method should be named `self`
    |
  8 |         pass
- 9 | 
+ 9 |
 10 |     def stillBad(this):
    |                  ^^^^ N805
 11 |         pass
@@ -44,7 +43,7 @@ N805.py:10:18: N805 [*] First argument of a method should be named `self`
 N805.py:15:24: N805 [*] First argument of a method should be named `self`
    |
 13 |     if False:
-14 | 
+14 |
 15 |         def badAllowed(this):
    |                        ^^^^ N805
 16 |             pass
@@ -64,7 +63,7 @@ N805.py:15:24: N805 [*] First argument of a method should be named `self`
 N805.py:18:22: N805 [*] First argument of a method should be named `self`
    |
 16 |             pass
-17 | 
+17 |
 18 |         def stillBad(this):
    |                      ^^^^ N805
 19 |             pass
@@ -169,7 +168,7 @@ N805.py:55:20: N805 First argument of a method should be named `self`
 N805.py:58:18: N805 First argument of a method should be named `self`
    |
 56 |         pass
-57 | 
+57 |
 58 |     def stillBad(this, blah, /, self, something: str):
    |                  ^^^^ N805
 59 |         pass

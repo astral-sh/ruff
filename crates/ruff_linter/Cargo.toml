@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.9.0"
+version = "0.9.1"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_index = { workspace = true }
@@ -30,7 +31,6 @@ ruff_source_file = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
 
 aho-corasick = { workspace = true }
-annotate-snippets = { workspace = true, features = ["color"] }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 chrono = { workspace = true }

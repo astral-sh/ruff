@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 5 | if TYPE_CHECKING:
 6 |     from foo import Foo  # TC004
   |                     ^^^ TC004
-7 | 
+7 |
 8 | a: TypeAlias = Foo | None  # OK
   |
   = help: Move out of type-checking block

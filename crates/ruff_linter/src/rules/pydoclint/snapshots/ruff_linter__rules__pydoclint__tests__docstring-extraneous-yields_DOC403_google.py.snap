@@ -1,18 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
 DOC403_google.py:14:5: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
    |
 12 |   # DOC403
 13 |   def foo(num: int) -> str:
-14 |       """
-   |  _____^
+14 | /     """
 15 | |     Do something
-16 | | 
+16 | |
 17 | |     Args:
 18 | |         num (int): A number
-19 | | 
+19 | |
 20 | |     Yields:
 21 | |         str: A string
 22 | |     """
@@ -25,13 +23,12 @@ DOC403_google.py:30:9: DOC403 Docstring has a "Yields" section but the function 
    |
 28 |       # DOC403
 29 |       def foo(self) -> str:
-30 |           """
-   |  _________^
+30 | /         """
 31 | |         Do something
-32 | | 
+32 | |
 33 | |         Args:
 34 | |             num (int): A number
-35 | | 
+35 | |
 36 | |         Yields:
 37 | |             str: A string
 38 | |         """

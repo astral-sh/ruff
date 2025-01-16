@@ -1,0 +1,62 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT030.py:11:23: PT030 `pytest.warns(EncodingWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+10 | def test_ok_different_error_from_config():
+11 |     with pytest.warns(EncodingWarning):
+   |                       ^^^^^^^^^^^^^^^ PT030
+12 |         pass
+   |
+
+PT030.py:16:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+15 | def test_error_no_argument_given():
+16 |     with pytest.warns(UserWarning):
+   |                       ^^^^^^^^^^^ PT030
+17 |         pass
+   |
+
+PT030.py:19:40: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+17 |         pass
+18 |
+19 |     with pytest.warns(expected_warning=UserWarning):
+   |                                        ^^^^^^^^^^^ PT030
+20 |         pass
+   |
+
+PT030.py:22:23: PT030 `pytest.warns(foo.FooWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+20 |         pass
+21 |
+22 |     with pytest.warns(FooWarning):
+   |                       ^^^^^^^^^^ PT030
+23 |         pass
+   |
+
+PT030.py:27:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+26 | def test_error_match_is_empty():
+27 |     with pytest.warns(UserWarning, match=None):
+   |                       ^^^^^^^^^^^ PT030
+28 |         pass
+   |
+
+PT030.py:30:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+28 |         pass
+29 |
+30 |     with pytest.warns(UserWarning, match=""):
+   |                       ^^^^^^^^^^^ PT030
+31 |         pass
+   |
+
+PT030.py:33:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+   |
+31 |         pass
+32 |
+33 |     with pytest.warns(UserWarning, match=f""):
+   |                       ^^^^^^^^^^^ PT030
+34 |         pass
+   |

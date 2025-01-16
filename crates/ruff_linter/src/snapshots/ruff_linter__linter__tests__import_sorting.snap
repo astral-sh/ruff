@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/linter.rs
-snapshot_kind: text
 ---
 isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / from pathlib import Path
 2 | | import random
 3 | | import math
-4 | | from typing import Any
-  | |_^ I001
+  | |____________^ I001
+4 |   from typing import Any
 5 |   import collections
 6 |   # Newline should be added here
   |
@@ -28,8 +27,8 @@ isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / from typing import Any
 2 | | import collections
-3 | | # Newline should be added here
-  | |_^ I001
+  | |___________________^ I001
+3 |   # Newline should be added here
 4 |   def foo():
 5 |       pass
   |
@@ -52,9 +51,9 @@ isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / from pathlib import Path
 2 | | import sys
-3 | | 
-4 | | %matplotlib \
-  | |_^ I001
+3 | |
+  | |__^ I001
+4 |   %matplotlib \
 5 |       --inline
   |
   = help: Organize imports
@@ -73,9 +72,10 @@ isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
 isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
   |
 5 |       --inline
-6 |   
+6 |
 7 | / import math
 8 | | import abc
+  | |___________^ I001
   |
   = help: Organize imports
 

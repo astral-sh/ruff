@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 self_assigning_variable.py:6:1: PLW0127 Self-assignment of variable `foo`
   |
@@ -395,7 +394,7 @@ self_assigning_variable.py:28:2: PLW0127 Self-assignment of variable `foo`
 27 | (foo, bar) = (foo, bar) = baz
 28 | (foo, bar) = baz = (foo, bar) = 1
    |  ^^^ PLW0127
-29 | 
+29 |
 30 | # Non-errors.
    |
 
@@ -405,6 +404,6 @@ self_assigning_variable.py:28:7: PLW0127 Self-assignment of variable `bar`
 27 | (foo, bar) = (foo, bar) = baz
 28 | (foo, bar) = baz = (foo, bar) = 1
    |       ^^^ PLW0127
-29 | 
+29 |
 30 | # Non-errors.
    |

@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 /// The target platform to assume when resolving types.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(
@@ -16,4 +18,13 @@ pub enum PythonPlatform {
     /// some known platform identifiers.
     #[cfg_attr(feature = "serde", serde(untagged))]
     Identifier(String),
+}
+
+impl Display for PythonPlatform {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PythonPlatform::All => f.write_str("all"),
+            PythonPlatform::Identifier(name) => f.write_str(name),
+        }
+    }
 }

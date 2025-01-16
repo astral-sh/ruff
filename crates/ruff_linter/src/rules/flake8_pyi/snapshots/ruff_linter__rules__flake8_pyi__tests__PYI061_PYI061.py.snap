@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI061.py:4:25: PYI061 [*] `Literal[None]` can be replaced with `None`
   |
@@ -208,7 +207,7 @@ PYI061.py:53:15: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
    |               ^^^^ PYI061
-54 | 
+54 |
 55 | ###
    |
    = help: Replace with `Literal[...] | None`
@@ -269,7 +268,7 @@ PYI061.py:63:12: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |            ^^^^ PYI061
-64 | 
+64 |
 65 | # ... but if Y061 and Y062 both apply
    |
    = help: Replace with `Literal[...] | None`
@@ -290,7 +289,7 @@ PYI061.py:63:25: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |                         ^^^^ PYI061
-64 | 
+64 |
 65 | # ... but if Y061 and Y062 both apply
    |
    = help: Replace with `Literal[...] | None`
@@ -369,7 +368,7 @@ PYI061.py:74:18: PYI061 [*] `Literal[None]` can be replaced with `None`
 73 | y: None | Literal[None]
 74 | z: Union[Literal[None], None]
    |                  ^^^^ PYI061
-75 | 
+75 |
 76 | a: int | Literal[None] | None
    |
    = help: Replace with `None`
@@ -387,7 +386,7 @@ PYI061.py:74:18: PYI061 [*] `Literal[None]` can be replaced with `None`
 PYI061.py:76:18: PYI061 `Literal[None]` can be replaced with `None`
    |
 74 | z: Union[Literal[None], None]
-75 | 
+75 |
 76 | a: int | Literal[None] | None
    |                  ^^^^ PYI061
 77 | b: None | Literal[None] | None

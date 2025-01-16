@@ -115,6 +115,8 @@ impl RuffSettingsIndex {
         editor_settings: &ResolvedEditorSettings,
         is_default_workspace: bool,
     ) -> Self {
+        tracing::debug!("Indexing settings for workspace: {}", root.display());
+
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
@@ -186,10 +188,9 @@ impl RuffSettingsIndex {
         // means for different editors.
         if is_default_workspace {
             if has_error {
-                let root = root.display();
                 show_err_msg!(
-                    "Error while resolving settings from workspace {root}. \
-                    Please refer to the logs for more details.",
+                    "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
+                    root.display()
                 );
             }
 
@@ -300,9 +301,9 @@ impl RuffSettingsIndex {
         });
 
         if has_error.load(Ordering::Relaxed) {
-            let root = root.display();
             show_err_msg!(
-                "Error while resolving settings from workspace {root}. Please refer to the logs for more details.",
+                "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
+                root.display()
             );
         }
 
@@ -386,8 +387,12 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             );
             match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                Err(err) => {
-                    tracing::error!("Unable to find editor-specified configuration file: {err}");
+                err => {
+                    tracing::error!(
+                        "{:?}",
+                        err.context("Unable to load editor-specified configuration file")
+                            .unwrap_err()
+                    );
                     editor_configuration
                 }
             }

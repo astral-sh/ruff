@@ -5,6 +5,8 @@ def static_assert(condition: object, msg: LiteralString | None = None) -> None: 
 
 # Types
 Unknown = object()
+AlwaysTruthy = object()
+AlwaysFalsy = object()
 
 # Special forms
 Not: _SpecialForm

@@ -152,7 +152,7 @@ FURB157.py:12:17: FURB157 [*] Verbose expression in `Decimal` constructor
 11 | Decimal(float("nan"))
 12 | decimal.Decimal("0")
    |                 ^^^ FURB157
-13 | 
+13 |
 14 | # OK
    |
    = help: Replace with `0`
@@ -192,7 +192,7 @@ FURB157.py:24:9: FURB157 [*] Verbose expression in `Decimal` constructor
 23 | Decimal("1_000")
 24 | Decimal("__1____000") 
    |         ^^^^^^^^^^^^ FURB157
-25 | 
+25 |
 26 | # Ok
    |
    = help: Replace with `1000`

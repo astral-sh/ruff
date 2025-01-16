@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
@@ -14,7 +13,7 @@ SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
 11 | | else:
 12 | |     return 42
    | |_____________^ SIM116
-13 |   
+13 |
 14 |   # SIM116
    |
 
@@ -30,7 +29,7 @@ SIM116.py:15:1: SIM116 Use a dictionary instead of consecutive `if` statements
 21 | | else:
 22 | |     return (10, 11, 12)
    | |_______________________^ SIM116
-23 |   
+23 |
 24 |   # SIM116
    |
 
@@ -44,7 +43,7 @@ SIM116.py:25:1: SIM116 Use a dictionary instead of consecutive `if` statements
 29 | | elif a == 3:
 30 | |     return (7, 8, 9)
    | |____________________^ SIM116
-31 |   
+31 |
 32 |   # SIM116
    |
 
@@ -60,7 +59,7 @@ SIM116.py:33:1: SIM116 Use a dictionary instead of consecutive `if` statements
 39 | | else:
 40 | |     return (10, 11, 12)
    | |_______________________^ SIM116
-41 |   
+41 |
 42 |   # SIM116
    |
 
@@ -74,7 +73,7 @@ SIM116.py:43:1: SIM116 Use a dictionary instead of consecutive `if` statements
 47 | | elif a == b"three":
 48 | |     return 3
    | |____________^ SIM116
-49 |   
+49 |
 50 |   # SIM116
    |
 
@@ -90,7 +89,7 @@ SIM116.py:51:1: SIM116 Use a dictionary instead of consecutive `if` statements
 57 | | else:
 58 | |     return (10, 11, 12)
    | |_______________________^ SIM116
-59 |   
+59 |
 60 |   # OK
    |
 
@@ -106,6 +105,6 @@ SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
 85 | | elif func_name == "move":
 86 | |     return "MV"
    | |_______________^ SIM116
-87 |   
+87 |
 88 |   # OK
    |

@@ -1,23 +1,22 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 lines_after_imports.pyi:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
  1 | / from __future__ import annotations
- 2 | | 
+ 2 | |
  3 | | from typing import Any
- 4 | | 
+ 4 | |
  5 | | from requests import Session
- 6 | | 
+ 6 | |
  7 | | from my_first_party import my_first_party_object
- 8 | | 
+ 8 | |
  9 | | from . import my_local_folder_object
-10 | | 
-11 | | 
-12 | | 
-13 | | class Thing(object):
-   | |_^ I001
+10 | |
+11 | |
+12 | |
+   | |__^ I001
+13 |   class Thing(object):
 14 |     name: str
 15 |     def __init__(self, name: str):
    |

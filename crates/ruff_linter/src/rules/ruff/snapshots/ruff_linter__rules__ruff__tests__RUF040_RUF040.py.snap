@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF040.py:3:21: RUF040 Non-string literal used as assert message
   |
@@ -8,6 +7,6 @@ RUF040.py:3:21: RUF040 Non-string literal used as assert message
 2 | fruits.filter(lambda fruit: fruit.startwith("p"))
 3 | assert len(fruits), 2
   |                     ^ RUF040
-4 | 
+4 |
 5 | assert True, "always true"
   |

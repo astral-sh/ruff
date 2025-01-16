@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI063.py:6:9: PYI063 Use PEP 570 syntax for positional-only parameters
   |
 4 | from typing import Self
-5 | 
+5 |
 6 | def bad(__x: int) -> None: ...  # PYI063
   |         ^^^ PYI063
 7 | def also_bad(__x: int, __y: str) -> None: ...  # PYI063
@@ -27,7 +27,7 @@ PYI063.py:8:15: PYI063 Use PEP 570 syntax for positional-only parameters
  7 | def also_bad(__x: int, __y: str) -> None: ...  # PYI063
  8 | def still_bad(__x_: int) -> None: ...  # PYI063
    |               ^^^^ PYI063
- 9 | 
+ 9 |
 10 | def no_args() -> None: ...
    |
    = help: Add `/` to function signature
@@ -82,7 +82,7 @@ PYI063.py:30:23: PYI063 Use PEP 570 syntax for positional-only parameters
 29 |     @classmethod
 30 |     def not_good(cls, __foo: int) -> None: ...  # PYI063
    |                       ^^^^^ PYI063
-31 | 
+31 |
 32 |     # The first non-self argument isn't positional-only, so logically the second can't be either:
    |
    = help: Add `/` to function signature
@@ -93,7 +93,7 @@ PYI063.py:52:23: PYI063 Use PEP 570 syntax for positional-only parameters
 51 |     @classmethod
 52 |     def __new__(mcls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
    |                       ^^^^^^ PYI063
-53 | 
+53 |
 54 | class Metaclass2(type):
    |
    = help: Add `/` to function signature
@@ -104,7 +104,7 @@ PYI063.py:56:26: PYI063 Use PEP 570 syntax for positional-only parameters
 55 |     @classmethod
 56 |     def __new__(metacls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
    |                          ^^^^^^ PYI063
-57 | 
+57 |
 58 | class GoodMetaclass(type):
    |
    = help: Add `/` to function signature

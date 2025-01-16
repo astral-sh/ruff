@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -95,7 +94,7 @@ RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 32 |         pass
-33 | 
+33 |
 34 |     defaultdict(default_factory=foo)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
    |
@@ -132,7 +131,7 @@ RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 42 |     from collections import deque
-43 | 
+43 |
 44 |     defaultdict(default_factory=deque)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
    |
@@ -151,7 +150,7 @@ RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 50 |             pass
-51 | 
+51 |
 52 |     defaultdict(default_factory=MyCallable())  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
    |
@@ -224,8 +223,7 @@ RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 67 |   def func():
-68 |       defaultdict(
-   |  _____^
+68 | /     defaultdict(
 69 | |         member=1,
 70 | |         default_factory=tuple,
 71 | |     )  # RUF026
@@ -247,8 +245,7 @@ RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 74 |   def func():
-75 |       defaultdict(
-   |  _____^
+75 | /     defaultdict(
 76 | |         default_factory=tuple,
 77 | |         member=1,
 78 | |     )  # RUF026

@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/message/text.rs
 expression: content
-snapshot_kind: text
 ---
 syntax_errors.py:1:15: SyntaxError: Expected one or more symbol names after import
   |
 1 | from os import
   |               ^
-2 | 
+2 |
 3 | if call(foo
 4 |     def bar():
   |
@@ -15,7 +14,7 @@ syntax_errors.py:1:15: SyntaxError: Expected one or more symbol names after impo
 syntax_errors.py:3:12: SyntaxError: Expected ')', found newline
   |
 1 | from os import
-2 | 
+2 |
 3 | if call(foo
   |            ^
 4 |     def bar():
