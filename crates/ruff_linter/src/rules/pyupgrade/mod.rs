@@ -101,7 +101,7 @@ mod tests {
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
-    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040_0.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn non_pep695_type_alias_not_applied_py311() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pyupgrade/UP040.py"),
+            Path::new("pyupgrade/UP040_0.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py311,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP695TypeAlias)
