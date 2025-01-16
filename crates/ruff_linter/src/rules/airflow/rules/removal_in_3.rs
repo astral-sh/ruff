@@ -548,7 +548,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.utils.dates
-        ["airflow", "utils", "dates", "date_range"] => Replacement::Name("airflow.timetables."),
+        ["airflow", "utils", "dates", "date_range"] => Replacement::None,
         ["airflow", "utils", "dates", "days_ago"] => {
             Replacement::Name("pendulum.today('UTC').add(days=-N, ...)")
         }
