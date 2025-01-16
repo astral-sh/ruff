@@ -100,8 +100,8 @@ def _(flag: bool):
     foo_3: LiteralString = "foo" * 1_000_000_000
     bar_3: str = foo_2  # fine
 
-    def _(baz_1: str):
-        qux_1: LiteralString = baz_1  # error: [invalid-assignment]
+    baz_1: str = repr(object())
+    qux_1: LiteralString = baz_1  # error: [invalid-assignment]
 
     baz_2: LiteralString = "baz" * 1_000_000_000
     qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]

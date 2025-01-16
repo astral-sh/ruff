@@ -20,12 +20,14 @@ def _(
     a: tuple[()],
     b: Literal[0],
     c: Literal[""],
-    d: Literal[0, 0]
+    d: Literal[b""],
+    e: Literal[0, 0]
 ):
     reveal_type(bool(a))  # revealed: Literal[False]
     reveal_type(bool(b))  # revealed: Literal[False]
     reveal_type(bool(c))  # revealed: Literal[False]
     reveal_type(bool(d))  # revealed: Literal[False]
+    reveal_type(bool(e))  # revealed: Literal[False]
 
 def _(
     a: str,

@@ -3403,7 +3403,7 @@ pub enum KnownFunction {
     RevealType,
     /// `builtins.len`
     Len,
-    /// `buitlins.repr`
+    /// `builtins.repr`
     Repr,
     /// `typing(_extensions).final`
     Final,
