@@ -282,6 +282,59 @@ for group in groups:
 # AstNode
 
 for group in groups:
+    if group.name != "ungrouped":
+        out.append(f"""
+        impl crate::AstNode for {group.owned_enum_ty} {{
+            type Ref<'a> = {group.ref_enum_ty}<'a>;
+
+            fn cast(node: AnyNode) -> Option<Self>
+            where
+                Self: Sized,
+            {{
+                match node {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"""AnyNode::{node.name}(node) => Some({group.owned_enum_ty}::{node.variant}(node)),"""
+            )
+        out.append("""
+                    _ => None,
+                }
+            }
+
+            fn cast_ref(node: AnyNodeRef) -> Option<Self::Ref<'_>> {
+                match node {
+        """)
+        for node in group.nodes:
+            out.append(
+                f"""AnyNodeRef::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"""
+            )
+        out.append("""
+                    _ => None,
+                }
+            }
+
+            fn can_cast(kind: crate::NodeKind) -> bool {
+                matches!(kind,
+        """)
+        for i, node in enumerate(group.nodes):
+            if i > 0:
+                out.append("|")
+            out.append(f"""crate::NodeKind::{node.name}""")
+        out.append("""
+                )
+            }
+
+            fn as_any_node_ref(&self) -> AnyNodeRef {
+                AnyNodeRef::from(self)
+            }
+
+            fn into_any_node(self) -> AnyNode {
+                AnyNode::from(self)
+            }
+        }
+        """)
+
     for node in group.nodes:
         out.append(f"""
         impl crate::AstNode for {node.ty} {{
