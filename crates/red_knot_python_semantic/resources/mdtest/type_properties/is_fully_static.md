@@ -38,8 +38,8 @@ static_assert(is_fully_static(type[object]))
 ## Non-fully-static
 
 ```py
-from typing_extensions import Literal, LiteralString
-from knot_extensions import Intersection, Not, TypeOf, is_fully_static, static_assert
+from typing_extensions import Any, Literal, LiteralString
+from knot_extensions import Intersection, Not, TypeOf, Unknown, is_fully_static, static_assert
 
 static_assert(not is_fully_static(Any))
 static_assert(not is_fully_static(Unknown))

@@ -3,7 +3,7 @@
 A type is single-valued iff it is not empty and all inhabitants of it compare equal.
 
 ```py
-from typing_extensions import Literal, LiteralString, Never
+from typing_extensions import Any, Literal, LiteralString, Never
 from knot_extensions import is_single_valued, static_assert
 
 static_assert(is_single_valued(None))
