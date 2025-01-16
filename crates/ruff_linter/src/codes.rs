@@ -1089,6 +1089,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
         (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
+        (Refurb, "122") => (RuleGroup::Preview, rules::refurb::rules::ForLoopWrites),
         (Refurb, "129") => (RuleGroup::Stable, rules::refurb::rules::ReadlinesInFor),
         (Refurb, "131") => (RuleGroup::Preview, rules::refurb::rules::DeleteFullSlice),
         (Refurb, "132") => (RuleGroup::Preview, rules::refurb::rules::CheckAndRemoveFromSet),
