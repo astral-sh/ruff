@@ -38,6 +38,10 @@ mod tests {
     )]
     #[test_case(
         Rule::StdlibModuleShadowing,
+        Path::new("A005/modules/package/collections.pyi")
+    )]
+    #[test_case(
+        Rule::StdlibModuleShadowing,
         Path::new("A005/modules/_abc/__init__.py")
     )]
     #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]

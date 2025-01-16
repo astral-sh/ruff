@@ -695,7 +695,7 @@ match newlines:
     case "case comment with newlines" if foo == 2:  # second
         pass
 
-    case "one", "newline" if (foo := 1):  # third
+    case "one", "newline" if foo := 1:  # third
         pass
 
     case "two newlines":
@@ -708,7 +708,9 @@ match newlines:
 
 
 match long_lines:
-    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+    case "this is a long line for if condition" if (
+        aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
+    ):  # comment
         pass
 
     case "this is a long line for if condition with parentheses" if (
@@ -719,7 +721,7 @@ match long_lines:
     case "named expressions aren't special" if foo := 1:
         pass
 
-    case "named expressions aren't that special" if (foo := 1):
+    case "named expressions aren't that special" if foo := 1:
         pass
 
     case "but with already broken long lines" if (
@@ -727,9 +729,9 @@ match long_lines:
     ):  # another comment
         pass
 
-    case {
-        "long_long_long_key": str(long_long_long_key)
-    } if value := "long long long long long long long long long long long value":
+    case {"long_long_long_key": str(long_long_long_key)} if (
+        value := "long long long long long long long long long long long value"
+    ):
         pass
 
 
@@ -824,7 +826,9 @@ match pattern_singleton:
         # trailing own 2
     ):
         pass
-    case True:  # trailing
+    case (
+        True  # trailing
+    ):
         pass
     case False:
         pass
@@ -875,7 +879,9 @@ match foo:
         1
     ):
         y = 1
-    case 1:  # comment
+    case (
+        1  # comment
+    ):
         y = 1
     case (
         1
@@ -1133,11 +1139,8 @@ match pattern_match_or:
         pass
 
     case (
-        (
-            a  # trailing
-        )
-        | (b)
-    ):
+        a  # trailing
+    ) | (b):
         pass
 
     case a | b | c:
@@ -1151,8 +1154,7 @@ match pattern_match_or:
         pass
 
     case (  # end of line
-        a
-        | b
+        a | b
         # own line
     ):
         pass
@@ -1283,99 +1285,4 @@ match guard_comments:
         # trailing own line comment
     ):
         pass
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -69,7 +69,7 @@
-     case "case comment with newlines" if foo == 2:  # second
-         pass
- 
--    case "one", "newline" if (foo := 1):  # third
-+    case "one", "newline" if foo := 1:  # third
-         pass
- 
-     case "two newlines":
-@@ -82,7 +82,9 @@
- 
- 
- match long_lines:
--    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
-+    case "this is a long line for if condition" if (
-+        aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
-+    ):  # comment
-         pass
- 
-     case "this is a long line for if condition with parentheses" if (
-@@ -93,7 +95,7 @@
-     case "named expressions aren't special" if foo := 1:
-         pass
- 
--    case "named expressions aren't that special" if (foo := 1):
-+    case "named expressions aren't that special" if foo := 1:
-         pass
- 
-     case "but with already broken long lines" if (
-@@ -101,9 +103,9 @@
-     ):  # another comment
-         pass
- 
--    case {
--        "long_long_long_key": str(long_long_long_key)
--    } if value := "long long long long long long long long long long long value":
-+    case {"long_long_long_key": str(long_long_long_key)} if (
-+        value := "long long long long long long long long long long long value"
-+    ):
-         pass
- 
- 
-@@ -198,7 +200,9 @@
-         # trailing own 2
-     ):
-         pass
--    case True:  # trailing
-+    case (
-+        True  # trailing
-+    ):
-         pass
-     case False:
-         pass
-@@ -249,7 +253,9 @@
-         1
-     ):
-         y = 1
--    case 1:  # comment
-+    case (
-+        1  # comment
-+    ):
-         y = 1
-     case (
-         1
-@@ -507,11 +513,8 @@
-         pass
- 
-     case (
--        (
--            a  # trailing
--        )
--        | (b)
--    ):
-+        a  # trailing
-+    ) | (b):
-         pass
- 
-     case a | b | c:
-@@ -525,8 +528,7 @@
-         pass
- 
-     case (  # end of line
--        a
--        | b
-+        a | b
-         # own line
-     ):
-         pass
 ```

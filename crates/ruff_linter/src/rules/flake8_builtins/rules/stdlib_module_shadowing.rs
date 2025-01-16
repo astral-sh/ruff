@@ -23,6 +23,24 @@ use crate::settings::types::PythonVersion;
 /// Standard-library modules can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-allowed-modules`] configuration option.
 ///
+/// This rule is not applied to stub files, as the name of a stub module is out
+/// of the control of the author of the stub file. Instead, a stub should aim to
+/// faithfully emulate the runtime module it is stubbing.
+///
+/// As of Python 3.13, errors from modules that use the same name as
+/// standard-library modules now display a custom message.
+///
+/// ## Example
+///
+/// ```console
+/// $ touch random.py
+/// $ python3 -c 'from random import choice'
+/// Traceback (most recent call last):
+///   File "<string>", line 1, in <module>
+///     from random import choice
+/// ImportError: cannot import name 'choice' from 'random' (consider renaming '/random.py' since it has the same name as the standard library module named 'random' and prevents importing that standard library module)
+/// ```
+///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
 #[derive(ViolationMetadata)]
@@ -45,7 +63,7 @@ pub(crate) fn stdlib_module_shadowing(
     allowed_modules: &[String],
     target_version: PythonVersion,
 ) -> Option<Diagnostic> {
-    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
+    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
     }
 

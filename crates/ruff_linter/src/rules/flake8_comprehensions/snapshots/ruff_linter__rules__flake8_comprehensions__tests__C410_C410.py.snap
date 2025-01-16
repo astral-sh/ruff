@@ -79,7 +79,7 @@ C410.py:7:1: C410 [*] Unnecessary list literal passed to `list()` (remove the ou
  8 | |     [1, 2]
  9 | | )
    | |_^ C410
-10 |   
+10 |
 11 |   list([  # comment
    |
    = help: Remove outer `list()` call
@@ -99,7 +99,7 @@ C410.py:7:1: C410 [*] Unnecessary list literal passed to `list()` (remove the ou
 C410.py:11:1: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
    |
  9 |   )
-10 |   
+10 |
 11 | / list([  # comment
 12 | |     1, 2
 13 | | ])

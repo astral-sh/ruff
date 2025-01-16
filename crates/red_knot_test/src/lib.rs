@@ -141,10 +141,23 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 Ok(type_diagnostics) => type_diagnostics,
                 Err(info) => {
                     let mut by_line = matcher::FailuresByLine::default();
-                    by_line.push(
-                        OneIndexed::from_zero_indexed(0),
-                        info.info.split('\n').map(String::from).collect(),
-                    );
+                    let mut messages = vec![];
+                    match info.location {
+                        Some(location) => messages.push(format!("panicked at {location}")),
+                        None => messages.push("panicked at unknown location".to_string()),
+                    };
+                    match info.payload {
+                        Some(payload) => messages.push(payload),
+                        // Mimic the default panic hook's rendering of the panic payload if it's
+                        // not a string.
+                        None => messages.push("Box<dyn Any>".to_string()),
+                    };
+                    if let Some(backtrace) = info.backtrace {
+                        if std::env::var("RUST_BACKTRACE").is_ok() {
+                            messages.extend(backtrace.to_string().split('\n').map(String::from));
+                        }
+                    }
+                    by_line.push(OneIndexed::from_zero_indexed(0), messages);
                     return Some(FileFailures {
                         backtick_offset: test_file.backtick_offset,
                         by_line,

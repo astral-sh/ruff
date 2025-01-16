@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
-snapshot_kind: text
 ---
 full_name.py:7:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
   |
 5 | q = "bar"
-6 | 
+6 |
 7 | a = os.path.abspath(p)
   |     ^^^^^^^^^^^^^^^ PTH100
 8 | aa = os.chmod(p)
@@ -296,7 +295,7 @@ full_name.py:37:1: PTH118 `os.sep.join()` should be replaced by `Path.joinpath()
 36 | os.path.join(p, *q)
 37 | os.sep.join(p, *q)
    | ^^^^^^^^^^^ PTH118
-38 | 
+38 |
 39 | # https://github.com/astral-sh/ruff/issues/7620
    |
 

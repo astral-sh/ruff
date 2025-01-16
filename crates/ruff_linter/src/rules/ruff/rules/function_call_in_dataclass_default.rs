@@ -81,10 +81,6 @@ pub(crate) fn function_call_in_dataclass_default(
         return;
     };
 
-    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
-        return;
-    }
-
     let attrs_auto_attribs = match dataclass_kind {
         DataclassKind::Stdlib => None,
 

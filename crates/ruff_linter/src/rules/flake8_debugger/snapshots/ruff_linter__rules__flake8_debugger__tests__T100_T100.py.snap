@@ -1,19 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_debugger/mod.rs
-snapshot_kind: text
 ---
 T100.py:1:1: T100 Trace found: `breakpoint` used
   |
 1 | breakpoint()
   | ^^^^^^^^^^^^ T100
-2 | 
+2 |
 3 | import pdb
   |
 
 T100.py:3:1: T100 Import for `pdb` found
   |
 1 | breakpoint()
-2 | 
+2 |
 3 | import pdb
   | ^^^^^^^^^^ T100
 4 | import builtins
@@ -105,14 +104,14 @@ T100.py:15:1: T100 Import for `ptvsd` found
 14 | from ptvsd import wait_for_attach
 15 | import ptvsd
    | ^^^^^^^^^^^^ T100
-16 | 
+16 |
 17 | breakpoint()
    |
 
 T100.py:17:1: T100 Trace found: `builtins.breakpoint` used
    |
 15 | import ptvsd
-16 | 
+16 |
 17 | breakpoint()
    | ^^^^^^^^^^^^ T100
 18 | st()

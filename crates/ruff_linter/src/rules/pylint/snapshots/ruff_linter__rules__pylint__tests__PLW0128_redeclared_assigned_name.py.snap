@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 redeclared_assigned_name.py:1:8: PLW0128 Redeclared variable `FIRST` in assignment
   |
@@ -43,7 +42,7 @@ redeclared_assigned_name.py:4:23: PLW0128 Redeclared variable `FIRST` in assignm
 3 | FIRST, (FIRST, SECOND, (THIRD, FIRST)) = (1, (1, 2))  # PLW0128
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |                       ^^^^^ PLW0128
-5 | 
+5 |
 6 | FIRST, SECOND, _, _, _ignored = (1, 2, 3, 4, 5)  # OK
   |
 
@@ -53,6 +52,6 @@ redeclared_assigned_name.py:4:30: PLW0128 Redeclared variable `SECOND` in assign
 3 | FIRST, (FIRST, SECOND, (THIRD, FIRST)) = (1, (1, 2))  # PLW0128
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |                              ^^^^^^ PLW0128
-5 | 
+5 |
 6 | FIRST, SECOND, _, _, _ignored = (1, 2, 3, 4, 5)  # OK
   |

@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 docstring_singles_mixed_quotes_module_singleline_var_1.py:1:1: Q002 Single quote docstring found but double quotes preferred
   |
 1 | ''"Start with empty string" ' and lint docstring safely'
   | ^^ Q002
-2 | 
+2 |
 3 | def foo():
   |
   = help: Replace single quotes docstring with double quotes
@@ -15,7 +14,7 @@ docstring_singles_mixed_quotes_module_singleline_var_1.py:1:29: Q002 [*] Single 
   |
 1 | ''"Start with empty string" ' and lint docstring safely'
   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
-2 | 
+2 |
 3 | def foo():
   |
   = help: Replace single quotes docstring with double quotes

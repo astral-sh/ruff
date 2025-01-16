@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
   |
@@ -64,7 +63,7 @@ F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
 20 |     foo = (1, 2)
 21 |     (a, b) = (1, 2)
    |      ^ F841
-22 | 
+22 |
 23 |     bar = (1, 2)
    |
    = help: Remove assignment to unused variable `a`
@@ -85,7 +84,7 @@ F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
 20 |     foo = (1, 2)
 21 |     (a, b) = (1, 2)
    |         ^ F841
-22 | 
+22 |
 23 |     bar = (1, 2)
    |
    = help: Remove assignment to unused variable `b`
@@ -103,7 +102,7 @@ F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
 F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
    |
 24 |     (c, d) = bar
-25 | 
+25 |
 26 |     (x, y) = baz = bar
    |              ^^^ F841
    |
@@ -125,7 +124,7 @@ F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
 50 |         # F841
 51 |         b = 1
    |         ^ F841
-52 | 
+52 |
 53 |     def d():
    |
    = help: Remove assignment to unused variable `b`
@@ -206,7 +205,7 @@ F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
 114 |     Bar = enum.Enum("Bar", "A B")
 115 |     Baz = enum.Enum("Baz", "A B")
     |     ^^^ F841
-116 | 
+116 |
 117 |     match x:
     |
     = help: Remove assignment to unused variable `Baz`

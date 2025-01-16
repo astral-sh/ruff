@@ -1,7 +1,7 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
+use crate::project::{check_file, Project, ProjectMetadata};
 use crate::DEFAULT_LINT_REGISTRY;
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
@@ -17,28 +17,28 @@ mod changes;
 
 #[salsa::db]
 pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
-    fn workspace(&self) -> Workspace;
+    fn project(&self) -> Project;
 }
 
 #[salsa::db]
 #[derive(Clone)]
-pub struct RootDatabase {
-    workspace: Option<Workspace>,
-    storage: salsa::Storage<RootDatabase>,
+pub struct ProjectDatabase {
+    project: Option<Project>,
+    storage: salsa::Storage<ProjectDatabase>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
     rule_selection: Arc<RuleSelection>,
 }
 
-impl RootDatabase {
-    pub fn new<S>(workspace: WorkspaceMetadata, system: S) -> anyhow::Result<Self>
+impl ProjectDatabase {
+    pub fn new<S>(project_metadata: ProjectMetadata, system: S) -> anyhow::Result<Self>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
         let rule_selection = RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY);
 
         let mut db = Self {
-            workspace: None,
+            project: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
             system: Arc::new(system),
@@ -46,16 +46,17 @@ impl RootDatabase {
         };
 
         // Initialize the `Program` singleton
-        Program::from_settings(&db, workspace.settings().program())?;
+        let program_settings = project_metadata.to_program_settings();
+        Program::from_settings(&db, program_settings)?;
 
-        db.workspace = Some(Workspace::from_metadata(&db, workspace));
+        db.project = Some(Project::from_metadata(&db, project_metadata));
 
         Ok(db)
     }
 
-    /// Checks all open files in the workspace and its dependencies.
+    /// Checks all open files in the project and its dependencies.
     pub fn check(&self) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
-        self.with_db(|db| db.workspace().check(db))
+        self.with_db(|db| db.project().check(db))
     }
 
     pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
@@ -77,13 +78,13 @@ impl RootDatabase {
 
     pub(crate) fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
     where
-        F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
+        F: FnOnce(&ProjectDatabase) -> T + std::panic::UnwindSafe,
     {
         Cancelled::catch(|| f(self))
     }
 }
 
-impl Upcast<dyn SemanticDb> for RootDatabase {
+impl Upcast<dyn SemanticDb> for ProjectDatabase {
     fn upcast(&self) -> &(dyn SemanticDb + 'static) {
         self
     }
@@ -93,7 +94,7 @@ impl Upcast<dyn SemanticDb> for RootDatabase {
     }
 }
 
-impl Upcast<dyn SourceDb> for RootDatabase {
+impl Upcast<dyn SourceDb> for ProjectDatabase {
     fn upcast(&self) -> &(dyn SourceDb + 'static) {
         self
     }
@@ -104,13 +105,13 @@ impl Upcast<dyn SourceDb> for RootDatabase {
 }
 
 #[salsa::db]
-impl SemanticDb for RootDatabase {
+impl SemanticDb for ProjectDatabase {
     fn is_file_open(&self, file: File) -> bool {
-        let Some(workspace) = &self.workspace else {
+        let Some(project) = &self.project else {
             return false;
         };
 
-        workspace.is_file_open(self, file)
+        project.is_file_open(self, file)
     }
 
     fn rule_selection(&self) -> &RuleSelection {
@@ -123,7 +124,7 @@ impl SemanticDb for RootDatabase {
 }
 
 #[salsa::db]
-impl SourceDb for RootDatabase {
+impl SourceDb for ProjectDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
         red_knot_vendored::file_system()
     }
@@ -138,7 +139,7 @@ impl SourceDb for RootDatabase {
 }
 
 #[salsa::db]
-impl salsa::Database for RootDatabase {
+impl salsa::Database for ProjectDatabase {
     fn salsa_event(&self, event: &dyn Fn() -> Event) {
         if !tracing::enabled!(tracing::Level::TRACE) {
             return;
@@ -154,9 +155,9 @@ impl salsa::Database for RootDatabase {
 }
 
 #[salsa::db]
-impl Db for RootDatabase {
-    fn workspace(&self) -> Workspace {
-        self.workspace.unwrap()
+impl Db for ProjectDatabase {
+    fn project(&self) -> Project {
+        self.project.unwrap()
     }
 }
 
@@ -174,7 +175,7 @@ pub(crate) mod tests {
     use ruff_db::{Db as SourceDb, Upcast};
 
     use crate::db::Db;
-    use crate::workspace::{Workspace, WorkspaceMetadata};
+    use crate::project::{Project, ProjectMetadata};
     use crate::DEFAULT_LINT_REGISTRY;
 
     #[salsa::db]
@@ -186,11 +187,11 @@ pub(crate) mod tests {
         system: TestSystem,
         vendored: VendoredFileSystem,
         rule_selection: RuleSelection,
-        workspace: Option<Workspace>,
+        project: Option<Project>,
     }
 
     impl TestDb {
-        pub(crate) fn new(workspace: WorkspaceMetadata) -> Self {
+        pub(crate) fn new(project: ProjectMetadata) -> Self {
             let mut db = Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
@@ -198,11 +199,11 @@ pub(crate) mod tests {
                 files: Files::default(),
                 events: Arc::default(),
                 rule_selection: RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY),
-                workspace: None,
+                project: None,
             };
 
-            let workspace = Workspace::from_metadata(&db, workspace);
-            db.workspace = Some(workspace);
+            let project = Project::from_metadata(&db, project);
+            db.project = Some(project);
             db
         }
     }
@@ -280,8 +281,8 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
-        fn workspace(&self) -> Workspace {
-            self.workspace.unwrap()
+        fn project(&self) -> Project {
+            self.project.unwrap()
         }
     }
 

@@ -36,6 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_TYPE_FORM);
@@ -48,6 +49,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
@@ -290,6 +292,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    /// ## What it does
     /// Checks for exception handlers that catch non-exception classes.
     ///
     /// ## Why is this bad?
@@ -319,6 +322,33 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for arguments to `metaclass=` that are invalid.
+    ///
+    /// ## Why is this bad?
+    /// Python allows arbitrary expressions to be used as the argument to `metaclass=`.
+    /// These expressions, however, need to be callable and accept the same arguments
+    /// as `type.__new__`.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(): ...
+    ///
+    /// # TypeError: f() takes 0 positional arguments but 3 were given
+    /// class B(metaclass=f): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)
+    pub(crate) static INVALID_METACLASS = {
+        summary: "detects invalid `metaclass=` arguments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -541,6 +571,28 @@ declare_lint! {
     /// ```
     pub(crate) static SUBCLASS_OF_FINAL_CLASS = {
         summary: "detects subclasses of final classes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `assert_type()` calls where the actual type
+    /// is not the same as the asserted type.
+    ///
+    /// ## Why is this bad?
+    /// `assert_type()` allows confirming the inferred type of a certain value.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def _(x: int):
+    ///     assert_type(x, int)  # fine
+    ///     assert_type(x, str)  # error: Actual type does not match asserted type
+    /// ```
+    pub(crate) static TYPE_ASSERTION_FAILURE = {
+        summary: "detects failed type assertions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
-snapshot_kind: text
 ---
 TRY301.py:14:13: TRY301 Abstract `raise` to an inner function
    |
@@ -8,17 +7,17 @@ TRY301.py:14:13: TRY301 Abstract `raise` to an inner function
 13 |         if not a:
 14 |             raise MyException(a)
    |             ^^^^^^^^^^^^^^^^^^^^ TRY301
-15 | 
+15 |
 16 |         raise MyException(a)
    |
 
 TRY301.py:16:9: TRY301 Abstract `raise` to an inner function
    |
 14 |             raise MyException(a)
-15 | 
+15 |
 16 |         raise MyException(a)
    |         ^^^^^^^^^^^^^^^^^^^^ TRY301
-17 | 
+17 |
 18 |         try:
    |
 
@@ -38,17 +37,17 @@ TRY301.py:32:13: TRY301 Abstract `raise` to an inner function
 31 |         if not a:
 32 |             raise MyException(a)
    |             ^^^^^^^^^^^^^^^^^^^^ TRY301
-33 | 
+33 |
 34 |         raise MyException(a)
    |
 
 TRY301.py:34:9: TRY301 Abstract `raise` to an inner function
    |
 32 |             raise MyException(a)
-33 | 
+33 |
 34 |         raise MyException(a)
    |         ^^^^^^^^^^^^^^^^^^^^ TRY301
-35 | 
+35 |
 36 |         try:
    |
 

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 sys_exit_alias_2.py:3:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
 1 | import sys as sys2
-2 | 
+2 |
 3 | exit(0)
   | ^^^^ PLR1722
 4 | quit(0)

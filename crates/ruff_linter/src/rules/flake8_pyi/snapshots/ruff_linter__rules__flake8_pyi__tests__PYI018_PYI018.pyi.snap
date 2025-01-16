@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI018.pyi:6:1: PYI018 Private TypeVar `_T` is never used
   |
 4 | from typing_extensions import ParamSpec, TypeVarTuple
-5 | 
+5 |
 6 | _T = typing.TypeVar("_T")
   | ^^ PYI018
 7 | _Ts = typing_extensions.TypeVarTuple("_Ts")
@@ -46,6 +45,6 @@ PYI018.pyi:10:1: PYI018 Private TypeVarTuple `_Ts2` is never used
  9 | _P2 = typing.ParamSpec("_P2")
 10 | _Ts2 = TypeVarTuple("_Ts2")
    | ^^^^ PYI018
-11 | 
+11 |
 12 | # OK
    |

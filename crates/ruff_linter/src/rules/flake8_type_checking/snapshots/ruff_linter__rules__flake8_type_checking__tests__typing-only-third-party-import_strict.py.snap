@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 strict.py:54:25: TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
    |
@@ -8,7 +7,7 @@ strict.py:54:25: TC002 [*] Move third-party import `pkg.bar.A` into a type-check
 53 |     import pkg
 54 |     from pkg.bar import A
    |                         ^ TC002
-55 | 
+55 |
 56 |     def test(value: A):
    |
    = help: Move into type-checking block

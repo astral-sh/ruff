@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_misspelled_except.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -198,8 +197,8 @@ Module(
   |
 3 | exept:  # spellchecker:disable-line
 4 |     pass
+  |         ^ Syntax Error: Expected a statement
 5 | finally:
-  |  Syntax Error: Expected a statement
 6 |     pass
 7 | a = 1
   |
@@ -239,8 +238,8 @@ Module(
   |
 5 | finally:
 6 |     pass
+  |         ^ Syntax Error: Expected a statement
 7 | a = 1
-  |  Syntax Error: Expected a statement
 8 | try:
 9 |     pass
   |
@@ -268,6 +267,6 @@ Module(
    |
 12 | exept:  # spellchecker:disable-line
 13 |     pass
+   |         ^ Syntax Error: Expected a statement
 14 | b = 1
-   |  Syntax Error: Expected a statement
    |

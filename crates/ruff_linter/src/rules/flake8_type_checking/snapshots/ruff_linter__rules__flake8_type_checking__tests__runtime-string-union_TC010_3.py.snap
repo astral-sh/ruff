@@ -70,7 +70,7 @@ TC010_3.py:18:20: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 18 | z: list[str, str | "list[str]"] = []  # TC010
    |                    ^^^^^^^^^^^ TC010
-19 | 
+19 |
 20 | type A = Value["Foo" | str]  # OK
    |
    = help: Extend quotes
@@ -88,10 +88,10 @@ TC010_3.py:18:20: TC010 [*] Invalid string member in `X | Y`-style union type
 TC010_3.py:22:30: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 20 | type A = Value["Foo" | str]  # OK
-21 | 
+21 |
 22 | OldS = TypeVar('OldS', int | 'foo.Bar', str)  # TC010
    |                              ^^^^^^^^^ TC010
-23 | 
+23 |
 24 | x: ("Foo"  # TC010 (unsafe fix)
    |
    = help: Extend quotes
@@ -109,7 +109,7 @@ TC010_3.py:22:30: TC010 [*] Invalid string member in `X | Y`-style union type
 TC010_3.py:24:5: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 22 | OldS = TypeVar('OldS', int | 'foo.Bar', str)  # TC010
-23 | 
+23 |
 24 | x: ("Foo"  # TC010 (unsafe fix)
    |     ^^^^^ TC010
 25 |     | str)

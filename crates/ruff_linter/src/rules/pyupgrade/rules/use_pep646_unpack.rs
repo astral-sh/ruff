@@ -117,7 +117,7 @@ fn in_subscript_index(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
     }
 
     // E.g., `Generic[DType, Unpack[int]]`.
-    if parent.slice.as_tuple_expr().map_or(false, |slice| {
+    if parent.slice.as_tuple_expr().is_some_and(|slice| {
         slice
             .elts
             .iter()
@@ -144,5 +144,5 @@ fn in_vararg(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
         .as_ref()
         .and_then(|vararg| vararg.annotation.as_ref())
         .and_then(|annotation| annotation.as_subscript_expr())
-        .map_or(false, |annotation| annotation == expr)
+        == Some(expr)
 }

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
-snapshot_kind: text
 ---
 RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
   |
@@ -27,7 +26,7 @@ RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is 
 13 |         print(f"{key} not found")
 14 |         return None
    |         ^^^^^^^^^^^ RET501
-15 | 
+15 |
 16 |     @property
    |
    = help: Remove explicit `return None`

@@ -1,21 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
    |
  6 |   pass
- 7 |   
+ 7 |
  8 | / from mylib import (
  9 | |     MyClient,
 10 | |     MyMgmtClient,
 11 | | ); from foo import (
 12 | |     bar
 13 | | )# some comment
-14 | | 
-15 | | pass
-   | |_^ I001
-16 |   
+14 | |
+   | |__^ I001
+15 |   pass
+16 |
 17 |   from foo import (
    |
    = help: Organize imports
@@ -39,7 +38,7 @@ trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
 trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
    |
 15 |   pass
-16 |   
+16 |
 17 | / from foo import (
 18 | |     bar
 19 | | )
@@ -48,10 +47,10 @@ trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
 22 | |     MyMgmtClient,
 23 | |     # some comment
 24 | | )
-25 | | 
-26 | | pass
-   | |_^ I001
-27 |   
+25 | |
+   | |__^ I001
+26 |   pass
+27 |
 28 |   from mylib import (
    |
    = help: Organize imports
@@ -71,15 +70,15 @@ trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
 trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
    |
 33 |   pass
-34 |   
+34 |
 35 | / from mylib import (
 36 | |     MyClient
 37 | |     # some comment
 38 | | )
-39 | | 
-40 | | pass
-   | |_^ I001
-41 |   
+39 | |
+   | |__^ I001
+40 |   pass
+41 |
 42 |   from mylib import (
    |
    = help: Organize imports
@@ -100,15 +99,15 @@ trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
 trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
    |
 40 |   pass
-41 |   
+41 |
 42 | / from mylib import (
 43 | |     # some comment
 44 | |     MyClient
 45 | | )
-46 | | 
-47 | | pass
-   | |_^ I001
-48 |   
+46 | |
+   | |__^ I001
+47 |   pass
+48 |
 49 |   # a
    |
    = help: Organize imports
@@ -134,6 +133,7 @@ trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
 52 | |     MyClient # d
 53 | |     # e
 54 | | ) # f
+   | |______^ I001
    |
    = help: Organize imports
 

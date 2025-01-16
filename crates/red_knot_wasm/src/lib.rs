@@ -3,9 +3,9 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_workspace::db::{Db, RootDatabase};
-use red_knot_workspace::workspace::settings::Configuration;
-use red_knot_workspace::workspace::WorkspaceMetadata;
+use red_knot_workspace::db::{Db, ProjectDatabase};
+use red_knot_workspace::project::settings::Configuration;
+use red_knot_workspace::project::ProjectMetadata;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -33,7 +33,7 @@ pub fn run() {
 
 #[wasm_bindgen]
 pub struct Workspace {
-    db: RootDatabase,
+    db: ProjectDatabase,
     system: WasmSystem,
 }
 
@@ -42,7 +42,7 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace = WorkspaceMetadata::discover(
+        let workspace = ProjectMetadata::discover(
             SystemPath::new(root),
             &system,
             Some(&Configuration {
@@ -52,7 +52,7 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let db = RootDatabase::new(workspace, system.clone()).map_err(into_error)?;
+        let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
 
         Ok(Self { db, system })
     }
@@ -67,7 +67,7 @@ impl Workspace {
         let file = system_path_to_file(&self.db, path).expect("File to exist");
         file.sync(&mut self.db);
 
-        self.db.workspace().open_file(&mut self.db, file);
+        self.db.project().open_file(&mut self.db, file);
 
         Ok(FileHandle {
             file,
@@ -95,7 +95,7 @@ impl Workspace {
     pub fn close_file(&mut self, file_id: &FileHandle) -> Result<(), Error> {
         let file = file_id.file;
 
-        self.db.workspace().close_file(&mut self.db, file);
+        self.db.project().close_file(&mut self.db, file);
         self.system
             .fs
             .remove_file(&file_id.path)

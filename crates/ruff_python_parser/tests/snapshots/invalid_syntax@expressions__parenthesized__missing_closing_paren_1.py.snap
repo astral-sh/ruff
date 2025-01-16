@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/missing_closing_paren_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -43,7 +42,7 @@ Module(
 
   |
 4 | (
-5 | 
+5 |
 6 | x + y
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ Syntax Error: unexpected EOF while parsing
   |

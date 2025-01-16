@@ -232,7 +232,7 @@ impl TestCaseBuilder<MockedTypeshed> {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version,
                 python_platform,
                 search_paths: SearchPathSettings {
@@ -290,7 +290,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version,
                 python_platform,
                 search_paths: SearchPathSettings {

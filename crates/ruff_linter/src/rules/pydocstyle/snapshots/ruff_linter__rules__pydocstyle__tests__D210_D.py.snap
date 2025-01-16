@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
@@ -44,9 +43,8 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
 297 |   @expect('D213: Multi-line docstring summary should start at the second line')
 298 |   def multiline():
-299 |       """ Whitespace at the beginning.
-    |  _____^
-300 | | 
+299 | /     """ Whitespace at the beginning.
+300 | |
 301 | |     This is the end.
 302 | |     """
     | |_______^ D210

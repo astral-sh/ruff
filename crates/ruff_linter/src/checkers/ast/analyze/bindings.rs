@@ -24,7 +24,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         return;
     }
 
-    for binding in &*checker.semantic.bindings {
+    for (binding_id, binding) in checker.semantic.bindings.iter_enumerated() {
         if checker.enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
                 && binding.is_unused()
@@ -90,7 +90,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
             }
         }
         if checker.enabled(Rule::UsedDummyVariable) {
-            if let Some(diagnostic) = ruff::rules::used_dummy_variable(checker, binding) {
+            if let Some(diagnostic) = ruff::rules::used_dummy_variable(checker, binding, binding_id)
+            {
                 checker.diagnostics.push(diagnostic);
             }
         }

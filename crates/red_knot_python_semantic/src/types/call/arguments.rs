@@ -1,11 +1,10 @@
 use super::Type;
-use ruff_python_ast::name::Name;
 
 /// Typed arguments for a single call, in source order.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CallArguments<'db>(Vec<Argument<'db>>);
+pub(crate) struct CallArguments<'a, 'db>(Vec<Argument<'a, 'db>>);
 
-impl<'db> CallArguments<'db> {
+impl<'a, 'db> CallArguments<'a, 'db> {
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
         positional_tys
@@ -17,12 +16,12 @@ impl<'db> CallArguments<'db> {
     /// Prepend an extra positional argument.
     pub(crate) fn with_self(&self, self_ty: Type<'db>) -> Self {
         let mut arguments = Vec::with_capacity(self.0.len() + 1);
-        arguments.push(Argument::Positional(self_ty));
+        arguments.push(Argument::Synthetic(self_ty));
         arguments.extend_from_slice(&self.0);
         Self(arguments)
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'db>> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'a, 'db>> {
         self.0.iter()
     }
 
@@ -32,36 +31,39 @@ impl<'db> CallArguments<'db> {
     }
 }
 
-impl<'db, 'a> IntoIterator for &'a CallArguments<'db> {
-    type Item = &'a Argument<'db>;
-    type IntoIter = std::slice::Iter<'a, Argument<'db>>;
+impl<'db, 'a, 'b> IntoIterator for &'b CallArguments<'a, 'db> {
+    type Item = &'b Argument<'a, 'db>;
+    type IntoIter = std::slice::Iter<'b, Argument<'a, 'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-impl<'db> FromIterator<Argument<'db>> for CallArguments<'db> {
-    fn from_iter<T: IntoIterator<Item = Argument<'db>>>(iter: T) -> Self {
+impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
+    fn from_iter<T: IntoIterator<Item = Argument<'a, 'db>>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum Argument<'db> {
+pub(crate) enum Argument<'a, 'db> {
+    /// The synthetic `self` or `cls` argument, which doesn't appear explicitly at the call site.
+    Synthetic(Type<'db>),
     /// A positional argument.
     Positional(Type<'db>),
     /// A starred positional argument (e.g. `*args`).
     Variadic(Type<'db>),
     /// A keyword argument (e.g. `a=1`).
-    Keyword { name: Name, ty: Type<'db> },
+    Keyword { name: &'a str, ty: Type<'db> },
     /// The double-starred keywords argument (e.g. `**kwargs`).
     Keywords(Type<'db>),
 }
 
-impl<'db> Argument<'db> {
+impl<'db> Argument<'_, 'db> {
     fn ty(&self) -> Type<'db> {
         match self {
+            Self::Synthetic(ty) => *ty,
             Self::Positional(ty) => *ty,
             Self::Variadic(ty) => *ty,
             Self::Keyword { name: _, ty } => *ty,

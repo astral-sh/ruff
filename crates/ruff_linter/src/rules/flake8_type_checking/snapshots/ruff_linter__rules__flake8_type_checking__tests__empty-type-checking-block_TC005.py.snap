@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 TC005.py:4:5: TC005 [*] Found empty type-checking block
   |
@@ -24,7 +23,7 @@ TC005.py:8:5: TC005 [*] Found empty type-checking block
  7 | if False:
  8 |     pass  # TC005
    |     ^^^^ TC005
- 9 | 
+ 9 |
 10 | if 0:
    |
    = help: Delete empty type-checking block
@@ -102,7 +101,7 @@ TC005.py:45:5: TC005 [*] Found empty type-checking block
 44 | if TYPE_CHECKING:
 45 |     pass  # TC005
    |     ^^^^ TC005
-46 | 
+46 |
 47 | # https://github.com/astral-sh/ruff/issues/11368
    |
    = help: Delete empty type-checking block

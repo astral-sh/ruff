@@ -38,7 +38,7 @@ pub(crate) fn fix_file(
             diagnostic
                 .fix
                 .as_ref()
-                .map_or(false, |fix| fix.applies(required_applicability))
+                .is_some_and(|fix| fix.applies(required_applicability))
         })
         .peekable();
 

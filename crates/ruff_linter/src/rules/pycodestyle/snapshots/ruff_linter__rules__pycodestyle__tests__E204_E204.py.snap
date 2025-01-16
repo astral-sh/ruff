@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E204.py:14:2: E204 [*] Whitespace after decorator
    |
@@ -44,13 +43,12 @@ E204.py:25:6: E204 [*] Whitespace after decorator
 
 E204.py:31:2: E204 [*] Whitespace after decorator
    |
-30 |   # E204
-31 |   @ \
-   |  __^
-32 | | foo
-   | |_^ E204
-33 |   def baz():
-34 |       print('baz')
+30 | # E204
+31 | @ \
+   |  ^^ E204
+32 | foo
+33 | def baz():
+34 |     print('baz')
    |
    = help: Remove whitespace
 

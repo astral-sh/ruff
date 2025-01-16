@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 __main__.py:2:16: PLC2701 Private name import `_a`
   |
@@ -66,6 +65,6 @@ __main__.py:8:24: PLC2701 Private name import `_ddd` from external module `bbb.c
  7 | import _aaa
  8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
    |                        ^^^ PLC2701
- 9 | 
+ 9 |
 10 | # Non-errors.
    |

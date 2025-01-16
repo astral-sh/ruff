@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B019.py:78:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
@@ -14,7 +13,7 @@ B019.py:78:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods 
 B019.py:82:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 80 |         ...
-81 | 
+81 |
 82 |     @cache
    |     ^^^^^^ B019
 83 |     def another_cached_instance_method(self, y):
@@ -24,7 +23,7 @@ B019.py:82:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods 
 B019.py:86:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 84 |         ...
-85 | 
+85 |
 86 |     @functools.cache()
    |     ^^^^^^^^^^^^^^^^^^ B019
 87 |     def called_cached_instance_method(self, y):
@@ -34,7 +33,7 @@ B019.py:86:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods 
 B019.py:90:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 88 |         ...
-89 | 
+89 |
 90 |     @cache()
    |     ^^^^^^^^ B019
 91 |     def another_called_cached_instance_method(self, y):
@@ -44,7 +43,7 @@ B019.py:90:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods 
 B019.py:94:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 92 |         ...
-93 | 
+93 |
 94 |     @functools.lru_cache
    |     ^^^^^^^^^^^^^^^^^^^^ B019
 95 |     def lru_cached_instance_method(self, y):
@@ -54,7 +53,7 @@ B019.py:94:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods 
 B019.py:98:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     |
  96 |         ...
- 97 | 
+ 97 |
  98 |     @lru_cache
     |     ^^^^^^^^^^ B019
  99 |     def another_lru_cached_instance_method(self, y):
@@ -64,7 +63,7 @@ B019.py:98:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods 
 B019.py:102:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     |
 100 |         ...
-101 | 
+101 |
 102 |     @functools.lru_cache()
     |     ^^^^^^^^^^^^^^^^^^^^^^ B019
 103 |     def called_lru_cached_instance_method(self, y):
@@ -74,7 +73,7 @@ B019.py:102:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods
 B019.py:106:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     |
 104 |         ...
-105 | 
+105 |
 106 |     @lru_cache()
     |     ^^^^^^^^^^^^ B019
 107 |     def another_called_lru_cached_instance_method(self, y):

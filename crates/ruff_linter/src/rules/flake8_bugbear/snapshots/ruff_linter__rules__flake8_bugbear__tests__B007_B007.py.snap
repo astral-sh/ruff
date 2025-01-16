@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B007.py:6:5: B007 Loop control variable `i` not used within loop body
   |
 4 | print(i)  # name no longer defined on Python 3; no warning yet
-5 | 
+5 |
 6 | for i in range(10):  # name not used within the loop; B007
   |     ^ B007
 7 |     print(10)
@@ -71,7 +70,7 @@ B007.py:34:10: B007 Loop control variable `bar` may not be used within loop body
 B007.py:38:10: B007 Loop control variable `bar` may not be used within loop body
    |
 36 |         print(FMT.format(**locals()))
-37 | 
+37 |
 38 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
 39 |     if foo:
@@ -82,7 +81,7 @@ B007.py:38:10: B007 Loop control variable `bar` may not be used within loop body
 B007.py:42:10: B007 Loop control variable `bar` may not be used within loop body
    |
 40 |         print(FMT.format(**globals()))
-41 | 
+41 |
 42 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
 43 |     if foo:
@@ -93,7 +92,7 @@ B007.py:42:10: B007 Loop control variable `bar` may not be used within loop body
 B007.py:46:10: B007 Loop control variable `bar` may not be used within loop body
    |
 44 |         print(FMT.format(**vars()))
-45 | 
+45 |
 46 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
 47 |     print(FMT.format(foo=foo, bar=eval("bar")))

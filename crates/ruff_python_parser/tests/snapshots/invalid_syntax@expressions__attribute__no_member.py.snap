@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no_member.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -77,7 +76,7 @@ Module(
 2 | first.
   |       ^ Syntax Error: Expected an identifier
 3 | second
-4 | 
+4 |
 5 | # No member access after the dot.
   |
 
@@ -85,5 +84,5 @@ Module(
   |
 5 | # No member access after the dot.
 6 | last.
-  |       Syntax Error: Expected an identifier
+  |      ^ Syntax Error: Expected an identifier
   |

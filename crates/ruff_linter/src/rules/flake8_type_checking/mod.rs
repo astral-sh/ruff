@@ -82,6 +82,24 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.py"))]
+    fn type_alias_rules_pre_py310(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "pre_py310_{}_{}",
+            rule_code.as_ref(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                target_version: settings::types::PythonVersion::Py39,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]

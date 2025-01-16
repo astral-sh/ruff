@@ -33,7 +33,7 @@ RUF048_1.py:8:6: RUF048 `__version__` may contain non-integral-like elements
  7 | tuple(map(int, bar.__version__.split(".")))
  8 | list(map(int, bar.__version__.split(".")))
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
- 9 | 
+ 9 |
 10 | # `sep` passed as keyword argument
    |
 
@@ -48,7 +48,7 @@ RUF048_1.py:11:13: RUF048 `__version__` may contain non-integral-like elements
 RUF048_1.py:14:13: RUF048 `__version__` may contain non-integral-like elements
    |
 12 |     print(part)
-13 | 
+13 |
 14 | for part in map(int, __version__.split(sep=".")):
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 15 |     print(part)

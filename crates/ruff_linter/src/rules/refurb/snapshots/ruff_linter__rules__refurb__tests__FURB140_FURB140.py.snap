@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB140.py:7:1: FURB140 [*] Use `itertools.starmap` instead of the generator
   |
 6 | # FURB140
 7 | [print(x, y) for x, y in zipped()]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-8 | 
+8 |
 9 | # FURB140
   |
   = help: Replace with `itertools.starmap`
@@ -31,7 +30,7 @@ FURB140.py:10:1: FURB140 [*] Use `itertools.starmap` instead of the generator
  9 | # FURB140
 10 | (print(x, y) for x, y in zipped())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-11 | 
+11 |
 12 | # FURB140
    |
    = help: Replace with `itertools.starmap`
@@ -79,7 +78,7 @@ FURB140.py:19:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 18 | # FURB140
 19 | [print(x, y) for x, y in zipped()]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-20 | 
+20 |
 21 | # FURB140
    |
    = help: Replace with `itertools.starmap`
@@ -99,7 +98,7 @@ FURB140.py:22:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 21 | # FURB140
 22 | (print(x, y) for x, y in zipped())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-23 | 
+23 |
 24 | # FURB140
    |
    = help: Replace with `itertools.starmap`
@@ -119,7 +118,7 @@ FURB140.py:25:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 24 | # FURB140
 25 | {print(x, y) for x, y in zipped()}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-26 | 
+26 |
 27 | # FURB140 (check it still flags starred arguments).
    |
    = help: Replace with `itertools.starmap`
@@ -181,7 +180,7 @@ FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 30 | (foo(*t) for t in [(85, 60), (100, 80)])
 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB140
-32 | 
+32 |
 33 | # Non-errors.
    |
    = help: Replace with `itertools.starmap`

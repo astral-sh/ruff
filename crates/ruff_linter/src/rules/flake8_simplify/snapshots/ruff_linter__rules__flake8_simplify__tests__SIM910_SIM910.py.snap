@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
   |
 1 | # SIM910
 2 | {}.get(key, None)
   | ^^^^^^^^^^^^^^^^^ SIM910
-3 | 
+3 |
 4 | # SIM910
   |
   = help: Replace `{}.get(key, None)` with `{}.get(key)`
@@ -25,7 +24,7 @@ SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
 4 | # SIM910
 5 | {}.get("key", None)
   | ^^^^^^^^^^^^^^^^^^^ SIM910
-6 | 
+6 |
 7 | # OK
   |
   = help: Replace `{}.get("key", None)` with `{}.get("key")`
@@ -64,7 +63,7 @@ SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 23 | # SIM910
 24 | a = {}.get(key, None)
    |     ^^^^^^^^^^^^^^^^^ SIM910
-25 | 
+25 |
 26 | # SIM910
    |
    = help: Replace `{}.get(key, None)` with `{}.get(key)`
@@ -84,7 +83,7 @@ SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
 26 | # SIM910
 27 | ({}).get(key, None)
    | ^^^^^^^^^^^^^^^^^^^ SIM910
-28 | 
+28 |
 29 | # SIM910
    |
    = help: Replace `({}).get(key, None)` with `({}).get(key)`
@@ -105,7 +104,7 @@ SIM910.py:31:7: SIM910 [*] Use `ages.get("Cat")` instead of `ages.get("Cat", Non
 30 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 31 | age = ages.get("Cat", None)
    |       ^^^^^^^^^^^^^^^^^^^^^ SIM910
-32 | 
+32 |
 33 | # OK
    |
    = help: Replace `ages.get("Cat", None)` with `ages.get("Cat")`
@@ -126,7 +125,7 @@ SIM910.py:39:9: SIM910 [*] Use `kwargs.get('a')` instead of `kwargs.get('a', Non
 38 | def foo(**kwargs):
 39 |     a = kwargs.get('a', None)
    |         ^^^^^^^^^^^^^^^^^^^^^ SIM910
-40 | 
+40 |
 41 | # SIM910
    |
    = help: Replace `kwargs.get('a', None)` with `kwargs.get('a')`
@@ -147,7 +146,7 @@ SIM910.py:43:9: SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a
 42 | def foo(some_dict: dict):
 43 |     a = some_dict.get('a', None)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^ SIM910
-44 | 
+44 |
 45 | # OK
    |
    = help: Replace `some_dict.get('a', None)` with `some_dict.get('a')`

@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
-snapshot_kind: text
 ---
 ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
  8 |   _ = (
- 9 |     "abc" +
-   |  ___^
+ 9 | /   "abc" +
 10 | |   "def"
    | |_______^ ISC003
 11 |   )
@@ -15,8 +13,7 @@ ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatena
 ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
 13 |   _ = (
-14 |     f"abc" +
-   |  ___^
+14 | /   f"abc" +
 15 | |   "def"
    | |_______^ ISC003
 16 |   )
@@ -25,8 +22,7 @@ ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concaten
 ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
 18 |   _ = (
-19 |     b"abc" +
-   |  ___^
+19 | /   b"abc" +
 20 | |   b"def"
    | |________^ ISC003
 21 |   )
@@ -51,6 +47,6 @@ ISC.py:80:10: ISC003 Explicitly concatenated string should be implicitly concate
    |  __________^
 81 | |     + f"second"} d"
    | |_______________^ ISC003
-82 |   
+82 |
 83 |   # See https://github.com/astral-sh/ruff/issues/12936
    |

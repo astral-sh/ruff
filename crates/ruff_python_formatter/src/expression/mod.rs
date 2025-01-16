@@ -4,9 +4,9 @@ use std::slice;
 use ruff_formatter::{
     write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
-use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
+use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -19,10 +19,7 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::{
-    is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
-    is_f_string_formatting_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
-};
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -388,18 +385,12 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
             // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
             _ if f.context().node_level().is_parenthesized() => {
-                if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
-                    f.context(),
-                ) {
-                    OptionalParentheses::Never
-                } else if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
-                    return parenthesize_if_expands(
-                        &expression.format().with_options(Parentheses::Never),
-                    )
-                    .with_indent(!is_expression_huggable(expression, f.context()))
-                    .fmt(f);
+                return if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .with_indent(!is_expression_huggable(expression, f.context()))
+                        .fmt(f)
                 } else {
-                    return expression.format().with_options(Parentheses::Never).fmt(f);
+                    expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             }
             needs_parentheses => needs_parentheses,
@@ -409,13 +400,12 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
-                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
-                    parenthesize_if_expands(&unparenthesized).fmt(f)
-                }
-
                 Parenthesize::IfRequired => unparenthesized.fmt(f),
 
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
+                Parenthesize::Optional
+                | Parenthesize::IfBreaks
+                | Parenthesize::IfBreaksParenthesized
+                | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
@@ -424,9 +414,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) =>
-                    parenthesize_if_expands(&unparenthesized).fmt(f),
-
                 Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     // Can-omit layout is relevant for `"abcd".call`. We don't want to add unnecessary
                     // parentheses in this case.
@@ -454,15 +441,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::Never => match parenthesize {
-                Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
-                    parenthesize_if_expands(&unparenthesized)
-                        .with_indent(!is_expression_huggable(expression, f.context()))
-                        .fmt(f)
-                }
-
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired | Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested => {
-                    unparenthesized.fmt(f)
-                }
+                Parenthesize::Optional
+                | Parenthesize::IfBreaks
+                | Parenthesize::IfRequired
+                | Parenthesize::IfBreaksParenthesized
+                | Parenthesize::IfBreaksParenthesizedNested => unparenthesized.fmt(f),
             },
 
             OptionalParentheses::Always => {
@@ -763,32 +746,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                     self.update_max_precedence(OperatorPrecedence::Attribute);
                 }
                 self.last = Some(expr);
-                return;
-            }
-
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-                if value.is_implicit_concatenated() =>
-            {
-                if !is_f_string_formatting_enabled(self.context) {
-                    self.update_max_precedence(OperatorPrecedence::String);
-                }
-
-                return;
-            }
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
-                if value.is_implicit_concatenated() =>
-            {
-                if !is_f_string_formatting_enabled(self.context) {
-                    self.update_max_precedence(OperatorPrecedence::String);
-                }
-
-                return;
-            }
-            Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
-                if !is_f_string_formatting_enabled(self.context) {
-                    self.update_max_precedence(OperatorPrecedence::String);
-                }
-
                 return;
             }
 
@@ -1193,8 +1150,6 @@ enum OperatorPrecedence {
     BitwiseXor,
     BitwiseOr,
     Comparator,
-    // Implicit string concatenation
-    String,
     BooleanOperation,
     Conditional,
 }
@@ -1286,5 +1241,73 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
                 context.source(),
             ) || is_splittable_expression(expression.as_ref(), context)
         }
+    }
+}
+
+/// Returns the sub-expression to which the left-most character in expression belongs.
+///
+/// For example, in the expression `a + b * c`, the left-most subexpression is `a`. But for
+/// the expression `{ "a": 1 }`, the left-most subexpression is the dictionary, and not `"a"` because
+/// the `{` belongs to the dictionary.
+///
+/// Parenthesized expressions are treated as belonging to the enclosing expression. Therefore, the left
+/// most expression for `(a + b) * c` is `a + b` and not `a`.
+pub(crate) fn left_most<'expr>(
+    expression: &'expr Expr,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> &'expr Expr {
+    let mut current = expression;
+    loop {
+        let left = match current {
+            Expr::BinOp(ast::ExprBinOp { left, .. })
+            | Expr::If(ast::ExprIf { body: left, .. })
+            | Expr::Call(ast::ExprCall { func: left, .. })
+            | Expr::Attribute(ast::ExprAttribute { value: left, .. })
+            | Expr::Subscript(ast::ExprSubscript { value: left, .. }) => Some(&**left),
+
+            Expr::BoolOp(expr_bool_op) => expr_bool_op.values.first(),
+            Expr::Compare(compare) => Some(&*compare.left),
+
+            Expr::Generator(generator) if !generator.parenthesized => Some(&*generator.elt),
+
+            Expr::Tuple(tuple) if !tuple.parenthesized => tuple.elts.first(),
+            Expr::Slice(slice) => slice.lower.as_deref(),
+
+            Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Name(_)
+            | Expr::Starred(_)
+            | Expr::FString(_)
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::Await(_)
+            | Expr::DictComp(_)
+            | Expr::SetComp(_)
+            | Expr::ListComp(_)
+            | Expr::Set(_)
+            | Expr::Dict(_)
+            | Expr::UnaryOp(_)
+            | Expr::Lambda(_)
+            | Expr::Named(_)
+            | Expr::IpyEscapeCommand(_)
+            | Expr::Generator(_) => None,
+        };
+
+        let Some(left) = left else {
+            break current;
+        };
+
+        if is_expression_parenthesized(left.into(), comment_ranges, source) {
+            break current;
+        }
+
+        current = left;
     }
 }

@@ -70,7 +70,7 @@ TC010_2.py:13:20: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 13 | z: list[str, str | "int"] = []  # TC010
    |                    ^^^^^ TC010
-14 | 
+14 |
 15 | type A = Value["int" | str]  # OK
    |
    = help: Remove quotes
@@ -88,10 +88,10 @@ TC010_2.py:13:20: TC010 [*] Invalid string member in `X | Y`-style union type
 TC010_2.py:17:30: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 15 | type A = Value["int" | str]  # OK
-16 | 
+16 |
 17 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
    |                              ^^^^^ TC010
-18 | 
+18 |
 19 | x: ("int"  # TC010 (unsafe fix)
    |
    = help: Remove quotes
@@ -109,7 +109,7 @@ TC010_2.py:17:30: TC010 [*] Invalid string member in `X | Y`-style union type
 TC010_2.py:19:5: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 17 |   OldS = TypeVar('OldS', int | 'str', str)  # TC010
-18 |   
+18 |
 19 |   x: ("int"  # TC010 (unsafe fix)
    |  _____^
 20 | |     " | str" | None)

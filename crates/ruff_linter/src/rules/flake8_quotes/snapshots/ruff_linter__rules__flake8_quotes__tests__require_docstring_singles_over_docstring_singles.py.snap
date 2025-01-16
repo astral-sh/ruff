@@ -1,16 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
   |
 3 |   '''
-4 |   
+4 |
 5 | / '''
 6 | | this is not a docstring
 7 | | '''
   | |___^ Q001
-8 |   
+8 |
 9 |   l = []
   |
   = help: Replace single multiline quotes with double quotes
@@ -31,7 +30,7 @@ docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quote
 docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
  9 |   l = []
-10 |   
+10 |
 11 |   class Cls(MakeKlass('''
    |  _____________________^
 12 | |     class params \t not a docstring
@@ -58,13 +57,12 @@ docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quo
 docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
 16 |       '''
-17 |   
-18 |       '''
-   |  _____^
+17 |
+18 | /     '''
 19 | |     this is not a docstring
 20 | |     '''
    | |_______^ Q001
-21 |   
+21 |
 22 |       # The colon in the list indexing below is an edge case for the docstring scanner
    |
    = help: Replace single multiline quotes with double quotes
@@ -109,13 +107,12 @@ docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quo
 docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
    |
 30 |           some_expression = 'hello world'
-31 |   
-32 |           '''
-   |  _________^
+31 |
+32 | /         '''
 33 | |         this is not a docstring
 34 | |         '''
    | |___________^ Q001
-35 |   
+35 |
 36 |           if l:
    |
    = help: Replace single multiline quotes with double quotes
@@ -136,8 +133,7 @@ docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quot
 docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
    |
 36 |           if l:
-37 |               '''
-   |  _____________^
+37 | /             '''
 38 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
 39 | |             '''
    | |_______________^ Q001

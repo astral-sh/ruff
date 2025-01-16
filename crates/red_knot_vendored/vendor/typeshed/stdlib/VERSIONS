@@ -341,5 +341,3 @@ zipfile._path: 3.12-
 zipimport: 3.0-
 zlib: 3.0-
 zoneinfo: 3.9-
-# Patch applied for red_knot:
-knot_extensions: 3.0-

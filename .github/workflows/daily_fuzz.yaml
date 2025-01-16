@@ -73,6 +73,6 @@ jobs:
               owner: "astral-sh",
               repo: "ruff",
               title: `Daily parser fuzz failed on ${new Date().toDateString()}`,
-              body: "Runs listed here: https://github.com/astral-sh/ruff/actions/workflows/daily_fuzz.yml",
+              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               labels: ["bug", "parser", "fuzzer"],
             })

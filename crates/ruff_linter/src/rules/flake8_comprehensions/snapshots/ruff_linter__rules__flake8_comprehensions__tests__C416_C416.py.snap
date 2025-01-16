@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
 C416.py:6:1: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
   |
 4 | d = {"a": 1, "b": 2, "c": 3}
-5 | 
+5 |
 6 | [i for i in x]
   | ^^^^^^^^^^^^^^ C416
 7 | {i for i in x}
@@ -131,7 +130,7 @@ C416.py:25:70: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 25 | any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^ C416
-26 | 
+26 |
 27 | zz = [[1], [2], [3]]
    |
    = help: Rewrite using `list()`

@@ -810,6 +810,8 @@ fn value_given_to_table_key_is_not_inline_table_1() {
     - `lint.flake8-pytest-style.raises-require-match-for`
     - `lint.flake8-pytest-style.raises-extend-require-match-for`
     - `lint.flake8-pytest-style.mark-parentheses`
+    - `lint.flake8-pytest-style.warns-require-match-for`
+    - `lint.flake8-pytest-style.warns-extend-require-match-for`
 
     For more information, try '--help'.
     "#);
@@ -2070,7 +2072,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
             .arg(&ruff_toml)
-    , @r###"
+    , @r#"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -2078,12 +2080,12 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
         ----- stderr -----
         ruff failed
           Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 2, column 2
+          Cause: TOML parse error at line 3, column 17
           |
-        2 | [lint.flake8-import-conventions.aliases]
-          |  ^^^^
+        3 | "module.name" = "invalid.alias"
+          |                 ^^^^^^^^^^^^^^^
         invalid value: string "invalid.alias", expected a Python identifier
-        "###);});
+        "#);});
     Ok(())
 }
 
@@ -2106,7 +2108,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
             .arg(&ruff_toml)
-    , @r###"
+    , @r#"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -2114,12 +2116,12 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
         ----- stderr -----
         ruff failed
           Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 2, column 2
+          Cause: TOML parse error at line 3, column 17
           |
-        2 | [lint.flake8-import-conventions.extend-aliases]
-          |  ^^^^
+        3 | "module.name" = "__debug__"
+          |                 ^^^^^^^^^^^
         invalid value: string "__debug__", expected an assignable Python identifier
-        "###);});
+        "#);});
     Ok(())
 }
 
@@ -2142,7 +2144,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
             .arg(&ruff_toml)
-    , @r###"
+    , @r#"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -2150,11 +2152,11 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
         ----- stderr -----
         ruff failed
           Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 2, column 2
+          Cause: TOML parse error at line 3, column 1
           |
-        2 | [lint.flake8-import-conventions.aliases]
-          |  ^^^^
+        3 | "module..invalid" = "alias"
+          | ^^^^^^^^^^^^^^^^^
         invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
-        "###);});
+        "#);});
     Ok(())
 }

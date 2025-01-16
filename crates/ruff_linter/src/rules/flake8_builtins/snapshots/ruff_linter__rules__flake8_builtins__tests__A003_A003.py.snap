@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
-snapshot_kind: text
 ---
 A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14
    |
 15 |         pass
-16 | 
+16 |
 17 |     def method_usage(self) -> str:
    |                               ^^^ A003
 18 |         pass
@@ -14,7 +13,7 @@ A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14
 A003.py:20:34: A003 Python builtin is shadowed by class attribute `id` from line 3
    |
 18 |         pass
-19 | 
+19 |
 20 |     def attribute_usage(self) -> id:
    |                                  ^^ A003
 21 |         pass

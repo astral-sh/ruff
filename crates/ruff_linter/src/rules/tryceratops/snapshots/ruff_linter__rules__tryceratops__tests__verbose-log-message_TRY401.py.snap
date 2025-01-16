@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
-snapshot_kind: text
 ---
 TRY401.py:8:45: TRY401 Redundant exception object included in `logging.exception` call
   |
@@ -55,7 +54,7 @@ TRY401.py:24:45: TRY401 Redundant exception object included in `logging.exceptio
 23 |         logger.exception(f"Found an error: {bad}")  # TRY401
 24 |         logger.exception(f"Found an error: {bad}")  # TRY401
    |                                             ^^^ TRY401
-25 | 
+25 |
 26 |         if True:
    |
 
@@ -143,7 +142,7 @@ TRY401.py:93:38: TRY401 Redundant exception object included in `logging.exceptio
 92 |         exception(f"Found an error: {bad}")  # TRY401
 93 |         exception(f"Found an error: {bad}")  # TRY401
    |                                      ^^^ TRY401
-94 | 
+94 |
 95 |         if True:
    |
 

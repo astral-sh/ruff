@@ -336,32 +336,24 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
 
 # Breaking return type annotations. Black adds parentheses if the parameters are
 # empty; otherwise, it leverages the expressions own parentheses if possible.
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
@@ -462,11 +454,8 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
 ): ...
 
 
-def double() -> (
-    first_item
-    and foo.bar.baz().bop(
-        1,
-    )
+def double() -> first_item and foo.bar.baz().bop(
+    1,
 ):
     return 2 * a
 
@@ -519,70 +508,4 @@ def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
     pass
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -131,32 +131,24 @@
- 
- # Breaking return type annotations. Black adds parentheses if the parameters are
- # empty; otherwise, it leverages the expressions own parentheses if possible.
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
--    Set[
--        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--    ]
--): ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+]: ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
--    Set[
--        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--    ]
--): ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+]: ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
--    Set[
--        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--    ]
--): ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+]: ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
--    Set[
--        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--    ]
--): ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+]: ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-@@ -257,11 +249,8 @@
- ): ...
- 
- 
--def double() -> (
--    first_item
--    and foo.bar.baz().bop(
--        1,
--    )
-+def double() -> first_item and foo.bar.baz().bop(
-+    1,
- ):
-     return 2 * a
- 
 ```

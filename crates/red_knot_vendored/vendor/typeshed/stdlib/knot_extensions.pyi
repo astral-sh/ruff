@@ -1,1 +1,0 @@
-../../../knot_extensions/knot_extensions.pyi

@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, ScopeId};
+use ruff_python_semantic::{Binding, BindingId, ScopeId};
 use ruff_python_stdlib::{
     builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
 };
@@ -97,7 +97,11 @@ impl Violation for UsedDummyVariable {
 }
 
 /// RUF052
-pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn used_dummy_variable(
+    checker: &Checker,
+    binding: &Binding,
+    binding_id: BindingId,
+) -> Option<Diagnostic> {
     let name = binding.name(checker.source());
 
     // Ignore `_` and dunder variables
@@ -139,6 +143,21 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Optio
     // Only variables defined in function scopes
     let scope = &semantic.scopes[binding.scope];
     if !scope.kind.is_function() {
+        return None;
+    }
+
+    // Recall from above that we do not wish to flag "private"
+    // function parameters. The previous early exit ensured
+    // that the binding in hand was not a function parameter.
+    // We now check that, in the body of our function, we are
+    // not looking at a shadowing of a private parameter.
+    //
+    // (Technically this also covers the case in the previous early exit,
+    // but it is more expensive so we keep both.)
+    if scope
+        .shadowed_bindings(binding_id)
+        .any(|shadow_id| semantic.binding(shadow_id).kind.is_argument())
+    {
         return None;
     }
     if !checker.settings.dummy_variable_rgx.is_match(name) {

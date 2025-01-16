@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 separate_future_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / import sys
 2 | | import os
 3 | | from __future__ import annotations
+  | |___________________________________^ I001
   |
   = help: Organize imports
 

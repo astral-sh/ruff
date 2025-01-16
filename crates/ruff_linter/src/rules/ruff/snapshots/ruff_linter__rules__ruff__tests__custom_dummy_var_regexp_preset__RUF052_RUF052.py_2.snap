@@ -1,185 +1,186 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
-RUF052.py:77:9: RUF052 Local dummy variable `_var` is accessed
+RUF052.py:92:9: RUF052 Local dummy variable `_var` is accessed
    |
-75 | class Class_:
-76 |     def fun(self):
-77 |         _var = "method variable" # [RUF052]
+90 | class Class_:
+91 |     def fun(self):
+92 |         _var = "method variable" # [RUF052]
    |         ^^^^ RUF052
-78 |         return _var
+93 |         return _var
    |
    = help: Remove leading underscores
 
-RUF052.py:84:5: RUF052 Local dummy variable `_list` is accessed
-   |
-83 | def fun():
-84 |     _list = "built-in" # [RUF052]
-   |     ^^^^^ RUF052
-85 |     return _list
-   |
-   = help: Prefer using trailing underscores to avoid shadowing a built-in
-
-RUF052.py:91:5: RUF052 Local dummy variable `_x` is accessed
-   |
-89 | def fun():
-90 |     global x
-91 |     _x = "shadows global" # [RUF052]
-   |     ^^ RUF052
-92 |     return _x
-   |
-   = help: Prefer using trailing underscores to avoid shadowing a variable
-
-RUF052.py:95:3: RUF052 Local dummy variable `x` is accessed
-   |
-94 | def foo():
-95 |   x = "outer"
-   |   ^ RUF052
-96 |   def bar():
-97 |     nonlocal x
-   |
-
-RUF052.py:98:5: RUF052 Local dummy variable `_x` is accessed
+RUF052.py:99:5: RUF052 Local dummy variable `_list` is accessed
     |
- 96 |   def bar():
- 97 |     nonlocal x
- 98 |     _x = "shadows nonlocal" # [RUF052]
+ 98 | def fun():
+ 99 |     _list = "built-in" # [RUF052]
+    |     ^^^^^ RUF052
+100 |     return _list
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a built-in
+
+RUF052.py:106:5: RUF052 Local dummy variable `_x` is accessed
+    |
+104 | def fun():
+105 |     global x
+106 |     _x = "shadows global" # [RUF052]
     |     ^^ RUF052
- 99 |     return _x
-100 |   bar()
+107 |     return _x
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:105:5: RUF052 Local dummy variable `_x` is accessed
+RUF052.py:110:3: RUF052 Local dummy variable `x` is accessed
     |
-103 | def fun():
-104 |     x = "local"
-105 |     _x = "shadows local" # [RUF052]
+109 | def foo():
+110 |   x = "outer"
+    |   ^ RUF052
+111 |   def bar():
+112 |     nonlocal x
+    |
+
+RUF052.py:113:5: RUF052 Local dummy variable `_x` is accessed
+    |
+111 |   def bar():
+112 |     nonlocal x
+113 |     _x = "shadows nonlocal" # [RUF052]
     |     ^^ RUF052
-106 |     return _x
+114 |     return _x
+115 |   bar()
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:113:5: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+RUF052.py:120:5: RUF052 Local dummy variable `_x` is accessed
     |
-112 | def unfixables():
-113 |     _GLOBAL_1 = "foo"
+118 | def fun():
+119 |     x = "local"
+120 |     _x = "shadows local" # [RUF052]
+    |     ^^ RUF052
+121 |     return _x
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:128:5: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+    |
+127 | def unfixables():
+128 |     _GLOBAL_1 = "foo"
     |     ^^^^^^^^^ RUF052
-114 |     # unfixable because the rename would shadow a global variable
-115 |     print(_GLOBAL_1)  # [RUF052]
+129 |     # unfixable because the rename would shadow a global variable
+130 |     print(_GLOBAL_1)  # [RUF052]
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:121:5: RUF052 Local dummy variable `_local` is accessed
+RUF052.py:136:5: RUF052 Local dummy variable `_local` is accessed
     |
-120 |     # unfixable because the rename would shadow a local variable
-121 |     _local = "local3"  # [RUF052]
+135 |     # unfixable because the rename would shadow a local variable
+136 |     _local = "local3"  # [RUF052]
     |     ^^^^^^ RUF052
-122 |     print(_local)
+137 |     print(_local)
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:125:9: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+RUF052.py:140:9: RUF052 Local dummy variable `_GLOBAL_1` is accessed
     |
-124 |     def nested():
-125 |         _GLOBAL_1 = "foo"
+139 |     def nested():
+140 |         _GLOBAL_1 = "foo"
     |         ^^^^^^^^^ RUF052
-126 |         # unfixable because the rename would shadow a global variable
-127 |         print(_GLOBAL_1)  # [RUF052]
+141 |         # unfixable because the rename would shadow a global variable
+142 |         print(_GLOBAL_1)  # [RUF052]
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:130:9: RUF052 Local dummy variable `_local` is accessed
+RUF052.py:145:9: RUF052 Local dummy variable `_local` is accessed
     |
-129 |         # unfixable because the rename would shadow a variable from the outer function
-130 |         _local = "local4"
+144 |         # unfixable because the rename would shadow a variable from the outer function
+145 |         _local = "local4"
     |         ^^^^^^ RUF052
-131 |         print(_local)
+146 |         print(_local)
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:138:5: RUF052 Local dummy variable `_P` is accessed
+RUF052.py:153:5: RUF052 Local dummy variable `_P` is accessed
     |
-136 |     from collections import namedtuple
-137 | 
-138 |     _P = ParamSpec("_P")
+151 |     from collections import namedtuple
+152 |
+153 |     _P = ParamSpec("_P")
     |     ^^ RUF052
-139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-140 |     _NT = NamedTuple("_NT", [("foo", int)])
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
     |
     = help: Remove leading underscores
 
-RUF052.py:139:5: RUF052 Local dummy variable `_T` is accessed
+RUF052.py:154:5: RUF052 Local dummy variable `_T` is accessed
     |
-138 |     _P = ParamSpec("_P")
-139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+153 |     _P = ParamSpec("_P")
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
     |     ^^ RUF052
-140 |     _NT = NamedTuple("_NT", [("foo", int)])
-141 |     _E = Enum("_E", ["a", "b", "c"])
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
     |
     = help: Remove leading underscores
 
-RUF052.py:140:5: RUF052 Local dummy variable `_NT` is accessed
+RUF052.py:155:5: RUF052 Local dummy variable `_NT` is accessed
     |
-138 |     _P = ParamSpec("_P")
-139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-140 |     _NT = NamedTuple("_NT", [("foo", int)])
+153 |     _P = ParamSpec("_P")
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
     |     ^^^ RUF052
-141 |     _E = Enum("_E", ["a", "b", "c"])
-142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
     |
     = help: Remove leading underscores
 
-RUF052.py:141:5: RUF052 Local dummy variable `_E` is accessed
+RUF052.py:156:5: RUF052 Local dummy variable `_E` is accessed
     |
-139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-140 |     _NT = NamedTuple("_NT", [("foo", int)])
-141 |     _E = Enum("_E", ["a", "b", "c"])
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
     |     ^^ RUF052
-142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
     |
     = help: Remove leading underscores
 
-RUF052.py:142:5: RUF052 Local dummy variable `_NT2` is accessed
+RUF052.py:157:5: RUF052 Local dummy variable `_NT2` is accessed
     |
-140 |     _NT = NamedTuple("_NT", [("foo", int)])
-141 |     _E = Enum("_E", ["a", "b", "c"])
-142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
     |     ^^^^ RUF052
-143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-144 |     _DynamicClass = type("_DynamicClass", (), {})
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
     |
     = help: Remove leading underscores
 
-RUF052.py:143:5: RUF052 Local dummy variable `_NT3` is accessed
+RUF052.py:158:5: RUF052 Local dummy variable `_NT3` is accessed
     |
-141 |     _E = Enum("_E", ["a", "b", "c"])
-142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
     |     ^^^^ RUF052
-144 |     _DynamicClass = type("_DynamicClass", (), {})
-145 |     _NotADynamicClass = type("_NotADynamicClass")
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
     |
     = help: Remove leading underscores
 
-RUF052.py:144:5: RUF052 Local dummy variable `_DynamicClass` is accessed
+RUF052.py:159:5: RUF052 Local dummy variable `_DynamicClass` is accessed
     |
-142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-144 |     _DynamicClass = type("_DynamicClass", (), {})
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
     |     ^^^^^^^^^^^^^ RUF052
-145 |     _NotADynamicClass = type("_NotADynamicClass")
+160 |     _NotADynamicClass = type("_NotADynamicClass")
     |
     = help: Remove leading underscores
 
-RUF052.py:145:5: RUF052 Local dummy variable `_NotADynamicClass` is accessed
+RUF052.py:160:5: RUF052 Local dummy variable `_NotADynamicClass` is accessed
     |
-143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-144 |     _DynamicClass = type("_DynamicClass", (), {})
-145 |     _NotADynamicClass = type("_NotADynamicClass")
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
     |     ^^^^^^^^^^^^^^^^^ RUF052
-146 | 
-147 |     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+161 |
+162 |     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     |
     = help: Remove leading underscores

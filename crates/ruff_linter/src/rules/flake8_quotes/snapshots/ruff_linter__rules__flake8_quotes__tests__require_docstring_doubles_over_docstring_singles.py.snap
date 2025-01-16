@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
   |
@@ -8,7 +7,7 @@ docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quote
 2 | | Single quotes multiline module docstring
 3 | | '''
   | |___^ Q002
-4 |   
+4 |
 5 |   '''
   |
   = help: Replace single quotes docstring with double quotes
@@ -27,12 +26,11 @@ docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quot
    |
 12 |       class params \t not a docstring
 13 |   ''')):
-14 |       '''
-   |  _____^
+14 | /     '''
 15 | |     Single quotes multiline class docstring
 16 | |     '''
    | |_______^ Q002
-17 |   
+17 |
 18 |       '''
    |
    = help: Replace single quotes docstring with double quotes
@@ -54,12 +52,11 @@ docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quot
    |
 24 |           definitely not a docstring''',
 25 |           val=l[Cls():3]):
-26 |           '''
-   |  _________^
+26 | /         '''
 27 | |         Single quotes multiline function docstring
 28 | |         '''
    | |___________^ Q002
-29 |   
+29 |
 30 |           some_expression = 'hello world'
    |
    = help: Replace single quotes docstring with double quotes

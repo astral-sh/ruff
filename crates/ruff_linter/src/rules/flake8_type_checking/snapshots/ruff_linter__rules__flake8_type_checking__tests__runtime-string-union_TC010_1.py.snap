@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC010_1.py:19:30: TC010 [*] Invalid string member in `X | Y`-style union type
    |
 17 | type A = Value["int" | str]  # OK
-18 | 
+18 |
 19 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
    |                              ^^^^^ TC010
    |

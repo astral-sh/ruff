@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB164.py:7:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
   |
@@ -342,7 +341,7 @@ FURB164.py:22:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 21 | _ = Decimal.from_float(float("-Infinity"))
 22 | _ = Decimal.from_float(float("nan"))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
-23 | 
+23 |
 24 | # OK
    |
    = help: Replace with `Decimal` constructor

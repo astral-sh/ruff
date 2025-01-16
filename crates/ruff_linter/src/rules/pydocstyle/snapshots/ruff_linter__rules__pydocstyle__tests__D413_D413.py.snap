@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D413.py:7:1: D413 [*] Missing blank line after last section ("Returns")
   |
 5 |         with a hanging indent
-6 | 
+6 |
 7 | Returns:
   | ^^^^^^^ D413
 8 |     the value
@@ -25,7 +24,7 @@ D413.py:7:1: D413 [*] Missing blank line after last section ("Returns")
 D413.py:19:5: D413 [*] Missing blank line after last section ("Returns")
    |
 17 |             with a hanging indent
-18 | 
+18 |
 19 |     Returns:
    |     ^^^^^^^ D413
 20 |         the value
@@ -45,7 +44,7 @@ D413.py:19:5: D413 [*] Missing blank line after last section ("Returns")
 D413.py:58:5: D413 [*] Missing blank line after last section ("Returns")
    |
 56 |             with a hanging indent
-57 | 
+57 |
 58 |     Returns:
    |     ^^^^^^^ D413
 59 |         the value"""
@@ -67,7 +66,7 @@ D413.py:58:5: D413 [*] Missing blank line after last section ("Returns")
 D413.py:69:5: D413 [*] Missing blank line after last section ("Returns")
    |
 67 |             with a hanging indent
-68 | 
+68 |
 69 |     Returns:
    |     ^^^^^^^ D413
 70 |         the value

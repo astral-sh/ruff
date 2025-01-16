@@ -259,7 +259,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
         (Pylint, "R1730") => (RuleGroup::Stable, rules::pylint::rules::IfStmtMinMax),
-        (Pylint, "R1716") => (RuleGroup::Preview, rules::pylint::rules::BooleanChainedComparison),
+        (Pylint, "R1716") => (RuleGroup::Stable, rules::pylint::rules::BooleanChainedComparison),
         (Pylint, "R1733") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDictIndexLookup),
         (Pylint, "R1736") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryListIndexLookup),
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
@@ -317,8 +317,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Builtins, "002") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinArgumentShadowing),
         (Flake8Builtins, "003") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinAttributeShadowing),
         (Flake8Builtins, "004") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinImportShadowing),
-        (Flake8Builtins, "005") => (RuleGroup::Preview, rules::flake8_builtins::rules::StdlibModuleShadowing),
-        (Flake8Builtins, "006") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinLambdaArgumentShadowing),
+        (Flake8Builtins, "005") => (RuleGroup::Stable, rules::flake8_builtins::rules::StdlibModuleShadowing),
+        (Flake8Builtins, "006") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinLambdaArgumentShadowing),
 
         // flake8-bugbear
         (Flake8Bugbear, "002") => (RuleGroup::Stable, rules::flake8_bugbear::rules::UnaryPrefixIncrementDecrement),
@@ -830,6 +830,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "025") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestErroneousUseFixturesOnFixture),
         (Flake8PytestStyle, "026") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUseFixturesWithoutParameters),
         (Flake8PytestStyle, "027") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
+        (Flake8PytestStyle, "028") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestParameterWithDefaultArgument),
+        (Flake8PytestStyle, "029") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestWarnsWithoutWarning),
+        (Flake8PytestStyle, "030") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestWarnsTooBroad),
+        (Flake8PytestStyle, "031") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestWarnsWithMultipleStatements),
 
         // flake8-pie
         (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPlaceholder),
@@ -980,9 +984,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::UnusedAsync),
         (Ruff, "030") => (RuleGroup::Stable, rules::ruff::rules::AssertWithPrintMessage),
         (Ruff, "031") => (RuleGroup::Preview, rules::ruff::rules::IncorrectlyParenthesizedTupleInSubscript),
-        (Ruff, "032") => (RuleGroup::Preview, rules::ruff::rules::DecimalFromFloatLiteral),
-        (Ruff, "033") => (RuleGroup::Preview, rules::ruff::rules::PostInitDefault),
-        (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
+        (Ruff, "032") => (RuleGroup::Stable, rules::ruff::rules::DecimalFromFloatLiteral),
+        (Ruff, "033") => (RuleGroup::Stable, rules::ruff::rules::PostInitDefault),
+        (Ruff, "034") => (RuleGroup::Stable, rules::ruff::rules::UselessIfElse),
         (Ruff, "035") => (RuleGroup::Preview, rules::ruff::rules::UnsafeMarkupUse),
         (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
         (Ruff, "037") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall),
@@ -1108,7 +1112,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Stable, rules::refurb::rules::HashlibDigestHex),
         (Refurb, "187") => (RuleGroup::Stable, rules::refurb::rules::ListReverseCopy),
-        (Refurb, "188") => (RuleGroup::Preview, rules::refurb::rules::SliceToRemovePrefixOrSuffix),
+        (Refurb, "188") => (RuleGroup::Stable, rules::refurb::rules::SliceToRemovePrefixOrSuffix),
         (Refurb, "189") => (RuleGroup::Preview, rules::refurb::rules::SubclassBuiltin),
         (Refurb, "192") => (RuleGroup::Preview, rules::refurb::rules::SortedMinMax),
 
