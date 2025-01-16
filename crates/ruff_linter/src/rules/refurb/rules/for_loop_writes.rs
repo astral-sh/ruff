@@ -1,7 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -106,6 +107,12 @@ pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
         }
     };
 
+    let applicability = if checker.comment_ranges().intersects(for_stmt.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     checker.diagnostics.push(
         Diagnostic::new(
             ForLoopWrites {
@@ -113,9 +120,9 @@ pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
             },
             for_stmt.range,
         )
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
-            content,
-            for_stmt.range,
-        ))),
+        .with_fix(Fix::applicable_edit(
+            Edit::range_replacement(content, for_stmt.range),
+            applicability,
+        )),
     );
 }
