@@ -1,0 +1,129 @@
+# This file is used to autogenerate our Python AST data model.
+
+[Mod]
+comment = "/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
+
+[Mod.nodes]
+ModModule = {}
+ModExpression = {}
+
+[Stmt]
+add_suffix_to_is_methods = true
+comment = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+
+[Stmt.nodes]
+StmtFunctionDef = {}
+StmtClassDef = {}
+StmtReturn = {}
+StmtDelete = {}
+StmtTypeAlias = {}
+StmtAssign = {}
+StmtAugAssign = {}
+StmtAnnAssign = {}
+StmtFor = {}
+StmtWhile = {}
+StmtIf = {}
+StmtWith = {}
+StmtMatch = {}
+StmtRaise = {}
+StmtTry = {}
+StmtAssert = {}
+StmtImport = {}
+StmtImportFrom = {}
+StmtGlobal = {}
+StmtNonlocal = {}
+StmtExpr = {}
+StmtPass = {}
+StmtBreak = {}
+StmtContinue = {}
+StmtIpyEscapeCommand = {}
+
+[Expr]
+add_suffix_to_is_methods = true
+comment = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
+
+[Expr.nodes]
+ExprBoolOp = {}
+ExprNamed = {}
+ExprBinOp = {}
+ExprUnaryOp = {}
+ExprLambda = {}
+ExprIf = {}
+ExprDict = {}
+ExprSet = {}
+ExprListComp = {}
+ExprSetComp = {}
+ExprDictComp = {}
+ExprGenerator = {}
+ExprAwait = {}
+ExprYield = {}
+ExprYieldFrom = {}
+ExprCompare = {}
+ExprCall = {}
+ExprFString = {}
+ExprStringLiteral = {}
+ExprBytesLiteral = {}
+ExprNumberLiteral = {}
+ExprBooleanLiteral = {}
+ExprNoneLiteral = {}
+ExprEllipsisLiteral = {}
+ExprAttribute = {}
+ExprSubscript = {}
+ExprStarred = {}
+ExprName = {}
+ExprList = {}
+ExprTuple = {}
+ExprSlice = {}
+ExprIpyEscapeCommand = {}
+
+[ExceptHandler]
+comment = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
+
+[ExceptHandler.nodes]
+ExceptHandlerExceptHandler = {}
+
+[FStringElement.nodes]
+FStringExpressionElement = {variant = "Expression"}
+FStringLiteralElement = {variant = "Literal"}
+
+[Pattern]
+comment = "/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
+
+[Pattern.nodes]
+PatternMatchValue = {}
+PatternMatchSingleton = {}
+PatternMatchSequence = {}
+PatternMatchMapping = {}
+PatternMatchClass = {}
+PatternMatchStar = {}
+PatternMatchAs = {}
+PatternMatchOr = {}
+
+[TypeParam]
+comment = "/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
+
+[TypeParam.nodes]
+TypeParamTypeVar = {}
+TypeParamTypeVarTuple = {}
+TypeParamParamSpec = {}
+
+[ungrouped.nodes]
+FStringFormatSpec = {}
+PatternArguments = {}
+PatternKeyword = {}
+Comprehension = {}
+Arguments = {}
+Parameters = {}
+Parameter = {}
+ParameterWithDefault = {}
+Keyword = {}
+Alias = {}
+WithItem = {}
+MatchCase = {}
+Decorator = {}
+ElifElseClause = {}
+TypeParams = {}
+FString = {}
+StringLiteral = {}
+BytesLiteral = {}
+Identifier = {}

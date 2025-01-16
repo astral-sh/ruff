@@ -18,15 +18,8 @@ use crate::{
     int,
     str::Quote,
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
-    LiteralExpressionRef,
+    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Mod, Pattern, Stmt, TypeParam,
 };
-
-/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Mod {
-    Module(ModModule),
-    Expression(ModExpression),
-}
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
@@ -52,63 +45,6 @@ impl From<ModExpression> for Mod {
     fn from(payload: ModExpression) -> Self {
         Mod::Expression(payload)
     }
-}
-
-/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Stmt {
-    #[is(name = "function_def_stmt")]
-    FunctionDef(StmtFunctionDef),
-    #[is(name = "class_def_stmt")]
-    ClassDef(StmtClassDef),
-    #[is(name = "return_stmt")]
-    Return(StmtReturn),
-    #[is(name = "delete_stmt")]
-    Delete(StmtDelete),
-    #[is(name = "assign_stmt")]
-    Assign(StmtAssign),
-    #[is(name = "aug_assign_stmt")]
-    AugAssign(StmtAugAssign),
-    #[is(name = "ann_assign_stmt")]
-    AnnAssign(StmtAnnAssign),
-    #[is(name = "type_alias_stmt")]
-    TypeAlias(StmtTypeAlias),
-    #[is(name = "for_stmt")]
-    For(StmtFor),
-    #[is(name = "while_stmt")]
-    While(StmtWhile),
-    #[is(name = "if_stmt")]
-    If(StmtIf),
-    #[is(name = "with_stmt")]
-    With(StmtWith),
-    #[is(name = "match_stmt")]
-    Match(StmtMatch),
-    #[is(name = "raise_stmt")]
-    Raise(StmtRaise),
-    #[is(name = "try_stmt")]
-    Try(StmtTry),
-    #[is(name = "assert_stmt")]
-    Assert(StmtAssert),
-    #[is(name = "import_stmt")]
-    Import(StmtImport),
-    #[is(name = "import_from_stmt")]
-    ImportFrom(StmtImportFrom),
-    #[is(name = "global_stmt")]
-    Global(StmtGlobal),
-    #[is(name = "nonlocal_stmt")]
-    Nonlocal(StmtNonlocal),
-    #[is(name = "expr_stmt")]
-    Expr(StmtExpr),
-    #[is(name = "pass_stmt")]
-    Pass(StmtPass),
-    #[is(name = "break_stmt")]
-    Break(StmtBreak),
-    #[is(name = "continue_stmt")]
-    Continue(StmtContinue),
-
-    // Jupyter notebook specific
-    #[is(name = "ipy_escape_command_stmt")]
-    IpyEscapeCommand(StmtIpyEscapeCommand),
 }
 
 /// An AST node used to represent a IPython escape command at the statement level.
@@ -560,77 +496,6 @@ impl From<StmtContinue> for Stmt {
     fn from(payload: StmtContinue) -> Self {
         Stmt::Continue(payload)
     }
-}
-
-/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Expr {
-    #[is(name = "bool_op_expr")]
-    BoolOp(ExprBoolOp),
-    #[is(name = "named_expr")]
-    Named(ExprNamed),
-    #[is(name = "bin_op_expr")]
-    BinOp(ExprBinOp),
-    #[is(name = "unary_op_expr")]
-    UnaryOp(ExprUnaryOp),
-    #[is(name = "lambda_expr")]
-    Lambda(ExprLambda),
-    #[is(name = "if_expr")]
-    If(ExprIf),
-    #[is(name = "dict_expr")]
-    Dict(ExprDict),
-    #[is(name = "set_expr")]
-    Set(ExprSet),
-    #[is(name = "list_comp_expr")]
-    ListComp(ExprListComp),
-    #[is(name = "set_comp_expr")]
-    SetComp(ExprSetComp),
-    #[is(name = "dict_comp_expr")]
-    DictComp(ExprDictComp),
-    #[is(name = "generator_expr")]
-    Generator(ExprGenerator),
-    #[is(name = "await_expr")]
-    Await(ExprAwait),
-    #[is(name = "yield_expr")]
-    Yield(ExprYield),
-    #[is(name = "yield_from_expr")]
-    YieldFrom(ExprYieldFrom),
-    #[is(name = "compare_expr")]
-    Compare(ExprCompare),
-    #[is(name = "call_expr")]
-    Call(ExprCall),
-    #[is(name = "f_string_expr")]
-    FString(ExprFString),
-    #[is(name = "string_literal_expr")]
-    StringLiteral(ExprStringLiteral),
-    #[is(name = "bytes_literal_expr")]
-    BytesLiteral(ExprBytesLiteral),
-    #[is(name = "number_literal_expr")]
-    NumberLiteral(ExprNumberLiteral),
-    #[is(name = "boolean_literal_expr")]
-    BooleanLiteral(ExprBooleanLiteral),
-    #[is(name = "none_literal_expr")]
-    NoneLiteral(ExprNoneLiteral),
-    #[is(name = "ellipsis_literal_expr")]
-    EllipsisLiteral(ExprEllipsisLiteral),
-    #[is(name = "attribute_expr")]
-    Attribute(ExprAttribute),
-    #[is(name = "subscript_expr")]
-    Subscript(ExprSubscript),
-    #[is(name = "starred_expr")]
-    Starred(ExprStarred),
-    #[is(name = "name_expr")]
-    Name(ExprName),
-    #[is(name = "list_expr")]
-    List(ExprList),
-    #[is(name = "tuple_expr")]
-    Tuple(ExprTuple),
-    #[is(name = "slice_expr")]
-    Slice(ExprSlice),
-
-    // Jupyter notebook specific
-    #[is(name = "ipy_escape_command_expr")]
-    IpyEscapeCommand(ExprIpyEscapeCommand),
 }
 
 impl Expr {
@@ -1652,12 +1517,6 @@ impl fmt::Debug for FStringElements {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
-}
-
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum FStringElement {
-    Literal(FStringLiteralElement),
-    Expression(FStringExpressionElement),
 }
 
 impl Ranged for FStringElement {
@@ -3135,12 +2994,6 @@ pub struct Comprehension {
     pub is_async: bool,
 }
 
-/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum ExceptHandler {
-    ExceptHandler(ExceptHandlerExceptHandler),
-}
-
 /// See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExceptHandlerExceptHandler {
@@ -3195,19 +3048,6 @@ pub struct MatchCase {
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
-}
-
-/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Pattern {
-    MatchValue(PatternMatchValue),
-    MatchSingleton(PatternMatchSingleton),
-    MatchSequence(PatternMatchSequence),
-    MatchMapping(PatternMatchMapping),
-    MatchClass(PatternMatchClass),
-    MatchStar(PatternMatchStar),
-    MatchAs(PatternMatchAs),
-    MatchOr(PatternMatchOr),
 }
 
 impl Pattern {
@@ -3376,14 +3216,6 @@ impl From<PatternMatchOr> for Pattern {
     fn from(payload: PatternMatchOr) -> Self {
         Pattern::MatchOr(payload)
     }
-}
-
-/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum TypeParam {
-    TypeVar(TypeParamTypeVar),
-    ParamSpec(TypeParamParamSpec),
-    TypeVarTuple(TypeParamTypeVarTuple),
 }
 
 impl TypeParam {

@@ -2,6 +2,7 @@ use std::ffi::OsStr;
 use std::path::Path;
 
 pub use expression::*;
+pub use generated::*;
 pub use int::*;
 pub use node::{AnyNode, AnyNodeRef, AstNode, NodeKind};
 pub use nodes::*;
@@ -9,6 +10,7 @@ pub use nodes::*;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
+mod generated;
 pub mod helpers;
 pub mod identifier;
 mod int;
