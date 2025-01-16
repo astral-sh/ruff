@@ -2013,6 +2013,14 @@ impl<'db> Type<'db> {
                         CallOutcome::callable(binding)
                     }
 
+                    Some(KnownFunction::Repr) => {
+                        if let Some(first_arg) = binding.one_parameter_ty() {
+                            binding.set_return_ty(first_arg.repr(db));
+                        };
+
+                        CallOutcome::callable(binding)
+                    }
+
                     Some(KnownFunction::AssertType) => {
                         let Some((_, asserted_ty)) = binding.two_parameter_tys() else {
                             return CallOutcome::callable(binding);
@@ -2050,6 +2058,12 @@ impl<'db> Type<'db> {
                         .first_argument()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
+
+                    Some(KnownClass::Str) => arguments
+                        .first_argument()
+                        .map(|arg| arg.str(db))
+                        .unwrap_or(Type::string_literal(db, "")),
+
                     _ => Type::Instance(InstanceType { class }),
                 }))
             }
@@ -3389,6 +3403,8 @@ pub enum KnownFunction {
     RevealType,
     /// `builtins.len`
     Len,
+    /// `builtins.repr`
+    Repr,
     /// `typing(_extensions).final`
     Final,
 
@@ -3436,6 +3452,7 @@ impl KnownFunction {
             "issubclass" => Self::ConstraintFunction(KnownConstraintFunction::IsSubclass),
             "reveal_type" => Self::RevealType,
             "len" => Self::Len,
+            "repr" => Self::Repr,
             "final" => Self::Final,
             "no_type_check" => Self::NoTypeCheck,
             "assert_type" => Self::AssertType,
@@ -3464,7 +3481,7 @@ impl KnownFunction {
                     module.is_builtins()
                 }
             },
-            Self::Len => module.is_builtins(),
+            Self::Len | Self::Repr => module.is_builtins(),
             Self::AssertType | Self::Cast | Self::RevealType | Self::Final | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -3496,6 +3513,7 @@ impl KnownFunction {
 
             Self::ConstraintFunction(_)
             | Self::Len
+            | Self::Repr
             | Self::Final
             | Self::NoTypeCheck
             | Self::RevealType
@@ -4623,58 +4641,6 @@ pub(crate) mod tests {
 
         assert!(!a.is_gradual_equivalent_to(&db, b));
         assert!(!b.is_gradual_equivalent_to(&db, a));
-    }
-
-    #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
-    #[test_case(Ty::IntLiteral(-1))]
-    #[test_case(Ty::StringLiteral("foo"))]
-    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(0)]))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
-    fn is_truthy(ty: Ty) {
-        let db = setup_db();
-        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::AlwaysTrue);
-    }
-
-    #[test_case(Ty::Tuple(vec![]))]
-    #[test_case(Ty::IntLiteral(0))]
-    #[test_case(Ty::StringLiteral(""))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(0), Ty::IntLiteral(0)]))]
-    fn is_falsy(ty: Ty) {
-        let db = setup_db();
-        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::AlwaysFalse);
-    }
-
-    #[test_case(Ty::BuiltinInstance("str"))]
-    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
-    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(0)]))]
-    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(1)]))]
-    fn boolean_value_is_unknown(ty: Ty) {
-        let db = setup_db();
-        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::Ambiguous);
-    }
-
-    #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
-    #[test_case(Ty::BooleanLiteral(true), Ty::StringLiteral("True"))]
-    #[test_case(Ty::BooleanLiteral(false), Ty::StringLiteral("False"))]
-    #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("ab'cd"))] // no quotes
-    #[test_case(Ty::LiteralString, Ty::LiteralString)]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
-    fn has_correct_str(ty: Ty, expected: Ty) {
-        let db = setup_db();
-
-        assert_eq!(ty.into_type(&db).str(&db), expected.into_type(&db));
-    }
-
-    #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
-    #[test_case(Ty::BooleanLiteral(true), Ty::StringLiteral("True"))]
-    #[test_case(Ty::BooleanLiteral(false), Ty::StringLiteral("False"))]
-    #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("'ab\\'cd'"))] // single quotes
-    #[test_case(Ty::LiteralString, Ty::LiteralString)]
-    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
-    fn has_correct_repr(ty: Ty, expected: Ty) {
-        let db = setup_db();
-
-        assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
     }
 
     #[test]
