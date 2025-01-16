@@ -89,33 +89,10 @@ jobs:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
 
-  custom-build-binaries:
-    needs:
-      - plan
-    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
-    uses: ./.github/workflows/build-binaries.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
-
-  custom-build-docker:
-    needs:
-      - plan
-    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
-    uses: ./.github/workflows/build-docker.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
-    permissions:
-      "contents": "read"
-      "packages": "write"
-
   # Build and package all the platform-agnostic(ish) things
   build-global-artifacts:
     needs:
       - plan
-      - custom-build-binaries
-      - custom-build-docker
     runs-on: "ubuntu-20.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -160,11 +137,9 @@ jobs:
   host:
     needs:
       - plan
-      - custom-build-binaries
-      - custom-build-docker
       - build-global-artifacts
     # Only run if we're "publishing", and only if local and global didn't fail (skipped is fine)
-    if: ${{ always() && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-binaries.result == 'skipped' || needs.custom-build-binaries.result == 'success') && (needs.custom-build-docker.result == 'skipped' || needs.custom-build-docker.result == 'success') }}
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "ubuntu-20.04"
@@ -202,20 +177,6 @@ jobs:
           name: artifacts-dist-manifest
           path: dist-manifest.json
 
-  custom-publish-pypi:
-    needs:
-      - plan
-      - host
-    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-pypi.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
-    # publish jobs get escalated permissions
-    permissions:
-      "id-token": "write"
-      "packages": "write"
-
   custom-publish-wasm:
     needs:
       - plan
@@ -236,12 +197,11 @@ jobs:
     needs:
       - plan
       - host
-      - custom-publish-pypi
       - custom-publish-wasm
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-pypi.result == 'skipped' || needs.custom-publish-pypi.result == 'success') && (needs.custom-publish-wasm.result == 'skipped' || needs.custom-publish-wasm.result == 'success') }}
+    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-wasm.result == 'skipped' || needs.custom-publish-wasm.result == 'success') }}
     runs-on: "ubuntu-20.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
