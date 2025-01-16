@@ -294,6 +294,11 @@ fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
             )),
             _ => None,
         },
+        ["airflow", "secrets", "local_filesystem", "LocalFilesystemBackend"] => match attr.as_str()
+        {
+            "get_connections" => Some(Replacement::Name("get_connection")),
+            _ => None,
+        },
         ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
             "iter_datasets" => Some(Replacement::Name("iter_assets")),
             "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
@@ -543,12 +548,13 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "secrets", "local_filesystem", "load_connections"] => {
             Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
         }
-        ["airflow", "secrets", "local_filesystem", "get_connection"] => {
-            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
-        }
 
+        // airflow.utils.dag_parsing_context
+        ["airflow", "utils", "dag_parsing_context", "get_parsing_context"] => {
+            Replacement::Name("airflow.sdk.get_parsing_context")
+        }
         // airflow.utils.dates
-        ["airflow", "utils", "dates", "date_range"] => Replacement::Name("airflow.timetables."),
+        ["airflow", "utils", "dates", "date_range"] => Replacement::None,
         ["airflow", "utils", "dates", "days_ago"] => {
             Replacement::Name("pendulum.today('UTC').add(days=-N, ...)")
         }
