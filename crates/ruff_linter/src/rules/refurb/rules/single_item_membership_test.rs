@@ -195,7 +195,7 @@ fn merge_to_be_removed_comments(
         .filter(|token| matches!(token.kind(), TokenKind::Comment))
         .map(|token| locator.slice(token))
         .for_each(|comment| {
-            aggregated_comments.push_str(&*format!("{comment}{line_ending}{stmt_indentation}"));
+            aggregated_comments.push_str(&format!("{comment}{line_ending}{stmt_indentation}"));
         });
 
     aggregated_comments
