@@ -286,6 +286,7 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
     }
 
+    // Regression test for https://github.com/astral-sh/ruff/issues/12897
     #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
     fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
