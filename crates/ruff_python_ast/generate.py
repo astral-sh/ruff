@@ -152,6 +152,48 @@ out.append("""
 """)
 
 # ------------------------------------------------------------------------------
+# AstNode
+
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""
+        impl crate::AstNode for {node.ty} {{
+            type Ref<'a> = &'a Self;
+
+            fn cast(kind: AnyNode) -> Option<Self>
+            where
+                Self: Sized,
+            {{
+                if let AnyNode::{node.name}(node) = kind {{
+                    Some(node)
+                }} else {{
+                    None
+                }}
+            }}
+
+            fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {{
+                if let AnyNodeRef::{node.name}(node) = kind {{
+                    Some(node)
+                }} else {{
+                    None
+                }}
+            }}
+
+            fn can_cast(kind: crate::NodeKind) -> bool {{
+                matches!(kind, crate::NodeKind::{node.name})
+            }}
+
+            fn as_any_node_ref(&self) -> AnyNodeRef {{
+                AnyNodeRef::from(self)
+            }}
+
+            fn into_any_node(self) -> AnyNode {{
+                AnyNode::from(self)
+            }}
+        }}
+        """)
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 out_path.write_text(rustfmt("\n".join(out)))

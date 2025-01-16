@@ -1468,3 +1468,3223 @@ pub enum AnyNodeRef<'a> {
     BytesLiteral(&'a crate::BytesLiteral),
     Identifier(&'a crate::Identifier),
 }
+
+impl crate::AstNode for crate::ModModule {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ModModule(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ModModule(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ModModule)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ModExpression {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ModExpression(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ModExpression(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ModExpression)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtFunctionDef {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtFunctionDef(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtFunctionDef(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtFunctionDef)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtClassDef {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtClassDef(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtClassDef(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtClassDef)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtReturn {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtReturn(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtReturn(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtReturn)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtDelete {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtDelete(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtDelete(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtDelete)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtTypeAlias {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtTypeAlias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtTypeAlias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtTypeAlias)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtAssign {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtAssign(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtAssign(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtAssign)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtAugAssign {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtAugAssign(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtAugAssign(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtAugAssign)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtAnnAssign {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtAnnAssign(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtAnnAssign(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtAnnAssign)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtFor {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtFor(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtFor(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtFor)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtWhile {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtWhile(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtWhile(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtWhile)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtIf {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtIf(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtIf(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtIf)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtWith {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtWith(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtWith(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtWith)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtMatch {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtMatch(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtMatch(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtMatch)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtRaise {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtRaise(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtRaise(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtRaise)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtTry {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtTry(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtTry(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtTry)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtAssert {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtAssert(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtAssert(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtAssert)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtImport {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtImport(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtImport(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtImport)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtImportFrom {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtImportFrom(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtImportFrom(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtImportFrom)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtGlobal {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtGlobal(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtGlobal(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtGlobal)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtNonlocal {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtNonlocal(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtNonlocal(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtNonlocal)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtExpr {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtExpr(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtExpr(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtExpr)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtPass {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtPass(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtPass(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtPass)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtBreak {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtBreak(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtBreak(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtBreak)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtContinue {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtContinue(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtContinue(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtContinue)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StmtIpyEscapeCommand {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtIpyEscapeCommand(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtIpyEscapeCommand(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StmtIpyEscapeCommand)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprBoolOp {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprBoolOp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprBoolOp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprBoolOp)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprNamed {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprNamed(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprNamed(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprNamed)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprBinOp {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprBinOp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprBinOp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprBinOp)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprUnaryOp {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprUnaryOp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprUnaryOp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprUnaryOp)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprLambda {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprLambda(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprLambda(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprLambda)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprIf {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprIf(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprIf(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprIf)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprDict {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprDict(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprDict(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprDict)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprSet {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprSet(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprSet(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprSet)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprListComp {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprListComp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprListComp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprListComp)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprSetComp {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprSetComp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprSetComp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprSetComp)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprDictComp {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprDictComp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprDictComp(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprDictComp)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprGenerator {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprGenerator(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprGenerator(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprGenerator)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprAwait {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprAwait(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprAwait(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprAwait)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprYield {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprYield(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprYield(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprYield)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprYieldFrom {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprYieldFrom(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprYieldFrom(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprYieldFrom)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprCompare {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprCompare(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprCompare(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprCompare)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprCall {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprCall(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprCall(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprCall)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprFString {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprFString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprFString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprFString)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprStringLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprStringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprStringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprStringLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprBytesLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprBytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprBytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprBytesLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprNumberLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprNumberLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprNumberLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprNumberLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprBooleanLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprBooleanLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprBooleanLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprBooleanLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprNoneLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprNoneLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprNoneLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprNoneLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprEllipsisLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprEllipsisLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprEllipsisLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprEllipsisLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprAttribute {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprAttribute(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprAttribute(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprAttribute)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprSubscript {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprSubscript(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprSubscript(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprSubscript)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprStarred {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprStarred(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprStarred(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprStarred)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprName {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprName(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprName(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprName)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprList {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprList(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprList(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprList)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprTuple {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprTuple)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprSlice {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprSlice(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprSlice(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprSlice)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExprIpyEscapeCommand {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprIpyEscapeCommand(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprIpyEscapeCommand(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExprIpyEscapeCommand)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ExceptHandlerExceptHandler {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExceptHandlerExceptHandler(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExceptHandlerExceptHandler(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ExceptHandlerExceptHandler)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::FStringExpressionElement {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FStringExpressionElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FStringExpressionElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::FStringExpressionElement)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::FStringLiteralElement {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FStringLiteralElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FStringLiteralElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::FStringLiteralElement)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchValue {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchValue(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchValue(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchValue)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchSingleton {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchSingleton(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchSingleton(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchSingleton)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchSequence {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchSequence(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchSequence(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchSequence)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchMapping {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchMapping(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchMapping(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchMapping)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchClass {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchClass(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchClass(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchClass)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchStar {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchStar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchStar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchStar)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchAs {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchAs(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchAs(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchAs)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternMatchOr {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchOr(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchOr(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternMatchOr)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::TypeParamTypeVar {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamTypeVar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamTypeVar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::TypeParamTypeVar)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::TypeParamTypeVarTuple {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamTypeVarTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamTypeVarTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::TypeParamTypeVarTuple)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::TypeParamParamSpec {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamParamSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamParamSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::TypeParamParamSpec)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::FStringFormatSpec {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FStringFormatSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FStringFormatSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::FStringFormatSpec)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternArguments {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternArguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternArguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternArguments)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::PatternKeyword {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternKeyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternKeyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::PatternKeyword)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Comprehension {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Comprehension(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Comprehension(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Comprehension)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Arguments {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Arguments)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Parameters {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Parameters(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Parameters(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Parameters)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Parameter {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Parameter(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Parameter(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Parameter)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ParameterWithDefault {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ParameterWithDefault(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ParameterWithDefault(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ParameterWithDefault)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Keyword {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Keyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Keyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Keyword)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Alias {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Alias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Alias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Alias)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::WithItem {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::WithItem(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::WithItem(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::WithItem)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::MatchCase {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::MatchCase(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::MatchCase(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::MatchCase)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Decorator {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Decorator(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Decorator(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Decorator)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::ElifElseClause {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ElifElseClause(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ElifElseClause(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::ElifElseClause)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::TypeParams {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParams(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParams(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::TypeParams)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::FString {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::FString)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::StringLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::StringLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::BytesLiteral {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::BytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::BytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::BytesLiteral)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
+impl crate::AstNode for crate::Identifier {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Identifier(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Identifier(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: crate::NodeKind) -> bool {
+        matches!(kind, crate::NodeKind::Identifier)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
