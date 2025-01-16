@@ -733,12 +733,6 @@ pub struct FStringFormatSpec {
     pub elements: FStringElements,
 }
 
-impl Ranged for FStringFormatSpec {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringExpressionElement {
@@ -747,12 +741,6 @@ pub struct FStringExpressionElement {
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
     pub format_spec: Option<Box<FStringFormatSpec>>,
-}
-
-impl Ranged for FStringExpressionElement {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
@@ -765,12 +753,6 @@ pub struct FStringLiteralElement {
 impl FStringLiteralElement {
     pub fn is_valid(&self) -> bool {
         !self.value.is_empty()
-    }
-}
-
-impl Ranged for FStringLiteralElement {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 
@@ -1167,12 +1149,6 @@ pub struct FString {
     pub flags: FStringFlags,
 }
 
-impl Ranged for FString {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 impl From<FString> for Expr {
     fn from(payload: FString) -> Self {
         ExprFString {
@@ -1243,27 +1219,12 @@ impl fmt::Debug for FStringElements {
     }
 }
 
-impl Ranged for FStringElement {
-    fn range(&self) -> TextRange {
-        match self {
-            FStringElement::Literal(node) => node.range(),
-            FStringElement::Expression(node) => node.range(),
-        }
-    }
-}
-
 /// An AST node that represents either a single string literal or an implicitly
 /// concatenated string literals.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprStringLiteral {
     pub range: TextRange,
     pub value: StringLiteralValue,
-}
-
-impl Ranged for ExprStringLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// The value representing a [`ExprStringLiteral`].
@@ -1566,12 +1527,6 @@ pub struct StringLiteral {
     pub flags: StringLiteralFlags,
 }
 
-impl Ranged for StringLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 impl Deref for StringLiteral {
     type Target = str;
 
@@ -1654,12 +1609,6 @@ impl Debug for ConcatenatedStringLiteral {
 pub struct ExprBytesLiteral {
     pub range: TextRange,
     pub value: BytesLiteralValue,
-}
-
-impl Ranged for ExprBytesLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// The value representing a [`ExprBytesLiteral`].
@@ -1921,12 +1870,6 @@ pub struct BytesLiteral {
     pub range: TextRange,
     pub value: Box<[u8]>,
     pub flags: BytesLiteralFlags,
-}
-
-impl Ranged for BytesLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 impl Deref for BytesLiteral {
@@ -2257,12 +2200,6 @@ pub struct ExprNumberLiteral {
     pub value: Number,
 }
 
-impl Ranged for ExprNumberLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Number {
     Int(int::Int),
@@ -2276,32 +2213,14 @@ pub struct ExprBooleanLiteral {
     pub value: bool,
 }
 
-impl Ranged for ExprBooleanLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprNoneLiteral {
     pub range: TextRange,
 }
 
-impl Ranged for ExprNoneLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprEllipsisLiteral {
     pub range: TextRange,
-}
-
-impl Ranged for ExprEllipsisLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
@@ -3507,12 +3426,6 @@ impl From<Identifier> for Name {
     }
 }
 
-impl Ranged for Identifier {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Singleton {
     None,
@@ -3527,512 +3440,6 @@ impl From<bool> for Singleton {
         } else {
             Singleton::False
         }
-    }
-}
-
-impl Ranged for crate::nodes::ModModule {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ModExpression {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Mod {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::Module(node) => node.range(),
-            Self::Expression(node) => node.range(),
-        }
-    }
-}
-
-impl Ranged for crate::nodes::StmtFunctionDef {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtClassDef {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtReturn {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtDelete {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtTypeAlias {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAssign {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAugAssign {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAnnAssign {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtFor {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtWhile {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtIf {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ElifElseClause {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtWith {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtMatch {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtRaise {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtTry {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAssert {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtImport {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtImportFrom {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtGlobal {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtNonlocal {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtExpr {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtPass {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtBreak {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtContinue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtIpyEscapeCommand {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Stmt {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::FunctionDef(node) => node.range(),
-            Self::ClassDef(node) => node.range(),
-            Self::Return(node) => node.range(),
-            Self::Delete(node) => node.range(),
-            Self::TypeAlias(node) => node.range(),
-            Self::Assign(node) => node.range(),
-            Self::AugAssign(node) => node.range(),
-            Self::AnnAssign(node) => node.range(),
-            Self::For(node) => node.range(),
-            Self::While(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::With(node) => node.range(),
-            Self::Match(node) => node.range(),
-            Self::Raise(node) => node.range(),
-            Self::Try(node) => node.range(),
-            Self::Assert(node) => node.range(),
-            Self::Import(node) => node.range(),
-            Self::ImportFrom(node) => node.range(),
-            Self::Global(node) => node.range(),
-            Self::Nonlocal(node) => node.range(),
-            Self::Expr(node) => node.range(),
-            Self::Pass(node) => node.range(),
-            Self::Break(node) => node.range(),
-            Self::Continue(node) => node.range(),
-            Stmt::IpyEscapeCommand(node) => node.range(),
-        }
-    }
-}
-
-impl Ranged for crate::nodes::ExprBoolOp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprNamed {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprBinOp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprUnaryOp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprLambda {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprIf {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprDict {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSet {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprListComp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSetComp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprDictComp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprGenerator {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprAwait {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprYield {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprYieldFrom {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprCompare {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprCall {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprFString {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprAttribute {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSubscript {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprStarred {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprName {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprList {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprTuple {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSlice {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprIpyEscapeCommand {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Expr {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::BoolOp(node) => node.range(),
-            Self::Named(node) => node.range(),
-            Self::BinOp(node) => node.range(),
-            Self::UnaryOp(node) => node.range(),
-            Self::Lambda(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::Dict(node) => node.range(),
-            Self::Set(node) => node.range(),
-            Self::ListComp(node) => node.range(),
-            Self::SetComp(node) => node.range(),
-            Self::DictComp(node) => node.range(),
-            Self::Generator(node) => node.range(),
-            Self::Await(node) => node.range(),
-            Self::Yield(node) => node.range(),
-            Self::YieldFrom(node) => node.range(),
-            Self::Compare(node) => node.range(),
-            Self::Call(node) => node.range(),
-            Self::FString(node) => node.range(),
-            Self::StringLiteral(node) => node.range(),
-            Self::BytesLiteral(node) => node.range(),
-            Self::NumberLiteral(node) => node.range(),
-            Self::BooleanLiteral(node) => node.range(),
-            Self::NoneLiteral(node) => node.range(),
-            Self::EllipsisLiteral(node) => node.range(),
-            Self::Attribute(node) => node.range(),
-            Self::Subscript(node) => node.range(),
-            Self::Starred(node) => node.range(),
-            Self::Name(node) => node.range(),
-            Self::List(node) => node.range(),
-            Self::Tuple(node) => node.range(),
-            Self::Slice(node) => node.range(),
-            Self::IpyEscapeCommand(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::Comprehension {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExceptHandlerExceptHandler {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::ExceptHandler {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::ExceptHandler(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::Parameter {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Keyword {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Alias {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::WithItem {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::MatchCase {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchValue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchSingleton {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchSequence {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchMapping {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchClass {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchStar {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchAs {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchOr {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Pattern {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::MatchValue(node) => node.range(),
-            Self::MatchSingleton(node) => node.range(),
-            Self::MatchSequence(node) => node.range(),
-            Self::MatchMapping(node) => node.range(),
-            Self::MatchClass(node) => node.range(),
-            Self::MatchStar(node) => node.range(),
-            Self::MatchAs(node) => node.range(),
-            Self::MatchOr(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::PatternArguments {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternKeyword {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl Ranged for crate::nodes::TypeParams {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::TypeParamTypeVar {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::TypeParamTypeVarTuple {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::TypeParamParamSpec {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::TypeParam {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::TypeVar(node) => node.range(),
-            Self::TypeVarTuple(node) => node.range(),
-            Self::ParamSpec(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::Decorator {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Arguments {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Parameters {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ParameterWithDefault {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 

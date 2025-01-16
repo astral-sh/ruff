@@ -103,6 +103,29 @@ for group in groups:
         }}
         """)
 
+    out.append(f"""
+    impl ruff_text_size::Ranged for {group.owned_enum_ty} {{
+        fn range(&self) -> ruff_text_size::TextRange {{
+            match self {{
+    """)
+    for node in group.nodes:
+        out.append(f"Self::{node.variant}(node) => node.range(),")
+    out.append("""
+            }
+        }
+    }
+    """)
+
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""
+        impl ruff_text_size::Ranged for {node.ty} {{
+            fn range(&self) -> ruff_text_size::TextRange {{
+                self.range
+            }}
+        }}
+        """)
+
 # ------------------------------------------------------------------------------
 # Format and write output
 
