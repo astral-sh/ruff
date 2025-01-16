@@ -88,12 +88,7 @@ pub(super) fn order_union_elements<'db>(
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
 
         (Type::Tuple(left), Type::Tuple(right)) => {
-            let left_elements = left.elements(db);
-            let right_elements = right.elements(db);
-            left_elements
-                .len()
-                .cmp(&right_elements.len())
-                .then_with(|| order_sequences(db, left_elements, right_elements))
+            order_sequences(db, left.elements(db), right.elements(db))
         }
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,
@@ -168,33 +163,14 @@ pub(super) fn order_union_elements<'db>(
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
         (Type::Union(left), Type::Union(right)) => {
-            let left_elements = left.elements(db);
-            let right_elements = right.elements(db);
-            left_elements
-                .len()
-                .cmp(&right_elements.len())
-                .then_with(|| order_sequences(db, left_elements, right_elements))
+            order_sequences(db, left.elements(db), right.elements(db))
         }
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
 
         (Type::Intersection(left), Type::Intersection(right)) => {
-            let left_pos = left.positive(db);
-            let right_pos = right.positive(db);
-            let left_neg = left.negative(db);
-            let right_neg = right.negative(db);
-
-            left_pos
-                .len()
-                .cmp(&right_pos.len())
-                .then_with(|| left_neg.len().cmp(&right_neg.len()))
-                .then_with(|| {
-                    order_sequences(
-                        db,
-                        left_pos.iter().chain(left_neg),
-                        right_pos.iter().chain(right_neg),
-                    )
-                })
+            order_sequences(db, left.positive(db), right.positive(db))
+                .then_with(|| order_sequences(db, left.negative(db), right.negative(db)))
         }
     }
 }
@@ -283,14 +259,18 @@ fn order_dynamic_elements(left: DynamicType, right: DynamicType) -> Ordering {
 /// Determine a canonical order for two types that wrap sequences of other types.
 ///
 /// This is useful for ordering tuples, unions and intersections.
-fn order_sequences<'db>(
-    db: &'db dyn Db,
-    left: impl IntoIterator<Item = &'db Type<'db>>,
-    right: impl IntoIterator<Item = &'db Type<'db>>,
-) -> Ordering {
-    left.into_iter()
-        .zip(right)
-        .map(|(left, right)| order_union_elements(db, left, right))
-        .find(|ordering| !ordering.is_eq())
-        .unwrap_or(Ordering::Equal)
+fn order_sequences<'db, I, J>(db: &'db dyn Db, left: I, right: I) -> Ordering
+where
+    I: IntoIterator<IntoIter = J>,
+    J: ExactSizeIterator<Item = &'db Type<'db>>,
+{
+    let left = left.into_iter();
+    let right = right.into_iter();
+
+    left.len().cmp(&right.len()).then_with(|| {
+        left.zip(right)
+            .map(|(left, right)| order_union_elements(db, left, right))
+            .find(|ordering| !ordering.is_eq())
+            .unwrap_or(Ordering::Equal)
+    })
 }
