@@ -48,8 +48,16 @@ starmap(
    ),
 )
 
-
-
+starmap(
+    func \
+    , \
+    zip \
+        (
+            a,\
+            b,\
+            c,\
+        )
+)
 
 
 # No errors

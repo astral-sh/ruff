@@ -173,6 +173,8 @@ RUF058.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 48 | |    ),
 49 | | )
    | |_^ RUF058
+50 |   
+51 |   starmap(
    |
    = help: Use `map` instead
 
@@ -203,4 +205,43 @@ RUF058.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
    40 |+   
 49 41 | )
 50 42 | 
-51 43 |
+51 43 | starmap(
+
+RUF058.py:51:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+   |
+49 |   )
+50 |   
+51 | / starmap(
+52 | |     func \
+53 | |     , \
+54 | |     zip \
+55 | |         (
+56 | |             a,\
+57 | |             b,\
+58 | |             c,\
+59 | |         )
+60 | | )
+   | |_^ RUF058
+   |
+   = help: Use `map` instead
+
+ℹ Safe fix
+48 48 |    ),
+49 49 | )
+50 50 | 
+51    |-starmap(
+   51 |+map(
+52 52 |     func \
+53 53 |     , \
+54    |-    zip \
+55    |-        (
+   54 |+     \
+   55 |+        
+56 56 |             a,\
+57 57 |             b,\
+58 58 |             c,\
+59    |-        )
+   59 |+        
+60 60 | )
+61 61 | 
+62 62 |
