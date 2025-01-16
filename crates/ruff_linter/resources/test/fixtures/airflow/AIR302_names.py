@@ -66,7 +66,7 @@ from airflow.providers.openlineage.utils.utils import (
 )
 from airflow.providers.postgres.datasets import postgres
 from airflow.providers.trino.datasets import trino
-from airflow.secrets.local_filesystem import get_connection, load_connections
+from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connections
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
 from airflow.sensors.date_time_sensor import DateTimeSensor
@@ -84,6 +84,7 @@ from airflow.timetables.simple import DatasetTriggeredTimetable
 from airflow.triggers.external_task import TaskStateTrigger
 from airflow.utils import dates
 from airflow.utils.dag_cycle_tester import test_cycle
+from airflow.utils.dag_parsing_context import get_parsing_context
 from airflow.utils.dates import (
     date_range,
     datetime_to_nano,
@@ -225,7 +226,10 @@ postgres.sanitize_uri
 trino.sanitize_uri
 
 # airflow.secrets
-get_connection, load_connections
+# get_connection
+lfb = LocalFilesystemBackend()
+lfb.get_connections()
+load_connections
 
 # airflow.security.permissions
 RESOURCE_DATASET
@@ -271,6 +275,9 @@ dates.datetime_to_nano
 
 # airflow.utils.dag_cycle_tester
 test_cycle
+
+# airflow.utils.dag_parsing_context
+get_parsing_context
 
 # airflow.utils.decorators
 apply_defaults
