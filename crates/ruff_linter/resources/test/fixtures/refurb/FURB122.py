@@ -31,6 +31,12 @@ with Path("file").open("w") as f:
     for line in lines:
         f.write(line)
 
+# Offer unsafe fix if it would delete comments
+with open("file","w") as f:
+    for line in lines:
+        # a really important comment
+        f.write(line)
+
 # OK
 
 for line in lines:
