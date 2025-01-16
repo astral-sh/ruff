@@ -1,10 +1,12 @@
+use std::hash::Hash;
+
+use ruff_python_semantic::{analyze::class::any_super_class, SemanticModel};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
-use std::collections::HashMap;
 
 use crate::checkers::ast::Checker;
 
@@ -49,21 +51,58 @@ impl Violation for RedefinedSlotsInSubclass {
 }
 
 // PLW0244
-pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, body: &[Stmt]) {
-    for slot in redefined_slots(body) {
-        checker.diagnostics.push(Diagnostic::new(
-            RedefinedSlotsInSubclass {
-                name: slot.name.to_string(),
-            },
-            slot.range(),
-        ));
+pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    // Early return if this is not a subclass
+    if class_def.bases().is_empty() {
+        return;
     }
+
+    let ast::StmtClassDef { body, .. } = class_def;
+    let class_slots = slots_members(body);
+
+    // If there are no slots, we're safe
+    if class_slots.is_empty() {
+        return;
+    }
+
+    let semantic = checker.semantic();
+    let mut diagnostics: Vec<_> = class_slots
+        .iter()
+        .filter(|&slot| contained_in_super_slots(class_def, semantic, slot))
+        .map(|slot| {
+            Diagnostic::new(
+                RedefinedSlotsInSubclass {
+                    name: slot.name.to_string(),
+                },
+                slot.range(),
+            )
+        })
+        .collect();
+    checker.diagnostics.append(&mut diagnostics);
 }
 
-#[derive(Clone, Hash, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 struct Slot<'a> {
     name: &'a str,
     range: TextRange,
+}
+
+impl std::cmp::PartialEq for Slot<'_> {
+    // We will only ever be comparing slots
+    // within a class and with the slots of
+    // a super class. In that context, we
+    // want to compare names and not ranges.
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl std::cmp::Eq for Slot<'_> {}
+
+impl Hash for Slot<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
 }
 
 impl Ranged for Slot<'_> {
@@ -72,56 +111,21 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn redefined_slots(body: &[Stmt]) -> Vec<Slot> {
-    // First, collect all the slot attributes that are assigned to classes.
-    let mut class_slots = HashMap::new();
-    let mut class_bases = HashMap::new();
-    for stmt in body {
-        let Stmt::ClassDef(ast::StmtClassDef {
-            name,
-            body,
-            arguments,
-            ..
-        }) = stmt
-        else {
-            continue;
-        };
-        class_slots.insert(name.as_str(), slots_members(body));
-
-        if let Some(arguments) = arguments {
-            let mut bases = FxHashSet::default();
-            for base in &arguments.args {
-                let Expr::Name(ast::ExprName { id, .. }) = base else {
-                    continue;
-                };
-                bases.insert(id.as_str());
-            }
-            class_bases.insert(name.as_str(), bases);
-        };
-    }
-
-    if class_slots.is_empty() || class_bases.is_empty() {
-        return vec![];
-    }
-
-    // Second, find redefined slots.
-    let mut slots_redefined = vec![];
-    for (klass, bases) in &class_bases {
-        if let Some(slots) = class_slots.get(klass) {
-            for base in bases {
-                if let Some(base_slots) = class_slots.get(base) {
-                    for slot in slots {
-                        for base_slot in base_slots {
-                            if slot.name == base_slot.name {
-                                slots_redefined.push(slot.to_owned());
-                            }
-                        }
-                    }
-                }
-            }
+fn contained_in_super_slots(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+    slot: &Slot,
+) -> bool {
+    any_super_class(class_def, semantic, &|super_class| {
+        // This function checks every super class
+        // but we want every _strict_ super class, hence:
+        if class_def.name == super_class.name {
+            return false;
         }
-    }
-    slots_redefined
+        let ast::StmtClassDef { body, .. } = &super_class;
+        let super_slots = slots_members(body);
+        super_slots.contains(slot)
+    })
 }
 
 fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
