@@ -163,14 +163,26 @@ pub(super) fn order_union_elements<'db>(
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
         (Type::Union(left), Type::Union(right)) => {
-            order_sequences(db, left.elements(db), right.elements(db))
+            let left = left.to_sorted_union(db);
+            let right = right.to_sorted_union(db);
+            if left == right {
+                Ordering::Equal
+            } else {
+                order_sequences(db, left.elements(db), right.elements(db))
+            }
         }
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
 
         (Type::Intersection(left), Type::Intersection(right)) => {
-            order_sequences(db, left.positive(db), right.positive(db))
-                .then_with(|| order_sequences(db, left.negative(db), right.negative(db)))
+            let left = left.to_sorted_intersection(db);
+            let right = right.to_sorted_intersection(db);
+            if left == right {
+                Ordering::Equal
+            } else {
+                order_sequences(db, left.positive(db), right.positive(db))
+                    .then_with(|| order_sequences(db, left.negative(db), right.negative(db)))
+            }
         }
     }
 }

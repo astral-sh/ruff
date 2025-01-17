@@ -8,6 +8,7 @@ use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use type_ordering::order_union_elements;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::register_lints;
@@ -1084,9 +1085,15 @@ impl<'db> Type<'db> {
 
         // TODO equivalent but not identical structural types
 
-        // For all other cases, types are equivalent iff they have the same internal
-        // representation.
-        self == other
+        match (self, other) {
+            (Type::Union(left), Type::Union(right)) => {
+                left.to_sorted_union(db) == right.to_sorted_union(db)
+            }
+            (Type::Intersection(left), Type::Intersection(right)) => {
+                left.to_sorted_intersection(db) == right.to_sorted_intersection(db)
+            }
+            _ => self == other,
+        }
     }
 
     /// Returns true if both `self` and `other` are the same gradual form
@@ -1128,16 +1135,6 @@ impl<'db> Type<'db> {
 
             (Type::Dynamic(_), Type::Dynamic(_)) => true,
 
-            (Type::Instance(instance), Type::SubclassOf(subclass))
-            | (Type::SubclassOf(subclass), Type::Instance(instance)) => {
-                let Some(base_class) = subclass.subclass_of().into_class() else {
-                    return false;
-                };
-
-                instance.class.is_known(db, KnownClass::Type)
-                    && base_class.is_known(db, KnownClass::Object)
-            }
-
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
                 match (first.subclass_of(), second.subclass_of()) {
                     (first, second) if first == second => true,
@@ -1154,33 +1151,40 @@ impl<'db> Type<'db> {
                     && iter::zip(first_elements, second_elements).all(equivalent)
             }
 
-            // TODO: Handle equivalent unions with items in different order
             (Type::Union(first), Type::Union(second)) => {
+                let first = first.to_sorted_union(db);
+                let second = second.to_sorted_union(db);
+
+                if first == second {
+                    return true;
+                }
+
                 let first_elements = first.elements(db);
                 let second_elements = second.elements(db);
 
-                if first_elements.len() != second_elements.len() {
-                    return false;
-                }
-
-                iter::zip(first_elements, second_elements).all(equivalent)
+                // TODO: Unknown ≡ Any, a union might contain both, etc.
+                first_elements.len() == second_elements.len()
+                    && iter::zip(first_elements, second_elements).all(equivalent)
             }
 
-            // TODO: Handle equivalent intersections with items in different order
             (Type::Intersection(first), Type::Intersection(second)) => {
+                let first = first.to_sorted_intersection(db);
+                let second = second.to_sorted_intersection(db);
+
+                if first == second {
+                    return true;
+                }
+
                 let first_positive = first.positive(db);
                 let first_negative = first.negative(db);
 
                 let second_positive = second.positive(db);
                 let second_negative = second.negative(db);
 
-                if first_positive.len() != second_positive.len()
-                    || first_negative.len() != second_negative.len()
-                {
-                    return false;
-                }
-
-                iter::zip(first_positive, second_positive).all(equivalent)
+                // TODO: Unknown ≡ Any, an intersection might contain both, etc.
+                first_positive.len() == second_positive.len()
+                    && first_negative.len() == second_negative.len()
+                    && iter::zip(first_positive, second_positive).all(equivalent)
                     && iter::zip(first_negative, second_negative).all(equivalent)
             }
 
@@ -4200,6 +4204,7 @@ pub struct UnionType<'db> {
     elements_boxed: Box<[Type<'db>]>,
 }
 
+#[salsa::tracked]
 impl<'db> UnionType<'db> {
     fn elements(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         self.elements_boxed(db)
@@ -4228,6 +4233,18 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
+
+    #[salsa::tracked]
+    fn to_sorted_union(self, db: &'db dyn Db) -> UnionType<'db> {
+        let mut elements = self.elements_boxed(db).to_vec();
+        for element in &mut elements {
+            if let Type::Intersection(intersection) = element {
+                *element = Type::Intersection(intersection.to_sorted_intersection(db));
+            }
+        }
+        elements.sort_unstable_by(|left, right| order_union_elements(db, left, right));
+        UnionType::new(db, elements.into_boxed_slice())
+    }
 }
 
 #[salsa::interned]
@@ -4243,6 +4260,20 @@ pub struct IntersectionType<'db> {
     /// directly in intersections rather than as a separate type.
     #[return_ref]
     negative: FxOrderSet<Type<'db>>,
+}
+
+#[salsa::tracked]
+impl<'db> IntersectionType<'db> {
+    #[salsa::tracked]
+    fn to_sorted_intersection(self, db: &'db dyn Db) -> IntersectionType<'db> {
+        let mut positive = self.positive(db).clone();
+        positive.sort_unstable_by(|left, right| order_union_elements(db, left, right));
+
+        let mut negative = self.negative(db).clone();
+        negative.sort_unstable_by(|left, right| order_union_elements(db, left, right));
+
+        IntersectionType::new(db, positive, negative)
+    }
 }
 
 #[salsa::interned]
