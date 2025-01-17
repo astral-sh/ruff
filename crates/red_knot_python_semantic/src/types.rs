@@ -1311,7 +1311,13 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => {
-                other.is_disjoint_from(db, subclass_of_ty.as_instance_type_of_metaclass(db))
+                let metaclass_instance_ty = match subclass_of_ty.subclass_of() {
+                    // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
+                    // so although the type is dynamic we can still determine disjointness in some situations
+                    ClassBase::Dynamic(_) => KnownClass::Type.to_instance(db),
+                    ClassBase::Class(class) => class.metaclass(db).to_instance(db),
+                };
+                other.is_disjoint_from(db, metaclass_instance_ty)
             }
 
             (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))
