@@ -3983,6 +3983,300 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum NodeKind {
+    ModModule,
+    ModExpression,
+    StmtFunctionDef,
+    StmtClassDef,
+    StmtReturn,
+    StmtDelete,
+    StmtTypeAlias,
+    StmtAssign,
+    StmtAugAssign,
+    StmtAnnAssign,
+    StmtFor,
+    StmtWhile,
+    StmtIf,
+    StmtWith,
+    StmtMatch,
+    StmtRaise,
+    StmtTry,
+    StmtAssert,
+    StmtImport,
+    StmtImportFrom,
+    StmtGlobal,
+    StmtNonlocal,
+    StmtExpr,
+    StmtPass,
+    StmtBreak,
+    StmtContinue,
+    StmtIpyEscapeCommand,
+    ExprBoolOp,
+    ExprNamed,
+    ExprBinOp,
+    ExprUnaryOp,
+    ExprLambda,
+    ExprIf,
+    ExprDict,
+    ExprSet,
+    ExprListComp,
+    ExprSetComp,
+    ExprDictComp,
+    ExprGenerator,
+    ExprAwait,
+    ExprYield,
+    ExprYieldFrom,
+    ExprCompare,
+    ExprCall,
+    ExprFString,
+    ExprStringLiteral,
+    ExprBytesLiteral,
+    ExprNumberLiteral,
+    ExprBooleanLiteral,
+    ExprNoneLiteral,
+    ExprEllipsisLiteral,
+    ExprAttribute,
+    ExprSubscript,
+    ExprStarred,
+    ExprName,
+    ExprList,
+    ExprTuple,
+    ExprSlice,
+    ExprIpyEscapeCommand,
+    ExceptHandlerExceptHandler,
+    FStringExpressionElement,
+    FStringLiteralElement,
+    PatternMatchValue,
+    PatternMatchSingleton,
+    PatternMatchSequence,
+    PatternMatchMapping,
+    PatternMatchClass,
+    PatternMatchStar,
+    PatternMatchAs,
+    PatternMatchOr,
+    TypeParamTypeVar,
+    TypeParamTypeVarTuple,
+    TypeParamParamSpec,
+    FStringFormatSpec,
+    PatternArguments,
+    PatternKeyword,
+    Comprehension,
+    Arguments,
+    Parameters,
+    Parameter,
+    ParameterWithDefault,
+    Keyword,
+    Alias,
+    WithItem,
+    MatchCase,
+    Decorator,
+    ElifElseClause,
+    TypeParams,
+    FString,
+    StringLiteral,
+    BytesLiteral,
+    Identifier,
+}
+
+impl AnyNode {
+    pub const fn kind(&self) -> NodeKind {
+        match self {
+            AnyNode::ModModule(_) => NodeKind::ModModule,
+            AnyNode::ModExpression(_) => NodeKind::ModExpression,
+            AnyNode::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
+            AnyNode::StmtClassDef(_) => NodeKind::StmtClassDef,
+            AnyNode::StmtReturn(_) => NodeKind::StmtReturn,
+            AnyNode::StmtDelete(_) => NodeKind::StmtDelete,
+            AnyNode::StmtTypeAlias(_) => NodeKind::StmtTypeAlias,
+            AnyNode::StmtAssign(_) => NodeKind::StmtAssign,
+            AnyNode::StmtAugAssign(_) => NodeKind::StmtAugAssign,
+            AnyNode::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
+            AnyNode::StmtFor(_) => NodeKind::StmtFor,
+            AnyNode::StmtWhile(_) => NodeKind::StmtWhile,
+            AnyNode::StmtIf(_) => NodeKind::StmtIf,
+            AnyNode::StmtWith(_) => NodeKind::StmtWith,
+            AnyNode::StmtMatch(_) => NodeKind::StmtMatch,
+            AnyNode::StmtRaise(_) => NodeKind::StmtRaise,
+            AnyNode::StmtTry(_) => NodeKind::StmtTry,
+            AnyNode::StmtAssert(_) => NodeKind::StmtAssert,
+            AnyNode::StmtImport(_) => NodeKind::StmtImport,
+            AnyNode::StmtImportFrom(_) => NodeKind::StmtImportFrom,
+            AnyNode::StmtGlobal(_) => NodeKind::StmtGlobal,
+            AnyNode::StmtNonlocal(_) => NodeKind::StmtNonlocal,
+            AnyNode::StmtExpr(_) => NodeKind::StmtExpr,
+            AnyNode::StmtPass(_) => NodeKind::StmtPass,
+            AnyNode::StmtBreak(_) => NodeKind::StmtBreak,
+            AnyNode::StmtContinue(_) => NodeKind::StmtContinue,
+            AnyNode::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
+            AnyNode::ExprBoolOp(_) => NodeKind::ExprBoolOp,
+            AnyNode::ExprNamed(_) => NodeKind::ExprNamed,
+            AnyNode::ExprBinOp(_) => NodeKind::ExprBinOp,
+            AnyNode::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
+            AnyNode::ExprLambda(_) => NodeKind::ExprLambda,
+            AnyNode::ExprIf(_) => NodeKind::ExprIf,
+            AnyNode::ExprDict(_) => NodeKind::ExprDict,
+            AnyNode::ExprSet(_) => NodeKind::ExprSet,
+            AnyNode::ExprListComp(_) => NodeKind::ExprListComp,
+            AnyNode::ExprSetComp(_) => NodeKind::ExprSetComp,
+            AnyNode::ExprDictComp(_) => NodeKind::ExprDictComp,
+            AnyNode::ExprGenerator(_) => NodeKind::ExprGenerator,
+            AnyNode::ExprAwait(_) => NodeKind::ExprAwait,
+            AnyNode::ExprYield(_) => NodeKind::ExprYield,
+            AnyNode::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
+            AnyNode::ExprCompare(_) => NodeKind::ExprCompare,
+            AnyNode::ExprCall(_) => NodeKind::ExprCall,
+            AnyNode::ExprFString(_) => NodeKind::ExprFString,
+            AnyNode::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
+            AnyNode::ExprBytesLiteral(_) => NodeKind::ExprBytesLiteral,
+            AnyNode::ExprNumberLiteral(_) => NodeKind::ExprNumberLiteral,
+            AnyNode::ExprBooleanLiteral(_) => NodeKind::ExprBooleanLiteral,
+            AnyNode::ExprNoneLiteral(_) => NodeKind::ExprNoneLiteral,
+            AnyNode::ExprEllipsisLiteral(_) => NodeKind::ExprEllipsisLiteral,
+            AnyNode::ExprAttribute(_) => NodeKind::ExprAttribute,
+            AnyNode::ExprSubscript(_) => NodeKind::ExprSubscript,
+            AnyNode::ExprStarred(_) => NodeKind::ExprStarred,
+            AnyNode::ExprName(_) => NodeKind::ExprName,
+            AnyNode::ExprList(_) => NodeKind::ExprList,
+            AnyNode::ExprTuple(_) => NodeKind::ExprTuple,
+            AnyNode::ExprSlice(_) => NodeKind::ExprSlice,
+            AnyNode::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
+            AnyNode::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
+            AnyNode::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
+            AnyNode::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
+            AnyNode::PatternMatchValue(_) => NodeKind::PatternMatchValue,
+            AnyNode::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
+            AnyNode::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
+            AnyNode::PatternMatchMapping(_) => NodeKind::PatternMatchMapping,
+            AnyNode::PatternMatchClass(_) => NodeKind::PatternMatchClass,
+            AnyNode::PatternMatchStar(_) => NodeKind::PatternMatchStar,
+            AnyNode::PatternMatchAs(_) => NodeKind::PatternMatchAs,
+            AnyNode::PatternMatchOr(_) => NodeKind::PatternMatchOr,
+            AnyNode::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
+            AnyNode::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
+            AnyNode::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
+            AnyNode::FStringFormatSpec(_) => NodeKind::FStringFormatSpec,
+            AnyNode::PatternArguments(_) => NodeKind::PatternArguments,
+            AnyNode::PatternKeyword(_) => NodeKind::PatternKeyword,
+            AnyNode::Comprehension(_) => NodeKind::Comprehension,
+            AnyNode::Arguments(_) => NodeKind::Arguments,
+            AnyNode::Parameters(_) => NodeKind::Parameters,
+            AnyNode::Parameter(_) => NodeKind::Parameter,
+            AnyNode::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
+            AnyNode::Keyword(_) => NodeKind::Keyword,
+            AnyNode::Alias(_) => NodeKind::Alias,
+            AnyNode::WithItem(_) => NodeKind::WithItem,
+            AnyNode::MatchCase(_) => NodeKind::MatchCase,
+            AnyNode::Decorator(_) => NodeKind::Decorator,
+            AnyNode::ElifElseClause(_) => NodeKind::ElifElseClause,
+            AnyNode::TypeParams(_) => NodeKind::TypeParams,
+            AnyNode::FString(_) => NodeKind::FString,
+            AnyNode::StringLiteral(_) => NodeKind::StringLiteral,
+            AnyNode::BytesLiteral(_) => NodeKind::BytesLiteral,
+            AnyNode::Identifier(_) => NodeKind::Identifier,
+        }
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn kind(self) -> NodeKind {
+        match self {
+            AnyNodeRef::ModModule(_) => NodeKind::ModModule,
+            AnyNodeRef::ModExpression(_) => NodeKind::ModExpression,
+            AnyNodeRef::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
+            AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
+            AnyNodeRef::StmtReturn(_) => NodeKind::StmtReturn,
+            AnyNodeRef::StmtDelete(_) => NodeKind::StmtDelete,
+            AnyNodeRef::StmtTypeAlias(_) => NodeKind::StmtTypeAlias,
+            AnyNodeRef::StmtAssign(_) => NodeKind::StmtAssign,
+            AnyNodeRef::StmtAugAssign(_) => NodeKind::StmtAugAssign,
+            AnyNodeRef::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
+            AnyNodeRef::StmtFor(_) => NodeKind::StmtFor,
+            AnyNodeRef::StmtWhile(_) => NodeKind::StmtWhile,
+            AnyNodeRef::StmtIf(_) => NodeKind::StmtIf,
+            AnyNodeRef::StmtWith(_) => NodeKind::StmtWith,
+            AnyNodeRef::StmtMatch(_) => NodeKind::StmtMatch,
+            AnyNodeRef::StmtRaise(_) => NodeKind::StmtRaise,
+            AnyNodeRef::StmtTry(_) => NodeKind::StmtTry,
+            AnyNodeRef::StmtAssert(_) => NodeKind::StmtAssert,
+            AnyNodeRef::StmtImport(_) => NodeKind::StmtImport,
+            AnyNodeRef::StmtImportFrom(_) => NodeKind::StmtImportFrom,
+            AnyNodeRef::StmtGlobal(_) => NodeKind::StmtGlobal,
+            AnyNodeRef::StmtNonlocal(_) => NodeKind::StmtNonlocal,
+            AnyNodeRef::StmtExpr(_) => NodeKind::StmtExpr,
+            AnyNodeRef::StmtPass(_) => NodeKind::StmtPass,
+            AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
+            AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
+            AnyNodeRef::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
+            AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
+            AnyNodeRef::ExprNamed(_) => NodeKind::ExprNamed,
+            AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
+            AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
+            AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
+            AnyNodeRef::ExprIf(_) => NodeKind::ExprIf,
+            AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
+            AnyNodeRef::ExprSet(_) => NodeKind::ExprSet,
+            AnyNodeRef::ExprListComp(_) => NodeKind::ExprListComp,
+            AnyNodeRef::ExprSetComp(_) => NodeKind::ExprSetComp,
+            AnyNodeRef::ExprDictComp(_) => NodeKind::ExprDictComp,
+            AnyNodeRef::ExprGenerator(_) => NodeKind::ExprGenerator,
+            AnyNodeRef::ExprAwait(_) => NodeKind::ExprAwait,
+            AnyNodeRef::ExprYield(_) => NodeKind::ExprYield,
+            AnyNodeRef::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
+            AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
+            AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
+            AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
+            AnyNodeRef::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
+            AnyNodeRef::ExprBytesLiteral(_) => NodeKind::ExprBytesLiteral,
+            AnyNodeRef::ExprNumberLiteral(_) => NodeKind::ExprNumberLiteral,
+            AnyNodeRef::ExprBooleanLiteral(_) => NodeKind::ExprBooleanLiteral,
+            AnyNodeRef::ExprNoneLiteral(_) => NodeKind::ExprNoneLiteral,
+            AnyNodeRef::ExprEllipsisLiteral(_) => NodeKind::ExprEllipsisLiteral,
+            AnyNodeRef::ExprAttribute(_) => NodeKind::ExprAttribute,
+            AnyNodeRef::ExprSubscript(_) => NodeKind::ExprSubscript,
+            AnyNodeRef::ExprStarred(_) => NodeKind::ExprStarred,
+            AnyNodeRef::ExprName(_) => NodeKind::ExprName,
+            AnyNodeRef::ExprList(_) => NodeKind::ExprList,
+            AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
+            AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
+            AnyNodeRef::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
+            AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
+            AnyNodeRef::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
+            AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
+            AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
+            AnyNodeRef::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
+            AnyNodeRef::PatternMatchMapping(_) => NodeKind::PatternMatchMapping,
+            AnyNodeRef::PatternMatchClass(_) => NodeKind::PatternMatchClass,
+            AnyNodeRef::PatternMatchStar(_) => NodeKind::PatternMatchStar,
+            AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
+            AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
+            AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
+            AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
+            AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
+            AnyNodeRef::FStringFormatSpec(_) => NodeKind::FStringFormatSpec,
+            AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
+            AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
+            AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
+            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
+            AnyNodeRef::Parameters(_) => NodeKind::Parameters,
+            AnyNodeRef::Parameter(_) => NodeKind::Parameter,
+            AnyNodeRef::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
+            AnyNodeRef::Keyword(_) => NodeKind::Keyword,
+            AnyNodeRef::Alias(_) => NodeKind::Alias,
+            AnyNodeRef::WithItem(_) => NodeKind::WithItem,
+            AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
+            AnyNodeRef::Decorator(_) => NodeKind::Decorator,
+            AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
+            AnyNodeRef::TypeParams(_) => NodeKind::TypeParams,
+            AnyNodeRef::FString(_) => NodeKind::FString,
+            AnyNodeRef::StringLiteral(_) => NodeKind::StringLiteral,
+            AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
+            AnyNodeRef::Identifier(_) => NodeKind::Identifier,
+        }
+    }
+}
+
 impl crate::AstNode for Mod {
     type Ref<'a> = ModRef<'a>;
 
@@ -4007,11 +4301,8 @@ impl crate::AstNode for Mod {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(
-            kind,
-            crate::NodeKind::ModModule | crate::NodeKind::ModExpression
-        )
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ModModule | NodeKind::ModExpression)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4045,8 +4336,8 @@ impl crate::AstNode for crate::ModModule {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ModModule)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ModModule)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4080,8 +4371,8 @@ impl crate::AstNode for crate::ModExpression {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ModExpression)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ModExpression)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4163,34 +4454,34 @@ impl crate::AstNode for Stmt {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
+    fn can_cast(kind: NodeKind) -> bool {
         matches!(
             kind,
-            crate::NodeKind::StmtFunctionDef
-                | crate::NodeKind::StmtClassDef
-                | crate::NodeKind::StmtReturn
-                | crate::NodeKind::StmtDelete
-                | crate::NodeKind::StmtTypeAlias
-                | crate::NodeKind::StmtAssign
-                | crate::NodeKind::StmtAugAssign
-                | crate::NodeKind::StmtAnnAssign
-                | crate::NodeKind::StmtFor
-                | crate::NodeKind::StmtWhile
-                | crate::NodeKind::StmtIf
-                | crate::NodeKind::StmtWith
-                | crate::NodeKind::StmtMatch
-                | crate::NodeKind::StmtRaise
-                | crate::NodeKind::StmtTry
-                | crate::NodeKind::StmtAssert
-                | crate::NodeKind::StmtImport
-                | crate::NodeKind::StmtImportFrom
-                | crate::NodeKind::StmtGlobal
-                | crate::NodeKind::StmtNonlocal
-                | crate::NodeKind::StmtExpr
-                | crate::NodeKind::StmtPass
-                | crate::NodeKind::StmtBreak
-                | crate::NodeKind::StmtContinue
-                | crate::NodeKind::StmtIpyEscapeCommand
+            NodeKind::StmtFunctionDef
+                | NodeKind::StmtClassDef
+                | NodeKind::StmtReturn
+                | NodeKind::StmtDelete
+                | NodeKind::StmtTypeAlias
+                | NodeKind::StmtAssign
+                | NodeKind::StmtAugAssign
+                | NodeKind::StmtAnnAssign
+                | NodeKind::StmtFor
+                | NodeKind::StmtWhile
+                | NodeKind::StmtIf
+                | NodeKind::StmtWith
+                | NodeKind::StmtMatch
+                | NodeKind::StmtRaise
+                | NodeKind::StmtTry
+                | NodeKind::StmtAssert
+                | NodeKind::StmtImport
+                | NodeKind::StmtImportFrom
+                | NodeKind::StmtGlobal
+                | NodeKind::StmtNonlocal
+                | NodeKind::StmtExpr
+                | NodeKind::StmtPass
+                | NodeKind::StmtBreak
+                | NodeKind::StmtContinue
+                | NodeKind::StmtIpyEscapeCommand
         )
     }
 
@@ -4225,8 +4516,8 @@ impl crate::AstNode for crate::StmtFunctionDef {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtFunctionDef)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtFunctionDef)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4260,8 +4551,8 @@ impl crate::AstNode for crate::StmtClassDef {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtClassDef)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtClassDef)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4295,8 +4586,8 @@ impl crate::AstNode for crate::StmtReturn {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtReturn)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtReturn)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4330,8 +4621,8 @@ impl crate::AstNode for crate::StmtDelete {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtDelete)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtDelete)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4365,8 +4656,8 @@ impl crate::AstNode for crate::StmtTypeAlias {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtTypeAlias)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtTypeAlias)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4400,8 +4691,8 @@ impl crate::AstNode for crate::StmtAssign {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtAssign)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtAssign)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4435,8 +4726,8 @@ impl crate::AstNode for crate::StmtAugAssign {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtAugAssign)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtAugAssign)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4470,8 +4761,8 @@ impl crate::AstNode for crate::StmtAnnAssign {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtAnnAssign)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtAnnAssign)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4505,8 +4796,8 @@ impl crate::AstNode for crate::StmtFor {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtFor)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtFor)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4540,8 +4831,8 @@ impl crate::AstNode for crate::StmtWhile {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtWhile)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtWhile)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4575,8 +4866,8 @@ impl crate::AstNode for crate::StmtIf {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtIf)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtIf)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4610,8 +4901,8 @@ impl crate::AstNode for crate::StmtWith {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtWith)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtWith)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4645,8 +4936,8 @@ impl crate::AstNode for crate::StmtMatch {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtMatch)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtMatch)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4680,8 +4971,8 @@ impl crate::AstNode for crate::StmtRaise {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtRaise)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtRaise)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4715,8 +5006,8 @@ impl crate::AstNode for crate::StmtTry {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtTry)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtTry)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4750,8 +5041,8 @@ impl crate::AstNode for crate::StmtAssert {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtAssert)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtAssert)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4785,8 +5076,8 @@ impl crate::AstNode for crate::StmtImport {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtImport)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtImport)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4820,8 +5111,8 @@ impl crate::AstNode for crate::StmtImportFrom {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtImportFrom)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtImportFrom)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4855,8 +5146,8 @@ impl crate::AstNode for crate::StmtGlobal {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtGlobal)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtGlobal)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4890,8 +5181,8 @@ impl crate::AstNode for crate::StmtNonlocal {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtNonlocal)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtNonlocal)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4925,8 +5216,8 @@ impl crate::AstNode for crate::StmtExpr {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtExpr)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtExpr)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4960,8 +5251,8 @@ impl crate::AstNode for crate::StmtPass {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtPass)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtPass)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -4995,8 +5286,8 @@ impl crate::AstNode for crate::StmtBreak {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtBreak)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtBreak)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5030,8 +5321,8 @@ impl crate::AstNode for crate::StmtContinue {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtContinue)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtContinue)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5065,8 +5356,8 @@ impl crate::AstNode for crate::StmtIpyEscapeCommand {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StmtIpyEscapeCommand)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StmtIpyEscapeCommand)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5162,41 +5453,41 @@ impl crate::AstNode for Expr {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
+    fn can_cast(kind: NodeKind) -> bool {
         matches!(
             kind,
-            crate::NodeKind::ExprBoolOp
-                | crate::NodeKind::ExprNamed
-                | crate::NodeKind::ExprBinOp
-                | crate::NodeKind::ExprUnaryOp
-                | crate::NodeKind::ExprLambda
-                | crate::NodeKind::ExprIf
-                | crate::NodeKind::ExprDict
-                | crate::NodeKind::ExprSet
-                | crate::NodeKind::ExprListComp
-                | crate::NodeKind::ExprSetComp
-                | crate::NodeKind::ExprDictComp
-                | crate::NodeKind::ExprGenerator
-                | crate::NodeKind::ExprAwait
-                | crate::NodeKind::ExprYield
-                | crate::NodeKind::ExprYieldFrom
-                | crate::NodeKind::ExprCompare
-                | crate::NodeKind::ExprCall
-                | crate::NodeKind::ExprFString
-                | crate::NodeKind::ExprStringLiteral
-                | crate::NodeKind::ExprBytesLiteral
-                | crate::NodeKind::ExprNumberLiteral
-                | crate::NodeKind::ExprBooleanLiteral
-                | crate::NodeKind::ExprNoneLiteral
-                | crate::NodeKind::ExprEllipsisLiteral
-                | crate::NodeKind::ExprAttribute
-                | crate::NodeKind::ExprSubscript
-                | crate::NodeKind::ExprStarred
-                | crate::NodeKind::ExprName
-                | crate::NodeKind::ExprList
-                | crate::NodeKind::ExprTuple
-                | crate::NodeKind::ExprSlice
-                | crate::NodeKind::ExprIpyEscapeCommand
+            NodeKind::ExprBoolOp
+                | NodeKind::ExprNamed
+                | NodeKind::ExprBinOp
+                | NodeKind::ExprUnaryOp
+                | NodeKind::ExprLambda
+                | NodeKind::ExprIf
+                | NodeKind::ExprDict
+                | NodeKind::ExprSet
+                | NodeKind::ExprListComp
+                | NodeKind::ExprSetComp
+                | NodeKind::ExprDictComp
+                | NodeKind::ExprGenerator
+                | NodeKind::ExprAwait
+                | NodeKind::ExprYield
+                | NodeKind::ExprYieldFrom
+                | NodeKind::ExprCompare
+                | NodeKind::ExprCall
+                | NodeKind::ExprFString
+                | NodeKind::ExprStringLiteral
+                | NodeKind::ExprBytesLiteral
+                | NodeKind::ExprNumberLiteral
+                | NodeKind::ExprBooleanLiteral
+                | NodeKind::ExprNoneLiteral
+                | NodeKind::ExprEllipsisLiteral
+                | NodeKind::ExprAttribute
+                | NodeKind::ExprSubscript
+                | NodeKind::ExprStarred
+                | NodeKind::ExprName
+                | NodeKind::ExprList
+                | NodeKind::ExprTuple
+                | NodeKind::ExprSlice
+                | NodeKind::ExprIpyEscapeCommand
         )
     }
 
@@ -5231,8 +5522,8 @@ impl crate::AstNode for crate::ExprBoolOp {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprBoolOp)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprBoolOp)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5266,8 +5557,8 @@ impl crate::AstNode for crate::ExprNamed {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprNamed)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprNamed)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5301,8 +5592,8 @@ impl crate::AstNode for crate::ExprBinOp {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprBinOp)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprBinOp)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5336,8 +5627,8 @@ impl crate::AstNode for crate::ExprUnaryOp {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprUnaryOp)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprUnaryOp)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5371,8 +5662,8 @@ impl crate::AstNode for crate::ExprLambda {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprLambda)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprLambda)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5406,8 +5697,8 @@ impl crate::AstNode for crate::ExprIf {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprIf)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprIf)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5441,8 +5732,8 @@ impl crate::AstNode for crate::ExprDict {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprDict)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprDict)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5476,8 +5767,8 @@ impl crate::AstNode for crate::ExprSet {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprSet)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprSet)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5511,8 +5802,8 @@ impl crate::AstNode for crate::ExprListComp {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprListComp)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprListComp)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5546,8 +5837,8 @@ impl crate::AstNode for crate::ExprSetComp {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprSetComp)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprSetComp)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5581,8 +5872,8 @@ impl crate::AstNode for crate::ExprDictComp {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprDictComp)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprDictComp)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5616,8 +5907,8 @@ impl crate::AstNode for crate::ExprGenerator {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprGenerator)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprGenerator)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5651,8 +5942,8 @@ impl crate::AstNode for crate::ExprAwait {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprAwait)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprAwait)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5686,8 +5977,8 @@ impl crate::AstNode for crate::ExprYield {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprYield)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprYield)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5721,8 +6012,8 @@ impl crate::AstNode for crate::ExprYieldFrom {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprYieldFrom)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprYieldFrom)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5756,8 +6047,8 @@ impl crate::AstNode for crate::ExprCompare {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprCompare)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprCompare)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5791,8 +6082,8 @@ impl crate::AstNode for crate::ExprCall {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprCall)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprCall)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5826,8 +6117,8 @@ impl crate::AstNode for crate::ExprFString {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprFString)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprFString)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5861,8 +6152,8 @@ impl crate::AstNode for crate::ExprStringLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprStringLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprStringLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5896,8 +6187,8 @@ impl crate::AstNode for crate::ExprBytesLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprBytesLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprBytesLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5931,8 +6222,8 @@ impl crate::AstNode for crate::ExprNumberLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprNumberLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprNumberLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -5966,8 +6257,8 @@ impl crate::AstNode for crate::ExprBooleanLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprBooleanLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprBooleanLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6001,8 +6292,8 @@ impl crate::AstNode for crate::ExprNoneLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprNoneLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprNoneLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6036,8 +6327,8 @@ impl crate::AstNode for crate::ExprEllipsisLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprEllipsisLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprEllipsisLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6071,8 +6362,8 @@ impl crate::AstNode for crate::ExprAttribute {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprAttribute)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprAttribute)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6106,8 +6397,8 @@ impl crate::AstNode for crate::ExprSubscript {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprSubscript)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprSubscript)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6141,8 +6432,8 @@ impl crate::AstNode for crate::ExprStarred {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprStarred)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprStarred)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6176,8 +6467,8 @@ impl crate::AstNode for crate::ExprName {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprName)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprName)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6211,8 +6502,8 @@ impl crate::AstNode for crate::ExprList {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprList)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprList)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6246,8 +6537,8 @@ impl crate::AstNode for crate::ExprTuple {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprTuple)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprTuple)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6281,8 +6572,8 @@ impl crate::AstNode for crate::ExprSlice {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprSlice)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprSlice)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6316,8 +6607,8 @@ impl crate::AstNode for crate::ExprIpyEscapeCommand {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExprIpyEscapeCommand)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExprIpyEscapeCommand)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6353,8 +6644,8 @@ impl crate::AstNode for ExceptHandler {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExceptHandlerExceptHandler)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExceptHandlerExceptHandler)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6388,8 +6679,8 @@ impl crate::AstNode for crate::ExceptHandlerExceptHandler {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ExceptHandlerExceptHandler)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ExceptHandlerExceptHandler)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6425,10 +6716,10 @@ impl crate::AstNode for FStringElement {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
+    fn can_cast(kind: NodeKind) -> bool {
         matches!(
             kind,
-            crate::NodeKind::FStringExpressionElement | crate::NodeKind::FStringLiteralElement
+            NodeKind::FStringExpressionElement | NodeKind::FStringLiteralElement
         )
     }
 
@@ -6463,8 +6754,8 @@ impl crate::AstNode for crate::FStringExpressionElement {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::FStringExpressionElement)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::FStringExpressionElement)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6498,8 +6789,8 @@ impl crate::AstNode for crate::FStringLiteralElement {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::FStringLiteralElement)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::FStringLiteralElement)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6547,17 +6838,17 @@ impl crate::AstNode for Pattern {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
+    fn can_cast(kind: NodeKind) -> bool {
         matches!(
             kind,
-            crate::NodeKind::PatternMatchValue
-                | crate::NodeKind::PatternMatchSingleton
-                | crate::NodeKind::PatternMatchSequence
-                | crate::NodeKind::PatternMatchMapping
-                | crate::NodeKind::PatternMatchClass
-                | crate::NodeKind::PatternMatchStar
-                | crate::NodeKind::PatternMatchAs
-                | crate::NodeKind::PatternMatchOr
+            NodeKind::PatternMatchValue
+                | NodeKind::PatternMatchSingleton
+                | NodeKind::PatternMatchSequence
+                | NodeKind::PatternMatchMapping
+                | NodeKind::PatternMatchClass
+                | NodeKind::PatternMatchStar
+                | NodeKind::PatternMatchAs
+                | NodeKind::PatternMatchOr
         )
     }
 
@@ -6592,8 +6883,8 @@ impl crate::AstNode for crate::PatternMatchValue {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchValue)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchValue)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6627,8 +6918,8 @@ impl crate::AstNode for crate::PatternMatchSingleton {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchSingleton)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchSingleton)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6662,8 +6953,8 @@ impl crate::AstNode for crate::PatternMatchSequence {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchSequence)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchSequence)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6697,8 +6988,8 @@ impl crate::AstNode for crate::PatternMatchMapping {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchMapping)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchMapping)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6732,8 +7023,8 @@ impl crate::AstNode for crate::PatternMatchClass {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchClass)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchClass)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6767,8 +7058,8 @@ impl crate::AstNode for crate::PatternMatchStar {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchStar)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchStar)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6802,8 +7093,8 @@ impl crate::AstNode for crate::PatternMatchAs {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchAs)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchAs)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6837,8 +7128,8 @@ impl crate::AstNode for crate::PatternMatchOr {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternMatchOr)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternMatchOr)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6876,12 +7167,12 @@ impl crate::AstNode for TypeParam {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
+    fn can_cast(kind: NodeKind) -> bool {
         matches!(
             kind,
-            crate::NodeKind::TypeParamTypeVar
-                | crate::NodeKind::TypeParamTypeVarTuple
-                | crate::NodeKind::TypeParamParamSpec
+            NodeKind::TypeParamTypeVar
+                | NodeKind::TypeParamTypeVarTuple
+                | NodeKind::TypeParamParamSpec
         )
     }
 
@@ -6916,8 +7207,8 @@ impl crate::AstNode for crate::TypeParamTypeVar {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::TypeParamTypeVar)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::TypeParamTypeVar)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6951,8 +7242,8 @@ impl crate::AstNode for crate::TypeParamTypeVarTuple {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::TypeParamTypeVarTuple)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::TypeParamTypeVarTuple)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -6986,8 +7277,8 @@ impl crate::AstNode for crate::TypeParamParamSpec {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::TypeParamParamSpec)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::TypeParamParamSpec)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7021,8 +7312,8 @@ impl crate::AstNode for crate::FStringFormatSpec {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::FStringFormatSpec)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::FStringFormatSpec)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7056,8 +7347,8 @@ impl crate::AstNode for crate::PatternArguments {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternArguments)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternArguments)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7091,8 +7382,8 @@ impl crate::AstNode for crate::PatternKeyword {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::PatternKeyword)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::PatternKeyword)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7126,8 +7417,8 @@ impl crate::AstNode for crate::Comprehension {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Comprehension)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Comprehension)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7161,8 +7452,8 @@ impl crate::AstNode for crate::Arguments {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Arguments)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Arguments)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7196,8 +7487,8 @@ impl crate::AstNode for crate::Parameters {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Parameters)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Parameters)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7231,8 +7522,8 @@ impl crate::AstNode for crate::Parameter {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Parameter)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Parameter)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7266,8 +7557,8 @@ impl crate::AstNode for crate::ParameterWithDefault {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ParameterWithDefault)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ParameterWithDefault)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7301,8 +7592,8 @@ impl crate::AstNode for crate::Keyword {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Keyword)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Keyword)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7336,8 +7627,8 @@ impl crate::AstNode for crate::Alias {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Alias)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Alias)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7371,8 +7662,8 @@ impl crate::AstNode for crate::WithItem {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::WithItem)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::WithItem)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7406,8 +7697,8 @@ impl crate::AstNode for crate::MatchCase {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::MatchCase)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::MatchCase)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7441,8 +7732,8 @@ impl crate::AstNode for crate::Decorator {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Decorator)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Decorator)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7476,8 +7767,8 @@ impl crate::AstNode for crate::ElifElseClause {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::ElifElseClause)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::ElifElseClause)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7511,8 +7802,8 @@ impl crate::AstNode for crate::TypeParams {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::TypeParams)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::TypeParams)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7546,8 +7837,8 @@ impl crate::AstNode for crate::FString {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::FString)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::FString)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7581,8 +7872,8 @@ impl crate::AstNode for crate::StringLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::StringLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::StringLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7616,8 +7907,8 @@ impl crate::AstNode for crate::BytesLiteral {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::BytesLiteral)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::BytesLiteral)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {
@@ -7651,8 +7942,8 @@ impl crate::AstNode for crate::Identifier {
         }
     }
 
-    fn can_cast(kind: crate::NodeKind) -> bool {
-        matches!(kind, crate::NodeKind::Identifier)
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Identifier)
     }
 
     fn as_any_node_ref(&self) -> AnyNodeRef {

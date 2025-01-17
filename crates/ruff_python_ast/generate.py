@@ -310,6 +310,48 @@ out.append("""
 """)
 
 # ------------------------------------------------------------------------------
+# NodeKind
+
+out.append("""
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum NodeKind {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""{node.name},""")
+out.append("""
+}
+""")
+
+out.append("""
+impl AnyNode {
+    pub const fn kind(&self) -> NodeKind {
+        match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""AnyNode::{node.name}(_) => NodeKind::{node.name},""")
+out.append("""
+        }
+    }
+}
+""")
+
+out.append("""
+impl AnyNodeRef<'_> {
+    pub const fn kind(self) -> NodeKind {
+        match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""AnyNodeRef::{node.name}(_) => NodeKind::{node.name},""")
+out.append("""
+        }
+    }
+}
+""")
+
+# ------------------------------------------------------------------------------
 # AstNode
 
 for group in groups:
@@ -345,13 +387,13 @@ for group in groups:
                 }
             }
 
-            fn can_cast(kind: crate::NodeKind) -> bool {
+            fn can_cast(kind: NodeKind) -> bool {
                 matches!(kind,
         """)
         for i, node in enumerate(group.nodes):
             if i > 0:
                 out.append("|")
-            out.append(f"""crate::NodeKind::{node.name}""")
+            out.append(f"""NodeKind::{node.name}""")
         out.append("""
                 )
             }
@@ -390,8 +432,8 @@ for group in groups:
                 }}
             }}
 
-            fn can_cast(kind: crate::NodeKind) -> bool {{
-                matches!(kind, crate::NodeKind::{node.name})
+            fn can_cast(kind: NodeKind) -> bool {{
+                matches!(kind, NodeKind::{node.name})
             }}
 
             fn as_any_node_ref(&self) -> AnyNodeRef {{
