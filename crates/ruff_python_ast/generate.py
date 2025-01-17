@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 from subprocess import check_output
 import tomllib
+from typing import Any
 
 
 def rustfmt(code: str) -> str:
