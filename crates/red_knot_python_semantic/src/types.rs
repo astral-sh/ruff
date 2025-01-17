@@ -8,7 +8,7 @@ use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
-use type_ordering::order_union_elements;
+use type_ordering::union_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::register_lints;
@@ -4238,7 +4238,7 @@ impl<'db> UnionType<'db> {
                 *element = Type::Intersection(intersection.to_sorted_intersection(db));
             }
         }
-        elements.sort_unstable_by(order_union_elements);
+        elements.sort_unstable_by(union_elements_ordering);
         UnionType::new(db, elements.into_boxed_slice())
     }
 }
@@ -4261,10 +4261,10 @@ pub struct IntersectionType<'db> {
 impl<'db> IntersectionType<'db> {
     fn to_sorted_intersection(self, db: &'db dyn Db) -> IntersectionType<'db> {
         let mut positive = self.positive(db).clone();
-        positive.sort_unstable_by(order_union_elements);
+        positive.sort_unstable_by(union_elements_ordering);
 
         let mut negative = self.negative(db).clone();
-        negative.sort_unstable_by(order_union_elements);
+        negative.sort_unstable_by(union_elements_ordering);
 
         IntersectionType::new(db, positive, negative)
     }

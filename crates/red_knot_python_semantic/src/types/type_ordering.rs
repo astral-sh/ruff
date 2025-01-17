@@ -13,20 +13,13 @@ use super::{
 /// Two unions with equal sets of elements will only compare equal if they have their element sets
 /// ordered the same way.
 ///
-/// ## Why not just implement `Ord` on `Type`?
+/// ## Why not just implement [`Ord`] on [`Type`]?
 ///
-/// It would be fairly easy to slap `#[derive(PartialOrd, Ord)]` on `Type`. However, this would
-/// order types according to their Salsa ID. While this would mean that types would always be
-/// consistently ordered in any single run of red-knot, the order in which they would appear
-/// might vary between different runs of red-knot. The ordering we create here is not user-facing;
-/// however, it will be useful in the future to know where, for example, any `Protocol` elements
-/// lie in the union's element list (if there are any `Protocol` elements in the union's element
-/// list).
-///
-/// Moreover, it doesn't really "make sense" for `Type` to implement `Ord` in terms of the
-/// semantics. There are many different ways in which you could plausibly sort a list of types;
-/// this is only one (somewhat arbitrary, at times) possible ordering.
-pub(super) fn order_union_elements<'db>(left: &Type<'db>, right: &Type<'db>) -> Ordering {
+/// It would be fairly easy to slap `#[derive(PartialOrd, Ord)]` on [`Type`], and the ordering we
+/// create here is not user-facing. However, it doesn't really "make sense" for `Type` to implement
+/// [`Ord`] in terms of the semantics. There are many different ways in which you could plausibly
+/// sort a list of types; this is only one (somewhat arbitrary, at times) possible ordering.
+pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) -> Ordering {
     if left == right {
         return Ordering::Equal;
     }
@@ -83,7 +76,7 @@ pub(super) fn order_union_elements<'db>(left: &Type<'db>, right: &Type<'db>) -> 
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
-                    order_dynamic_elements(left, right)
+                    dynamic_elements_ordering(left, right)
                 }
             }
         }
@@ -233,7 +226,7 @@ pub(super) fn order_union_elements<'db>(left: &Type<'db>, right: &Type<'db>) -> 
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
 
-        (Type::Dynamic(left), Type::Dynamic(right)) => order_dynamic_elements(*left, *right),
+        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
@@ -246,7 +239,7 @@ pub(super) fn order_union_elements<'db>(left: &Type<'db>, right: &Type<'db>) -> 
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
-fn order_dynamic_elements(left: DynamicType, right: DynamicType) -> Ordering {
+fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering {
     match (left, right) {
         (DynamicType::Any, _) => Ordering::Less,
         (_, DynamicType::Any) => Ordering::Greater,
