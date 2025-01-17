@@ -1,4 +1,8 @@
 #!/usr/bin/python
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 
 from __future__ import annotations
 from dataclasses import dataclass
