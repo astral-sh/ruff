@@ -800,7 +800,7 @@ pub(crate) struct SuspiciousTelnetUsage;
 impl Violation for SuspiciousTelnetUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.".to_string()
+        "Telnet is considered insecure. Use SSH or some other encrypted protocol.".to_string()
     }
 }
 
@@ -839,12 +839,16 @@ pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) 
         return;
     }
 
-    let parent_expr = checker.semantic().current_expression_parent();
-
-    if let Some(Expr::Call(parent)) = parent_expr {
-        if parent.func.range().contains_range(func.range()) {
+    match checker.semantic().current_expression_parent() {
+        Some(Expr::Call(parent)) => {
+            if parent.func.range().contains_range(func.range()) {
+                return;
+            }
+        }
+        Some(Expr::Attribute(_)) => {
             return;
         }
+        _ => {}
     }
 
     suspicious_function(checker, func, None, func.range());
@@ -905,6 +909,10 @@ fn suspicious_function(
             }) => leading_chars(left),
             _ => None,
         }
+    }
+
+    if checker.semantic().in_annotation() {
+        return;
     }
 
     let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(func).and_then(|qualified_name| {
@@ -1000,9 +1008,9 @@ fn suspicious_function(
             // XMLETree
             ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser" | "check_docinfo"] => Some(SuspiciousXMLETreeUsage.into()),
             // Telnet
-            ["telnetlib", ..] => Some(SuspiciousTelnetUsage.into()),
+            ["telnetlib", _, ..] => Some(SuspiciousTelnetUsage.into()),
             // FTPLib
-            ["ftplib", ..] => Some(SuspiciousFTPLibUsage.into()),
+            ["ftplib", _, ..] => Some(SuspiciousFTPLibUsage.into()),
             _ => None
         }
     }) else {
