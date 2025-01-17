@@ -11,7 +11,7 @@ def _(flag: bool):
     else:
         reveal_type(x)  # revealed: Literal[1]
 
-    reveal_type(x)  # revealed: Literal[1] | None
+    reveal_type(x)  # revealed: None | Literal[1]
 ```
 
 ## `is` for other types
@@ -56,7 +56,7 @@ def _(x_flag: bool, y_flag: bool):
 def _(flag1: bool, flag2: bool):
     x = None if flag1 else (1 if flag2 else True)
 
-    reveal_type(x)  # revealed: Literal[True, 1] | None
+    reveal_type(x)  # revealed: None | Literal[1, True]
     if x is None:
         reveal_type(x)  # revealed: None
     elif x is True:

@@ -9,39 +9,39 @@ def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[(
 x = foo()
 
 if x:
-    reveal_type(x)  # revealed: Literal[True, -1, "foo", b"bar"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 else:
-    reveal_type(x)  # revealed: Literal[False, 0, "", b""] | tuple[()] | None
+    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 
 if not x:
-    reveal_type(x)  # revealed: Literal[False, 0, "", b""] | tuple[()] | None
+    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 else:
-    reveal_type(x)  # revealed: Literal[True, -1, "foo", b"bar"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 
 if x and not x:
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0, "", "foo", b"", b"bar"] | tuple[()] | bool | None
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if not (x and not x):
-    reveal_type(x)  # revealed: Literal[-1, 0, "", "foo", b"", b"bar"] | tuple[()] | bool | None
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, 0, "", "foo", b"", b"bar"] | tuple[()] | bool | None
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0, "", "foo", b"", b"bar"] | tuple[()] | bool | None
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
-    reveal_type(x)  # revealed: Literal[True, -1, "foo"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo"]
 else:
-    reveal_type(x)  # revealed: Literal[False, 0, "", b"", b"bar"] | tuple[()] | None
+    reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
 ```
 
 ## Function Literals
@@ -61,7 +61,7 @@ def bar(world: str, *args, **kwargs) -> float:
 x = foo if flag() else bar
 
 if x:
-    reveal_type(x)  # revealed: Literal[bar, foo]
+    reveal_type(x)  # revealed: Literal[foo, bar]
 else:
     reveal_type(x)  # revealed: Never
 ```
@@ -85,7 +85,7 @@ def f(x: A | B):
         reveal_type(x)  # revealed: A & ~AlwaysTruthy | B & ~AlwaysTruthy
 
     if x and not x:
-        reveal_type(x)  # revealed: A & ~AlwaysTruthy & ~AlwaysFalsy | B & ~AlwaysTruthy & ~AlwaysFalsy
+        reveal_type(x)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy | B & ~AlwaysFalsy & ~AlwaysTruthy
     else:
         reveal_type(x)  # revealed: A | B
 
@@ -170,12 +170,12 @@ if isinstance(x, str) and not isinstance(x, B):
 
     z = x if flag() else y
 
-    reveal_type(z)  # revealed: Literal[0, 42, "", "hello"] | A & str & ~B
+    reveal_type(z)  # revealed: A & str & ~B | Literal[0, 42, "", "hello"]
 
     if z:
-        reveal_type(z)  # revealed: Literal[42, "hello"] | A & str & ~B & ~AlwaysFalsy
+        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysFalsy | Literal[42, "hello"]
     else:
-        reveal_type(z)  # revealed: Literal[0, ""] | A & str & ~B & ~AlwaysTruthy
+        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysTruthy | Literal[0, ""]
 ```
 
 ## Narrowing Multiple Variables
@@ -211,7 +211,7 @@ x = A()
 
 if x and not x:
     y = x
-    reveal_type(y)  # revealed: A & ~AlwaysTruthy & ~AlwaysFalsy
+    reveal_type(y)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy
 else:
     y = x
     reveal_type(y)  # revealed: A
@@ -248,7 +248,7 @@ def _(
     af: type[AmbiguousClass] | type[FalsyClass],
     flag: bool,
 ):
-    reveal_type(ta)  # revealed: type[AmbiguousClass] | type[TruthyClass]
+    reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
     if ta:
         reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass] & ~AlwaysFalsy
 
@@ -262,7 +262,7 @@ def _(
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
 
     tf = TruthyClass if flag else FalsyClass
-    reveal_type(tf)  # revealed: Literal[FalsyClass, TruthyClass]
+    reveal_type(tf)  # revealed: Literal[TruthyClass, FalsyClass]
 
     if tf:
         reveal_type(tf)  # revealed: Literal[TruthyClass]
@@ -282,12 +282,12 @@ def _(x: Literal[0, 1]):
     reveal_type(x and A())  # revealed: Literal[0] | A
 
 def _(x: str):
-    reveal_type(x or A())  # revealed: A | str & ~AlwaysFalsy
-    reveal_type(x and A())  # revealed: A | str & ~AlwaysTruthy
+    reveal_type(x or A())  # revealed: str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: str & ~AlwaysTruthy | A
 
 def _(x: bool | str):
-    reveal_type(x or A())  # revealed: Literal[True] | A | str & ~AlwaysFalsy
-    reveal_type(x and A())  # revealed: Literal[False] | A | str & ~AlwaysTruthy
+    reveal_type(x or A())  # revealed: Literal[True] | str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: Literal[False] | str & ~AlwaysTruthy | A
 
 class Falsy:
     def __bool__(self) -> Literal[False]: ...
@@ -296,8 +296,8 @@ class Truthy:
     def __bool__(self) -> Literal[True]: ...
 
 def _(x: Falsy | Truthy):
-    reveal_type(x or A())  # revealed: A | Truthy
-    reveal_type(x and A())  # revealed: A | Falsy
+    reveal_type(x or A())  # revealed: Truthy | A
+    reveal_type(x and A())  # revealed: Falsy | A
 
 class MetaFalsy(type):
     def __bool__(self) -> Literal[False]: ...

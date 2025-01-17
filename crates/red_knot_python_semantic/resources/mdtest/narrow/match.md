@@ -6,7 +6,7 @@
 def _(flag: bool):
     x = None if flag else 1
 
-    reveal_type(x)  # revealed: Literal[1] | None
+    reveal_type(x)  # revealed: None | Literal[1]
 
     y = 0
 

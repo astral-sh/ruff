@@ -15,7 +15,7 @@ reveal_type(__doc__)  # revealed: str | None
 
 # TODO: Should be `ModuleSpec | None`
 # (needs support for `*` imports)
-reveal_type(__spec__)  # revealed: None | Unknown
+reveal_type(__spec__)  # revealed: Unknown | None
 
 reveal_type(__path__)  # revealed: @Todo(generics)
 

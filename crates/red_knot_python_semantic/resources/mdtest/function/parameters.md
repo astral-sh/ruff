@@ -19,11 +19,11 @@ from typing import Literal
 def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5, h: Literal[6] = 6, **kwargs: str):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: int
-    reveal_type(c)  # revealed: Literal[1] | Unknown
+    reveal_type(c)  # revealed: Unknown | Literal[1]
     reveal_type(d)  # revealed: int
-    reveal_type(e)  # revealed: Literal[3] | Unknown
+    reveal_type(e)  # revealed: Unknown | Literal[3]
     reveal_type(f)  # revealed: Literal[4]
-    reveal_type(g)  # revealed: Literal[5] | Unknown
+    reveal_type(g)  # revealed: Unknown | Literal[5]
     reveal_type(h)  # revealed: Literal[6]
 
     # TODO: should be `tuple[object, ...]` (needs generics)
@@ -54,7 +54,7 @@ The default value type should be a lower bound on the inferred type.
 from typing import Any
 
 def f(x: Any = 1):
-    reveal_type(x)  # revealed: Literal[1] | Any
+    reveal_type(x)  # revealed: Any | Literal[1]
 ```
 
 ## Default value type must be assignable to annotated type
@@ -71,5 +71,5 @@ def f(x: int = "foo"):
 from typing import Any
 
 def g(x: Any = "foo"):
-    reveal_type(x)  # revealed: Literal["foo"] | Any
+    reveal_type(x)  # revealed: Any | Literal["foo"]
 ```

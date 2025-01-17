@@ -74,7 +74,7 @@ for x in IntIterable():
 else:
     x = "foo"
 
-reveal_type(x)  # revealed: Literal["foo"] | int
+reveal_type(x)  # revealed: int | Literal["foo"]
 ```
 
 ## With old-style iteration protocol
@@ -209,7 +209,7 @@ class Test2:
 
 def _(flag: bool):
     for x in Test() if flag else Test2():
-        reveal_type(x)  # revealed: tuple[int, int] | Exception | bytes | int | memoryview | str
+        reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method
@@ -224,7 +224,7 @@ class Test:
         return TestIter()
 
 def _(flag: bool):
-    # error: [not-iterable] "Object of type `Literal[42] | Test` is not iterable because its `__iter__` method is possibly unbound"
+    # error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
     for x in Test() if flag else 42:
         reveal_type(x)  # revealed: int
 ```

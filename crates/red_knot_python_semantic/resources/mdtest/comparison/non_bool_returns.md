@@ -31,7 +31,7 @@ class C:
     def __lt__(self, other) -> C: ...
 
 x = A() < B() < C()
-reveal_type(x)  # revealed: B | A & ~AlwaysTruthy
+reveal_type(x)  # revealed: A & ~AlwaysTruthy | B
 
 y = 0 < 1 < A() < 3
 reveal_type(y)  # revealed: Literal[False] | A

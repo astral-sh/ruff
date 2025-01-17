@@ -1234,7 +1234,7 @@ if flag():
     x: int
 
 def f() -> None:
-    reveal_type(x)  # revealed: int | str
+    reveal_type(x)  # revealed: str | int
 ```
 
 ## Conditional function definitions

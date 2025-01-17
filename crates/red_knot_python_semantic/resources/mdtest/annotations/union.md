@@ -21,7 +21,7 @@ def f():
     # Since bool is a subtype of int we simplify to int here. But we do allow assigning boolean values (see below).
     # revealed: int
     reveal_type(a1)
-    # revealed: float | int | str
+    # revealed: int | float | str
     reveal_type(a2)
     # revealed: int | None
     reveal_type(a3)

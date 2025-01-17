@@ -13,7 +13,7 @@ if returns_bool():
     chr = 1
 
 def f():
-    reveal_type(chr)  # revealed: Literal[1] | Literal[chr]
+    reveal_type(chr)  # revealed: Literal[chr] | Literal[1]
 ```
 
 ## Conditionally global or builtin, with annotation

@@ -10,7 +10,7 @@ def _(x: A | B):
     if isinstance(x, A) and isinstance(x, B):
         reveal_type(x)  # revealed:  A & B
     else:
-        reveal_type(x)  # revealed:  A & ~B | B & ~A
+        reveal_type(x)  # revealed:  B & ~A | A & ~B
 ```
 
 ## Arms might not add narrowing constraints
@@ -155,7 +155,7 @@ def _(x: A | B | C):
         reveal_type(x)  # revealed:  B & ~C
     else:
         # ~(B & ~C) -> ~B | C -> (A & ~B) | (C & ~B) | C -> (A & ~B) | C
-        reveal_type(x)  # revealed: C | A & ~B
+        reveal_type(x)  # revealed: A & ~B | C
 ```
 
 ## mixing `or` and `not`
@@ -197,7 +197,7 @@ class C: ...
 def _(x: A | B | C):
     if isinstance(x, A) and (isinstance(x, B) or not isinstance(x, C)):
         # A & (B | ~C) -> (A & B) | (A & ~C)
-        reveal_type(x)  # revealed:  A & ~C | A & B
+        reveal_type(x)  # revealed:  A & B | A & ~C
     else:
         # ~((A & B) | (A & ~C)) ->
         # ~(A & B) & ~(A & ~C) ->

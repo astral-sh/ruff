@@ -37,7 +37,7 @@ def _(flag: bool):
     context_expr = Manager1() if flag else Manager2()
 
     with context_expr as f:
-        reveal_type(f)  # revealed: int | str
+        reveal_type(f)  # revealed: str | int
 ```
 
 ## Context manager without an `__enter__` or `__exit__` method

@@ -61,7 +61,7 @@ def _(flag: bool):
     f = Foo()
     f += 12
 
-    reveal_type(f)  # revealed: int | str
+    reveal_type(f)  # revealed: str | int
 ```
 
 ## Partially bound `__iadd__`
@@ -116,7 +116,7 @@ def _(flag1: bool, flag2: bool):
         f = 42.0
     f += 12
 
-    reveal_type(f)  # revealed: float | int | str
+    reveal_type(f)  # revealed: int | str | float
 ```
 
 ## Target union
@@ -133,7 +133,7 @@ def _(flag: bool):
         f = 42.0
     f += 12
 
-    reveal_type(f)  # revealed: float | str
+    reveal_type(f)  # revealed: str | float
 ```
 
 ## Partially bound target union with `__add__`
@@ -160,5 +160,5 @@ def f(flag: bool, flag2: bool):
         f = Bar()
     f += 12
 
-    reveal_type(f)  # revealed: float | int | str
+    reveal_type(f)  # revealed: int | str | float
 ```

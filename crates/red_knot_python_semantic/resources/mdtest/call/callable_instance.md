@@ -68,7 +68,7 @@ def _(flag: bool):
 
     a = NonCallable()
     # error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
-    reveal_type(a())  # revealed: int | Unknown
+    reveal_type(a())  # revealed: Unknown | int
 ```
 
 ## Call binding errors

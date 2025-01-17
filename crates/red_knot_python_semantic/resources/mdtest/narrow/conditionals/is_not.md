@@ -13,7 +13,7 @@ def _(flag: bool):
     else:
         reveal_type(x)  # revealed: None
 
-    reveal_type(x)  # revealed: Literal[1] | None
+    reveal_type(x)  # revealed: None | Literal[1]
 ```
 
 ## `is not` for other singleton types

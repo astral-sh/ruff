@@ -82,7 +82,7 @@ static_assert(not is_fully_static(Unknown))
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: tuple[str, Unknown]
-    reveal_type(z)  # revealed: Literal[1] | Unknown
+    reveal_type(z)  # revealed: Unknown | Literal[1]
 
 # Unknown can be subclassed, just like Any
 class C(Unknown): ...

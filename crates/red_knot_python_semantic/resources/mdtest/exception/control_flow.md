@@ -44,7 +44,7 @@ except:
     x = 2
     reveal_type(x)  # revealed: Literal[2]
 
-reveal_type(x)  # revealed: Literal[2] | str
+reveal_type(x)  # revealed: str | Literal[2]
 ```
 
 If `x` has the same type at the end of both branches, however, the branches unify and `x` is not
@@ -88,7 +88,7 @@ except TypeError:
     x = 2
     reveal_type(x)  # revealed: Literal[2]
 
-reveal_type(x)  # revealed: Literal[2] | str
+reveal_type(x)  # revealed: str | Literal[2]
 ```
 
 ## Multiple `except` branches
@@ -120,7 +120,7 @@ except ValueError:
     x = 3
     reveal_type(x)  # revealed: Literal[3]
 
-reveal_type(x)  # revealed: Literal[2, 3] | str
+reveal_type(x)  # revealed: str | Literal[2, 3]
 ```
 
 ## Exception handlers with `else` branches (but no `finally`)
@@ -273,7 +273,7 @@ except TypeError:
     reveal_type(x)  # revealed: bool
 finally:
     # TODO: should be `Literal[1] | str | bytes | bool`
-    reveal_type(x)  # revealed: bool | str
+    reveal_type(x)  # revealed: str | bool
     x = 2
     reveal_type(x)  # revealed: Literal[2]
 
@@ -310,9 +310,9 @@ except TypeError:
     reveal_type(x)  # revealed: bool
 finally:
     # TODO: should be `Literal[1] | str | bytes | bool`
-    reveal_type(x)  # revealed: bool | str
+    reveal_type(x)  # revealed: str | bool
 
-reveal_type(x)  # revealed: bool | str
+reveal_type(x)  # revealed: str | bool
 ```
 
 An example with multiple `except` branches and a `finally` branch:
@@ -353,9 +353,9 @@ except ValueError:
     reveal_type(x)  # revealed: float
 finally:
     # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float`
-    reveal_type(x)  # revealed: bool | float | str
+    reveal_type(x)  # revealed: str | bool | float
 
-reveal_type(x)  # revealed: bool | float | str
+reveal_type(x)  # revealed: str | bool | float
 ```
 
 ## Combining `except`, `else` and `finally` branches
@@ -539,7 +539,7 @@ try:
         reveal_type(x)  # revealed: Literal[2]
     reveal_type(x)  # revealed: Literal[2]
 except:
-    reveal_type(x)  # revealed: Literal[1, 2] | bool | bytes | float | memoryview | range | slice | str
+    reveal_type(x)  # revealed: Literal[1, 2] | str | bytes | bool | memoryview | float | range | slice
     x = could_raise_returns_complex()
     reveal_type(x)  # revealed: complex
     x = could_raise_returns_bytearray()
@@ -552,11 +552,11 @@ else:
     reveal_type(x)  # revealed: Bar
 finally:
     # TODO: should be `Literal[1, 2] | str | bytes | bool | memoryview | float | range | slice | complex | bytearray | Foo | Bar`
-    reveal_type(x)  # revealed: Bar | bytearray
+    reveal_type(x)  # revealed: bytearray | Bar
 
 # Either one `except` branch or the `else`
 # must have been taken and completed to get here:
-reveal_type(x)  # revealed: Bar | bytearray
+reveal_type(x)  # revealed: bytearray | Bar
 ```
 
 ## Nested scopes inside `try` blocks
@@ -592,7 +592,7 @@ try:
             x = could_raise_returns_bytes()
             reveal_type(x)  # revealed: bytes
         except:
-            reveal_type(x)  # revealed: bytes | str
+            reveal_type(x)  # revealed: str | bytes
             x = could_raise_returns_bytearray()
             reveal_type(x)  # revealed: bytearray
             x = could_raise_returns_float()

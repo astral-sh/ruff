@@ -30,7 +30,7 @@ def _(flag: bool):
             def __class_getitem__(cls, item: int) -> int:
                 return item
 
-    reveal_type(UnionClassGetItem[0])  # revealed: int | str
+    reveal_type(UnionClassGetItem[0])  # revealed: str | int
 ```
 
 ## Class getitem with class union
@@ -48,7 +48,7 @@ def _(flag: bool):
     x = A if flag else B
 
     reveal_type(x)  # revealed: Literal[A, B]
-    reveal_type(x[0])  # revealed: int | str
+    reveal_type(x[0])  # revealed: str | int
 ```
 
 ## Class getitem with unbound method union
@@ -79,7 +79,7 @@ def _(flag: bool):
     else:
         Eggs = 1
 
-    a = Eggs[42]  # error: "Cannot subscript object of type `Literal[1] | Literal[Eggs]` with no `__getitem__` method"
+    a = Eggs[42]  # error: "Cannot subscript object of type `Literal[Eggs] | Literal[1]` with no `__getitem__` method"
 
     # TODO: should _probably_ emit `str | Unknown`
     reveal_type(a)  # revealed: Unknown

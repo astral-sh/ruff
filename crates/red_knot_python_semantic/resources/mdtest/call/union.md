@@ -25,7 +25,7 @@ if coinflip():
     def f() -> int:
         return 1
 
-reveal_type(f())  # revealed: int | Unknown
+reveal_type(f())  # revealed: Unknown | int
 ```
 
 ## Non-callable elements in a union
@@ -40,7 +40,7 @@ def _(flag: bool):
         def f() -> int:
             return 1
     x = f()  # error: "Object of type `Literal[1] | Literal[f]` is not callable (due to union element `Literal[1]`)"
-    reveal_type(x)  # revealed: int | Unknown
+    reveal_type(x)  # revealed: Unknown | int
 ```
 
 ## Multiple non-callable elements in a union
@@ -57,7 +57,7 @@ def _(flag: bool, flag2: bool):
         def f() -> int:
             return 1
     # error: "Object of type `Literal[1, "foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
-    # revealed: int | Unknown
+    # revealed: Unknown | int
     reveal_type(f())
 ```
 

@@ -47,9 +47,9 @@ def _(
     u2: int | (str | bytes),
     u3: int | (str | (bytes | complex)),
 ) -> None:
-    reveal_type(u1)  # revealed: bytes | int | str
-    reveal_type(u2)  # revealed: bytes | int | str
-    reveal_type(u3)  # revealed: bytes | complex | int | str
+    reveal_type(u1)  # revealed: int | str | bytes
+    reveal_type(u2)  # revealed: int | str | bytes
+    reveal_type(u3)  # revealed: int | str | bytes | complex
 ```
 
 ## Simplification using subtyping
@@ -65,7 +65,7 @@ def _(
     reveal_type(u1)  # revealed: str
     reveal_type(u2)  # revealed: str
     reveal_type(u3)  # revealed: str
-    reveal_type(u4)  # revealed: bytes | str
+    reveal_type(u4)  # revealed: str | bytes
 ```
 
 ## Boolean literals
@@ -86,7 +86,7 @@ def _(
     reveal_type(u2)  # revealed: bool
     reveal_type(u3)  # revealed: bool
     reveal_type(u4)  # revealed: Literal[True, 17]
-    reveal_type(u5)  # revealed: Literal[17] | bool
+    reveal_type(u5)  # revealed: bool | Literal[17]
 ```
 
 ## Do not erase `Unknown`
@@ -95,7 +95,7 @@ def _(
 from knot_extensions import Unknown
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
-    reveal_type(u1)  # revealed: str | Unknown
+    reveal_type(u1)  # revealed: Unknown | str
     reveal_type(u2)  # revealed: str | Unknown
 ```
 
@@ -108,8 +108,8 @@ union are still redundant:
 from knot_extensions import Unknown
 
 def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknown | Unknown) -> None:
-    reveal_type(u1)  # revealed: str | Unknown
-    reveal_type(u2)  # revealed: str | Unknown
+    reveal_type(u1)  # revealed: Unknown | str
+    reveal_type(u2)  # revealed: Unknown | str
     reveal_type(u3)  # revealed: str | Unknown
 ```
 
@@ -121,7 +121,7 @@ Simplifications still apply when `Unknown` is present.
 from knot_extensions import Unknown
 
 def _(u1: str | Unknown | int | object):
-    reveal_type(u1)  # revealed: object | Unknown
+    reveal_type(u1)  # revealed: Unknown | object
 ```
 
 ## Union of intersections

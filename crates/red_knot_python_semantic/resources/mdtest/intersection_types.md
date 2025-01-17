@@ -158,7 +158,7 @@ def mixed(
     reveal_type(i1)  # revealed: P & R & ~Q
     reveal_type(i2)  # revealed: P & R & ~Q
     reveal_type(i3)  # revealed: Q & ~P & ~R
-    reveal_type(i4)  # revealed: Q & ~P & ~R
+    reveal_type(i4)  # revealed: Q & ~R & ~P
 
 def multiple(
     i1: Intersection[Intersection[P, Q], Intersection[R, S]],
@@ -193,7 +193,7 @@ def _(
 ) -> None:
     reveal_type(i1)  # revealed: P & Q | P & R | P & S
     reveal_type(i2)  # revealed: P & S | Q & S | R & S
-    reveal_type(i3)  # revealed: P & R | P & S | Q & R | Q & S
+    reveal_type(i3)  # revealed: P & R | Q & R | P & S | Q & S
 
 def simplifications_for_same_elements(
     i1: Intersection[P, Q | P],
@@ -519,15 +519,15 @@ def _(
     reveal_type(i10)  # revealed: B & Unrelated
     reveal_type(i11)  # revealed: B & Unrelated
     reveal_type(i12)  # revealed: B & Unrelated
-    reveal_type(i13)  # revealed: B & Unrelated
-    reveal_type(i14)  # revealed: B & Unrelated
-    reveal_type(i15)  # revealed: B & Unrelated
+    reveal_type(i13)  # revealed: Unrelated & B
+    reveal_type(i14)  # revealed: Unrelated & B
+    reveal_type(i15)  # revealed: Unrelated & B
     reveal_type(i16)  # revealed: B & Any
     reveal_type(i17)  # revealed: B & Any
     reveal_type(i18)  # revealed: B & Any
-    reveal_type(i19)  # revealed: B & Any
-    reveal_type(i20)  # revealed: B & Any
-    reveal_type(i21)  # revealed: B & Any
+    reveal_type(i19)  # revealed: Any & B
+    reveal_type(i20)  # revealed: Any & B
+    reveal_type(i21)  # revealed: Any & B
 ```
 
 #### Negative type and negative subtype
@@ -718,8 +718,8 @@ def f(
     reveal_type(f)  # revealed: Literal[""]
     reveal_type(g)  # revealed: LiteralString & ~Literal[""]
     reveal_type(h)  # revealed: LiteralString & ~Literal[""]
-    reveal_type(i)  # revealed: Literal[""] & Unknown
-    reveal_type(j)  # revealed: Literal[""] & Unknown
+    reveal_type(i)  # revealed: Unknown & Literal[""]
+    reveal_type(j)  # revealed: Unknown & Literal[""]
 ```
 
 ## Addition of a type to an intersection with many non-disjoint types
@@ -732,7 +732,7 @@ from knot_extensions import AlwaysFalsy, Intersection, Unknown
 from typing_extensions import Literal
 
 def _(x: Intersection[str, Unknown, AlwaysFalsy, Literal[""]]):
-    reveal_type(x)  # revealed: Literal[""] & Unknown
+    reveal_type(x)  # revealed: Unknown & Literal[""]
 ```
 
 ## Non fully-static types
@@ -787,8 +787,8 @@ def any(
 ) -> None:
     reveal_type(i1)  # revealed: Any
     reveal_type(i2)  # revealed: P & Any
-    reveal_type(i3)  # revealed: P & Any
-    reveal_type(i4)  # revealed: P & Any
+    reveal_type(i3)  # revealed: Any & P
+    reveal_type(i4)  # revealed: Any & P
 
 def unknown(
     i1: Intersection[Unknown, Unknown],
@@ -798,8 +798,8 @@ def unknown(
 ) -> None:
     reveal_type(i1)  # revealed: Unknown
     reveal_type(i2)  # revealed: P & Unknown
-    reveal_type(i3)  # revealed: P & Unknown
-    reveal_type(i4)  # revealed: P & Unknown
+    reveal_type(i3)  # revealed: Unknown & P
+    reveal_type(i4)  # revealed: Unknown & P
 ```
 
 ### No self-cancellation
