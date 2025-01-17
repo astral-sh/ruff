@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 unspecified_encoding.py:8:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -132,7 +131,7 @@ unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in tex
 13 | codecs.open("test.txt")
 14 | tempfile.SpooledTemporaryFile(0, "w")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW1514
-15 | 
+15 |
 16 | # Non-errors.
    |
    = help: Add explicit `encoding` argument
@@ -150,7 +149,7 @@ unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in tex
 unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 44 | tempfile.SpooledTemporaryFile(0, )
-45 | 
+45 |
 46 | open("test.txt",)
    | ^^^^ PLW1514
 47 | open()
@@ -296,7 +295,7 @@ unspecified_encoding.py:59:1: PLW1514 [*] `open` in text mode without explicit `
 unspecified_encoding.py:64:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 62 | )
-63 | 
+63 |
 64 | open((("test.txt")),)
    | ^^^^ PLW1514
 65 | open(
@@ -422,7 +421,7 @@ unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path(...).write_text` without
 79 | text = Path("foo.txt").read_text()
 80 | Path("foo.txt").write_text(text)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW1514
-81 | 
+81 |
 82 | # Non-errors.
    |
    = help: Add explicit `encoding` argument

@@ -17,8 +17,8 @@ box: MyBox[int] = MyBox(5)
 # TODO should emit a diagnostic here (str is not assignable to int)
 wrong_innards: MyBox[int] = MyBox("five")
 
-# TODO reveal int
-reveal_type(box.data)  # revealed: @Todo(instance attributes)
+# TODO reveal int, do not leak the typevar
+reveal_type(box.data)  # revealed: T
 
 reveal_type(MyBox.box_model_number)  # revealed: Literal[695]
 ```
@@ -39,7 +39,9 @@ class MySecureBox[T](MyBox[T]): ...
 secure_box: MySecureBox[int] = MySecureBox(5)
 reveal_type(secure_box)  # revealed: MySecureBox
 # TODO reveal int
-reveal_type(secure_box.data)  # revealed: @Todo(instance attributes)
+# The @Todo(…) is misleading here. We currently treat `MyBox[T]` as a dynamic base class because we
+# don't understand generics and therefore infer `Unknown` for the `MyBox[T]` base of `MySecureBox[T]`.
+reveal_type(secure_box.data)  # revealed: @Todo(instance attribute on class with dynamic base)
 ```
 
 ## Cyclical class definition

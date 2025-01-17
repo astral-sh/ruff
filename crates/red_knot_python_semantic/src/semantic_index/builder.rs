@@ -404,6 +404,17 @@ impl<'db> SemanticIndexBuilder<'db> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
     ) -> Constraint<'db> {
+        // This is called for the top-level pattern of each match arm. We need to create a
+        // standalone expression for each arm of a match statement, since they can introduce
+        // constraints on the match subject. (Or more accurately, for the match arm's pattern,
+        // since its the pattern that introduces any constraints, not the body.) Ideally, that
+        // standalone expression would wrap the match arm's pattern as a whole. But a standalone
+        // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
+        // choose an Expr that can “stand in” for the pattern, which we can wrap in a standalone
+        // expression.
+        //
+        // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
+
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
 
         let kind = match pattern {
@@ -413,6 +424,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             }
             ast::Pattern::MatchSingleton(singleton) => {
                 PatternConstraintKind::Singleton(singleton.value, guard)
+            }
+            ast::Pattern::MatchClass(pattern) => {
+                let cls = self.add_standalone_expression(&pattern.cls);
+                PatternConstraintKind::Class(cls, guard)
             }
             _ => PatternConstraintKind::Unsupported,
         };
@@ -1089,37 +1104,35 @@ where
                 cases,
                 range: _,
             }) => {
+                debug_assert_eq!(self.current_match_case, None);
+
                 let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
-
-                let after_subject = self.flow_snapshot();
-                let Some((first, remaining)) = cases.split_first() else {
+                if cases.is_empty() {
                     return;
                 };
 
-                let first_constraint_id = self.add_pattern_constraint(
-                    subject_expr,
-                    &first.pattern,
-                    first.guard.as_deref(),
-                );
-
-                self.visit_match_case(first);
-
-                let first_vis_constraint_id =
-                    self.record_visibility_constraint(first_constraint_id);
-                let mut vis_constraints = vec![first_vis_constraint_id];
-
+                let after_subject = self.flow_snapshot();
+                let mut vis_constraints = vec![];
                 let mut post_case_snapshots = vec![];
-                for case in remaining {
-                    post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
+                for (i, case) in cases.iter().enumerate() {
+                    if i != 0 {
+                        post_case_snapshots.push(self.flow_snapshot());
+                        self.flow_restore(after_subject.clone());
+                    }
+
+                    self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
+                    self.visit_pattern(&case.pattern);
+                    self.current_match_case = None;
                     let constraint_id = self.add_pattern_constraint(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    self.visit_match_case(case);
-
+                    if let Some(expr) = &case.guard {
+                        self.visit_expr(expr);
+                    }
+                    self.visit_body(&case.body);
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
@@ -1538,18 +1551,6 @@ where
         }
     }
 
-    fn visit_match_case(&mut self, match_case: &'ast ast::MatchCase) {
-        debug_assert!(self.current_match_case.is_none());
-        self.current_match_case = Some(CurrentMatchCase::new(&match_case.pattern));
-        self.visit_pattern(&match_case.pattern);
-        self.current_match_case = None;
-
-        if let Some(expr) = &match_case.guard {
-            self.visit_expr(expr);
-        }
-        self.visit_body(&match_case.body);
-    }
-
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
@@ -1636,6 +1637,7 @@ impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 struct CurrentMatchCase<'a> {
     /// The pattern that's part of the current match case.
     pattern: &'a ast::Pattern,

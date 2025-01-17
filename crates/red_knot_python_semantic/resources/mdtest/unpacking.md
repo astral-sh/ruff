@@ -426,8 +426,8 @@ def _(flag: bool):
         value = ("a", "b")
 
     a, b = value
-    reveal_type(a)  # revealed: Literal[1] | Literal["a"]
-    reveal_type(b)  # revealed: Literal[2] | Literal["b"]
+    reveal_type(a)  # revealed: Literal[1, "a"]
+    reveal_type(b)  # revealed: Literal[2, "b"]
 ```
 
 ### Typing literal
@@ -528,8 +528,8 @@ for a, b in ((1, 2), (3, 4)):
 
 ```py
 for a, b in ((1, 2), ("a", "b")):
-    reveal_type(a)  # revealed: Literal[1] | Literal["a"]
-    reveal_type(b)  # revealed: Literal[2] | Literal["b"]
+    reveal_type(a)  # revealed: Literal[1, "a"]
+    reveal_type(b)  # revealed: Literal[2, "b"]
 ```
 
 ### Mixed literals values (2)

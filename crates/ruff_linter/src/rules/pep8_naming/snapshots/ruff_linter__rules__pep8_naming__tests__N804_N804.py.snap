@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N804.py:30:27: N804 [*] First argument of a class method should be named `cls`
    |
 28 |         ...
-29 | 
+29 |
 30 |     def __init_subclass__(self, default_name, **kwargs):
    |                           ^^^^ N804
 31 |         ...
@@ -72,7 +71,7 @@ N804.py:54:25: N804 First argument of a class method should be named `cls`
 N804.py:57:34: N804 First argument of a class method should be named `cls`
    |
 55 |         pass
-56 | 
+56 |
 57 |     def cls_as_pos_only_argument(this, cls, /):
    |                                  ^^^^ N804
 58 |         pass
@@ -82,7 +81,7 @@ N804.py:57:34: N804 First argument of a class method should be named `cls`
 N804.py:60:33: N804 First argument of a class method should be named `cls`
    |
 58 |         pass
-59 | 
+59 |
 60 |     def cls_as_kw_only_argument(this, *, cls):
    |                                 ^^^^ N804
 61 |         pass
@@ -92,7 +91,7 @@ N804.py:60:33: N804 First argument of a class method should be named `cls`
 N804.py:63:23: N804 First argument of a class method should be named `cls`
    |
 61 |         pass
-62 | 
+62 |
 63 |     def cls_as_varags(this, *cls):
    |                       ^^^^ N804
 64 |         pass
@@ -102,7 +101,7 @@ N804.py:63:23: N804 First argument of a class method should be named `cls`
 N804.py:66:23: N804 First argument of a class method should be named `cls`
    |
 64 |         pass
-65 | 
+65 |
 66 |     def cls_as_kwargs(this, **cls):
    |                       ^^^^ N804
 67 |         pass
@@ -136,7 +135,7 @@ N804.py:70:20: N804 [*] First argument of a class method should be named `cls`
 N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
    |
 72 |         this
-73 | 
+73 |
 74 |     def bad_method(this):
    |                    ^^^^ N804
 75 |         self = this

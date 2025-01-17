@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -84,7 +83,7 @@ Module(
   |
 1 | call(a, b, \\\
   |            ^ Syntax Error: Expected a newline after line continuation character
-2 | 
+2 |
 3 | def bar():
   |
 
@@ -92,14 +91,14 @@ Module(
   |
 1 | call(a, b, \\\
   |             ^ Syntax Error: Expected a newline after line continuation character
-2 | 
+2 |
 3 | def bar():
   |
 
 
   |
 1 | call(a, b, \\\
-2 | 
+2 |
   | ^ Syntax Error: Expected ')', found newline
 3 | def bar():
 4 |     pass

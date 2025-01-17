@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 too_many_branches.py:8:5: PLR0912 Too many branches (13 > 12)
    |
@@ -14,7 +13,7 @@ too_many_branches.py:8:5: PLR0912 Too many branches (13 > 12)
 too_many_branches.py:80:5: PLR0912 Too many branches (13 > 12)
    |
 78 |         pass
-79 | 
+79 |
 80 | def with_statement_wrong():
    |     ^^^^^^^^^^^^^^^^^^^^ PLR0912
 81 |     """statements inside the with statement should get counted"""

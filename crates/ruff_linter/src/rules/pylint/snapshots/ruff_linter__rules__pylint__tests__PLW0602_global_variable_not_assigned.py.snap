@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 global_variable_not_assigned.py:5:12: PLW0602 Using global for `X` but no assignment is done
   |
@@ -15,6 +14,6 @@ global_variable_not_assigned.py:9:12: PLW0602 Using global for `X` but no assign
  8 | def f():
  9 |     global X
    |            ^ PLW0602
-10 | 
+10 |
 11 |     print(X)
    |

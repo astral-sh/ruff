@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
   |
 2 | # parenthesis.
-3 | 
+3 |
 4 | def foo[T1, T2():
   |               ^
 5 |     pass
@@ -24,7 +23,7 @@ E30_syntax_error.py:13:18: SyntaxError: Expected ')', found newline
 E30_syntax_error.py:18:1: E305 Expected 2 blank lines after class or function definition, found (1)
    |
 16 |         pass
-17 | 
+17 |
 18 | foo = Foo(
    | ^^^ E305
    |
@@ -33,11 +32,11 @@ E30_syntax_error.py:18:1: E305 Expected 2 blank lines after class or function de
 E30_syntax_error.py:18:11: SyntaxError: Expected ')', found newline
    |
 16 |         pass
-17 | 
+17 |
 18 | foo = Foo(
    |           ^
-19 | 
-20 | 
+19 |
+20 |
 21 | def top(
    |
 

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
 C419_1.py:1:5: C419 [*] Unnecessary list comprehension
   |
@@ -61,7 +60,7 @@ C419_1.py:4:5: C419 [*] Unnecessary list comprehension
 3 | max([x.val for x in bar])
 4 | sum([x.val for x in bar], 0)
   |     ^^^^^^^^^^^^^^^^^^^^ C419
-5 | 
+5 |
 6 | # OK
   |
   = help: Remove unnecessary comprehension
@@ -80,8 +79,7 @@ C419_1.py:14:5: C419 [*] Unnecessary list comprehension
    |
 12 |   # Multi-line
 13 |   sum(
-14 |       [
-   |  _____^
+14 | /     [
 15 | |         delta
 16 | |         for delta in timedelta_list
 17 | |         if delta

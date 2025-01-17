@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed_ambiguous_lpar.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -65,14 +64,14 @@ Module(
   |
 1 | with (:
   |       ^ Syntax Error: Expected an expression
-2 | 
+2 |
 3 | x + y
   |
 
 
   |
 1 | with (:
-2 | 
+2 |
 3 | x + y
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ Syntax Error: unexpected EOF while parsing
   |

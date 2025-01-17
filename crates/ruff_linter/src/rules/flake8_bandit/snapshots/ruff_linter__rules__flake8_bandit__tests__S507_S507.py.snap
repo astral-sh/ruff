@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S507.py:15:40: S507 Paramiko call with policy set to automatically trust the unknown host key
    |
@@ -76,6 +75,6 @@ S507.py:22:54: S507 Paramiko call with policy set to automatically trust the unk
 21 | ssh_client.set_missing_host_key_policy(policy=WarningPolicy)
 22 | ssh_client_from_paramiko.set_missing_host_key_policy(paramiko.AutoAddPolicy)
    |                                                      ^^^^^^^^^^^^^^^^^^^^^^ S507
-23 | 
+23 |
 24 | # Unrelated
    |

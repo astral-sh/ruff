@@ -109,6 +109,7 @@ pub enum KnownModule {
     #[allow(dead_code)]
     Abc, // currently only used in tests
     Collections,
+    KnotExtensions,
 }
 
 impl KnownModule {
@@ -122,6 +123,7 @@ impl KnownModule {
             Self::Sys => "sys",
             Self::Abc => "abc",
             Self::Collections => "collections",
+            Self::KnotExtensions => "knot_extensions",
         }
     }
 
@@ -147,11 +149,20 @@ impl KnownModule {
             "sys" => Some(Self::Sys),
             "abc" => Some(Self::Abc),
             "collections" => Some(Self::Collections),
+            "knot_extensions" => Some(Self::KnotExtensions),
             _ => None,
         }
     }
 
+    pub const fn is_builtins(self) -> bool {
+        matches!(self, Self::Builtins)
+    }
+
     pub const fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
+    }
+
+    pub const fn is_knot_extensions(self) -> bool {
+        matches!(self, Self::KnotExtensions)
     }
 }

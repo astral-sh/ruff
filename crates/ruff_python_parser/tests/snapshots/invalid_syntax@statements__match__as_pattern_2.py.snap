@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_pattern_2.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -124,4 +123,5 @@ Module(
   |
 4 |     case x as y + 1j:
 5 |         pass
+  |             ^ Syntax Error: Expected a statement
   |

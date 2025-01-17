@@ -159,7 +159,14 @@ def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...  # Soft Deprecated, no plans to
 if sys.platform == "win32":
     def DllCanUnloadNow() -> int: ...
     def DllGetClassObject(rclsid: Any, riid: Any, ppv: Any) -> int: ...  # TODO not documented
-    def GetLastError() -> int: ...
+
+    # Actually just an instance of _NamedFuncPointer (aka _CDLLFuncPointer),
+    # but we want to set a more specific __call__
+    @type_check_only
+    class _GetLastErrorFunctionType(_NamedFuncPointer):
+        def __call__(self) -> int: ...
+
+    GetLastError: _GetLastErrorFunctionType
 
 # Actually just an instance of _CFunctionType, but we want to set a more
 # specific __call__.

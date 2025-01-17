@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
    |
 76 |     """Toggle the gizmo.
-77 | 
+77 |
 78 |     Returns
    |     ^^^^^^^ D410
 79 |     -------
@@ -25,7 +24,7 @@ sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
 sections.py:224:5: D410 [*] Missing blank line after section ("Returns")
     |
 222 |     returns.
-223 | 
+223 |
 224 |     Returns
     |     ^^^^^^^ D410
 225 |     ------

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP026.py:3:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
   |
@@ -8,7 +7,7 @@ UP026.py:3:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
 2 | if True:
 3 |     import mock
   |            ^^^^ UP026
-4 | 
+4 |
 5 | # Error (`from unittest import mock`)
   |
   = help: Import from `unittest.mock` instead
@@ -28,7 +27,7 @@ UP026.py:7:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
 6 | if True:
 7 |     import mock, sys
   |            ^^^^ UP026
-8 | 
+8 |
 9 | # Error (`from unittest.mock import *`)
   |
   = help: Import from `unittest.mock` instead
@@ -50,7 +49,7 @@ UP026.py:11:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
 10 | if True:
 11 |     from mock import *
    |     ^^^^^^^^^^^^^^^^^^ UP026
-12 | 
+12 |
 13 | # Error (`from unittest import mock`)
    |
    = help: Import from `unittest.mock` instead
@@ -70,7 +69,7 @@ UP026.py:14:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
 13 | # Error (`from unittest import mock`)
 14 | import mock.mock
    |        ^^^^^^^^^ UP026
-15 | 
+15 |
 16 | # Error (`from unittest import mock`)
    |
    = help: Import from `unittest.mock` instead
@@ -90,7 +89,7 @@ UP026.py:17:20: UP026 [*] `mock` is deprecated, use `unittest.mock`
 16 | # Error (`from unittest import mock`)
 17 | import contextlib, mock, sys
    |                    ^^^^ UP026
-18 | 
+18 |
 19 | # Error (`from unittest import mock`)
    |
    = help: Import from `unittest.mock` instead
@@ -131,7 +130,7 @@ UP026.py:24:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
 23 | # Error (`from unittest import mock`)
 24 | from mock import mock
    | ^^^^^^^^^^^^^^^^^^^^^ UP026
-25 | 
+25 |
 26 | # Error (keep trailing comma)
    |
    = help: Import from `unittest.mock` instead
@@ -188,7 +187,7 @@ UP026.py:33:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
 37 | |     mock,
 38 | | )
    | |_^ UP026
-39 |   
+39 |
 40 |   # Error (avoid trailing comma)
    |
    = help: Import from `unittest.mock` instead
@@ -300,7 +299,7 @@ UP026.py:54:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
 53 | from mock import mock, a, b, c
 54 | from mock import a, b, c, mock
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP026
-55 | 
+55 |
 56 | if True:
    |
    = help: Import from `unittest.mock` instead
@@ -320,15 +319,14 @@ UP026.py:58:9: UP026 [*] `mock` is deprecated, use `unittest.mock`
    |
 56 |   if True:
 57 |       if False:
-58 |           from mock import (
-   |  _________^
+58 | /         from mock import (
 59 | |             mock,
 60 | |             a,
 61 | |             b,
 62 | |             c
 63 | |         )
    | |_________^ UP026
-64 |   
+64 |
 65 |   # OK
    |
    = help: Import from `unittest.mock` instead
@@ -354,7 +352,7 @@ UP026.py:69:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
 68 | # Error (`from unittest import mock`)
 69 | import mock, mock
    |        ^^^^ UP026
-70 | 
+70 |
 71 | # Error (`from unittest import mock as foo`)
    |
    = help: Import from `unittest.mock` instead
@@ -375,7 +373,7 @@ UP026.py:69:14: UP026 [*] `mock` is deprecated, use `unittest.mock`
 68 | # Error (`from unittest import mock`)
 69 | import mock, mock
    |              ^^^^ UP026
-70 | 
+70 |
 71 | # Error (`from unittest import mock as foo`)
    |
    = help: Import from `unittest.mock` instead
@@ -396,7 +394,7 @@ UP026.py:72:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
 71 | # Error (`from unittest import mock as foo`)
 72 | import mock as foo
    |        ^^^^^^^^^^^ UP026
-73 | 
+73 |
 74 | # Error (`from unittest import mock as foo`)
    |
    = help: Import from `unittest.mock` instead
@@ -416,7 +414,7 @@ UP026.py:75:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
 74 | # Error (`from unittest import mock as foo`)
 75 | from mock import mock as foo
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP026
-76 | 
+76 |
 77 | if True:
    |
    = help: Import from `unittest.mock` instead
@@ -437,7 +435,7 @@ UP026.py:79:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
 78 |     # This should yield multiple, aliased imports.
 79 |     import mock as foo, mock as bar, mock
    |            ^^^^^^^^^^^ UP026
-80 | 
+80 |
 81 |     # This should yield multiple, aliased imports, and preserve `os`.
    |
    = help: Import from `unittest.mock` instead
@@ -460,7 +458,7 @@ UP026.py:79:25: UP026 [*] `mock` is deprecated, use `unittest.mock`
 78 |     # This should yield multiple, aliased imports.
 79 |     import mock as foo, mock as bar, mock
    |                         ^^^^^^^^^^^ UP026
-80 | 
+80 |
 81 |     # This should yield multiple, aliased imports, and preserve `os`.
    |
    = help: Import from `unittest.mock` instead
@@ -483,7 +481,7 @@ UP026.py:79:38: UP026 [*] `mock` is deprecated, use `unittest.mock`
 78 |     # This should yield multiple, aliased imports.
 79 |     import mock as foo, mock as bar, mock
    |                                      ^^^^ UP026
-80 | 
+80 |
 81 |     # This should yield multiple, aliased imports, and preserve `os`.
    |
    = help: Import from `unittest.mock` instead
@@ -505,7 +503,7 @@ UP026.py:82:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
 81 |     # This should yield multiple, aliased imports, and preserve `os`.
 82 |     import mock as foo, mock as bar, mock, os
    |            ^^^^^^^^^^^ UP026
-83 | 
+83 |
 84 | if True:
    |
    = help: Import from `unittest.mock` instead
@@ -528,7 +526,7 @@ UP026.py:82:25: UP026 [*] `mock` is deprecated, use `unittest.mock`
 81 |     # This should yield multiple, aliased imports, and preserve `os`.
 82 |     import mock as foo, mock as bar, mock, os
    |                         ^^^^^^^^^^^ UP026
-83 | 
+83 |
 84 | if True:
    |
    = help: Import from `unittest.mock` instead
@@ -551,7 +549,7 @@ UP026.py:82:38: UP026 [*] `mock` is deprecated, use `unittest.mock`
 81 |     # This should yield multiple, aliased imports, and preserve `os`.
 82 |     import mock as foo, mock as bar, mock, os
    |                                      ^^^^ UP026
-83 | 
+83 |
 84 | if True:
    |
    = help: Import from `unittest.mock` instead

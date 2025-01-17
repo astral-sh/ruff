@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use red_knot_python_semantic::{HasTy, SemanticModel};
-use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::workspace::WorkspaceMetadata;
+use red_knot_workspace::db::ProjectDatabase;
+use red_knot_workspace::project::ProjectMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
@@ -9,12 +9,12 @@ use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{self as ast, Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 
-fn setup_db(workspace_root: &SystemPath, system: TestSystem) -> anyhow::Result<RootDatabase> {
-    let workspace = WorkspaceMetadata::discover(workspace_root, &system, None)?;
-    RootDatabase::new(workspace, system)
+fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
+    let project = ProjectMetadata::discover(project_root, &system)?;
+    ProjectDatabase::new(project, system)
 }
 
-fn get_workspace_root() -> anyhow::Result<SystemPathBuf> {
+fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
     Ok(SystemPathBuf::from(String::from_utf8(
         std::process::Command::new("cargo")
             .args(["locate-project", "--workspace", "--message-format", "plain"])
@@ -35,7 +35,7 @@ fn corpus_no_panic() -> anyhow::Result<()> {
 
 #[test]
 fn parser_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_workspace_root()?;
+    let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
         "{workspace_root}/crates/ruff_python_parser/resources/**/*.py"
     ))
@@ -43,7 +43,7 @@ fn parser_no_panic() -> anyhow::Result<()> {
 
 #[test]
 fn linter_af_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_workspace_root()?;
+    let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
         "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[a-f]*/**/*.py"
     ))
@@ -51,7 +51,7 @@ fn linter_af_no_panic() -> anyhow::Result<()> {
 
 #[test]
 fn linter_gz_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_workspace_root()?;
+    let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
         "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[g-z]*/**/*.py"
     ))
@@ -60,7 +60,7 @@ fn linter_gz_no_panic() -> anyhow::Result<()> {
 #[test]
 #[ignore = "Enable running once there are fewer failures"]
 fn linter_stubs_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_workspace_root()?;
+    let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
         "{workspace_root}/crates/ruff_linter/resources/test/fixtures/**/*.pyi"
     ))
@@ -69,7 +69,7 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
 #[test]
 #[ignore = "Enable running over typeshed stubs once there are fewer failures"]
 fn typeshed_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_workspace_root()?;
+    let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
         "{workspace_root}/crates/red_knot_vendored/vendor/typeshed/**/*.pyi"
     ))
@@ -85,7 +85,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
     let mut db = setup_db(&root, system.clone())?;
 
-    let workspace_root = get_workspace_root()?;
+    let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
 
     let corpus = glob::glob(pattern).context("Failed to compile pattern")?;
@@ -163,7 +163,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn pull_types(db: &RootDatabase, file: File) {
+fn pull_types(db: &ProjectDatabase, file: File) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
     let ast = parsed_module(db, file);
@@ -176,7 +176,7 @@ struct PullTypesVisitor<'db> {
 }
 
 impl<'db> PullTypesVisitor<'db> {
-    fn new(db: &'db RootDatabase, file: File) -> Self {
+    fn new(db: &'db ProjectDatabase, file: File) -> Self {
         Self {
             model: SemanticModel::new(db, file),
         }
@@ -272,7 +272,8 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // related to circular references in class definitions
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_27.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
     // related to circular references in type aliases (salsa cycle panic):

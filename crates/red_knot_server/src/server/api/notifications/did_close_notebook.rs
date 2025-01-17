@@ -33,7 +33,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         if let AnySystemPath::SystemVirtual(virtual_path) = path {
-            let db = session.default_workspace_db_mut();
+            let db = session.default_project_db_mut();
             db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
         }
 

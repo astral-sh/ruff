@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM300.py:2:1: SIM300 [*] Yoda condition detected
   |
@@ -318,7 +317,7 @@ SIM300.py:17:1: SIM300 [*] Yoda condition detected
 16 | B or(B)<A[0][0]
 17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-18 | 
+18 |
 19 | # Errors in preview
    |
    = help: Rewrite as `DummyHandler.CONFIG == {"non-empty-dict": "is-ok"}`
@@ -358,7 +357,7 @@ SIM300.py:21:1: SIM300 [*] Yoda condition detected
 20 | ['upper'] == UPPER_LIST
 21 | {} == DummyHandler.CONFIG
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-22 | 
+22 |
 23 | # Errors in stable
    |
    = help: Rewrite as `DummyHandler.CONFIG == {}`

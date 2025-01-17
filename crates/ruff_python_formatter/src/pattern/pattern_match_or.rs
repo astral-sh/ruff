@@ -8,7 +8,6 @@ use crate::expression::parentheses::{
     OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::preview::is_match_case_parentheses_enabled;
 
 #[derive(Default)]
 pub struct FormatPatternMatchOr;
@@ -43,11 +42,7 @@ impl FormatNodeRule<PatternMatchOr> for FormatPatternMatchOr {
             Ok(())
         });
 
-        if is_match_case_parentheses_enabled(f.context()) {
-            in_parentheses_only_group(&inner).fmt(f)
-        } else {
-            inner.fmt(f)
-        }
+        in_parentheses_only_group(&inner).fmt(f)
     }
 }
 

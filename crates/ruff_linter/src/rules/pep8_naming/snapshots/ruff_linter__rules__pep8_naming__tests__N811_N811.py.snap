@@ -43,6 +43,6 @@ N811.py:5:17: N811 Constant `C` imported as non-constant `c`
 4 | import mod.CON as c
 5 | from mod import C as c
   |                 ^^^^^^ N811
-6 | 
+6 |
 7 | # These are all OK:
   |

@@ -1,18 +1,18 @@
+use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
 use crate::python_version::PythonVersion;
+use crate::Db;
+
 use anyhow::Context;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Durability;
 use salsa::Setter;
-
-use ruff_db::system::{SystemPath, SystemPathBuf};
-
-use crate::module_resolver::SearchPaths;
-use crate::Db;
 
 #[salsa::input(singleton)]
 pub struct Program {
     pub python_version: PythonVersion,
 
+    #[return_ref]
     pub python_platform: PythonPlatform,
 
     #[return_ref]
@@ -20,23 +20,49 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_settings(db: &dyn Db, settings: &ProgramSettings) -> anyhow::Result<Self> {
+    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
             python_version,
             python_platform,
             search_paths,
         } = settings;
 
-        tracing::info!("Python version: Python {python_version}");
+        tracing::info!("Python version: Python {python_version}, platform: {python_platform}");
 
-        let search_paths = SearchPaths::from_settings(db, search_paths)
+        let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
         Ok(
-            Program::builder(*python_version, python_platform.clone(), search_paths)
+            Program::builder(python_version, python_platform, search_paths)
                 .durability(Durability::HIGH)
                 .new(db),
         )
+    }
+
+    pub fn update_from_settings(
+        self,
+        db: &mut dyn Db,
+        settings: ProgramSettings,
+    ) -> anyhow::Result<()> {
+        let ProgramSettings {
+            python_version,
+            python_platform,
+            search_paths,
+        } = settings;
+
+        if &python_platform != self.python_platform(db) {
+            tracing::debug!("Updating python platform: `{python_platform:?}`");
+            self.set_python_platform(db).to(python_platform);
+        }
+
+        if python_version != self.python_version(db) {
+            tracing::debug!("Updating python version: Python {python_version}");
+            self.set_python_version(db).to(python_version);
+        }
+
+        self.update_search_paths(db, &search_paths)?;
+
+        Ok(())
     }
 
     pub fn update_search_paths(
@@ -76,8 +102,8 @@ pub struct SearchPathSettings {
     /// or pyright's stubPath configuration setting.
     pub extra_paths: Vec<SystemPathBuf>,
 
-    /// The root of the workspace, used for finding first-party modules.
-    pub src_root: SystemPathBuf,
+    /// The root of the project, used for finding first-party modules.
+    pub src_roots: Vec<SystemPathBuf>,
 
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -89,9 +115,9 @@ pub struct SearchPathSettings {
 }
 
 impl SearchPathSettings {
-    pub fn new(src_root: SystemPathBuf) -> Self {
+    pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
         Self {
-            src_root,
+            src_roots,
             extra_paths: vec![],
             typeshed: None,
             site_packages: SitePackages::Known(vec![]),
@@ -100,11 +126,20 @@ impl SearchPathSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SitePackages {
     Derived {
         venv_path: SystemPathBuf,
     },
     /// Resolved site packages paths
     Known(Vec<SystemPathBuf>),
+}
+
+impl SitePackages {
+    pub fn paths(&self) -> &[SystemPathBuf] {
+        match self {
+            SitePackages::Derived { venv_path } => std::slice::from_ref(venv_path),
+            SitePackages::Known(paths) => paths,
+        }
+    }
 }

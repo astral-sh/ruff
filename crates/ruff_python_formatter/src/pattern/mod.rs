@@ -14,7 +14,6 @@ use crate::expression::parentheses::{
     optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
-use crate::preview::is_join_implicit_concatenated_string_enabled;
 
 pub(crate) mod pattern_arguments;
 pub(crate) mod pattern_keyword;
@@ -227,7 +226,7 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
     pattern: &Pattern,
     context: &PyFormatContext,
 ) -> bool {
-    let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
+    let mut visitor = CanOmitOptionalParenthesesVisitor::default();
     visitor.visit_pattern(pattern, context);
 
     if !visitor.any_parenthesized_expressions {
@@ -272,32 +271,16 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
     max_precedence_count: usize,
     any_parenthesized_expressions: bool,
-    join_implicit_concatenated_strings: bool,
     last: Option<&'input Pattern>,
     first: First<'input>,
 }
 
 impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
-    fn new(context: &PyFormatContext) -> Self {
-        Self {
-            max_precedence: OperatorPrecedence::default(),
-            max_precedence_count: 0,
-            any_parenthesized_expressions: false,
-            // TODO: Derive default for `CanOmitOptionalParenthesesVisitor` when removing the `join_implicit_concatenated_strings`
-            //   preview style.
-            join_implicit_concatenated_strings: is_join_implicit_concatenated_string_enabled(
-                context,
-            ),
-            last: None,
-            first: First::default(),
-        }
-    }
-
     fn visit_pattern(&mut self, pattern: &'a Pattern, context: &PyFormatContext) {
         match pattern {
             Pattern::MatchSequence(_) | Pattern::MatchMapping(_) => {
@@ -305,27 +288,11 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
             }
 
             Pattern::MatchValue(value) => match &*value.value {
-                Expr::StringLiteral(string) => {
-                    if !self.join_implicit_concatenated_strings {
-                        self.update_max_precedence(OperatorPrecedence::String, string.value.len());
-                    }
-                }
-                Expr::BytesLiteral(bytes) => {
-                    if !self.join_implicit_concatenated_strings {
-                        self.update_max_precedence(OperatorPrecedence::String, bytes.value.len());
-                    }
-                }
+                Expr::StringLiteral(_)  |
+                Expr::BytesLiteral(_) |
                 // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
                 // That's why we need to support them for formatting.
-                Expr::FString(string) => {
-                    if !self.join_implicit_concatenated_strings {
-                        self.update_max_precedence(
-                            OperatorPrecedence::String,
-                            string.value.as_slice().len(),
-                        );
-                    }
-                }
-
+                Expr::FString(_)  |
                 Expr::NumberLiteral(_) | Expr::Attribute(_) | Expr::UnaryOp(_) => {
                     // require no state update other than visit_pattern does.
                 }
@@ -397,8 +364,6 @@ enum OperatorPrecedence {
     None,
     Additive,
     Or,
-    // Implicit string concatenation
-    String,
 }
 
 #[derive(Copy, Clone, Debug, Default)]

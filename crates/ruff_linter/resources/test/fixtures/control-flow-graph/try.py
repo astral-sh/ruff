@@ -116,3 +116,15 @@ def func():
 
     finally:
         raise Exception("other")
+
+# previously caused infinite loop
+# found by fuzzer
+def func():
+ for i in():
+    try:
+        try:
+         while r:
+          if t:break
+        finally:()
+        return
+    except:l

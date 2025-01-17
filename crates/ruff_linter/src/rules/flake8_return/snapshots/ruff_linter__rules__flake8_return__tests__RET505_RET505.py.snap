@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
-snapshot_kind: text
 ---
 RET505.py:8:5: RET505 [*] Unnecessary `elif` after `return` statement
    |
@@ -369,7 +368,7 @@ RET505.py:207:5: RET505 [*] Unnecessary `else` after `return` statement
 206 |         return y
 207 |     else:
     |     ^^^^ RET505
-208 | 
+208 |
 209 |         c = 3
     |
     = help: Remove unnecessary `else`

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_expected_case_block.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -113,8 +112,8 @@ Module(
   |
 1 | match x:
 2 |     x = 1
+  |          ^ Syntax Error: Expected a statement
 3 | match x:
-  |  Syntax Error: Expected a statement
 4 |     match y:
 5 |         case _: ...
   |
@@ -132,4 +131,5 @@ Module(
   |
 4 |     match y:
 5 |         case _: ...
+  |                    ^ Syntax Error: Expected a statement
   |

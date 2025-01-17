@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
    |
 65 |     """Toggle the gizmo.
-66 | 
+66 |
 67 |     Returns"""
    |     ^^^^^^^ D413
    |
@@ -26,7 +25,7 @@ sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
 sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
     |
 120 |     """Toggle the gizmo.
-121 | 
+121 |
 122 |     Returns
     |     ^^^^^^^ D413
 123 |     -------
@@ -46,7 +45,7 @@ sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
 sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
     |
 170 |     """Toggle the gizmo.
-171 | 
+171 |
 172 |     Returns
     |     ^^^^^^^ D413
 173 |         -------
@@ -66,7 +65,7 @@ sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
 sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
     |
 519 |     """Equal length equals should be replaced with dashes.
-520 | 
+520 |
 521 |     Parameters
     |     ^^^^^^^^^^ D413
 522 |     ==========
@@ -86,7 +85,7 @@ sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
 sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
     |
 527 |     """Here, the length of equals is not the same.
-528 | 
+528 |
 529 |     Parameters
     |     ^^^^^^^^^^ D413
 530 |     ===========
@@ -106,7 +105,7 @@ sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
 sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
     |
 548 |     """Below, `returns:` should _not_ be considered a section header.
-549 | 
+549 |
 550 |     Args:
     |     ^^^^ D413
 551 |         Here's a note.
@@ -125,7 +124,7 @@ sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
 sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
     |
 561 |         Here's a note.
-562 | 
+562 |
 563 |         Returns:
     |         ^^^^^^^ D413
 564 |     """
@@ -141,22 +140,42 @@ sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
 565 566 | 
 566 567 | 
 
-sections.py:590:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:573:5: D413 [*] Missing blank line after last section ("returns")
     |
-588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
-589 | 
-590 |     Parameters:
+571 |         arg: Here's a note.
+572 |
+573 |     returns:
+    |     ^^^^^^^ D413
+574 |         Here's another note.
+575 |     """
+    |
+    = help: Add blank line after "returns"
+
+ℹ Safe fix
+572 572 | 
+573 573 |     returns:
+574 574 |         Here's another note.
+    575 |+
+575 576 |     """
+576 577 | 
+577 578 | 
+
+sections.py:601:5: D413 [*] Missing blank line after last section ("Parameters")
+    |
+599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+600 |
+601 |     Parameters:
     |     ^^^^^^^^^^ D413
-591 |     ----------
-592 |     parameters:
+602 |     ----------
+603 |     parameters:
     |
     = help: Add blank line after "Parameters"
 
 ℹ Safe fix
-593 593 |         A list of string parameters
-594 594 |     value:
-595 595 |         Some value
-    596 |+
-596 597 |     """
-597 598 | 
-598 599 |
+604 604 |         A list of string parameters
+605 605 |     value:
+606 606 |         Some value
+    607 |+
+607 608 |     """
+608 609 | 
+609 610 |

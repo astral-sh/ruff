@@ -519,7 +519,7 @@ fn check_dynamically_typed<F>(
 {
     if let Expr::StringLiteral(string_expr) = annotation {
         // Quoted annotations
-        if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
+        if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
             if type_hint_resolves_to_any(
                 parsed_annotation.expression(),
                 checker,

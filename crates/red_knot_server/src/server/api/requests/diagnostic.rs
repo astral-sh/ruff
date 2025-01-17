@@ -11,7 +11,7 @@ use crate::edit::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use red_knot_workspace::db::{Db, RootDatabase};
+use red_knot_workspace::db::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};
 
@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: RootDatabase,
+        db: ProjectDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
@@ -46,7 +46,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     }
 }
 
-fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
+fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec<Diagnostic> {
     let Some(file) = snapshot.file(db) else {
         tracing::info!(
             "No file found for snapshot for `{}`",

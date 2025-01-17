@@ -103,3 +103,40 @@ class Foo:
     def validate_y(self, attribute, value):
         if value <= 0:
             raise ValueError("y must be a positive integer")
+
+
+class Foo:
+
+    # No errors
+
+    def string(self):
+        msg = ""
+        raise NotImplementedError(msg)
+
+    def fstring(self, x):
+        msg = f"{x}"
+        raise NotImplementedError(msg)
+
+    def docstring(self):
+        """Lorem ipsum dolor sit amet."""
+        msg = ""
+        raise NotImplementedError(msg)
+
+
+    # Errors
+
+    def non_simple_assignment(self):
+        msg = foo = ""
+        raise NotImplementedError(msg)
+
+    def non_simple_assignment_2(self):
+        msg[0] = ""
+        raise NotImplementedError(msg)
+
+    def unused_message(self):
+        msg = ""
+        raise NotImplementedError("")
+
+    def unused_message_2(self, x):
+        msg = ""
+        raise NotImplementedError(x)

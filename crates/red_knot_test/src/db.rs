@@ -11,7 +11,7 @@ use ruff_db::{Db as SourceDb, Upcast};
 #[salsa::db]
 #[derive(Clone)]
 pub(crate) struct Db {
-    workspace_root: SystemPathBuf,
+    project_root: SystemPathBuf,
     storage: salsa::Storage<Self>,
     files: Files,
     system: TestSystem,
@@ -20,11 +20,11 @@ pub(crate) struct Db {
 }
 
 impl Db {
-    pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
+    pub(crate) fn setup(project_root: SystemPathBuf) -> Self {
         let rule_selection = RuleSelection::from_registry(default_lint_registry());
 
         let db = Self {
-            workspace_root,
+            project_root,
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
@@ -33,15 +33,15 @@ impl Db {
         };
 
         db.memory_file_system()
-            .create_directory_all(&db.workspace_root)
+            .create_directory_all(&db.project_root)
             .unwrap();
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(db.workspace_root.clone()),
+                search_paths: SearchPathSettings::new(vec![db.project_root.clone()]),
             },
         )
         .expect("Invalid search path settings");
@@ -49,8 +49,8 @@ impl Db {
         db
     }
 
-    pub(crate) fn workspace_root(&self) -> &SystemPath {
-        &self.workspace_root
+    pub(crate) fn project_root(&self) -> &SystemPath {
+        &self.project_root
     }
 }
 

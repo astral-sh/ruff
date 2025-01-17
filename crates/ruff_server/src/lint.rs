@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     edit::{NotebookRange, ToRangeExt},
-    resolve::is_document_excluded,
+    resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
     PositionEncoding, DIAGNOSTIC_NAME,
 };
@@ -73,11 +73,10 @@ pub(crate) fn check(
 
     // If the document is excluded, return an empty list of diagnostics.
     let package = if let Some(document_path) = document_path.as_ref() {
-        if is_document_excluded(
+        if is_document_excluded_for_linting(
             document_path,
             file_resolver_settings,
-            Some(linter_settings),
-            None,
+            linter_settings,
             query.text_document_language_id(),
         ) {
             return DiagnosticsMap::default();
@@ -206,6 +205,7 @@ pub(crate) fn fixes_for_diagnostics(
 ) -> crate::Result<Vec<DiagnosticFix>> {
     diagnostics
         .into_iter()
+        .filter(|diagnostic| diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME))
         .map(move |mut diagnostic| {
             let Some(data) = diagnostic.data.take() else {
                 return Ok(None);

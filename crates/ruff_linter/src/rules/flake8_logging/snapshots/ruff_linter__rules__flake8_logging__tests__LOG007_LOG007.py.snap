@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
-snapshot_kind: text
 ---
 LOG007.py:6:1: LOG007 Use of `logging.exception` with falsy `exc_info`
   |
@@ -44,7 +43,7 @@ LOG007.py:10:1: LOG007 Use of `logging.exception` with falsy `exc_info`
 LOG007.py:17:1: LOG007 Use of `logging.exception` with falsy `exc_info`
    |
 15 | from logging import exception
-16 | 
+16 |
 17 | exception("foo", exc_info=False)  # LOG007
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG007
 18 | exception("foo", exc_info=True)  # OK

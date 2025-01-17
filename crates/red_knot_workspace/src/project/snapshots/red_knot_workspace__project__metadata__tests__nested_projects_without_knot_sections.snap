@@ -1,0 +1,12 @@
+---
+source: crates/red_knot_workspace/src/project/metadata.rs
+expression: sub_project
+---
+ProjectMetadata(
+  name: Name("nested-project"),
+  root: "/app/packages/a",
+  options: Options(
+    environment: None,
+    src: None,
+  ),
+)

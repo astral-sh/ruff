@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S505.py:29:35: S505 DSA key sizes below 2048 bits are considered breakable
    |
@@ -136,6 +135,6 @@ S505.py:44:28: S505 DSA key sizes below 2048 bits are considered breakable
 43 | pycryptodomex_dsa.generate(2047)
 44 | pycryptodomex_rsa.generate(2047)
    |                            ^^^^ S505
-45 | 
+45 |
 46 | # Don't crash when the size is variable.
    |

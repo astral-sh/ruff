@@ -19,6 +19,7 @@ mod tests {
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
+    #[test_case(Rule::ForLoopWrites, Path::new("FURB122.py"))]
     #[test_case(Rule::ReadlinesInFor, Path::new("FURB129.py"))]
     #[test_case(Rule::DeleteFullSlice, Path::new("FURB131.py"))]
     #[test_case(Rule::CheckAndRemoveFromSet, Path::new("FURB132.py"))]

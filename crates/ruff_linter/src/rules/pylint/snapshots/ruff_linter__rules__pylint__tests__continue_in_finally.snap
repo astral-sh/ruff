@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` clause
   |
@@ -8,7 +7,7 @@ continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` cl
 4 |     finally:
 5 |         continue  # [continue-in-finally]
   |         ^^^^^^^^ PLE0116
-6 | 
+6 |
 7 | while True:
   |
 
@@ -27,7 +26,7 @@ continue_in_finally.py:26:17: PLE0116 `continue` not supported inside `finally` 
 25 |             case "aa":
 26 |                 continue  # [continue-in-finally]
    |                 ^^^^^^^^ PLE0116
-27 | 
+27 |
 28 | while True:
    |
 
@@ -37,7 +36,7 @@ continue_in_finally.py:33:13: PLE0116 `continue` not supported inside `finally` 
 32 |         with "aa" as f:
 33 |             continue  # [continue-in-finally]
    |             ^^^^^^^^ PLE0116
-34 | 
+34 |
 35 | while True:
    |
 
@@ -56,7 +55,7 @@ continue_in_finally.py:41:9: PLE0116 `continue` not supported inside `finally` c
 40 |             continue  # [continue-in-finally]
 41 |         continue  # [continue-in-finally]
    |         ^^^^^^^^ PLE0116
-42 | 
+42 |
 43 |         def test():
    |
 
@@ -74,7 +73,7 @@ continue_in_finally.py:56:9: PLE0116 `continue` not supported inside `finally` c
 55 |     finally:
 56 |         continue  # [continue-in-finally]
    |         ^^^^^^^^ PLE0116
-57 | 
+57 |
 58 |         def test():
    |
 
@@ -84,7 +83,7 @@ continue_in_finally.py:69:9: PLE0116 `continue` not supported inside `finally` c
 68 |             continue
 69 |         continue  # [continue-in-finally]
    |         ^^^^^^^^ PLE0116
-70 | 
+70 |
 71 |         while True:
    |
 
@@ -94,7 +93,7 @@ continue_in_finally.py:74:13: PLE0116 `continue` not supported inside `finally` 
 73 |         else:
 74 |             continue  # [continue-in-finally]
    |             ^^^^^^^^ PLE0116
-75 | 
+75 |
 76 |         def test():
    |
 

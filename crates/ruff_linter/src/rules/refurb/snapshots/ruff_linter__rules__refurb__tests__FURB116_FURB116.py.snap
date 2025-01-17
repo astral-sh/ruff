@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB116.py:6:7: FURB116 [*] Replace `oct` call with `f"{num:o}"`
   |
 4 |     return num
-5 | 
+5 |
 6 | print(oct(num)[2:])  # FURB116
   |       ^^^^^^^^^^^^ FURB116
 7 | print(hex(num)[2:])  # FURB116
@@ -48,7 +47,7 @@ FURB116.py:8:7: FURB116 [*] Replace `bin` call with `f"{num:b}"`
  7 | print(hex(num)[2:])  # FURB116
  8 | print(bin(num)[2:])  # FURB116
    |       ^^^^^^^^^^^^ FURB116
- 9 | 
+ 9 |
 10 | print(oct(1337)[2:])  # FURB116
    |
    = help: Replace with `f"{num:b}"`
@@ -66,7 +65,7 @@ FURB116.py:8:7: FURB116 [*] Replace `bin` call with `f"{num:b}"`
 FURB116.py:10:7: FURB116 [*] Replace `oct` call with `f"{1337:o}"`
    |
  8 | print(bin(num)[2:])  # FURB116
- 9 | 
+ 9 |
 10 | print(oct(1337)[2:])  # FURB116
    |       ^^^^^^^^^^^^^ FURB116
 11 | print(hex(1337)[2:])  # FURB116
@@ -109,7 +108,7 @@ FURB116.py:12:7: FURB116 [*] Replace `bin` call with `f"{1337:b}"`
 11 | print(hex(1337)[2:])  # FURB116
 12 | print(bin(1337)[2:])  # FURB116
    |       ^^^^^^^^^^^^^ FURB116
-13 | 
+13 |
 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
    |
    = help: Replace with `f"{1337:b}"`
@@ -127,7 +126,7 @@ FURB116.py:12:7: FURB116 [*] Replace `bin` call with `f"{1337:b}"`
 FURB116.py:14:7: FURB116 Replace `bin` call with f-string
    |
 12 | print(bin(1337)[2:])  # FURB116
-13 | 
+13 |
 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
    |       ^^^^^^^^^^^^^^^^^^^^^ FURB116
 15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
@@ -139,7 +138,7 @@ FURB116.py:15:7: FURB116 Replace `bin` call with f-string
 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
 15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
    |       ^^^^^^^^^^^^^^^^^^^^^^ FURB116
-16 | 
+16 |
 17 | ## invalid
    |
    = help: Replace with f-string

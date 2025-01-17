@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/await/no_expression_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -65,7 +64,7 @@ Module(
 1 | # No expression after `await`, a statement on another line
 2 | await
   |      ^ Syntax Error: Expected an expression
-3 | 
+3 |
 4 | def foo():
 5 |     pass
   |

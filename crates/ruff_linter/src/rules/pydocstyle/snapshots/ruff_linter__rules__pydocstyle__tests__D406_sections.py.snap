@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
    |
 30 |     """Toggle the gizmo.
-31 | 
+31 |
 32 |     Returns:
    |     ^^^^^^^ D406
 33 |     -------
@@ -43,23 +42,23 @@ sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
 229 229 | 
 230 230 |     """
 
-sections.py:590:5: D406 [*] Section name should end with a newline ("Parameters")
+sections.py:601:5: D406 [*] Section name should end with a newline ("Parameters")
     |
-588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
-589 | 
-590 |     Parameters:
+599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+600 |
+601 |     Parameters:
     |     ^^^^^^^^^^ D406
-591 |     ----------
-592 |     parameters:
+602 |     ----------
+603 |     parameters:
     |
     = help: Add newline after "Parameters"
 
 ℹ Safe fix
-587 587 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
-588 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
-589 589 | 
-590     |-    Parameters:
-    590 |+    Parameters
-591 591 |     ----------
-592 592 |     parameters:
-593 593 |         A list of string parameters
+598 598 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+599 599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+600 600 | 
+601     |-    Parameters:
+    601 |+    Parameters
+602 602 |     ----------
+603 603 |     parameters:
+604 604 |         A list of string parameters

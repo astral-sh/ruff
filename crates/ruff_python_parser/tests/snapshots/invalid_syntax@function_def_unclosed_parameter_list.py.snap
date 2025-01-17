@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/function_def_unclosed_parameter_list.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -231,4 +230,5 @@ Module(
   |
 4 | def foo(a: int, b: str
 5 | x = 10
+  |       ^ Syntax Error: unexpected EOF while parsing
   |

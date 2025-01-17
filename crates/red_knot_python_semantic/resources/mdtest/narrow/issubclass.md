@@ -90,7 +90,7 @@ def _(t: type[object]):
         if issubclass(t, B):
             reveal_type(t)  # revealed: type[A] & type[B]
     else:
-        reveal_type(t)  # revealed: type[object] & ~type[A]
+        reveal_type(t)  # revealed: type & ~type[A]
 ```
 
 ### Handling of `None`
@@ -146,7 +146,7 @@ class A: ...
 
 t = object()
 
-# TODO: we should emit a diagnostic here
+# error: [invalid-argument-type]
 if issubclass(t, A):
     reveal_type(t)  # revealed: type[A]
 ```
@@ -160,7 +160,7 @@ branch:
 ```py
 t = 1
 
-# TODO: we should emit a diagnostic here
+# error: [invalid-argument-type]
 if issubclass(t, int):
     reveal_type(t)  # revealed: Never
 ```
@@ -234,8 +234,7 @@ def flag() -> bool: ...
 
 t = int if flag() else str
 
-# TODO: this should cause us to emit a diagnostic
-# (`issubclass` has no `foo` parameter)
+# error: [unknown-argument]
 if issubclass(t, int, foo="bar"):
     reveal_type(t)  # revealed: Literal[int, str]
 ```
@@ -246,4 +245,32 @@ if issubclass(t, int, foo="bar"):
 def _(x: type, y: type[int]):
     if issubclass(x, y):
         reveal_type(x)  # revealed: type[int]
+```
+
+### Disjoint `type[]` types are narrowed to `Never`
+
+Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
+and `UsesMeta2` could only exist if a common subclass of their metaclasses could exist. This is
+known to be impossible due to the fact that `Meta1` is marked as `@final`.
+
+```py
+from typing import final
+
+@final
+class Meta1(type): ...
+
+class Meta2(type): ...
+class UsesMeta1(metaclass=Meta1): ...
+class UsesMeta2(metaclass=Meta2): ...
+
+def _(x: type[UsesMeta1], y: type[UsesMeta2]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: type[UsesMeta1]
+
+    if issubclass(y, x):
+        reveal_type(y)  # revealed: Never
+    else:
+        reveal_type(y)  # revealed: type[UsesMeta2]
 ```

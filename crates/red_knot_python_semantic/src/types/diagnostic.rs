@@ -30,27 +30,35 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INCOMPATIBLE_SLOTS);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
+    registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
+    registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
+    registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&TYPE_ASSERTION_FAILURE);
+    registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
+    registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
+    registry.register_lint(&STATIC_ASSERT_ERROR);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -227,6 +235,27 @@ declare_lint! {
 }
 
 declare_lint! {
+    /// ## What it does
+    /// Detects call arguments whose type is not assignable to the corresponding typed parameter.
+    ///
+    /// ## Why is this bad?
+    /// Passing an argument of a type the function (or callable object) does not accept violates
+    /// the expectations of the function author and may cause unexpected runtime errors within the
+    /// body of the function.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def func(x: int): ...
+    /// func("foo")  # error: [invalid-argument-type]
+    /// ```
+    pub(crate) static INVALID_ARGUMENT_TYPE = {
+        summary: "detects call arguments whose type is not assignable to the corresponding typed parameter",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
@@ -263,6 +292,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    /// ## What it does
     /// Checks for exception handlers that catch non-exception classes.
     ///
     /// ## Why is this bad?
@@ -292,6 +322,33 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for arguments to `metaclass=` that are invalid.
+    ///
+    /// ## Why is this bad?
+    /// Python allows arbitrary expressions to be used as the argument to `metaclass=`.
+    /// These expressions, however, need to be callable and accept the same arguments
+    /// as `type.__new__`.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(): ...
+    ///
+    /// # TypeError: f() takes 0 positional arguments but 3 were given
+    /// class B(metaclass=f): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)
+    pub(crate) static INVALID_METACLASS = {
+        summary: "detects invalid `metaclass=` arguments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -377,6 +434,25 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for missing required arguments in a call.
+    ///
+    /// ## Why is this bad?
+    /// Failing to provide a required argument will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def func(x: int): ...
+    /// func()  # TypeError: func() missing 1 required positional argument: 'x'
+    /// ```
+    pub(crate) static MISSING_ARGUMENT = {
+        summary: "detects missing required arguments in a call",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for subscripting objects that do not support subscripting.
     ///
     /// ## Why is this bad?
@@ -408,6 +484,27 @@ declare_lint! {
     /// ```
     pub(crate) static NOT_ITERABLE = {
         summary: "detects iteration over an object that is not iterable",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls which provide more than one argument for a single parameter.
+    ///
+    /// ## Why is this bad?
+    /// Providing multiple values for a single parameter will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f(x: int) -> int: ...
+    ///
+    /// f(1, x=2)  # Error raised here
+    /// ```
+    pub(crate) static PARAMETER_ALREADY_ASSIGNED = {
+        summary: "detects multiple arguments for the same parameter",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -481,6 +578,49 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for `assert_type()` calls where the actual type
+    /// is not the same as the asserted type.
+    ///
+    /// ## Why is this bad?
+    /// `assert_type()` allows confirming the inferred type of a certain value.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def _(x: int):
+    ///     assert_type(x, int)  # fine
+    ///     assert_type(x, str)  # error: Actual type does not match asserted type
+    /// ```
+    pub(crate) static TYPE_ASSERTION_FAILURE = {
+        summary: "detects failed type assertions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls that pass more positional arguments than the callable can accept.
+    ///
+    /// ## Why is this bad?
+    /// Passing too many positional arguments will raise `TypeError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(): ...
+    ///
+    /// f("foo")  # Error raised here
+    /// ```
+    pub(crate) static TOO_MANY_POSITIONAL_ARGUMENTS = {
+        summary: "detects calls passing too many positional arguments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for calls to `reveal_type` without importing it.
     ///
     /// ## Why is this bad?
@@ -492,6 +632,27 @@ declare_lint! {
         summary: "detects usages of `reveal_type` without importing it",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for keyword arguments in calls that don't match any parameter of the callable.
+    ///
+    /// ## Why is this bad?
+    /// Providing an unknown keyword argument will raise `TypeError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(x: int) -> int: ...
+    ///
+    /// f(x=1, y=2)  # Error raised here
+    /// ```
+    pub(crate) static UNKNOWN_ARGUMENT = {
+        summary: "detects unknown keyword arguments in calls",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
     }
 }
 
@@ -565,6 +726,25 @@ declare_lint! {
     /// ```
     pub(crate) static ZERO_STEPSIZE_IN_SLICE = {
         summary: "detects a slice step size of zero",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Makes sure that the argument of `static_assert` is statically known to be true.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from knot_extensions import static_assert
+    ///
+    /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
+    ///
+    /// static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
+    /// ```
+    pub(crate) static STATIC_ASSERT_ERROR = {
+        summary: "Failed static assertion",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

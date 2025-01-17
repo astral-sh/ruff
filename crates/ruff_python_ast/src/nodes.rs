@@ -1732,7 +1732,7 @@ impl StringLiteralValue {
     pub fn is_unicode(&self) -> bool {
         self.iter()
             .next()
-            .map_or(false, |part| part.flags.prefix().is_unicode())
+            .is_some_and(|part| part.flags.prefix().is_unicode())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -3891,6 +3891,18 @@ impl Arguments {
         let args = self.args.iter().map(ArgOrKeyword::Arg);
         let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
         args.merge_by(keywords, |left, right| left.start() < right.start())
+    }
+
+    pub fn inner_range(&self) -> TextRange {
+        TextRange::new(self.l_paren_range().end(), self.r_paren_range().start())
+    }
+
+    pub fn l_paren_range(&self) -> TextRange {
+        TextRange::at(self.start(), '('.text_len())
+    }
+
+    pub fn r_paren_range(&self) -> TextRange {
+        TextRange::new(self.end() - ')'.text_len(), self.end())
     }
 }
 

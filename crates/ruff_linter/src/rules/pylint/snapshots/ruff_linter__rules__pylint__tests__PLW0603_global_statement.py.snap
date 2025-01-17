@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 global_statement.py:17:12: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
@@ -56,7 +55,7 @@ global_statement.py:50:12: PLW0603 Using the global statement to update `CONSTAN
 49 |     """Function assigns should only throw a global statement error"""
 50 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^ PLW0603
-51 | 
+51 |
 52 |     def CONSTANT():
    |
 
@@ -66,7 +65,7 @@ global_statement.py:60:12: PLW0603 Using the global statement to update `FUNC` i
 59 |     """Overriding a function should only throw a global statement error"""
 60 |     global FUNC  # [global-statement]
    |            ^^^^ PLW0603
-61 | 
+61 |
 62 |     def FUNC():
    |
 
@@ -76,7 +75,7 @@ global_statement.py:70:12: PLW0603 Using the global statement to update `CLASS` 
 69 |     """Overriding a class should only throw a global statement error"""
 70 |     global CLASS  # [global-statement]
    |            ^^^^^ PLW0603
-71 | 
+71 |
 72 |     class CLASS:
    |
 

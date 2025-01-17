@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B031.py:27:37: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
    |
@@ -18,7 +17,7 @@ B031.py:29:33: B031 Using the generator returned from `itertools.groupby()` more
 28 |     # We're outside the nested loop and used the group again.
 29 |     collect_shop_items(shopper, section_items)  # B031
    |                                 ^^^^^^^^^^^^^ B031
-30 | 
+30 |
 31 | for _section, section_items in groupby(items, key=lambda p: p[1]):
    |
 
@@ -45,7 +44,7 @@ B031.py:46:29: B031 Using the generator returned from `itertools.groupby()` more
 45 | for _section, section_items in groupby(items, key=lambda p: p[1]):
 46 |     collection.append([list(section_items) for _ in range(3)])  # B031
    |                             ^^^^^^^^^^^^^ B031
-47 | 
+47 |
 48 | unique_items = set()
    |
 
@@ -63,7 +62,7 @@ B031.py:79:37: B031 Using the generator returned from `itertools.groupby()` more
 78 |     for shopper in shoppers:
 79 |         collect_shop_items(shopper, section_items)  # B031
    |                                     ^^^^^^^^^^^^^ B031
-80 | 
+80 |
 81 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
    |
 
@@ -72,7 +71,7 @@ B031.py:82:38: B031 Using the generator returned from `itertools.groupby()` more
 81 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
 82 |     _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]  # B031
    |                                      ^^^^^^^^^^^^^ B031
-83 | 
+83 |
 84 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
    |
 
@@ -82,7 +81,7 @@ B031.py:94:65: B031 Using the generator returned from `itertools.groupby()` more
 93 |     # The iterator is being used for the second time.
 94 |     _ = [(item1, item2) for item1 in section_items for item2 in section_items]  # B031
    |                                                                 ^^^^^^^^^^^^^ B031
-95 | 
+95 |
 96 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
    |
 
@@ -92,7 +91,7 @@ B031.py:101:37: B031 Using the generator returned from `itertools.groupby()` mor
 100 |         collect_shop_items(shopper, section_items)
 101 |         collect_shop_items(shopper, section_items)  # B031
     |                                     ^^^^^^^^^^^^^ B031
-102 | 
+102 |
 103 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     |
 
@@ -152,7 +151,7 @@ B031.py:126:33: B031 Using the generator returned from `itertools.groupby()` mor
 125 |     # Now, it should detect
 126 |     collect_shop_items(shopper, section_items)  # B031
     |                                 ^^^^^^^^^^^^^ B031
-127 | 
+127 |
 128 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     |
 
@@ -192,7 +191,7 @@ B031.py:144:33: B031 Using the generator returned from `itertools.groupby()` mor
 143 |     # Now, it should detect
 144 |     collect_shop_items(shopper, section_items)  # B031
     |                                 ^^^^^^^^^^^^^ B031
-145 | 
+145 |
 146 | for group in groupby(items, key=lambda p: p[1]):
     |
 
@@ -211,7 +210,7 @@ B031.py:210:37: B031 Using the generator returned from `itertools.groupby()` mor
 209 |         collect_shop_items(shopper, section_items)
 210 |         collect_shop_items(shopper, section_items)
     |                                     ^^^^^^^^^^^^^ B031
-211 | 
+211 |
 212 | # Should trigger, since only one branch has a return statement.
     |
 
@@ -221,6 +220,6 @@ B031.py:219:33: B031 Using the generator returned from `itertools.groupby()` mor
 218 |         collect_shop_items(shopper, section_items)
 219 |     collect_shop_items(shopper, section_items)  # B031
     |                                 ^^^^^^^^^^^^^ B031
-220 | 
+220 |
 221 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
     |

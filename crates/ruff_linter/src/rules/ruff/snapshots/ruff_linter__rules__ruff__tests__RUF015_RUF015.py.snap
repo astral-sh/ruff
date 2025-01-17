@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
@@ -69,7 +68,7 @@ RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 6 | list(i for i in x)[0]
 7 | [i for i in x][0]
   | ^^^^^^^^^^^^^^^^^ RUF015
-8 | 
+8 |
 9 | # OK (not indexing (solely) the first element)
   |
   = help: Replace with `next(iter(x))`
@@ -130,7 +129,7 @@ RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single elem
 30 | [i for i in x if i > 5][0]
 31 | [(i, i + 1) for i in x][0]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
-32 | 
+32 |
 33 | # RUF015 (multiple generators)
    |
    = help: Replace with `next((i, i + 1) for i in x)`
@@ -151,7 +150,7 @@ RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over singl
 34 | y = range(10)
 35 | [i + j for i in x for j in y][0]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
-36 | 
+36 |
 37 | # RUF015
    |
    = help: Replace with `next(i + j for i in x for j in y)`
@@ -320,7 +319,7 @@ RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 46 | |     *x.y
 47 | | ][0]
    | |____^ RUF015
-48 |   
+48 |
 49 |   # RUF015 (multi-line)
    |
    = help: Replace with `next(iter(x.y))`
@@ -347,7 +346,7 @@ RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
 53 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
 54 | | ][0]
    | |____^ RUF015
-55 |   
+55 |
 56 |   # RUF015 (zip)
    |
    = help: Replace with `next(...)`
@@ -392,7 +391,7 @@ RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 57 | list(zip(x, y))[0]
 58 | [*zip(x, y)][0]
    | ^^^^^^^^^^^^^^^ RUF015
-59 | 
+59 |
 60 | # RUF015 (pop)
    |
    = help: Replace with `next(zip(x, y))`
@@ -453,7 +452,7 @@ RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 62 | [i for i in x].pop(0)
 63 | list(i for i in x).pop(0)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
-64 | 
+64 |
 65 | # OK
    |
    = help: Replace with `next(iter(x))`

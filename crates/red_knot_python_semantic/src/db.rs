@@ -175,12 +175,12 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            let mut search_paths = SearchPathSettings::new(src_root);
+            let mut search_paths = SearchPathSettings::new(vec![src_root]);
             search_paths.typeshed = self.custom_typeshed;
 
             Program::from_settings(
                 &db,
-                &ProgramSettings {
+                ProgramSettings {
                     python_version: self.python_version,
                     python_platform: self.python_platform,
                     search_paths,

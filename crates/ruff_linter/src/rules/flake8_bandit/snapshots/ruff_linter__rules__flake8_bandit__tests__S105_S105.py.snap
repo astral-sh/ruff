@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S105.py:13:12: S105 Possible hardcoded password assigned to: "password"
    |
@@ -126,14 +125,14 @@ S105.py:25:19: S105 Possible hardcoded password assigned to: "password"
 24 | password: str = "s3cr3t"
 25 | password: Final = "s3cr3t"
    |                   ^^^^^^^^ S105
-26 | 
+26 |
 27 | d["password"] = "s3cr3t"
    |
 
 S105.py:27:17: S105 Possible hardcoded password assigned to: "password"
    |
 25 | password: Final = "s3cr3t"
-26 | 
+26 |
 27 | d["password"] = "s3cr3t"
    |                 ^^^^^^^^ S105
 28 | d["pass"] = "s3cr3t"
@@ -286,14 +285,14 @@ S105.py:49:19: S105 Possible hardcoded password assigned to: "secrete"
 48 | MyClass.token = "s3cr3t"
 49 | MyClass.secrete = "s3cr3t"
    |                   ^^^^^^^^ S105
-50 | 
+50 |
 51 | password == "s3cr3t"
    |
 
 S105.py:51:13: S105 Possible hardcoded password assigned to: "password"
    |
 49 | MyClass.secrete = "s3cr3t"
-50 | 
+50 |
 51 | password == "s3cr3t"
    |             ^^^^^^^^ S105
 52 | _pass == "s3cr3t"
@@ -364,14 +363,14 @@ S105.py:58:21: S105 Possible hardcoded password assigned to: "password"
 57 | secrete == "s3cr3t"
 58 | password == safe == "s3cr3t"
    |                     ^^^^^^^^ S105
-59 | 
+59 |
 60 | if token == "1\n2":
    |
 
 S105.py:60:13: S105 Possible hardcoded password assigned to: "token"
    |
 58 | password == safe == "s3cr3t"
-59 | 
+59 |
 60 | if token == "1\n2":
    |             ^^^^^^ S105
 61 |     pass
@@ -380,7 +379,7 @@ S105.py:60:13: S105 Possible hardcoded password assigned to: "token"
 S105.py:63:13: S105 Possible hardcoded password assigned to: "token"
    |
 61 |     pass
-62 | 
+62 |
 63 | if token == "3\t4":
    |             ^^^^^^ S105
 64 |     pass
@@ -389,7 +388,7 @@ S105.py:63:13: S105 Possible hardcoded password assigned to: "token"
 S105.py:66:13: S105 Possible hardcoded password assigned to: "token"
    |
 64 |     pass
-65 | 
+65 |
 66 | if token == "5\r6":
    |             ^^^^^^ S105
 67 |     pass

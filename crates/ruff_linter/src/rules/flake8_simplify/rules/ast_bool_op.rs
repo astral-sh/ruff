@@ -833,6 +833,10 @@ fn is_short_circuit(
 
 /// SIM222
 pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::Or, checker) {
         let mut diagnostic = Diagnostic::new(
             ExprOrTrue {
@@ -848,6 +852,10 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 
 /// SIM223
 pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::And, checker) {
         let mut diagnostic = Diagnostic::new(
             ExprAndFalse {

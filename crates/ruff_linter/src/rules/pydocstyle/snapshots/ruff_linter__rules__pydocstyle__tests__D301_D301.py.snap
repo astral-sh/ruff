@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
   |
@@ -29,8 +28,7 @@ D301.py:37:5: D301 Use `r"""` if any backslashes in a docstring
 D301.py:93:5: D301 [*] Use `r"""` if any backslashes in a docstring
    |
 92 |   def should_add_raw_for_single_double_quote_escape():
-93 |       """
-   |  _____^
+93 | /     """
 94 | |     This is single quote escape \".
 95 | |     """
    | |_______^ D301
@@ -50,8 +48,7 @@ D301.py:93:5: D301 [*] Use `r"""` if any backslashes in a docstring
 D301.py:99:5: D301 [*] Use `r"""` if any backslashes in a docstring
     |
  98 |   def should_add_raw_for_single_single_quote_escape():
- 99 |       '''
-    |  _____^
+ 99 | /     '''
 100 | |     This is single quote escape \'.
 101 | |     '''
     | |_______^ D301

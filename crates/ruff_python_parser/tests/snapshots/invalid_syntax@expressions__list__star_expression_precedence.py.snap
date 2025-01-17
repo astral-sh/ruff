@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/list/star_expression_precedence.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -394,7 +393,7 @@ Module(
 
   |
 1 | # For list expression, the minimum binding power of star expression is bitwise or.
-2 | 
+2 |
 3 | [(*x), y]
   |   ^^ Syntax Error: Starred expression cannot be used here
 4 | [*x in y, z]

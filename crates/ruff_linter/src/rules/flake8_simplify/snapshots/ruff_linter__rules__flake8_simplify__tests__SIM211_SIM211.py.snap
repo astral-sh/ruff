@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM211.py:1:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 1 | a = False if b else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^ SIM211
-2 | 
+2 |
 3 | a = False if b != c else True  # SIM211
   |
   = help: Replace with `not ...`
@@ -21,10 +20,10 @@ SIM211.py:1:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
 SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 1 | a = False if b else True  # SIM211
-2 | 
+2 |
 3 | a = False if b != c else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM211
-4 | 
+4 |
 5 | a = False if b + c else True  # SIM211
   |
   = help: Replace with `not ...`
@@ -41,10 +40,10 @@ SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
 SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 3 | a = False if b != c else True  # SIM211
-4 | 
+4 |
 5 | a = False if b + c else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^^^^^ SIM211
-6 | 
+6 |
 7 | a = True if b else False  # OK
   |
   = help: Replace with `not ...`

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT007.py:23:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `tuple`
    |
@@ -67,8 +66,7 @@ PT007.py:38:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
    |
 36 |   @pytest.mark.parametrize(
 37 |       ("param1", "param2"),
-38 |       [
-   |  _____^
+38 | /     [
 39 | |         (1, 2),
 40 | |         (3, 4),
 41 | |     ],
@@ -96,8 +94,7 @@ PT007.py:49:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
    |
 47 |   @pytest.mark.parametrize(
 48 |       ("param1", "param2"),
-49 |       [
-   |  _____^
+49 | /     [
 50 | |         [1, 2],
 51 | |         [3, 4],
 52 | |     ],
@@ -167,8 +164,7 @@ PT007.py:60:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
    |
 58 |   @pytest.mark.parametrize(
 59 |       "param1,param2",
-60 |       [
-   |  _____^
+60 | /     [
 61 | |         [1, 2],
 62 | |         [3, 4],
 63 | |     ],
@@ -238,8 +234,7 @@ PT007.py:71:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
    |
 69 |   @pytest.mark.parametrize(
 70 |       "param",
-71 |       [
-   |  _____^
+71 | /     [
 72 | |         [1, 2],
 73 | |         [3, 4],
 74 | |     ],

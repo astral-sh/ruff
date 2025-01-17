@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI051.pyi:4:18: PYI051 `Literal["foo"]` is redundant in a union with `str`
   |
 2 | from typing import Literal, TypeAlias, Union
-3 | 
+3 |
 4 | A: str | Literal["foo"]
   |                  ^^^^^ PYI051
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -95,26 +94,26 @@ PYI051.pyi:10:69: PYI051 `Literal["foo"]` is redundant in a union with `str`
  9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
    |                                                                     ^^^^^ PYI051
-11 | 
+11 |
 12 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
    |
 
 PYI051.pyi:12:31: PYI051 `Literal[1J]` is redundant in a union with `complex`
    |
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-11 | 
+11 |
 12 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
    |                               ^^ PYI051
-13 | 
+13 |
 14 | # OK
    |
 
 PYI051.pyi:12:53: PYI051 `Literal[3.14]` is redundant in a union with `float`
    |
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-11 | 
+11 |
 12 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
    |                                                     ^^^^ PYI051
-13 | 
+13 |
 14 | # OK
    |

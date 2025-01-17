@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E101.py:11:1: E101 Indentation contains mixed spaces and tabs
    |
@@ -8,7 +7,7 @@ E101.py:11:1: E101 Indentation contains mixed spaces and tabs
 10 |     # E101
 11 |       print("mixed starts with tab")
    | ^^^^^^ E101
-12 | 
+12 |
 13 | def func_mixed_start_with_space():
    |
 
@@ -18,7 +17,7 @@ E101.py:15:1: E101 Indentation contains mixed spaces and tabs
 14 |     # E101
 15 |                print("mixed starts with space")
    | ^^^^^^^^^^^^^^^ E101
-16 | 
+16 |
 17 | def xyz():
    |
 

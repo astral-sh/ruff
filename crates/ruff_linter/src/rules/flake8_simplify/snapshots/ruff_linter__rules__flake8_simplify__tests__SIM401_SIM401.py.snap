@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM401.py:6:1: SIM401 [*] Use `var = a_dict.get(key, "default1")` instead of an `if` block
    |
@@ -10,7 +9,7 @@ SIM401.py:6:1: SIM401 [*] Use `var = a_dict.get(key, "default1")` instead of an 
  8 | | else:
  9 | |     var = "default1"
    | |____________________^ SIM401
-10 |   
+10 |
 11 |   # SIM401 (pattern-2)
    |
    = help: Replace with `var = a_dict.get(key, "default1")`
@@ -36,7 +35,7 @@ SIM401.py:12:1: SIM401 [*] Use `var = a_dict.get(key, "default2")` instead of an
 14 | | else:
 15 | |     var = a_dict[key]
    | |_____________________^ SIM401
-16 |   
+16 |
 17 |   # OK (default contains effect)
    |
    = help: Replace with `var = a_dict.get(key, "default2")`
@@ -62,7 +61,7 @@ SIM401.py:24:1: SIM401 [*] Use `var = a_dict.get(keys[idx], "default")` instead 
 26 | | else:
 27 | |     var = "default"
    | |___________________^ SIM401
-28 |   
+28 |
 29 |   # SIM401 (complex expression in dict)
    |
    = help: Replace with `var = a_dict.get(keys[idx], "default")`
@@ -88,7 +87,7 @@ SIM401.py:30:1: SIM401 [*] Use `var = dicts[idx].get(key, "default")` instead of
 32 | | else:
 33 | |     var = "default"
    | |___________________^ SIM401
-34 |   
+34 |
 35 |   # SIM401 (complex expression in var)
    |
    = help: Replace with `var = dicts[idx].get(key, "default")`
@@ -114,7 +113,7 @@ SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6
 38 | | else:
 39 | |     vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
    | |___________________________________________________________________________^ SIM401
-40 |   
+40 |
 41 |   # SIM401
    |
    = help: Replace with `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")`
@@ -136,13 +135,12 @@ SIM401.py:45:5: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead 
    |
 43 |       pass
 44 |   else:
-45 |       if key in a_dict:
-   |  _____^
+45 | /     if key in a_dict:
 46 | |         vars[idx] = a_dict[key]
 47 | |     else:
 48 | |         vars[idx] = "default"
    | |_____________________________^ SIM401
-49 |   
+49 |
 50 |   ###
    |
    = help: Replace with `vars[idx] = a_dict.get(key, "default")`
@@ -165,7 +163,7 @@ SIM401.py:123:7: SIM401 [*] Use `a_dict.get(key, "default3")` instead of an `if`
 122 | # SIM401
 123 | var = a_dict[key] if key in a_dict else "default3"
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM401
-124 | 
+124 |
 125 | # SIM401
     |
     = help: Replace with `a_dict.get(key, "default3")`
@@ -185,7 +183,7 @@ SIM401.py:126:7: SIM401 [*] Use `a_dict.get(key, "default-1")` instead of an `if
 125 | # SIM401
 126 | var = "default-1" if key not in a_dict else a_dict[key]
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM401
-127 | 
+127 |
 128 | # OK (default contains effect)
     |
     = help: Replace with `a_dict.get(key, "default-1")`

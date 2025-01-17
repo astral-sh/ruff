@@ -59,13 +59,16 @@ pub(crate) fn analyze_graph(
         .collect::<FxHashMap<_, _>>();
 
     // Create a database from the source roots.
+    let src_roots = package_roots
+        .values()
+        .filter_map(|package| package.as_deref())
+        .filter_map(|package| package.parent())
+        .map(Path::to_path_buf)
+        .filter_map(|path| SystemPathBuf::from_path_buf(path).ok())
+        .collect();
+
     let db = ModuleDb::from_src_roots(
-        package_roots
-            .values()
-            .filter_map(|package| package.as_deref())
-            .filter_map(|package| package.parent())
-            .map(Path::to_path_buf)
-            .filter_map(|path| SystemPathBuf::from_path_buf(path).ok()),
+        src_roots,
         pyproject_config
             .settings
             .analyze

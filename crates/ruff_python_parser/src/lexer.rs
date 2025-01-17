@@ -84,15 +84,21 @@ impl<'src> Lexer<'src> {
             "Lexer only supports files with a size up to 4GB"
         );
 
+        let (state, nesting) = if mode == Mode::ParenthesizedExpression {
+            (State::Other, 1)
+        } else {
+            (State::AfterNewline, 0)
+        };
+
         let mut lexer = Lexer {
             source,
             cursor: Cursor::new(source),
-            state: State::AfterNewline,
+            state,
             current_kind: TokenKind::EndOfFile,
             current_range: TextRange::empty(start_offset),
             current_value: TokenValue::None,
             current_flags: TokenFlags::empty(),
-            nesting: 0,
+            nesting,
             indentations: Indentations::default(),
             pending_indentation: None,
             mode,
@@ -1309,7 +1315,11 @@ impl<'src> Lexer<'src> {
     fn consume_end(&mut self) -> TokenKind {
         // We reached end of file.
         // First of all, we need all nestings to be finished.
-        if self.nesting > 0 {
+        // For Mode::ParenthesizedExpression we start with nesting level 1.
+        // So we check if we end with that level.
+        let init_nesting = u32::from(self.mode == Mode::ParenthesizedExpression);
+
+        if self.nesting > init_nesting {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));

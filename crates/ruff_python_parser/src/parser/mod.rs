@@ -74,7 +74,9 @@ impl<'src> Parser<'src> {
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
         let syntax = match self.mode {
-            Mode::Expression => Mod::Expression(self.parse_single_expression()),
+            Mode::Expression | Mode::ParenthesizedExpression => {
+                Mod::Expression(self.parse_single_expression())
+            }
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
         };
 

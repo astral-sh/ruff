@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
+use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -151,15 +152,15 @@ impl Violation for DocstringExtraneousParameter {
 }
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a "returns" section in
-/// their docstring.
+/// Checks for functions with `return` statements that do not have "Returns"
+/// sections in their docstrings.
 ///
 /// ## Why is this bad?
-/// Docstrings missing return sections are a sign of incomplete documentation
-/// or refactors.
+/// A missing "Returns" section is a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods, stubs functions, or
-/// functions that only return `None`.
+/// This rule is not enforced for abstract methods or functions that only return
+/// `None`. It is also ignored for "stub functions": functions where the body only
+/// consists of `pass`, `...`, `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -202,14 +203,15 @@ impl Violation for DocstringMissingReturns {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a "returns" section without
-/// needing one.
+/// Checks for function docstrings with unnecessary "Returns" sections.
 ///
 /// ## Why is this bad?
-/// Functions without an explicit return should not have a returns section
-/// in their docstrings.
+/// A function without an explicit `return` statement should not have a
+/// "Returns" section in its docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -253,15 +255,15 @@ impl Violation for DocstringExtraneousReturns {
 }
 
 /// ## What it does
-/// Checks for functions with yield statements missing a "yields" section in
-/// their docstring.
+/// Checks for functions with `yield` statements that do not have "Yields" sections in
+/// their docstrings.
 ///
 /// ## Why is this bad?
-/// Docstrings missing yields sections are a sign of incomplete documentation
-/// or refactors.
+/// A missing "Yields" section is a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods, stubs functions, or
-/// functions that only yield `None`.
+/// This rule is not enforced for abstract methods or functions that only yield `None`.
+/// It is also ignored for "stub functions": functions where the body only consists
+/// of `pass`, `...`, `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -304,14 +306,15 @@ impl Violation for DocstringMissingYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a "yields" section without
-/// needing one.
+/// Checks for function docstrings with unnecessary "Yields" sections.
 ///
 /// ## Why is this bad?
-/// Functions which don't yield anything should not have a yields section
-/// in their docstrings.
+/// A function that doesn't yield anything should not have a "Yields" section
+/// in its docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -354,15 +357,17 @@ impl Violation for DocstringExtraneousYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings that do not include documentation for all
-/// explicitly raised exceptions.
+/// Checks for function docstrings that do not document all explicitly raised
+/// exceptions.
 ///
 /// ## Why is this bad?
-/// If a function raises an exception without documenting it in its docstring,
-/// it can be misleading to users and/or a sign of incomplete documentation or
-/// refactors.
+/// A function should document all exceptions that are directly raised in some
+/// circumstances. Failing to document an exception that could be raised
+/// can be misleading to users and/or a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -421,14 +426,16 @@ impl Violation for DocstringMissingException {
 }
 
 /// ## What it does
-/// Checks for function docstrings that include exceptions which are not
-/// explicitly raised.
+/// Checks for function docstrings that state that exceptions could be raised
+/// even though they are not directly raised in the function body.
 ///
 /// ## Why is this bad?
 /// Some conventions prefer non-explicit exceptions be omitted from the
 /// docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -462,6 +469,11 @@ impl Violation for DocstringMissingException {
 ///     """
 ///     return distance / time
 /// ```
+///
+/// ## Known issues
+/// It may often be desirable to document *all* exceptions that a function
+/// could possibly raise, even those which are not explicitly raised using
+/// `raise` statements in the function body.
 #[derive(ViolationMetadata)]
 pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
@@ -1100,6 +1112,19 @@ fn parameters_from_signature<'a>(
     parameters
 }
 
+fn is_one_line(docstring: &Docstring) -> bool {
+    let mut non_empty_line_count = 0;
+    for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {
+        if !line.trim().is_empty() {
+            non_empty_line_count += 1;
+        }
+        if non_empty_line_count > 1 {
+            return false;
+        }
+    }
+    true
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
@@ -1115,9 +1140,12 @@ pub(crate) fn check_docstring(
         return;
     };
 
+    if checker.settings.pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
+        return;
+    }
+
     let semantic = checker.semantic();
 
-    // Ignore stubs.
     if function_type::is_stub(function_def, semantic) {
         return;
     }

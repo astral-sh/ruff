@@ -1,8 +1,8 @@
-use crate::db::{Db, RootDatabase};
-use crate::watch;
+use crate::db::{Db, ProjectDatabase};
+use crate::project::options::Options;
+use crate::project::{Project, ProjectMetadata};
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::workspace::settings::Configuration;
-use crate::workspace::{Workspace, WorkspaceMetadata};
+
 use red_knot_python_semantic::Program;
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::walk_directory::WalkState;
@@ -10,25 +10,20 @@ use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
 
-impl RootDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes, base_configuration))]
-    pub fn apply_changes(
-        &mut self,
-        changes: Vec<watch::ChangeEvent>,
-        base_configuration: Option<&Configuration>,
-    ) {
-        let mut workspace = self.workspace();
-        let workspace_path = workspace.root(self).to_path_buf();
+impl ProjectDatabase {
+    #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]
+    pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, cli_options: Option<&Options>) {
+        let mut project = self.project();
+        let project_path = project.root(self).to_path_buf();
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
             .map(|path| path.join("VERSIONS"));
 
-        let mut workspace_change = false;
+        // Are there structural changes to the project
+        let mut project_changed = false;
         // Changes to a custom stdlib path's VERSIONS
         let mut custom_stdlib_change = false;
-        // Packages that need reloading
-        let mut changed_packages = FxHashSet::default();
         // Paths that were added
         let mut added_paths = FxHashSet::default();
 
@@ -36,13 +31,13 @@ impl RootDatabase {
         let mut synced_files = FxHashSet::default();
         let mut synced_recursively = FxHashSet::default();
 
-        let mut sync_path = |db: &mut RootDatabase, path: &SystemPath| {
+        let mut sync_path = |db: &mut ProjectDatabase, path: &SystemPath| {
             if synced_files.insert(path.to_path_buf()) {
                 File::sync_path(db, path);
             }
         };
 
-        let mut sync_recursively = |db: &mut RootDatabase, path: &SystemPath| {
+        let mut sync_recursively = |db: &mut ProjectDatabase, path: &SystemPath| {
             if synced_recursively.insert(path.to_path_buf()) {
                 Files::sync_recursively(db, path);
             }
@@ -54,19 +49,8 @@ impl RootDatabase {
                     path.file_name(),
                     Some(".gitignore" | ".ignore" | "ruff.toml" | ".ruff.toml" | "pyproject.toml")
                 ) {
-                    // Changes to ignore files or settings can change the workspace structure or add/remove files
-                    // from packages.
-                    if let Some(package) = workspace.package(self, path) {
-                        if package.root(self) == workspace.root(self)
-                            || matches!(change, ChangeEvent::Deleted { .. })
-                        {
-                            workspace_change = true;
-                        }
-
-                        changed_packages.insert(package);
-                    } else {
-                        workspace_change = true;
-                    }
+                    // Changes to ignore files or settings can change the project structure or add/remove files.
+                    project_changed = true;
 
                     continue;
                 }
@@ -77,10 +61,11 @@ impl RootDatabase {
             }
 
             match change {
-                watch::ChangeEvent::Changed { path, kind: _ }
-                | watch::ChangeEvent::Opened(path) => sync_path(self, &path),
+                ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
+                    sync_path(self, &path);
+                }
 
-                watch::ChangeEvent::Created { kind, path } => {
+                ChangeEvent::Created { kind, path } => {
                     match kind {
                         CreatedKind::File => sync_path(self, &path),
                         CreatedKind::Directory | CreatedKind::Any => {
@@ -97,7 +82,7 @@ impl RootDatabase {
                     }
                 }
 
-                watch::ChangeEvent::Deleted { kind, path } => {
+                ChangeEvent::Deleted { kind, path } => {
                     let is_file = match kind {
                         DeletedKind::File => true,
                         DeletedKind::Directory => {
@@ -113,10 +98,8 @@ impl RootDatabase {
                     if is_file {
                         sync_path(self, &path);
 
-                        if let Some(package) = workspace.package(self, &path) {
-                            if let Some(file) = self.files().try_system(self, &path) {
-                                package.remove_file(self, file);
-                            }
+                        if let Some(file) = self.files().try_system(self, &path) {
+                            project.remove_file(self, file);
                         }
                     } else {
                         sync_recursively(self, &path);
@@ -128,69 +111,75 @@ impl RootDatabase {
                             custom_stdlib_change = true;
                         }
 
-                        if let Some(package) = workspace.package(self, &path) {
-                            changed_packages.insert(package);
-                        } else {
-                            workspace_change = true;
-                        }
+                        // Perform a full-reload in case the deleted directory contained the pyproject.toml.
+                        // We may want to make this more clever in the future, to e.g. iterate over the
+                        // indexed files and remove the once that start with the same path, unless
+                        // the deleted path is the project configuration.
+                        project_changed = true;
                     }
                 }
 
-                watch::ChangeEvent::CreatedVirtual(path)
-                | watch::ChangeEvent::ChangedVirtual(path) => {
+                ChangeEvent::CreatedVirtual(path) | ChangeEvent::ChangedVirtual(path) => {
                     File::sync_virtual_path(self, &path);
                 }
 
-                watch::ChangeEvent::DeletedVirtual(path) => {
+                ChangeEvent::DeletedVirtual(path) => {
                     if let Some(virtual_file) = self.files().try_virtual_file(&path) {
                         virtual_file.close(self);
                     }
                 }
 
-                watch::ChangeEvent::Rescan => {
-                    workspace_change = true;
+                ChangeEvent::Rescan => {
+                    project_changed = true;
                     Files::sync_all(self);
                     break;
                 }
             }
         }
 
-        if workspace_change {
-            match WorkspaceMetadata::discover(&workspace_path, self.system(), base_configuration) {
-                Ok(metadata) => {
-                    if metadata.root() == workspace.root(self) {
-                        tracing::debug!("Reloading workspace after structural change");
-                        // TODO: Handle changes in the program settings.
-                        workspace.reload(self, metadata);
+        if project_changed {
+            match ProjectMetadata::discover(&project_path, self.system()) {
+                Ok(mut metadata) => {
+                    if let Some(cli_options) = cli_options {
+                        metadata.apply_cli_options(cli_options.clone());
+                    }
+
+                    let program_settings = metadata.to_program_settings(self.system());
+
+                    let program = Program::get(self);
+                    if let Err(error) = program.update_from_settings(self, program_settings) {
+                        tracing::error!("Failed to update the program settings, keeping the old program settings: {error}");
+                    };
+
+                    if metadata.root() == project.root(self) {
+                        tracing::debug!("Reloading project after structural change");
+                        project.reload(self, metadata);
                     } else {
-                        tracing::debug!("Replace workspace after structural change");
-                        workspace = Workspace::from_metadata(self, metadata);
-                        self.workspace = Some(workspace);
+                        tracing::debug!("Replace project after structural change");
+                        project = Project::from_metadata(self, metadata);
+                        self.project = Some(project);
                     }
                 }
                 Err(error) => {
                     tracing::error!(
-                        "Failed to load workspace, keeping old workspace configuration: {error}"
+                        "Failed to load project, keeping old project configuration: {error}"
                     );
                 }
             }
 
             return;
         } else if custom_stdlib_change {
-            let search_paths = workspace.search_path_settings(self).clone();
+            let search_paths = project
+                .metadata(self)
+                .to_program_settings(self.system())
+                .search_paths;
+
             if let Err(error) = program.update_search_paths(self, &search_paths) {
                 tracing::error!("Failed to set the new search paths: {error}");
             }
         }
 
-        let mut added_paths = added_paths.into_iter().filter(|path| {
-            let Some(package) = workspace.package(self, path) else {
-                return false;
-            };
-
-            // Skip packages that need reloading
-            !changed_packages.contains(&package)
-        });
+        let mut added_paths = added_paths.into_iter();
 
         // Use directory walking to discover newly added files.
         if let Some(path) = added_paths.next() {
@@ -221,18 +210,12 @@ impl RootDatabase {
             });
 
             for path in added_paths.into_inner().unwrap() {
-                let package = workspace.package(self, &path);
                 let file = system_path_to_file(self, &path);
 
-                if let (Some(package), Ok(file)) = (package, file) {
-                    package.add_file(self, file);
+                if let Ok(file) = file {
+                    project.add_file(self, file);
                 }
             }
-        }
-
-        // Reload
-        for package in changed_packages {
-            package.reload_files(self);
         }
     }
 }

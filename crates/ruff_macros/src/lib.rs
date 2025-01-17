@@ -7,6 +7,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, Error, ItemFn, ItemStruct};
 
 mod cache_key;
+mod combine;
 mod combine_options;
 mod config;
 mod derive_message_formats;
@@ -31,6 +32,19 @@ pub fn derive_combine_options(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     combine_options::derive_impl(input)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Automatically derives a `red_knot_workspace::project::Combine` implementation for the attributed type
+/// that calls `red_knot_workspace::project::Combine::combine` for each field.
+///
+/// The derive macro can only be used on structs with named fields.
+#[proc_macro_derive(Combine)]
+pub fn derive_combine(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    combine::derive_impl(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

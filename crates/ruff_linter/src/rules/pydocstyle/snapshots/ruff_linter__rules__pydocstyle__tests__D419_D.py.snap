@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:20:9: D419 Docstring is empty
    |
 19 |     class meta:
 20 |         """"""
    |         ^^^^^^ D419
-21 | 
+21 |
 22 |     @expect('D102: Missing docstring in public method')
    |
 

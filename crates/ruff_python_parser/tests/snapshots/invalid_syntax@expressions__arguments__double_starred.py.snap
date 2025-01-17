@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/double_starred.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -201,14 +200,14 @@ Module(
 2 | call(** *x)
 3 | call(***x)
   |        ^^ Syntax Error: Starred expression cannot be used here
-4 | 
+4 |
 5 | call(**x := 1)
   |
 
 
   |
 3 | call(***x)
-4 | 
+4 |
 5 | call(**x := 1)
   |          ^^ Syntax Error: Expected ',', found ':='
   |
@@ -216,7 +215,7 @@ Module(
 
   |
 3 | call(***x)
-4 | 
+4 |
 5 | call(**x := 1)
   |             ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
   |

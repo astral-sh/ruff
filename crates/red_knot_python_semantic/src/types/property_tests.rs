@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use super::tests::Ty;
 use crate::db::tests::{setup_db, TestDb};
-use crate::types::KnownClass;
+use crate::types::{IntersectionBuilder, KnownClass, Type, UnionType};
 use quickcheck::{Arbitrary, Gen};
 
 fn arbitrary_core_type(g: &mut Gen) -> Ty {
@@ -123,14 +123,61 @@ impl Arbitrary for Ty {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        // This is incredibly naive. We can do much better here by
-        // trying various subsets of the elements in unions, tuples,
-        // and intersections. For now, we only try to shrink by
-        // reducing unions/tuples/intersections to a single element.
         match self.clone() {
-            Ty::Union(types) => Box::new(types.into_iter()),
-            Ty::Tuple(types) => Box::new(types.into_iter()),
-            Ty::Intersection { pos, neg } => Box::new(pos.into_iter().chain(neg)),
+            Ty::Union(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
+                0 => None,
+                1 => Some(elts.into_iter().next().unwrap()),
+                _ => Some(Ty::Union(elts)),
+            })),
+            Ty::Tuple(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
+                0 => None,
+                1 => Some(elts.into_iter().next().unwrap()),
+                _ => Some(Ty::Tuple(elts)),
+            })),
+            Ty::Intersection { pos, neg } => {
+                // Shrinking on intersections is not exhaustive!
+                //
+                // We try to shrink the positive side or the negative side,
+                // but we aren't shrinking both at the same time.
+                //
+                // This should remove positive or negative constraints but
+                // won't shrink (A & B & ~C & ~D) to (A & ~C) in one shrink
+                // iteration.
+                //
+                // Instead, it hopes that (A & B & ~C) or (A & ~C & ~D) fails
+                // so that shrinking can happen there.
+                let pos_orig = pos.clone();
+                let neg_orig = neg.clone();
+                Box::new(
+                    // we shrink negative constraints first, as
+                    // intersections with only negative constraints are
+                    // more confusing
+                    neg.shrink()
+                        .map(move |shrunk_neg| Ty::Intersection {
+                            pos: pos_orig.clone(),
+                            neg: shrunk_neg,
+                        })
+                        .chain(pos.shrink().map(move |shrunk_pos| Ty::Intersection {
+                            pos: shrunk_pos,
+                            neg: neg_orig.clone(),
+                        }))
+                        .filter_map(|ty| {
+                            if let Ty::Intersection { pos, neg } = &ty {
+                                match (pos.len(), neg.len()) {
+                                    // an empty intersection does not mean
+                                    // anything
+                                    (0, 0) => None,
+                                    // a single positive element should be
+                                    // unwrapped
+                                    (1, 0) => Some(pos[0].clone()),
+                                    _ => Some(ty),
+                                }
+                            } else {
+                                unreachable!()
+                            }
+                        }),
+                )
+            }
             _ => Box::new(std::iter::empty()),
         }
     }
@@ -172,14 +219,41 @@ macro_rules! type_property_test {
     };
 }
 
+fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+    IntersectionBuilder::new(db)
+        .add_positive(s)
+        .add_positive(t)
+        .build()
+}
+
+fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
+    UnionType::from_elements(db, [s, t])
+}
+
 mod stable {
-    // `T` is equivalent to itself.
+    use super::union;
+    use crate::types::{KnownClass, Type};
+
+    // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
     );
 
-    // `T` is a subtype of itself.
+    // Symmetry: If `S` is equivalent to `T`, then `T` must be equivalent to `S`.
+    // Note that this (trivially) holds true for gradual types as well.
+    type_property_test!(
+        equivalent_to_is_symmetric, db,
+        forall types s, t. s.is_equivalent_to(db, t) => t.is_equivalent_to(db, s)
+    );
+
+    // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.
+    type_property_test!(
+        equivalent_to_is_transitive, db,
+        forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
+    );
+
+    // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
         forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
@@ -209,12 +283,6 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
     );
 
-    // `T` can be assigned to itself.
-    type_property_test!(
-        assignable_to_is_reflexive, db,
-        forall types t. t.is_assignable_to(db, t)
-    );
-
     // `S <: T` implies that `S` can be assigned to `T`.
     type_property_test!(
         subtype_of_implies_assignable_to, db,
@@ -238,6 +306,38 @@ mod stable {
         non_fully_static_types_do_not_participate_in_subtyping, db,
         forall types s, t. !s.is_fully_static(db) => !s.is_subtype_of(db, t) && !t.is_subtype_of(db, s)
     );
+
+    // All types should be assignable to `object`
+    type_property_test!(
+        all_types_assignable_to_object, db,
+        forall types t. t.is_assignable_to(db, KnownClass::Object.to_instance(db))
+    );
+
+    // And for fully static types, they should also be subtypes of `object`
+    type_property_test!(
+        all_fully_static_types_subtype_of_object, db,
+        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, KnownClass::Object.to_instance(db))
+    );
+
+    // Never should be assignable to every type
+    type_property_test!(
+        never_assignable_to_every_type, db,
+        forall types t. Type::Never.is_assignable_to(db, t)
+    );
+
+    // And it should be a subtype of all fully static types
+    type_property_test!(
+        never_subtype_of_every_fully_static_type, db,
+        forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
+    );
+
+    // For any two fully static types, each type in the pair must be a subtype of their union.
+    type_property_test!(
+        all_fully_static_type_pairs_are_subtype_of_their_union, db,
+        forall types s, t.
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -248,7 +348,17 @@ mod stable {
 /// tests to the `stable` section. In the meantime, it can still be useful to run these
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
+    use super::{intersection, union};
+
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    // `T` can be assigned to itself.
+    type_property_test!(
+        assignable_to_is_reflexive, db,
+        forall types t. t.is_assignable_to(db, t)
+    );
+
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
+    // This very often passes now, but occasionally flakes due to https://github.com/astral-sh/ruff/issues/15380
     type_property_test!(
         subtype_of_is_antisymmetric, db,
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
@@ -258,5 +368,40 @@ mod flaky {
     type_property_test!(
         double_negation_is_identity, db,
         forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+    );
+
+    // ~T should be disjoint from T
+    type_property_test!(
+        negation_is_disjoint, db,
+        forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
+    );
+
+    // If `S <: T`, then `~T <: ~S`.
+    type_property_test!(
+        negation_reverses_subtype_order, db,
+        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+    );
+
+    // For two fully static types, their intersection must be a subtype of each type in the pair.
+    type_property_test!(
+        all_fully_static_type_pairs_are_supertypes_of_their_intersection, db,
+        forall types s, t.
+            s.is_fully_static(db) && t.is_fully_static(db)
+            => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
+    );
+
+    // And for non-fully-static types, the intersection of a pair of types
+    // should be assignable to both types of the pair.
+    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
+    type_property_test!(
+        all_type_pairs_can_be_assigned_from_their_intersection, db,
+        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
+    );
+
+    // For *any* pair of types, whether fully static or not,
+    // each of the pair should be assignable to the union of the two.
+    type_property_test!(
+        all_type_pairs_are_assignable_to_their_union, db,
+        forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
     );
 }

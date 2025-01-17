@@ -4,10 +4,10 @@ source: crates/ruff_linter/src/rules/airflow/mod.rs
 AIR302_args.py:18:39: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
    |
 16 | DAG(dag_id="class_schedule", schedule="@hourly")
-17 | 
+17 |
 18 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
    |                                       ^^^^^^^^^^^^^^^^^ AIR302
-19 | 
+19 |
 20 | DAG(dag_id="class_timetable", timetable=NullTimetable())
    |
    = help: Use `schedule` instead
@@ -25,7 +25,7 @@ AIR302_args.py:18:39: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
 AIR302_args.py:20:31: AIR302 [*] `timetable` is removed in Airflow 3.0
    |
 18 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
-19 | 
+19 |
 20 | DAG(dag_id="class_timetable", timetable=NullTimetable())
    |                               ^^^^^^^^^ AIR302
    |
@@ -238,14 +238,14 @@ AIR302_args.py:90:16: AIR302 `filename_template` is removed in Airflow 3.0
 89 | ElasticsearchTaskHandler(filename_template="/tmp/test")
 90 | GCSTaskHandler(filename_template="/tmp/test")
    |                ^^^^^^^^^^^^^^^^^ AIR302
-91 | 
+91 |
 92 | FabAuthManager(None)
    |
 
 AIR302_args.py:92:15: AIR302 `appbuilder` is removed in Airflow 3.0; The constructor takes no parameter now
    |
 90 | GCSTaskHandler(filename_template="/tmp/test")
-91 | 
+91 |
 92 | FabAuthManager(None)
    |               ^^^^^^ AIR302
    |

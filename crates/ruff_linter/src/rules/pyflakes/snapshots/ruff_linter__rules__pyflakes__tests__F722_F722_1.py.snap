@@ -1,8 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F722_1.py:8:22: F722 Syntax error in forward annotation: `this isn't python`
+F722_1.py:8:22: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
   |
 6 | @no_type_check
 7 | class C:
@@ -11,7 +10,7 @@ F722_1.py:8:22: F722 Syntax error in forward annotation: `this isn't python`
 9 |         x: "this also isn't python" = 1
   |
 
-F722_1.py:8:46: F722 Syntax error in forward annotation: `this isn't python either`
+F722_1.py:8:46: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
   |
 6 | @no_type_check
 7 | class C:
@@ -20,7 +19,7 @@ F722_1.py:8:46: F722 Syntax error in forward annotation: `this isn't python eith
 9 |         x: "this also isn't python" = 1
   |
 
-F722_1.py:9:12: F722 Syntax error in forward annotation: `this also isn't python`
+F722_1.py:9:12: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
   |
 7 | class C:
 8 |     def f(self, arg: "this isn't python") -> "this isn't python either":

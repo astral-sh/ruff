@@ -168,7 +168,7 @@ impl SearchPaths {
 
         let SearchPathSettings {
             extra_paths,
-            src_root,
+            src_roots,
             typeshed,
             site_packages: site_packages_paths,
         } = settings;
@@ -186,8 +186,10 @@ impl SearchPaths {
             static_paths.push(SearchPath::extra(system, path)?);
         }
 
-        tracing::debug!("Adding first-party search path '{src_root}'");
-        static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        for src_root in src_roots {
+            tracing::debug!("Adding first-party search path '{src_root}'");
+            static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
             let typeshed = canonicalize(typeshed, system);
@@ -1294,12 +1296,12 @@ mod tests {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::PY38,
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: src.clone(),
+                    src_roots: vec![src.clone()],
                     typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
@@ -1800,12 +1802,12 @@ not_a_directory
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
+                    src_roots: vec![SystemPathBuf::from("/src")],
                     typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,

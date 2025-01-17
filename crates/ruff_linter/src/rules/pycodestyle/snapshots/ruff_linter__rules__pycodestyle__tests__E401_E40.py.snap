@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E40.py:2:1: E401 [*] Multiple imports on one line
   |
 1 | #: E401
 2 | import os, sys
   | ^^^^^^^^^^^^^^ E401
-3 | 
+3 |
 4 | #: Okay
   |
   = help: Split imports
@@ -47,7 +46,7 @@ E40.py:66:1: E401 [*] Multiple imports on one line
 65 | import re as regex, string  # also with a comment!
 66 | import re as regex, string; x = 1
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-67 | 
+67 |
 68 | x = 1; import re as regex, string
    |
    = help: Split imports
@@ -65,7 +64,7 @@ E40.py:66:1: E401 [*] Multiple imports on one line
 E40.py:68:8: E401 [*] Multiple imports on one line
    |
 66 | import re as regex, string; x = 1
-67 | 
+67 |
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
    |
@@ -86,7 +85,7 @@ E40.py:72:5: E401 [*] Multiple imports on one line
 71 | def blah():
 72 |     import datetime as dt, copy
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-73 | 
+73 |
 74 |     def nested_and_tested():
    |
    = help: Split imports
@@ -107,7 +106,7 @@ E40.py:75:9: E401 [*] Multiple imports on one line
 74 |     def nested_and_tested():
 75 |         import builtins, textwrap as tw
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-76 | 
+76 |
 77 |         x = 1; import re as regex, string
    |
    = help: Split imports
@@ -126,7 +125,7 @@ E40.py:75:9: E401 [*] Multiple imports on one line
 E40.py:77:16: E401 [*] Multiple imports on one line
    |
 75 |         import builtins, textwrap as tw
-76 | 
+76 |
 77 |         x = 1; import re as regex, string
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
 78 |         import re as regex, string; x = 1
@@ -148,7 +147,7 @@ E40.py:78:9: E401 [*] Multiple imports on one line
 77 |         x = 1; import re as regex, string
 78 |         import re as regex, string; x = 1
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-79 | 
+79 |
 80 |     if True: import re as regex, string
    |
    = help: Split imports
@@ -165,7 +164,7 @@ E40.py:78:9: E401 [*] Multiple imports on one line
 E40.py:80:14: E401 [*] Multiple imports on one line
    |
 78 |         import re as regex, string; x = 1
-79 | 
+79 |
 80 |     if True: import re as regex, string
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
    |

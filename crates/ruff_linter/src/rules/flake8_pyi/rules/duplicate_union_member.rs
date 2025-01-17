@@ -93,40 +93,38 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
         return;
     }
 
-    if checker.settings.preview.is_enabled() {
-        // Mark [`Fix`] as unsafe when comments are in range.
-        let applicability = if checker.comment_ranges().intersects(expr.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
+    // Mark [`Fix`] as unsafe when comments are in range.
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
 
-        // Generate the flattened fix once.
-        let fix = if let &[edit_expr] = unique_nodes.as_slice() {
-            // Generate a [`Fix`] for a single type expression, e.g. `int`.
-            Some(Fix::applicable_edit(
-                Edit::range_replacement(checker.generator().expr(edit_expr), expr.range()),
+    // Generate the flattened fix once.
+    let fix = if let &[edit_expr] = unique_nodes.as_slice() {
+        // Generate a [`Fix`] for a single type expression, e.g. `int`.
+        Some(Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(edit_expr), expr.range()),
+            applicability,
+        ))
+    } else {
+        match union_type {
+            // See redundant numeric union
+            UnionKind::PEP604 => Some(generate_pep604_fix(
+                checker,
+                unique_nodes,
+                expr,
                 applicability,
-            ))
-        } else {
-            match union_type {
-                // See redundant numeric union
-                UnionKind::PEP604 => Some(generate_pep604_fix(
-                    checker,
-                    unique_nodes,
-                    expr,
-                    applicability,
-                )),
-                UnionKind::TypingUnion => {
-                    generate_union_fix(checker, unique_nodes, expr, applicability).ok()
-                }
+            )),
+            UnionKind::TypingUnion => {
+                generate_union_fix(checker, unique_nodes, expr, applicability).ok()
             }
-        };
+        }
+    };
 
-        if let Some(fix) = fix {
-            for diagnostic in &mut diagnostics {
-                diagnostic.set_fix(fix.clone());
-            }
+    if let Some(fix) = fix {
+        for diagnostic in &mut diagnostics {
+            diagnostic.set_fix(fix.clone());
         }
     }
 
