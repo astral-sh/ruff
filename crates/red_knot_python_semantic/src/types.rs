@@ -2288,7 +2288,11 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
                 fallback_type: Type::unknown(),
             }),
-            Type::KnownInstance(KnownInstanceType::ClassVar) => Ok(Type::unknown()),
+            Type::KnownInstance(KnownInstanceType::ClassVar) => {
+                // TODO: A bare `ClassVar` should rather be treated as if the symbol was not
+                // declared at all.
+                Ok(Type::unknown())
+            }
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::unknown(),

@@ -179,6 +179,9 @@ c_instance = C()
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
+# TODO: Should be `Unknown | Literal[1]`.
+reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown
+
 # TODO: should raise an error. It is not allowed to reassign a pure class variable on an instance.
 c_instance.pure_class_variable1 = "value set on instance"
 
@@ -244,6 +247,8 @@ class C:
         self.variable_with_class_default1 = "value set in instance method"
 
 reveal_type(C.variable_with_class_default1)  # revealed: str
+
+# TODO: this should be `Unknown | Literal[1]`.
 reveal_type(C.variable_with_class_default2)  # revealed: Literal[1]
 
 c_instance = C()
