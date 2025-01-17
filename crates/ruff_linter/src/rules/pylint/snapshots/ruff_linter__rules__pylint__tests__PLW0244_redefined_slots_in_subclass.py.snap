@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-redefined_slots_in_subclass.py:6:18: PLW0244 Redefined slot 'a' in subclass
+redefined_slots_in_subclass.py:6:18: PLW0244 Slot `a` redefined from base `Base`
   |
 5 | class Subclass(Base):
 6 |     __slots__ = ("a", "d")  # [redefined-slots-in-subclass]
@@ -10,7 +10,7 @@ redefined_slots_in_subclass.py:6:18: PLW0244 Redefined slot 'a' in subclass
 8 | class Grandparent:
   |
 
-redefined_slots_in_subclass.py:17:23: PLW0244 Redefined slot 'a' in subclass
+redefined_slots_in_subclass.py:17:23: PLW0244 Slot `a` redefined from base `Grandparent`
    |
 16 | class Child(Parent):
 17 |     __slots__ = ("c", "a")
@@ -19,14 +19,14 @@ redefined_slots_in_subclass.py:17:23: PLW0244 Redefined slot 'a' in subclass
 19 | class AnotherBase:
    |
 
-redefined_slots_in_subclass.py:23:18: PLW0244 Redefined slot 'a' in subclass
+redefined_slots_in_subclass.py:23:18: PLW0244 Slot `a` redefined from base `AnotherBase`
    |
 22 | class AnotherChild(AnotherBase):
 23 |     __slots__ = ["a","b","e","f"]
    |                  ^^^ PLW0244
    |
 
-redefined_slots_in_subclass.py:23:22: PLW0244 Redefined slot 'b' in subclass
+redefined_slots_in_subclass.py:23:22: PLW0244 Slot `b` redefined from base `AnotherBase`
    |
 22 | class AnotherChild(AnotherBase):
 23 |     __slots__ = ["a","b","e","f"]
