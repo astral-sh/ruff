@@ -37,6 +37,7 @@ use crate::types::call::{
 };
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
+use crate::types::infer::QualifiedType;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -246,7 +247,7 @@ pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> T
 }
 
 /// Infer the type of a declaration.
-fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> QualifiedType<'db> {
     let inference = infer_definition_types(db, definition);
     inference.declaration_ty(definition)
 }
@@ -400,7 +401,7 @@ fn declarations_ty<'db>(
             if static_visibility.is_always_false() {
                 None
             } else {
-                Some(declaration_ty(db, declaration))
+                Some(declaration_ty(db, declaration).ignore_qualifiers())
             }
         },
     );
