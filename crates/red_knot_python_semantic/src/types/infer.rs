@@ -3418,8 +3418,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let value_ty = self.infer_expression(value);
 
                 if let (ast::ExprContext::Store, Type::Instance(instance)) = (ctx, value_ty) {
-                    let qualifiers = instance.class.instance_member(self.db(), attr).1;
-                    if qualifiers.is_class_var() {
+                    let instance_member = instance.class.instance_member(self.db(), attr);
+                    if instance_member.is_class_var() {
                         self.context.report_lint(
                             &INVALID_ATTRIBUTE_ACCESS,
                             attribute.into(),

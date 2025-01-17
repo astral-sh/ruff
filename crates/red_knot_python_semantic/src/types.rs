@@ -371,6 +371,12 @@ fn bindings_ty<'db>(
 /// that this comes with a [`TypeQualifiers::CLASS_VAR`] type qualifier.
 pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
+impl SymbolAndQualifiers<'_> {
+    fn is_class_var(&self) -> bool {
+        self.1.contains(TypeQualifiers::CLASS_VAR)
+    }
+}
+
 impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
     fn from(symbol: Symbol<'db>) -> Self {
         SymbolAndQualifiers(symbol, TypeQualifiers::empty())
@@ -2516,12 +2522,6 @@ bitflags! {
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
         const FINAL     = 1 << 1;
-    }
-}
-
-impl TypeQualifiers {
-    pub(crate) fn is_class_var(self) -> bool {
-        self.contains(Self::CLASS_VAR)
     }
 }
 
