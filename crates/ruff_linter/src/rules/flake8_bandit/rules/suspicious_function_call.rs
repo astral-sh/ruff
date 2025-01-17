@@ -4,8 +4,8 @@
 use itertools::Either;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Operator};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -825,8 +825,31 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
-/// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+    // In preview mode, references are handled collectively by `suspicious_function_reference`
+    if checker.settings.preview.is_disabled() {
+        suspicious_function(
+            checker,
+            call.func.as_ref(),
+            Some(&call.arguments),
+            call.range,
+        );
+    }
+}
+
+pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) {
+    if checker.settings.preview.is_enabled() {
+        suspicious_function(checker, func, None, func.range());
+    }
+}
+
+/// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
+fn suspicious_function(
+    checker: &mut Checker,
+    func: &Expr,
+    arguments: Option<&Arguments>,
+    range: TextRange,
+) {
     /// Returns `true` if the iterator starts with the given prefix.
     fn has_prefix(mut chars: impl Iterator<Item = char>, prefix: &str) -> bool {
         for expected in prefix.chars() {
@@ -877,7 +900,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
         }
     }
 
-    let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(call.func.as_ref()).and_then(|qualified_name| {
+    let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(func).and_then(|qualified_name| {
         match qualified_name.segments() {
             // Pickle
             ["pickle" | "dill", "load" | "loads" | "Unpickler"] |
@@ -904,9 +927,13 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             // URLOpen (`Request`)
             ["urllib", "request", "Request"] |
             ["six", "moves", "urllib", "request", "Request"] => {
+                let Some(arguments) = arguments else {
+                    return Some(SuspiciousURLOpenUsage.into());
+                };
+
                 // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
-                if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if call.arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
+                if arguments.args.iter().all(|arg| !arg.is_starred_expr()) && arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
+                    if arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
                         return None;
                     }
                 }
@@ -915,8 +942,12 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             // URLOpen (`urlopen`, `urlretrieve`)
             ["urllib", "request", "urlopen" | "urlretrieve" ] |
             ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
-                if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    match call.arguments.find_argument_value("url", 0) {
+                let Some(arguments) = arguments else {
+                    return Some(SuspiciousURLOpenUsage.into());
+                };
+
+                if arguments.args.iter().all(|arg| !arg.is_starred_expr()) && arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
+                    match arguments.find_argument_value("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
                         Some(Expr::Call(ExprCall { func, arguments, .. })) => {
                             if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
@@ -971,7 +1002,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.range());
+    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);
     }
@@ -979,24 +1010,8 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
 
 /// S308
 pub(crate) fn suspicious_function_decorator(checker: &mut Checker, decorator: &Decorator) {
-    let Some(diagnostic_kind) = checker
-        .semantic()
-        .resolve_qualified_name(&decorator.expression)
-        .and_then(|qualified_name| {
-            match qualified_name.segments() {
-                // MarkSafe
-                ["django", "utils", "safestring" | "html", "mark_safe"] => {
-                    Some(SuspiciousMarkSafeUsage.into())
-                }
-                _ => None,
-            }
-        })
-    else {
-        return;
-    };
-
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, decorator.range());
-    if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+    // In preview mode, references are handled collectively by `suspicious_function_reference`
+    if checker.settings.preview.is_disabled() {
+        suspicious_function(checker, &decorator.expression, None, decorator.range);
     }
 }
