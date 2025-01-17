@@ -40,9 +40,9 @@ class Group:
 
     add_suffix_to_is_methods: bool
     anynode_is_label: str
-    comment: Optional[str]
+    comment: str | None
 
-    def __init__(self, group_name, group):
+    def __init__(self, group_name: str, group: dict[str, Any]) -> None:
         self.name = group_name
         self.owned_enum_ty = group_name
         self.ref_enum_ty = group.get("ref_enum_ty", group_name + "Ref")
@@ -60,7 +60,7 @@ class Node:
     variant: str
     ty: str
 
-    def __init__(self, group, node_name, node):
+    def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
         self.ty = f"crate::{node_name}"

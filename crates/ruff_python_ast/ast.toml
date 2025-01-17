@@ -1,17 +1,17 @@
 # This file is used by generate.py to autogenerate our Python AST data model.
 #
 # We have defined a Rust struct for each syntax node in `src/nodes.rs`.  Many of
-# these nodes belong to groups.  For instance, there is a `Stmt` group
+# these nodes belong to groups. For instance, there is a `Stmt` group
 # consisting of all of the syntax nodes that represent valid Python statements.
 #
 # There is a special group named `ungrouped` that contains syntax nodes that do
 # not belong to any group.
 #
-# Each group is defined by two sections below.  The `[GROUP]` section defines
-# options that control the auto-generation for that group.  The `[GROUP.nodes]`
-# section defines which syntax nodes belong to that group.  The name of each
+# Each group is defined by two sections below. The `[GROUP]` section defines
+# options that control the auto-generation for that group. The `[GROUP.nodes]`
+# section defines which syntax nodes belong to that group. The name of each
 # entry in the nodes section must match the name of the corresponding Rust
-# struct.  The value of each entry defines options that control the
+# struct. The value of each entry defines options that control the
 # auto-generation for that syntax node.
 #
 # The following group options are available:
