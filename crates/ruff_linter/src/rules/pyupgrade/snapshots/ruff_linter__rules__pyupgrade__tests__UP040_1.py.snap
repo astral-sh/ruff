@@ -2,38 +2,56 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP040_1.py:7:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP040_1.py:8:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of type parameters
   |
-7 | class A(Generic[T]):
+8 | class A(Generic[T]):
   |       ^^^^^^^^^^^^^ UP040
-8 |     pass
+9 |     pass
   |
   = help: Use type parameters
 
 ℹ Safe fix
-4 4 | Ts = TypeVarTuple("Ts")
-5 5 | 
+5 5 | P = ParamSpec("P")
 6 6 | 
-7   |-class A(Generic[T]):
-  7 |+class A[T: float]:
-8 8 |     pass
-9 9 | 
+7 7 | 
+8   |-class A(Generic[T]):
+  8 |+class A[T: float]:
+9 9 |     pass
 10 10 | 
+11 11 | 
 
-UP040_1.py:11:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP040_1.py:12:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
-11 | class B(Generic[*Ts]):
+12 | class B(Generic[*Ts]):
    |       ^^^^^^^^^^^^^^^ UP040
-12 |     pass
+13 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-8  8  |     pass
-9  9  | 
+9  9  |     pass
 10 10 | 
-11    |-class B(Generic[*Ts]):
-   11 |+class B[*Ts]:
-12 12 |     pass
-13 13 | 
-14 14 |
+11 11 | 
+12    |-class B(Generic[*Ts]):
+   12 |+class B[*Ts]:
+13 13 |     pass
+14 14 | 
+15 15 | 
+
+UP040_1.py:16:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+   |
+16 | class C(Generic[P]):
+   |       ^^^^^^^^^^^^^ UP040
+17 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+13 13 |     pass
+14 14 | 
+15 15 | 
+16    |-class C(Generic[P]):
+   16 |+class C[**P]:
+17 17 |     pass
+18 18 | 
+19 19 |

@@ -9,7 +9,7 @@ use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSubscript, Identifier, Keyword, Stmt, StmtAnnAssign, StmtAssign,
     StmtTypeAlias, TypeParam, TypeParamTypeVar,
 };
-use ruff_python_ast::{StmtClassDef, TypeParamTypeVarTuple};
+use ruff_python_ast::{StmtClassDef, TypeParamParamSpec, TypeParamTypeVarTuple};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -391,6 +391,11 @@ fn create_type_params(vars: &[TypeVar]) -> Option<ruff_python_ast::TypeParams> {
                                 name: Identifier::new(name.id.clone(), TextRange::default()),
                                 default: None,
                             }),
+                            TypeVarKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
+                                range: TextRange::default(),
+                                name: Identifier::new(name.id.clone(), TextRange::default()),
+                                default: None,
+                            }),
                         }
                     },
                 )
@@ -412,7 +417,7 @@ enum TypeVarRestriction<'a> {
 enum TypeVarKind {
     Var,
     Tuple,
-    // ParamSpec,
+    ParamSpec,
 }
 
 #[derive(Debug)]
@@ -475,6 +480,8 @@ fn expr_name_to_type_var<'a>(
                 TypeVarKind::Var
             } else if semantic.match_typing_expr(func, "TypeVarTuple") {
                 TypeVarKind::Tuple
+            } else if semantic.match_typing_expr(func, "ParamSpec") {
+                TypeVarKind::ParamSpec
             } else {
                 return None;
             };

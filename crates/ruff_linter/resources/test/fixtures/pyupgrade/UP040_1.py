@@ -1,7 +1,8 @@
-from typing import Generic, TypeVar, TypeVarTuple
+from typing import Generic, ParamSpec, TypeVar, TypeVarTuple
 
 T = TypeVar("T", bound=float)
 Ts = TypeVarTuple("Ts")
+P = ParamSpec("P")
 
 
 class A(Generic[T]):
@@ -9,6 +10,10 @@ class A(Generic[T]):
 
 
 class B(Generic[*Ts]):
+    pass
+
+
+class C(Generic[P]):
     pass
 
 
