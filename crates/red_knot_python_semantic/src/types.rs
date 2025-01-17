@@ -1608,6 +1608,7 @@ impl<'db> Type<'db> {
                     | KnownClass::FrozenSet
                     | KnownClass::Dict
                     | KnownClass::Slice
+                    | KnownClass::Property
                     | KnownClass::BaseException
                     | KnownClass::BaseExceptionGroup
                     | KnownClass::GenericAlias
@@ -1665,19 +1666,15 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => known_instance.member(db, name),
 
-            Type::Instance(InstanceType { class }) => {
-                let ty = match (class.known(db), name) {
-                    (Some(KnownClass::VersionInfo), "major") => {
-                        Type::IntLiteral(Program::get(db).python_version(db).major.into())
-                    }
-                    (Some(KnownClass::VersionInfo), "minor") => {
-                        Type::IntLiteral(Program::get(db).python_version(db).minor.into())
-                    }
-                    // TODO MRO? get_own_instance_member, get_instance_member
-                    _ => todo_type!("instance attributes"),
-                };
-                ty.into()
-            }
+            Type::Instance(InstanceType { class }) => match (class.known(db), name) {
+                (Some(KnownClass::VersionInfo), "major") => {
+                    Type::IntLiteral(Program::get(db).python_version(db).major.into()).into()
+                }
+                (Some(KnownClass::VersionInfo), "minor") => {
+                    Type::IntLiteral(Program::get(db).python_version(db).minor.into()).into()
+                }
+                _ => class.instance_member(db, name),
+            },
 
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -2291,6 +2288,11 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
                 fallback_type: Type::unknown(),
             }),
+            Type::KnownInstance(KnownInstanceType::ClassVar) => {
+                // TODO: A bare `ClassVar` should rather be treated as if the symbol was not
+                // declared at all.
+                Ok(Type::unknown())
+            }
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::unknown(),
@@ -2536,6 +2538,7 @@ pub enum KnownClass {
     FrozenSet,
     Dict,
     Slice,
+    Property,
     BaseException,
     BaseExceptionGroup,
     // Types
@@ -2580,6 +2583,7 @@ impl<'db> KnownClass {
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
+            Self::Property => "property",
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::GenericAlias => "GenericAlias",
@@ -2649,7 +2653,8 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
-            | Self::Slice => KnownModule::Builtins,
+            | Self::Slice
+            | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
@@ -2696,6 +2701,7 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Type
             | Self::Slice
+            | Self::Property
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -2770,6 +2776,7 @@ impl<'db> KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::Slice
+            | Self::Property
             | Self::GenericAlias
             | Self::ChainMap
             | Self::Counter
@@ -3963,6 +3970,86 @@ impl<'db> Class<'db> {
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
+    }
+
+    /// Returns the `name` attribute of an instance of this class.
+    ///
+    /// The attribute could be defined in the class body, but it could also be an implicitly
+    /// defined attribute that is only present in a method (typically `__init__`).
+    ///
+    /// The attribute might also be defined in a superclass of this class.
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        for superclass in self.iter_mro(db) {
+            match superclass {
+                ClassBase::Dynamic(_) => {
+                    return todo_type!("instance attribute on class with dynamic base").into();
+                }
+                ClassBase::Class(class) => {
+                    let member = class.own_instance_member(db, name);
+                    if !member.is_unbound() {
+                        return member;
+                    }
+                }
+            }
+        }
+
+        // TODO: The symbol is not present in any class body, but it could be implicitly
+        // defined in `__init__` or other methods anywhere in the MRO.
+        todo_type!("implicit instance attribute").into()
+    }
+
+    /// A helper function for `instance_member` that looks up the `name` attribute only on
+    /// this class, not on its superclasses.
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        // TODO: There are many things that are not yet implemented here:
+        // - `typing.ClassVar` and `typing.Final`
+        // - Proper diagnostics
+        // - Handling of possibly-undeclared/possibly-unbound attributes
+        // - The descriptor protocol
+
+        let body_scope = self.body_scope(db);
+        let table = symbol_table(db, body_scope);
+
+        if let Some(symbol) = table.symbol_id_by_name(name) {
+            let use_def = use_def_map(db, body_scope);
+
+            let declarations = use_def.public_declarations(symbol);
+
+            match declarations_ty(db, declarations) {
+                Ok(Symbol::Type(declared_ty, _)) => {
+                    if let Some(function) = declared_ty.into_function_literal() {
+                        // TODO: Eventually, we are going to process all decorators correctly. This is
+                        // just a temporary heuristic to provide a broad categorization into properties
+                        // and non-property methods.
+                        if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
+                            todo_type!("@property").into()
+                        } else {
+                            todo_type!("bound method").into()
+                        }
+                    } else {
+                        Symbol::Type(declared_ty, Boundness::Bound)
+                    }
+                }
+                Ok(Symbol::Unbound) => {
+                    let bindings = use_def.public_bindings(symbol);
+                    let inferred_ty = bindings_ty(db, bindings);
+
+                    match inferred_ty {
+                        Symbol::Type(ty, _) => Symbol::Type(
+                            UnionType::from_elements(db, [Type::unknown(), ty]),
+                            Boundness::Bound,
+                        ),
+                        Symbol::Unbound => Symbol::Unbound,
+                    }
+                }
+                Err((declared_ty, _)) => {
+                    // Ignore conflicting declarations
+                    declared_ty.into()
+                }
+            }
+        } else {
+            Symbol::Unbound
+        }
     }
 
     /// Return `true` if this class appears to be a cyclic definition,
