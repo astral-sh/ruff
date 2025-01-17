@@ -4202,7 +4202,6 @@ pub struct UnionType<'db> {
     elements_boxed: Box<[Type<'db>]>,
 }
 
-#[salsa::tracked]
 impl<'db> UnionType<'db> {
     fn elements(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         self.elements_boxed(db)
@@ -4232,7 +4231,6 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
 
-    #[salsa::tracked]
     fn to_sorted_union(self, db: &'db dyn Db) -> UnionType<'db> {
         let mut elements = self.elements_boxed(db).to_vec();
         for element in &mut elements {
@@ -4260,9 +4258,7 @@ pub struct IntersectionType<'db> {
     negative: FxOrderSet<Type<'db>>,
 }
 
-#[salsa::tracked]
 impl<'db> IntersectionType<'db> {
-    #[salsa::tracked]
     fn to_sorted_intersection(self, db: &'db dyn Db) -> IntersectionType<'db> {
         let mut positive = self.positive(db).clone();
         positive.sort_unstable_by(order_union_elements);
