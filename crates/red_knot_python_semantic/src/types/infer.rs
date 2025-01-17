@@ -2075,7 +2075,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             &INVALID_ATTRIBUTE_ACCESS,
                             expr_attr.into(),
                             format_args!(
-                                "Cannot assign to pure class variable `{attr}` from an instance",
+                                "Cannot assign to pure class variable `{attr}` from an instance of type `{ty}`",
+                                ty = attr_value_ty.display(self.db()),
                             ),
                         );
                     }
