@@ -169,6 +169,10 @@ class C:
     pure_class_variable1: ClassVar[str] = "value in class body"
     pure_class_variable2: ClassVar = 1
 
+    def method(self):
+        # TODO: this should be an error
+        self.pure_class_variable1 = "value set through instance"
+
 reveal_type(C.pure_class_variable1)  # revealed: str
 
 # TODO: this should be `Literal[1]`, or `Unknown | Literal[1]`.
