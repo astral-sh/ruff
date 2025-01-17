@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Generic, ParamSpec, TypeVar, TypeVarTuple
 
 T = TypeVar("T", bound=float)
@@ -18,4 +19,12 @@ class C(Generic[P]):
 
 
 def f(t: T):
+    pass
+
+
+def g(ts: tuple[*Ts]):
+    pass
+
+
+def h(p: Callable[P, T]):
     pass

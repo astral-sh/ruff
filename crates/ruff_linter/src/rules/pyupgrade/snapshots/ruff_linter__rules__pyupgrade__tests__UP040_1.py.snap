@@ -2,72 +2,108 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP040_1.py:8:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of type parameters
-  |
-8 | class A(Generic[T]):
-  |       ^^^^^^^^^^^^^ UP040
-9 |     pass
-  |
-  = help: Use type parameters
-
-ℹ Safe fix
-5 5 | P = ParamSpec("P")
-6 6 | 
-7 7 | 
-8   |-class A(Generic[T]):
-  8 |+class A[T: float]:
-9 9 |     pass
-10 10 | 
-11 11 | 
-
-UP040_1.py:12:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP040_1.py:9:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
-12 | class B(Generic[*Ts]):
-   |       ^^^^^^^^^^^^^^^ UP040
-13 |     pass
-   |
-   = help: Use type parameters
-
-ℹ Safe fix
-9  9  |     pass
-10 10 | 
-11 11 | 
-12    |-class B(Generic[*Ts]):
-   12 |+class B[*Ts]:
-13 13 |     pass
-14 14 | 
-15 15 | 
-
-UP040_1.py:16:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of type parameters
-   |
-16 | class C(Generic[P]):
+ 9 | class A(Generic[T]):
    |       ^^^^^^^^^^^^^ UP040
-17 |     pass
+10 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-13 13 |     pass
-14 14 | 
+6  6  | P = ParamSpec("P")
+7  7  | 
+8  8  | 
+9     |-class A(Generic[T]):
+   9  |+class A[T: float]:
+10 10 |     pass
+11 11 | 
+12 12 | 
+
+UP040_1.py:13:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+   |
+13 | class B(Generic[*Ts]):
+   |       ^^^^^^^^^^^^^^^ UP040
+14 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+10 10 |     pass
+11 11 | 
+12 12 | 
+13    |-class B(Generic[*Ts]):
+   13 |+class B[*Ts]:
+14 14 |     pass
 15 15 | 
-16    |-class C(Generic[P]):
-   16 |+class C[**P]:
-17 17 |     pass
-18 18 | 
-19 19 | 
+16 16 | 
 
-UP040_1.py:20:5: UP040 [*] Generic function `f` should use type parameters
+UP040_1.py:17:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
-20 | def f(t: T):
-   |     ^^^^^^^ UP040
-21 |     pass
+17 | class C(Generic[P]):
+   |       ^^^^^^^^^^^^^ UP040
+18 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-17 17 |     pass
-18 18 | 
+14 14 |     pass
+15 15 | 
+16 16 | 
+17    |-class C(Generic[P]):
+   17 |+class C[**P]:
+18 18 |     pass
 19 19 | 
-20    |-def f(t: T):
-   20 |+def f[T: float](t: T):
-21 21 |     pass
+20 20 | 
+
+UP040_1.py:21:5: UP040 [*] Generic function `f` should use type parameters
+   |
+21 | def f(t: T):
+   |     ^^^^^^^ UP040
+22 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+18 18 |     pass
+19 19 | 
+20 20 | 
+21    |-def f(t: T):
+   21 |+def f[T: float](t: T):
+22 22 |     pass
+23 23 | 
+24 24 | 
+
+UP040_1.py:25:5: UP040 [*] Generic function `g` should use type parameters
+   |
+25 | def g(ts: tuple[*Ts]):
+   |     ^^^^^^^^^^^^^^^^^ UP040
+26 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+22 22 |     pass
+23 23 | 
+24 24 | 
+25    |-def g(ts: tuple[*Ts]):
+   25 |+def g[*Ts](ts: tuple[*Ts]):
+26 26 |     pass
+27 27 | 
+28 28 | 
+
+UP040_1.py:29:5: UP040 [*] Generic function `h` should use type parameters
+   |
+29 | def h(p: Callable[P, T]):
+   |     ^^^^^^^^^^^^^^^^^^^^ UP040
+30 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+26 26 |     pass
+27 27 | 
+28 28 | 
+29    |-def h(p: Callable[P, T]):
+   29 |+def h[T: float, **P](p: Callable[P, T]):
+30 30 |     pass

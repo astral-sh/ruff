@@ -280,17 +280,21 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     };
 
     // Type variables must be unique; filter while preserving order.
-    let type_vars = vars
+    let mut type_vars = vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
 
-    // build the fix as a String to avoid removing comments from the entire function body
-    let mut type_params = String::from("[");
-    for tv in type_vars {
-        tv.fmt_into(&mut type_params, checker.source());
+    if type_vars.is_empty() {
+        return;
     }
-    type_params.push_str("]");
+
+    // generally preserve order, but sort by kind so that the order will be TypeVar...,
+    // TypeVarTuple..., ParamSpec...
+    type_vars.sort_by_key(|tv| tv.kind);
+
+    // build the fix as a String to avoid removing comments from the entire function body
+    let type_params = fmt_type_vars(&type_vars, checker);
 
     checker.diagnostics.push(
         Diagnostic::new(
@@ -359,7 +363,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
     }
 
     // Type variables must be unique; filter while preserving order.
-    let type_vars = type_vars
+    let mut type_vars = type_vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
@@ -368,12 +372,12 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
         return;
     }
 
+    // generally preserve order, but sort by kind so that the order will be TypeVar...,
+    // TypeVarTuple..., ParamSpec...
+    type_vars.sort_by_key(|tv| tv.kind);
+
     // build the fix as a String to avoid removing comments from the entire function body
-    let mut type_params = String::from("[");
-    for tv in type_vars {
-        tv.fmt_into(&mut type_params, checker.source());
-    }
-    type_params.push(']');
+    let type_params = fmt_type_vars(&type_vars, checker);
 
     checker.diagnostics.push(
         Diagnostic::new(
@@ -444,7 +448,7 @@ enum TypeVarRestriction<'a> {
     Constraint(Vec<&'a Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum TypeVarKind {
     Var,
     Tuple,
@@ -456,6 +460,20 @@ struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
     kind: TypeVarKind,
+}
+
+fn fmt_type_vars(type_vars: &[TypeVar], checker: &Checker) -> String {
+    let nvars = type_vars.len();
+    let mut type_params = String::from("[");
+    for (i, tv) in type_vars.iter().enumerate() {
+        tv.fmt_into(&mut type_params, checker.source());
+        if i < nvars - 1 {
+            type_params.push_str(", ");
+        }
+    }
+    type_params.push_str("]");
+
+    type_params
 }
 
 impl<'a> TypeVar<'a> {
