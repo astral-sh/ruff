@@ -27,12 +27,12 @@
 #   AnyNodeRef::is_foo_bar methods.  The default is the group name in
 #   snake_case.
 #
-# comment:
-#   A rustdoc comment that is added to the group's enums.
-#
 # ref_enum_ty:
 #   The name of the reference enum that we create for this group.  The default
 #   is the group name with `Ref` added to the end.
+#
+# rustdoc:
+#   A rustdoc comment that is added to the group's enums.
 #
 # The following syntax node options are available:
 #
@@ -42,7 +42,7 @@
 
 [Mod]
 anynode_is_label = "module"
-comment = "/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
+rustdoc = "/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes]
 ModModule = {}
@@ -51,7 +51,7 @@ ModExpression = {}
 [Stmt]
 add_suffix_to_is_methods = true
 anynode_is_label = "statement"
-comment = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+rustdoc = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
 ref_enum_ty = "StatementRef"
 
 [Stmt.nodes]
@@ -84,7 +84,7 @@ StmtIpyEscapeCommand = {}
 [Expr]
 add_suffix_to_is_methods = true
 anynode_is_label = "expression"
-comment = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
+rustdoc = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 ref_enum_ty = "ExpressionRef"
 
 [Expr.nodes]
@@ -122,7 +122,7 @@ ExprSlice = {}
 ExprIpyEscapeCommand = {}
 
 [ExceptHandler]
-comment = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
+rustdoc = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
 
 [ExceptHandler.nodes]
 ExceptHandlerExceptHandler = {}
@@ -132,7 +132,7 @@ FStringExpressionElement = {variant = "Expression"}
 FStringLiteralElement = {variant = "Literal"}
 
 [Pattern]
-comment = "/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
+rustdoc = "/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
 
 [Pattern.nodes]
 PatternMatchValue = {}
@@ -145,7 +145,7 @@ PatternMatchAs = {}
 PatternMatchOr = {}
 
 [TypeParam]
-comment = "/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
+rustdoc = "/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
 
 [TypeParam.nodes]
 TypeParamTypeVar = {}

@@ -40,7 +40,7 @@ class Group:
 
     add_suffix_to_is_methods: bool
     anynode_is_label: str
-    comment: str | None
+    rustdoc: str | None
 
     def __init__(self, group_name: str, group: dict[str, Any]) -> None:
         self.name = group_name
@@ -48,7 +48,7 @@ class Group:
         self.ref_enum_ty = group.get("ref_enum_ty", group_name + "Ref")
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
         self.anynode_is_label = group.get("anynode_is_label", to_snake_case(group_name))
-        self.comment = group.get("comment")
+        self.rustdoc = group.get("rustdoc")
         self.nodes = [
             Node(self, node_name, node) for node_name, node in group["nodes"].items()
         ]
@@ -87,8 +87,8 @@ for group in groups:
         continue
 
     out.append("")
-    if group.comment is not None:
-        out.append(group.comment)
+    if group.rustdoc is not None:
+        out.append(group.rustdoc)
     out.append("#[derive(Clone, Debug, PartialEq, is_macro::Is)]")
     out.append(f"pub enum {group.owned_enum_ty} {{")
     for node in group.nodes:
@@ -162,8 +162,8 @@ for group in groups:
         continue
 
     out.append("")
-    if group.comment is not None:
-        out.append(group.comment)
+    if group.rustdoc is not None:
+        out.append(group.rustdoc)
     out.append("""#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]""")
     out.append(f"""pub enum {group.ref_enum_ty}<'a> {{""")
     for node in group.nodes:
