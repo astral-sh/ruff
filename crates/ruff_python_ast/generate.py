@@ -5,12 +5,14 @@
 # ///
 
 from __future__ import annotations
+
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from subprocess import check_output
-import tomllib
 from typing import Any
+
+import tomllib
 
 
 def rustfmt(code: str) -> str:

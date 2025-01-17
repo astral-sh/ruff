@@ -77,7 +77,15 @@ repos:
     hooks:
       - id: ruff-format
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+        args:
+          [
+            --fix,
+            --exit-non-zero-on-fix,
+            --extend-select,
+            I,
+            --extend-exclude,
+            crates/red_knot_vendored/**,
+          ]
         types_or: [python, pyi]
         require_serial: true
 
