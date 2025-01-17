@@ -3,13 +3,13 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::StmtClassDef;
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
     Expr, ExprCall, ExprName, ExprSubscript, Identifier, Keyword, Stmt, StmtAnnAssign, StmtAssign,
     StmtTypeAlias, TypeParam, TypeParamTypeVar,
 };
+use ruff_python_ast::{StmtClassDef, TypeParamTypeVarTuple};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -148,6 +148,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
                 expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
                     name,
                     restriction: None,
+                    kind: TypeVarKind::Var,
                 })
             })
         })
@@ -352,29 +353,47 @@ fn create_type_params(vars: &[TypeVar]) -> Option<ruff_python_ast::TypeParams> {
             range: TextRange::default(),
             type_params: vars
                 .iter()
-                .map(|TypeVar { name, restriction }| {
-                    TypeParam::TypeVar(TypeParamTypeVar {
-                        range: TextRange::default(),
-                        name: Identifier::new(name.id.clone(), TextRange::default()),
-                        bound: match restriction {
-                            Some(TypeVarRestriction::Bound(bound)) => {
-                                Some(Box::new((*bound).clone()))
-                            }
-                            Some(TypeVarRestriction::Constraint(constraints)) => {
-                                Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                .map(
+                    |TypeVar {
+                         name,
+                         restriction,
+                         kind,
+                     }| {
+                        match kind {
+                            TypeVarKind::Var => {
+                                TypeParam::TypeVar(TypeParamTypeVar {
                                     range: TextRange::default(),
-                                    elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
-                                    ctx: ast::ExprContext::Load,
-                                    parenthesized: true,
-                                })))
+                                    name: Identifier::new(name.id.clone(), TextRange::default()),
+                                    bound: match restriction {
+                                        Some(TypeVarRestriction::Bound(bound)) => {
+                                            Some(Box::new((*bound).clone()))
+                                        }
+                                        Some(TypeVarRestriction::Constraint(constraints)) => {
+                                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                                                range: TextRange::default(),
+                                                elts: constraints
+                                                    .iter()
+                                                    .map(|expr| (*expr).clone())
+                                                    .collect(),
+                                                ctx: ast::ExprContext::Load,
+                                                parenthesized: true,
+                                            })))
+                                        }
+                                        None => None,
+                                    },
+                                    // We don't handle defaults here yet. Should perhaps be a different rule since
+                                    // defaults are only valid in 3.13+.
+                                    default: None,
+                                })
                             }
-                            None => None,
-                        },
-                        // We don't handle defaults here yet. Should perhaps be a different rule since
-                        // defaults are only valid in 3.13+.
-                        default: None,
-                    })
-                })
+                            TypeVarKind::Tuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+                                range: TextRange::default(),
+                                name: Identifier::new(name.id.clone(), TextRange::default()),
+                                default: None,
+                            }),
+                        }
+                    },
+                )
                 .collect(),
         })
     };
@@ -390,9 +409,17 @@ enum TypeVarRestriction<'a> {
 }
 
 #[derive(Debug)]
+enum TypeVarKind {
+    Var,
+    Tuple,
+    // ParamSpec,
+}
+
+#[derive(Debug)]
 struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
+    kind: TypeVarKind,
 }
 
 struct TypeVarReferenceVisitor<'a> {
@@ -437,17 +464,25 @@ fn expr_name_to_type_var<'a>(
                 return Some(TypeVar {
                     name,
                     restriction: None,
+                    kind: TypeVarKind::Var,
                 });
             }
         }
         Expr::Call(ExprCall {
             func, arguments, ..
         }) => {
-            if semantic.match_typing_expr(func, "TypeVar")
-                && arguments
-                    .args
-                    .first()
-                    .is_some_and(Expr::is_string_literal_expr)
+            let kind = if semantic.match_typing_expr(func, "TypeVar") {
+                TypeVarKind::Var
+            } else if semantic.match_typing_expr(func, "TypeVarTuple") {
+                TypeVarKind::Tuple
+            } else {
+                return None;
+            };
+
+            if arguments
+                .args
+                .first()
+                .is_some_and(Expr::is_string_literal_expr)
             {
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
@@ -459,7 +494,11 @@ fn expr_name_to_type_var<'a>(
                     None
                 };
 
-                return Some(TypeVar { name, restriction });
+                return Some(TypeVar {
+                    name,
+                    restriction,
+                    kind,
+                });
             }
         }
         _ => {}

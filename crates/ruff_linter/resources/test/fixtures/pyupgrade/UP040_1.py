@@ -1,9 +1,14 @@
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, TypeVarTuple
 
 T = TypeVar("T", bound=float)
+Ts = TypeVarTuple("Ts")
 
 
 class A(Generic[T]):
+    pass
+
+
+class B(Generic[*Ts]):
     pass
 
 
