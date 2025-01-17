@@ -66,8 +66,8 @@ use crate::types::{
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType,
     FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
     KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
-    SliceLiteralType, SubclassOfType, Symbol, Truthiness, TupleType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
@@ -859,8 +859,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
         let declared_ty = declarations_ty(self.db(), declarations)
-            .map(|(ty, _)| ty)
-            .map(|s| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
+            .map(|SymbolAndQualifiers(s, _)| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db()));

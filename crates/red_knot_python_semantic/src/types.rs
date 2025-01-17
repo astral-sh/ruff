@@ -93,7 +93,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         // on inference from bindings.
 
         let declarations = use_def.public_declarations(symbol);
-        let declared = declarations_ty(db, declarations).map(|(ty, _)| ty);
+        let declared = declarations_ty(db, declarations).map(|SymbolAndQualifiers(ty, _)| ty);
 
         match declared {
             // Symbol is declared, trust the declared type
@@ -357,7 +357,7 @@ fn bindings_ty<'db>(
     }
 }
 
-type SymbolAndQualifiers<'db> = (Symbol<'db>, TypeQualifiers);
+struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
 /// The result of looking up a declared type from declarations; see [`declarations_ty`].
 type DeclaredTypeResult<'db> =
@@ -429,7 +429,10 @@ fn declarations_ty<'db>(
             };
 
             // TODO: deal with conflicting qualifiers?
-            Ok((Symbol::Type(declared_ty, boundness), first.qualifiers()))
+            Ok(SymbolAndQualifiers(
+                Symbol::Type(declared_ty, boundness),
+                first.qualifiers(),
+            ))
         } else {
             Err((
                 TypeAndQualifiers::new(declared_ty, first.qualifiers()),
@@ -439,7 +442,10 @@ fn declarations_ty<'db>(
             ))
         }
     } else {
-        Ok((Symbol::Unbound, TypeQualifiers::empty()))
+        Ok(SymbolAndQualifiers(
+            Symbol::Unbound,
+            TypeQualifiers::empty(),
+        ))
     }
 }
 
@@ -4095,7 +4101,7 @@ impl<'db> Class<'db> {
             let declarations = use_def.public_declarations(symbol);
 
             match declarations_ty(db, declarations) {
-                Ok((Symbol::Type(declared_ty, _), qualifiers)) => {
+                Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
                         // just a temporary heuristic to provide a broad categorization into properties
@@ -4109,7 +4115,7 @@ impl<'db> Class<'db> {
                         (Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
                     }
                 }
-                Ok((Symbol::Unbound, qualifiers)) => {
+                Ok(SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
                     let bindings = use_def.public_bindings(symbol);
                     let inferred_ty = bindings_ty(db, bindings);
 
