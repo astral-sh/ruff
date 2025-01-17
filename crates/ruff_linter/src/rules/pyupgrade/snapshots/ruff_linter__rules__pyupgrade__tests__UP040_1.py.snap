@@ -6,7 +6,8 @@ UP040_1.py:9:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of t
    |
  9 | class A(Generic[T]):
    |       ^^^^^^^^^^^^^ UP040
-10 |     pass
+10 |     # Comments in a class body are preserved
+11 |     pass
    |
    = help: Use type parameters
 
@@ -16,94 +17,102 @@ UP040_1.py:9:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of t
 8  8  | 
 9     |-class A(Generic[T]):
    9  |+class A[T: float]:
-10 10 |     pass
-11 11 | 
+10 10 |     # Comments in a class body are preserved
+11 11 |     pass
 12 12 | 
 
-UP040_1.py:13:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP040_1.py:14:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
-13 | class B(Generic[*Ts]):
+14 | class B(Generic[*Ts]):
    |       ^^^^^^^^^^^^^^^ UP040
-14 |     pass
+15 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-10 10 |     pass
-11 11 | 
+11 11 |     pass
 12 12 | 
-13    |-class B(Generic[*Ts]):
-   13 |+class B[*Ts]:
-14 14 |     pass
-15 15 | 
+13 13 | 
+14    |-class B(Generic[*Ts]):
+   14 |+class B[*Ts]:
+15 15 |     pass
 16 16 | 
+17 17 | 
 
-UP040_1.py:17:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP040_1.py:18:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
-17 | class C(Generic[P]):
+18 | class C(Generic[P]):
    |       ^^^^^^^^^^^^^ UP040
-18 |     pass
+19 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-14 14 |     pass
-15 15 | 
+15 15 |     pass
 16 16 | 
-17    |-class C(Generic[P]):
-   17 |+class C[**P]:
-18 18 |     pass
-19 19 | 
+17 17 | 
+18    |-class C(Generic[P]):
+   18 |+class C[**P]:
+19 19 |     pass
 20 20 | 
+21 21 | 
 
-UP040_1.py:21:5: UP040 [*] Generic function `f` should use type parameters
+UP040_1.py:22:5: UP040 [*] Generic function `f` should use type parameters
    |
-21 | def f(t: T):
+22 | def f(t: T):
    |     ^^^^^^^ UP040
-22 |     pass
+23 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-18 18 |     pass
-19 19 | 
+19 19 |     pass
 20 20 | 
-21    |-def f(t: T):
-   21 |+def f[T: float](t: T):
-22 22 |     pass
-23 23 | 
+21 21 | 
+22    |-def f(t: T):
+   22 |+def f[T: float](t: T):
+23 23 |     pass
 24 24 | 
+25 25 | 
 
-UP040_1.py:25:5: UP040 [*] Generic function `g` should use type parameters
+UP040_1.py:26:5: UP040 [*] Generic function `g` should use type parameters
    |
-25 | def g(ts: tuple[*Ts]):
+26 | def g(ts: tuple[*Ts]):
    |     ^^^^^^^^^^^^^^^^^ UP040
-26 |     pass
+27 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-22 22 |     pass
-23 23 | 
+23 23 |     pass
 24 24 | 
-25    |-def g(ts: tuple[*Ts]):
-   25 |+def g[*Ts](ts: tuple[*Ts]):
-26 26 |     pass
-27 27 | 
+25 25 | 
+26    |-def g(ts: tuple[*Ts]):
+   26 |+def g[*Ts](ts: tuple[*Ts]):
+27 27 |     pass
 28 28 | 
+29 29 | 
 
-UP040_1.py:29:5: UP040 [*] Generic function `h` should use type parameters
+UP040_1.py:30:5: UP040 [*] Generic function `h` should use type parameters
    |
-29 | def h(p: Callable[P, T]):
-   |     ^^^^^^^^^^^^^^^^^^^^ UP040
-30 |     pass
+30 |   def h(
+   |  _____^
+31 | |     p: Callable[P, T],
+32 | |     # Comment in the middle of a parameter list should be preserved
+33 | |     another_param,
+34 | |     and_another,
+35 | | ):
+   | |_^ UP040
+36 |       pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-26 26 |     pass
-27 27 | 
+27 27 |     pass
 28 28 | 
-29    |-def h(p: Callable[P, T]):
-   29 |+def h[T: float, **P](p: Callable[P, T]):
-30 30 |     pass
+29 29 | 
+30    |-def h(
+   30 |+def h[T: float, **P](
+31 31 |     p: Callable[P, T],
+32 32 |     # Comment in the middle of a parameter list should be preserved
+33 33 |     another_param,

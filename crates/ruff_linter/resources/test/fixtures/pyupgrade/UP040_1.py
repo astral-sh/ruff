@@ -7,6 +7,7 @@ P = ParamSpec("P")
 
 
 class A(Generic[T]):
+    # Comments in a class body are preserved
     pass
 
 
@@ -26,5 +27,10 @@ def g(ts: tuple[*Ts]):
     pass
 
 
-def h(p: Callable[P, T]):
+def h(
+    p: Callable[P, T],
+    # Comment in the middle of a parameter list should be preserved
+    another_param,
+    and_another,
+):
     pass
