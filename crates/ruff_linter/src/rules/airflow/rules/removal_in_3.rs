@@ -135,49 +135,34 @@ fn extract_name_from_slice(slice: &Expr) -> Option<String> {
 ///         "execution_date_macro": lambda context: context["execution_date"],  # Deprecated
 ///     }
 /// ```
-fn removed_context_variable(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
-        let is_context_arg = if let Expr::Name(ExprName { id, .. }) = &**value {
-            id.as_str() == "context" || id.as_str().starts_with("**")
+fn removed_context_variable(checker: &mut Checker, subscript: &ExprSubscript) {
+    let ExprSubscript { value, slice, .. } = subscript;
+
+    let is_context_arg = if let Expr::Name(ExprName { id, .. }) = &**value {
+        id.as_str() == "context" || id.as_str().starts_with("**")
+    } else {
+        false
+    };
+
+    let is_current_context =
+        if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
+            matches!(
+                qualname.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
         } else {
             false
         };
 
-        let is_current_context =
-            if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
-                matches!(
-                    qualname.segments(),
-                    ["airflow", "utils", "context", "get_current_context"]
-                )
-            } else {
-                false
-            };
-
-        if is_context_arg || is_current_context {
-            if let Some(key) = extract_name_from_slice(slice) {
-                if REMOVED_CONTEXT_KEYS.contains(&key.as_str()) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        Airflow3Removal {
-                            deprecated: key,
-                            replacement: Replacement::None,
-                        },
-                        slice.range(),
-                    ));
-                }
-            }
-        }
-    }
-
-    if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = expr {
-        let value_str = value.to_string();
-        for key in REMOVED_CONTEXT_KEYS {
-            if value_str.contains(&format!("{{{{ {key} }}}}")) {
+    if is_context_arg || is_current_context {
+        if let Some(key) = extract_name_from_slice(slice) {
+            if REMOVED_CONTEXT_KEYS.contains(&key.as_str()) {
                 checker.diagnostics.push(Diagnostic::new(
                     Airflow3Removal {
-                        deprecated: key.to_string(),
+                        deprecated: key,
                         replacement: Replacement::None,
                     },
-                    expr.range(),
+                    slice.range(),
                 ));
             }
         }
@@ -214,8 +199,8 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 }
             }
         }
-        Expr::Subscript(_) => {
-            removed_context_variable(checker, expr);
+        Expr::Subscript(subscript_expr) => {
+            removed_context_variable(checker, subscript_expr);
         }
         _ => {}
     }
@@ -1076,11 +1061,6 @@ fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
     for param in &stmt.parameters.args {
         arguments.push(param.parameter.name.to_string());
     }
-
-    if let Some(vararg) = &stmt.parameters.kwarg {
-        arguments.push(format!("**{}", vararg.name));
-    }
-
     arguments
 }
 
