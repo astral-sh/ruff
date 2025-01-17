@@ -68,6 +68,15 @@ impl<'db> SubclassOfType<'db> {
         Type::from(self.subclass_of).member(db, name)
     }
 
+    /// A class `T` is an instance of its metaclass `U`,
+    /// so the type `type[T]` is a subtype of the instance type `U`.
+    pub(crate) fn as_instance_type_of_metaclass(&self, db: &'db dyn Db) -> Type<'db> {
+        match self.subclass_of {
+            ClassBase::Dynamic(_) => KnownClass::Type.to_instance(db),
+            ClassBase::Class(class) => class.metaclass(db).to_instance(db),
+        }
+    }
+
     /// Return `true` if `self` is a subtype of `other`.
     ///
     /// This can only return `true` if `self.subclass_of` is a [`ClassBase::Class`] variant;

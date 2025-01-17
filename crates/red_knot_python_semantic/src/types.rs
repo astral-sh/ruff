@@ -1276,21 +1276,6 @@ impl<'db> Type<'db> {
                 ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
             },
 
-            (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
-
-            (Type::SubclassOf(subclass_of_ty), instance @ Type::Instance(_))
-            | (instance @ Type::Instance(_), Type::SubclassOf(subclass_of_ty)) => {
-                // `type[T]` is disjoint from `S`, where `S` is an instance type,
-                // if `U` is disjoint from `S`,
-                // where `U` represents all instances of `T`'s metaclass
-                let metaclass_instance = subclass_of_ty
-                    .subclass_of()
-                    .into_class()
-                    .map(|class| class.metaclass(db).to_instance(db))
-                    .unwrap_or_else(|| KnownClass::Type.to_instance(db));
-                instance.is_disjoint_from(db, metaclass_instance)
-            }
-
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)
@@ -1324,12 +1309,9 @@ impl<'db> Type<'db> {
                 ty.bool(db).is_always_true()
             }
 
-            (Type::SubclassOf(_), other) | (other, Type::SubclassOf(_)) => {
-                // TODO we could do better here: if both variants are `SubclassOf` and they have different "solid bases",
-                // multiple inheritance between the two is impossible, so they are disjoint.
-                //
-                // Note that `type[<@final class>]` is eagerly simplified to `Literal[<@final class>]` by [`SubclassOfType::from`].
-                other.is_disjoint_from(db, KnownClass::Type.to_instance(db))
+            (Type::SubclassOf(subclass_of_ty), other)
+            | (other, Type::SubclassOf(subclass_of_ty)) => {
+                other.is_disjoint_from(db, subclass_of_ty.as_instance_type_of_metaclass(db))
             }
 
             (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))

@@ -246,3 +246,31 @@ def _(x: type, y: type[int]):
     if issubclass(x, y):
         reveal_type(x)  # revealed: type[int]
 ```
+
+### Disjoint `type[]` types are narrowed to `Never`
+
+Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
+and `UsesMeta2` could only exist if a common subclass of their metaclasses could exist. This is
+known to be impossible due to the fact that `Meta1` is marked as `@final`.
+
+```py
+from typing import final
+
+@final
+class Meta1(type): ...
+
+class Meta2(type): ...
+class UsesMeta1(metaclass=Meta1): ...
+class UsesMeta2(metaclass=Meta2): ...
+
+def _(x: type[UsesMeta1], y: type[UsesMeta2]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: type[UsesMeta1]
+
+    if issubclass(y, x):
+        reveal_type(y)  # revealed: Never
+    else:
+        reveal_type(y)  # revealed: type[UsesMeta2]
+```
