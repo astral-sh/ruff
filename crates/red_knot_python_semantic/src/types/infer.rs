@@ -5422,7 +5422,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         &INVALID_TYPE_FORM,
                         subscript.into(),
                         format_args!(
-                            "Special form `{}` expected exactly one type parameter",
+                            "Type qualifier `{}` expects exactly one type parameter",
                             known_instance.repr(self.db())
                         ),
                     );

@@ -68,7 +68,7 @@ c.a = 2
 
 ```py
 class C:
-    # error: [invalid-type-form] "Special form `typing.ClassVar` expected exactly one type parameter"
+    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` expects exactly one type parameter"
     x: ClassVar[int, str] = 1
 ```
 
