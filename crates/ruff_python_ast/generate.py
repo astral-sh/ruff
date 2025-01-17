@@ -325,6 +325,26 @@ out.append("""
     }
 """)
 
+out.append("""
+    impl<'a> AnyNodeRef<'a> {
+        pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+        where
+            V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+            'a: 'b,
+        {
+            match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(
+            f"""AnyNodeRef::{node.name}(node) => node.visit_source_order(visitor),"""
+        )
+out.append("""
+            }
+        }
+    }
+""")
+
 # ------------------------------------------------------------------------------
 # NodeKind
 
