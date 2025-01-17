@@ -37,7 +37,7 @@ use crate::types::call::{
 };
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::infer::{QualifiedType, TypeQualifiers};
+use crate::types::infer::{TypeAndQualifiers, TypeQualifiers};
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -247,7 +247,7 @@ pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> T
 }
 
 /// Infer the type of a declaration.
-fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> QualifiedType<'db> {
+fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
     inference.declaration_ty(definition)
 }
@@ -4026,10 +4026,10 @@ impl<'db> Class<'db> {
         let body_scope = self.body_scope(db);
         let table = symbol_table(db, body_scope);
 
-        if let Some(symbol) = table.symbol_id_by_name(name) {
+        let symbol = if let Some(symbol_id) = table.symbol_id_by_name(name) {
             let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.public_declarations(symbol);
+            let declarations = use_def.public_declarations(symbol_id);
 
             match declarations_ty(db, declarations) {
                 Ok((Symbol::Type(declared_ty, _), qualifiers)) => {
@@ -4037,38 +4037,40 @@ impl<'db> Class<'db> {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
                         // just a temporary heuristic to provide a broad categorization into properties
                         // and non-property methods.
-                        if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
-                            (todo_type!("@property").into(), qualifiers)
+                        let ty = if function
+                            .has_decorator(db, KnownClass::Property.to_class_literal(db))
+                        {
+                            todo_type!("@property")
                         } else {
-                            (todo_type!("bound method").into(), qualifiers)
-                        }
-                    } else {
-                        (Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
+                            todo_type!("bound method")
+                        };
+                        return (ty.into(), qualifiers);
                     }
+
+                    return (Symbol::Type(declared_ty, Boundness::Bound), qualifiers);
                 }
                 Ok((Symbol::Unbound, _)) => {
-                    let bindings = use_def.public_bindings(symbol);
+                    let bindings = use_def.public_bindings(symbol_id);
                     let inferred_ty = bindings_ty(db, bindings);
 
                     match inferred_ty {
-                        Symbol::Type(ty, _) => (
-                            Symbol::Type(
-                                UnionType::from_elements(db, [Type::unknown(), ty]),
-                                Boundness::Bound,
-                            ),
-                            TypeQualifiers::empty(),
+                        Symbol::Type(ty, _) => Symbol::Type(
+                            UnionType::from_elements(db, [Type::unknown(), ty]),
+                            Boundness::Bound,
                         ),
-                        Symbol::Unbound => (Symbol::Unbound, TypeQualifiers::empty()),
+                        Symbol::Unbound => Symbol::Unbound,
                     }
                 }
                 Err((declared_ty, _)) => {
                     // Ignore conflicting declarations
-                    (declared_ty.into(), TypeQualifiers::empty())
+                    declared_ty.into()
                 }
             }
         } else {
-            (Symbol::Unbound, TypeQualifiers::empty())
-        }
+            Symbol::Unbound
+        };
+
+        (symbol, TypeQualifiers::empty())
     }
 
     /// Return `true` if this class appears to be a cyclic definition,

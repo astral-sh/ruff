@@ -753,7 +753,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Makes sure that the argument of `static_assert` is statically known to be true.
+    /// Makes sure that instance attribute accesses are valid.
     ///
     /// ## Examples
     /// ```python

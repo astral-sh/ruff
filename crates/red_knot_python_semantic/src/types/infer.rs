@@ -243,8 +243,8 @@ pub(crate) struct TypeInference<'db> {
     /// The types of every binding in this region.
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
-    /// The types of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, QualifiedType<'db>>,
+    /// The types and type qualifiers of every declaration in this region.
+    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
@@ -283,7 +283,7 @@ impl<'db> TypeInference<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn declaration_ty(&self, definition: Definition<'db>) -> QualifiedType<'db> {
+    pub(crate) fn declaration_ty(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
         self.declarations[&definition]
     }
 
@@ -320,7 +320,7 @@ enum DeclaredAndInferredType<'db> {
     AreTheSame(Type<'db>),
     /// Declared and inferred types might be different, we need to check assignability.
     MightBeDifferent {
-        declared_ty: QualifiedType<'db>,
+        declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
     },
 }
@@ -330,9 +330,9 @@ bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     pub(crate) struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
-        const CLASS_VAR       = 1 << 0;
+        const CLASS_VAR = 1 << 0;
         /// `typing.Final`
-        const FINAL           = 1 << 1;
+        const FINAL     = 1 << 1;
     }
 }
 
@@ -343,17 +343,19 @@ impl TypeQualifiers {
 }
 
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
-/// such as `ClassVar` or `Final`. This struct holds the type and the corresponding qualifiers.
+/// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
+/// control how a particular symbol can be accessed or modified. This struct holds a type and
+/// a set of type qualifiers.
 ///
-/// Example: `Final[Annotated[ClassVar[tuple[int]], "metadata"]]` would have the type `tuple[int]`
-/// and the qualifiers `CLASS_VAR | FINAL`.
+/// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and
+/// qualifiers `CLASS_VAR | FINAL`.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]
-pub(crate) struct QualifiedType<'db> {
+pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     qualifiers: TypeQualifiers,
 }
 
-impl<'db> QualifiedType<'db> {
+impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn ignore_qualifiers(&self) -> Type<'db> {
         self.inner
     }
@@ -367,7 +369,7 @@ impl<'db> QualifiedType<'db> {
     }
 }
 
-impl<'db> From<Type<'db>> for QualifiedType<'db> {
+impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
     fn from(ty: Type<'db>) -> Self {
         Self {
             inner: ty,
@@ -939,7 +941,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         node: AnyNodeRef,
         declaration: Definition<'db>,
-        ty: QualifiedType<'db>,
+        ty: TypeAndQualifiers<'db>,
     ) {
         debug_assert!(declaration.is_declaration(self.db()));
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
@@ -4791,7 +4793,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
         let annotation_ty = self.infer_annotation_expression_impl(annotation);
         self.deferred_state = previous_deferred_state;
@@ -4806,14 +4808,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         annotation: Option<&ast::Expr>,
         deferred_state: DeferredExpressionState,
-    ) -> Option<QualifiedType<'db>> {
+    ) -> Option<TypeAndQualifiers<'db>> {
         annotation.map(|expr| self.infer_annotation_expression(expr, deferred_state))
     }
 
     /// Implementation of [`infer_annotation_expression`].
     ///
     /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
-    fn infer_annotation_expression_impl(&mut self, annotation: &ast::Expr) -> QualifiedType<'db> {
+    fn infer_annotation_expression_impl(
+        &mut self,
+        annotation: &ast::Expr,
+    ) -> TypeAndQualifiers<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let annotation_ty = match annotation {
             // String annotations: https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
@@ -4855,7 +4860,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_string_annotation_expression(
         &mut self,
         string: &ast::ExprStringLiteral,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
                 // String annotations are always evaluated in the deferred context.
@@ -4876,7 +4881,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_type_expression_with_qualifiers(
         &mut self,
         expression: &ast::Expr,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         let qualified_ty = self.infer_type_expression_no_store(expression);
         self.store_expression_type(expression, qualified_ty.ignore_qualifiers());
         qualified_ty
@@ -4895,7 +4900,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_optional_type_expression(
         &mut self,
         expression: Option<&ast::Expr>,
-    ) -> Option<QualifiedType<'db>> {
+    ) -> Option<TypeAndQualifiers<'db>> {
         expression.map(|expr| self.infer_type_expression_with_qualifiers(expr))
     }
 
@@ -4906,7 +4911,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         expression: &ast::Expr,
         deferred_state: DeferredExpressionState,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
         let annotation_ty = self.infer_type_expression_with_qualifiers(expression);
         self.deferred_state = previous_deferred_state;
@@ -4914,7 +4919,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Infer the type of a type expression without storing the result.
-    fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> QualifiedType<'db> {
+    fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> TypeAndQualifiers<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         let ty = match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -5099,7 +5104,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_string_type_expression(
         &mut self,
         string: &ast::ExprStringLiteral,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
                 // String annotations are always evaluated in the deferred context.
@@ -5250,7 +5255,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         let ast::ExprSubscript {
             range: _,
             value: _,
@@ -5277,7 +5282,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
-    ) -> QualifiedType<'db> {
+    ) -> TypeAndQualifiers<'db> {
         let arguments_slice = &*subscript.slice;
         let ty = match known_instance {
             KnownInstanceType::Annotated => {
