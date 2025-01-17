@@ -30,8 +30,6 @@ use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
-use super::type_ordering::order_union_elements;
-
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
     db: &'db dyn Db,
@@ -121,15 +119,10 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
-        let Self { mut elements, db } = self;
-
-        match elements.len() {
+        match self.elements.len() {
             0 => Type::Never,
-            1 => elements[0],
-            _ => {
-                elements.sort_by(|left, right| order_union_elements(db, left, right));
-                Type::Union(UnionType::new(self.db, elements.into_boxed_slice()))
-            }
+            1 => self.elements[0],
+            _ => Type::Union(UnionType::new(self.db, self.elements.into_boxed_slice())),
         }
     }
 }
@@ -486,23 +479,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    fn build(self, db: &'db dyn Db) -> Type<'db> {
-        let Self {
-            mut positive,
-            mut negative,
-        } = self;
-
-        match (positive.len(), negative.len()) {
+    fn build(mut self, db: &'db dyn Db) -> Type<'db> {
+        match (self.positive.len(), self.negative.len()) {
             (0, 0) => KnownClass::Object.to_instance(db),
-            (1, 0) => positive[0],
+            (1, 0) => self.positive[0],
             _ => {
-                positive.sort_by(|left, right| order_union_elements(db, left, right));
-                positive.shrink_to_fit();
-
-                negative.sort_by(|left, right| order_union_elements(db, left, right));
-                negative.shrink_to_fit();
-
-                Type::Intersection(IntersectionType::new(db, positive, negative))
+                self.positive.shrink_to_fit();
+                self.negative.shrink_to_fit();
+                Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
         }
     }
