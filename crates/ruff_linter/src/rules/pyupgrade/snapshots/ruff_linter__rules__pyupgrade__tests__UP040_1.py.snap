@@ -54,4 +54,20 @@ UP040_1.py:16:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of 
    16 |+class C[**P]:
 17 17 |     pass
 18 18 | 
-19 19 |
+19 19 | 
+
+UP040_1.py:20:5: UP040 [*] Generic function `f` should use type parameters
+   |
+20 | def f(t: T):
+   |     ^^^^^^^ UP040
+21 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+17 17 |     pass
+18 18 | 
+19 19 | 
+20    |-def f(t: T):
+   20 |+def f[T: float](t: T):
+21 21 |     pass

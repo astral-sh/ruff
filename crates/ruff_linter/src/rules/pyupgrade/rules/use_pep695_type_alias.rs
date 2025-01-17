@@ -9,7 +9,7 @@ use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSubscript, Identifier, Keyword, Stmt, StmtAnnAssign, StmtAssign,
     StmtTypeAlias, TypeParam, TypeParamTypeVar,
 };
-use ruff_python_ast::{StmtClassDef, TypeParamParamSpec, TypeParamTypeVarTuple};
+use ruff_python_ast::{StmtClassDef, StmtFunctionDef, TypeParamParamSpec, TypeParamTypeVarTuple};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -61,6 +61,7 @@ enum TypeAliasKind {
     TypeAlias,
     TypeAliasType,
     GenericClass,
+    GenericFunction,
 }
 
 impl Violation for NonPEP695TypeAlias {
@@ -76,6 +77,7 @@ impl Violation for NonPEP695TypeAlias {
             TypeAliasKind::TypeAlias => "`TypeAlias` annotation",
             TypeAliasKind::TypeAliasType => "`TypeAliasType` assignment",
             TypeAliasKind::GenericClass => "`Generic` subclass",
+            TypeAliasKind::GenericFunction => "Generic function",
         };
         match type_alias_kind {
             TypeAliasKind::TypeAlias | TypeAliasKind::TypeAliasType => format!(
@@ -84,6 +86,9 @@ impl Violation for NonPEP695TypeAlias {
             TypeAliasKind::GenericClass => format!(
                 "Generic class `{name}` uses {type_alias_method} instead of type parameters"
             ),
+            TypeAliasKind::GenericFunction => {
+                format!("Generic function `{name}` should use type parameters")
+            }
         }
     }
 
@@ -92,7 +97,9 @@ impl Violation for NonPEP695TypeAlias {
             TypeAliasKind::TypeAlias | TypeAliasKind::TypeAliasType => {
                 Some("Use the `type` keyword".to_string())
             }
-            TypeAliasKind::GenericClass => Some("Use type parameters".to_string()),
+            TypeAliasKind::GenericClass | TypeAliasKind::GenericFunction => {
+                Some("Use type parameters".to_string())
+            }
         }
     }
 }
@@ -303,6 +310,95 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             // The fix should be safe given the assumptions here:
             // 1. No existing type_params to conflict with
             // 2. A single, Generic argument to the class
+            Applicability::Safe,
+        )),
+    );
+}
+
+/// UP040
+pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    if checker.settings.target_version < PythonVersion::Py312 {
+        return;
+    }
+
+    let StmtFunctionDef {
+        range,
+        is_async,
+        decorator_list,
+        name,
+        type_params,
+        parameters,
+        returns,
+        body,
+    } = function_def;
+
+    // TODO(brent) handle methods, for now return early in a class body. For example, an additional
+    // generic parameter on the method needs to be handled separately from one already on the class
+    //
+    // ```python
+    // T = TypeVar("T")
+    // S = TypeVar("S")
+    //
+    // class Foo(Generic[T]):
+    //     def bar(self, x: T, y: S) -> S: ...
+    //
+    //
+    // class Foo[T]:
+    //     def bar[S](self, x: T, y: S) -> S: ...
+    // ```
+    if checker.semantic().current_scope().kind.is_class() {
+        return;
+    }
+
+    // invalid to mix old-style and new-style generics
+    if type_params.is_some() {
+        return;
+    }
+
+    let mut type_vars = Vec::new();
+    for parameter in parameters.iter() {
+        if let Some(annotation) = parameter.annotation() {
+            let vars = {
+                let mut visitor = TypeVarReferenceVisitor {
+                    vars: vec![],
+                    semantic: checker.semantic(),
+                };
+                visitor.visit_expr(annotation);
+                visitor.vars
+            };
+            type_vars.extend(vars);
+        }
+    }
+
+    // Type variables must be unique; filter while preserving order.
+    let type_vars = type_vars
+        .into_iter()
+        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .collect::<Vec<_>>();
+
+    let generator = checker.generator();
+    checker.diagnostics.push(
+        Diagnostic::new(
+            NonPEP695TypeAlias {
+                name: name.to_string(),
+                type_alias_kind: TypeAliasKind::GenericFunction,
+            },
+            TextRange::new(name.range().start(), parameters.range().end()),
+        )
+        .with_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                generator.stmt(&Stmt::from(StmtFunctionDef {
+                    range: TextRange::default(),
+                    is_async: *is_async,
+                    decorator_list: decorator_list.clone(),
+                    name: name.clone(),
+                    type_params: create_type_params(&type_vars).map(Box::new),
+                    parameters: parameters.clone(),
+                    returns: returns.clone(),
+                    body: body.clone(),
+                })),
+                *range,
+            ),
             Applicability::Safe,
         )),
     );

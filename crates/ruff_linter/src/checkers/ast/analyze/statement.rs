@@ -376,6 +376,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::PytestParameterWithDefaultArgument) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_generic_function(checker, function_def);
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
