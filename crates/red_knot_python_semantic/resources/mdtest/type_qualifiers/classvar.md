@@ -72,6 +72,17 @@ class C:
     x: ClassVar[int, str] = 1
 ```
 
+## Illegal `ClassVar` in type expression
+
+```py
+class C:
+    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+    x: ClassVar | int
+
+    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+    y: int | ClassVar[str]
+```
+
 ## Used outside of a class
 
 ```py

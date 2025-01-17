@@ -2336,6 +2336,12 @@ impl<'db> Type<'db> {
                 ],
                 fallback_type: Type::unknown(),
             }),
+            Type::KnownInstance(KnownInstanceType::Final) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::FinalInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::unknown(),
@@ -2599,8 +2605,10 @@ enum InvalidTypeExpression {
     BareAnnotated,
     /// `x: Literal` is invalid as an annotation
     BareLiteral,
-    /// The `ClassVar` type qualifier was used in a type expression (but can only be used in an annotation expression)
+    /// The `ClassVar` type qualifier was used in a type expression
     ClassVarInTypeExpression,
+    /// The `Final` type qualifier was used in a type expression
+    FinalInTypeExpression,
 }
 
 impl InvalidTypeExpression {
@@ -2608,7 +2616,8 @@ impl InvalidTypeExpression {
         match self {
             Self::BareAnnotated => "`Annotated` requires at least two arguments when used in an annotation or type expression",
             Self::BareLiteral => "`Literal` requires at least one argument when used in a type expression",
-            Self::ClassVarInTypeExpression => "Type qualifier `ClassVar` is not allowed in type expressions (only in annotation expressions)",
+            Self::ClassVarInTypeExpression => "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)",
+            Self::FinalInTypeExpression => "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)",
         }
     }
 }

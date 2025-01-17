@@ -4791,6 +4791,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::KnownInstance(KnownInstanceType::ClassVar) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
                         }
+                        Type::KnownInstance(KnownInstanceType::Final) => {
+                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
+                        }
                         _ => name_expr_ty
                             .in_type_expression(self.db())
                             .unwrap_or_else(|error| {
@@ -4840,14 +4843,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                             self.infer_annotation_expression_impl(slice)
                         }
                     }
-                    Type::KnownInstance(KnownInstanceType::ClassVar) => match slice {
+                    Type::KnownInstance(
+                        known_instance @ (KnownInstanceType::ClassVar | KnownInstanceType::Final),
+                    ) => match slice {
                         ast::Expr::Tuple(..) => {
                             self.context.report_lint(
                                 &INVALID_TYPE_FORM,
                                 subscript.into(),
                                 format_args!(
                                     "Type qualifier `{type_qualifier}` expects exactly one type parameter",
-                                    type_qualifier = KnownInstanceType::ClassVar.repr(self.db()),
+                                    type_qualifier = known_instance.repr(self.db()),
                                 ),
                             );
                             Type::unknown().into()
@@ -4855,7 +4860,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => {
                             let mut type_and_qualifiers =
                                 self.infer_annotation_expression_impl(slice);
-                            type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                            match known_instance {
+                                KnownInstanceType::ClassVar => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                                }
+                                KnownInstanceType::Final => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
+                                }
+                                _ => unreachable!(),
+                            }
                             type_and_qualifiers
                         }
                     },
@@ -5473,7 +5486,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("`NotRequired[]` type qualifier")
             }
             KnownInstanceType::ClassVar | KnownInstanceType::Final => {
-                // TODO: emit diagnostic: `ClassVar` and `Final` are not valid in type expressions
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    subscript.into(),
+                    format_args!(
+                        "Type qualifier `{}` is not allowed in type expressions (only in annotation expressions)",
+                        known_instance.repr(self.db())
+                    ),
+                );
                 self.infer_type_expression(arguments_slice)
             }
             KnownInstanceType::Required => {
