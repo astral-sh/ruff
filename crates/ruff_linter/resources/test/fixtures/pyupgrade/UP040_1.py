@@ -34,3 +34,20 @@ def h(
     and_another,
 ):
     pass
+
+
+# TODO(brent) we should also apply the fix to methods, but it will need a
+# little more work. these should be left alone for now but be fixed eventually.
+class NotGeneric:
+    # -> generic_method[T: float](t: T)
+    def generic_method(t: T):
+        pass
+
+
+# This one is strange in particular because of the mix of old- and new-style
+# generics, but according to the PEP, this is okay "if the class, function, or
+# type alias does not use the new syntax." `more_generic` doesn't use the new
+# syntax, so it can use T from the module and U from the class scope.
+class MixedGenerics[U]:
+    def more_generic(u: U, t: T):
+        pass
