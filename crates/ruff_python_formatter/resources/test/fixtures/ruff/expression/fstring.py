@@ -719,6 +719,7 @@ print(f"{({1, 2, 3}) - ({2})}")
 print(f"{1, 2, {3} }")
 print(f"{(1, 2, {3})}")
 
+
 # Regression tests for https://github.com/astral-sh/ruff/issues/15535
 print(f"{ {}, }")  # A single item tuple gets parenthesized
 print(f"{ {}.values(), }")
@@ -726,3 +727,7 @@ print(f"{ {}, 1 }")  # A tuple with multiple elements doesn't get parenthesized
 print(f"{  # Tuple with multiple elements that doesn't fit on a single line gets parenthesized
     {}, 1,
 }")
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/15536
+print(f"{ {}, 1, }")
