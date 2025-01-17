@@ -357,7 +357,7 @@ fn bindings_ty<'db>(
     }
 }
 
-struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
+pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
 /// The result of looking up a declared type from declarations; see [`declarations_ty`].
 type DeclaredTypeResult<'db> =
@@ -1685,7 +1685,10 @@ impl<'db> Type<'db> {
                 (Some(KnownClass::VersionInfo), "minor") => {
                     Type::IntLiteral(Program::get(db).python_version(db).minor.into()).into()
                 }
-                _ => class.instance_member(db, name).0,
+                _ => {
+                    let SymbolAndQualifiers(symbol, _) = class.instance_member(db, name);
+                    symbol
+                }
             },
 
             Type::Union(union) => {
@@ -4056,22 +4059,19 @@ impl<'db> Class<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(crate) fn instance_member(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-    ) -> (Symbol<'db>, TypeQualifiers) {
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
-                    return (
+                    return SymbolAndQualifiers(
                         todo_type!("instance attribute on class with dynamic base").into(),
                         TypeQualifiers::empty(),
                     );
                 }
                 ClassBase::Class(class) => {
-                    let member = class.own_instance_member(db, name);
-                    if !member.0.is_unbound() {
+                    if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
+                        class.own_instance_member(db, name)
+                    {
                         return member;
                     }
                 }
@@ -4080,7 +4080,7 @@ impl<'db> Class<'db> {
 
         // TODO: The symbol is not present in any class body, but it could be implicitly
         // defined in `__init__` or other methods anywhere in the MRO.
-        (
+        SymbolAndQualifiers(
             todo_type!("implicit instance attribute").into(),
             TypeQualifiers::empty(),
         )
@@ -4088,7 +4088,7 @@ impl<'db> Class<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> (Symbol<'db>, TypeQualifiers) {
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.ClassVar` and `typing.Final`
         // - Proper diagnostics
@@ -4110,12 +4110,12 @@ impl<'db> Class<'db> {
                         // just a temporary heuristic to provide a broad categorization into properties
                         // and non-property methods.
                         if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
-                            (todo_type!("@property").into(), qualifiers)
+                            SymbolAndQualifiers(todo_type!("@property").into(), qualifiers)
                         } else {
-                            (todo_type!("bound method").into(), qualifiers)
+                            SymbolAndQualifiers(todo_type!("bound method").into(), qualifiers)
                         }
                     } else {
-                        (Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
+                        SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
                     }
                 }
                 Ok(SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
@@ -4123,23 +4123,23 @@ impl<'db> Class<'db> {
                     let inferred_ty = bindings_ty(db, bindings);
 
                     match inferred_ty {
-                        Symbol::Type(ty, _) => (
+                        Symbol::Type(ty, _) => SymbolAndQualifiers(
                             Symbol::Type(
                                 UnionType::from_elements(db, [Type::unknown(), ty]),
                                 Boundness::Bound,
                             ),
                             qualifiers,
                         ),
-                        Symbol::Unbound => (Symbol::Unbound, qualifiers),
+                        Symbol::Unbound => SymbolAndQualifiers(Symbol::Unbound, qualifiers),
                     }
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // Ignore conflicting declarations
-                    (declared_ty.inner_type().into(), declared_ty.qualifiers())
+                    SymbolAndQualifiers(declared_ty.inner_type().into(), declared_ty.qualifiers())
                 }
             }
         } else {
-            (Symbol::Unbound, TypeQualifiers::empty())
+            SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
         }
     }
 
