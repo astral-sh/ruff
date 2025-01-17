@@ -28,7 +28,6 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use bitflags::bitflags;
 use itertools::{Either, Itertools};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -68,7 +67,8 @@ use crate::types::{
     FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
     KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
     SliceLiteralType, SubclassOfType, Symbol, Truthiness, TupleType, Type, TypeAliasType,
-    TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -323,66 +323,6 @@ enum DeclaredAndInferredType<'db> {
         declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
     },
-}
-
-bitflags! {
-    /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(crate) struct TypeQualifiers: u8 {
-        /// `typing.ClassVar`
-        const CLASS_VAR = 1 << 0;
-        /// `typing.Final`
-        const FINAL     = 1 << 1;
-    }
-}
-
-impl TypeQualifiers {
-    pub(crate) fn is_class_var(self) -> bool {
-        self.contains(Self::CLASS_VAR)
-    }
-}
-
-/// When inferring the type of an annotation expression, we can also encounter type qualifiers
-/// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
-/// control how a particular symbol can be accessed or modified. This struct holds a type and
-/// a set of type qualifiers.
-///
-/// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and
-/// qualifiers `CLASS_VAR | FINAL`.
-#[derive(Clone, Debug, Copy, Eq, PartialEq)]
-pub(crate) struct TypeAndQualifiers<'db> {
-    inner: Type<'db>,
-    qualifiers: TypeQualifiers,
-}
-
-impl<'db> TypeAndQualifiers<'db> {
-    pub(crate) fn new(ty: Type<'db>, qualifiers: TypeQualifiers) -> Self {
-        Self {
-            inner: ty,
-            qualifiers,
-        }
-    }
-
-    pub(crate) fn ignore_qualifiers(&self) -> Type<'db> {
-        self.inner
-    }
-
-    pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
-        self.qualifiers |= qualifier;
-    }
-
-    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
-        self.qualifiers
-    }
-}
-
-impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
-    fn from(ty: Type<'db>) -> Self {
-        Self {
-            inner: ty,
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
 }
 
 /// Builder to infer all types in a region.
@@ -933,7 +873,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         conflicting.display(self.db())
                     ),
                 );
-                ty
+                ty.ignore_qualifiers()
             });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
