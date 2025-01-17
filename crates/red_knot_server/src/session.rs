@@ -69,7 +69,7 @@ impl Session {
             let system = LSPSystem::new(index.clone());
 
             // TODO(dhruvmanila): Get the values from the client settings
-            let metadata = ProjectMetadata::discover(system_path, &system, None)?;
+            let metadata = ProjectMetadata::discover(system_path, &system)?;
             // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
             workspaces.insert(path, ProjectDatabase::new(metadata, system)?);
         }

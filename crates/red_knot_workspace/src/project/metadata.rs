@@ -1,8 +1,9 @@
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 
+use crate::project::combine::Combine;
+use crate::project::options::Options;
 use crate::project::pyproject::{PyProject, PyProjectError};
-use crate::project::settings::Configuration;
 use red_knot_python_semantic::ProgramSettings;
 use thiserror::Error;
 
@@ -13,42 +14,36 @@ pub struct ProjectMetadata {
 
     pub(super) root: SystemPathBuf,
 
-    /// The resolved settings for this project.
-    pub(super) configuration: Configuration,
+    /// The raw options
+    pub(super) options: Options,
 }
 
 impl ProjectMetadata {
-    /// Creates a project with the given name and root that uses the default configuration options.
+    /// Creates a project with the given name and root that uses the default options.
     pub fn new(name: Name, root: SystemPathBuf) -> Self {
         Self {
             name,
             root,
-            configuration: Configuration::default(),
+            options: Options::default(),
         }
     }
 
     /// Loads a project from a `pyproject.toml` file.
-    pub(crate) fn from_pyproject(
-        pyproject: PyProject,
-        root: SystemPathBuf,
-        base_configuration: Option<&Configuration>,
-    ) -> Self {
+    pub(crate) fn from_pyproject(pyproject: PyProject, root: SystemPathBuf) -> Self {
         let name = pyproject.project.and_then(|project| project.name);
         let name = name
             .map(|name| Name::new(&*name))
             .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
 
-        // TODO: load configuration from pyrpoject.toml
-        let mut configuration = Configuration::default();
-
-        if let Some(base_configuration) = base_configuration {
-            configuration.extend(base_configuration.clone());
-        }
+        let options = pyproject
+            .tool
+            .and_then(|tool| tool.knot)
+            .unwrap_or_default();
 
         Self {
             name,
             root,
-            configuration,
+            options,
         }
     }
 
@@ -63,7 +58,6 @@ impl ProjectMetadata {
     pub fn discover(
         path: &SystemPath,
         system: &dyn System,
-        base_configuration: Option<&Configuration>,
     ) -> Result<ProjectMetadata, ProjectDiscoveryError> {
         tracing::debug!("Searching for a project in '{path}'");
 
@@ -84,11 +78,7 @@ impl ProjectMetadata {
                 })?;
 
                 let has_knot_section = pyproject.knot().is_some();
-                let metadata = ProjectMetadata::from_pyproject(
-                    pyproject,
-                    ancestor.to_path_buf(),
-                    base_configuration,
-                );
+                let metadata = ProjectMetadata::from_pyproject(pyproject, ancestor.to_path_buf());
 
                 if has_knot_section {
                     let project_root = ancestor;
@@ -115,13 +105,11 @@ impl ProjectMetadata {
         } else {
             tracing::debug!("The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project.");
 
-            // Create a package with a default configuration
-            Self {
-                name: path.file_name().unwrap_or("root").into(),
-                root: path.to_path_buf(),
-                // TODO create the configuration from the pyproject toml
-                configuration: base_configuration.cloned().unwrap_or_default(),
-            }
+            // Create a project with a default configuration
+            Self::new(
+                path.file_name().unwrap_or("root").into(),
+                path.to_path_buf(),
+            )
         };
 
         Ok(metadata)
@@ -135,12 +123,22 @@ impl ProjectMetadata {
         &self.name
     }
 
-    pub fn configuration(&self) -> &Configuration {
-        &self.configuration
+    pub fn options(&self) -> &Options {
+        &self.options
     }
 
-    pub fn to_program_settings(&self) -> ProgramSettings {
-        self.configuration.to_program_settings(self.root())
+    pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
+        self.options.to_program_settings(self.root(), system)
+    }
+
+    /// Combine the project options with the CLI options where the CLI options take precedence.
+    pub fn apply_cli_options(&mut self, options: Options) {
+        self.options = options.combine(std::mem::take(&mut self.options));
+    }
+
+    /// Combine the project options with the user options where project options take precedence.
+    pub fn apply_user_options(&mut self, options: Options) {
+        self.options.combine_with(options);
     }
 }
 
@@ -177,8 +175,8 @@ mod tests {
             .write_files([(root.join("foo.py"), ""), (root.join("bar.py"), "")])
             .context("Failed to write files")?;
 
-        let project = ProjectMetadata::discover(&root, &system, None)
-            .context("Failed to discover project")?;
+        let project =
+            ProjectMetadata::discover(&root, &system).context("Failed to discover project")?;
 
         assert_eq!(project.root(), &*root);
 
@@ -207,14 +205,14 @@ mod tests {
             ])
             .context("Failed to write files")?;
 
-        let project = ProjectMetadata::discover(&root, &system, None)
-            .context("Failed to discover project")?;
+        let project =
+            ProjectMetadata::discover(&root, &system).context("Failed to discover project")?;
 
         assert_eq!(project.root(), &*root);
         snapshot_project!(project);
 
         // Discovering the same package from a subdirectory should give the same result
-        let from_src = ProjectMetadata::discover(&root.join("db"), &system, None)
+        let from_src = ProjectMetadata::discover(&root.join("db"), &system)
             .context("Failed to discover project from src sub-directory")?;
 
         assert_eq!(from_src, project);
@@ -243,7 +241,7 @@ mod tests {
             ])
             .context("Failed to write files")?;
 
-        let Err(error) = ProjectMetadata::discover(&root, &system, None) else {
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
             return Err(anyhow!("Expected project discovery to fail because of invalid syntax in the pyproject.toml"));
         };
 
@@ -275,7 +273,8 @@ expected `.`, `]`
                     [project]
                     name = "project-root"
 
-                    [tool.knot]
+                    [tool.knot.src]
+                    root = "src"
                     "#,
                 ),
                 (
@@ -284,13 +283,14 @@ expected `.`, `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.knot]
+                    [tool.knot.src]
+                    root = "src"
                     "#,
                 ),
             ])
             .context("Failed to write files")?;
 
-        let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system, None)?;
+        let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
         snapshot_project!(sub_project);
 
@@ -311,7 +311,8 @@ expected `.`, `]`
                     [project]
                     name = "project-root"
 
-                    [tool.knot]
+                    [tool.knot.src]
+                    root = "src"
                     "#,
                 ),
                 (
@@ -320,13 +321,14 @@ expected `.`, `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.knot]
+                    [tool.knot.src]
+                    root = "src"
                     "#,
                 ),
             ])
             .context("Failed to write files")?;
 
-        let root = ProjectMetadata::discover(&root, &system, None)?;
+        let root = ProjectMetadata::discover(&root, &system)?;
 
         snapshot_project!(root);
 
@@ -358,7 +360,7 @@ expected `.`, `]`
             ])
             .context("Failed to write files")?;
 
-        let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system, None)?;
+        let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
         snapshot_project!(sub_project);
 
@@ -379,7 +381,8 @@ expected `.`, `]`
                     [project]
                     name = "project-root"
 
-                    [tool.knot]
+                    [tool.knot.environment]
+                    python-version = "3.10"
                     "#,
                 ),
                 (
@@ -392,7 +395,7 @@ expected `.`, `]`
             ])
             .context("Failed to write files")?;
 
-        let root = ProjectMetadata::discover(&root.join("packages/a"), &system, None)?;
+        let root = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
         snapshot_project!(root);
 

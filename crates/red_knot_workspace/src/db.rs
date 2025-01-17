@@ -45,8 +45,12 @@ impl ProjectDatabase {
             rule_selection: Arc::new(rule_selection),
         };
 
+        // TODO: Use the `program_settings` to compute the key for the database's persistent
+        //   cache and load the cache if it exists.
+        //   we may want to have a dedicated method for this?
+
         // Initialize the `Program` singleton
-        let program_settings = project_metadata.to_program_settings();
+        let program_settings = project_metadata.to_program_settings(db.system());
         Program::from_settings(&db, program_settings)?;
 
         db.project = Some(Project::from_metadata(&db, project_metadata));

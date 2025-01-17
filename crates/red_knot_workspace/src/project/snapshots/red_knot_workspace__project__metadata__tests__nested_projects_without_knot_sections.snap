@@ -5,13 +5,8 @@ expression: sub_project
 ProjectMetadata(
   name: Name("nested-project"),
   root: "/app/packages/a",
-  configuration: Configuration(
-    python_version: None,
-    search_paths: SearchPathConfiguration(
-      extra_paths: None,
-      src_root: None,
-      typeshed: None,
-      site_packages: None,
-    ),
+  options: Options(
+    environment: None,
+    src: None,
   ),
 )

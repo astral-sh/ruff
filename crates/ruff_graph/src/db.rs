@@ -30,22 +30,10 @@ pub struct ModuleDb {
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_roots(
-        mut src_roots: impl Iterator<Item = SystemPathBuf>,
+        src_roots: Vec<SystemPathBuf>,
         python_version: PythonVersion,
     ) -> Result<Self> {
-        let search_paths = {
-            // Use the first source root.
-            let src_root = src_roots
-                .next()
-                .ok_or_else(|| anyhow::anyhow!("No source roots provided"))?;
-
-            let mut search_paths = SearchPathSettings::new(src_root);
-
-            // Add the remaining source roots as extra paths.
-            search_paths.extra_paths.extend(src_roots);
-
-            search_paths
-        };
+        let search_paths = SearchPathSettings::new(src_roots);
 
         let db = Self::default();
         Program::from_settings(
