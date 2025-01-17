@@ -309,6 +309,22 @@ out.append("""
     }
 """)
 
+out.append("""
+    impl AnyNodeRef<'_> {
+        pub fn as_ptr(&self) -> std::ptr::NonNull<()> {
+            match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(
+            f"""AnyNodeRef::{node.name}(node) => std::ptr::NonNull::from(*node).cast(),"""
+        )
+out.append("""
+            }
+        }
+    }
+""")
+
 # ------------------------------------------------------------------------------
 # NodeKind
 
