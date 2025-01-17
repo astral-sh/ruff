@@ -1,10 +1,10 @@
+use crate::AnyNodeRef;
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
     ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
     ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
     StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
 };
-use crate::{AnyNodeRef, AstNode};
 
 /// Visitor that traverses all nodes recursively in the order they appear in the source.
 ///
@@ -203,33 +203,7 @@ where
     let node = AnyNodeRef::from(stmt);
 
     if visitor.enter_node(node).is_traverse() {
-        match stmt {
-            Stmt::Expr(stmt) => stmt.visit_source_order(visitor),
-            Stmt::FunctionDef(stmt) => stmt.visit_source_order(visitor),
-            Stmt::ClassDef(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Return(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Delete(stmt) => stmt.visit_source_order(visitor),
-            Stmt::TypeAlias(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Assign(stmt) => stmt.visit_source_order(visitor),
-            Stmt::AugAssign(stmt) => stmt.visit_source_order(visitor),
-            Stmt::AnnAssign(stmt) => stmt.visit_source_order(visitor),
-            Stmt::For(stmt) => stmt.visit_source_order(visitor),
-            Stmt::While(stmt) => stmt.visit_source_order(visitor),
-            Stmt::If(stmt) => stmt.visit_source_order(visitor),
-            Stmt::With(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Match(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Raise(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Try(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Assert(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Import(stmt) => stmt.visit_source_order(visitor),
-            Stmt::ImportFrom(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Pass(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Break(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Continue(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Global(stmt) => stmt.visit_source_order(visitor),
-            Stmt::Nonlocal(stmt) => stmt.visit_source_order(visitor),
-            Stmt::IpyEscapeCommand(stmt) => stmt.visit_source_order(visitor),
-        }
+        stmt.visit_source_order(visitor);
     }
 
     visitor.leave_node(node);
@@ -455,11 +429,7 @@ where
 {
     let node = AnyNodeRef::from(type_param);
     if visitor.enter_node(node).is_traverse() {
-        match type_param {
-            TypeParam::TypeVar(type_param) => type_param.visit_source_order(visitor),
-            TypeParam::TypeVarTuple(type_param) => type_param.visit_source_order(visitor),
-            TypeParam::ParamSpec(type_param) => type_param.visit_source_order(visitor),
-        }
+        type_param.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }

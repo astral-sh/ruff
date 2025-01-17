@@ -1,12 +1,12 @@
 ---
 source: crates/ruff/tests/show_settings.rs
+assertion_line: 30
 info:
   program: ruff
   args:
     - check
     - "--show-settings"
     - unformatted.py
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -72,6 +72,8 @@ file_resolver.project_root = "[BASEPATH]"
 linter.exclude = []
 linter.project_root = "[BASEPATH]"
 linter.rules.enabled = [
+	unsorted-imports (I001),
+	missing-required-import (I002),
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
 	multiple-statements-on-one-line-colon (E701),
@@ -133,6 +135,8 @@ linter.rules.enabled = [
 	raise-not-implemented (F901),
 ]
 linter.rules.should_fix = [
+	unsorted-imports (I001),
+	missing-required-import (I002),
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
 	multiple-statements-on-one-line-colon (E701),

@@ -18,15 +18,8 @@ use crate::{
     int,
     str::Quote,
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
-    LiteralExpressionRef,
+    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam,
 };
-
-/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Mod {
-    Module(ModModule),
-    Expression(ModExpression),
-}
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
@@ -35,80 +28,11 @@ pub struct ModModule {
     pub body: Vec<Stmt>,
 }
 
-impl From<ModModule> for Mod {
-    fn from(payload: ModModule) -> Self {
-        Mod::Module(payload)
-    }
-}
-
 /// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModExpression {
     pub range: TextRange,
     pub body: Box<Expr>,
-}
-
-impl From<ModExpression> for Mod {
-    fn from(payload: ModExpression) -> Self {
-        Mod::Expression(payload)
-    }
-}
-
-/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Stmt {
-    #[is(name = "function_def_stmt")]
-    FunctionDef(StmtFunctionDef),
-    #[is(name = "class_def_stmt")]
-    ClassDef(StmtClassDef),
-    #[is(name = "return_stmt")]
-    Return(StmtReturn),
-    #[is(name = "delete_stmt")]
-    Delete(StmtDelete),
-    #[is(name = "assign_stmt")]
-    Assign(StmtAssign),
-    #[is(name = "aug_assign_stmt")]
-    AugAssign(StmtAugAssign),
-    #[is(name = "ann_assign_stmt")]
-    AnnAssign(StmtAnnAssign),
-    #[is(name = "type_alias_stmt")]
-    TypeAlias(StmtTypeAlias),
-    #[is(name = "for_stmt")]
-    For(StmtFor),
-    #[is(name = "while_stmt")]
-    While(StmtWhile),
-    #[is(name = "if_stmt")]
-    If(StmtIf),
-    #[is(name = "with_stmt")]
-    With(StmtWith),
-    #[is(name = "match_stmt")]
-    Match(StmtMatch),
-    #[is(name = "raise_stmt")]
-    Raise(StmtRaise),
-    #[is(name = "try_stmt")]
-    Try(StmtTry),
-    #[is(name = "assert_stmt")]
-    Assert(StmtAssert),
-    #[is(name = "import_stmt")]
-    Import(StmtImport),
-    #[is(name = "import_from_stmt")]
-    ImportFrom(StmtImportFrom),
-    #[is(name = "global_stmt")]
-    Global(StmtGlobal),
-    #[is(name = "nonlocal_stmt")]
-    Nonlocal(StmtNonlocal),
-    #[is(name = "expr_stmt")]
-    Expr(StmtExpr),
-    #[is(name = "pass_stmt")]
-    Pass(StmtPass),
-    #[is(name = "break_stmt")]
-    Break(StmtBreak),
-    #[is(name = "continue_stmt")]
-    Continue(StmtContinue),
-
-    // Jupyter notebook specific
-    #[is(name = "ipy_escape_command_stmt")]
-    IpyEscapeCommand(StmtIpyEscapeCommand),
 }
 
 /// An AST node used to represent a IPython escape command at the statement level.
@@ -171,12 +95,6 @@ pub struct StmtIpyEscapeCommand {
     pub value: Box<str>,
 }
 
-impl From<StmtIpyEscapeCommand> for Stmt {
-    fn from(payload: StmtIpyEscapeCommand) -> Self {
-        Stmt::IpyEscapeCommand(payload)
-    }
-}
-
 /// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef) and
 /// [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
 ///
@@ -192,12 +110,6 @@ pub struct StmtFunctionDef {
     pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
-}
-
-impl From<StmtFunctionDef> for Stmt {
-    fn from(payload: StmtFunctionDef) -> Self {
-        Stmt::FunctionDef(payload)
-    }
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
@@ -229,12 +141,6 @@ impl StmtClassDef {
     }
 }
 
-impl From<StmtClassDef> for Stmt {
-    fn from(payload: StmtClassDef) -> Self {
-        Stmt::ClassDef(payload)
-    }
-}
-
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtReturn {
@@ -242,23 +148,11 @@ pub struct StmtReturn {
     pub value: Option<Box<Expr>>,
 }
 
-impl From<StmtReturn> for Stmt {
-    fn from(payload: StmtReturn) -> Self {
-        Stmt::Return(payload)
-    }
-}
-
 /// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtDelete {
     pub range: TextRange,
     pub targets: Vec<Expr>,
-}
-
-impl From<StmtDelete> for Stmt {
-    fn from(payload: StmtDelete) -> Self {
-        Stmt::Delete(payload)
-    }
 }
 
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
@@ -270,24 +164,12 @@ pub struct StmtTypeAlias {
     pub value: Box<Expr>,
 }
 
-impl From<StmtTypeAlias> for Stmt {
-    fn from(payload: StmtTypeAlias) -> Self {
-        Stmt::TypeAlias(payload)
-    }
-}
-
 /// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssign {
     pub range: TextRange,
     pub targets: Vec<Expr>,
     pub value: Box<Expr>,
-}
-
-impl From<StmtAssign> for Stmt {
-    fn from(payload: StmtAssign) -> Self {
-        Stmt::Assign(payload)
-    }
 }
 
 /// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
@@ -299,12 +181,6 @@ pub struct StmtAugAssign {
     pub value: Box<Expr>,
 }
 
-impl From<StmtAugAssign> for Stmt {
-    fn from(payload: StmtAugAssign) -> Self {
-        Stmt::AugAssign(payload)
-    }
-}
-
 /// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAnnAssign {
@@ -313,12 +189,6 @@ pub struct StmtAnnAssign {
     pub annotation: Box<Expr>,
     pub value: Option<Box<Expr>>,
     pub simple: bool,
-}
-
-impl From<StmtAnnAssign> for Stmt {
-    fn from(payload: StmtAnnAssign) -> Self {
-        Stmt::AnnAssign(payload)
-    }
 }
 
 /// See also [For](https://docs.python.org/3/library/ast.html#ast.For) and
@@ -336,12 +206,6 @@ pub struct StmtFor {
     pub orelse: Vec<Stmt>,
 }
 
-impl From<StmtFor> for Stmt {
-    fn from(payload: StmtFor) -> Self {
-        Stmt::For(payload)
-    }
-}
-
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While) and
 /// [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
 #[derive(Clone, Debug, PartialEq)]
@@ -352,12 +216,6 @@ pub struct StmtWhile {
     pub orelse: Vec<Stmt>,
 }
 
-impl From<StmtWhile> for Stmt {
-    fn from(payload: StmtWhile) -> Self {
-        Stmt::While(payload)
-    }
-}
-
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtIf {
@@ -365,12 +223,6 @@ pub struct StmtIf {
     pub test: Box<Expr>,
     pub body: Vec<Stmt>,
     pub elif_else_clauses: Vec<ElifElseClause>,
-}
-
-impl From<StmtIf> for Stmt {
-    fn from(payload: StmtIf) -> Self {
-        Stmt::If(payload)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -393,12 +245,6 @@ pub struct StmtWith {
     pub body: Vec<Stmt>,
 }
 
-impl From<StmtWith> for Stmt {
-    fn from(payload: StmtWith) -> Self {
-        Stmt::With(payload)
-    }
-}
-
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtMatch {
@@ -407,24 +253,12 @@ pub struct StmtMatch {
     pub cases: Vec<MatchCase>,
 }
 
-impl From<StmtMatch> for Stmt {
-    fn from(payload: StmtMatch) -> Self {
-        Stmt::Match(payload)
-    }
-}
-
 /// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtRaise {
     pub range: TextRange,
     pub exc: Option<Box<Expr>>,
     pub cause: Option<Box<Expr>>,
-}
-
-impl From<StmtRaise> for Stmt {
-    fn from(payload: StmtRaise) -> Self {
-        Stmt::Raise(payload)
-    }
 }
 
 /// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try) and
@@ -439,12 +273,6 @@ pub struct StmtTry {
     pub is_star: bool,
 }
 
-impl From<StmtTry> for Stmt {
-    fn from(payload: StmtTry) -> Self {
-        Stmt::Try(payload)
-    }
-}
-
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssert {
@@ -453,23 +281,11 @@ pub struct StmtAssert {
     pub msg: Option<Box<Expr>>,
 }
 
-impl From<StmtAssert> for Stmt {
-    fn from(payload: StmtAssert) -> Self {
-        Stmt::Assert(payload)
-    }
-}
-
 /// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtImport {
     pub range: TextRange,
     pub names: Vec<Alias>,
-}
-
-impl From<StmtImport> for Stmt {
-    fn from(payload: StmtImport) -> Self {
-        Stmt::Import(payload)
-    }
 }
 
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
@@ -481,23 +297,11 @@ pub struct StmtImportFrom {
     pub level: u32,
 }
 
-impl From<StmtImportFrom> for Stmt {
-    fn from(payload: StmtImportFrom) -> Self {
-        Stmt::ImportFrom(payload)
-    }
-}
-
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtGlobal {
     pub range: TextRange,
     pub names: Vec<Identifier>,
-}
-
-impl From<StmtGlobal> for Stmt {
-    fn from(payload: StmtGlobal) -> Self {
-        Stmt::Global(payload)
-    }
 }
 
 /// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
@@ -507,23 +311,11 @@ pub struct StmtNonlocal {
     pub names: Vec<Identifier>,
 }
 
-impl From<StmtNonlocal> for Stmt {
-    fn from(payload: StmtNonlocal) -> Self {
-        Stmt::Nonlocal(payload)
-    }
-}
-
 /// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtExpr {
     pub range: TextRange,
     pub value: Box<Expr>,
-}
-
-impl From<StmtExpr> for Stmt {
-    fn from(payload: StmtExpr) -> Self {
-        Stmt::Expr(payload)
-    }
 }
 
 /// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
@@ -532,105 +324,16 @@ pub struct StmtPass {
     pub range: TextRange,
 }
 
-impl From<StmtPass> for Stmt {
-    fn from(payload: StmtPass) -> Self {
-        Stmt::Pass(payload)
-    }
-}
-
 /// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtBreak {
     pub range: TextRange,
 }
 
-impl From<StmtBreak> for Stmt {
-    fn from(payload: StmtBreak) -> Self {
-        Stmt::Break(payload)
-    }
-}
-
 /// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtContinue {
     pub range: TextRange,
-}
-
-impl From<StmtContinue> for Stmt {
-    fn from(payload: StmtContinue) -> Self {
-        Stmt::Continue(payload)
-    }
-}
-
-/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Expr {
-    #[is(name = "bool_op_expr")]
-    BoolOp(ExprBoolOp),
-    #[is(name = "named_expr")]
-    Named(ExprNamed),
-    #[is(name = "bin_op_expr")]
-    BinOp(ExprBinOp),
-    #[is(name = "unary_op_expr")]
-    UnaryOp(ExprUnaryOp),
-    #[is(name = "lambda_expr")]
-    Lambda(ExprLambda),
-    #[is(name = "if_expr")]
-    If(ExprIf),
-    #[is(name = "dict_expr")]
-    Dict(ExprDict),
-    #[is(name = "set_expr")]
-    Set(ExprSet),
-    #[is(name = "list_comp_expr")]
-    ListComp(ExprListComp),
-    #[is(name = "set_comp_expr")]
-    SetComp(ExprSetComp),
-    #[is(name = "dict_comp_expr")]
-    DictComp(ExprDictComp),
-    #[is(name = "generator_expr")]
-    Generator(ExprGenerator),
-    #[is(name = "await_expr")]
-    Await(ExprAwait),
-    #[is(name = "yield_expr")]
-    Yield(ExprYield),
-    #[is(name = "yield_from_expr")]
-    YieldFrom(ExprYieldFrom),
-    #[is(name = "compare_expr")]
-    Compare(ExprCompare),
-    #[is(name = "call_expr")]
-    Call(ExprCall),
-    #[is(name = "f_string_expr")]
-    FString(ExprFString),
-    #[is(name = "string_literal_expr")]
-    StringLiteral(ExprStringLiteral),
-    #[is(name = "bytes_literal_expr")]
-    BytesLiteral(ExprBytesLiteral),
-    #[is(name = "number_literal_expr")]
-    NumberLiteral(ExprNumberLiteral),
-    #[is(name = "boolean_literal_expr")]
-    BooleanLiteral(ExprBooleanLiteral),
-    #[is(name = "none_literal_expr")]
-    NoneLiteral(ExprNoneLiteral),
-    #[is(name = "ellipsis_literal_expr")]
-    EllipsisLiteral(ExprEllipsisLiteral),
-    #[is(name = "attribute_expr")]
-    Attribute(ExprAttribute),
-    #[is(name = "subscript_expr")]
-    Subscript(ExprSubscript),
-    #[is(name = "starred_expr")]
-    Starred(ExprStarred),
-    #[is(name = "name_expr")]
-    Name(ExprName),
-    #[is(name = "list_expr")]
-    List(ExprList),
-    #[is(name = "tuple_expr")]
-    Tuple(ExprTuple),
-    #[is(name = "slice_expr")]
-    Slice(ExprSlice),
-
-    // Jupyter notebook specific
-    #[is(name = "ipy_escape_command_expr")]
-    IpyEscapeCommand(ExprIpyEscapeCommand),
 }
 
 impl Expr {
@@ -682,12 +385,6 @@ pub struct ExprIpyEscapeCommand {
     pub value: Box<str>,
 }
 
-impl From<ExprIpyEscapeCommand> for Expr {
-    fn from(payload: ExprIpyEscapeCommand) -> Self {
-        Expr::IpyEscapeCommand(payload)
-    }
-}
-
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBoolOp {
@@ -696,24 +393,12 @@ pub struct ExprBoolOp {
     pub values: Vec<Expr>,
 }
 
-impl From<ExprBoolOp> for Expr {
-    fn from(payload: ExprBoolOp) -> Self {
-        Expr::BoolOp(payload)
-    }
-}
-
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
-}
-
-impl From<ExprNamed> for Expr {
-    fn from(payload: ExprNamed) -> Self {
-        Expr::Named(payload)
-    }
 }
 
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
@@ -725,24 +410,12 @@ pub struct ExprBinOp {
     pub right: Box<Expr>,
 }
 
-impl From<ExprBinOp> for Expr {
-    fn from(payload: ExprBinOp) -> Self {
-        Expr::BinOp(payload)
-    }
-}
-
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprUnaryOp {
     pub range: TextRange,
     pub op: UnaryOp,
     pub operand: Box<Expr>,
-}
-
-impl From<ExprUnaryOp> for Expr {
-    fn from(payload: ExprUnaryOp) -> Self {
-        Expr::UnaryOp(payload)
-    }
 }
 
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
@@ -753,12 +426,6 @@ pub struct ExprLambda {
     pub body: Box<Expr>,
 }
 
-impl From<ExprLambda> for Expr {
-    fn from(payload: ExprLambda) -> Self {
-        Expr::Lambda(payload)
-    }
-}
-
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIf {
@@ -766,12 +433,6 @@ pub struct ExprIf {
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
-}
-
-impl From<ExprIf> for Expr {
-    fn from(payload: ExprIf) -> Self {
-        Expr::If(payload)
-    }
 }
 
 /// Represents an item in a [dictionary literal display][1].
@@ -877,12 +538,6 @@ impl<'a> IntoIterator for &'a ExprDict {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl From<ExprDict> for Expr {
-    fn from(payload: ExprDict) -> Self {
-        Expr::Dict(payload)
     }
 }
 
@@ -1000,12 +655,6 @@ impl<'a> IntoIterator for &'a ExprSet {
     }
 }
 
-impl From<ExprSet> for Expr {
-    fn from(payload: ExprSet) -> Self {
-        Expr::Set(payload)
-    }
-}
-
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprListComp {
@@ -1014,24 +663,12 @@ pub struct ExprListComp {
     pub generators: Vec<Comprehension>,
 }
 
-impl From<ExprListComp> for Expr {
-    fn from(payload: ExprListComp) -> Self {
-        Expr::ListComp(payload)
-    }
-}
-
 /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSetComp {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
-}
-
-impl From<ExprSetComp> for Expr {
-    fn from(payload: ExprSetComp) -> Self {
-        Expr::SetComp(payload)
-    }
 }
 
 /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
@@ -1043,12 +680,6 @@ pub struct ExprDictComp {
     pub generators: Vec<Comprehension>,
 }
 
-impl From<ExprDictComp> for Expr {
-    fn from(payload: ExprDictComp) -> Self {
-        Expr::DictComp(payload)
-    }
-}
-
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprGenerator {
@@ -1058,23 +689,11 @@ pub struct ExprGenerator {
     pub parenthesized: bool,
 }
 
-impl From<ExprGenerator> for Expr {
-    fn from(payload: ExprGenerator) -> Self {
-        Expr::Generator(payload)
-    }
-}
-
 /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAwait {
     pub range: TextRange,
     pub value: Box<Expr>,
-}
-
-impl From<ExprAwait> for Expr {
-    fn from(payload: ExprAwait) -> Self {
-        Expr::Await(payload)
-    }
 }
 
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
@@ -1084,23 +703,11 @@ pub struct ExprYield {
     pub value: Option<Box<Expr>>,
 }
 
-impl From<ExprYield> for Expr {
-    fn from(payload: ExprYield) -> Self {
-        Expr::Yield(payload)
-    }
-}
-
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYieldFrom {
     pub range: TextRange,
     pub value: Box<Expr>,
-}
-
-impl From<ExprYieldFrom> for Expr {
-    fn from(payload: ExprYieldFrom) -> Self {
-        Expr::YieldFrom(payload)
-    }
 }
 
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
@@ -1112,12 +719,6 @@ pub struct ExprCompare {
     pub comparators: Box<[Expr]>,
 }
 
-impl From<ExprCompare> for Expr {
-    fn from(payload: ExprCompare) -> Self {
-        Expr::Compare(payload)
-    }
-}
-
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCall {
@@ -1126,22 +727,10 @@ pub struct ExprCall {
     pub arguments: Arguments,
 }
 
-impl From<ExprCall> for Expr {
-    fn from(payload: ExprCall) -> Self {
-        Expr::Call(payload)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringFormatSpec {
     pub range: TextRange,
     pub elements: FStringElements,
-}
-
-impl Ranged for FStringFormatSpec {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
@@ -1154,12 +743,6 @@ pub struct FStringExpressionElement {
     pub format_spec: Option<Box<FStringFormatSpec>>,
 }
 
-impl Ranged for FStringExpressionElement {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
@@ -1170,12 +753,6 @@ pub struct FStringLiteralElement {
 impl FStringLiteralElement {
     pub fn is_valid(&self) -> bool {
         !self.value.is_empty()
-    }
-}
-
-impl Ranged for FStringLiteralElement {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 
@@ -1233,12 +810,6 @@ pub struct DebugText {
 pub struct ExprFString {
     pub range: TextRange,
     pub value: FStringValue,
-}
-
-impl From<ExprFString> for Expr {
-    fn from(payload: ExprFString) -> Self {
-        Expr::FString(payload)
-    }
 }
 
 /// The value representing an [`ExprFString`].
@@ -1578,12 +1149,6 @@ pub struct FString {
     pub flags: FStringFlags,
 }
 
-impl Ranged for FString {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 impl From<FString> for Expr {
     fn from(payload: FString) -> Self {
         ExprFString {
@@ -1654,39 +1219,12 @@ impl fmt::Debug for FStringElements {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum FStringElement {
-    Literal(FStringLiteralElement),
-    Expression(FStringExpressionElement),
-}
-
-impl Ranged for FStringElement {
-    fn range(&self) -> TextRange {
-        match self {
-            FStringElement::Literal(node) => node.range(),
-            FStringElement::Expression(node) => node.range(),
-        }
-    }
-}
-
 /// An AST node that represents either a single string literal or an implicitly
 /// concatenated string literals.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprStringLiteral {
     pub range: TextRange,
     pub value: StringLiteralValue,
-}
-
-impl From<ExprStringLiteral> for Expr {
-    fn from(payload: ExprStringLiteral) -> Self {
-        Expr::StringLiteral(payload)
-    }
-}
-
-impl Ranged for ExprStringLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// The value representing a [`ExprStringLiteral`].
@@ -1989,12 +1527,6 @@ pub struct StringLiteral {
     pub flags: StringLiteralFlags,
 }
 
-impl Ranged for StringLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 impl Deref for StringLiteral {
     type Target = str;
 
@@ -2077,18 +1609,6 @@ impl Debug for ConcatenatedStringLiteral {
 pub struct ExprBytesLiteral {
     pub range: TextRange,
     pub value: BytesLiteralValue,
-}
-
-impl From<ExprBytesLiteral> for Expr {
-    fn from(payload: ExprBytesLiteral) -> Self {
-        Expr::BytesLiteral(payload)
-    }
-}
-
-impl Ranged for ExprBytesLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// The value representing a [`ExprBytesLiteral`].
@@ -2350,12 +1870,6 @@ pub struct BytesLiteral {
     pub range: TextRange,
     pub value: Box<[u8]>,
     pub flags: BytesLiteralFlags,
-}
-
-impl Ranged for BytesLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 impl Deref for BytesLiteral {
@@ -2686,18 +2200,6 @@ pub struct ExprNumberLiteral {
     pub value: Number,
 }
 
-impl From<ExprNumberLiteral> for Expr {
-    fn from(payload: ExprNumberLiteral) -> Self {
-        Expr::NumberLiteral(payload)
-    }
-}
-
-impl Ranged for ExprNumberLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Number {
     Int(int::Int),
@@ -2711,50 +2213,14 @@ pub struct ExprBooleanLiteral {
     pub value: bool,
 }
 
-impl From<ExprBooleanLiteral> for Expr {
-    fn from(payload: ExprBooleanLiteral) -> Self {
-        Expr::BooleanLiteral(payload)
-    }
-}
-
-impl Ranged for ExprBooleanLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprNoneLiteral {
     pub range: TextRange,
 }
 
-impl From<ExprNoneLiteral> for Expr {
-    fn from(payload: ExprNoneLiteral) -> Self {
-        Expr::NoneLiteral(payload)
-    }
-}
-
-impl Ranged for ExprNoneLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprEllipsisLiteral {
     pub range: TextRange,
-}
-
-impl From<ExprEllipsisLiteral> for Expr {
-    fn from(payload: ExprEllipsisLiteral) -> Self {
-        Expr::EllipsisLiteral(payload)
-    }
-}
-
-impl Ranged for ExprEllipsisLiteral {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
@@ -2766,12 +2232,6 @@ pub struct ExprAttribute {
     pub ctx: ExprContext,
 }
 
-impl From<ExprAttribute> for Expr {
-    fn from(payload: ExprAttribute) -> Self {
-        Expr::Attribute(payload)
-    }
-}
-
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSubscript {
@@ -2781,24 +2241,12 @@ pub struct ExprSubscript {
     pub ctx: ExprContext,
 }
 
-impl From<ExprSubscript> for Expr {
-    fn from(payload: ExprSubscript) -> Self {
-        Expr::Subscript(payload)
-    }
-}
-
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStarred {
     pub range: TextRange,
     pub value: Box<Expr>,
     pub ctx: ExprContext,
-}
-
-impl From<ExprStarred> for Expr {
-    fn from(payload: ExprStarred) -> Self {
-        Expr::Starred(payload)
-    }
 }
 
 /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
@@ -2812,12 +2260,6 @@ pub struct ExprName {
 impl ExprName {
     pub fn id(&self) -> &Name {
         &self.id
-    }
-}
-
-impl From<ExprName> for Expr {
-    fn from(payload: ExprName) -> Self {
-        Expr::Name(payload)
     }
 }
 
@@ -2849,12 +2291,6 @@ impl<'a> IntoIterator for &'a ExprList {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl From<ExprList> for Expr {
-    fn from(payload: ExprList) -> Self {
-        Expr::List(payload)
     }
 }
 
@@ -2892,12 +2328,6 @@ impl<'a> IntoIterator for &'a ExprTuple {
     }
 }
 
-impl From<ExprTuple> for Expr {
-    fn from(payload: ExprTuple) -> Self {
-        Expr::Tuple(payload)
-    }
-}
-
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSlice {
@@ -2905,12 +2335,6 @@ pub struct ExprSlice {
     pub lower: Option<Box<Expr>>,
     pub upper: Option<Box<Expr>>,
     pub step: Option<Box<Expr>>,
-}
-
-impl From<ExprSlice> for Expr {
-    fn from(payload: ExprSlice) -> Self {
-        Expr::Slice(payload)
-    }
 }
 
 /// See also [expr_context](https://docs.python.org/3/library/ast.html#ast.expr_context)
@@ -3135,12 +2559,6 @@ pub struct Comprehension {
     pub is_async: bool,
 }
 
-/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum ExceptHandler {
-    ExceptHandler(ExceptHandlerExceptHandler),
-}
-
 /// See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExceptHandlerExceptHandler {
@@ -3148,12 +2566,6 @@ pub struct ExceptHandlerExceptHandler {
     pub type_: Option<Box<Expr>>,
     pub name: Option<Identifier>,
     pub body: Vec<Stmt>,
-}
-
-impl From<ExceptHandlerExceptHandler> for ExceptHandler {
-    fn from(payload: ExceptHandlerExceptHandler) -> Self {
-        ExceptHandler::ExceptHandler(payload)
-    }
 }
 
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
@@ -3195,19 +2607,6 @@ pub struct MatchCase {
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
-}
-
-/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Pattern {
-    MatchValue(PatternMatchValue),
-    MatchSingleton(PatternMatchSingleton),
-    MatchSequence(PatternMatchSequence),
-    MatchMapping(PatternMatchMapping),
-    MatchClass(PatternMatchClass),
-    MatchStar(PatternMatchStar),
-    MatchAs(PatternMatchAs),
-    MatchOr(PatternMatchOr),
 }
 
 impl Pattern {
@@ -3255,12 +2654,6 @@ pub struct PatternMatchValue {
     pub value: Box<Expr>,
 }
 
-impl From<PatternMatchValue> for Pattern {
-    fn from(payload: PatternMatchValue) -> Self {
-        Pattern::MatchValue(payload)
-    }
-}
-
 /// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton {
@@ -3268,23 +2661,11 @@ pub struct PatternMatchSingleton {
     pub value: Singleton,
 }
 
-impl From<PatternMatchSingleton> for Pattern {
-    fn from(payload: PatternMatchSingleton) -> Self {
-        Pattern::MatchSingleton(payload)
-    }
-}
-
 /// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSequence {
     pub range: TextRange,
     pub patterns: Vec<Pattern>,
-}
-
-impl From<PatternMatchSequence> for Pattern {
-    fn from(payload: PatternMatchSequence) -> Self {
-        Pattern::MatchSequence(payload)
-    }
 }
 
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
@@ -3296,24 +2677,12 @@ pub struct PatternMatchMapping {
     pub rest: Option<Identifier>,
 }
 
-impl From<PatternMatchMapping> for Pattern {
-    fn from(payload: PatternMatchMapping) -> Self {
-        Pattern::MatchMapping(payload)
-    }
-}
-
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchClass {
     pub range: TextRange,
     pub cls: Box<Expr>,
     pub arguments: PatternArguments,
-}
-
-impl From<PatternMatchClass> for Pattern {
-    fn from(payload: PatternMatchClass) -> Self {
-        Pattern::MatchClass(payload)
-    }
 }
 
 /// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
@@ -3345,12 +2714,6 @@ pub struct PatternMatchStar {
     pub name: Option<Identifier>,
 }
 
-impl From<PatternMatchStar> for Pattern {
-    fn from(payload: PatternMatchStar) -> Self {
-        Pattern::MatchStar(payload)
-    }
-}
-
 /// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchAs {
@@ -3359,31 +2722,11 @@ pub struct PatternMatchAs {
     pub name: Option<Identifier>,
 }
 
-impl From<PatternMatchAs> for Pattern {
-    fn from(payload: PatternMatchAs) -> Self {
-        Pattern::MatchAs(payload)
-    }
-}
-
 /// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchOr {
     pub range: TextRange,
     pub patterns: Vec<Pattern>,
-}
-
-impl From<PatternMatchOr> for Pattern {
-    fn from(payload: PatternMatchOr) -> Self {
-        Pattern::MatchOr(payload)
-    }
-}
-
-/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum TypeParam {
-    TypeVar(TypeParamTypeVar),
-    ParamSpec(TypeParamParamSpec),
-    TypeVarTuple(TypeParamTypeVarTuple),
 }
 
 impl TypeParam {
@@ -3413,12 +2756,6 @@ pub struct TypeParamTypeVar {
     pub default: Option<Box<Expr>>,
 }
 
-impl From<TypeParamTypeVar> for TypeParam {
-    fn from(payload: TypeParamTypeVar) -> Self {
-        TypeParam::TypeVar(payload)
-    }
-}
-
 /// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamParamSpec {
@@ -3427,24 +2764,12 @@ pub struct TypeParamParamSpec {
     pub default: Option<Box<Expr>>,
 }
 
-impl From<TypeParamParamSpec> for TypeParam {
-    fn from(payload: TypeParamParamSpec) -> Self {
-        TypeParam::ParamSpec(payload)
-    }
-}
-
 /// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub name: Identifier,
     pub default: Option<Box<Expr>>,
-}
-
-impl From<TypeParamTypeVarTuple> for TypeParam {
-    fn from(payload: TypeParamTypeVarTuple) -> Self {
-        TypeParam::TypeVarTuple(payload)
-    }
 }
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
@@ -4101,12 +3426,6 @@ impl From<Identifier> for Name {
     }
 }
 
-impl Ranged for Identifier {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Singleton {
     None,
@@ -4124,516 +3443,12 @@ impl From<bool> for Singleton {
     }
 }
 
-impl Ranged for crate::nodes::ModModule {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ModExpression {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Mod {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::Module(node) => node.range(),
-            Self::Expression(node) => node.range(),
-        }
-    }
-}
-
-impl Ranged for crate::nodes::StmtFunctionDef {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtClassDef {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtReturn {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtDelete {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtTypeAlias {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAssign {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAugAssign {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAnnAssign {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtFor {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtWhile {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtIf {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ElifElseClause {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtWith {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtMatch {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtRaise {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtTry {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAssert {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtImport {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtImportFrom {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtGlobal {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtNonlocal {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtExpr {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtPass {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtBreak {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtContinue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtIpyEscapeCommand {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Stmt {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::FunctionDef(node) => node.range(),
-            Self::ClassDef(node) => node.range(),
-            Self::Return(node) => node.range(),
-            Self::Delete(node) => node.range(),
-            Self::TypeAlias(node) => node.range(),
-            Self::Assign(node) => node.range(),
-            Self::AugAssign(node) => node.range(),
-            Self::AnnAssign(node) => node.range(),
-            Self::For(node) => node.range(),
-            Self::While(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::With(node) => node.range(),
-            Self::Match(node) => node.range(),
-            Self::Raise(node) => node.range(),
-            Self::Try(node) => node.range(),
-            Self::Assert(node) => node.range(),
-            Self::Import(node) => node.range(),
-            Self::ImportFrom(node) => node.range(),
-            Self::Global(node) => node.range(),
-            Self::Nonlocal(node) => node.range(),
-            Self::Expr(node) => node.range(),
-            Self::Pass(node) => node.range(),
-            Self::Break(node) => node.range(),
-            Self::Continue(node) => node.range(),
-            Stmt::IpyEscapeCommand(node) => node.range(),
-        }
-    }
-}
-
-impl Ranged for crate::nodes::ExprBoolOp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprNamed {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprBinOp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprUnaryOp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprLambda {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprIf {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprDict {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSet {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprListComp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSetComp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprDictComp {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprGenerator {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprAwait {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprYield {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprYieldFrom {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprCompare {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprCall {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprFString {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprAttribute {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSubscript {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprStarred {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprName {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprList {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprTuple {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprSlice {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprIpyEscapeCommand {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Expr {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::BoolOp(node) => node.range(),
-            Self::Named(node) => node.range(),
-            Self::BinOp(node) => node.range(),
-            Self::UnaryOp(node) => node.range(),
-            Self::Lambda(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::Dict(node) => node.range(),
-            Self::Set(node) => node.range(),
-            Self::ListComp(node) => node.range(),
-            Self::SetComp(node) => node.range(),
-            Self::DictComp(node) => node.range(),
-            Self::Generator(node) => node.range(),
-            Self::Await(node) => node.range(),
-            Self::Yield(node) => node.range(),
-            Self::YieldFrom(node) => node.range(),
-            Self::Compare(node) => node.range(),
-            Self::Call(node) => node.range(),
-            Self::FString(node) => node.range(),
-            Self::StringLiteral(node) => node.range(),
-            Self::BytesLiteral(node) => node.range(),
-            Self::NumberLiteral(node) => node.range(),
-            Self::BooleanLiteral(node) => node.range(),
-            Self::NoneLiteral(node) => node.range(),
-            Self::EllipsisLiteral(node) => node.range(),
-            Self::Attribute(node) => node.range(),
-            Self::Subscript(node) => node.range(),
-            Self::Starred(node) => node.range(),
-            Self::Name(node) => node.range(),
-            Self::List(node) => node.range(),
-            Self::Tuple(node) => node.range(),
-            Self::Slice(node) => node.range(),
-            Self::IpyEscapeCommand(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::Comprehension {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExceptHandlerExceptHandler {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::ExceptHandler {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::ExceptHandler(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::Parameter {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Keyword {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Alias {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::WithItem {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::MatchCase {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchValue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchSingleton {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchSequence {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchMapping {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchClass {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchStar {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchAs {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternMatchOr {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::Pattern {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::MatchValue(node) => node.range(),
-            Self::MatchSingleton(node) => node.range(),
-            Self::MatchSequence(node) => node.range(),
-            Self::MatchMapping(node) => node.range(),
-            Self::MatchClass(node) => node.range(),
-            Self::MatchStar(node) => node.range(),
-            Self::MatchAs(node) => node.range(),
-            Self::MatchOr(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::PatternArguments {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::PatternKeyword {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl Ranged for crate::nodes::TypeParams {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::TypeParamTypeVar {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::TypeParamTypeVarTuple {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::TypeParamParamSpec {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::TypeParam {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::TypeVar(node) => node.range(),
-            Self::TypeVarTuple(node) => node.range(),
-            Self::ParamSpec(node) => node.range(),
-        }
-    }
-}
-impl Ranged for crate::nodes::Decorator {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Arguments {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Parameters {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ParameterWithDefault {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
+
+    use crate::Mod;
 
     #[test]
     #[cfg(target_pointer_width = "64")]
