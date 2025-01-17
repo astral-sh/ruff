@@ -1162,7 +1162,8 @@ impl<'db> Type<'db> {
                 let first_elements = first.elements(db);
                 let second_elements = second.elements(db);
 
-                // TODO: Unknown ≡ Any, a union might contain both, etc.
+                // TODO: `Unknown ≡ Any`, so `int | Unknown ≡ int | Unknown | Any`
+                // even though they have differently sized element lists.
                 first_elements.len() == second_elements.len()
                     && iter::zip(first_elements, second_elements).all(equivalent)
             }
@@ -1181,7 +1182,8 @@ impl<'db> Type<'db> {
                 let second_positive = second.positive(db);
                 let second_negative = second.negative(db);
 
-                // TODO: Unknown ≡ Any, an intersection might contain both, etc.
+                // TODO: `Unknown ≡ Any`, so `int & Unknown ≡ int & Unknown & Any`
+                // even though they have differently sized positive sets.
                 first_positive.len() == second_positive.len()
                     && first_negative.len() == second_negative.len()
                     && iter::zip(first_positive, second_positive).all(equivalent)

@@ -11,20 +11,21 @@ use super::{
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
-/// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`].
+/// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
+/// to be compared for equivalence.
 ///
-/// Two unions with equal sets of elements always have elements ordered the same way in our
-/// representation. This helps reduce memory usage, and also makes it easier to answer the
-/// question of whether two unions are equal.
+/// Two unions with equal sets of elements will only compare equal if they have their element sets
+/// ordered the same way.
 ///
 /// ## Why not just implement `Ord` on `Type`?
 ///
 /// It would be fairly easy to slap `#[derive(PartialOrd, Ord)]` on `Type`. However, this would
 /// order types according to their Salsa ID. While this would mean that types would always be
 /// consistently ordered in any single run of red-knot, the order in which they would appear
-/// might vary between different runs of red-knot. Unless we implemented an entirely different
-/// order for display purposes, this would make it difficult to write mdtests, and would also
-/// be quite confusing for users.
+/// might vary between different runs of red-knot. The ordering we create here is not user-facing;
+/// however, it will be useful in the future to know where, for example, any `Protocol` elements
+/// lie in the union's element list (if there are any `Protocol` elements in the union's element
+/// list).
 ///
 /// Moreover, it doesn't really "make sense" for `Type` to implement `Ord` in terms of the
 /// semantics. There are many different ways in which you could plausibly sort a list of types;
