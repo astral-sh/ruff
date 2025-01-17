@@ -39,6 +39,31 @@ c.d = 2
 c.e = 2
 ```
 
+## Conflicting type qualifiers
+
+We currently ignore conflicting qualifiers and simply union them, which is more conservative than
+intersecting them. This means that we consider `a` to be a `ClassVar` here:
+
+```py
+from typing import ClassVar
+
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        a: ClassVar[int] = 1
+    else:
+        a: str
+
+reveal_type(C.a)  # revealed: int | str
+
+c = C()
+
+# error: [invalid-attribute-access]
+c.a = 2
+```
+
 ## Too many arguments
 
 ```py

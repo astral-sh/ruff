@@ -366,10 +366,11 @@ type DeclaredTypeResult<'db> =
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
-/// `Ok((declared_type, type_qualifiers))`. If there are conflicting declarations, returns
-/// `Err((union_of_declared_types, conflicting_declared_types))`.
+/// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with
+/// a union of the declared types as well as a list of all conflicting types.
 ///
-/// Also returns a set of [`TypeQualifiers`] that have been specified on the declaration(s).
+/// This function also returns declaredness information (see [`Symbol`]) and a set of
+/// [`TypeQualifiers`] that have been specified on the declaration(s).
 fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
@@ -407,6 +408,8 @@ fn declarations_ty<'db>(
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
             let ty_first = first.ignore_qualifiers();
+            let mut qualifiers = first.qualifiers();
+
             let mut builder = UnionBuilder::new(db).add(ty_first);
             for other in std::iter::once(second).chain(types) {
                 let other_ty = other.ignore_qualifiers();
@@ -414,10 +417,11 @@ fn declarations_ty<'db>(
                     conflicting.push(other_ty);
                 }
                 builder = builder.add(other_ty);
+                qualifiers = qualifiers.union(other.qualifiers());
             }
-            builder.build()
+            TypeAndQualifiers::new(builder.build(), qualifiers)
         } else {
-            first.ignore_qualifiers()
+            first
         };
         if conflicting.is_empty() {
             let boundness = match undeclared_visibility {
@@ -428,14 +432,13 @@ fn declarations_ty<'db>(
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
-            // TODO: deal with conflicting qualifiers?
             Ok(SymbolAndQualifiers(
-                Symbol::Type(declared_ty, boundness),
-                first.qualifiers(),
+                Symbol::Type(declared_ty.ignore_qualifiers(), boundness),
+                declared_ty.qualifiers(),
             ))
         } else {
             Err((
-                TypeAndQualifiers::new(declared_ty, first.qualifiers()),
+                declared_ty,
                 std::iter::once(first.ignore_qualifiers())
                     .chain(conflicting)
                     .collect(),
