@@ -130,6 +130,28 @@ for group in groups:
         }}
         """)
 
+for group in groups:
+    if group.name == "ungrouped":
+        continue
+    out.append(f"""
+        impl {group.owned_enum_ty} {{
+            #[allow(unused)]
+            pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+            where
+                V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+            {{
+                match self {{
+    """)
+    for node in group.nodes:
+        out.append(
+            f"""{group.owned_enum_ty}::{node.variant}(node) => node.visit_source_order(visitor),"""
+        )
+    out.append("""
+                }
+            }
+        }
+    """)
+
 # ------------------------------------------------------------------------------
 # Ref enum
 #

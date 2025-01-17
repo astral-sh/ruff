@@ -1277,6 +1277,156 @@ impl ruff_text_size::Ranged for crate::Identifier {
     }
 }
 
+impl Mod {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            Mod::Module(node) => node.visit_source_order(visitor),
+            Mod::Expression(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
+impl Stmt {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            Stmt::FunctionDef(node) => node.visit_source_order(visitor),
+            Stmt::ClassDef(node) => node.visit_source_order(visitor),
+            Stmt::Return(node) => node.visit_source_order(visitor),
+            Stmt::Delete(node) => node.visit_source_order(visitor),
+            Stmt::TypeAlias(node) => node.visit_source_order(visitor),
+            Stmt::Assign(node) => node.visit_source_order(visitor),
+            Stmt::AugAssign(node) => node.visit_source_order(visitor),
+            Stmt::AnnAssign(node) => node.visit_source_order(visitor),
+            Stmt::For(node) => node.visit_source_order(visitor),
+            Stmt::While(node) => node.visit_source_order(visitor),
+            Stmt::If(node) => node.visit_source_order(visitor),
+            Stmt::With(node) => node.visit_source_order(visitor),
+            Stmt::Match(node) => node.visit_source_order(visitor),
+            Stmt::Raise(node) => node.visit_source_order(visitor),
+            Stmt::Try(node) => node.visit_source_order(visitor),
+            Stmt::Assert(node) => node.visit_source_order(visitor),
+            Stmt::Import(node) => node.visit_source_order(visitor),
+            Stmt::ImportFrom(node) => node.visit_source_order(visitor),
+            Stmt::Global(node) => node.visit_source_order(visitor),
+            Stmt::Nonlocal(node) => node.visit_source_order(visitor),
+            Stmt::Expr(node) => node.visit_source_order(visitor),
+            Stmt::Pass(node) => node.visit_source_order(visitor),
+            Stmt::Break(node) => node.visit_source_order(visitor),
+            Stmt::Continue(node) => node.visit_source_order(visitor),
+            Stmt::IpyEscapeCommand(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
+impl Expr {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            Expr::BoolOp(node) => node.visit_source_order(visitor),
+            Expr::Named(node) => node.visit_source_order(visitor),
+            Expr::BinOp(node) => node.visit_source_order(visitor),
+            Expr::UnaryOp(node) => node.visit_source_order(visitor),
+            Expr::Lambda(node) => node.visit_source_order(visitor),
+            Expr::If(node) => node.visit_source_order(visitor),
+            Expr::Dict(node) => node.visit_source_order(visitor),
+            Expr::Set(node) => node.visit_source_order(visitor),
+            Expr::ListComp(node) => node.visit_source_order(visitor),
+            Expr::SetComp(node) => node.visit_source_order(visitor),
+            Expr::DictComp(node) => node.visit_source_order(visitor),
+            Expr::Generator(node) => node.visit_source_order(visitor),
+            Expr::Await(node) => node.visit_source_order(visitor),
+            Expr::Yield(node) => node.visit_source_order(visitor),
+            Expr::YieldFrom(node) => node.visit_source_order(visitor),
+            Expr::Compare(node) => node.visit_source_order(visitor),
+            Expr::Call(node) => node.visit_source_order(visitor),
+            Expr::FString(node) => node.visit_source_order(visitor),
+            Expr::StringLiteral(node) => node.visit_source_order(visitor),
+            Expr::BytesLiteral(node) => node.visit_source_order(visitor),
+            Expr::NumberLiteral(node) => node.visit_source_order(visitor),
+            Expr::BooleanLiteral(node) => node.visit_source_order(visitor),
+            Expr::NoneLiteral(node) => node.visit_source_order(visitor),
+            Expr::EllipsisLiteral(node) => node.visit_source_order(visitor),
+            Expr::Attribute(node) => node.visit_source_order(visitor),
+            Expr::Subscript(node) => node.visit_source_order(visitor),
+            Expr::Starred(node) => node.visit_source_order(visitor),
+            Expr::Name(node) => node.visit_source_order(visitor),
+            Expr::List(node) => node.visit_source_order(visitor),
+            Expr::Tuple(node) => node.visit_source_order(visitor),
+            Expr::Slice(node) => node.visit_source_order(visitor),
+            Expr::IpyEscapeCommand(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
+impl ExceptHandler {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            ExceptHandler::ExceptHandler(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
+impl FStringElement {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            FStringElement::Expression(node) => node.visit_source_order(visitor),
+            FStringElement::Literal(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
+impl Pattern {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            Pattern::MatchValue(node) => node.visit_source_order(visitor),
+            Pattern::MatchSingleton(node) => node.visit_source_order(visitor),
+            Pattern::MatchSequence(node) => node.visit_source_order(visitor),
+            Pattern::MatchMapping(node) => node.visit_source_order(visitor),
+            Pattern::MatchClass(node) => node.visit_source_order(visitor),
+            Pattern::MatchStar(node) => node.visit_source_order(visitor),
+            Pattern::MatchAs(node) => node.visit_source_order(visitor),
+            Pattern::MatchOr(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
+impl TypeParam {
+    #[allow(unused)]
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            TypeParam::TypeVar(node) => node.visit_source_order(visitor),
+            TypeParam::TypeVarTuple(node) => node.visit_source_order(visitor),
+            TypeParam::ParamSpec(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
 pub enum ModRef<'a> {
