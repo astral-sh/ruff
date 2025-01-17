@@ -23,9 +23,8 @@
 #   is, `StmtIf` will become `if_stmt`.)
 #
 # anynode_is_label: foo_bar
-#   Controls the name of the AnyNode::foo_bar, AnyNode::is_foo_bar, and
-#   AnyNodeRef::is_foo_bar methods.  The default is the group name in
-#   snake_case.
+#   Controls the name of the AnyNodeRef::is_foo_bar method.  The default is the
+#   group name in snake_case.
 #
 # ref_enum_ty:
 #   The name of the reference enum that we create for this group.  The default
