@@ -3,7 +3,7 @@ use std::ops::Range;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{AstNode, Expr, ExprBinOp, ExprCall, Operator};
+use ruff_python_ast::{Expr, ExprBinOp, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -134,12 +134,6 @@ fn parent_and_next_path_fragment_range(
 
     Some((
         parent.range(),
-        parenthesized_range(
-            right.into(),
-            parent.as_any_node_ref(),
-            comment_ranges,
-            source,
-        )
-        .unwrap_or(range),
+        parenthesized_range(right.into(), parent.into(), comment_ranges, source).unwrap_or(range),
     ))
 }

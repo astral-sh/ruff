@@ -1,26 +1,8 @@
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
-    self as ast, Alias, AnyNode, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, NodeKind,
-    PatternArguments, PatternKeyword,
+    self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternArguments,
+    PatternKeyword,
 };
-use ruff_text_size::Ranged;
-
-pub trait AstNode: Ranged {
-    type Ref<'a>;
-
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized;
-    fn cast_ref(kind: AnyNodeRef<'_>) -> Option<Self::Ref<'_>>;
-
-    fn can_cast(kind: NodeKind) -> bool;
-
-    /// Returns the [`AnyNodeRef`] referencing this node.
-    fn as_any_node_ref(&self) -> AnyNodeRef;
-
-    /// Consumes `self` and returns its [`AnyNode`] representation.
-    fn into_any_node(self) -> AnyNode;
-}
 
 impl ast::ModModule {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)

@@ -266,141 +266,6 @@ def write_ref_enum(out: list[str], groups: list[Group]) -> None:
 
 
 # ------------------------------------------------------------------------------
-# AnyNode
-
-
-def write_anynode(out: list[str], groups: list[Group]) -> None:
-    """
-    Create the AnyNode type.
-
-    ```rust
-    pub enum AnyNode {
-        ...
-        TypeParamTypeVar(TypeParamTypeVar),
-        TypeParamTypeVarTuple(TypeParamTypeVarTuple),
-        ...
-    }
-    ```
-
-    Also creates:
-    - `impl From<TypeParam> for AnyNode`
-    - `impl From<TypeParamTypeVarTuple> for AnyNode`
-    - `impl Ranged for AnyNode`
-    - `fn AnyNode::type_param(self) -> Option<TypeParam>`
-    - `fn AnyNode::is_type_param(&self) -> bool`
-    - `fn AnyNode::is_type_param_type_var(&self) -> bool`
-    - `fn AnyNode::as_ref(&self) -> AnyNodeRef`
-
-    The name of the `type_param` and `is_type_param` methods can be customized
-    via the `anynode_is_label` group option.
-    """
-
-    out.append("""
-    #[derive(Clone, Debug, is_macro::Is, PartialEq)]
-    pub enum AnyNode {
-    """)
-    for group in groups:
-        for node in group.nodes:
-            out.append(f"{node.name}({node.ty}),")
-    out.append("""
-    }
-    """)
-
-    for group in groups:
-        if group.name != "ungrouped":
-            out.append(f"""
-            impl From<{group.owned_enum_ty}> for AnyNode {{
-                fn from(node: {group.owned_enum_ty}) -> AnyNode {{
-                    match node {{
-            """)
-            for node in group.nodes:
-                out.append(
-                    f"""{group.owned_enum_ty}::{node.variant}(node) => AnyNode::{node.name}(node),"""
-                )
-            out.append("""
-                    }
-                }
-            }
-            """)
-
-        for node in group.nodes:
-            out.append(f"""
-            impl From<{node.ty}> for AnyNode {{
-                fn from(node: {node.ty}) -> AnyNode {{
-                    AnyNode::{node.name}(node)
-                }}
-            }}
-            """)
-
-    out.append("""
-        impl ruff_text_size::Ranged for AnyNode {
-            fn range(&self) -> ruff_text_size::TextRange {
-                match self {
-    """)
-    for group in groups:
-        for node in group.nodes:
-            out.append(f"""AnyNode::{node.name}(node) => node.range(),""")
-    out.append("""
-                }
-            }
-        }
-    """)
-
-    for group in groups:
-        if group.name == "ungrouped":
-            continue
-        out.append(f"""
-        impl AnyNode {{
-            pub fn {group.anynode_is_label}(self) -> Option<{group.owned_enum_ty}> {{
-                match self {{
-        """)
-        for node in group.nodes:
-            out.append(
-                f"""AnyNode::{node.name}(node) => Some({group.owned_enum_ty}::{node.variant}(node)),"""
-            )
-        out.append("""
-                    _ => None,
-                }
-            }
-        }
-        """)
-
-    for group in groups:
-        if group.name == "ungrouped":
-            continue
-        out.append(f"""
-        impl AnyNode {{
-            pub const fn is_{group.anynode_is_label}(&self) -> bool {{
-                matches!(self,
-        """)
-        for i, node in enumerate(group.nodes):
-            if i > 0:
-                out.append("|")
-            out.append(f"""AnyNode::{node.name}(_)""")
-        out.append("""
-                )
-            }
-        }
-        """)
-
-    out.append("""
-    impl AnyNode {
-        pub const fn as_ref(&self) -> AnyNodeRef {
-            match self {
-    """)
-    for group in groups:
-        for node in group.nodes:
-            out.append(
-                f"""AnyNode::{node.name}(node) => AnyNodeRef::{node.name}(node),"""
-            )
-    out.append("""
-            }
-        }
-    }
-    """)
-
-
-# ------------------------------------------------------------------------------
 # AnyNodeRef
 
 
@@ -424,7 +289,6 @@ def write_anynoderef(out: list[str], groups: list[Group]) -> None:
     - `impl Ranged for AnyNodeRef<'_>`
     - `fn AnyNodeRef::as_ptr(&self) -> std::ptr::NonNull<()>`
     - `fn AnyNodeRef::visit_preorder(self, visitor &mut impl SourceOrderVisitor)`
-    - `fn AnyNode::is_type_param(&self) -> bool`
     """
 
     out.append("""
@@ -565,7 +429,6 @@ def write_nodekind(out: list[str], groups: list[Group]) -> None:
     }
 
     Also creates:
-    - `fn AnyNode::kind(&self) -> NodeKind`
     - `fn AnyNodeRef::kind(self) -> NodeKind`
     ```
     """
@@ -578,20 +441,6 @@ def write_nodekind(out: list[str], groups: list[Group]) -> None:
         for node in group.nodes:
             out.append(f"""{node.name},""")
     out.append("""
-    }
-    """)
-
-    out.append("""
-    impl AnyNode {
-        pub const fn kind(&self) -> NodeKind {
-            match self {
-    """)
-    for group in groups:
-        for node in group.nodes:
-            out.append(f"""AnyNode::{node.name}(_) => NodeKind::{node.name},""")
-    out.append("""
-            }
-        }
     }
     """)
 
@@ -611,110 +460,6 @@ def write_nodekind(out: list[str], groups: list[Group]) -> None:
 
 
 # ------------------------------------------------------------------------------
-# AstNode
-
-
-def write_astnode(out: list[str], groups: list[Group]) -> None:
-    """
-    Creates AstNode trait impls:
-    - `impl AstNode for TypeParam`
-    - `impl AstNode for TypeParamTypeVar`
-    """
-
-    for group in groups:
-        if group.name != "ungrouped":
-            out.append(f"""
-            impl crate::AstNode for {group.owned_enum_ty} {{
-                type Ref<'a> = {group.ref_enum_ty}<'a>;
-
-                fn cast(node: AnyNode) -> Option<Self>
-                where
-                    Self: Sized,
-                {{
-                    match node {{
-            """)
-            for node in group.nodes:
-                out.append(
-                    f"""AnyNode::{node.name}(node) => Some({group.owned_enum_ty}::{node.variant}(node)),"""
-                )
-            out.append("""
-                        _ => None,
-                    }
-                }
-
-                fn cast_ref(node: AnyNodeRef) -> Option<Self::Ref<'_>> {
-                    match node {
-            """)
-            for node in group.nodes:
-                out.append(
-                    f"""AnyNodeRef::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"""
-                )
-            out.append("""
-                        _ => None,
-                    }
-                }
-
-                fn can_cast(kind: NodeKind) -> bool {
-                    matches!(kind,
-            """)
-            for i, node in enumerate(group.nodes):
-                if i > 0:
-                    out.append("|")
-                out.append(f"""NodeKind::{node.name}""")
-            out.append("""
-                    )
-                }
-
-                fn as_any_node_ref(&self) -> AnyNodeRef {
-                    AnyNodeRef::from(self)
-                }
-
-                fn into_any_node(self) -> AnyNode {
-                    AnyNode::from(self)
-                }
-            }
-            """)
-
-        for node in group.nodes:
-            out.append(f"""
-            impl crate::AstNode for {node.ty} {{
-                type Ref<'a> = &'a Self;
-
-                fn cast(kind: AnyNode) -> Option<Self>
-                where
-                    Self: Sized,
-                {{
-                    if let AnyNode::{node.name}(node) = kind {{
-                        Some(node)
-                    }} else {{
-                        None
-                    }}
-                }}
-
-                fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {{
-                    if let AnyNodeRef::{node.name}(node) = kind {{
-                        Some(node)
-                    }} else {{
-                        None
-                    }}
-                }}
-
-                fn can_cast(kind: NodeKind) -> bool {{
-                    matches!(kind, NodeKind::{node.name})
-                }}
-
-                fn as_any_node_ref(&self) -> AnyNodeRef {{
-                    AnyNodeRef::from(self)
-                }}
-
-                fn into_any_node(self) -> AnyNode {{
-                    AnyNode::from(self)
-                }}
-            }}
-            """)
-
-
-# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -723,10 +468,8 @@ def generate(groups: list[Group]) -> list[str]:
     write_preamble(out)
     write_owned_enum(out, groups)
     write_ref_enum(out, groups)
-    write_anynode(out, groups)
     write_anynoderef(out, groups)
     write_nodekind(out, groups)
-    write_astnode(out, groups)
     return out
 
 

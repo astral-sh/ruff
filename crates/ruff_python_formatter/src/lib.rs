@@ -4,10 +4,10 @@ use tracing::Level;
 pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::AstNode;
-use ruff_python_ast::Mod;
+use ruff_python_ast::{AnyNodeRef, Mod};
 use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
 use ruff_python_trivia::CommentRanges;
+use ruff_text_size::Ranged;
 
 use crate::comments::{
     has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
@@ -43,22 +43,22 @@ mod verbatim;
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
 
-/// Rule for formatting a Python [`AstNode`].
+/// Rule for formatting a Python AST node.
 pub(crate) trait FormatNodeRule<N>
 where
-    N: AstNode,
+    N: Ranged,
+    for<'a> AnyNodeRef<'a>: From<&'a N>,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
-        let node_comments = comments.leading_dangling_trailing(node.as_any_node_ref());
+        let node_ref = AnyNodeRef::from(node);
+        let node_comments = comments.leading_dangling_trailing(node_ref);
 
         if self.is_suppressed(node_comments.trailing, f.context()) {
-            suppressed_node(node.as_any_node_ref()).fmt(f)
+            suppressed_node(node_ref).fmt(f)
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
-
-            let node_ref = node.as_any_node_ref();
 
             // Emit source map information for nodes that are valid "narrowing" targets
             // in range formatting. Never emit source map information if they're disabled

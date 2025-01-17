@@ -4,7 +4,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
@@ -324,7 +323,7 @@ fn get_parametrize_name_range(
 ) -> Option<TextRange> {
     parenthesized_range(
         expr.into(),
-        call.arguments.as_any_node_ref(),
+        (&call.arguments).into(),
         comment_ranges,
         source,
     )
