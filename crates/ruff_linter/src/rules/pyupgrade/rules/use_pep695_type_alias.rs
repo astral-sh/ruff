@@ -348,7 +348,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
     }
 
     let mut type_vars = Vec::new();
-    for parameter in parameters.iter() {
+    for parameter in parameters {
         if let Some(annotation) = parameter.annotation() {
             let vars = {
                 let mut visitor = TypeVarReferenceVisitor {
@@ -471,12 +471,12 @@ fn fmt_type_vars(type_vars: &[TypeVar], checker: &Checker) -> String {
             type_params.push_str(", ");
         }
     }
-    type_params.push_str("]");
+    type_params.push(']');
 
     type_params
 }
 
-impl<'a> TypeVar<'a> {
+impl TypeVar<'_> {
     /// Format `self` into `s`, where `source` is the whole file, which will be sliced to recover
     /// the `TypeVarRestriction` values for generic bounds and constraints.
     fn fmt_into(&self, s: &mut String, source: &str) {
