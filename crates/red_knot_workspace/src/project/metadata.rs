@@ -3,9 +3,11 @@ use ruff_python_ast::name::Name;
 
 use crate::project::combine::Combine;
 use crate::project::options::Options;
-use crate::project::pyproject::{PyProject, PyProjectError};
+use crate::project::pyproject::{Project, PyProject, PyProjectError};
 use red_knot_python_semantic::ProgramSettings;
 use thiserror::Error;
+
+use super::options::KnotTomlError;
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
@@ -30,16 +32,28 @@ impl ProjectMetadata {
 
     /// Loads a project from a `pyproject.toml` file.
     pub(crate) fn from_pyproject(pyproject: PyProject, root: SystemPathBuf) -> Self {
-        let name = pyproject.project.and_then(|project| project.name);
-        let name = name
-            .map(|name| Name::new(&*name))
+        Self::from_options(
+            pyproject
+                .tool
+                .and_then(|tool| tool.knot)
+                .unwrap_or_default(),
+            root,
+            pyproject.project.as_ref(),
+        )
+    }
+
+    /// Loads a project from a set of options with an optional pyproject-project table.
+    pub(crate) fn from_options(
+        options: Options,
+        root: SystemPathBuf,
+        project: Option<&Project>,
+    ) -> Self {
+        let name = project
+            .and_then(|project| project.name.as_ref())
+            .map(|name| Name::new(&**name))
             .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
 
-        let options = pyproject
-            .tool
-            .and_then(|tool| tool.knot)
-            .unwrap_or_default();
-
+        // TODO(https://github.com/astral-sh/ruff/issues/15491): Respect requires-python
         Self {
             name,
             root,
@@ -52,7 +66,7 @@ impl ProjectMetadata {
     /// The algorithm traverses upwards in the `path`'s ancestor chain and uses the following precedence
     /// the resolve the project's root.
     ///
-    /// 1. The closest `pyproject.toml` with a `tool.knot` section.
+    /// 1. The closest `pyproject.toml` with a `tool.knot` section or `knot.toml`.
     /// 1. The closest `pyproject.toml`.
     /// 1. Fallback to use `path` as the root and use the default settings.
     pub fn discover(
@@ -67,21 +81,60 @@ impl ProjectMetadata {
 
         let mut closest_project: Option<ProjectMetadata> = None;
 
-        for ancestor in path.ancestors() {
-            let pyproject_path = ancestor.join("pyproject.toml");
-            if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
-                let pyproject = PyProject::from_str(&pyproject_str).map_err(|error| {
-                    ProjectDiscoveryError::InvalidPyProject {
-                        path: pyproject_path,
-                        source: Box::new(error),
-                    }
-                })?;
+        for project_root in path.ancestors() {
+            let pyproject_path = project_root.join("pyproject.toml");
 
+            let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
+                match PyProject::from_toml_str(&pyproject_str) {
+                    Ok(pyproject) => Some(pyproject),
+                    Err(error) => {
+                        return Err(ProjectDiscoveryError::InvalidPyProject {
+                            path: pyproject_path,
+                            source: Box::new(error),
+                        })
+                    }
+                }
+            } else {
+                None
+            };
+
+            // A `knot.toml` takes precedence over a `pyproject.toml`.
+            let knot_toml_path = project_root.join("knot.toml");
+            if let Ok(knot_str) = system.read_to_string(&knot_toml_path) {
+                let options = match Options::from_toml_str(&knot_str) {
+                    Ok(options) => options,
+                    Err(error) => {
+                        return Err(ProjectDiscoveryError::InvalidKnotToml {
+                            path: knot_toml_path,
+                            source: Box::new(error),
+                        })
+                    }
+                };
+
+                if pyproject
+                    .as_ref()
+                    .is_some_and(|project| project.knot().is_some())
+                {
+                    // TODO: Consider using a diagnostic here
+                    tracing::warn!("Ignoring the `tool.knot` section in `{pyproject_path}` because `{knot_toml_path}` takes precedence.");
+                }
+
+                tracing::debug!("Found project at '{}'", project_root);
+                return Ok(ProjectMetadata::from_options(
+                    options,
+                    project_root.to_path_buf(),
+                    pyproject
+                        .as_ref()
+                        .and_then(|pyproject| pyproject.project.as_ref()),
+                ));
+            }
+
+            if let Some(pyproject) = pyproject {
                 let has_knot_section = pyproject.knot().is_some();
-                let metadata = ProjectMetadata::from_pyproject(pyproject, ancestor.to_path_buf());
+                let metadata =
+                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf());
 
                 if has_knot_section {
-                    let project_root = ancestor;
                     tracing::debug!("Found project at '{}'", project_root);
 
                     return Ok(metadata);
@@ -150,6 +203,12 @@ pub enum ProjectDiscoveryError {
     #[error("{path} is not a valid `pyproject.toml`: {source}")]
     InvalidPyProject {
         source: Box<PyProjectError>,
+        path: SystemPathBuf,
+    },
+
+    #[error("{path} is not a valid `knot.toml`: {source}")]
+    InvalidKnotToml {
+        source: Box<KnotTomlError>,
         path: SystemPathBuf,
     },
 }
@@ -396,6 +455,46 @@ expected `.`, `]`
             .context("Failed to write files")?;
 
         let root = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+
+    /// A `knot.toml` takes precedence over any `pyproject.toml`.
+    ///
+    /// However, the `pyproject.toml` is still loaded to get the project name and, in the future,
+    /// the requires-python constraint.
+    #[test]
+    fn project_with_knot_and_pyproject_toml() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                        [project]
+                        name = "super-app"
+                        requires-python = ">=3.12"
+
+                        [tool.knot.src]
+                        root = "this_option_is_ignored"
+                        "#,
+                ),
+                (
+                    root.join("knot.toml"),
+                    r#"
+                        [src]
+                        root = "src"
+                        "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
 
         snapshot_project!(root);
 

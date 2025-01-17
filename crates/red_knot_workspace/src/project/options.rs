@@ -4,6 +4,7 @@ use red_knot_python_semantic::{
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// The options for the project.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize)]
@@ -15,6 +16,11 @@ pub struct Options {
 }
 
 impl Options {
+    pub(super) fn from_toml_str(content: &str) -> Result<Self, KnotTomlError> {
+        let options = toml::from_str(content)?;
+        Ok(options)
+    }
+
     pub(super) fn to_program_settings(
         &self,
         project_root: &SystemPath,
@@ -100,4 +106,10 @@ pub struct EnvironmentOptions {
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
     pub root: Option<SystemPathBuf>,
+}
+
+#[derive(Error, Debug)]
+pub enum KnotTomlError {
+    #[error(transparent)]
+    TomlSyntax(#[from] toml::de::Error),
 }
