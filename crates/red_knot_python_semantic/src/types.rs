@@ -359,6 +359,19 @@ fn bindings_ty<'db>(
 
 pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
+impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
+    fn from(symbol: Symbol<'db>) -> Self {
+        SymbolAndQualifiers(symbol, TypeQualifiers::empty())
+    }
+}
+
+impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
+    fn from(ty: Type<'db>) -> Self {
+        let symbol: Symbol<'db> = ty.into();
+        symbol.into()
+    }
+}
+
 /// The result of looking up a declared type from declarations; see [`declarations_ty`].
 type DeclaredTypeResult<'db> =
     Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
@@ -445,10 +458,7 @@ fn declarations_ty<'db>(
             ))
         }
     } else {
-        Ok(SymbolAndQualifiers(
-            Symbol::Unbound,
-            TypeQualifiers::empty(),
-        ))
+        Ok(Symbol::Unbound.into())
     }
 }
 
@@ -2518,11 +2528,8 @@ pub(crate) struct TypeAndQualifiers<'db> {
 }
 
 impl<'db> TypeAndQualifiers<'db> {
-    pub(crate) fn new(ty: Type<'db>, qualifiers: TypeQualifiers) -> Self {
-        Self {
-            inner: ty,
-            qualifiers,
-        }
+    pub(crate) fn new(inner: Type<'db>, qualifiers: TypeQualifiers) -> Self {
+        Self { inner, qualifiers }
     }
 
     /// Forget about type qualifiers and only return the inner type.
@@ -2542,9 +2549,9 @@ impl<'db> TypeAndQualifiers<'db> {
 }
 
 impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
-    fn from(ty: Type<'db>) -> Self {
+    fn from(inner: Type<'db>) -> Self {
         Self {
-            inner: ty,
+            inner,
             qualifiers: TypeQualifiers::empty(),
         }
     }
@@ -4063,10 +4070,7 @@ impl<'db> Class<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
-                    return SymbolAndQualifiers(
-                        todo_type!("instance attribute on class with dynamic base").into(),
-                        TypeQualifiers::empty(),
-                    );
+                    return todo_type!("instance attribute on class with dynamic base").into();
                 }
                 ClassBase::Class(class) => {
                     if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
@@ -4080,10 +4084,7 @@ impl<'db> Class<'db> {
 
         // TODO: The symbol is not present in any class body, but it could be implicitly
         // defined in `__init__` or other methods anywhere in the MRO.
-        SymbolAndQualifiers(
-            todo_type!("implicit instance attribute").into(),
-            TypeQualifiers::empty(),
-        )
+        todo_type!("implicit instance attribute").into()
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -4110,9 +4111,9 @@ impl<'db> Class<'db> {
                         // just a temporary heuristic to provide a broad categorization into properties
                         // and non-property methods.
                         if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
-                            SymbolAndQualifiers(todo_type!("@property").into(), qualifiers)
+                            todo_type!("@property").into()
                         } else {
-                            SymbolAndQualifiers(todo_type!("bound method").into(), qualifiers)
+                            todo_type!("bound method").into()
                         }
                     } else {
                         SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
@@ -4139,7 +4140,7 @@ impl<'db> Class<'db> {
                 }
             }
         } else {
-            SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+            Symbol::Unbound.into()
         }
     }
 
