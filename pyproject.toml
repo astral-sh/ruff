@@ -89,7 +89,7 @@ ignore = [
   "COM812",
   "ISC001",
   # only relevant if you run a script with `python -0`,
-  # which seems unlikely for any of the scripts in this directory
+  # which seems unlikely for any of the scripts in this repo
   "B011",
 ]
 
