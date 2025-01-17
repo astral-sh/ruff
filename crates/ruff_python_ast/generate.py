@@ -301,6 +301,20 @@ for group in groups:
     }
     """)
 
+out.append("""
+impl AnyNode {
+    pub const fn as_ref(&self) -> AnyNodeRef {
+        match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""AnyNode::{node.name}(node) => AnyNodeRef::{node.name}(node),""")
+out.append("""
+        }
+    }
+}
+""")
+
 # ------------------------------------------------------------------------------
 # AnyNodeRef
 
