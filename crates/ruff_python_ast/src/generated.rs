@@ -2992,6 +2992,263 @@ impl ruff_text_size::Ranged for AnyNode {
     }
 }
 
+impl AnyNode {
+    pub fn module(self) -> Option<Mod> {
+        match self {
+            AnyNode::ModModule(node) => Some(Mod::Module(node)),
+            AnyNode::ModExpression(node) => Some(Mod::Expression(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub fn statement(self) -> Option<Stmt> {
+        match self {
+            AnyNode::StmtFunctionDef(node) => Some(Stmt::FunctionDef(node)),
+            AnyNode::StmtClassDef(node) => Some(Stmt::ClassDef(node)),
+            AnyNode::StmtReturn(node) => Some(Stmt::Return(node)),
+            AnyNode::StmtDelete(node) => Some(Stmt::Delete(node)),
+            AnyNode::StmtTypeAlias(node) => Some(Stmt::TypeAlias(node)),
+            AnyNode::StmtAssign(node) => Some(Stmt::Assign(node)),
+            AnyNode::StmtAugAssign(node) => Some(Stmt::AugAssign(node)),
+            AnyNode::StmtAnnAssign(node) => Some(Stmt::AnnAssign(node)),
+            AnyNode::StmtFor(node) => Some(Stmt::For(node)),
+            AnyNode::StmtWhile(node) => Some(Stmt::While(node)),
+            AnyNode::StmtIf(node) => Some(Stmt::If(node)),
+            AnyNode::StmtWith(node) => Some(Stmt::With(node)),
+            AnyNode::StmtMatch(node) => Some(Stmt::Match(node)),
+            AnyNode::StmtRaise(node) => Some(Stmt::Raise(node)),
+            AnyNode::StmtTry(node) => Some(Stmt::Try(node)),
+            AnyNode::StmtAssert(node) => Some(Stmt::Assert(node)),
+            AnyNode::StmtImport(node) => Some(Stmt::Import(node)),
+            AnyNode::StmtImportFrom(node) => Some(Stmt::ImportFrom(node)),
+            AnyNode::StmtGlobal(node) => Some(Stmt::Global(node)),
+            AnyNode::StmtNonlocal(node) => Some(Stmt::Nonlocal(node)),
+            AnyNode::StmtExpr(node) => Some(Stmt::Expr(node)),
+            AnyNode::StmtPass(node) => Some(Stmt::Pass(node)),
+            AnyNode::StmtBreak(node) => Some(Stmt::Break(node)),
+            AnyNode::StmtContinue(node) => Some(Stmt::Continue(node)),
+            AnyNode::StmtIpyEscapeCommand(node) => Some(Stmt::IpyEscapeCommand(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub fn expression(self) -> Option<Expr> {
+        match self {
+            AnyNode::ExprBoolOp(node) => Some(Expr::BoolOp(node)),
+            AnyNode::ExprNamed(node) => Some(Expr::Named(node)),
+            AnyNode::ExprBinOp(node) => Some(Expr::BinOp(node)),
+            AnyNode::ExprUnaryOp(node) => Some(Expr::UnaryOp(node)),
+            AnyNode::ExprLambda(node) => Some(Expr::Lambda(node)),
+            AnyNode::ExprIf(node) => Some(Expr::If(node)),
+            AnyNode::ExprDict(node) => Some(Expr::Dict(node)),
+            AnyNode::ExprSet(node) => Some(Expr::Set(node)),
+            AnyNode::ExprListComp(node) => Some(Expr::ListComp(node)),
+            AnyNode::ExprSetComp(node) => Some(Expr::SetComp(node)),
+            AnyNode::ExprDictComp(node) => Some(Expr::DictComp(node)),
+            AnyNode::ExprGenerator(node) => Some(Expr::Generator(node)),
+            AnyNode::ExprAwait(node) => Some(Expr::Await(node)),
+            AnyNode::ExprYield(node) => Some(Expr::Yield(node)),
+            AnyNode::ExprYieldFrom(node) => Some(Expr::YieldFrom(node)),
+            AnyNode::ExprCompare(node) => Some(Expr::Compare(node)),
+            AnyNode::ExprCall(node) => Some(Expr::Call(node)),
+            AnyNode::ExprFString(node) => Some(Expr::FString(node)),
+            AnyNode::ExprStringLiteral(node) => Some(Expr::StringLiteral(node)),
+            AnyNode::ExprBytesLiteral(node) => Some(Expr::BytesLiteral(node)),
+            AnyNode::ExprNumberLiteral(node) => Some(Expr::NumberLiteral(node)),
+            AnyNode::ExprBooleanLiteral(node) => Some(Expr::BooleanLiteral(node)),
+            AnyNode::ExprNoneLiteral(node) => Some(Expr::NoneLiteral(node)),
+            AnyNode::ExprEllipsisLiteral(node) => Some(Expr::EllipsisLiteral(node)),
+            AnyNode::ExprAttribute(node) => Some(Expr::Attribute(node)),
+            AnyNode::ExprSubscript(node) => Some(Expr::Subscript(node)),
+            AnyNode::ExprStarred(node) => Some(Expr::Starred(node)),
+            AnyNode::ExprName(node) => Some(Expr::Name(node)),
+            AnyNode::ExprList(node) => Some(Expr::List(node)),
+            AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
+            AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
+            AnyNode::ExprIpyEscapeCommand(node) => Some(Expr::IpyEscapeCommand(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub fn except_handler(self) -> Option<ExceptHandler> {
+        match self {
+            AnyNode::ExceptHandlerExceptHandler(node) => Some(ExceptHandler::ExceptHandler(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub fn f_string_element(self) -> Option<FStringElement> {
+        match self {
+            AnyNode::FStringExpressionElement(node) => Some(FStringElement::Expression(node)),
+            AnyNode::FStringLiteralElement(node) => Some(FStringElement::Literal(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub fn pattern(self) -> Option<Pattern> {
+        match self {
+            AnyNode::PatternMatchValue(node) => Some(Pattern::MatchValue(node)),
+            AnyNode::PatternMatchSingleton(node) => Some(Pattern::MatchSingleton(node)),
+            AnyNode::PatternMatchSequence(node) => Some(Pattern::MatchSequence(node)),
+            AnyNode::PatternMatchMapping(node) => Some(Pattern::MatchMapping(node)),
+            AnyNode::PatternMatchClass(node) => Some(Pattern::MatchClass(node)),
+            AnyNode::PatternMatchStar(node) => Some(Pattern::MatchStar(node)),
+            AnyNode::PatternMatchAs(node) => Some(Pattern::MatchAs(node)),
+            AnyNode::PatternMatchOr(node) => Some(Pattern::MatchOr(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub fn type_param(self) -> Option<TypeParam> {
+        match self {
+            AnyNode::TypeParamTypeVar(node) => Some(TypeParam::TypeVar(node)),
+            AnyNode::TypeParamTypeVarTuple(node) => Some(TypeParam::TypeVarTuple(node)),
+            AnyNode::TypeParamParamSpec(node) => Some(TypeParam::ParamSpec(node)),
+
+            _ => None,
+        }
+    }
+}
+
+impl AnyNode {
+    pub const fn is_module(&self) -> bool {
+        matches!(self, AnyNode::ModModule(_) | AnyNode::ModExpression(_))
+    }
+}
+
+impl AnyNode {
+    pub const fn is_statement(&self) -> bool {
+        matches!(
+            self,
+            AnyNode::StmtFunctionDef(_)
+                | AnyNode::StmtClassDef(_)
+                | AnyNode::StmtReturn(_)
+                | AnyNode::StmtDelete(_)
+                | AnyNode::StmtTypeAlias(_)
+                | AnyNode::StmtAssign(_)
+                | AnyNode::StmtAugAssign(_)
+                | AnyNode::StmtAnnAssign(_)
+                | AnyNode::StmtFor(_)
+                | AnyNode::StmtWhile(_)
+                | AnyNode::StmtIf(_)
+                | AnyNode::StmtWith(_)
+                | AnyNode::StmtMatch(_)
+                | AnyNode::StmtRaise(_)
+                | AnyNode::StmtTry(_)
+                | AnyNode::StmtAssert(_)
+                | AnyNode::StmtImport(_)
+                | AnyNode::StmtImportFrom(_)
+                | AnyNode::StmtGlobal(_)
+                | AnyNode::StmtNonlocal(_)
+                | AnyNode::StmtExpr(_)
+                | AnyNode::StmtPass(_)
+                | AnyNode::StmtBreak(_)
+                | AnyNode::StmtContinue(_)
+                | AnyNode::StmtIpyEscapeCommand(_)
+        )
+    }
+}
+
+impl AnyNode {
+    pub const fn is_expression(&self) -> bool {
+        matches!(
+            self,
+            AnyNode::ExprBoolOp(_)
+                | AnyNode::ExprNamed(_)
+                | AnyNode::ExprBinOp(_)
+                | AnyNode::ExprUnaryOp(_)
+                | AnyNode::ExprLambda(_)
+                | AnyNode::ExprIf(_)
+                | AnyNode::ExprDict(_)
+                | AnyNode::ExprSet(_)
+                | AnyNode::ExprListComp(_)
+                | AnyNode::ExprSetComp(_)
+                | AnyNode::ExprDictComp(_)
+                | AnyNode::ExprGenerator(_)
+                | AnyNode::ExprAwait(_)
+                | AnyNode::ExprYield(_)
+                | AnyNode::ExprYieldFrom(_)
+                | AnyNode::ExprCompare(_)
+                | AnyNode::ExprCall(_)
+                | AnyNode::ExprFString(_)
+                | AnyNode::ExprStringLiteral(_)
+                | AnyNode::ExprBytesLiteral(_)
+                | AnyNode::ExprNumberLiteral(_)
+                | AnyNode::ExprBooleanLiteral(_)
+                | AnyNode::ExprNoneLiteral(_)
+                | AnyNode::ExprEllipsisLiteral(_)
+                | AnyNode::ExprAttribute(_)
+                | AnyNode::ExprSubscript(_)
+                | AnyNode::ExprStarred(_)
+                | AnyNode::ExprName(_)
+                | AnyNode::ExprList(_)
+                | AnyNode::ExprTuple(_)
+                | AnyNode::ExprSlice(_)
+                | AnyNode::ExprIpyEscapeCommand(_)
+        )
+    }
+}
+
+impl AnyNode {
+    pub const fn is_except_handler(&self) -> bool {
+        matches!(self, AnyNode::ExceptHandlerExceptHandler(_))
+    }
+}
+
+impl AnyNode {
+    pub const fn is_f_string_element(&self) -> bool {
+        matches!(
+            self,
+            AnyNode::FStringExpressionElement(_) | AnyNode::FStringLiteralElement(_)
+        )
+    }
+}
+
+impl AnyNode {
+    pub const fn is_pattern(&self) -> bool {
+        matches!(
+            self,
+            AnyNode::PatternMatchValue(_)
+                | AnyNode::PatternMatchSingleton(_)
+                | AnyNode::PatternMatchSequence(_)
+                | AnyNode::PatternMatchMapping(_)
+                | AnyNode::PatternMatchClass(_)
+                | AnyNode::PatternMatchStar(_)
+                | AnyNode::PatternMatchAs(_)
+                | AnyNode::PatternMatchOr(_)
+        )
+    }
+}
+
+impl AnyNode {
+    pub const fn is_type_param(&self) -> bool {
+        matches!(
+            self,
+            AnyNode::TypeParamTypeVar(_)
+                | AnyNode::TypeParamTypeVarTuple(_)
+                | AnyNode::TypeParamParamSpec(_)
+        )
+    }
+}
+
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNodeRef<'a> {
     ModModule(&'a crate::ModModule),
@@ -4182,6 +4439,130 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::BytesLiteral(node) => node.visit_source_order(visitor),
             AnyNodeRef::Identifier(node) => node.visit_source_order(visitor),
         }
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_module(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::ModModule(_) | AnyNodeRef::ModExpression(_)
+        )
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_statement(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::StmtFunctionDef(_)
+                | AnyNodeRef::StmtClassDef(_)
+                | AnyNodeRef::StmtReturn(_)
+                | AnyNodeRef::StmtDelete(_)
+                | AnyNodeRef::StmtTypeAlias(_)
+                | AnyNodeRef::StmtAssign(_)
+                | AnyNodeRef::StmtAugAssign(_)
+                | AnyNodeRef::StmtAnnAssign(_)
+                | AnyNodeRef::StmtFor(_)
+                | AnyNodeRef::StmtWhile(_)
+                | AnyNodeRef::StmtIf(_)
+                | AnyNodeRef::StmtWith(_)
+                | AnyNodeRef::StmtMatch(_)
+                | AnyNodeRef::StmtRaise(_)
+                | AnyNodeRef::StmtTry(_)
+                | AnyNodeRef::StmtAssert(_)
+                | AnyNodeRef::StmtImport(_)
+                | AnyNodeRef::StmtImportFrom(_)
+                | AnyNodeRef::StmtGlobal(_)
+                | AnyNodeRef::StmtNonlocal(_)
+                | AnyNodeRef::StmtExpr(_)
+                | AnyNodeRef::StmtPass(_)
+                | AnyNodeRef::StmtBreak(_)
+                | AnyNodeRef::StmtContinue(_)
+                | AnyNodeRef::StmtIpyEscapeCommand(_)
+        )
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_expression(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::ExprBoolOp(_)
+                | AnyNodeRef::ExprNamed(_)
+                | AnyNodeRef::ExprBinOp(_)
+                | AnyNodeRef::ExprUnaryOp(_)
+                | AnyNodeRef::ExprLambda(_)
+                | AnyNodeRef::ExprIf(_)
+                | AnyNodeRef::ExprDict(_)
+                | AnyNodeRef::ExprSet(_)
+                | AnyNodeRef::ExprListComp(_)
+                | AnyNodeRef::ExprSetComp(_)
+                | AnyNodeRef::ExprDictComp(_)
+                | AnyNodeRef::ExprGenerator(_)
+                | AnyNodeRef::ExprAwait(_)
+                | AnyNodeRef::ExprYield(_)
+                | AnyNodeRef::ExprYieldFrom(_)
+                | AnyNodeRef::ExprCompare(_)
+                | AnyNodeRef::ExprCall(_)
+                | AnyNodeRef::ExprFString(_)
+                | AnyNodeRef::ExprStringLiteral(_)
+                | AnyNodeRef::ExprBytesLiteral(_)
+                | AnyNodeRef::ExprNumberLiteral(_)
+                | AnyNodeRef::ExprBooleanLiteral(_)
+                | AnyNodeRef::ExprNoneLiteral(_)
+                | AnyNodeRef::ExprEllipsisLiteral(_)
+                | AnyNodeRef::ExprAttribute(_)
+                | AnyNodeRef::ExprSubscript(_)
+                | AnyNodeRef::ExprStarred(_)
+                | AnyNodeRef::ExprName(_)
+                | AnyNodeRef::ExprList(_)
+                | AnyNodeRef::ExprTuple(_)
+                | AnyNodeRef::ExprSlice(_)
+                | AnyNodeRef::ExprIpyEscapeCommand(_)
+        )
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_except_handler(self) -> bool {
+        matches!(self, AnyNodeRef::ExceptHandlerExceptHandler(_))
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_f_string_element(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
+        )
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_pattern(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::PatternMatchValue(_)
+                | AnyNodeRef::PatternMatchSingleton(_)
+                | AnyNodeRef::PatternMatchSequence(_)
+                | AnyNodeRef::PatternMatchMapping(_)
+                | AnyNodeRef::PatternMatchClass(_)
+                | AnyNodeRef::PatternMatchStar(_)
+                | AnyNodeRef::PatternMatchAs(_)
+                | AnyNodeRef::PatternMatchOr(_)
+        )
+    }
+}
+
+impl AnyNodeRef<'_> {
+    pub const fn is_type_param(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::TypeParamTypeVar(_)
+                | AnyNodeRef::TypeParamTypeVarTuple(_)
+                | AnyNodeRef::TypeParamParamSpec(_)
+        )
     }
 }
 

@@ -39,6 +39,7 @@ class Group:
     ref_enum_ty: str
 
     add_suffix_to_is_methods: bool
+    anynode_is_label: str
     comment: Optional[str]
 
     def __init__(self, group_name, group):
@@ -46,6 +47,7 @@ class Group:
         self.owned_enum_ty = group_name
         self.ref_enum_ty = group.get("ref_enum_ty", group_name + "Ref")
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
+        self.anynode_is_label = group.get("anynode_is_label", to_snake_case(group_name))
         self.comment = group.get("comment")
         self.nodes = [
             Node(self, node_name, node) for node_name, node in group["nodes"].items()
@@ -240,6 +242,43 @@ out.append("""
     }
 """)
 
+for group in groups:
+    if group.name == "ungrouped":
+        continue
+    out.append(f"""
+    impl AnyNode {{
+        pub fn {group.anynode_is_label}(self) -> Option<{group.owned_enum_ty}> {{
+            match self {{
+    """)
+    for node in group.nodes:
+        out.append(
+            f"""AnyNode::{node.name}(node) => Some({group.owned_enum_ty}::{node.variant}(node)),"""
+        )
+    out.append("""
+                _ => None,
+            }
+        }
+    }
+    """)
+
+for group in groups:
+    if group.name == "ungrouped":
+        continue
+    out.append(f"""
+    impl AnyNode {{
+        pub const fn is_{group.anynode_is_label}(&self) -> bool {{
+            matches!(self,
+    """)
+    for i, node in enumerate(group.nodes):
+        if i > 0:
+            out.append("|")
+        out.append(f"""AnyNode::{node.name}(_)""")
+    out.append("""
+            )
+        }
+    }
+    """)
+
 # ------------------------------------------------------------------------------
 # AnyNodeRef
 
@@ -344,6 +383,24 @@ out.append("""
         }
     }
 """)
+
+for group in groups:
+    if group.name == "ungrouped":
+        continue
+    out.append(f"""
+    impl AnyNodeRef<'_> {{
+        pub const fn is_{group.anynode_is_label}(self) -> bool {{
+            matches!(self,
+    """)
+    for i, node in enumerate(group.nodes):
+        if i > 0:
+            out.append("|")
+        out.append(f"""AnyNodeRef::{node.name}(_)""")
+    out.append("""
+            )
+        }
+    }
+    """)
 
 # ------------------------------------------------------------------------------
 # NodeKind

@@ -1,6 +1,7 @@
 # This file is used to autogenerate our Python AST data model.
 
 [Mod]
+anynode_is_label = "module"
 comment = "/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes]
@@ -9,6 +10,7 @@ ModExpression = {}
 
 [Stmt]
 add_suffix_to_is_methods = true
+anynode_is_label = "statement"
 comment = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
 ref_enum_ty = "StatementRef"
 
@@ -41,6 +43,7 @@ StmtIpyEscapeCommand = {}
 
 [Expr]
 add_suffix_to_is_methods = true
+anynode_is_label = "expression"
 comment = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 ref_enum_ty = "ExpressionRef"
 
