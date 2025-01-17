@@ -357,6 +357,18 @@ fn bindings_ty<'db>(
     }
 }
 
+/// A type with declaredness information, and a set of type qualifiers.
+///
+/// This is used to represent the result of looking up the declared type. Consider this
+/// example:
+/// ```py
+/// class C:
+///     if flag:
+///         variable: ClassVar[int]
+/// ```
+/// If we look up the declared type of `variable` in the scope of class `C`, we will get
+/// the type `int`, a "declaredness" of [`Boundness::PossiblyUnbound`], and the information
+/// that this comes with a [`TypeQualifiers::CLASS_VAR`] type qualifier.
 pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
 impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
@@ -367,8 +379,7 @@ impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
 
 impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
     fn from(ty: Type<'db>) -> Self {
-        let symbol: Symbol<'db> = ty.into();
-        symbol.into()
+        SymbolAndQualifiers(ty.into(), TypeQualifiers::empty())
     }
 }
 
