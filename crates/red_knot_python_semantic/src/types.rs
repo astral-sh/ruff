@@ -127,7 +127,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             Err((declared_ty, _conflicting_types)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
-                declared_ty.ignore_qualifiers().into()
+                declared_ty.inner_type().into()
             }
         }
 
@@ -407,12 +407,12 @@ fn declarations_ty<'db>(
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
-            let ty_first = first.ignore_qualifiers();
+            let ty_first = first.inner_type();
             let mut qualifiers = first.qualifiers();
 
             let mut builder = UnionBuilder::new(db).add(ty_first);
             for other in std::iter::once(second).chain(types) {
-                let other_ty = other.ignore_qualifiers();
+                let other_ty = other.inner_type();
                 if !ty_first.is_equivalent_to(db, other_ty) {
                     conflicting.push(other_ty);
                 }
@@ -433,13 +433,13 @@ fn declarations_ty<'db>(
             };
 
             Ok(SymbolAndQualifiers(
-                Symbol::Type(declared_ty.ignore_qualifiers(), boundness),
+                Symbol::Type(declared_ty.inner_type(), boundness),
                 declared_ty.qualifiers(),
             ))
         } else {
             Err((
                 declared_ty,
-                std::iter::once(first.ignore_qualifiers())
+                std::iter::once(first.inner_type())
                     .chain(conflicting)
                     .collect(),
             ))
@@ -2267,7 +2267,7 @@ impl<'db> Type<'db> {
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
                     match element.in_type_expression(db) {
-                        Ok(type_expr) => builder = builder.add(type_expr.ignore_qualifiers()),
+                        Ok(type_expr) => builder = builder.add(type_expr.inner_type()),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
                             invalid_expressions: new_invalid_expressions,
@@ -2523,7 +2523,7 @@ impl<'db> TypeAndQualifiers<'db> {
     }
 
     /// Forget about type qualifiers and only return the inner type.
-    pub(crate) fn ignore_qualifiers(&self) -> Type<'db> {
+    pub(crate) fn inner_type(&self) -> Type<'db> {
         self.inner
     }
 
@@ -4135,10 +4135,7 @@ impl<'db> Class<'db> {
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // Ignore conflicting declarations
-                    (
-                        declared_ty.ignore_qualifiers().into(),
-                        declared_ty.qualifiers(),
-                    )
+                    (declared_ty.inner_type().into(), declared_ty.qualifiers())
                 }
             }
         } else {

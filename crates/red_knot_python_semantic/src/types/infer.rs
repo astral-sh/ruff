@@ -565,7 +565,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|(definition, ty)| {
                 // Filter out class literals that result from imports
                 if let DefinitionKind::Class(class) = definition.kind(self.db()) {
-                    ty.ignore_qualifiers()
+                    ty.inner_type()
                         .into_class_literal()
                         .map(|ty| (ty.class, class.node()))
                 } else {
@@ -872,7 +872,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         conflicting.display(self.db())
                     ),
                 );
-                ty.ignore_qualifiers()
+                ty.inner_type()
             });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
@@ -896,7 +896,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let inferred_ty = bindings_ty(self.db(), prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
-        let ty = if inferred_ty.is_assignable_to(self.db(), ty.ignore_qualifiers()) {
+        let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
         } else {
             self.context.report_lint(
@@ -904,7 +904,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 node,
                 format_args!(
                     "Cannot declare type `{}` for inferred type `{}`",
-                    ty.ignore_qualifiers().display(self.db()),
+                    ty.inner_type().display(self.db()),
                     inferred_ty.display(self.db())
                 ),
             );
@@ -928,17 +928,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 declared_ty,
                 inferred_ty,
             } => {
-                if inferred_ty.is_assignable_to(self.db(), declared_ty.ignore_qualifiers()) {
+                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
                     (declared_ty, inferred_ty)
                 } else {
                     report_invalid_assignment(
                         &self.context,
                         node,
-                        declared_ty.ignore_qualifiers(),
+                        declared_ty.inner_type(),
                         inferred_ty,
                     );
                     // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_ty.ignore_qualifiers())
+                    (declared_ty, declared_ty.inner_type())
                 }
             }
         };
@@ -1769,7 +1769,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let default_ty = self
             .infer_optional_type_expression(default.as_deref())
-            .map(|qualified_type| qualified_type.ignore_qualifiers());
+            .map(|qualified_type| qualified_type.inner_type());
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
@@ -1995,32 +1995,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_standalone_expression(value);
                 }
             }
-            ast::Expr::Attribute(
-                expr_attr @ ast::ExprAttribute {
-                    value: attr_value,
-                    attr,
-                    ctx,
-                    ..
-                },
-            ) => {
-                self.infer_standalone_expression(value);
-                let attr_value_ty = self.infer_expression(attr_value);
-                self.store_expression_type(expr_attr, attr_value_ty);
-
-                if let (ast::ExprContext::Store, Type::Instance(instance)) = (ctx, attr_value_ty) {
-                    let qualifiers = instance.class.instance_member(self.db(), attr).1;
-                    if qualifiers.is_class_var() {
-                        self.context.report_lint(
-                            &INVALID_ATTRIBUTE_ACCESS,
-                            expr_attr.into(),
-                            format_args!(
-                                "Cannot assign to pure class variable `{attr}` from an instance of type `{ty}`",
-                                ty = attr_value_ty.display(self.db()),
-                            ),
-                        );
-                    }
-                }
-            }
             _ => {
                 // TODO: Remove this once we handle all possible assignment targets.
                 self.infer_standalone_expression(value);
@@ -2108,7 +2082,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
 
         // Handle various singletons.
-        if let Type::Instance(InstanceType { class }) = declared_ty.ignore_qualifiers() {
+        if let Type::Instance(InstanceType { class }) = declared_ty.inner_type() {
             if class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
@@ -2125,7 +2099,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Some(value) = value.as_deref() {
             let inferred_ty = self.infer_expression(value);
             let inferred_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
-                declared_ty.ignore_qualifiers()
+                declared_ty.inner_type()
             } else {
                 inferred_ty
             };
@@ -3433,14 +3407,33 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute {
             value,
-            attr: _,
+            attr,
             range: _,
             ctx,
         } = attribute;
 
         match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
-            ExprContext::Store | ExprContext::Del => {
+            ExprContext::Store => {
+                let value_ty = self.infer_expression(value);
+
+                if let (ast::ExprContext::Store, Type::Instance(instance)) = (ctx, value_ty) {
+                    let qualifiers = instance.class.instance_member(self.db(), attr).1;
+                    if qualifiers.is_class_var() {
+                        self.context.report_lint(
+                            &INVALID_ATTRIBUTE_ACCESS,
+                            attribute.into(),
+                            format_args!(
+                                "Cannot assign to pure class variable `{attr}` from an instance of type `{ty}`",
+                                ty = value_ty.display(self.db()),
+                            ),
+                        );
+                    }
+                }
+
+                Type::Never
+            }
+            ExprContext::Del => {
                 self.infer_expression(value);
                 Type::Never
             }
@@ -4798,7 +4791,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             type_expr => self.infer_type_expression_no_store(type_expr),
         };
 
-        self.store_expression_type(annotation, annotation_ty.ignore_qualifiers());
+        self.store_expression_type(annotation, annotation_ty.inner_type());
 
         annotation_ty
     }
@@ -4830,14 +4823,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         expression: &ast::Expr,
     ) -> TypeAndQualifiers<'db> {
         let qualified_ty = self.infer_type_expression_no_store(expression);
-        self.store_expression_type(expression, qualified_ty.ignore_qualifiers());
+        self.store_expression_type(expression, qualified_ty.inner_type());
         qualified_ty
     }
 
     /// Infer the type of a type expression.
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         self.infer_type_expression_with_qualifiers(expression)
-            .ignore_qualifiers()
+            .inner_type()
     }
 
     /// Similar to [`infer_type_expression_with_qualifiers`], but accepts an optional
@@ -5279,7 +5272,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let qualified_ty = self.infer_type_expression_with_qualifiers(type_expr);
-                self.store_expression_type(arguments_slice, qualified_ty.ignore_qualifiers());
+                self.store_expression_type(arguments_slice, qualified_ty.inner_type());
                 return qualified_ty;
             }
             KnownInstanceType::Literal => {
