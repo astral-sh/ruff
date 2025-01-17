@@ -8,3 +8,12 @@ S312.py:3:1: S312 Telnet is considered insecure. Use SSH or some other encrypted
 3 | Telnet("localhost", 23)
   | ^^^^^^^^^^^^^^^^^^^^^^^ S312
   |
+
+S312.py:14:24: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+   |
+13 | from typing import Annotated
+14 | foo: Annotated[Telnet, telnetlib.Telnet()]
+   |                        ^^^^^^^^^^^^^^^^^^ S312
+15 |
+16 | def _() -> Telnet: ...
+   |

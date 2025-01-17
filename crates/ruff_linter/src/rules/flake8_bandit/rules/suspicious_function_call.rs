@@ -911,7 +911,7 @@ fn suspicious_function(
         }
     }
 
-    if checker.semantic().in_annotation() {
+    if checker.semantic().in_type_definition() {
         return;
     }
 

@@ -10,4 +10,7 @@ foo = Telnet
 import telnetlib
 _ = telnetlib.Telnet
 
+from typing import Annotated
+foo: Annotated[Telnet, telnetlib.Telnet()]
+
 def _() -> Telnet: ...
