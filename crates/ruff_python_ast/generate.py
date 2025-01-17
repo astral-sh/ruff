@@ -187,7 +187,7 @@ for group in groups:
     """)
 
 # ------------------------------------------------------------------------------
-# AnyNode and AnyNodeRef
+# AnyNode
 
 out.append("""
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
@@ -225,6 +225,23 @@ for group in groups:
             }}
         }}
         """)
+
+out.append("""
+    impl ruff_text_size::Ranged for AnyNode {
+        fn range(&self) -> ruff_text_size::TextRange {
+            match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""AnyNode::{node.name}(node) => node.range(),""")
+out.append("""
+            }
+        }
+    }
+""")
+
+# ------------------------------------------------------------------------------
+# AnyNodeRef
 
 out.append("""
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
@@ -277,6 +294,20 @@ for group in groups:
             }}
         }}
         """)
+
+out.append("""
+    impl ruff_text_size::Ranged for AnyNodeRef<'_> {
+        fn range(&self) -> ruff_text_size::TextRange {
+            match self {
+""")
+for group in groups:
+    for node in group.nodes:
+        out.append(f"""AnyNodeRef::{node.name}(node) => node.range(),""")
+out.append("""
+            }
+        }
+    }
+""")
 
 # ------------------------------------------------------------------------------
 # AstNode
