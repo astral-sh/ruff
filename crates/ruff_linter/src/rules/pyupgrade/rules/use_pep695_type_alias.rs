@@ -322,14 +322,10 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
     }
 
     let StmtFunctionDef {
-        range,
-        is_async,
-        decorator_list,
         name,
         type_params,
         parameters,
-        returns,
-        body,
+        ..
     } = function_def;
 
     // TODO(brent) handle methods, for now return early in a class body. For example, an additional
@@ -376,29 +372,27 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
 
-    let generator = checker.generator();
+    if type_vars.is_empty() {
+        return;
+    }
+
+    // build the fix as a String to avoid removing comments from the entire function body
+    let mut type_params = String::from("[");
+    for tv in type_vars {
+        tv.fmt_into(&mut type_params, checker.source());
+    }
+    type_params.push(']');
+
     checker.diagnostics.push(
         Diagnostic::new(
             NonPEP695TypeAlias {
                 name: name.to_string(),
                 type_alias_kind: TypeAliasKind::GenericFunction,
             },
-            TextRange::new(name.range().start(), parameters.range().end()),
+            TextRange::new(name.start(), parameters.end()),
         )
         .with_fix(Fix::applicable_edit(
-            Edit::range_replacement(
-                generator.stmt(&Stmt::from(StmtFunctionDef {
-                    range: TextRange::default(),
-                    is_async: *is_async,
-                    decorator_list: decorator_list.clone(),
-                    name: name.clone(),
-                    type_params: create_type_params(&type_vars).map(Box::new),
-                    parameters: parameters.clone(),
-                    returns: returns.clone(),
-                    body: body.clone(),
-                })),
-                *range,
-            ),
+            Edit::insertion(type_params, name.end()),
             Applicability::Safe,
         )),
     );
@@ -470,6 +464,33 @@ struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
     kind: TypeVarKind,
+}
+
+impl<'a> TypeVar<'a> {
+    /// Format `self` into `s`, where `source` is the whole file, which will be sliced to recover
+    /// the `TypeVarRestriction` values for generic bounds and constraints.
+    fn fmt_into(&self, s: &mut String, source: &str) {
+        s.push_str(&self.name.id);
+        if let Some(restriction) = &self.restriction {
+            s.push_str(": ");
+            match restriction {
+                TypeVarRestriction::Bound(bound) => {
+                    s.push_str(&source[bound.range()]);
+                }
+                TypeVarRestriction::Constraint(vec) => {
+                    let len = vec.len();
+                    s.push('(');
+                    for (i, v) in vec.iter().enumerate() {
+                        s.push_str(&source[v.range()]);
+                        if i < len - 1 {
+                            s.push_str(", ");
+                        }
+                    }
+                    s.push(')');
+                }
+            }
+        }
+    }
 }
 
 impl<'a> From<&'a TypeVar<'a>> for TypeParam {
