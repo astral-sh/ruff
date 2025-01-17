@@ -630,6 +630,10 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub const fn is_intersection(&self) -> bool {
+        matches!(self, Type::Intersection(..))
+    }
+
     #[track_caller]
     pub fn expect_intersection(self) -> IntersectionType<'db> {
         self.into_intersection()
@@ -4231,7 +4235,28 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
 
+    /// Return `true` if the elements in this union type are already sorted according to the algorithm
+    /// given by the [`union_elements_ordering`] routine, *and* all intersection elements in the union
+    /// are also internally sorted.
+    fn is_sorted(self, db: &'db dyn Db) -> bool {
+        let elements = self.elements(db);
+
+        type_ordering::sequence_is_sorted(elements)
+            && elements
+                .iter()
+                .copied()
+                .skip_while(|ty| !ty.is_intersection())
+                .map_while(Type::into_intersection)
+                .all(|intersection| intersection.is_sorted(db))
+    }
+
+    /// Return a new [`UnionType`] instance with the same elements as `self`,
+    /// but sorted according to a canonical ordering.
     fn to_sorted_union(self, db: &'db dyn Db) -> UnionType<'db> {
+        if self.is_sorted(db) {
+            return self;
+        }
+
         let mut elements = self.elements_boxed(db).to_vec();
         for element in &mut elements {
             if let Type::Intersection(intersection) = element {
@@ -4239,6 +4264,7 @@ impl<'db> UnionType<'db> {
             }
         }
         elements.sort_unstable_by(union_elements_ordering);
+
         UnionType::new(db, elements.into_boxed_slice())
     }
 }
@@ -4259,7 +4285,20 @@ pub struct IntersectionType<'db> {
 }
 
 impl<'db> IntersectionType<'db> {
+    /// Return `true` if the elements in this intersection type are already sorted according
+    /// to the algorithm given by the [`union_elements_ordering`] routine
+    fn is_sorted(self, db: &'db dyn Db) -> bool {
+        type_ordering::sequence_is_sorted(self.positive(db))
+            && type_ordering::sequence_is_sorted(self.negative(db))
+    }
+
+    /// Return a new [`IntersectionType`] instance with the same elements as `self`,
+    /// but sorted according to a canonical ordering.
     fn to_sorted_intersection(self, db: &'db dyn Db) -> IntersectionType<'db> {
+        if self.is_sorted(db) {
+            return self;
+        }
+
         let mut positive = self.positive(db).clone();
         positive.sort_unstable_by(union_elements_ordering);
 
