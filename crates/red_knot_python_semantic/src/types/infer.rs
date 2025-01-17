@@ -4902,8 +4902,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    /// Similar to [`infer_type_expression`], but accepts an optional
-    /// type expression and returns [`None`] if the expression is [`None`].
+    /// Similar to [`infer_type_expression`], but accepts an optional type expression and returns
+    /// [`None`] if the expression is [`None`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
     fn infer_optional_type_expression(
@@ -4922,9 +4922,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         deferred_state: DeferredExpressionState,
     ) -> Type<'db> {
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
-        let type_expression_ty = self.infer_type_expression(expression);
+        let annotation_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
-        type_expression_ty
+        annotation_ty
     }
 
     /// Infer the type of a type expression without storing the result.

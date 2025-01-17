@@ -124,7 +124,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                 bindings_ty(db, bindings)
             }
             // Symbol is possibly undeclared
-            Err((declared_ty, _conflicting_types)) => {
+            Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
                 declared_ty.inner_type().into()
@@ -2259,7 +2259,7 @@ impl<'db> Type<'db> {
     /// `Type::ClassLiteral(builtins.int)`, that is, it is the `int` class itself. As a type
     /// expression, it names the type `Type::Instance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
-    pub(crate) fn in_type_expression(
+    pub fn in_type_expression(
         &self,
         db: &'db dyn Db,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
