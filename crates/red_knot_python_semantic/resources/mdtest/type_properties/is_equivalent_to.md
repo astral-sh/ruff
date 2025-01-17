@@ -42,21 +42,21 @@ class Q: ...
 class R: ...
 class S: ...
 
-static_assert(is_equivalent_to(P | Q | R, P | R | Q)) #1
-static_assert(is_equivalent_to(P | Q | R, Q | P | R)) #2
-static_assert(is_equivalent_to(P | Q | R, Q | R | P)) #3
-static_assert(is_equivalent_to(P | Q | R, R | P | Q)) #4
-static_assert(is_equivalent_to(P | Q | R, R | Q | P)) #5
-static_assert(is_equivalent_to(P | R | Q, Q | P | R)) #6
-static_assert(is_equivalent_to(P | R | Q, Q | R | P)) #7
-static_assert(is_equivalent_to(P | R | Q, R | P | Q)) #8
-static_assert(is_equivalent_to(P | R | Q, R | Q | P)) #9
-static_assert(is_equivalent_to(Q | P | R, Q | R | P)) #10
-static_assert(is_equivalent_to(Q | P | R, R | P | Q)) #11
-static_assert(is_equivalent_to(Q | P | R, R | Q | P)) #12
-static_assert(is_equivalent_to(Q | R | P, R | P | Q)) #13
-static_assert(is_equivalent_to(Q | R | P, R | Q | P)) #14
-static_assert(is_equivalent_to(R | P | Q, R | Q | P)) #15
+static_assert(is_equivalent_to(P | Q | R, P | R | Q))  # 1
+static_assert(is_equivalent_to(P | Q | R, Q | P | R))  # 2
+static_assert(is_equivalent_to(P | Q | R, Q | R | P))  # 3
+static_assert(is_equivalent_to(P | Q | R, R | P | Q))  # 4
+static_assert(is_equivalent_to(P | Q | R, R | Q | P))  # 5
+static_assert(is_equivalent_to(P | R | Q, Q | P | R))  # 6
+static_assert(is_equivalent_to(P | R | Q, Q | R | P))  # 7
+static_assert(is_equivalent_to(P | R | Q, R | P | Q))  # 8
+static_assert(is_equivalent_to(P | R | Q, R | Q | P))  # 9
+static_assert(is_equivalent_to(Q | P | R, Q | R | P))  # 10
+static_assert(is_equivalent_to(Q | P | R, R | P | Q))  # 11
+static_assert(is_equivalent_to(Q | P | R, R | Q | P))  # 12
+static_assert(is_equivalent_to(Q | R | P, R | P | Q))  # 13
+static_assert(is_equivalent_to(Q | R | P, R | Q | P))  # 14
+static_assert(is_equivalent_to(R | P | Q, R | Q | P))  # 15
 
 static_assert(is_equivalent_to(str | None, None | str))
 

@@ -2,10 +2,9 @@ use std::cmp::Ordering;
 
 use itertools::Itertools;
 
-use crate::types::Type;
-
 use super::{
-    class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType, TodoType,
+    class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
+    TodoType, Type,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
