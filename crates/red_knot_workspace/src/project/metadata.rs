@@ -3,7 +3,7 @@ use ruff_python_ast::name::Name;
 
 use crate::project::combine::Combine;
 use crate::project::options::Options;
-use crate::project::pyproject::{PyProject, PyProjectError};
+use crate::project::pyproject::{Project, PyProject, PyProjectError};
 use red_knot_python_semantic::ProgramSettings;
 use thiserror::Error;
 
@@ -32,36 +32,30 @@ impl ProjectMetadata {
 
     /// Loads a project from a `pyproject.toml` file.
     pub(crate) fn from_pyproject(pyproject: PyProject, root: SystemPathBuf) -> Self {
-        let name = Self::name_from_pyproject(Some(&pyproject), &root);
-        let options = pyproject
-            .tool
-            .and_then(|tool| tool.knot)
-            .unwrap_or_default();
-
-        Self {
-            name,
+        Self::from_options(
+            pyproject
+                .tool
+                .and_then(|tool| tool.knot)
+                .unwrap_or_default(),
             root,
-            options,
-        }
+            pyproject.project.as_ref(),
+        )
     }
 
-    fn name_from_pyproject(pyproject: Option<&PyProject>, root: &SystemPath) -> Name {
-        let name = pyproject
-            .and_then(|pyproject| pyproject.project.as_ref())
-            .and_then(|project| project.name.as_ref());
-        name.map(|name| Name::new(&**name))
-            .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")))
-    }
-
-    /// Loads a project form a `knot.toml` file.
-    pub(crate) fn from_knot_toml(
+    /// Loads a project from a set of options with an optional pyproject-project table.
+    pub(crate) fn from_options(
         options: Options,
         root: SystemPathBuf,
-        pyproject: Option<&PyProject>,
+        project: Option<&Project>,
     ) -> Self {
+        let name = project
+            .and_then(|project| project.name.as_ref())
+            .map(|name| Name::new(&**name))
+            .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
+
         // TODO(https://github.com/astral-sh/ruff/issues/15491): Respect requires-python
         Self {
-            name: Self::name_from_pyproject(pyproject, &root),
+            name,
             root,
             options,
         }
@@ -126,10 +120,12 @@ impl ProjectMetadata {
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
-                return Ok(ProjectMetadata::from_knot_toml(
+                return Ok(ProjectMetadata::from_options(
                     options,
                     project_root.to_path_buf(),
-                    pyproject.as_ref(),
+                    pyproject
+                        .as_ref()
+                        .and_then(|pyproject| pyproject.project.as_ref()),
                 ));
             }
 
