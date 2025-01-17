@@ -244,12 +244,10 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     }
 
     let StmtClassDef {
-        range,
-        decorator_list,
         name,
         type_params,
         arguments,
-        body,
+        ..
     } = class_def;
 
     // it's a runtime error to mix type_params and Generic, so bail out early if we see existing
@@ -262,6 +260,8 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         return;
     };
 
+    // TODO(brent) only accept a single, Generic argument for now. I think it should be fine to have
+    // other arguments, but this simplifies the fix just to delete the argument list for now
     let [Expr::Subscript(ExprSubscript { value, slice, .. })] = arguments.args.as_ref() else {
         return;
     };
@@ -280,36 +280,28 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     };
 
     // Type variables must be unique; filter while preserving order.
-    let vars = vars
+    let type_vars = vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
 
-    let generator = checker.generator();
+    // build the fix as a String to avoid removing comments from the entire function body
+    let mut type_params = String::from("[");
+    for tv in type_vars {
+        tv.fmt_into(&mut type_params, checker.source());
+    }
+    type_params.push_str("]");
+
     checker.diagnostics.push(
         Diagnostic::new(
             NonPEP695TypeAlias {
                 name: name.to_string(),
                 type_alias_kind: TypeAliasKind::GenericClass,
             },
-            TextRange::new(name.range().start(), arguments.range().end()),
+            TextRange::new(name.start(), arguments.end()),
         )
         .with_fix(Fix::applicable_edit(
-            Edit::range_replacement(
-                generator.stmt(&Stmt::from(StmtClassDef {
-                    range: TextRange::default(),
-                    decorator_list: decorator_list.clone(),
-                    name: name.clone(),
-                    type_params: create_type_params(&vars).map(Box::new),
-                    // checked for a single argument above, so this is always None
-                    arguments: None,
-                    body: body.clone(),
-                })),
-                *range,
-            ),
-            // The fix should be safe given the assumptions here:
-            // 1. No existing type_params to conflict with
-            // 2. A single, Generic argument to the class
+            Edit::replacement(type_params, name.end(), arguments.end()),
             Applicability::Safe,
         )),
     );
@@ -470,6 +462,11 @@ impl<'a> TypeVar<'a> {
     /// Format `self` into `s`, where `source` is the whole file, which will be sliced to recover
     /// the `TypeVarRestriction` values for generic bounds and constraints.
     fn fmt_into(&self, s: &mut String, source: &str) {
+        match self.kind {
+            TypeVarKind::Var => {}
+            TypeVarKind::Tuple => s.push('*'),
+            TypeVarKind::ParamSpec => s.push_str("**"),
+        }
         s.push_str(&self.name.id);
         if let Some(restriction) = &self.restriction {
             s.push_str(": ");
