@@ -24,7 +24,7 @@ nodes_file = (
     root.joinpath("crates")
     .joinpath("ruff_python_ast")
     .joinpath("src")
-    .joinpath("node.rs")
+    .joinpath("generated.rs")
     .read_text()
 )
 node_lines = (
