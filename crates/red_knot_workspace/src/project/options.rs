@@ -90,7 +90,7 @@ pub struct EnvironmentOptions {
     /// bundled as a zip file in the binary
     pub typeshed: Option<SystemPathBuf>,
 
-    // TODO: Rename to python, see
+    // TODO: Rename to python, see https://github.com/astral-sh/ruff/issues/15530
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
     pub venv_path: Option<SitePackages>,
 }
