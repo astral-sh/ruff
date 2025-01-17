@@ -1,13 +1,9 @@
 use std::cmp::Ordering;
 
-use ruff_db::files::{File, FilePath};
-
-use crate::db::Db;
 use crate::types::Type;
 
 use super::{
-    class_base::ClassBase, Class, ClassLiteralType, DynamicType, InstanceType, KnownClass,
-    KnownInstanceType, TodoType,
+    class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType, TodoType,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -30,11 +26,7 @@ use super::{
 /// Moreover, it doesn't really "make sense" for `Type` to implement `Ord` in terms of the
 /// semantics. There are many different ways in which you could plausibly sort a list of types;
 /// this is only one (somewhat arbitrary, at times) possible ordering.
-pub(super) fn order_union_elements<'db>(
-    db: &'db dyn Db,
-    left: &Type<'db>,
-    right: &Type<'db>,
-) -> Ordering {
+pub(super) fn order_union_elements<'db>(left: &Type<'db>, right: &Type<'db>) -> Ordering {
     if left == right {
         return Ordering::Equal;
     }
@@ -54,69 +46,42 @@ pub(super) fn order_union_elements<'db>(
         (Type::IntLiteral(_), _) => Ordering::Less,
         (_, Type::IntLiteral(_)) => Ordering::Greater,
 
-        (Type::StringLiteral(left), Type::StringLiteral(right)) => {
-            left.value(db).cmp(right.value(db))
-        }
-
+        (Type::StringLiteral(left), Type::StringLiteral(right)) => left.cmp(right),
         (Type::StringLiteral(_), _) => Ordering::Less,
         (_, Type::StringLiteral(_)) => Ordering::Greater,
 
-        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => {
-            left.value(db).cmp(right.value(db))
-        }
-
+        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => left.cmp(right),
         (Type::BytesLiteral(_), _) => Ordering::Less,
         (_, Type::BytesLiteral(_)) => Ordering::Greater,
 
-        (Type::SliceLiteral(left), Type::SliceLiteral(right)) => {
-            left.as_tuple(db).cmp(&right.as_tuple(db))
-        }
-
+        (Type::SliceLiteral(left), Type::SliceLiteral(right)) => left.cmp(right),
         (Type::SliceLiteral(_), _) => Ordering::Less,
         (_, Type::SliceLiteral(_)) => Ordering::Greater,
 
-        // First ensure functions in the same file are grouped together,
-        // then sort by the function's name, then by the function's Salsa ID.
-        (Type::FunctionLiteral(left_fn), Type::FunctionLiteral(right_fn)) => order_files(
-            db,
-            left_fn.body_scope(db).file(db),
-            right_fn.body_scope(db).file(db),
-        )
-        .then_with(|| left_fn.name(db).cmp(right_fn.name(db)))
-        .then_with(|| left_fn.cmp(right_fn)),
-
+        (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => {
-            order_sequences(db, left.elements(db), right.elements(db))
-        }
+        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,
 
-        (Type::ModuleLiteral(left_mod), Type::ModuleLiteral(right_mod)) => {
-            order_files(db, left_mod.module(db).file(), right_mod.module(db).file())
-        }
-
+        (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => left.cmp(right),
         (Type::ModuleLiteral(_), _) => Ordering::Less,
         (_, Type::ModuleLiteral(_)) => Ordering::Greater,
 
         (
             Type::ClassLiteral(ClassLiteralType { class: left }),
             Type::ClassLiteral(ClassLiteralType { class: right }),
-        ) => order_class_elements(db, *left, *right),
-
+        ) => left.cmp(right),
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
 
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
-                (ClassBase::Class(left), ClassBase::Class(right)) => {
-                    order_class_elements(db, left, right)
-                }
+                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
-
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     order_dynamic_elements(left, right)
                 }
@@ -125,36 +90,145 @@ pub(super) fn order_union_elements<'db>(
 
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
-
         (
             Type::Instance(InstanceType { class: left }),
             Type::Instance(InstanceType { class: right }),
-        ) => order_class_elements(db, *left, *right),
+        ) => left.cmp(right),
 
         (Type::Instance(_), _) => Ordering::Less,
         (_, Type::Instance(_)) => Ordering::Greater,
 
-        // Nice to have this after most other types, since it's a type users will be less familiar with.
         (Type::AlwaysTruthy, _) => Ordering::Less,
         (_, Type::AlwaysTruthy) => Ordering::Greater,
 
-        // Nice to have this after most other types, since it's a type users will be less familiar with.
         (Type::AlwaysFalsy, _) => Ordering::Less,
         (_, Type::AlwaysFalsy) => Ordering::Greater,
 
-        (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => left_instance
-            .repr(db)
-            .cmp(right_instance.repr(db))
-            .then_with(|| match (left_instance, right_instance) {
+        (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => {
+            match (left_instance, right_instance) {
+                (KnownInstanceType::Any, _) => Ordering::Less,
+                (_, KnownInstanceType::Any) => Ordering::Greater,
+
+                (KnownInstanceType::Tuple, _) => Ordering::Less,
+                (_, KnownInstanceType::Tuple) => Ordering::Greater,
+
+                (KnownInstanceType::AlwaysFalsy, _) => Ordering::Less,
+                (_, KnownInstanceType::AlwaysFalsy) => Ordering::Greater,
+
+                (KnownInstanceType::AlwaysTruthy, _) => Ordering::Less,
+                (_, KnownInstanceType::AlwaysTruthy) => Ordering::Greater,
+
+                (KnownInstanceType::Annotated, _) => Ordering::Less,
+                (_, KnownInstanceType::Annotated) => Ordering::Greater,
+
+                (KnownInstanceType::Callable, _) => Ordering::Less,
+                (_, KnownInstanceType::Callable) => Ordering::Greater,
+
+                (KnownInstanceType::ChainMap, _) => Ordering::Less,
+                (_, KnownInstanceType::ChainMap) => Ordering::Greater,
+
+                (KnownInstanceType::ClassVar, _) => Ordering::Less,
+                (_, KnownInstanceType::ClassVar) => Ordering::Greater,
+
+                (KnownInstanceType::Concatenate, _) => Ordering::Less,
+                (_, KnownInstanceType::Concatenate) => Ordering::Greater,
+
+                (KnownInstanceType::Counter, _) => Ordering::Less,
+                (_, KnownInstanceType::Counter) => Ordering::Greater,
+
+                (KnownInstanceType::DefaultDict, _) => Ordering::Less,
+                (_, KnownInstanceType::DefaultDict) => Ordering::Greater,
+
+                (KnownInstanceType::Deque, _) => Ordering::Less,
+                (_, KnownInstanceType::Deque) => Ordering::Greater,
+
+                (KnownInstanceType::Dict, _) => Ordering::Less,
+                (_, KnownInstanceType::Dict) => Ordering::Greater,
+
+                (KnownInstanceType::Final, _) => Ordering::Less,
+                (_, KnownInstanceType::Final) => Ordering::Greater,
+
+                (KnownInstanceType::FrozenSet, _) => Ordering::Less,
+                (_, KnownInstanceType::FrozenSet) => Ordering::Greater,
+
+                (KnownInstanceType::TypeGuard, _) => Ordering::Less,
+                (_, KnownInstanceType::TypeGuard) => Ordering::Greater,
+
+                (KnownInstanceType::List, _) => Ordering::Less,
+                (_, KnownInstanceType::List) => Ordering::Greater,
+
+                (KnownInstanceType::Literal, _) => Ordering::Less,
+                (_, KnownInstanceType::Literal) => Ordering::Greater,
+
+                (KnownInstanceType::LiteralString, _) => Ordering::Less,
+                (_, KnownInstanceType::LiteralString) => Ordering::Greater,
+
+                (KnownInstanceType::Optional, _) => Ordering::Less,
+                (_, KnownInstanceType::Optional) => Ordering::Greater,
+
+                (KnownInstanceType::OrderedDict, _) => Ordering::Less,
+                (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
+
+                (KnownInstanceType::NoReturn, _) => Ordering::Less,
+                (_, KnownInstanceType::NoReturn) => Ordering::Greater,
+
+                (KnownInstanceType::Never, _) => Ordering::Less,
+                (_, KnownInstanceType::Never) => Ordering::Greater,
+
+                (KnownInstanceType::Set, _) => Ordering::Less,
+                (_, KnownInstanceType::Set) => Ordering::Greater,
+
+                (KnownInstanceType::Type, _) => Ordering::Less,
+                (_, KnownInstanceType::Type) => Ordering::Greater,
+
+                (KnownInstanceType::TypeAlias, _) => Ordering::Less,
+                (_, KnownInstanceType::TypeAlias) => Ordering::Greater,
+
+                (KnownInstanceType::Unknown, _) => Ordering::Less,
+                (_, KnownInstanceType::Unknown) => Ordering::Greater,
+
+                (KnownInstanceType::Not, _) => Ordering::Less,
+                (_, KnownInstanceType::Not) => Ordering::Greater,
+
+                (KnownInstanceType::Intersection, _) => Ordering::Less,
+                (_, KnownInstanceType::Intersection) => Ordering::Greater,
+
+                (KnownInstanceType::TypeOf, _) => Ordering::Less,
+                (_, KnownInstanceType::TypeOf) => Ordering::Greater,
+
+                (KnownInstanceType::Unpack, _) => Ordering::Less,
+                (_, KnownInstanceType::Unpack) => Ordering::Greater,
+
+                (KnownInstanceType::TypingSelf, _) => Ordering::Less,
+                (_, KnownInstanceType::TypingSelf) => Ordering::Greater,
+
+                (KnownInstanceType::Required, _) => Ordering::Less,
+                (_, KnownInstanceType::Required) => Ordering::Greater,
+
+                (KnownInstanceType::NotRequired, _) => Ordering::Less,
+                (_, KnownInstanceType::NotRequired) => Ordering::Greater,
+
+                (KnownInstanceType::TypeIs, _) => Ordering::Less,
+                (_, KnownInstanceType::TypeIs) => Ordering::Greater,
+
+                (KnownInstanceType::ReadOnly, _) => Ordering::Less,
+                (_, KnownInstanceType::ReadOnly) => Ordering::Greater,
+
+                (KnownInstanceType::Union, _) => Ordering::Less,
+                (_, KnownInstanceType::Union) => Ordering::Greater,
+
                 (
                     KnownInstanceType::TypeAliasType(left),
                     KnownInstanceType::TypeAliasType(right),
-                ) => left
-                    .name(db)
-                    .cmp(right.name(db))
-                    .then_with(|| left.cmp(right)),
-                _ => Ordering::Equal,
-            }),
+                ) => left.cmp(right),
+                (KnownInstanceType::TypeAliasType(_), _) => Ordering::Less,
+                (_, KnownInstanceType::TypeAliasType(_)) => Ordering::Greater,
+
+                (KnownInstanceType::TypeVar(left), KnownInstanceType::TypeVar(right)) => {
+                    left.cmp(right)
+                }
+            }
+        }
 
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
@@ -163,82 +237,12 @@ pub(super) fn order_union_elements<'db>(
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
-        (Type::Union(left), Type::Union(right)) => {
-            let left = left.to_sorted_union(db);
-            let right = right.to_sorted_union(db);
-            if left == right {
-                Ordering::Equal
-            } else {
-                order_sequences(db, left.elements(db), right.elements(db))
-            }
-        }
+        (Type::Union(left), Type::Union(right)) => left.cmp(right),
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
 
-        (Type::Intersection(left), Type::Intersection(right)) => {
-            let left = left.to_sorted_intersection(db);
-            let right = right.to_sorted_intersection(db);
-            if left == right {
-                Ordering::Equal
-            } else {
-                order_sequences(db, left.positive(db), right.positive(db))
-                    .then_with(|| order_sequences(db, left.negative(db), right.negative(db)))
-            }
-        }
+        (Type::Intersection(left), Type::Intersection(right)) => left.cmp(right),
     }
-}
-
-/// Determine a canonical order for two [`File`]s.
-///
-/// This is useful for ordering modules, classes and functions:
-/// for all three, it makes sense to group types from the same module together
-/// in intersections and unions.
-fn order_files(db: &dyn Db, left_file: File, right_file: File) -> Ordering {
-    if left_file == right_file {
-        return Ordering::Equal;
-    }
-
-    let left_path = left_file.path(db.upcast());
-    let right_path = right_file.path(db.upcast());
-
-    match (left_path, right_path) {
-        (FilePath::System(left_path), FilePath::System(right_path)) => left_path.cmp(right_path),
-        (FilePath::System(_), _) => Ordering::Less,
-        (_, FilePath::System(_)) => Ordering::Greater,
-
-        (FilePath::Vendored(left_path), FilePath::Vendored(right_path)) => {
-            left_path.cmp(right_path)
-        }
-        (FilePath::Vendored(_), _) => Ordering::Less,
-        (_, FilePath::Vendored(_)) => Ordering::Greater,
-
-        (FilePath::SystemVirtual(left_path), FilePath::SystemVirtual(right_path)) => {
-            left_path.cmp(right_path)
-        }
-    }
-    .then_with(|| left_file.cmp(&right_file))
-}
-
-/// Determine a canonical order for two [`Class`]es.
-fn order_class_elements<'db>(db: &'db dyn Db, left: Class<'db>, right: Class<'db>) -> Ordering {
-    if left == right {
-        return Ordering::Equal;
-    }
-
-    // aesthetically, it's nice if `None` is always last
-    if left.is_known(db, KnownClass::NoneType) {
-        return Ordering::Greater;
-    }
-    if right.is_known(db, KnownClass::NoneType) {
-        return Ordering::Less;
-    }
-
-    // General case: first, group the classes according to which file they're in
-    order_files(db, left.file(db), right.file(db))
-        // then sort by the class's name
-        .then_with(|| left.name(db).cmp(right.name(db)))
-        // lastly, sort by the Salsa ID directly
-        .then_with(|| left.cmp(&right))
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
@@ -267,23 +271,4 @@ fn order_dynamic_elements(left: DynamicType, right: DynamicType) -> Ordering {
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
     }
-}
-
-/// Determine a canonical order for two types that wrap sequences of other types.
-///
-/// This is useful for ordering tuples, unions and intersections.
-fn order_sequences<'db, I, J>(db: &'db dyn Db, left: I, right: I) -> Ordering
-where
-    I: IntoIterator<IntoIter = J>,
-    J: ExactSizeIterator<Item = &'db Type<'db>>,
-{
-    let left = left.into_iter();
-    let right = right.into_iter();
-
-    left.len().cmp(&right.len()).then_with(|| {
-        left.zip(right)
-            .map(|(left, right)| order_union_elements(db, left, right))
-            .find(|ordering| !ordering.is_eq())
-            .unwrap_or(Ordering::Equal)
-    })
 }

@@ -623,10 +623,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Union(..))
     }
 
-    pub const fn is_intersection(&self) -> bool {
-        matches!(self, Type::Intersection(..))
-    }
-
     pub const fn into_intersection(self) -> Option<IntersectionType<'db>> {
         match self {
             Type::Intersection(intersection_type) => Some(intersection_type),
@@ -4244,7 +4240,7 @@ impl<'db> UnionType<'db> {
                 *element = Type::Intersection(intersection.to_sorted_intersection(db));
             }
         }
-        elements.sort_unstable_by(|left, right| order_union_elements(db, left, right));
+        elements.sort_unstable_by(order_union_elements);
         UnionType::new(db, elements.into_boxed_slice())
     }
 }
@@ -4269,10 +4265,10 @@ impl<'db> IntersectionType<'db> {
     #[salsa::tracked]
     fn to_sorted_intersection(self, db: &'db dyn Db) -> IntersectionType<'db> {
         let mut positive = self.positive(db).clone();
-        positive.sort_unstable_by(|left, right| order_union_elements(db, left, right));
+        positive.sort_unstable_by(order_union_elements);
 
         let mut negative = self.negative(db).clone();
-        negative.sort_unstable_by(|left, right| order_union_elements(db, left, right));
+        negative.sort_unstable_by(order_union_elements);
 
         IntersectionType::new(db, positive, negative)
     }
