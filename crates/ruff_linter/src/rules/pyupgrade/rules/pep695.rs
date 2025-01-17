@@ -39,6 +39,8 @@ struct TypeVar<'a> {
     kind: TypeVarKind,
 }
 
+/// Format a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T, *Ts, **P]`).
+/// See [`TypeVar::fmt_into`] for further details.
 fn fmt_type_vars(type_vars: &[TypeVar], checker: &Checker) -> String {
     let nvars = type_vars.len();
     let mut type_params = String::from("[");
