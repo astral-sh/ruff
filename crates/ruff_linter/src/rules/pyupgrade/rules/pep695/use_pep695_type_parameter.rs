@@ -87,7 +87,7 @@ impl Violation for NonPEP695TypeParameter {
     }
 }
 
-/// UP040
+/// UP046
 pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtClassDef) {
     if checker.settings.target_version < PythonVersion::Py312 {
         return;
@@ -161,7 +161,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     );
 }
 
-/// UP040
+/// UP046
 pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &StmtFunctionDef) {
     if checker.settings.target_version < PythonVersion::Py312 {
         return;

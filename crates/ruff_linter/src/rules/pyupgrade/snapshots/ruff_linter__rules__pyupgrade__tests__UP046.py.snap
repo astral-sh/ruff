@@ -2,10 +2,10 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP040_1.py:9:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP046.py:9:7: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
  9 | class A(Generic[T]):
-   |       ^^^^^^^^^^^^^ UP040
+   |       ^^^^^^^^^^^^^ UP046
 10 |     # Comments in a class body are preserved
 11 |     pass
    |
@@ -21,10 +21,10 @@ UP040_1.py:9:7: UP040 [*] Generic class `A` uses `Generic` subclass instead of t
 11 11 |     pass
 12 12 | 
 
-UP040_1.py:14:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP046.py:14:7: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
 14 | class B(Generic[*Ts]):
-   |       ^^^^^^^^^^^^^^^ UP040
+   |       ^^^^^^^^^^^^^^^ UP046
 15 |     pass
    |
    = help: Use type parameters
@@ -39,10 +39,10 @@ UP040_1.py:14:7: UP040 [*] Generic class `B` uses `Generic` subclass instead of 
 16 16 | 
 17 17 | 
 
-UP040_1.py:18:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP046.py:18:7: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
 18 | class C(Generic[P]):
-   |       ^^^^^^^^^^^^^ UP040
+   |       ^^^^^^^^^^^^^ UP046
 19 |     pass
    |
    = help: Use type parameters
@@ -57,10 +57,10 @@ UP040_1.py:18:7: UP040 [*] Generic class `C` uses `Generic` subclass instead of 
 20 20 | 
 21 21 | 
 
-UP040_1.py:22:5: UP040 [*] Generic function `f` should use type parameters
+UP046.py:22:5: UP046 [*] Generic function `f` should use type parameters
    |
 22 | def f(t: T):
-   |     ^^^^^^^ UP040
+   |     ^^^^^^^ UP046
 23 |     pass
    |
    = help: Use type parameters
@@ -75,10 +75,10 @@ UP040_1.py:22:5: UP040 [*] Generic function `f` should use type parameters
 24 24 | 
 25 25 | 
 
-UP040_1.py:26:5: UP040 [*] Generic function `g` should use type parameters
+UP046.py:26:5: UP046 [*] Generic function `g` should use type parameters
    |
 26 | def g(ts: tuple[*Ts]):
-   |     ^^^^^^^^^^^^^^^^^ UP040
+   |     ^^^^^^^^^^^^^^^^^ UP046
 27 |     pass
    |
    = help: Use type parameters
@@ -93,7 +93,7 @@ UP040_1.py:26:5: UP040 [*] Generic function `g` should use type parameters
 28 28 | 
 29 29 | 
 
-UP040_1.py:30:5: UP040 [*] Generic function `h` should use type parameters
+UP046.py:30:5: UP046 [*] Generic function `h` should use type parameters
    |
 30 |   def h(
    |  _____^
@@ -102,7 +102,7 @@ UP040_1.py:30:5: UP040 [*] Generic function `h` should use type parameters
 33 | |     another_param,
 34 | |     and_another,
 35 | | ):
-   | |_^ UP040
+   | |_^ UP046
 36 |       pass
    |
    = help: Use type parameters
