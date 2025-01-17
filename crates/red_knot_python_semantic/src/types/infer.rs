@@ -54,10 +54,11 @@ use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
     report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
-    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
+    INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER, INVALID_DECLARATION,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
@@ -335,6 +336,12 @@ bitflags! {
     }
 }
 
+impl TypeQualifiers {
+    pub(crate) fn is_class_var(self) -> bool {
+        self.contains(Self::CLASS_VAR)
+    }
+}
+
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
 /// such as `ClassVar` or `Final`. This struct holds the type and the corresponding qualifiers.
 ///
@@ -353,6 +360,10 @@ impl<'db> QualifiedType<'db> {
 
     pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
         self.qualifiers |= qualifier;
+    }
+
+    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
+        self.qualifiers
     }
 }
 
@@ -899,6 +910,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
         let declared_ty = declarations_ty(self.db(), declarations)
+            .map(|(ty, _)| ty)
             .map(|s| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
@@ -2033,6 +2045,32 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 if elts.is_empty() {
                     self.infer_standalone_expression(value);
+                }
+            }
+            ast::Expr::Attribute(
+                expr_attr @ ast::ExprAttribute {
+                    value: attr_value,
+                    attr,
+                    ctx,
+                    ..
+                },
+            ) => {
+                self.infer_standalone_expression(value);
+                let attr_value_ty = self.infer_expression(attr_value);
+                match (ctx, attr_value_ty) {
+                    (ast::ExprContext::Store, Type::Instance(instance)) => {
+                        let qualifiers = instance.class.instance_member(self.db(), attr).1;
+                        if qualifiers.is_class_var() {
+                            self.context.report_lint(
+                                &INVALID_ATTRIBUTE_ACCESS,
+                                expr_attr.into(),
+                                format_args!(
+                                    "Cannot assign to pure class variable `{attr}` from an instance",
+                                ),
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
             _ => {
@@ -5262,7 +5300,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
                     // giving better diagnostics later on.
                     // Pyright also does this. Mypy doesn't; it falls back to `Any` instead.
-                    return self.infer_type_expression(arguments_slice).into();
+                    return self.infer_type_expression(arguments_slice);
                 };
 
                 if arguments.len() < 2 {
@@ -5278,9 +5316,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(element);
                 }
 
-                let ty = self.infer_pure_type_expression(type_expr);
-                self.store_expression_type(arguments_slice, ty);
-                ty
+                let qualified_ty = self.infer_type_expression(type_expr);
+                self.store_expression_type(arguments_slice, qualified_ty.ignore_qualifiers());
+                return qualified_ty;
             }
             KnownInstanceType::Literal => {
                 match self.infer_literal_parameter_type(arguments_slice) {

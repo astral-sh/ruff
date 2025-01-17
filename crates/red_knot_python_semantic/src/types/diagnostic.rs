@@ -59,6 +59,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
+    registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -745,6 +746,25 @@ declare_lint! {
     /// ```
     pub(crate) static STATIC_ASSERT_ERROR = {
         summary: "Failed static assertion",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Makes sure that the argument of `static_assert` is statically known to be true.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class C:
+    ///   var: ClassVar[int] = 1
+    ///
+    /// C.var = 3  # okay
+    /// C().var = 3  # error: Cannot assign to class variable
+    /// ```
+    pub(crate) static INVALID_ATTRIBUTE_ACCESS = {
+        summary: "Invalid attribute access",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

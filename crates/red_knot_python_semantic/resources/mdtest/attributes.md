@@ -182,7 +182,7 @@ reveal_type(c_instance.pure_class_variable1)  # revealed: str
 # TODO: Should be `Unknown | Literal[1]`.
 reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown
 
-# TODO: should raise an error. It is not allowed to reassign a pure class variable on an instance.
+# error: [invalid-attribute-access] "Cannot assign to pure class variable `pure_class_variable1` from an instance"
 c_instance.pure_class_variable1 = "value set on instance"
 
 C.pure_class_variable1 = "overwritten on class"

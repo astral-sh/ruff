@@ -37,7 +37,7 @@ use crate::types::call::{
 };
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::infer::QualifiedType;
+use crate::types::infer::{QualifiedType, TypeQualifiers};
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -93,7 +93,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         // on inference from bindings.
 
         let declarations = use_def.public_declarations(symbol);
-        let declared = declarations_ty(db, declarations);
+        let declared = declarations_ty(db, declarations).map(|(ty, _)| ty);
 
         match declared {
             // Symbol is declared, trust the declared type
@@ -358,7 +358,7 @@ fn bindings_ty<'db>(
 }
 
 /// The result of looking up a declared type from declarations; see [`declarations_ty`].
-type DeclaredTypeResult<'db> = Result<Symbol<'db>, (Type<'db>, Box<[Type<'db>]>)>;
+type DeclaredTypeResult<'db> = Result<(Symbol<'db>, TypeQualifiers), (Type<'db>, Box<[Type<'db>]>)>;
 
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
@@ -401,7 +401,7 @@ fn declarations_ty<'db>(
             if static_visibility.is_always_false() {
                 None
             } else {
-                Some(declaration_ty(db, declaration).ignore_qualifiers())
+                Some(declaration_ty(db, declaration))
             }
         },
     );
@@ -409,16 +409,18 @@ fn declarations_ty<'db>(
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
-            let mut builder = UnionBuilder::new(db).add(first);
+            let ty_first = first.ignore_qualifiers();
+            let mut builder = UnionBuilder::new(db).add(ty_first);
             for other in std::iter::once(second).chain(types) {
-                if !first.is_equivalent_to(db, other) {
-                    conflicting.push(other);
+                let other_ty = other.ignore_qualifiers();
+                if !ty_first.is_equivalent_to(db, other_ty) {
+                    conflicting.push(other_ty);
                 }
-                builder = builder.add(other);
+                builder = builder.add(other_ty);
             }
             builder.build()
         } else {
-            first
+            first.ignore_qualifiers()
         };
         if conflicting.is_empty() {
             let boundness = match undeclared_visibility {
@@ -429,15 +431,18 @@ fn declarations_ty<'db>(
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
-            Ok(Symbol::Type(declared_ty, boundness))
+            // TODO: deal with conflicting qualifiers?
+            Ok((Symbol::Type(declared_ty, boundness), first.qualifiers()))
         } else {
             Err((
                 declared_ty,
-                std::iter::once(first).chain(conflicting).collect(),
+                std::iter::once(first.ignore_qualifiers())
+                    .chain(conflicting)
+                    .collect(),
             ))
         }
     } else {
-        Ok(Symbol::Unbound)
+        Ok((Symbol::Unbound, TypeQualifiers::empty()))
     }
 }
 
@@ -1674,7 +1679,7 @@ impl<'db> Type<'db> {
                 (Some(KnownClass::VersionInfo), "minor") => {
                     Type::IntLiteral(Program::get(db).python_version(db).minor.into()).into()
                 }
-                _ => class.instance_member(db, name),
+                _ => class.instance_member(db, name).0,
             },
 
             Type::Union(union) => {
@@ -3979,15 +3984,22 @@ impl<'db> Class<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> (Symbol<'db>, TypeQualifiers) {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
-                    return todo_type!("instance attribute on class with dynamic base").into();
+                    return (
+                        todo_type!("instance attribute on class with dynamic base").into(),
+                        TypeQualifiers::empty(),
+                    );
                 }
                 ClassBase::Class(class) => {
                     let member = class.own_instance_member(db, name);
-                    if !member.is_unbound() {
+                    if !member.0.is_unbound() {
                         return member;
                     }
                 }
@@ -3996,12 +4008,15 @@ impl<'db> Class<'db> {
 
         // TODO: The symbol is not present in any class body, but it could be implicitly
         // defined in `__init__` or other methods anywhere in the MRO.
-        todo_type!("implicit instance attribute").into()
+        (
+            todo_type!("implicit instance attribute").into(),
+            TypeQualifiers::empty(),
+        )
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> (Symbol<'db>, TypeQualifiers) {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.ClassVar` and `typing.Final`
         // - Proper diagnostics
@@ -4017,39 +4032,42 @@ impl<'db> Class<'db> {
             let declarations = use_def.public_declarations(symbol);
 
             match declarations_ty(db, declarations) {
-                Ok(Symbol::Type(declared_ty, _)) => {
+                Ok((Symbol::Type(declared_ty, _), qualifiers)) => {
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
                         // just a temporary heuristic to provide a broad categorization into properties
                         // and non-property methods.
                         if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
-                            todo_type!("@property").into()
+                            (todo_type!("@property").into(), qualifiers)
                         } else {
-                            todo_type!("bound method").into()
+                            (todo_type!("bound method").into(), qualifiers)
                         }
                     } else {
-                        Symbol::Type(declared_ty, Boundness::Bound)
+                        (Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
                     }
                 }
-                Ok(Symbol::Unbound) => {
+                Ok((Symbol::Unbound, _)) => {
                     let bindings = use_def.public_bindings(symbol);
                     let inferred_ty = bindings_ty(db, bindings);
 
                     match inferred_ty {
-                        Symbol::Type(ty, _) => Symbol::Type(
-                            UnionType::from_elements(db, [Type::unknown(), ty]),
-                            Boundness::Bound,
+                        Symbol::Type(ty, _) => (
+                            Symbol::Type(
+                                UnionType::from_elements(db, [Type::unknown(), ty]),
+                                Boundness::Bound,
+                            ),
+                            TypeQualifiers::empty(),
                         ),
-                        Symbol::Unbound => Symbol::Unbound,
+                        Symbol::Unbound => (Symbol::Unbound, TypeQualifiers::empty()),
                     }
                 }
                 Err((declared_ty, _)) => {
                     // Ignore conflicting declarations
-                    declared_ty.into()
+                    (declared_ty.into(), TypeQualifiers::empty())
                 }
             }
         } else {
-            Symbol::Unbound
+            (Symbol::Unbound, TypeQualifiers::empty())
         }
     }
 
