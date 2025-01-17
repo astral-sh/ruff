@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// class Subclass(Base):
-///     __slots__ = ("a", "d")  # [redefined-slots-in-subclass]
+///     __slots__ = ("a", "d")  # slot "a" redefined
 /// ```
 ///
 /// Use instead:
@@ -46,7 +46,7 @@ impl Violation for RedefinedSlotsInSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedefinedSlotsInSubclass { name } = self;
-        format!("Redefined slots ['{name}'] in subclass")
+        format!("Redefined slot '{name}' in subclass")
     }
 }
 
@@ -122,9 +122,7 @@ fn contained_in_super_slots(
         if class_def.name == super_class.name {
             return false;
         }
-        let ast::StmtClassDef { body, .. } = &super_class;
-        let super_slots = slots_members(body);
-        super_slots.contains(slot)
+        slots_members(&super_class.body).contains(slot)
     })
 }
 
