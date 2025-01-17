@@ -69,7 +69,7 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// A class `T` is an instance of its metaclass `U`,
-    /// so the type `type[T]` is a strict subtype of the instance type `U`.
+    /// so the type `type[T]` is a subtype of the instance type `U`.
     pub(crate) fn as_instance_type_of_metaclass(&self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
             ClassBase::Dynamic(_) => KnownClass::Type.to_instance(db),

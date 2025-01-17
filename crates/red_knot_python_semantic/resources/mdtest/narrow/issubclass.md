@@ -249,6 +249,10 @@ def _(x: type, y: type[int]):
 
 ### Disjoint `type[]` types are narrowed to `Never`
 
+Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
+and `UsesMeta2` could only exist if a common subclass of their metaclasses could exist. This is
+known to be impossible due to the fact that `Meta1` is marked as `@final`.
+
 ```py
 from typing import final
 
