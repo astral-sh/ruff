@@ -8,6 +8,7 @@ use ruff_python_semantic::{
 };
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_variable;
 
 /// ## What it does
 /// Checks for the presence of unused `self` parameter in methods definitions.
@@ -97,6 +98,7 @@ pub(crate) fn no_self_use(
         || visibility::is_overload(decorator_list, semantic)
         || visibility::is_property(decorator_list, extra_property_decorators, semantic)
         || visibility::is_validator(decorator_list, semantic)
+        || is_not_implemented_stub_with_variable(func, semantic)
     {
         return;
     }
