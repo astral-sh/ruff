@@ -5,7 +5,7 @@ S311.py:10:1: S311 Standard pseudo-random generators are not suitable for crypto
    |
  9 | # Errors
 10 | random.Random()
-   | ^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^ S311
 11 | random.random()
 12 | random.randrange()
    |
@@ -15,7 +15,7 @@ S311.py:11:1: S311 Standard pseudo-random generators are not suitable for crypto
  9 | # Errors
 10 | random.Random()
 11 | random.random()
-   | ^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^ S311
 12 | random.randrange()
 13 | random.randint()
    |
@@ -25,7 +25,7 @@ S311.py:12:1: S311 Standard pseudo-random generators are not suitable for crypto
 10 | random.Random()
 11 | random.random()
 12 | random.randrange()
-   | ^^^^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^^^^ S311
 13 | random.randint()
 14 | random.choice()
    |
@@ -35,7 +35,7 @@ S311.py:13:1: S311 Standard pseudo-random generators are not suitable for crypto
 11 | random.random()
 12 | random.randrange()
 13 | random.randint()
-   | ^^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^^ S311
 14 | random.choice()
 15 | random.choices()
    |
@@ -45,7 +45,7 @@ S311.py:14:1: S311 Standard pseudo-random generators are not suitable for crypto
 12 | random.randrange()
 13 | random.randint()
 14 | random.choice()
-   | ^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^ S311
 15 | random.choices()
 16 | random.uniform()
    |
@@ -55,7 +55,7 @@ S311.py:15:1: S311 Standard pseudo-random generators are not suitable for crypto
 13 | random.randint()
 14 | random.choice()
 15 | random.choices()
-   | ^^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^^ S311
 16 | random.uniform()
 17 | random.triangular()
    |
@@ -65,7 +65,7 @@ S311.py:16:1: S311 Standard pseudo-random generators are not suitable for crypto
 14 | random.choice()
 15 | random.choices()
 16 | random.uniform()
-   | ^^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^^ S311
 17 | random.triangular()
 18 | random.randbytes()
    |
@@ -75,7 +75,7 @@ S311.py:17:1: S311 Standard pseudo-random generators are not suitable for crypto
 15 | random.choices()
 16 | random.uniform()
 17 | random.triangular()
-   | ^^^^^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^^^^^ S311
 18 | random.randbytes()
    |
 
@@ -84,7 +84,7 @@ S311.py:18:1: S311 Standard pseudo-random generators are not suitable for crypto
 16 | random.uniform()
 17 | random.triangular()
 18 | random.randbytes()
-   | ^^^^^^^^^^^^^^^^ S311
+   | ^^^^^^^^^^^^^^^^^^ S311
 19 |
 20 | # Unrelated
    |

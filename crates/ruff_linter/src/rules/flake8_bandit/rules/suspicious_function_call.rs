@@ -826,21 +826,28 @@ impl Violation for SuspiciousFTPLibUsage {
 }
 
 pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
-    // In preview mode, references are handled collectively by `suspicious_function_reference`
-    if checker.settings.preview.is_disabled() {
-        suspicious_function(
-            checker,
-            call.func.as_ref(),
-            Some(&call.arguments),
-            call.range,
-        );
-    }
+    suspicious_function(
+        checker,
+        call.func.as_ref(),
+        Some(&call.arguments),
+        call.range,
+    );
 }
 
 pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) {
-    if checker.settings.preview.is_enabled() {
-        suspicious_function(checker, func, None, func.range());
+    if checker.settings.preview.is_disabled() {
+        return;
     }
+
+    let parent_expr = checker.semantic().current_expression_parent();
+
+    if let Some(Expr::Call(parent)) = parent_expr {
+        if parent.func.range().contains_range(func.range()) {
+            return;
+        }
+    }
+
+    suspicious_function(checker, func, None, func.range());
 }
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
