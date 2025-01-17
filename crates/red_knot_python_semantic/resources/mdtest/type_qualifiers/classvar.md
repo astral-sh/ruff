@@ -14,14 +14,16 @@ from typing import ClassVar, Annotated
 class C:
     a: ClassVar[int] = 1
     b: Annotated[ClassVar[int], "the annotation for b"] = 1
-    c: ClassVar = 1
-    d: "ClassVar[int]" = 1
+    c: ClassVar[Annotated[int, "the annotation for c"]] = 1
+    d: ClassVar = 1
+    e: "ClassVar[int]" = 1
 
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
+reveal_type(C.c)  # revealed: int
 # TODO: should be Unknown | Literal[1]
-reveal_type(C.c)  # revealed: Unknown
-reveal_type(C.d)  # revealed: int
+reveal_type(C.d)  # revealed: Unknown
+reveal_type(C.e)  # revealed: int
 
 c = C()
 
@@ -33,6 +35,8 @@ c.b = 2
 c.c = 2
 # error: [invalid-attribute-access]
 c.d = 2
+# error: [invalid-attribute-access]
+c.e = 2
 ```
 
 ## Too many arguments
