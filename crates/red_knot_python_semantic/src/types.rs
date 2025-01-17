@@ -3802,7 +3802,7 @@ impl<'db> Class<'db> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-        if base_classes.peek().is_some() && self.is_cyclically_defined(db) {
+        if base_classes.peek().is_some() && self.is_involved_in_cyclic_definition(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
@@ -4034,37 +4034,50 @@ impl<'db> Class<'db> {
         }
     }
 
-    /// Return `true` if this class appears to be a cyclic definition,
+    /// Return if this class is involved with a cycle in a cyclic definition,
+    /// if it is cyclically defined at all.
     /// i.e., it inherits either directly or indirectly from itself.
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
     #[salsa::tracked]
-    fn is_cyclically_defined(self, db: &'db dyn Db) -> bool {
-        fn is_cyclically_defined_recursive<'db>(
+    fn is_involved_in_cyclic_definition(self, db: &'db dyn Db) -> Option<bool> {
+        fn is_involved_in_cyclic_definition_recursive<'db>(
             db: &'db dyn Db,
+            start: Class<'db>,
             class: Class<'db>,
             classes_to_watch: &mut IndexSet<Class<'db>>,
-        ) -> bool {
-            if !classes_to_watch.insert(class) {
-                return true;
-            }
+            result: Option<bool>,
+        ) -> Option<bool> {
+            let mut result = result;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
+                if start == explicit_base_class || result == Some(true) {
+                    return Some(true);
+                }
+
                 // Each base must be considered in isolation.
                 // This is due to the fact that if a class uses multiple inheritance,
                 // there could easily be a situation where two bases have the same class in their MROs;
                 // that isn't enough to constitute the class being cyclically defined.
-                let classes_to_watch_len = classes_to_watch.len();
-                if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
-                    return true;
+                if !classes_to_watch.insert(explicit_base_class) {
+                    return Some(false);
                 }
-                classes_to_watch.truncate(classes_to_watch_len);
+                result = is_involved_in_cyclic_definition_recursive(
+                    db,
+                    start,
+                    explicit_base_class,
+                    classes_to_watch,
+                    result,
+                );
+                if result.is_none() {
+                    classes_to_watch.pop();
+                }
+                // If we find a cycle, keep searching to check if we can reach the starting class.
             }
-            false
+            result
         }
 
-        self.fully_static_explicit_bases(db)
-            .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
+        is_involved_in_cyclic_definition_recursive(db, self, self, &mut IndexSet::new(), None)
     }
 }
 
