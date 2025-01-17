@@ -71,6 +71,9 @@ ignore = [
   # Conflicts with the formatter
   "COM812", "ISC001"
 ]
+extend-select = [
+  "I",
+]
 
 [tool.black]
 force-exclude = '''

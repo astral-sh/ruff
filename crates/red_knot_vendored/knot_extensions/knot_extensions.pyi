@@ -1,4 +1,4 @@
-from typing import _SpecialForm, Any, LiteralString
+from typing import Any, LiteralString, _SpecialForm
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
