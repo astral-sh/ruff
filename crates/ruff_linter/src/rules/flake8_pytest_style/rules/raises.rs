@@ -205,10 +205,17 @@ pub(crate) fn complex_raises(
     // Check body for `pytest.raises` context manager
     if raises_called {
         let is_too_complex = if let [stmt] = body {
+            let in_preview = checker.settings.preview.is_enabled();
+
             match stmt {
                 Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
                 // Allow function and class definitions to test decorators
                 Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
+                Stmt::For(ast::StmtFor { body, .. }) if in_preview => match &body[..] {
+                    [Stmt::Pass(_)] => false,
+                    [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
+                    _ => true,
+                },
                 stmt => is_compound_statement(stmt),
             }
         } else {
