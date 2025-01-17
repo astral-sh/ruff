@@ -1,12 +1,14 @@
 ---
 source: crates/red_knot_workspace/src/project/metadata.rs
-expression: project
+expression: root
 ---
 ProjectMetadata(
-  name: Name("backend"),
+  name: Name("super-app"),
   root: "/app",
   options: Options(
     environment: None,
-    src: None,
+    src: Some(SrcOptions(
+      root: Some("src"),
+    )),
   ),
 )

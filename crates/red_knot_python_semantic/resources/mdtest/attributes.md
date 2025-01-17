@@ -34,21 +34,21 @@ c_instance = C(1)
 
 # TODO: should be `Literal["value set in __init__"]`, or `Unknown | Literal[…]` to allow
 # assignments to this unannotated attribute from other scopes.
-reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `int`
-reveal_type(c_instance.pure_instance_variable2)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable2)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `bytes`
-reveal_type(c_instance.pure_instance_variable3)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable3)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `bool`
-reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `str`
 # We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
 # mypy and pyright do not show an error here.
-reveal_type(c_instance.pure_instance_variable5)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable5)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: If we choose to infer a precise `Literal[…]` type for the instance attribute (see
 # above), this should be an error: incompatible types in assignment. If we choose to infer
@@ -74,7 +74,7 @@ c_instance.pure_instance_variable4 = False
 # in general (we don't know what else happened to `c_instance` between the assignment and the use
 # here), but mypy and pyright support this. In conclusion, this could be `bool` but should probably
 # be `Literal[False]`.
-reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(implicit instance attribute)
 ```
 
 #### Variable declared in class body and declared/bound in `__init__`
@@ -91,8 +91,7 @@ class C:
 
 c_instance = C()
 
-# TODO: should be `str`
-reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable)  # revealed: str
 
 # TODO: we currently plan to emit a diagnostic here. Note that both mypy
 # and pyright show no error in this case! So we may reconsider this in
@@ -123,7 +122,7 @@ c_instance = C()
 c_instance.set_instance_variable()
 
 # TODO: should be `Literal["value set in method"]` or `Unknown | Literal[…]` (see above).
-reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: We already show an error here, but the message might be improved?
 # error: [unresolved-attribute]
@@ -144,8 +143,7 @@ class C:
 
 c_instance = C()
 
-# TODO: should be 'str'
-reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_instance_variable)  # revealed: str
 
 # TODO: mypy and pyright do not show an error here, but we plan to emit a diagnostic.
 # The type could be changed to 'Unknown' if we decide to emit an error?
@@ -174,12 +172,15 @@ class C:
 reveal_type(C.pure_class_variable1)  # revealed: str
 
 # TODO: this should be `Literal[1]`, or `Unknown | Literal[1]`.
-reveal_type(C.pure_class_variable2)  # revealed: @Todo(Unsupported or invalid type in a type expression)
+reveal_type(C.pure_class_variable2)  # revealed: Unknown
 
 c_instance = C()
 
-# TODO: This should be `str`. It is okay to access a pure class variable on an instance.
-reveal_type(c_instance.pure_class_variable1)  # revealed: @Todo(instance attributes)
+# It is okay to access a pure class variable on an instance.
+reveal_type(c_instance.pure_class_variable1)  # revealed: str
+
+# TODO: Should be `Unknown | Literal[1]`.
+reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown
 
 # TODO: should raise an error. It is not allowed to reassign a pure class variable on an instance.
 c_instance.pure_class_variable1 = "value set on instance"
@@ -222,7 +223,7 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 c_instance = C()
 # TODO: should be `Literal["overwritten on class"]`
-reveal_type(c_instance.pure_class_variable)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.pure_class_variable)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should raise an error.
 c_instance.pure_class_variable = "value set on instance"
@@ -239,34 +240,38 @@ attributes.
 
 ```py
 class C:
-    variable_with_class_default: str = "value in class body"
+    variable_with_class_default1: str = "value in class body"
+    variable_with_class_default2 = 1
 
     def instance_method(self):
-        self.variable_with_class_default = "value set in instance method"
+        self.variable_with_class_default1 = "value set in instance method"
 
-reveal_type(C.variable_with_class_default)  # revealed: str
+reveal_type(C.variable_with_class_default1)  # revealed: str
+
+# TODO: this should be `Unknown | Literal[1]`.
+reveal_type(C.variable_with_class_default2)  # revealed: Literal[1]
 
 c_instance = C()
 
-# TODO: should be `str`
-reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.variable_with_class_default1)  # revealed: str
+reveal_type(c_instance.variable_with_class_default2)  # revealed: Unknown | Literal[1]
 
-c_instance.variable_with_class_default = "value set on instance"
+c_instance.variable_with_class_default1 = "value set on instance"
 
-reveal_type(C.variable_with_class_default)  # revealed: str
+reveal_type(C.variable_with_class_default1)  # revealed: str
 
 # TODO: Could be Literal["value set on instance"], or still `str` if we choose not to
 # narrow the type.
-reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.variable_with_class_default1)  # revealed: str
 
-C.variable_with_class_default = "overwritten on class"
+C.variable_with_class_default1 = "overwritten on class"
 
 # TODO: Could be `Literal["overwritten on class"]`, or still `str` if we choose not to
 # narrow the type.
-reveal_type(C.variable_with_class_default)  # revealed: str
+reveal_type(C.variable_with_class_default1)  # revealed: str
 
 # TODO: should still be `Literal["value set on instance"]`, or `str`.
-reveal_type(c_instance.variable_with_class_default)  # revealed: @Todo(instance attributes)
+reveal_type(c_instance.variable_with_class_default1)  # revealed: str
 ```
 
 ## Union of attributes
@@ -437,8 +442,8 @@ functions are instances of that class:
 ```py path=a.py
 def f(): ...
 
-reveal_type(f.__defaults__)  # revealed: @Todo(instance attributes)
-reveal_type(f.__kwdefaults__)  # revealed: @Todo(instance attributes)
+reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
+reveal_type(f.__kwdefaults__)  # revealed: @Todo(generics) | None
 ```
 
 Some attributes are special-cased, however:
@@ -456,8 +461,8 @@ Most attribute accesses on int-literal types are delegated to `builtins.int`, si
 integers are instances of that class:
 
 ```py path=a.py
-reveal_type((2).bit_length)  # revealed: @Todo(instance attributes)
-reveal_type((2).denominator)  # revealed: @Todo(instance attributes)
+reveal_type((2).bit_length)  # revealed: @Todo(bound method)
+reveal_type((2).denominator)  # revealed: @Todo(@property)
 ```
 
 Some attributes are special-cased, however:
@@ -473,8 +478,8 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bols are instances of that class:
 
 ```py path=a.py
-reveal_type(True.__and__)  # revealed: @Todo(instance attributes)
-reveal_type(False.__or__)  # revealed: @Todo(instance attributes)
+reveal_type(True.__and__)  # revealed: @Todo(bound method)
+reveal_type(False.__or__)  # revealed: @Todo(bound method)
 ```
 
 Some attributes are special-cased, however:
@@ -489,8 +494,8 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `buitins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: @Todo(instance attributes)
-reveal_type(b"foo".endswith)  # revealed: @Todo(instance attributes)
+reveal_type(b"foo".join)  # revealed: @Todo(bound method)
+reveal_type(b"foo".endswith)  # revealed: @Todo(bound method)
 ```
 
 ## References

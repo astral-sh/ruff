@@ -204,18 +204,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             // before the closing curly brace is not strictly necessary, but it's
             // added to maintain consistency.
             let bracket_spacing =
-                match left_most(expression, comments.ranges(), f.context().source()) {
-                    Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_) => {
-                        Some(format_with(|f| {
-                            if self.context.can_contain_line_breaks() {
-                                soft_line_break_or_space().fmt(f)
-                            } else {
-                                space().fmt(f)
-                            }
-                        }))
+                needs_bracket_spacing(expression, f.context()).then_some(format_with(|f| {
+                    if self.context.can_contain_line_breaks() {
+                        soft_line_break_or_space().fmt(f)
+                    } else {
+                        space().fmt(f)
                     }
-                    _ => None,
-                };
+                }));
 
             let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
@@ -289,4 +284,20 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             token("}").fmt(f)
         }
     }
+}
+
+fn needs_bracket_spacing(expr: &Expr, context: &PyFormatContext) -> bool {
+    // Ruff parenthesizes single element tuples, that's why we shouldn't insert
+    // a space around the curly braces for those.
+    if expr
+        .as_tuple_expr()
+        .is_some_and(|tuple| !tuple.parenthesized && tuple.elts.len() == 1)
+    {
+        return false;
+    }
+
+    matches!(
+        left_most(expr, context.comments().ranges(), context.source()),
+        Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_)
+    )
 }

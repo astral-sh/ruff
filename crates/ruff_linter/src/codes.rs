@@ -279,6 +279,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0131") => (RuleGroup::Stable, rules::pylint::rules::NamedExprWithoutContext),
         (Pylint, "W0133") => (RuleGroup::Stable, rules::pylint::rules::UselessExceptionStatement),
         (Pylint, "W0211") => (RuleGroup::Stable, rules::pylint::rules::BadStaticmethodArgument),
+        (Pylint, "W0244") => (RuleGroup::Preview, rules::pylint::rules::RedefinedSlotsInSubclass),
         (Pylint, "W0245") => (RuleGroup::Stable, rules::pylint::rules::SuperWithoutBrackets),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),

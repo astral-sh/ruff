@@ -3,7 +3,7 @@
 use rayon::ThreadPoolBuilder;
 use red_knot_python_semantic::PythonVersion;
 use red_knot_workspace::db::{Db, ProjectDatabase};
-use red_knot_workspace::project::settings::Configuration;
+use red_knot_workspace::project::options::{EnvironmentOptions, Options};
 use red_knot_workspace::project::ProjectMetadata;
 use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
@@ -74,15 +74,14 @@ fn setup_case() -> Case {
     .unwrap();
 
     let src_root = SystemPath::new("/src");
-    let metadata = ProjectMetadata::discover(
-        src_root,
-        &system,
-        Some(&Configuration {
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+    metadata.apply_cli_options(Options {
+        environment: Some(EnvironmentOptions {
             python_version: Some(PythonVersion::PY312),
-            ..Configuration::default()
+            ..EnvironmentOptions::default()
         }),
-    )
-    .unwrap();
+        ..Options::default()
+    });
 
     let mut db = ProjectDatabase::new(metadata, system).unwrap();
 

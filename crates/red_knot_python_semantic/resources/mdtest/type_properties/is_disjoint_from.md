@@ -37,3 +37,22 @@ class UsesMeta2(metaclass=Meta2): ...
 static_assert(not is_disjoint_from(Meta2, type[UsesMeta2]))
 static_assert(is_disjoint_from(Meta1, type[UsesMeta2]))
 ```
+
+## `type[T]` versus `type[S]`
+
+By the same token, `type[T]` is disjoint from `type[S]` if the metaclass of `T` is disjoint from the
+metaclass of `S`.
+
+```py
+from typing import final
+from knot_extensions import static_assert, is_disjoint_from
+
+@final
+class Meta1(type): ...
+
+class Meta2(type): ...
+class UsesMeta1(metaclass=Meta1): ...
+class UsesMeta2(metaclass=Meta2): ...
+
+static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
+```

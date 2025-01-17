@@ -103,7 +103,7 @@ pub struct SearchPathSettings {
     pub extra_paths: Vec<SystemPathBuf>,
 
     /// The root of the project, used for finding first-party modules.
-    pub src_root: SystemPathBuf,
+    pub src_roots: Vec<SystemPathBuf>,
 
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -115,9 +115,9 @@ pub struct SearchPathSettings {
 }
 
 impl SearchPathSettings {
-    pub fn new(src_root: SystemPathBuf) -> Self {
+    pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
         Self {
-            src_root,
+            src_roots,
             extra_paths: vec![],
             typeshed: None,
             site_packages: SitePackages::Known(vec![]),
@@ -126,11 +126,20 @@ impl SearchPathSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SitePackages {
     Derived {
         venv_path: SystemPathBuf,
     },
     /// Resolved site packages paths
     Known(Vec<SystemPathBuf>),
+}
+
+impl SitePackages {
+    pub fn paths(&self) -> &[SystemPathBuf] {
+        match self {
+            SitePackages::Derived { venv_path } => std::slice::from_ref(venv_path),
+            SitePackages::Known(paths) => paths,
+        }
+    }
 }

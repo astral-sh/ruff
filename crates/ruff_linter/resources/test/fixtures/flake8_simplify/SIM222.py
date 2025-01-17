@@ -193,3 +193,7 @@ for x in (*a, *b) or [None]:
 
 for x in {**a, **b} or [None]:
     pass
+
+
+# https://github.com/astral-sh/ruff/issues/7127
+def f(a: "'b' or 'c'"): ...

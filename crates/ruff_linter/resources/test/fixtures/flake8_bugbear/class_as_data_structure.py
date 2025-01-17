@@ -95,4 +95,10 @@ class WarningsWithDocstring:
         self.foo = foo
         self.bar = bar
 
+
+class KeywordOnly: # OK with python3.9 or less, not OK starting python3.10
+    def __init__(self, *, foo: int, bar: int):
+        self.foo = foo
+        self.bar = bar 
+
 # <-- end flake8-bugbear tests

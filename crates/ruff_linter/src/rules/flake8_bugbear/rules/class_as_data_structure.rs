@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for classes that only have a public `__init__` method,
@@ -77,6 +78,7 @@ pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::St
                         // skip `self`
                         .skip(1)
                         .all(|param| param.annotation().is_some() && !param.is_variadic())
+                    && (func_def.parameters.kwonlyargs.is_empty() || checker.settings.target_version >= PythonVersion::Py310)
                     // `__init__` should not have complicated logic in it
                     // only assignments
                     && func_def
