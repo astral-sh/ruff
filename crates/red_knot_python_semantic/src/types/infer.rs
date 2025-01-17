@@ -572,16 +572,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Iterate through all class definitions in this scope.
         for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
-            if let Some(involved_in_cyclic_definition) = class.is_involved_in_cyclic_definition(self.db()) {
+            if let Some(involved_in_cyclic_definition) =
+                class.is_involved_in_cyclic_definition(self.db())
+            {
                 if involved_in_cyclic_definition {
                     self.context.report_lint(
-                    &CYCLIC_CLASS_DEFINITION,
-                    class_node.into(),
-                    format_args!(
-                        "Cyclic definition of `{}` (class cannot inherit from itself)",
-                        class.name(self.db())
-                    ),
-                );
+                        &CYCLIC_CLASS_DEFINITION,
+                        class_node.into(),
+                        format_args!(
+                            "Cyclic definition of `{}` (class cannot inherit from itself)",
+                            class.name(self.db())
+                        ),
+                    );
                 }
                 // Attempting to determine the MRO of a class or if the class has a metaclass conflict
                 // is impossible if the class is cyclically defined; there's nothing more to do here.
