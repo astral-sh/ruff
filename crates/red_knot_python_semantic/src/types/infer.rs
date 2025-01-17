@@ -4884,7 +4884,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
-    /// Infer the type of a type expression, including all type qualifiers such
+    /// Infer the type of a type expression, and collect all type qualifiers such
     /// as `ClassVar` or `Final`.
     fn infer_type_expression_with_qualifiers(
         &mut self,

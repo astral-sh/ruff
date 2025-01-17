@@ -1,10 +1,10 @@
 # `typing.ClassVar`
 
 [`typing.ClassVar`] is a type qualifier that is used to indicate that a class variable may not be
-set on instances.
+written to from instances of that class.
 
-This test mostly makes sure that we "see" the type qualifier in an annotation. For more details on
-the semantics, see the [test on attributes](../attributes.md) test.
+This test makes sure that we discover the type qualifier while inferring types from an annotation.
+For more details on the semantics of pure class variables, see [this test](../attributes.md).
 
 ## Basic
 
