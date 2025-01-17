@@ -356,6 +356,13 @@ pub(crate) struct TypeAndQualifiers<'db> {
 }
 
 impl<'db> TypeAndQualifiers<'db> {
+    pub(crate) fn new(ty: Type<'db>, qualifiers: TypeQualifiers) -> Self {
+        Self {
+            inner: ty,
+            qualifiers,
+        }
+    }
+
     pub(crate) fn ignore_qualifiers(&self) -> Type<'db> {
         self.inner
     }
@@ -4923,19 +4930,27 @@ impl<'db> TypeInferenceBuilder<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         let ty = match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self
-                    .infer_name_expression(name)
-                    .in_type_expression(self.db())
-                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
+                ast::ExprContext::Load => {
+                    return self
+                        .infer_name_expression(name)
+                        .in_type_expression(self.db())
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(&self.context, expression).into()
+                        });
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
-                ast::ExprContext::Load => self
-                    .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db())
-                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
+                ast::ExprContext::Load => {
+                    return self
+                        .infer_attribute_expression(attribute_expression)
+                        .in_type_expression(self.db())
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(&self.context, expression).into()
+                        });
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
