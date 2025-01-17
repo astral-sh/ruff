@@ -318,8 +318,6 @@ fn create_diagnostic(
     applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
-    let type_params = create_type_params(vars);
-
     Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
@@ -336,7 +334,7 @@ fn create_diagnostic(
                     id: name,
                     ctx: ast::ExprContext::Load,
                 })),
-                type_params,
+                type_params: create_type_params(vars),
                 value: Box::new(value.clone()),
             })),
             stmt_range,
@@ -346,63 +344,14 @@ fn create_diagnostic(
 }
 
 fn create_type_params(vars: &[TypeVar]) -> Option<ruff_python_ast::TypeParams> {
-    let type_params = if vars.is_empty() {
-        None
-    } else {
-        Some(ast::TypeParams {
-            range: TextRange::default(),
-            type_params: vars
-                .iter()
-                .map(
-                    |TypeVar {
-                         name,
-                         restriction,
-                         kind,
-                     }| {
-                        match kind {
-                            TypeVarKind::Var => {
-                                TypeParam::TypeVar(TypeParamTypeVar {
-                                    range: TextRange::default(),
-                                    name: Identifier::new(name.id.clone(), TextRange::default()),
-                                    bound: match restriction {
-                                        Some(TypeVarRestriction::Bound(bound)) => {
-                                            Some(Box::new((*bound).clone()))
-                                        }
-                                        Some(TypeVarRestriction::Constraint(constraints)) => {
-                                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                                range: TextRange::default(),
-                                                elts: constraints
-                                                    .iter()
-                                                    .map(|expr| (*expr).clone())
-                                                    .collect(),
-                                                ctx: ast::ExprContext::Load,
-                                                parenthesized: true,
-                                            })))
-                                        }
-                                        None => None,
-                                    },
-                                    // We don't handle defaults here yet. Should perhaps be a different rule since
-                                    // defaults are only valid in 3.13+.
-                                    default: None,
-                                })
-                            }
-                            TypeVarKind::Tuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
-                                range: TextRange::default(),
-                                name: Identifier::new(name.id.clone(), TextRange::default()),
-                                default: None,
-                            }),
-                            TypeVarKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
-                                range: TextRange::default(),
-                                name: Identifier::new(name.id.clone(), TextRange::default()),
-                                default: None,
-                            }),
-                        }
-                    },
-                )
-                .collect(),
-        })
-    };
-    type_params
+    if vars.is_empty() {
+        return None;
+    }
+
+    Some(ast::TypeParams {
+        range: TextRange::default(),
+        type_params: vars.iter().map(TypeParam::from).collect(),
+    })
 }
 
 #[derive(Debug)]
@@ -425,6 +374,50 @@ struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
     kind: TypeVarKind,
+}
+
+impl<'a> From<&'a TypeVar<'a>> for TypeParam {
+    fn from(
+        TypeVar {
+            name,
+            restriction,
+            kind,
+        }: &'a TypeVar<'a>,
+    ) -> Self {
+        match kind {
+            TypeVarKind::Var => {
+                TypeParam::TypeVar(TypeParamTypeVar {
+                    range: TextRange::default(),
+                    name: Identifier::new(name.id.clone(), TextRange::default()),
+                    bound: match restriction {
+                        Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
+                        Some(TypeVarRestriction::Constraint(constraints)) => {
+                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                                range: TextRange::default(),
+                                elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
+                                ctx: ast::ExprContext::Load,
+                                parenthesized: true,
+                            })))
+                        }
+                        None => None,
+                    },
+                    // We don't handle defaults here yet. Should perhaps be a different rule since
+                    // defaults are only valid in 3.13+.
+                    default: None,
+                })
+            }
+            TypeVarKind::Tuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+                range: TextRange::default(),
+                name: Identifier::new(name.id.clone(), TextRange::default()),
+                default: None,
+            }),
+            TypeVarKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
+                range: TextRange::default(),
+                name: Identifier::new(name.id.clone(), TextRange::default()),
+                default: None,
+            }),
+        }
+    }
 }
 
 struct TypeVarReferenceVisitor<'a> {
