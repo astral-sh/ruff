@@ -409,7 +409,7 @@ def write_anynoderef(out: list[str], groups: list[Group]) -> None:
     Create the AnyNodeRef type.
 
     ```rust
-    pub enum AnyNode<'a> {
+    pub enum AnyNodeRef<'a> {
         ...
         TypeParamTypeVar(&'a TypeParamTypeVar),
         TypeParamTypeVarTuple(&'a TypeParamTypeVarTuple),
