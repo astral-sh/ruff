@@ -2262,8 +2262,8 @@ impl<'db> Type<'db> {
     pub(crate) fn in_type_expression(
         &self,
         db: &'db dyn Db,
-    ) -> Result<TypeAndQualifiers<'db>, InvalidTypeExpressionError<'db>> {
-        let ty = match self {
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+        match self {
             // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
             // equivalent to `type[object]`.
             Type::ClassLiteral(_) | Type::SubclassOf(_) => Ok(self.to_instance(db)),
@@ -2297,7 +2297,7 @@ impl<'db> Type<'db> {
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
                     match element.in_type_expression(db) {
-                        Ok(type_expr) => builder = builder.add(type_expr.inner_type()),
+                        Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
                             invalid_expressions: new_invalid_expressions,
@@ -2330,12 +2330,12 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
                 fallback_type: Type::unknown(),
             }),
-            Type::KnownInstance(KnownInstanceType::ClassVar) => {
-                return Ok(TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeQualifiers::CLASS_VAR,
-                ));
-            }
+            Type::KnownInstance(KnownInstanceType::ClassVar) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::ClassVarInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::unknown(),
@@ -2346,9 +2346,7 @@ impl<'db> Type<'db> {
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
             )),
-        };
-
-        ty.map(Into::into)
+        }
     }
 
     /// The type `NoneType` / `None`
@@ -2601,6 +2599,8 @@ enum InvalidTypeExpression {
     BareAnnotated,
     /// `x: Literal` is invalid as an annotation
     BareLiteral,
+    /// The `ClassVar` type qualifier was used in a type expression (but can only be used in an annotation expression)
+    ClassVarInTypeExpression,
 }
 
 impl InvalidTypeExpression {
@@ -2608,6 +2608,7 @@ impl InvalidTypeExpression {
         match self {
             Self::BareAnnotated => "`Annotated` requires at least two arguments when used in an annotation or type expression",
             Self::BareLiteral => "`Literal` requires at least one argument when used in a type expression",
+            Self::ClassVarInTypeExpression => "Type qualifier `ClassVar` is not allowed in type expressions (only in annotation expressions)",
         }
     }
 }

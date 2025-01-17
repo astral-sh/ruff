@@ -1767,9 +1767,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             )),
             None => None,
         };
-        let default_ty = self
-            .infer_optional_type_expression(default.as_deref())
-            .map(|qualified_type| qualified_type.inner_type());
+        let default_ty = self.infer_optional_type_expression(default.as_deref());
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
@@ -4786,9 +4784,90 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::unknown().into()
             }
 
+            ast::Expr::Name(name) => match name.ctx {
+                ast::ExprContext::Load => {
+                    let name_expr_ty = self.infer_name_expression(name);
+                    match name_expr_ty {
+                        Type::KnownInstance(KnownInstanceType::ClassVar) => {
+                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
+                        }
+                        _ => name_expr_ty
+                            .in_type_expression(self.db())
+                            .unwrap_or_else(|error| {
+                                error.into_fallback_type(&self.context, annotation)
+                            })
+                            .into(),
+                    }
+                }
+                ast::ExprContext::Invalid => Type::unknown().into(),
+                ast::ExprContext::Store | ast::ExprContext::Del => todo_type!().into(),
+            },
+
+            ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
+                let value_ty = self.infer_expression(value);
+
+                let slice = &**slice;
+
+                match value_ty {
+                    Type::KnownInstance(KnownInstanceType::Annotated) => {
+                        // This branch is similar to the corresponding branch in `infer_parameterized_known_instance_type_expression`, but
+                        // `Annotated[…]` can appear both in annotation expressions and in type expressions, and needs to be handled slightly
+                        // differently in each case (calling either `infer_type_expression_*` or `infer_annotation_expression_*`).
+                        if let ast::Expr::Tuple(ast::ExprTuple {
+                            elts: arguments, ..
+                        }) = slice
+                        {
+                            if arguments.len() < 2 {
+                                self.report_invalid_arguments_to_annotated(subscript);
+                            }
+
+                            if let [inner_annotation, metadata @ ..] = &arguments[..] {
+                                for element in metadata {
+                                    self.infer_expression(element);
+                                }
+
+                                let inner_annotation_ty =
+                                    self.infer_annotation_expression_impl(inner_annotation);
+
+                                self.store_expression_type(slice, inner_annotation_ty.inner_type());
+                                inner_annotation_ty
+                            } else {
+                                self.infer_type_expression(slice);
+                                Type::unknown().into()
+                            }
+                        } else {
+                            self.report_invalid_arguments_to_annotated(subscript);
+                            self.infer_annotation_expression_impl(slice)
+                        }
+                    }
+                    Type::KnownInstance(KnownInstanceType::ClassVar) => match slice {
+                        ast::Expr::Tuple(..) => {
+                            self.context.report_lint(
+                                &INVALID_TYPE_FORM,
+                                subscript.into(),
+                                format_args!(
+                                    "Type qualifier `{type_qualifier}` expects exactly one type parameter",
+                                    type_qualifier = KnownInstanceType::ClassVar.repr(self.db()),
+                                ),
+                            );
+                            Type::unknown().into()
+                        }
+                        _ => {
+                            let mut type_and_qualifiers =
+                                self.infer_annotation_expression_impl(slice);
+                            type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                            type_and_qualifiers
+                        }
+                    },
+                    _ => self
+                        .infer_subscript_type_expression_no_store(subscript, slice, value_ty)
+                        .into(),
+                }
+            }
+
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
-            type_expr => self.infer_type_expression_no_store(type_expr),
+            type_expr => self.infer_type_expression_no_store(type_expr).into(),
         };
 
         self.store_expression_type(annotation, annotation_ty.inner_type());
@@ -4816,74 +4895,56 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
-    /// Infer the type of a type expression, and collect all type qualifiers such
-    /// as `ClassVar` or `Final`.
-    fn infer_type_expression_with_qualifiers(
-        &mut self,
-        expression: &ast::Expr,
-    ) -> TypeAndQualifiers<'db> {
-        let qualified_ty = self.infer_type_expression_no_store(expression);
-        self.store_expression_type(expression, qualified_ty.inner_type());
-        qualified_ty
-    }
-
     /// Infer the type of a type expression.
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        self.infer_type_expression_with_qualifiers(expression)
-            .inner_type()
+        let ty = self.infer_type_expression_no_store(expression);
+        self.store_expression_type(expression, ty);
+        ty
     }
 
-    /// Similar to [`infer_type_expression_with_qualifiers`], but accepts an optional
+    /// Similar to [`infer_type_expression`], but accepts an optional
     /// type expression and returns [`None`] if the expression is [`None`].
     ///
-    /// [`infer_type_expression_with_qualifiers`]: TypeInferenceBuilder::infer_type_expression_with_qualifiers
+    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
     fn infer_optional_type_expression(
         &mut self,
         expression: Option<&ast::Expr>,
-    ) -> Option<TypeAndQualifiers<'db>> {
-        expression.map(|expr| self.infer_type_expression_with_qualifiers(expr))
+    ) -> Option<Type<'db>> {
+        expression.map(|expr| self.infer_type_expression(expr))
     }
 
-    /// Similar to [`infer_type_expression_with_qualifiers`], but accepts a [`DeferredExpressionState`].
+    /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
-    /// [`infer_type_expression_with_qualifiers`]: TypeInferenceBuilder::infer_type_expression_with_qualifiers
+    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
     fn infer_type_expression_with_state(
         &mut self,
         expression: &ast::Expr,
         deferred_state: DeferredExpressionState,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> Type<'db> {
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
-        let annotation_ty = self.infer_type_expression_with_qualifiers(expression);
+        let type_expression_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
-        annotation_ty
+        type_expression_ty
     }
 
     /// Infer the type of a type expression without storing the result.
-    fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> TypeAndQualifiers<'db> {
+    fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        let ty = match expression {
+        match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => {
-                    return self
-                        .infer_name_expression(name)
-                        .in_type_expression(self.db())
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(&self.context, expression).into()
-                        });
-                }
+                ast::ExprContext::Load => self
+                    .infer_name_expression(name)
+                    .in_type_expression(self.db())
+                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
-                ast::ExprContext::Load => {
-                    return self
-                        .infer_attribute_expression(attribute_expression)
-                        .in_type_expression(self.db())
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(&self.context, expression).into()
-                        });
-                }
+                ast::ExprContext::Load => self
+                    .infer_attribute_expression(attribute_expression)
+                    .in_type_expression(self.db())
+                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
@@ -4891,9 +4952,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db()),
 
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(string) => {
-                return self.infer_string_type_expression(string);
-            }
+            ast::Expr::StringLiteral(string) => self.infer_string_type_expression(string),
 
             // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
             // expressions, but is meaningful in the context of a number of special forms.
@@ -4916,21 +4975,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let value_ty = self.infer_expression(value);
 
-                let qualified_ty = match value_ty {
-                    Type::ClassLiteral(class_literal_ty) => {
-                        match class_literal_ty.class.known(self.db()) {
-                            Some(KnownClass::Tuple) => {
-                                self.infer_tuple_type_expression(slice).into()
-                            }
-                            Some(KnownClass::Type) => {
-                                self.infer_subclass_of_type_expression(slice).into()
-                            }
-                            _ => self.infer_subscript_type_expression(subscript, value_ty),
-                        }
-                    }
-                    _ => self.infer_subscript_type_expression(subscript, value_ty),
-                };
-                return qualified_ty;
+                self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
             }
 
             ast::Expr::BinOp(binary) => {
@@ -5043,16 +5088,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::unknown()
             }
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
-        };
+        }
+    }
 
-        ty.into()
+    fn infer_subscript_type_expression_no_store(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        slice: &ast::Expr,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        match value_ty {
+            Type::ClassLiteral(class_literal_ty) => match class_literal_ty.class.known(self.db()) {
+                Some(KnownClass::Tuple) => self.infer_tuple_type_expression(slice),
+                Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
+                _ => self.infer_subscript_type_expression(subscript, value_ty),
+            },
+            _ => self.infer_subscript_type_expression(subscript, value_ty),
+        }
     }
 
     /// Infer the type of a string type expression.
-    fn infer_string_type_expression(
-        &mut self,
-        string: &ast::ExprStringLiteral,
-    ) -> TypeAndQualifiers<'db> {
+    fn infer_string_type_expression(&mut self, string: &ast::ExprStringLiteral) -> Type<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
                 // String annotations are always evaluated in the deferred context.
@@ -5061,7 +5117,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     DeferredExpressionState::InStringAnnotation,
                 )
             }
-            None => Type::unknown().into(),
+            None => Type::unknown(),
         }
     }
 
@@ -5156,7 +5212,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 union_ty
             }
             ast::Expr::Tuple(_) => {
-                self.infer_type_expression_with_qualifiers(slice);
+                self.infer_type_expression(slice);
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     slice.into(),
@@ -5184,7 +5240,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => self.infer_subclass_of_type_expression(parameters),
                     },
                     _ => {
-                        self.infer_type_expression_with_qualifiers(parameters);
+                        self.infer_type_expression(parameters);
                         todo_type!("unsupported nested subscript in type[X]")
                     }
                 };
@@ -5193,7 +5249,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             // TODO: subscripts, etc.
             _ => {
-                self.infer_type_expression_with_qualifiers(slice);
+                self.infer_type_expression(slice);
                 todo_type!("unsupported type[X] special form")
             }
         }
@@ -5203,7 +5259,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
             value: _,
@@ -5216,64 +5272,64 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }
             Type::Dynamic(DynamicType::Todo(_)) => {
-                self.infer_type_expression_with_qualifiers(slice);
-                value_ty.into()
+                self.infer_type_expression(slice);
+                value_ty
             }
             _ => {
-                self.infer_type_expression_with_qualifiers(slice);
-                todo_type!("generics").into()
+                self.infer_type_expression(slice);
+                todo_type!("generics")
             }
         }
+    }
+
+    fn report_invalid_arguments_to_annotated(&self, subscript: &ast::ExprSubscript) {
+        self.context.report_lint(
+            &INVALID_TYPE_FORM,
+            subscript.into(),
+            format_args!(
+                "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
+                KnownInstanceType::Annotated.repr(self.db())
+            ),
+        );
     }
 
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> Type<'db> {
         let arguments_slice = &*subscript.slice;
-        let ty = match known_instance {
+        match known_instance {
             KnownInstanceType::Annotated => {
-                let report_invalid_arguments = || {
-                    self.context.report_lint(
-                        &INVALID_TYPE_FORM,
-                        subscript.into(),
-                        format_args!(
-                            "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-                            known_instance.repr(self.db())
-                        ),
-                    );
-                };
-
                 let ast::Expr::Tuple(ast::ExprTuple {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    report_invalid_arguments();
+                    self.report_invalid_arguments_to_annotated(subscript);
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
                     // giving better diagnostics later on.
                     // Pyright also does this. Mypy doesn't; it falls back to `Any` instead.
-                    return self.infer_type_expression_with_qualifiers(arguments_slice);
+                    return self.infer_type_expression(arguments_slice);
                 };
 
                 if arguments.len() < 2 {
-                    report_invalid_arguments();
+                    self.report_invalid_arguments_to_annotated(subscript);
                 }
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {
-                    self.infer_type_expression_with_qualifiers(arguments_slice);
-                    return Type::unknown().into();
+                    self.infer_type_expression(arguments_slice);
+                    return Type::unknown();
                 };
 
                 for element in metadata {
                     self.infer_expression(element);
                 }
 
-                let qualified_ty = self.infer_type_expression_with_qualifiers(type_expr);
-                self.store_expression_type(arguments_slice, qualified_ty.inner_type());
-                return qualified_ty;
+                let ty = self.infer_type_expression(type_expr);
+                self.store_expression_type(arguments_slice, ty);
+                ty
             }
             KnownInstanceType::Literal => {
                 match self.infer_literal_parameter_type(arguments_slice) {
@@ -5309,15 +5365,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 _ => self.infer_type_expression(arguments_slice),
             },
             KnownInstanceType::TypeVar(_) => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("TypeVar annotations")
             }
             KnownInstanceType::TypeAliasType(_) => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Generic PEP-695 type alias")
             }
             KnownInstanceType::Callable => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Callable types")
             }
 
@@ -5372,95 +5428,72 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // TODO: Generics
             KnownInstanceType::ChainMap => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::ChainMap.to_instance(self.db())
             }
             KnownInstanceType::OrderedDict => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::OrderedDict.to_instance(self.db())
             }
             KnownInstanceType::Dict => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::Dict.to_instance(self.db())
             }
             KnownInstanceType::List => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::List.to_instance(self.db())
             }
             KnownInstanceType::DefaultDict => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::DefaultDict.to_instance(self.db())
             }
             KnownInstanceType::Counter => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::Counter.to_instance(self.db())
             }
             KnownInstanceType::Set => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::Set.to_instance(self.db())
             }
             KnownInstanceType::FrozenSet => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::FrozenSet.to_instance(self.db())
             }
             KnownInstanceType::Deque => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 KnownClass::Deque.to_instance(self.db())
             }
 
             KnownInstanceType::ReadOnly => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`ReadOnly[]` type qualifier")
             }
             KnownInstanceType::NotRequired => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`NotRequired[]` type qualifier")
             }
-            KnownInstanceType::ClassVar | KnownInstanceType::Final => match arguments_slice {
-                ast::Expr::Tuple(_) => {
-                    self.context.report_lint(
-                        &INVALID_TYPE_FORM,
-                        subscript.into(),
-                        format_args!(
-                            "Type qualifier `{}` expects exactly one type parameter",
-                            known_instance.repr(self.db())
-                        ),
-                    );
-                    Type::unknown()
-                }
-                _ => {
-                    let mut argument_type =
-                        self.infer_type_expression_with_qualifiers(arguments_slice);
-                    match known_instance {
-                        KnownInstanceType::ClassVar => {
-                            argument_type.add_qualifier(TypeQualifiers::CLASS_VAR);
-                        }
-                        KnownInstanceType::Final => {
-                            argument_type.add_qualifier(TypeQualifiers::FINAL);
-                        }
-                        _ => unreachable!(),
-                    }
-                    return argument_type;
-                }
-            },
+            KnownInstanceType::ClassVar | KnownInstanceType::Final => {
+                // TODO: emit diagnostic: `ClassVar` and `Final` are not valid in type expressions
+                self.infer_type_expression(arguments_slice)
+            }
             KnownInstanceType::Required => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`Required[]` type qualifier")
             }
             KnownInstanceType::TypeIs => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`TypeIs[]` special form")
             }
             KnownInstanceType::TypeGuard => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`TypeGuard[]` special form")
             }
             KnownInstanceType::Concatenate => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`Concatenate[]` special form")
             }
             KnownInstanceType::Unpack => {
-                self.infer_type_expression_with_qualifiers(arguments_slice);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
             KnownInstanceType::NoReturn
@@ -5504,9 +5537,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Type => self.infer_subclass_of_type_expression(arguments_slice),
             KnownInstanceType::Tuple => self.infer_tuple_type_expression(arguments_slice),
-        };
-
-        ty.into()
+        }
     }
 
     fn infer_literal_parameter_type<'ast>(
