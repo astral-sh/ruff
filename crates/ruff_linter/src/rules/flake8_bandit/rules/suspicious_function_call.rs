@@ -1012,109 +1012,169 @@ fn suspicious_function(
         return;
     }
 
-    let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(func).and_then(|qualified_name| {
-        match qualified_name.segments() {
-            // Pickle
-            ["pickle" | "dill", "load" | "loads" | "Unpickler"] |
-            ["shelve", "open" | "DbfilenameShelf"] |
-            ["jsonpickle", "decode"] |
-            ["jsonpickle", "unpickler", "decode"] |
-            ["pandas", "read_pickle"]  => Some(SuspiciousPickleUsage.into()),
-            // Marshal
-            ["marshal", "load" | "loads"] => Some(SuspiciousMarshalUsage.into()),
-            // InsecureHash
-            ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"] |
-            ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => Some(SuspiciousInsecureHashUsage.into()),
-            // InsecureCipher
-            ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish"  | "DES" | "XOR", "new"] |
-            ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA" ] => Some(SuspiciousInsecureCipherUsage.into()),
-            // InsecureCipherMode
-            ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => Some(SuspiciousInsecureCipherModeUsage.into()),
-            // Mktemp
-            ["tempfile", "mktemp"] => Some(SuspiciousMktempUsage.into()),
-            // Eval
-            ["" | "builtins", "eval"] => Some(SuspiciousEvalUsage.into()),
-            // MarkSafe
-            ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
-            // URLOpen (`Request`)
-            ["urllib", "request", "Request"] |
-            ["six", "moves", "urllib", "request", "Request"] => {
-                let Some(arguments) = arguments else {
-                    return Some(SuspiciousURLOpenUsage.into());
-                };
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
+        return;
+    };
 
+    let diagnostic_kind: DiagnosticKind = match qualified_name.segments() {
+        // Pickle
+        ["pickle" | "dill", "load" | "loads" | "Unpickler"]
+        | ["shelve", "open" | "DbfilenameShelf"]
+        | ["jsonpickle", "decode"]
+        | ["jsonpickle", "unpickler", "decode"]
+        | ["pandas", "read_pickle"] => SuspiciousPickleUsage.into(),
+
+        // Marshal
+        ["marshal", "load" | "loads"] => SuspiciousMarshalUsage.into(),
+
+        // InsecureHash
+        ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
+        | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
+            SuspiciousInsecureHashUsage.into()
+        }
+
+        // InsecureCipher
+        ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
+        | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
+            SuspiciousInsecureCipherUsage.into()
+        }
+
+        // InsecureCipherMode
+        ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
+            SuspiciousInsecureCipherModeUsage.into()
+        }
+
+        // Mktemp
+        ["tempfile", "mktemp"] => SuspiciousMktempUsage.into(),
+
+        // Eval
+        ["" | "builtins", "eval"] => SuspiciousEvalUsage.into(),
+
+        // MarkSafe
+        ["django", "utils", "safestring" | "html", "mark_safe"] => SuspiciousMarkSafeUsage.into(),
+
+        // URLOpen (`Request`)
+        ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
+            if let Some(arguments) = arguments {
                 // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
-                if arguments.args.iter().all(|arg| !arg.is_starred_expr()) && arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
-                        return None;
+                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
+                    && arguments
+                        .keywords
+                        .iter()
+                        .all(|keyword| keyword.arg.is_some())
+                {
+                    if arguments
+                        .find_argument_value("url", 0)
+                        .and_then(leading_chars)
+                        .is_some_and(has_http_prefix)
+                    {
+                        return;
                     }
                 }
-                Some(SuspiciousURLOpenUsage.into())
             }
-            // URLOpen (`urlopen`, `urlretrieve`)
-            ["urllib", "request", "urlopen" | "urlretrieve" ] |
-            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
-                let Some(arguments) = arguments else {
-                    return Some(SuspiciousURLOpenUsage.into());
-                };
+            SuspiciousURLOpenUsage.into()
+        }
 
-                if arguments.args.iter().all(|arg| !arg.is_starred_expr()) && arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
+        // URLOpen (`urlopen`, `urlretrieve`)
+        ["urllib", "request", "urlopen" | "urlretrieve"]
+        | ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve"] => {
+            if let Some(arguments) = arguments {
+                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
+                    && arguments
+                        .keywords
+                        .iter()
+                        .all(|keyword| keyword.arg.is_some())
+                {
                     match arguments.find_argument_value("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
-                        Some(Expr::Call(ExprCall { func, arguments, .. })) => {
-                            if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
-                                if arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
-                                    return None;
+                        Some(Expr::Call(ExprCall {
+                            func, arguments, ..
+                        })) => {
+                            if checker
+                                .semantic()
+                                .resolve_qualified_name(func.as_ref())
+                                .is_some_and(|name| {
+                                    name.segments() == ["urllib", "request", "Request"]
+                                })
+                            {
+                                if arguments
+                                    .find_argument_value("url", 0)
+                                    .and_then(leading_chars)
+                                    .is_some_and(has_http_prefix)
+                                {
+                                    return;
                                 }
                             }
-                        },
+                        }
 
                         // If the `url` argument is a string literal, allow `http` and `https` schemes.
                         Some(expr) => {
                             if leading_chars(expr).is_some_and(has_http_prefix) {
-                                return None;
+                                return;
                             }
-                        },
+                        }
 
                         _ => {}
                     }
                 }
-                Some(SuspiciousURLOpenUsage.into())
-            },
-            // URLOpen (`URLopener`, `FancyURLopener`)
-            ["urllib", "request", "URLopener" | "FancyURLopener"] |
-            ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
-            // NonCryptographicRandom
-            ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular" | "randbytes"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
-            // UnverifiedContext
-            ["ssl", "_create_unverified_context"] => Some(SuspiciousUnverifiedContextUsage.into()),
-            // XMLCElementTree
-            ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => Some(SuspiciousXMLCElementTreeUsage.into()),
-            // XMLElementTree
-            ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => Some(SuspiciousXMLElementTreeUsage.into()),
-            // XMLExpatReader
-            ["xml", "sax", "expatreader", "create_parser"] => Some(SuspiciousXMLExpatReaderUsage.into()),
-            // XMLExpatBuilder
-            ["xml", "dom", "expatbuilder", "parse" | "parseString"] => Some(SuspiciousXMLExpatBuilderUsage.into()),
-            // XMLSax
-            ["xml", "sax", "parse" | "parseString" | "make_parser"] => Some(SuspiciousXMLSaxUsage.into()),
-            // XMLMiniDOM
-            ["xml", "dom", "minidom", "parse" | "parseString"] => Some(SuspiciousXMLMiniDOMUsage.into()),
-            // XMLPullDOM
-            ["xml", "dom", "pulldom", "parse" | "parseString"] => Some(SuspiciousXMLPullDOMUsage.into()),
-            // XMLETree
-            ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser" | "check_docinfo"] => Some(SuspiciousXMLETreeUsage.into()),
-            // Telnet
-            ["telnetlib", ..] => Some(SuspiciousTelnetUsage.into()),
-            // FTPLib
-            ["ftplib", ..] => Some(SuspiciousFTPLibUsage.into()),
-            _ => None
+            }
+            SuspiciousURLOpenUsage.into()
         }
-    }) else {
-        return;
+
+        // URLOpen (`URLopener`, `FancyURLopener`)
+        ["urllib", "request", "URLopener" | "FancyURLopener"]
+        | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
+            SuspiciousURLOpenUsage.into()
+        }
+
+        // NonCryptographicRandom
+        ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
+        | "triangular" | "randbytes"] => SuspiciousNonCryptographicRandomUsage.into(),
+
+        // UnverifiedContext
+        ["ssl", "_create_unverified_context"] => SuspiciousUnverifiedContextUsage.into(),
+
+        // XMLCElementTree
+        ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
+            SuspiciousXMLCElementTreeUsage.into()
+        }
+
+        // XMLElementTree
+        ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
+            SuspiciousXMLElementTreeUsage.into()
+        }
+
+        // XMLExpatReader
+        ["xml", "sax", "expatreader", "create_parser"] => SuspiciousXMLExpatReaderUsage.into(),
+
+        // XMLExpatBuilder
+        ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
+            SuspiciousXMLExpatBuilderUsage.into()
+        }
+
+        // XMLSax
+        ["xml", "sax", "parse" | "parseString" | "make_parser"] => SuspiciousXMLSaxUsage.into(),
+
+        // XMLMiniDOM
+        ["xml", "dom", "minidom", "parse" | "parseString"] => SuspiciousXMLMiniDOMUsage.into(),
+
+        // XMLPullDOM
+        ["xml", "dom", "pulldom", "parse" | "parseString"] => SuspiciousXMLPullDOMUsage.into(),
+
+        // XMLETree
+        ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
+        | "check_docinfo"] => SuspiciousXMLETreeUsage.into(),
+
+        // Telnet
+        ["telnetlib", ..] => SuspiciousTelnetUsage.into(),
+
+        // FTPLib
+        ["ftplib", ..] => SuspiciousFTPLibUsage.into(),
+
+        _ => return,
     };
 
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
+    let diagnostic = Diagnostic::new(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);
     }
