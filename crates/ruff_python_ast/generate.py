@@ -78,7 +78,7 @@ class Node:
 # Preamble
 
 
-def write_preamble(out: list[str]):
+def write_preamble(out: list[str]) -> None:
     out.append("""
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
@@ -89,7 +89,7 @@ def write_preamble(out: list[str]):
 # Owned enum
 
 
-def write_owned_enum(out: list[str], groups: list[Group]):
+def write_owned_enum(out: list[str], groups: list[Group]) -> None:
     """
     Create an enum for each group that contains an owned copy of a syntax node.
 
@@ -187,7 +187,7 @@ def write_owned_enum(out: list[str], groups: list[Group]):
 # Ref enum
 
 
-def write_ref_enum(out: list[str], groups: list[Group]):
+def write_ref_enum(out: list[str], groups: list[Group]) -> None:
     """
     Create an enum for each group that contains a reference to a syntax node.
 
@@ -269,7 +269,7 @@ def write_ref_enum(out: list[str], groups: list[Group]):
 # AnyNode
 
 
-def write_anynode(out: list[str], groups: list[Group]):
+def write_anynode(out: list[str], groups: list[Group]) -> None:
     """
     Create the AnyNode type.
 
@@ -404,7 +404,7 @@ def write_anynode(out: list[str], groups: list[Group]):
 # AnyNodeRef
 
 
-def write_anynoderef(out: list[str], groups: list[Group]):
+def write_anynoderef(out: list[str], groups: list[Group]) -> None:
     """
     Create the AnyNodeRef type.
 
@@ -552,7 +552,7 @@ def write_anynoderef(out: list[str], groups: list[Group]):
 # NodeKind
 
 
-def write_nodekind(out: list[str], groups: list[Group]):
+def write_nodekind(out: list[str], groups: list[Group]) -> None:
     """
     Create the NodeKind type.
 
@@ -614,7 +614,7 @@ def write_nodekind(out: list[str], groups: list[Group]):
 # AstNode
 
 
-def write_astnode(out: list[str], groups: list[Group]):
+def write_astnode(out: list[str], groups: list[Group]) -> None:
     """
     Creates AstNode trait impls:
     - `impl AstNode for TypeParam`
@@ -730,7 +730,7 @@ def generate(groups: list[Group]) -> list[str]:
     return out
 
 
-def write_output(root: Path, out: list[str]):
+def write_output(root: Path, out: list[str]) -> None:
     out_path = root.joinpath("crates", "ruff_python_ast", "src", "generated.rs")
     out_path.write_text(rustfmt("\n".join(out)))
 
@@ -739,7 +739,7 @@ def write_output(root: Path, out: list[str]):
 # Main
 
 
-def main():
+def main() -> None:
     root = Path(
         check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
     )
