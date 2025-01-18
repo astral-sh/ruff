@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use ruff_python_semantic::{analyze::class::any_super_class, SemanticModel};
+use ruff_python_semantic::{analyze::class::iter_super_class, SemanticModel};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -39,14 +39,15 @@ use crate::checkers::ast::Checker;
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct RedefinedSlotsInSubclass {
-    name: String,
+    base: String,
+    slot_name: String,
 }
 
 impl Violation for RedefinedSlotsInSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedSlotsInSubclass { name } = self;
-        format!("Redefined slot '{name}' in subclass")
+        let RedefinedSlotsInSubclass { base, slot_name } = self;
+        format!("Slot `{slot_name}` redefined from base class `{base}`")
     }
 }
 
@@ -68,15 +69,7 @@ pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast
     let semantic = checker.semantic();
     let mut diagnostics: Vec<_> = class_slots
         .iter()
-        .filter(|&slot| contained_in_super_slots(class_def, semantic, slot))
-        .map(|slot| {
-            Diagnostic::new(
-                RedefinedSlotsInSubclass {
-                    name: slot.name.to_string(),
-                },
-                slot.range(),
-            )
-        })
+        .filter_map(|slot| check_super_slots(class_def, semantic, slot))
         .collect();
     checker.diagnostics.append(&mut diagnostics);
 }
@@ -111,19 +104,25 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn contained_in_super_slots(
+fn check_super_slots(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     slot: &Slot,
-) -> bool {
-    any_super_class(class_def, semantic, &|super_class| {
-        // This function checks every super class
-        // but we want every _strict_ super class, hence:
-        if class_def.name == super_class.name {
-            return false;
-        }
-        slots_members(&super_class.body).contains(slot)
-    })
+) -> Option<Diagnostic> {
+    iter_super_class(class_def, semantic)
+        .skip(1)
+        .find_map(&|super_class: &ast::StmtClassDef| {
+            if slots_members(&super_class.body).contains(slot) {
+                return Some(Diagnostic::new(
+                    RedefinedSlotsInSubclass {
+                        base: super_class.name.to_string(),
+                        slot_name: slot.name.to_string(),
+                    },
+                    slot.range(),
+                ));
+            }
+            None
+        })
 }
 
 fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
