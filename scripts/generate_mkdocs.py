@@ -264,9 +264,10 @@ def main() -> None:
                             (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
                             (
                                 f"rules/{rule['code'].lower()}.md",
-                                f"rules/{rule['name']}.md"
+                                f"rules/{rule['name']}.md",
                             ),
-                        ] for rule in rules
+                        ]
+                        for rule in rules
                     )
                 ),
             },
