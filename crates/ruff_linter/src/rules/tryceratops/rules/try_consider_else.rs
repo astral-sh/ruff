@@ -12,8 +12,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// The `try`-`except` statement has an `else` clause for code that should
-/// run _only_ if no exceptions were raised. Using the `else` clause is more
-/// explicit than using a `return` statement inside of a `try` block.
+/// run _only_ if no exceptions were raised. Returns in `try` blocks may
+/// exhibit confusing or unwanted behavior, such as being overridden by
+/// control flow in `except` and `finally` blocks, or unintentionally
+/// suppressing an exception.
 ///
 /// ## Example
 /// ```python
