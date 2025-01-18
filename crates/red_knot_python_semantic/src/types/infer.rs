@@ -51,13 +51,13 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
-    report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
-    CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
-    INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER, INVALID_DECLARATION,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_invalid_arguments_to_annotated, report_invalid_assignment, report_unresolved_module,
+    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
+    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
@@ -4821,7 +4821,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }) = slice
                         {
                             if arguments.len() < 2 {
-                                self.report_invalid_arguments_to_annotated(subscript);
+                                report_invalid_arguments_to_annotated(
+                                    self.db(),
+                                    &self.context,
+                                    subscript,
+                                );
                             }
 
                             if let [inner_annotation, metadata @ ..] = &arguments[..] {
@@ -4839,7 +4843,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Type::unknown().into()
                             }
                         } else {
-                            self.report_invalid_arguments_to_annotated(subscript);
+                            report_invalid_arguments_to_annotated(
+                                self.db(),
+                                &self.context,
+                                subscript,
+                            );
                             self.infer_annotation_expression_impl(slice)
                         }
                     }
@@ -5295,17 +5303,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn report_invalid_arguments_to_annotated(&self, subscript: &ast::ExprSubscript) {
-        self.context.report_lint(
-            &INVALID_TYPE_FORM,
-            subscript.into(),
-            format_args!(
-                "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-                KnownInstanceType::Annotated.repr(self.db())
-            ),
-        );
-    }
-
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -5318,7 +5315,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    self.report_invalid_arguments_to_annotated(subscript);
+                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
@@ -5328,7 +5325,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if arguments.len() < 2 {
-                    self.report_invalid_arguments_to_annotated(subscript);
+                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
                 }
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {

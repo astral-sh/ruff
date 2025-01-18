@@ -1,5 +1,4 @@
 use super::context::InferContext;
-use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::string_annotation::{
@@ -7,7 +6,8 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{ClassLiteralType, Type};
+use crate::types::{ClassLiteralType, KnownInstanceType, Type};
+use crate::{declare_lint, Db};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -1078,5 +1078,20 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
         &INCOMPATIBLE_SLOTS,
         node.into(),
         format_args!("Class base has incompatible `__slots__`"),
+    );
+}
+
+pub(crate) fn report_invalid_arguments_to_annotated<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db>,
+    subscript: &ast::ExprSubscript,
+) {
+    context.report_lint(
+        &INVALID_TYPE_FORM,
+        subscript.into(),
+        format_args!(
+            "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
+            KnownInstanceType::Annotated.repr(db)
+        ),
     );
 }
