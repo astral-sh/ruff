@@ -3819,9 +3819,9 @@ impl<'db> Class<'db> {
     #[salsa::tracked]
     pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
-        let mut base_classes = self.fully_static_explicit_bases(db).peekable();
+        let mut base_classes = self.fully_static_explicit_bases(db);
 
-        if base_classes.peek().is_some() && self.inheritance_cycle(db).is_some() {
+        if self.inheritance_cycle(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
@@ -4068,15 +4068,16 @@ impl<'db> Class<'db> {
         ) -> Option<InheritanceCycle> {
             let mut result = result;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
-                if start == explicit_base_class || result == Some(InheritanceCycle::Participant) {
-                    return Some(InheritanceCycle::Participant);
-                }
-
                 // Each base must be considered in isolation.
                 // This is due to the fact that if a class uses multiple inheritance,
                 // there could easily be a situation where two bases have the same class in their MROs;
                 // that isn't enough to constitute the class being cyclically defined.
                 if !classes_to_watch.insert(explicit_base_class) {
+                    if result == Some(InheritanceCycle::Participant) || start == explicit_base_class
+                    {
+                        return Some(InheritanceCycle::Participant);
+                    }
+
                     return Some(InheritanceCycle::Inherited);
                 }
                 result = inheritance_cycle_recursive(
@@ -4094,7 +4095,9 @@ impl<'db> Class<'db> {
             result
         }
 
-        inheritance_cycle_recursive(db, self, self, &mut IndexSet::new(), None)
+        let mut classes_to_watch = IndexSet::new();
+        classes_to_watch.insert(self);
+        inheritance_cycle_recursive(db, self, self, &mut classes_to_watch, None)
     }
 }
 
