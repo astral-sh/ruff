@@ -3,8 +3,6 @@
 Two gradual types `A` and `B` are equivalent if all [materializations] of `A` are also
 materializations of `B`, and all materializations of `B` are also materializations of `A`.
 
-[materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize
-
 ## Basic
 
 ```py
@@ -43,8 +41,14 @@ static_assert(is_gradual_equivalent_to(str | int | Any, str | int | Unknown))
 
 # TODO: These should pass
 static_assert(is_gradual_equivalent_to(str | int, int | str))  # error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]]))  # error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))  # error: [static-assert-error]
+# error: [static-assert-error]
+static_assert(
+    is_gradual_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]])
+)
+# error: [static-assert-error]
+static_assert(
+    is_gradual_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]])
+)
 
 static_assert(not is_gradual_equivalent_to(str | int, int | str | bytes))
 static_assert(not is_gradual_equivalent_to(str | int | bytes, int | str | dict))
@@ -60,3 +64,5 @@ static_assert(is_gradual_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
 static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[str, int, bytes]))
 static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[int, str]))
 ```
+
+[materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize

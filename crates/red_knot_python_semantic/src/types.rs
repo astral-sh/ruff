@@ -4337,7 +4337,6 @@ pub(crate) mod tests {
         Unknown,
         None,
         Any,
-        Todo,
         IntLiteral(i64),
         BooleanLiteral(bool),
         StringLiteral(&'static str),
@@ -4361,7 +4360,6 @@ pub(crate) mod tests {
         SubclassOfAny,
         SubclassOfBuiltinClass(&'static str),
         SubclassOfAbcClass(&'static str),
-        SliceLiteral(i32, i32, i32),
         AlwaysTruthy,
         AlwaysFalsy,
     }
@@ -4373,7 +4371,6 @@ pub(crate) mod tests {
                 Ty::Unknown => Type::unknown(),
                 Ty::None => Type::none(db),
                 Ty::Any => Type::any(),
-                Ty::Todo => todo_type!("Ty::Todo"),
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::string_literal(db, s),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
@@ -4421,12 +4418,6 @@ pub(crate) mod tests {
                         .expect_class_literal()
                         .class,
                 ),
-                Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
-                    db,
-                    Some(start),
-                    Some(stop),
-                    Some(step),
-                )),
                 Ty::AlwaysTruthy => Type::AlwaysTruthy,
                 Ty::AlwaysFalsy => Type::AlwaysFalsy,
             }
