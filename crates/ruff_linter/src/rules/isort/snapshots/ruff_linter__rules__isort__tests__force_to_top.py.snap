@@ -26,7 +26,7 @@ force_to_top.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 21 | | import lib3.lib4.lib5
 22 | | from lib3.lib4 import foo
 23 | | from lib3.lib4.lib5 import foo
-   | |_______________________________^ I001
+   | |______________________________^ I001
    |
    = help: Organize imports
 

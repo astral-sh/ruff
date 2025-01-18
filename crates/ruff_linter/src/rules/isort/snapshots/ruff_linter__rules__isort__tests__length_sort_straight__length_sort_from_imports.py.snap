@@ -6,7 +6,7 @@ length_sort_from_imports.py:1:1: I001 [*] Import block is un-sorted or un-format
 1 | / from mediuuuuuuuuuuum import a
 2 | | from short import b
 3 | | from loooooooooooooooooooooog import c
-  | |_______________________________________^ I001
+  | |______________________________________^ I001
   |
   = help: Organize imports
 
