@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    |
@@ -16,7 +17,7 @@ B901.py:17:5: B901 Using `yield` and `return {value}` in a generator function ca
 16 | def broken2():
 17 |     return [3, 2, 1]
    |     ^^^^^^^^^^^^^^^^ B901
-18 | 
+18 |
 19 |     yield from not_broken()
    |
 
@@ -26,6 +27,6 @@ B901.py:24:9: B901 Using `yield` and `return {value}` in a generator function ca
 23 |     if x is None:
 24 |         return 0
    |         ^^^^^^^^ B901
-25 | 
+25 |
 26 |     for i in range(3):
    |
