@@ -271,5 +271,5 @@ pub(crate) fn sequence_is_sorted<'db>(sequence: impl IntoIterator<Item = &'db Ty
     sequence
         .into_iter()
         .tuple_windows()
-        .all(|(left, right)| union_elements_ordering(left, right) != Ordering::Greater)
+        .all(|(left, right)| !union_elements_ordering(left, right).is_gt())
 }

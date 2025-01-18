@@ -254,6 +254,12 @@ mod stable {
         forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
     );
 
+    // Symmetry: If `S` is gradual equivalent to `T`, `T` is gradual equivalent to `S`.
+    type_property_test!(
+        gradual_equivalent_to_is_symmetric, db,
+        forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
+    );
+
     // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
@@ -408,7 +414,7 @@ mod flaky {
     );
 
     // Equal element sets of intersections implies equivalence
-    // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15508
+    // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
         intersection_equivalence_not_order_dependent, db,
         forall types s, t, u.
@@ -433,12 +439,6 @@ mod flaky {
                 .map(|trio_of_types| union(db, trio_of_types))
                 .permutations(2)
                 .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(db, vec_of_unions[1]))
-    );
-
-    // Symmetry: If `S` is gradual equivalent to `T`, `T` is gradual equivalent to `S`.
-    type_property_test!(
-        gradual_equivalent_to_is_symmetric, db,
-        forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
     );
 
     // A fully static type does not have any materializations.

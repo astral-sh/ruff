@@ -1087,10 +1087,10 @@ impl<'db> Type<'db> {
 
         match (self, other) {
             (Type::Union(left), Type::Union(right)) => {
-                left.to_sorted_union(db) == right.to_sorted_union(db)
+                left == right || left.to_sorted_union(db) == right.to_sorted_union(db)
             }
             (Type::Intersection(left), Type::Intersection(right)) => {
-                left.to_sorted_intersection(db) == right.to_sorted_intersection(db)
+                left == right || left.to_sorted_intersection(db) == right.to_sorted_intersection(db)
             }
             _ => self == other,
         }
@@ -1152,6 +1152,10 @@ impl<'db> Type<'db> {
             }
 
             (Type::Union(first), Type::Union(second)) => {
+                if first == second {
+                    return true;
+                }
+
                 let first = first.to_sorted_union(db);
                 let second = second.to_sorted_union(db);
 
@@ -1169,6 +1173,10 @@ impl<'db> Type<'db> {
             }
 
             (Type::Intersection(first), Type::Intersection(second)) => {
+                if first == second {
+                    return true;
+                }
+
                 let first = first.to_sorted_intersection(db);
                 let second = second.to_sorted_intersection(db);
 
