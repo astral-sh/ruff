@@ -75,7 +75,8 @@ pub fn any_base_class(
 /// Returns an iterator over all base classes, beginning with the
 /// given class.
 ///
-/// The traversal of the class hierarchy is breadth-first.
+/// The traversal of the class hierarchy is breadth-first, since
+/// this graph tends to have small width but could be rather deep.
 pub fn iter_super_class<'stmt>(
     class_def: &'stmt ast::StmtClassDef,
     semantic: &'stmt SemanticModel,
