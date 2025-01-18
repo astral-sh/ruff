@@ -47,7 +47,7 @@ impl Violation for RedefinedSlotsInSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedefinedSlotsInSubclass { base, slot_name } = self;
-        format!("Slot `{slot_name}` redefined from base `{base}`")
+        format!("Slot `{slot_name}` redefined from base class `{base}`")
     }
 }
 
