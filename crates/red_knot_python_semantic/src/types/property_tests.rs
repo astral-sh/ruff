@@ -404,4 +404,17 @@ mod flaky {
         all_type_pairs_are_assignable_to_their_union, db,
         forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
     );
+
+    // Symmetry: If `S` is gradual equivalent to `T`, `T` is gradual equivalent to `S`.
+    type_property_test!(
+        gradual_equivalent_to_is_symmetric, db,
+        forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
+    );
+
+    // A fully static type does not have any materializations.
+    // Thus, two equivalent (fully static) types are also gradual equivalent.
+    type_property_test!(
+        two_equivalent_types_are_also_gradual_equivalent, db,
+        forall types s, t. s.is_equivalent_to(db, t) => s.is_gradual_equivalent_to(db, t)
+    );
 }

@@ -1955,6 +1955,15 @@ impl<'db> Type<'db> {
                             .set_return_ty(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
+                    Some(KnownFunction::IsGradualEquivalentTo) => {
+                        let (ty_a, ty_b) = binding
+                            .two_parameter_tys()
+                            .unwrap_or((Type::unknown(), Type::unknown()));
+                        binding.set_return_ty(Type::BooleanLiteral(
+                            ty_a.is_gradual_equivalent_to(db, ty_b),
+                        ));
+                        CallOutcome::callable(binding)
+                    }
                     Some(KnownFunction::IsFullyStatic) => {
                         let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
                         binding.set_return_ty(Type::BooleanLiteral(ty.is_fully_static(db)));
@@ -3404,6 +3413,8 @@ pub enum KnownFunction {
     IsAssignableTo,
     /// `knot_extensions.is_disjoint_from`
     IsDisjointFrom,
+    /// `knot_extensions.is_gradual_equivalent_to`
+    IsGradualEquivalentTo,
     /// `knot_extensions.is_fully_static`
     IsFullyStatic,
     /// `knot_extensions.is_singleton`
@@ -3440,6 +3451,7 @@ impl KnownFunction {
             "is_disjoint_from" => Self::IsDisjointFrom,
             "is_equivalent_to" => Self::IsEquivalentTo,
             "is_assignable_to" => Self::IsAssignableTo,
+            "is_gradual_equivalent_to" => Self::IsGradualEquivalentTo,
             "is_fully_static" => Self::IsFullyStatic,
             "is_singleton" => Self::IsSingleton,
             "is_single_valued" => Self::IsSingleValued,
@@ -3466,6 +3478,7 @@ impl KnownFunction {
             Self::IsAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
+            | Self::IsGradualEquivalentTo
             | Self::IsFullyStatic
             | Self::IsSingleValued
             | Self::IsSingleton
@@ -3484,7 +3497,8 @@ impl KnownFunction {
             Self::IsEquivalentTo
             | Self::IsSubtypeOf
             | Self::IsAssignableTo
-            | Self::IsDisjointFrom => ParameterExpectations::TwoTypeExpressions,
+            | Self::IsDisjointFrom
+            | Self::IsGradualEquivalentTo => ParameterExpectations::TwoTypeExpressions,
 
             Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
             Self::Cast => ParameterExpectations::TypeExpressionAndValueExpression,
@@ -4623,82 +4637,6 @@ pub(crate) mod tests {
         let no_default = Ty::KnownClassInstance(KnownClass::NoDefaultType).into_type(&db);
 
         assert!(no_default.is_singleton(&db));
-    }
-
-    #[test_case(Ty::Todo, Ty::Todo)]
-    #[test_case(Ty::Any, Ty::Any)]
-    #[test_case(Ty::Unknown, Ty::Unknown)]
-    #[test_case(Ty::Any, Ty::Unknown)]
-    #[test_case(Ty::Todo, Ty::Unknown)]
-    #[test_case(Ty::Todo, Ty::Any)]
-    #[test_case(Ty::Never, Ty::Never)]
-    #[test_case(Ty::AlwaysTruthy, Ty::AlwaysTruthy)]
-    #[test_case(Ty::AlwaysFalsy, Ty::AlwaysFalsy)]
-    #[test_case(Ty::LiteralString, Ty::LiteralString)]
-    #[test_case(Ty::BooleanLiteral(true), Ty::BooleanLiteral(true))]
-    #[test_case(Ty::BooleanLiteral(false), Ty::BooleanLiteral(false))]
-    #[test_case(Ty::SliceLiteral(0, 1, 2), Ty::SliceLiteral(0, 1, 2))]
-    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinClassLiteral("str"))]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
-    // TODO: Compare unions/intersections with different orders
-    // #[test_case(
-    //     Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
-    //     Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")])
-    // )]
-    // #[test_case(
-    //     Ty::Intersection {
-    //         pos: vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")],
-    //         neg: vec![Ty::BuiltinInstance("bytes"), Ty::None]
-    //     },
-    //     Ty::Intersection {
-    //         pos: vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")],
-    //         neg: vec![Ty::None, Ty::BuiltinInstance("bytes")]
-    //     }
-    // )]
-    // #[test_case(
-    //     Ty::Intersection {
-    //         pos: vec![Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")])],
-    //         neg: vec![Ty::SubclassOfAny]
-    //     },
-    //     Ty::Intersection {
-    //         pos: vec![Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")])],
-    //         neg: vec![Ty::SubclassOfUnknown]
-    //     }
-    // )]
-    fn is_gradual_equivalent_to(a: Ty, b: Ty) {
-        let db = setup_db();
-        let a = a.into_type(&db);
-        let b = b.into_type(&db);
-
-        assert!(a.is_gradual_equivalent_to(&db, b));
-        assert!(b.is_gradual_equivalent_to(&db, a));
-    }
-
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
-    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::SubclassOfAny)]
-    #[test_case(
-        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
-        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"), Ty::BuiltinInstance("bytes")])
-    )]
-    #[test_case(
-        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int"), Ty::BuiltinInstance("bytes")]),
-        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"), Ty::BuiltinInstance("dict")])
-    )]
-    #[test_case(
-        Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
-        Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int"), Ty::BuiltinInstance("bytes")])
-    )]
-    #[test_case(
-        Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]),
-        Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")])
-    )]
-    fn is_not_gradual_equivalent_to(a: Ty, b: Ty) {
-        let db = setup_db();
-        let a = a.into_type(&db);
-        let b = b.into_type(&db);
-
-        assert!(!a.is_gradual_equivalent_to(&db, b));
-        assert!(!b.is_gradual_equivalent_to(&db, a));
     }
 
     #[test]
