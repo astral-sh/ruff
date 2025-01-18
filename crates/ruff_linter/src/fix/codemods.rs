@@ -7,6 +7,7 @@ use libcst_native::{
     Codegen, CodegenState, Expression, ImportNames, NameOrAttribute, ParenthesizableWhitespace,
     SmallStatement, Statement,
 };
+use rustc_hash::FxHashSet;
 use smallvec::{smallvec, SmallVec};
 use unicode_normalization::UnicodeNormalization;
 
@@ -80,14 +81,11 @@ pub(crate) fn remove_imports<'a>(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
-    for member in member_names {
-        let alias_index = aliases
-            .iter()
-            .position(|alias| member == qualified_name_from_name_or_attribute(&alias.name));
-        if let Some(index) = alias_index {
-            aliases.remove(index);
-        }
-    }
+    // Remove any imports that are specified in the `imports` iterator.
+    let member_names = member_names.collect::<FxHashSet<_>>();
+    aliases.retain(|alias| {
+        !member_names.contains(qualified_name_from_name_or_attribute(&alias.name).as_str())
+    });
 
     // But avoid destroying any trailing comments.
     if let Some(alias) = aliases.last_mut() {
@@ -144,10 +142,10 @@ pub(crate) fn retain_imports(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
+    // Retain any imports that are specified in the `imports` iterator.
+    let member_names = member_names.iter().copied().collect::<FxHashSet<_>>();
     aliases.retain(|alias| {
-        member_names
-            .iter()
-            .any(|member| *member == qualified_name_from_name_or_attribute(&alias.name))
+        member_names.contains(qualified_name_from_name_or_attribute(&alias.name).as_str())
     });
 
     // But avoid destroying any trailing comments.
