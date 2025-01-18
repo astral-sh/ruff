@@ -267,7 +267,7 @@ jobs:
 
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         platform:
