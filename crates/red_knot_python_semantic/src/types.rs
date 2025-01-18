@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::iter;
 
+use bitflags::bitflags;
 use context::InferContext;
 use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
 use indexmap::IndexSet;
@@ -92,7 +93,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         // on inference from bindings.
 
         let declarations = use_def.public_declarations(symbol);
-        let declared = declarations_ty(db, declarations);
+        let declared = declarations_ty(db, declarations).map(|SymbolAndQualifiers(ty, _)| ty);
 
         match declared {
             // Symbol is declared, trust the declared type
@@ -126,7 +127,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
-                declared_ty.into()
+                declared_ty.inner_ty().into()
             }
         }
 
@@ -246,7 +247,7 @@ pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> T
 }
 
 /// Infer the type of a declaration.
-fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
     inference.declaration_ty(definition)
 }
@@ -356,22 +357,50 @@ fn bindings_ty<'db>(
     }
 }
 
+/// A type with declaredness information, and a set of type qualifiers.
+///
+/// This is used to represent the result of looking up the declared type. Consider this
+/// example:
+/// ```py
+/// class C:
+///     if flag:
+///         variable: ClassVar[int]
+/// ```
+/// If we look up the declared type of `variable` in the scope of class `C`, we will get
+/// the type `int`, a "declaredness" of [`Boundness::PossiblyUnbound`], and the information
+/// that this comes with a [`TypeQualifiers::CLASS_VAR`] type qualifier.
+pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
+
+impl SymbolAndQualifiers<'_> {
+    fn is_class_var(&self) -> bool {
+        self.1.contains(TypeQualifiers::CLASS_VAR)
+    }
+}
+
+impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
+    fn from(symbol: Symbol<'db>) -> Self {
+        SymbolAndQualifiers(symbol, TypeQualifiers::empty())
+    }
+}
+
+impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
+    fn from(ty: Type<'db>) -> Self {
+        SymbolAndQualifiers(ty.into(), TypeQualifiers::empty())
+    }
+}
+
 /// The result of looking up a declared type from declarations; see [`declarations_ty`].
-type DeclaredTypeResult<'db> = Result<Symbol<'db>, (Type<'db>, Box<[Type<'db>]>)>;
+type DeclaredTypeResult<'db> =
+    Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
 
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
-/// `Ok(declared_type)`. If there are conflicting declarations, returns
-/// `Err((union_of_declared_types, conflicting_declared_types))`.
+/// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with
+/// a union of the declared types as well as a list of all conflicting types.
 ///
-/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type but it
-/// will not be considered to be conflicting with any other types.
-///
-/// # Panics
-/// Will panic if there are no declarations and no `undeclared_ty` is provided. This is a logic
-/// error, as any symbol with zero live declarations clearly must be undeclared, and the caller
-/// should provide an `undeclared_ty`.
+/// This function also returns declaredness information (see [`Symbol`]) and a set of
+/// [`TypeQualifiers`] that have been specified on the declaration(s).
 fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
@@ -408,14 +437,19 @@ fn declarations_ty<'db>(
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
-            let mut builder = UnionBuilder::new(db).add(first);
+            let ty_first = first.inner_ty();
+            let mut qualifiers = first.qualifiers();
+
+            let mut builder = UnionBuilder::new(db).add(ty_first);
             for other in std::iter::once(second).chain(types) {
-                if !first.is_equivalent_to(db, other) {
-                    conflicting.push(other);
+                let other_ty = other.inner_ty();
+                if !ty_first.is_equivalent_to(db, other_ty) {
+                    conflicting.push(other_ty);
                 }
-                builder = builder.add(other);
+                builder = builder.add(other_ty);
+                qualifiers = qualifiers.union(other.qualifiers());
             }
-            builder.build()
+            TypeAndQualifiers::new(builder.build(), qualifiers)
         } else {
             first
         };
@@ -428,15 +462,20 @@ fn declarations_ty<'db>(
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
-            Ok(Symbol::Type(declared_ty, boundness))
+            Ok(SymbolAndQualifiers(
+                Symbol::Type(declared_ty.inner_ty(), boundness),
+                declared_ty.qualifiers(),
+            ))
         } else {
             Err((
                 declared_ty,
-                std::iter::once(first).chain(conflicting).collect(),
+                std::iter::once(first.inner_ty())
+                    .chain(conflicting)
+                    .collect(),
             ))
         }
     } else {
-        Ok(Symbol::Unbound)
+        Ok(Symbol::Unbound.into())
     }
 }
 
@@ -1661,7 +1700,10 @@ impl<'db> Type<'db> {
                 (Some(KnownClass::VersionInfo), "minor") => {
                     Type::IntLiteral(Program::get(db).python_version(db).minor.into()).into()
                 }
-                _ => class.instance_member(db, name),
+                _ => {
+                    let SymbolAndQualifiers(symbol, _) = class.instance_member(db, name);
+                    symbol
+                }
             },
 
             Type::Union(union) => {
@@ -2285,11 +2327,18 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
                 fallback_type: Type::unknown(),
             }),
-            Type::KnownInstance(KnownInstanceType::ClassVar) => {
-                // TODO: A bare `ClassVar` should rather be treated as if the symbol was not
-                // declared at all.
-                Ok(Type::unknown())
-            }
+            Type::KnownInstance(KnownInstanceType::ClassVar) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::ClassVarInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
+            Type::KnownInstance(KnownInstanceType::Final) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::FinalInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::unknown(),
@@ -2466,6 +2515,60 @@ impl std::fmt::Display for DynamicType {
     }
 }
 
+bitflags! {
+    /// Type qualifiers that appear in an annotation expression.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    pub(crate) struct TypeQualifiers: u8 {
+        /// `typing.ClassVar`
+        const CLASS_VAR = 1 << 0;
+        /// `typing.Final`
+        const FINAL     = 1 << 1;
+    }
+}
+
+/// When inferring the type of an annotation expression, we can also encounter type qualifiers
+/// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
+/// control how a particular symbol can be accessed or modified. This struct holds a type and
+/// a set of type qualifiers.
+///
+/// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
+/// qualifier `ClassVar`.
+#[derive(Clone, Debug, Copy, Eq, PartialEq)]
+pub(crate) struct TypeAndQualifiers<'db> {
+    inner: Type<'db>,
+    qualifiers: TypeQualifiers,
+}
+
+impl<'db> TypeAndQualifiers<'db> {
+    pub(crate) fn new(inner: Type<'db>, qualifiers: TypeQualifiers) -> Self {
+        Self { inner, qualifiers }
+    }
+
+    /// Forget about type qualifiers and only return the inner type.
+    pub(crate) fn inner_ty(&self) -> Type<'db> {
+        self.inner
+    }
+
+    /// Insert/add an additional type qualifier.
+    pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
+        self.qualifiers |= qualifier;
+    }
+
+    /// Return the set of type qualifiers.
+    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
+        self.qualifiers
+    }
+}
+
+impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
+    fn from(inner: Type<'db>) -> Self {
+        Self {
+            inner,
+            qualifiers: TypeQualifiers::empty(),
+        }
+    }
+}
+
 /// Error struct providing information on type(s) that were deemed to be invalid
 /// in a type expression context, and the type we should therefore fallback to
 /// for the problematic type expression.
@@ -2499,6 +2602,10 @@ enum InvalidTypeExpression {
     BareAnnotated,
     /// `x: Literal` is invalid as an annotation
     BareLiteral,
+    /// The `ClassVar` type qualifier was used in a type expression
+    ClassVarInTypeExpression,
+    /// The `Final` type qualifier was used in a type expression
+    FinalInTypeExpression,
 }
 
 impl InvalidTypeExpression {
@@ -2506,6 +2613,8 @@ impl InvalidTypeExpression {
         match self {
             Self::BareAnnotated => "`Annotated` requires at least two arguments when used in an annotation or type expression",
             Self::BareLiteral => "`Literal` requires at least one argument when used in a type expression",
+            Self::ClassVarInTypeExpression => "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)",
+            Self::FinalInTypeExpression => "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)",
         }
     }
 }
@@ -3980,15 +4089,16 @@ impl<'db> Class<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
                     return todo_type!("instance attribute on class with dynamic base").into();
                 }
                 ClassBase::Class(class) => {
-                    let member = class.own_instance_member(db, name);
-                    if !member.is_unbound() {
+                    if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
+                        class.own_instance_member(db, name)
+                    {
                         return member;
                     }
                 }
@@ -4002,7 +4112,7 @@ impl<'db> Class<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.ClassVar` and `typing.Final`
         // - Proper diagnostics
@@ -4018,7 +4128,7 @@ impl<'db> Class<'db> {
             let declarations = use_def.public_declarations(symbol);
 
             match declarations_ty(db, declarations) {
-                Ok(Symbol::Type(declared_ty, _)) => {
+                Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
                         // just a temporary heuristic to provide a broad categorization into properties
@@ -4029,28 +4139,31 @@ impl<'db> Class<'db> {
                             todo_type!("bound method").into()
                         }
                     } else {
-                        Symbol::Type(declared_ty, Boundness::Bound)
+                        SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
                     }
                 }
-                Ok(Symbol::Unbound) => {
+                Ok(SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
                     let bindings = use_def.public_bindings(symbol);
                     let inferred_ty = bindings_ty(db, bindings);
 
                     match inferred_ty {
-                        Symbol::Type(ty, _) => Symbol::Type(
-                            UnionType::from_elements(db, [Type::unknown(), ty]),
-                            Boundness::Bound,
+                        Symbol::Type(ty, _) => SymbolAndQualifiers(
+                            Symbol::Type(
+                                UnionType::from_elements(db, [Type::unknown(), ty]),
+                                Boundness::Bound,
+                            ),
+                            qualifiers,
                         ),
-                        Symbol::Unbound => Symbol::Unbound,
+                        Symbol::Unbound => SymbolAndQualifiers(Symbol::Unbound, qualifiers),
                     }
                 }
-                Err((declared_ty, _)) => {
+                Err((declared_ty, _conflicting_declarations)) => {
                     // Ignore conflicting declarations
-                    declared_ty.into()
+                    SymbolAndQualifiers(declared_ty.inner_ty().into(), declared_ty.qualifiers())
                 }
             }
         } else {
-            Symbol::Unbound
+            Symbol::Unbound.into()
         }
     }
 
