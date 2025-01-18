@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 from collections.abc import Sequence
+from itertools import chain
 from pathlib import Path
 from typing import NamedTuple
 
@@ -40,7 +41,8 @@ SECTIONS: list[Section] = [
             Section("Setup", "editors/setup.md", generated=False),
             Section("Features", "editors/features.md", generated=False),
             Section("Settings", "editors/settings.md", generated=False),
-            Section("Migrating from ruff-lsp", "editors/migration.md", generated=False),
+            Section("Migrating from ruff-lsp",
+                    "editors/migration.md", generated=False),
         ],
     ),
     Section("Configuring Ruff", "configuration.md", generated=False),
@@ -257,10 +259,16 @@ def main() -> None:
     config["plugins"].append(
         {
             "redirects": {
-                "redirect_maps": {
-                    f"rules/{rule['code']}.md": f"rules/{rule['name']}.md"
-                    for rule in rules
-                },
+                "redirect_maps": dict(
+                    chain.from_iterable(
+                        [
+                            (f"rules/{rule['code']}.md",
+                             f"rules/{rule['name']}.md"),
+                            (f"rules/{rule['code'].lower()}.md",
+                             f"rules/{rule['name']}.md"),
+                        ] for rule in rules
+                    )
+                ),
             },
         },
     )
