@@ -269,6 +269,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-24.04-arm
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - target: aarch64-unknown-linux-gnu
