@@ -41,8 +41,7 @@ SECTIONS: list[Section] = [
             Section("Setup", "editors/setup.md", generated=False),
             Section("Features", "editors/features.md", generated=False),
             Section("Settings", "editors/settings.md", generated=False),
-            Section("Migrating from ruff-lsp",
-                    "editors/migration.md", generated=False),
+            Section("Migrating from ruff-lsp", "editors/migration.md", generated=False),
         ],
     ),
     Section("Configuring Ruff", "configuration.md", generated=False),
@@ -262,10 +261,11 @@ def main() -> None:
                 "redirect_maps": dict(
                     chain.from_iterable(
                         [
-                            (f"rules/{rule['code']}.md",
-                             f"rules/{rule['name']}.md"),
-                            (f"rules/{rule['code'].lower()}.md",
-                             f"rules/{rule['name']}.md"),
+                            (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
+                            (
+                                f"rules/{rule['code'].lower()}.md",
+                                f"rules/{rule['name']}.md"
+                            ),
                         ] for rule in rules
                     )
                 ),
