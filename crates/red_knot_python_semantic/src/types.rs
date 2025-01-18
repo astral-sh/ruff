@@ -127,7 +127,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
-                declared_ty.inner_type().into()
+                declared_ty.inner_ty().into()
             }
         }
 
@@ -437,12 +437,12 @@ fn declarations_ty<'db>(
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
-            let ty_first = first.inner_type();
+            let ty_first = first.inner_ty();
             let mut qualifiers = first.qualifiers();
 
             let mut builder = UnionBuilder::new(db).add(ty_first);
             for other in std::iter::once(second).chain(types) {
-                let other_ty = other.inner_type();
+                let other_ty = other.inner_ty();
                 if !ty_first.is_equivalent_to(db, other_ty) {
                     conflicting.push(other_ty);
                 }
@@ -463,13 +463,13 @@ fn declarations_ty<'db>(
             };
 
             Ok(SymbolAndQualifiers(
-                Symbol::Type(declared_ty.inner_type(), boundness),
+                Symbol::Type(declared_ty.inner_ty(), boundness),
                 declared_ty.qualifiers(),
             ))
         } else {
             Err((
                 declared_ty,
-                std::iter::once(first.inner_type())
+                std::iter::once(first.inner_ty())
                     .chain(conflicting)
                     .collect(),
             ))
@@ -2548,7 +2548,7 @@ impl<'db> TypeAndQualifiers<'db> {
     }
 
     /// Forget about type qualifiers and only return the inner type.
-    pub(crate) fn inner_type(&self) -> Type<'db> {
+    pub(crate) fn inner_ty(&self) -> Type<'db> {
         self.inner
     }
 
@@ -4157,7 +4157,7 @@ impl<'db> Class<'db> {
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // Ignore conflicting declarations
-                    SymbolAndQualifiers(declared_ty.inner_type().into(), declared_ty.qualifiers())
+                    SymbolAndQualifiers(declared_ty.inner_ty().into(), declared_ty.qualifiers())
                 }
             }
         } else {

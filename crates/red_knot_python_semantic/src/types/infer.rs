@@ -565,7 +565,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|(definition, ty)| {
                 // Filter out class literals that result from imports
                 if let DefinitionKind::Class(class) = definition.kind(self.db()) {
-                    ty.inner_type()
+                    ty.inner_ty()
                         .into_class_literal()
                         .map(|ty| (ty.class, class.node()))
                 } else {
@@ -872,7 +872,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         conflicting.display(self.db())
                     ),
                 );
-                ty.inner_type()
+                ty.inner_ty()
             });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
@@ -896,7 +896,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let inferred_ty = bindings_ty(self.db(), prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
-        let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
+        let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_ty()) {
             ty
         } else {
             self.context.report_lint(
@@ -904,7 +904,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 node,
                 format_args!(
                     "Cannot declare type `{}` for inferred type `{}`",
-                    ty.inner_type().display(self.db()),
+                    ty.inner_ty().display(self.db()),
                     inferred_ty.display(self.db())
                 ),
             );
@@ -928,17 +928,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 declared_ty,
                 inferred_ty,
             } => {
-                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
+                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_ty()) {
                     (declared_ty, inferred_ty)
                 } else {
                     report_invalid_assignment(
                         &self.context,
                         node,
-                        declared_ty.inner_type(),
+                        declared_ty.inner_ty(),
                         inferred_ty,
                     );
                     // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_ty.inner_type())
+                    (declared_ty, declared_ty.inner_ty())
                 }
             }
         };
@@ -2080,7 +2080,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
 
         // Handle various singletons.
-        if let Type::Instance(InstanceType { class }) = declared_ty.inner_type() {
+        if let Type::Instance(InstanceType { class }) = declared_ty.inner_ty() {
             if class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
@@ -2097,7 +2097,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Some(value) = value.as_deref() {
             let inferred_ty = self.infer_expression(value);
             let inferred_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
-                declared_ty.inner_type()
+                declared_ty.inner_ty()
             } else {
                 inferred_ty
             };
@@ -4836,7 +4836,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 let inner_annotation_ty =
                                     self.infer_annotation_expression_impl(inner_annotation);
 
-                                self.store_expression_type(slice, inner_annotation_ty.inner_type());
+                                self.store_expression_type(slice, inner_annotation_ty.inner_ty());
                                 inner_annotation_ty
                             } else {
                                 self.infer_type_expression(slice);
@@ -4891,7 +4891,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             type_expr => self.infer_type_expression_no_store(type_expr).into(),
         };
 
-        self.store_expression_type(annotation, annotation_ty.inner_type());
+        self.store_expression_type(annotation, annotation_ty.inner_ty());
 
         annotation_ty
     }
