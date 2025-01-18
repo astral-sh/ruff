@@ -89,12 +89,17 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-changelog_ignore_labels = ["internal", "ci", "red-knot"]
+changelog_ignore_labels = ["internal", "ci", "red-knot", "testing"]
 
 changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"
 changelog_sections.rule = "Rule changes"
+changelog_sections.diagnostics = "Rule changes"
+changelog_sections.docstring = "Rule changes"
+changelog_sections.fixes = "Rule changes"
 changelog_sections.formatter = "Formatter"
+changelog_sections.isort = "Rule changes"
+changelog_sections.performance = "Performance"
 changelog_sections.server = "Server"
 changelog_sections.cli = "CLI"
 changelog_sections.configuration = "Configuration"
