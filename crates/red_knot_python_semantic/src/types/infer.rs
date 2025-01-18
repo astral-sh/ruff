@@ -3415,7 +3415,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
 
-                if let (ast::ExprContext::Store, Type::Instance(instance)) = (ctx, value_ty) {
+                if let Type::Instance(instance) = value_ty {
                     let instance_member = instance.class.instance_member(self.db(), attr);
                     if instance_member.is_class_var() {
                         self.context.report_lint(
