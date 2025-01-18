@@ -2534,8 +2534,8 @@ bitflags! {
 /// control how a particular symbol can be accessed or modified. This struct holds a type and
 /// a set of type qualifiers.
 ///
-/// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and
-/// qualifiers `CLASS_VAR | FINAL`.
+/// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
+/// qualifier `ClassVar`.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]
 pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
