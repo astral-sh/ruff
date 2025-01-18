@@ -64,13 +64,9 @@ impl Violation for NonPEP695TypeParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NonPEP695TypeParameter { name, generic_kind } = self;
-        let generic_method = match generic_kind {
-            GenericKind::GenericClass => "`Generic` subclass",
-            GenericKind::GenericFunction => "Generic function",
-        };
         match generic_kind {
             GenericKind::GenericClass => {
-                format!("Generic class `{name}` uses {generic_method} instead of type parameters")
+                format!("Generic class `{name}` uses `Generic` subclass instead of type parameters")
             }
             GenericKind::GenericFunction => {
                 format!("Generic function `{name}` should use type parameters")
@@ -79,11 +75,7 @@ impl Violation for NonPEP695TypeParameter {
     }
 
     fn fix_title(&self) -> Option<String> {
-        match self.generic_kind {
-            GenericKind::GenericClass | GenericKind::GenericFunction => {
-                Some("Use type parameters".to_string())
-            }
-        }
+        Some("Use type parameters".to_string())
     }
 }
 

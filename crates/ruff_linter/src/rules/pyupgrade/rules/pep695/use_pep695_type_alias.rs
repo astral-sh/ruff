@@ -73,19 +73,11 @@ impl Violation for NonPEP695TypeAlias {
             TypeAliasKind::TypeAlias => "`TypeAlias` annotation",
             TypeAliasKind::TypeAliasType => "`TypeAliasType` assignment",
         };
-        match type_alias_kind {
-            TypeAliasKind::TypeAlias | TypeAliasKind::TypeAliasType => format!(
-                "Type alias `{name}` uses {type_alias_method} instead of the `type` keyword"
-            ),
-        }
+        format!("Type alias `{name}` uses {type_alias_method} instead of the `type` keyword")
     }
 
     fn fix_title(&self) -> Option<String> {
-        match self.type_alias_kind {
-            TypeAliasKind::TypeAlias | TypeAliasKind::TypeAliasType => {
-                Some("Use the `type` keyword".to_string())
-            }
-        }
+        Some("Use the `type` keyword".to_string())
     }
 }
 
