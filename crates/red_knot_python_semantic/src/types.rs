@@ -3645,6 +3645,25 @@ pub struct Class<'db> {
     known: Option<KnownClass>,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum InheritanceCycle {
+    // The class is cyclically defined and is a participant in the cycle.
+    // i.e., it inherits either directly or indirectly from itself.
+    Participant,
+    // The class inherits from a class that is a `Participant` in an inheritance cycle,
+    // but is not itself a participant.
+    Inherited,
+}
+
+impl InheritanceCycle {
+    fn is_participant(self) -> bool {
+        match self {
+            Self::Participant => true,
+            Self::Inherited => false,
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> Class<'db> {
     /// Return `true` if this class represents `known_class`
@@ -3802,7 +3821,7 @@ impl<'db> Class<'db> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-        if base_classes.peek().is_some() && self.is_involved_in_cyclic_definition(db).is_some() {
+        if base_classes.peek().is_some() && self.inheritance_cycle(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
@@ -4034,25 +4053,23 @@ impl<'db> Class<'db> {
         }
     }
 
-    /// Return if this class is involved with a cycle in a cyclic definition,
-    /// if it is cyclically defined at all.
-    /// i.e., it inherits either directly or indirectly from itself.
+    /// Return this class' involvement in an inheritance cycle, if any.
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
     #[salsa::tracked]
-    fn is_involved_in_cyclic_definition(self, db: &'db dyn Db) -> Option<bool> {
-        fn is_involved_in_cyclic_definition_recursive<'db>(
+    fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
+        fn inheritance_cycle_recursive<'db>(
             db: &'db dyn Db,
             start: Class<'db>,
             class: Class<'db>,
             classes_to_watch: &mut IndexSet<Class<'db>>,
-            result: Option<bool>,
-        ) -> Option<bool> {
+            result: Option<InheritanceCycle>,
+        ) -> Option<InheritanceCycle> {
             let mut result = result;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
-                if start == explicit_base_class || result == Some(true) {
-                    return Some(true);
+                if start == explicit_base_class || result == Some(InheritanceCycle::Participant) {
+                    return Some(InheritanceCycle::Participant);
                 }
 
                 // Each base must be considered in isolation.
@@ -4060,9 +4077,9 @@ impl<'db> Class<'db> {
                 // there could easily be a situation where two bases have the same class in their MROs;
                 // that isn't enough to constitute the class being cyclically defined.
                 if !classes_to_watch.insert(explicit_base_class) {
-                    return Some(false);
+                    return Some(InheritanceCycle::Inherited);
                 }
-                result = is_involved_in_cyclic_definition_recursive(
+                result = inheritance_cycle_recursive(
                     db,
                     start,
                     explicit_base_class,
@@ -4077,7 +4094,7 @@ impl<'db> Class<'db> {
             result
         }
 
-        is_involved_in_cyclic_definition_recursive(db, self, self, &mut IndexSet::new(), None)
+        inheritance_cycle_recursive(db, self, self, &mut IndexSet::new(), None)
     }
 }
 

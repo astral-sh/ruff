@@ -572,10 +572,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Iterate through all class definitions in this scope.
         for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
-            if let Some(involved_in_cyclic_definition) =
-                class.is_involved_in_cyclic_definition(self.db())
-            {
-                if involved_in_cyclic_definition {
+            if let Some(inheritance_cycle) = class.inheritance_cycle(self.db()) {
+                if inheritance_cycle.is_participant() {
                     self.context.report_lint(
                         &CYCLIC_CLASS_DEFINITION,
                         class_node.into(),
