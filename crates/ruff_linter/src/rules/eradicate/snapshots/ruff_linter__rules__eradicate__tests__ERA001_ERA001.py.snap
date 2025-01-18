@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/eradicate/mod.rs
-snapshot_kind: text
 ---
 ERA001.py:1:1: ERA001 Found commented-out code
   |
@@ -59,7 +58,7 @@ ERA001.py:5:1: ERA001 Found commented-out code
 4 | a = 4
 5 | #foo(1, 2, 3)
   | ^^^^^^^^^^^^^ ERA001
-6 | 
+6 |
 7 | def foo(x, y, z):
   |
   = help: Remove commented-out code
@@ -152,7 +151,7 @@ ERA001.py:27:5: ERA001 Found commented-out code
 ERA001.py:32:1: ERA001 Found commented-out code
    |
 30 | #import os  # noqa
-31 | 
+31 |
 32 | # case 1:
    | ^^^^^^^^^ ERA001
 33 | # try:
@@ -349,6 +348,8 @@ ERA001.py:78:1: ERA001 Found commented-out code
 77 | #   "rich",
 78 | # ]
    | ^^^ ERA001
+79 |
+80 | # Script tag block followed by normal block (Ok)
    |
    = help: Remove commented-out code
 
@@ -357,3 +358,6 @@ ERA001.py:78:1: ERA001 Found commented-out code
 76 76 | #   "requests<3",
 77 77 | #   "rich",
 78    |-# ]
+79 78 | 
+80 79 | # Script tag block followed by normal block (Ok)
+81 80 |

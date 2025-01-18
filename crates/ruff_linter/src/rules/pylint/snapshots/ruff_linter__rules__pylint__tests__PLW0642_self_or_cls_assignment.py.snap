@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 self_or_cls_assignment.py:4:9: PLW0642 Reassigned `cls` variable in class method
   |
@@ -62,7 +61,7 @@ self_or_cls_assignment.py:10:16: PLW0642 Reassigned `cls` variable in class meth
  9 |         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
 10 |         blah, [cls, blah2] = "apple", ("orange", "banana")  # PLW0642
    |                ^^^ PLW0642
-11 | 
+11 |
 12 |     @classmethod
    |
    = help: Consider using a different variable name
@@ -73,7 +72,7 @@ self_or_cls_assignment.py:14:9: PLW0642 Reassigned `cls` variable in class metho
 13 |     def add_fruits(cls, fruits, /) -> None:
 14 |         cls = fruits  # PLW0642
    |         ^^^ PLW0642
-15 | 
+15 |
 16 |     def print_color(self) -> None:
    |
    = help: Consider using a different variable name
@@ -137,7 +136,7 @@ self_or_cls_assignment.py:23:16: PLW0642 Reassigned `self` variable in instance 
 22 |         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642
 23 |         blah, [self, blah2] = "apple", ("orange", "banana")  # PLW0642
    |                ^^^^ PLW0642
-24 | 
+24 |
 25 |     def print_color(self, color, /) -> None:
    |
    = help: Consider using a different variable name
@@ -147,7 +146,7 @@ self_or_cls_assignment.py:26:9: PLW0642 Reassigned `self` variable in instance m
 25 |     def print_color(self, color, /) -> None:
 26 |         self = color
    |         ^^^^ PLW0642
-27 | 
+27 |
 28 |     def ok(self) -> None:
    |
    = help: Consider using a different variable name

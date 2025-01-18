@@ -306,7 +306,7 @@ impl Rule {
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage
             | Rule::InvalidModuleName
-            | Rule::BuiltinModuleShadowing => LintSource::Filesystem,
+            | Rule::StdlibModuleShadowing => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

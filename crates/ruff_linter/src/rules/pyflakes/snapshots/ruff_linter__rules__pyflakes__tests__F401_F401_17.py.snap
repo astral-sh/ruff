@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
    |
 11 | def fn(thread: Thread):
 12 |     from threading import Thread
    |                           ^^^^^^ F401
-13 | 
+13 |
 14 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
    |
    = help: Remove unused import: `threading.Thread`
@@ -26,7 +25,7 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
 19 | def fn(thread: Thread):
 20 |     from threading import Thread
    |                           ^^^^^^ F401
-21 | 
+21 |
 22 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
    |
    = help: Remove unused import: `threading.Thread`

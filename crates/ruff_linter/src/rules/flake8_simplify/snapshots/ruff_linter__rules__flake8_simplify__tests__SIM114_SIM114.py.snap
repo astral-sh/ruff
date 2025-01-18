@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
   |
@@ -10,7 +9,7 @@ SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
 4 | | elif c:
 5 | |     b
   | |_____^ SIM114
-6 |   
+6 |
 7 |   if a:  # we preserve comments, too!
   |
   = help: Combine `if` branches
@@ -28,13 +27,13 @@ SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
 SIM114.py:7:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
  5 |       b
- 6 |   
+ 6 |
  7 | / if a:  # we preserve comments, too!
  8 | |     b
  9 | | elif c:  # but not on the second branch
 10 | |     b
    | |_____^ SIM114
-11 |   
+11 |
 12 |   if x == 1:
    |
    = help: Combine `if` branches
@@ -54,7 +53,7 @@ SIM114.py:7:1: SIM114 [*] Combine `if` branches using logical `or` operator
 SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 10 |       b
-11 |   
+11 |
 12 | / if x == 1:
 13 | |     for _ in range(20):
 14 | |         print("hello")
@@ -62,7 +61,7 @@ SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
 16 | |     for _ in range(20):
 17 | |         print("hello")
    | |______________________^ SIM114
-18 |   
+18 |
 19 |   if x == 1:
    |
    = help: Combine `if` branches
@@ -83,7 +82,7 @@ SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
 SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 17 |           print("hello")
-18 |   
+18 |
 19 | / if x == 1:
 20 | |     if True:
 21 | |         for _ in range(20):
@@ -93,7 +92,7 @@ SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
 25 | |         for _ in range(20):
 26 | |             print("hello")
    | |__________________________^ SIM114
-27 |   
+27 |
 28 |   if x == 1:
    |
    = help: Combine `if` branches
@@ -115,7 +114,7 @@ SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
 SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 26 |               print("hello")
-27 |   
+27 |
 28 | / if x == 1:
 29 | |     if True:
 30 | |         for _ in range(20):
@@ -131,7 +130,7 @@ SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
 40 | |         for _ in range(20):
 41 | |             print("hello")
    | |__________________________^ SIM114
-42 |   
+42 |
 43 |   if (
    |
    = help: Combine `if` branches
@@ -156,8 +155,7 @@ SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
 SIM114.py:29:5: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 28 |   if x == 1:
-29 |       if True:
-   |  _____^
+29 | /     if True:
 30 | |         for _ in range(20):
 31 | |             print("hello")
 32 | |     elif False:
@@ -186,15 +184,14 @@ SIM114.py:36:5: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 34 |               print("hello")
 35 |   elif x == 2:
-36 |       if True:
-   |  _____^
+36 | /     if True:
 37 | |         for _ in range(20):
 38 | |             print("hello")
 39 | |     elif False:
 40 | |         for _ in range(20):
 41 | |             print("hello")
    | |__________________________^ SIM114
-42 |   
+42 |
 43 |   if (
    |
    = help: Combine `if` branches
@@ -215,7 +212,7 @@ SIM114.py:36:5: SIM114 [*] Combine `if` branches using logical `or` operator
 SIM114.py:43:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 41 |               print("hello")
-42 |   
+42 |
 43 | / if (
 44 | |     x == 1
 45 | |     and y == 2
@@ -236,7 +233,7 @@ SIM114.py:43:1: SIM114 [*] Combine `if` branches using logical `or` operator
 60 | | elif 1 == 2:
 61 | |     pass
    | |________^ SIM114
-62 |   
+62 |
 63 |   if result.eofs == "O":
    |
    = help: Combine `if` branches
@@ -333,8 +330,7 @@ SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 116 |       a = True
 117 |       b = False
-118 |       if a > b:  # end-of-line
-    |  _____^
+118 | /     if a > b:  # end-of-line
 119 | |         return 3
 120 | |     elif a == b:
 121 | |         return 3
@@ -360,8 +356,7 @@ SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 120 |       elif a == b:
 121 |           return 3
-122 |       elif a < b:  # end-of-line
-    |  _____^
+122 | /     elif a < b:  # end-of-line
 123 | |         return 4
 124 | |     elif b is None:
 125 | |         return 4
@@ -385,8 +380,7 @@ SIM114.py:132:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 130 |       a = True
 131 |       b = False
-132 |       if a > b:  # end-of-line
-    |  _____^
+132 | /     if a > b:  # end-of-line
 133 | |         return 3
 134 | |     elif a := 1:
 135 | |         return 3

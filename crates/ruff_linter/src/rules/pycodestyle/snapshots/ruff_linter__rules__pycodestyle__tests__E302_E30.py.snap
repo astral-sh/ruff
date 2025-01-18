@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30.py:533:1: E302 [*] Expected 2 blank lines, found 0
     |
@@ -47,7 +46,7 @@ E30.py:540:1: E302 [*] Expected 2 blank lines, found 0
 E30.py:549:1: E302 [*] Expected 2 blank lines, found 1
     |
 547 |     pass
-548 | 
+548 |
 549 | def b():
     | ^^^ E302
 550 |     pass
@@ -67,7 +66,7 @@ E30.py:549:1: E302 [*] Expected 2 blank lines, found 1
 E30.py:560:1: E302 [*] Expected 2 blank lines, found 1
     |
 558 | # comment
-559 | 
+559 |
 560 | def b():
     | ^^^ E302
 561 |     pass
@@ -87,7 +86,7 @@ E30.py:560:1: E302 [*] Expected 2 blank lines, found 1
 E30.py:569:1: E302 [*] Expected 2 blank lines, found 1
     |
 567 |     pass
-568 | 
+568 |
 569 | async def b():
     | ^^^^^ E302
 570 |     pass
@@ -107,7 +106,7 @@ E30.py:569:1: E302 [*] Expected 2 blank lines, found 1
 E30.py:578:1: E302 [*] Expected 2 blank lines, found 1
     |
 576 |     pass
-577 | 
+577 |
 578 | async  def x(y: int = 1):
     | ^^^^^ E302
 579 |     pass
@@ -207,7 +206,7 @@ E30.py:624:1: E302 [*] Expected 2 blank lines, found 0
 E30.py:634:1: E302 [*] Expected 2 blank lines, found 1
     |
 632 | def fn(a: str) -> str: ...
-633 | 
+633 |
 634 | def fn(a: int | str) -> int | str:
     | ^^^ E302
 635 |     ...

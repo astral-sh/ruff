@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:307:5: D300 [*] Use triple double quotes `"""`
     |
@@ -100,11 +99,10 @@ D.py:328:5: D300 [*] Use triple double quotes `"""`
 D.py:645:5: D300 [*] Use triple double quotes `"""`
     |
 644 |   def single_line_docstring_with_an_escaped_backslash():
-645 |       "\
-    |  _____^
+645 | /     "\
 646 | |     "
     | |_____^ D300
-647 |   
+647 |
 648 |   class StatementOnSameLineAsDocstring:
     |
     = help: Convert to triple double quotes
@@ -182,8 +180,7 @@ D.py:658:5: D300 [*] Use triple double quotes `"""`
 D.py:664:5: D300 [*] Use triple double quotes `"""`
     |
 663 |   def newline_after_closing_quote(self):
-664 |       "We enforce a newline after the closing quote for a multi-line docstring \
-    |  _____^
+664 | /     "We enforce a newline after the closing quote for a multi-line docstring \
 665 | |     but continuations shouldn't be considered multi-line"
     | |_________________________________________________________^ D300
     |

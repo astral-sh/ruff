@@ -59,7 +59,7 @@ repos:
           - black==24.10.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.28.4
+    rev: v1.29.4
     hooks:
       - id: typos
 
@@ -73,7 +73,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.9.1
     hooks:
       - id: ruff-format
       - id: ruff
@@ -91,19 +91,19 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v0.10.0
+    rev: v1.0.1
     hooks:
       - id: zizmor
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.30.0
+    rev: 0.31.0
     hooks:
       - id: check-github-workflows
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
   # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.5
+    rev: v1.7.6
     hooks:
       - id: actionlint
         stages:

@@ -2,10 +2,10 @@
 
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringFlags, StringLiteral};
+use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_expression, parse_expression_range, ParseError, Parsed};
+use crate::{parse_expression, parse_string_annotation, ParseError, Parsed};
 
 type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 
@@ -81,12 +81,8 @@ fn parse_simple_type_annotation(
     string_literal: &StringLiteral,
     source: &str,
 ) -> AnnotationParseResult {
-    let range_excluding_quotes = string_literal
-        .range()
-        .add_start(string_literal.flags.opener_len())
-        .sub_end(string_literal.flags.closer_len());
     Ok(ParsedAnnotation {
-        parsed: parse_expression_range(source, range_excluding_quotes)?,
+        parsed: parse_string_annotation(source, string_literal)?,
         kind: AnnotationKind::Simple,
     })
 }

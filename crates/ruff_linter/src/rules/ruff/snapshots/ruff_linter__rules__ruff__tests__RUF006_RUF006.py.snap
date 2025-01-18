@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
   |
@@ -58,7 +57,7 @@ RUF006.py:170:5: RUF006 Store a reference to the return value of `loop.create_ta
 169 |     loop = asyncio.new_event_loop()
 170 |     loop.create_task(main()) # Error
     |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
-171 | 
+171 |
 172 | # Error
     |
 
@@ -68,6 +67,6 @@ RUF006.py:175:5: RUF006 Store a reference to the return value of `loop.create_ta
 174 |     loop = asyncio.get_event_loop()
 175 |     loop.create_task(main()) # Error
     |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
-176 | 
+176 |
 177 | # OK
     |

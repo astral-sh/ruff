@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC402_google.py:3:5: DOC402 `yield` is not documented in docstring
+  |
+1 |   # DOC402
+2 |   def foo(num: int) -> str:
+3 | /     """
+4 | |     Do something
+5 | |
+6 | |     Args:
+7 | |         num (int): A number
+8 | |     """
+  | |_______^ DOC402
+9 |       yield 'test'
+  |
+  = help: Add a "Yields" section to the docstring
+
+DOC402_google.py:44:9: DOC402 `yield` is not documented in docstring
+   |
+42 |       # DOC402
+43 |       def bar(self) -> str:
+44 | /         """
+45 | |         Do something
+46 | |
+47 | |         Args:
+48 | |             num (int): A number
+49 | |         """
+   | |___________^ DOC402
+50 |           yield 'test'
+   |
+   = help: Add a "Yields" section to the docstring

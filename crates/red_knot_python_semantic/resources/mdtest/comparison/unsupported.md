@@ -22,7 +22,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
     reveal_type(d)  # revealed: bool
 
     int_literal_or_str_literal = 1 if flag else "foo"
-    # error: "Operator `in` is not supported for types `Literal[42]` and `Literal[1]`, in comparing `Literal[42]` with `Literal[1] | Literal["foo"]`"
+    # error: "Operator `in` is not supported for types `Literal[42]` and `Literal[1]`, in comparing `Literal[42]` with `Literal[1, "foo"]`"
     e = 42 in int_literal_or_str_literal
     reveal_type(e)  # revealed: bool
 

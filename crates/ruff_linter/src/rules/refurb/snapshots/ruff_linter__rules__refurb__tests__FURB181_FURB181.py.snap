@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB181.py:19:1: FURB181 [*] Use of hashlib's `.digest().hex()`
    |
 17 | # these will match
-18 | 
+18 |
 19 | blake2b().digest().hex()
    | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
 20 | blake2s().digest().hex()
@@ -268,7 +268,7 @@ FURB181.py:32:1: FURB181 Use of hashlib's `.digest().hex()`
 31 | shake_128().digest(10).hex()
 32 | shake_256().digest(10).hex()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
-33 | 
+33 |
 34 | hashlib.sha256().digest().hex()
    |
    = help: Replace with `.hexdigest()`
@@ -276,10 +276,10 @@ FURB181.py:32:1: FURB181 Use of hashlib's `.digest().hex()`
 FURB181.py:34:1: FURB181 [*] Use of hashlib's `.digest().hex()`
    |
 32 | shake_256().digest(10).hex()
-33 | 
+33 |
 34 | hashlib.sha256().digest().hex()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
-35 | 
+35 |
 36 | sha256(b"text").digest().hex()
    |
    = help: Replace with `.hexdigest()`
@@ -297,10 +297,10 @@ FURB181.py:34:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 FURB181.py:36:1: FURB181 [*] Use of hashlib's `.digest().hex()`
    |
 34 | hashlib.sha256().digest().hex()
-35 | 
+35 |
 36 | sha256(b"text").digest().hex()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
-37 | 
+37 |
 38 | hash_algo().digest().hex()
    |
    = help: Replace with `.hexdigest()`
@@ -318,10 +318,10 @@ FURB181.py:36:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 FURB181.py:38:1: FURB181 [*] Use of hashlib's `.digest().hex()`
    |
 36 | sha256(b"text").digest().hex()
-37 | 
+37 |
 38 | hash_algo().digest().hex()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
-39 | 
+39 |
 40 | # not yet supported
    |
    = help: Replace with `.hexdigest()`

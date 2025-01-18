@@ -49,7 +49,7 @@ use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
-use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_parser::{ParseError, Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -234,7 +234,7 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
-        parsed_annotations_arena: &'a typed_arena::Arena<ParsedAnnotation>,
+        parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -425,7 +425,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn parse_type_annotation(
         &self,
         annotation: &ast::ExprStringLiteral,
-    ) -> Option<&'a ParsedAnnotation> {
+    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
     }
@@ -441,7 +441,7 @@ impl<'a> Checker<'a> {
         match_fn: impl FnOnce(&ast::Expr) -> bool,
     ) -> bool {
         if let ast::Expr::StringLiteral(string_annotation) = expr {
-            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation) else {
+            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation).ok() else {
                 return false;
             };
             match_fn(parsed_annotation.expression())
@@ -460,8 +460,6 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        let in_preview = self.settings.preview.is_enabled();
-
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -514,7 +512,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
                     || imports::is_os_environ_modification(stmt, self.semantic())
-                    || (in_preview && imports::is_pytest_importorskip(stmt, self.semantic())))
+                    || imports::is_pytest_importorskip(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -2320,57 +2318,66 @@ impl<'a> Checker<'a> {
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
-                let annotation_parse_result = self.parse_type_annotation(string_expr);
-                if let Some(parsed_annotation) = annotation_parse_result {
-                    self.parsed_type_annotation = Some(parsed_annotation);
+                match self.parse_type_annotation(string_expr) {
+                    Ok(parsed_annotation) => {
+                        self.parsed_type_annotation = Some(parsed_annotation);
 
-                    let annotation = string_expr.value.to_str();
-                    let range = string_expr.range();
+                        let annotation = string_expr.value.to_str();
+                        let range = string_expr.range();
 
-                    self.semantic.restore(snapshot);
+                        self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.in_typing_only_annotation() {
-                        if self.enabled(Rule::QuotedAnnotation) {
-                            pyupgrade::rules::quoted_annotation(self, annotation, range);
+                        if self.semantic.in_annotation()
+                            && self.semantic.in_typing_only_annotation()
+                        {
+                            if self.enabled(Rule::QuotedAnnotation) {
+                                pyupgrade::rules::quoted_annotation(self, annotation, range);
+                            }
                         }
+                        if self.source_type.is_stub() {
+                            if self.enabled(Rule::QuotedAnnotationInStub) {
+                                flake8_pyi::rules::quoted_annotation_in_stub(
+                                    self, annotation, range,
+                                );
+                            }
+                        }
+
+                        let type_definition_flag = match parsed_annotation.kind() {
+                            AnnotationKind::Simple => {
+                                SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION
+                            }
+                            AnnotationKind::Complex => {
+                                SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                            }
+                        };
+
+                        self.semantic.flags |=
+                            SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
+                        let parsed_expr = parsed_annotation.expression();
+                        self.visit_expr(parsed_expr);
+                        if self.semantic.in_type_alias_value() {
+                            // stub files are covered by PYI020
+                            if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
+                                flake8_type_checking::rules::quoted_type_alias(
+                                    self,
+                                    parsed_expr,
+                                    string_expr,
+                                );
+                            }
+                        }
+                        self.parsed_type_annotation = None;
                     }
-                    if self.source_type.is_stub() {
-                        if self.enabled(Rule::QuotedAnnotationInStub) {
-                            flake8_pyi::rules::quoted_annotation_in_stub(self, annotation, range);
-                        }
-                    }
+                    Err(parse_error) => {
+                        self.semantic.restore(snapshot);
 
-                    let type_definition_flag = match parsed_annotation.kind() {
-                        AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => {
-                            SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                            self.push_type_diagnostic(Diagnostic::new(
+                                pyflakes::rules::ForwardAnnotationSyntaxError {
+                                    parse_error: parse_error.error.to_string(),
+                                },
+                                string_expr.range(),
+                            ));
                         }
-                    };
-
-                    self.semantic.flags |=
-                        SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    let parsed_expr = parsed_annotation.expression();
-                    self.visit_expr(parsed_expr);
-                    if self.semantic.in_type_alias_value() {
-                        if self.enabled(Rule::QuotedTypeAlias) {
-                            flake8_type_checking::rules::quoted_type_alias(
-                                self,
-                                parsed_expr,
-                                string_expr,
-                            );
-                        }
-                    }
-                    self.parsed_type_annotation = None;
-                } else {
-                    self.semantic.restore(snapshot);
-
-                    if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                        self.push_type_diagnostic(Diagnostic::new(
-                            pyflakes::rules::ForwardAnnotationSyntaxError {
-                                body: string_expr.value.to_string(),
-                            },
-                            string_expr.range(),
-                        ));
                     }
                 }
             }
@@ -2542,12 +2549,12 @@ impl<'a> Checker<'a> {
 }
 
 struct ParsedAnnotationsCache<'a> {
-    arena: &'a typed_arena::Arena<ParsedAnnotation>,
-    by_offset: RefCell<FxHashMap<TextSize, Option<&'a ParsedAnnotation>>>,
+    arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
+    by_offset: RefCell<FxHashMap<TextSize, Result<&'a ParsedAnnotation, &'a ParseError>>>,
 }
 
 impl<'a> ParsedAnnotationsCache<'a> {
-    fn new(arena: &'a typed_arena::Arena<ParsedAnnotation>) -> Self {
+    fn new(arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>) -> Self {
         Self {
             arena,
             by_offset: RefCell::default(),
@@ -2558,17 +2565,15 @@ impl<'a> ParsedAnnotationsCache<'a> {
         &self,
         annotation: &ast::ExprStringLiteral,
         source: &str,
-    ) -> Option<&'a ParsedAnnotation> {
+    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         *self
             .by_offset
             .borrow_mut()
             .entry(annotation.start())
             .or_insert_with(|| {
-                if let Ok(annotation) = parse_type_annotation(annotation, source) {
-                    Some(self.arena.alloc(annotation))
-                } else {
-                    None
-                }
+                self.arena
+                    .alloc(parse_type_annotation(annotation, source))
+                    .as_ref()
             })
     }
 

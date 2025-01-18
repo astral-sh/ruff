@@ -26,9 +26,9 @@ class Benchmark(enum.Enum):
 def which_tool(name: str) -> Path:
     tool = shutil.which(name)
 
-    assert (
-        tool is not None
-    ), f"Tool {name} not found. Run the script with `uv run <script>`."
+    assert tool is not None, (
+        f"Tool {name} not found. Run the script with `uv run <script>`."
+    )
 
     return Path(tool)
 
@@ -63,7 +63,9 @@ class Knot(Tool):
             (Path(__file__) / "../../../../../target/release/red_knot").resolve()
         )
 
-        assert self.path.is_file(), f"Red Knot not found at '{self.path}'. Run `cargo build --release --bin red_knot`."
+        assert self.path.is_file(), (
+            f"Red Knot not found at '{self.path}'. Run `cargo build --release --bin red_knot`."
+        )
 
     def cold_command(self, project: Project, venv: Venv) -> Command:
         command = [str(self.path), "-v"]

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/named/invalid_target.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -178,7 +177,7 @@ Module(
 
   |
 1 | # Assignment expression target can only be an identifier
-2 | 
+2 |
 3 | (x.y := 1)
   |  ^^^ Syntax Error: Assignment expression target must be an identifier
 4 | (x[y] := 1)

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
-snapshot_kind: text
 ---
 ASYNC105.py:30:5: ASYNC105 [*] Call to `trio.aclose_forcefully` is not immediately awaited
    |
@@ -468,7 +467,7 @@ ASYNC105.py:53:5: ASYNC105 [*] Call to `trio.lowlevel.wait_writable` is not imme
 52 |     trio.lowlevel.wait_task_rescheduled(foo)
 53 |     trio.lowlevel.wait_writable(foo)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC105
-54 | 
+54 |
 55 |     async with await trio.open_file(foo):  # Ok
    |
    = help: Add `await`
@@ -486,7 +485,7 @@ ASYNC105.py:53:5: ASYNC105 [*] Call to `trio.lowlevel.wait_writable` is not imme
 ASYNC105.py:58:16: ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
    |
 56 |         pass
-57 | 
+57 |
 58 |     async with trio.open_file(foo):  # ASYNC105
    |                ^^^^^^^^^^^^^^^^^^^ ASYNC105
 59 |         pass

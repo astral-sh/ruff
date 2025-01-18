@@ -92,8 +92,7 @@ def _(o: object):
     n = None
 
     if o is not None:
-        reveal_type(o)  # revealed: object & ~None
-
+        reveal_type(o)  # revealed:  ~None
         reveal_type(o is n)  # revealed: Literal[False]
         reveal_type(o is not n)  # revealed: Literal[True]
 ```

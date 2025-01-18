@@ -16,11 +16,14 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    use crate::settings::types::PythonVersion;
+
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
     #[test_case(Rule::AssertRaisesException, Path::new("B017.py"))]
     #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"))]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"))]
+    #[test_case(Rule::ClassAsDataStructure, Path::new("class_as_data_structure.py"))]
     #[test_case(Rule::DuplicateHandlerException, Path::new("B014.py"))]
     #[test_case(Rule::DuplicateTryBlockException, Path::new("B025.py"))]
     #[test_case(Rule::DuplicateValue, Path::new("B033.py"))]
@@ -72,6 +75,34 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::ClassAsDataStructure,
+        Path::new("class_as_data_structure.py"),
+        PythonVersion::Py39
+    )]
+    fn rules_with_target_version(
+        rule_code: Rule,
+        path: &Path,
+        target_version: PythonVersion,
+    ) -> Result<()> {
+        let snapshot = format!(
+            "{}_py{}{}_{}",
+            rule_code.noqa_code(),
+            target_version.major(),
+            target_version.minor(),
+            path.to_string_lossy(),
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear").join(path).as_path(),
+            &LinterSettings {
+                target_version,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

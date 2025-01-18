@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI061.pyi:4:25: PYI061 [*] `Literal[None]` can be replaced with `None`
   |
@@ -238,7 +237,7 @@ PYI061.pyi:49:18: PYI061 [*] `Literal[None]` can be replaced with `None`
 48 | y: None | Literal[None]
 49 | z: Union[Literal[None], None]
    |                  ^^^^ PYI061
-50 | 
+50 |
 51 | a: int | Literal[None] | None
    |
    = help: Replace with `None`
@@ -256,7 +255,7 @@ PYI061.pyi:49:18: PYI061 [*] `Literal[None]` can be replaced with `None`
 PYI061.pyi:51:18: PYI061 `Literal[None]` can be replaced with `None`
    |
 49 | z: Union[Literal[None], None]
-50 | 
+50 |
 51 | a: int | Literal[None] | None
    |                  ^^^^ PYI061
 52 | b: None | Literal[None] | None

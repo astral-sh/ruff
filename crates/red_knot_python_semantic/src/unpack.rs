@@ -76,6 +76,11 @@ impl<'db> UnpackValue<'db> {
         matches!(self, UnpackValue::Iterable(_))
     }
 
+    /// Returns `true` if the value is being assigned to a target.
+    pub(crate) const fn is_assign(self) -> bool {
+        matches!(self, UnpackValue::Assign(_))
+    }
+
     /// Returns the underlying [`Expression`] that is being unpacked.
     pub(crate) const fn expression(self) -> Expression<'db> {
         match self {

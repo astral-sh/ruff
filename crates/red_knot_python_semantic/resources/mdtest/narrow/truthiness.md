@@ -9,39 +9,39 @@ def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[(
 x = foo()
 
 if x:
-    reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"] | Literal[b"bar"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 else:
-    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 
 if not x:
-    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 else:
-    reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"] | Literal[b"bar"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 
 if x and not x:
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if not (x and not x):
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
-    reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"]
+    reveal_type(x)  # revealed: Literal[-1, True, "foo"]
 else:
-    reveal_type(x)  # revealed: Literal[b"", b"bar"] | None | tuple[()] | Literal[0] | Literal[False] | Literal[""]
+    reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
 ```
 
 ## Function Literals
@@ -87,10 +87,10 @@ def f(x: A | B):
     if x and not x:
         reveal_type(x)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy | B & ~AlwaysFalsy & ~AlwaysTruthy
     else:
-        reveal_type(x)  # revealed: A & ~AlwaysTruthy | B & ~AlwaysTruthy | A & ~AlwaysFalsy | B & ~AlwaysFalsy
+        reveal_type(x)  # revealed: A | B
 
     if x or not x:
-        reveal_type(x)  # revealed: A & ~AlwaysFalsy | B & ~AlwaysFalsy | A & ~AlwaysTruthy | B & ~AlwaysTruthy
+        reveal_type(x)  # revealed: A | B
     else:
         reveal_type(x)  # revealed: A & ~AlwaysTruthy & ~AlwaysFalsy | B & ~AlwaysTruthy & ~AlwaysFalsy
 ```
@@ -166,16 +166,16 @@ y = literals()
 
 if isinstance(x, str) and not isinstance(x, B):
     reveal_type(x)  # revealed: A & str & ~B
-    reveal_type(y)  # revealed: Literal[0, 42] | Literal["", "hello"]
+    reveal_type(y)  # revealed: Literal[0, 42, "", "hello"]
 
     z = x if flag() else y
 
-    reveal_type(z)  # revealed: A & str & ~B | Literal[0, 42] | Literal["", "hello"]
+    reveal_type(z)  # revealed: A & str & ~B | Literal[0, 42, "", "hello"]
 
     if z:
-        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysFalsy | Literal[42] | Literal["hello"]
+        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysFalsy | Literal[42, "hello"]
     else:
-        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysTruthy | Literal[0] | Literal[""]
+        reveal_type(z)  # revealed: A & str & ~B & ~AlwaysTruthy | Literal[0, ""]
 ```
 
 ## Narrowing Multiple Variables
@@ -199,7 +199,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(y)  # revealed: Literal["", "hello"]
 ```
 
-## ControlFlow Merging
+## Control Flow Merging
 
 After merging control flows, when we take the union of all constraints applied in each branch, we
 should return to the original state.
@@ -214,10 +214,9 @@ if x and not x:
     reveal_type(y)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy
 else:
     y = x
-    reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
+    reveal_type(y)  # revealed: A
 
-# TODO: It should be A. We should improve UnionBuilder or IntersectionBuilder. (issue #15023)
-reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
+reveal_type(y)  # revealed: A
 ```
 
 ## Truthiness of classes
@@ -312,4 +311,21 @@ class TruthyClass(metaclass=MetaTruthy): ...
 def _(x: type[FalsyClass] | type[TruthyClass]):
     reveal_type(x or A())  # revealed: type[TruthyClass] | A
     reveal_type(x and A())  # revealed: type[FalsyClass] | A
+```
+
+## Truthiness narrowing for `LiteralString`
+
+```py
+from typing_extensions import LiteralString
+
+def _(x: LiteralString):
+    if x:
+        reveal_type(x)  # revealed: LiteralString & ~Literal[""]
+    else:
+        reveal_type(x)  # revealed: Literal[""]
+
+    if not x:
+        reveal_type(x)  # revealed: Literal[""]
+    else:
+        reveal_type(x)  # revealed: LiteralString & ~Literal[""]
 ```

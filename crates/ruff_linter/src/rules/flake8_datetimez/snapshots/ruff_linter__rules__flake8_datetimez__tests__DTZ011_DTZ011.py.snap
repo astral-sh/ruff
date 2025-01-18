@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
-snapshot_kind: text
 ---
 DTZ011.py:4:1: DTZ011 `datetime.date.today()` used
   |
 3 | # qualified
 4 | datetime.date.today()
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ011
-5 | 
+5 |
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.now(tz=...).date()` instead

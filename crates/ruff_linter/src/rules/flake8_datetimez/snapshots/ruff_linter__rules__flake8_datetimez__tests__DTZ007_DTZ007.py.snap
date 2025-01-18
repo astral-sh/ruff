@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
-snapshot_kind: text
 ---
 DTZ007.py:4:1: DTZ007 Naive datetime constructed using `datetime.datetime.strptime()` without %z
   |
 3 | # bad format
 4 | datetime.datetime.strptime("something", "%H:%M:%S%Z")
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-5 | 
+5 |
 6 | # no replace or astimezone
   |
   = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
@@ -17,7 +16,7 @@ DTZ007.py:7:1: DTZ007 Naive datetime constructed using `datetime.datetime.strpti
 6 | # no replace or astimezone
 7 | datetime.datetime.strptime("something", "something")
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-8 | 
+8 |
 9 | # wrong replace
   |
   = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
@@ -27,7 +26,7 @@ DTZ007.py:10:1: DTZ007 Naive datetime constructed using `datetime.datetime.strpt
  9 | # wrong replace
 10 | datetime.datetime.strptime("something", "something").replace(hour=1)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-11 | 
+11 |
 12 | # none replace
    |
    = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
@@ -37,7 +36,7 @@ DTZ007.py:13:1: DTZ007 `datetime.datetime.strptime(...).replace(tz=None)` used
 12 | # none replace
 13 | datetime.datetime.strptime("something", "something").replace(tzinfo=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-14 | 
+14 |
 15 | # OK
    |
    = help: Pass a `datetime.timezone` object to the `tzinfo` parameter
@@ -47,7 +46,7 @@ DTZ007.py:35:1: DTZ007 Naive datetime constructed using `datetime.datetime.strpt
 34 | # no replace orastimezone unqualified
 35 | datetime.strptime("something", "something")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-36 | 
+36 |
 37 | # F-strings
    |
    = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime

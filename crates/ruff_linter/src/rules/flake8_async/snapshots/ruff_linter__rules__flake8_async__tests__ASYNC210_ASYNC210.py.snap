@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
-snapshot_kind: text
 ---
 ASYNC210.py:8:5: ASYNC210 Async functions should not call blocking HTTP methods
   |
@@ -71,7 +70,7 @@ ASYNC210.py:32:11: ASYNC210 Async functions should not call blocking HTTP method
 31 |     print(requests.get())  # ASYNC210
 32 |     print(requests.get(requests.get()))  # ASYNC210
    |           ^^^^^^^^^^^^ ASYNC210
-33 | 
+33 |
 34 |     requests.options()  # ASYNC210
    |
 
@@ -81,14 +80,14 @@ ASYNC210.py:32:24: ASYNC210 Async functions should not call blocking HTTP method
 31 |     print(requests.get())  # ASYNC210
 32 |     print(requests.get(requests.get()))  # ASYNC210
    |                        ^^^^^^^^^^^^ ASYNC210
-33 | 
+33 |
 34 |     requests.options()  # ASYNC210
    |
 
 ASYNC210.py:34:5: ASYNC210 Async functions should not call blocking HTTP methods
    |
 32 |     print(requests.get(requests.get()))  # ASYNC210
-33 | 
+33 |
 34 |     requests.options()  # ASYNC210
    |     ^^^^^^^^^^^^^^^^ ASYNC210
 35 |     requests.head()  # ASYNC210
@@ -146,7 +145,7 @@ ASYNC210.py:39:5: ASYNC210 Async functions should not call blocking HTTP methods
 ASYNC210.py:42:5: ASYNC210 Async functions should not call blocking HTTP methods
    |
 40 |     requests.foo()
-41 | 
+41 |
 42 |     httpx.options("")  # ASYNC210
    |     ^^^^^^^^^^^^^ ASYNC210
 43 |     httpx.head("")  # ASYNC210
@@ -204,7 +203,7 @@ ASYNC210.py:47:5: ASYNC210 Async functions should not call blocking HTTP methods
 ASYNC210.py:50:5: ASYNC210 Async functions should not call blocking HTTP methods
    |
 48 |     httpx.foo()  # Ok
-49 | 
+49 |
 50 |     urllib3.request()  # ASYNC210
    |     ^^^^^^^^^^^^^^^ ASYNC210
 51 |     urllib3.request(...)  # ASYNC210
@@ -215,16 +214,16 @@ ASYNC210.py:51:5: ASYNC210 Async functions should not call blocking HTTP methods
 50 |     urllib3.request()  # ASYNC210
 51 |     urllib3.request(...)  # ASYNC210
    |     ^^^^^^^^^^^^^^^ ASYNC210
-52 | 
+52 |
 53 |     urllib.request.urlopen("")  # ASYNC210
    |
 
 ASYNC210.py:53:5: ASYNC210 Async functions should not call blocking HTTP methods
    |
 51 |     urllib3.request(...)  # ASYNC210
-52 | 
+52 |
 53 |     urllib.request.urlopen("")  # ASYNC210
    |     ^^^^^^^^^^^^^^^^^^^^^^ ASYNC210
-54 | 
+54 |
 55 |     r = {}
    |

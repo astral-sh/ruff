@@ -1,18 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / import json
-2 | | 
-3 | | 
-4 | | 
+2 | |
+3 | |
+4 | |
 5 | | from typing import Any, Sequence
-6 | | 
-7 | | 
-8 | | class MissingCommand(TypeError): ...  # noqa: N818
-  | |_^ I001
+  | |________________________________^ I001
   |
   = help: Organize imports
 
@@ -65,7 +61,7 @@ E30_isort.py:21:5: E303 [*] Too many blank lines (2)
    |
 21 |     abcd.foo()
    |     ^^^^ E303
-22 | 
+22 |
 23 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
    = help: Remove extraneous blank line(s)
@@ -79,18 +75,15 @@ E30_isort.py:21:5: E303 [*] Too many blank lines (2)
 22 21 | 
 23 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
-E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:26:5: I001 [*] Import block is un-sorted or un-formatted
    |
 25 |   if TYPE_CHECKING:
 26 | /     import os
-27 | | 
-28 | | 
-29 | | 
+27 | |
+28 | |
+29 | |
 30 | |     from typing_extensions import TypeAlias
-31 | | 
-   | |_^ I001
-32 |   
-33 |       abcd.foo()
+   | |___________________________________________^ I001
    |
    = help: Organize imports
 
@@ -125,7 +118,7 @@ E30_isort.py:33:5: E303 [*] Too many blank lines (2)
    |
 33 |     abcd.foo()
    |     ^^^^ E303
-34 | 
+34 |
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
    = help: Remove extraneous blank line(s)
@@ -141,10 +134,10 @@ E30_isort.py:33:5: E303 [*] Too many blank lines (2)
 
 E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
    |
-60 | / from typing import Any, Sequence
-61 | | 
-62 | | class MissingCommand(TypeError): ...  # noqa: N818
-   | |_^ I001
+60 | from typing import Any, Sequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ I001
+61 |
+62 | class MissingCommand(TypeError): ...  # noqa: N818
    |
    = help: Organize imports
 
@@ -158,7 +151,7 @@ E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
 E30_isort.py:62:1: E303 [*] Too many blank lines (1)
    |
 60 | from typing import Any, Sequence
-61 | 
+61 |
 62 | class MissingCommand(TypeError): ...  # noqa: N818
    | ^^^^^ E303
    |

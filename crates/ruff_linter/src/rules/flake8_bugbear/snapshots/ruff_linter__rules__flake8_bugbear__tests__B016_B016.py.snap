@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B016.py:6:7: B016 Cannot raise a literal. Did you intend to return it or raise an Exception?
   |
 4 | """
-5 | 
+5 |
 6 | raise False
   |       ^^^^^ B016
 7 | raise 1

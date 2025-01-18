@@ -68,13 +68,9 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+    if dataclass_kind(class_def, semantic).is_none() {
         return;
     };
-
-    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
-        return;
-    }
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {

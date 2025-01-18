@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/invalid_assignment_targets.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -1383,30 +1382,30 @@ Module(
 
   |
 3 | # rejected by the parser. e.g., `5 = 3`, `5 += 3`, `(5): int = 3`.
-4 | 
+4 |
 5 | 5 = 3
   | ^ Syntax Error: Invalid assignment target
-6 | 
+6 |
 7 | 5 += 3
   |
 
 
   |
 5 | 5 = 3
-6 | 
+6 |
 7 | 5 += 3
   | ^ Syntax Error: Invalid augmented assignment target
-8 | 
+8 |
 9 | (5): int = 3
   |
 
 
    |
  7 | 5 += 3
- 8 | 
+ 8 |
  9 | (5): int = 3
    |  ^ Syntax Error: Invalid annotated assignment target
-10 | 
+10 |
 11 | # Now we exhaustively test all possible cases where assignment can fail.
    |
 
@@ -1574,14 +1573,14 @@ Module(
 27 | a < b < c = 42
 28 | foo() = 42
    | ^^^^^ Syntax Error: Invalid assignment target
-29 | 
+29 |
 30 | f"{quux}" = 42
    |
 
 
    |
 28 | foo() = 42
-29 | 
+29 |
 30 | f"{quux}" = 42
    | ^^^^^^^^^ Syntax Error: Invalid assignment target
 31 | f"{foo} and {bar}" = 42
@@ -1592,14 +1591,14 @@ Module(
 30 | f"{quux}" = 42
 31 | f"{foo} and {bar}" = 42
    | ^^^^^^^^^^^^^^^^^^ Syntax Error: Invalid assignment target
-32 | 
+32 |
 33 | "foo" = 42
    |
 
 
    |
 31 | f"{foo} and {bar}" = 42
-32 | 
+32 |
 33 | "foo" = 42
    | ^^^^^ Syntax Error: Invalid assignment target
 34 | b"foo" = 42

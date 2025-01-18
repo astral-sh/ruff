@@ -1,11 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary dictionary unpacking operators (`**`).
@@ -54,7 +53,7 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
             // inside a dict.
             if let Expr::Dict(inner) = value {
                 let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
-                if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.locator()) {
+                if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
                     diagnostic.set_fix(fix);
                 }
                 checker.diagnostics.push(diagnostic);
@@ -68,31 +67,67 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
 fn unnecessary_spread_fix(
     dict: &ast::ExprDict,
     prev_end: TextSize,
-    locator: &Locator,
+    tokens: &Tokens,
 ) -> Option<Fix> {
     // Find the `**` token preceding the spread.
-    let doublestar = SimpleTokenizer::starts_at(prev_end, locator.contents())
-        .find(|tok| matches!(tok.kind(), SimpleTokenKind::DoubleStar))?;
+    let doublestar = tokens
+        .after(prev_end)
+        .iter()
+        .find(|tok| matches!(tok.kind(), TokenKind::DoubleStar))?;
 
     if let Some(last) = dict.iter_values().last() {
         // Ex) `**{a: 1, b: 2}`
         let mut edits = vec![];
-        for tok in SimpleTokenizer::starts_at(last.end(), locator.contents()).skip_trivia() {
+        let mut open_parens: u32 = 0;
+
+        for tok in tokens.after(doublestar.end()) {
             match tok.kind() {
-                SimpleTokenKind::Comma => {
+                kind if kind.is_trivia() => {}
+                TokenKind::Lpar => {
                     edits.push(Edit::range_deletion(tok.range()));
+                    open_parens += 1;
                 }
-                SimpleTokenKind::RBrace => {
+                TokenKind::Lbrace => {
                     edits.push(Edit::range_deletion(tok.range()));
                     break;
                 }
-                _ => {}
+                _ => {
+                    // Unexpected token, bail
+                    return None;
+                }
             }
         }
+
+        let mut found_r_curly = false;
+        for tok in tokens.after(last.end()) {
+            if found_r_curly && open_parens == 0 {
+                break;
+            }
+
+            match tok.kind() {
+                kind if kind.is_trivia() => {}
+                TokenKind::Comma => {
+                    edits.push(Edit::range_deletion(tok.range()));
+                }
+                TokenKind::Rpar => {
+                    if found_r_curly {
+                        edits.push(Edit::range_deletion(tok.range()));
+                        open_parens -= 1;
+                    }
+                }
+                TokenKind::Rbrace => {
+                    edits.push(Edit::range_deletion(tok.range()));
+                    found_r_curly = true;
+                }
+                _ => {
+                    // Unexpected token, bail
+                    return None;
+                }
+            }
+        }
+
         Some(Fix::safe_edits(
-            // Delete the first `**{`
-            Edit::deletion(doublestar.start(), dict.start() + TextSize::from(1)),
-            // Delete the trailing `}`
+            Edit::range_deletion(doublestar.range()),
             edits,
         ))
     } else {

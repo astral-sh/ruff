@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF016.py:20:13: RUF016 Indexed access to type `str` uses type `str` instead of an integer or slice
    |
@@ -16,7 +15,7 @@ RUF016.py:21:14: RUF016 Indexed access to type `str` uses type `str` instead of 
 20 | var = "abc"["x"]
 21 | var = f"abc"["x"]
    |              ^^^ RUF016
-22 | 
+22 |
 23 | # Should emit for invalid access on bytes
    |
 
@@ -25,7 +24,7 @@ RUF016.py:24:14: RUF016 Indexed access to type `bytes` uses type `str` instead o
 23 | # Should emit for invalid access on bytes
 24 | var = b"abc"["x"]
    |              ^^^ RUF016
-25 | 
+25 |
 26 | # Should emit for invalid access on lists and tuples
    |
 
@@ -43,7 +42,7 @@ RUF016.py:28:17: RUF016 Indexed access to type `tuple` uses type `str` instead o
 27 | var = [1, 2, 3]["x"]
 28 | var = (1, 2, 3)["x"]
    |                 ^^^ RUF016
-29 | 
+29 |
 30 | # Should emit for invalid access on list comprehensions
    |
 
@@ -52,7 +51,7 @@ RUF016.py:31:30: RUF016 Indexed access to type `list comprehension` uses type `s
 30 | # Should emit for invalid access on list comprehensions
 31 | var = [x for x in range(10)]["x"]
    |                              ^^^ RUF016
-32 | 
+32 |
 33 | # Should emit for invalid access using tuple
    |
 
@@ -61,7 +60,7 @@ RUF016.py:34:13: RUF016 Indexed access to type `str` uses type `tuple` instead o
 33 | # Should emit for invalid access using tuple
 34 | var = "abc"[1, 2]
    |             ^^^^ RUF016
-35 | 
+35 |
 36 | # Should emit for invalid access using string
    |
 
@@ -70,7 +69,7 @@ RUF016.py:37:14: RUF016 Indexed access to type `list` uses type `str` instead of
 36 | # Should emit for invalid access using string
 37 | var = [1, 2]["x"]
    |              ^^^ RUF016
-38 | 
+38 |
 39 | # Should emit for invalid access using float
    |
 
@@ -79,7 +78,7 @@ RUF016.py:40:14: RUF016 Indexed access to type `list` uses type `float` instead 
 39 | # Should emit for invalid access using float
 40 | var = [1, 2][0.25]
    |              ^^^^ RUF016
-41 | 
+41 |
 42 | # Should emit for invalid access using dict
    |
 
@@ -88,7 +87,7 @@ RUF016.py:43:14: RUF016 Indexed access to type `list` uses type `dict` instead o
 42 | # Should emit for invalid access using dict
 43 | var = [1, 2][{"x": "y"}]
    |              ^^^^^^^^^^ RUF016
-44 | 
+44 |
 45 | # Should emit for invalid access using dict comp
    |
 
@@ -97,7 +96,7 @@ RUF016.py:46:14: RUF016 Indexed access to type `list` uses type `dict comprehens
 45 | # Should emit for invalid access using dict comp
 46 | var = [1, 2][{x: "y" for x in range(2)}]
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF016
-47 | 
+47 |
 48 | # Should emit for invalid access using list 
    |
 
@@ -106,7 +105,7 @@ RUF016.py:49:14: RUF016 Indexed access to type `list` uses type `tuple` instead 
 48 | # Should emit for invalid access using list 
 49 | var = [1, 2][2, 3]
    |              ^^^^ RUF016
-50 | 
+50 |
 51 | # Should emit for invalid access using list comp
    |
 
@@ -115,7 +114,7 @@ RUF016.py:52:14: RUF016 Indexed access to type `list` uses type `list comprehens
 51 | # Should emit for invalid access using list comp
 52 | var = [1, 2][[x for x in range(2)]]
    |              ^^^^^^^^^^^^^^^^^^^^^ RUF016
-53 | 
+53 |
 54 | # Should emit on invalid access using set
    |
 
@@ -124,7 +123,7 @@ RUF016.py:55:14: RUF016 Indexed access to type `list` uses type `set` instead of
 54 | # Should emit on invalid access using set
 55 | var = [1, 2][{"x", "y"}]
    |              ^^^^^^^^^^ RUF016
-56 | 
+56 |
 57 | # Should emit on invalid access using set comp
    |
 
@@ -133,7 +132,7 @@ RUF016.py:58:14: RUF016 Indexed access to type `list` uses type `set comprehensi
 57 | # Should emit on invalid access using set comp
 58 | var = [1, 2][{x for x in range(2)}]
    |              ^^^^^^^^^^^^^^^^^^^^^ RUF016
-59 | 
+59 |
 60 | # Should emit on invalid access using bytes
    |
 
@@ -142,7 +141,7 @@ RUF016.py:61:14: RUF016 Indexed access to type `list` uses type `bytes` instead 
 60 | # Should emit on invalid access using bytes
 61 | var = [1, 2][b"x"]
    |              ^^^^ RUF016
-62 | 
+62 |
 63 | # Should emit for non-integer slice start
    |
 
@@ -210,7 +209,7 @@ RUF016.py:70:17: RUF016 Slice in indexed access to type `list` uses type `list c
 69 | var = [1, 2, 3][{"x": x for x in range(2)}:2]
 70 | var = [1, 2, 3][[x for x in range(2)]:2]
    |                 ^^^^^^^^^^^^^^^^^^^^^ RUF016
-71 | 
+71 |
 72 | # Should emit for non-integer slice end
    |
 
@@ -278,7 +277,7 @@ RUF016.py:79:19: RUF016 Slice in indexed access to type `list` uses type `list c
 78 | var = [1, 2, 3][0:{"x": x for x in range(2)}]
 79 | var = [1, 2, 3][0:[x for x in range(2)]]
    |                   ^^^^^^^^^^^^^^^^^^^^^ RUF016
-80 | 
+80 |
 81 | # Should emit for non-integer slice step
    |
 
@@ -346,7 +345,7 @@ RUF016.py:88:21: RUF016 Slice in indexed access to type `list` uses type `list c
 87 | var = [1, 2, 3][0:1:{"x": x for x in range(2)}]
 88 | var = [1, 2, 3][0:1:[x for x in range(2)]]
    |                     ^^^^^^^^^^^^^^^^^^^^^ RUF016
-89 | 
+89 |
 90 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
    |
 
@@ -355,7 +354,7 @@ RUF016.py:91:17: RUF016 Slice in indexed access to type `list` uses type `str` i
 90 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
 91 | var = [1, 2, 3]["x":"y"]
    |                 ^^^ RUF016
-92 | 
+92 |
 93 | # Should emit once for repeated invalid access
    |
 
@@ -364,7 +363,7 @@ RUF016.py:91:21: RUF016 Slice in indexed access to type `list` uses type `str` i
 90 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
 91 | var = [1, 2, 3]["x":"y"]
    |                     ^^^ RUF016
-92 | 
+92 |
 93 | # Should emit once for repeated invalid access
    |
 
@@ -373,6 +372,6 @@ RUF016.py:94:17: RUF016 Indexed access to type `list` uses type `str` instead of
 93 | # Should emit once for repeated invalid access
 94 | var = [1, 2, 3]["x"]["y"]["z"]
    |                 ^^^ RUF016
-95 | 
+95 |
 96 | # Cannot emit on invalid access using variable in index
    |

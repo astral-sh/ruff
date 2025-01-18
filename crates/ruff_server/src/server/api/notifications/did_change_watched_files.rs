@@ -20,9 +20,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
         requester: &mut Requester,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
-        for change in &params.changes {
-            session.reload_settings(&change.uri);
-        }
+        session.reload_settings(&params.changes);
 
         if !params.changes.is_empty() {
             if session.resolved_client_capabilities().workspace_refresh {

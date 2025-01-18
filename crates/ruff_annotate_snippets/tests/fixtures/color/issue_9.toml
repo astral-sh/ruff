@@ -1,0 +1,31 @@
+[message]
+level = "Error"
+title = "expected one of `.`, `;`, `?`, or an operator, found `for`"
+
+[[message.snippets]]
+source = "let x = vec![1];"
+line_start = 4
+origin = "/code/rust/src/test/ui/annotate-snippet/suggestion.rs"
+[[message.snippets.annotations]]
+label = "move occurs because `x` has type `std::vec::Vec<i32>`, which does not implement the `Copy` trait"
+level = "Warning"
+range = [4, 5]
+
+[[message.snippets]]
+source = "let y = x;"
+line_start = 7
+[[message.snippets.annotations]]
+label = "value moved here"
+level = "Warning"
+range = [8, 9]
+
+[[message.snippets]]
+source = "x;"
+line_start = 9
+[[message.snippets.annotations]]
+label = "value used here after move"
+level = "Error"
+range = [0, 1]
+
+[renderer]
+color = true

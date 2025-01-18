@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
   |
@@ -142,7 +141,7 @@ RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
 RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 12 | print(a)  # noqa  comment
-13 | 
+13 |
 14 | # noqa: E501, F821
    | ^^^^^^^^^^^^^^^^^^ RUF100
 15 | # noqa: E501, F821 # comment
@@ -436,7 +435,7 @@ RUF100_3.py:28:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 27 | print(a)  # noqa: E501, ,F821  comment
 28 | print(a)  # noqa: E501 F821  comment
    |           ^^^^^^^^^^^^^^^^^ RUF100
-29 | 
+29 |
 30 | print(a)  # comment with unicode µ    # noqa: E501
    |
    = help: Remove unused `noqa` directive
@@ -454,7 +453,7 @@ RUF100_3.py:28:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 RUF100_3.py:30:7: F821 Undefined name `a`
    |
 28 | print(a)  # noqa: E501 F821  comment
-29 | 
+29 |
 30 | print(a)  # comment with unicode µ    # noqa: E501
    |       ^ F821
 31 | print(a)  # comment with unicode µ    # noqa: E501, F821
@@ -463,7 +462,7 @@ RUF100_3.py:30:7: F821 Undefined name `a`
 RUF100_3.py:30:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 28 | print(a)  # noqa: E501 F821  comment
-29 | 
+29 |
 30 | print(a)  # comment with unicode µ    # noqa: E501
    |                                       ^^^^^^^^^^^^ RUF100
 31 | print(a)  # comment with unicode µ    # noqa: E501, F821

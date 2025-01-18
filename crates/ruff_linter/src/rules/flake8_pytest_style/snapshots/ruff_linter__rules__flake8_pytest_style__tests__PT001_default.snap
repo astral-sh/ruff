@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
@@ -24,7 +23,7 @@ PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 24 | / @pytest.fixture(
-25 | | 
+25 | |
 26 | | )
    | |_^ PT001
 27 |   def parentheses_no_params_multiline():
@@ -66,7 +65,7 @@ PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 49 | / @fixture(
-50 | | 
+50 | |
 51 | | )
    | |_^ PT001
 52 |   def imported_from_parentheses_no_params_multiline():
@@ -108,7 +107,7 @@ PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 74 | / @aliased(
-75 | | 
+75 | |
 76 | | )
    | |_^ PT001
 77 |   def aliased_parentheses_no_params_multiline():

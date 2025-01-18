@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B020.py:8:5: B020 Loop control variable `items` overrides iterable it iterates
   |
 6 | items = [1, 2, 3]
-7 | 
+7 |
 8 | for items in items:
   |     ^^^^^ B020
 9 |     print(items)
@@ -14,7 +13,7 @@ B020.py:8:5: B020 Loop control variable `items` overrides iterable it iterates
 B020.py:21:10: B020 Loop control variable `values` overrides iterable it iterates
    |
 19 |     print(f"{key}, {value}")
-20 | 
+20 |
 21 | for key, values in values.items():
    |          ^^^^^^ B020
 22 |     print(f"{key}, {values}")

@@ -1,22 +1,19 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 main_first_party.py:1:1: I001 [*] Import block is un-sorted or un-formatted
-   |
- 1 | / import os
- 2 | | 
- 3 | | import __main__
- 4 | | import third_party
- 5 | | 
- 6 | | import first_party
- 7 | | 
- 8 | | os.a
-   | |_^ I001
- 9 |   third_party.a
-10 |   __main__.a
-   |
-   = help: Organize imports
+  |
+1 | / import os
+2 | |
+3 | | import __main__
+4 | | import third_party
+5 | |
+6 | | import first_party
+  | |__________________^ I001
+7 |
+8 |   os.a
+  |
+  = help: Organize imports
 
 ℹ Safe fix
 1 1 | import os

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D400.py:2:5: D400 [*] First line should end with a period
   |
@@ -41,8 +40,7 @@ D400.py:7:5: D400 [*] First line should end with a period
 D400.py:12:5: D400 [*] First line should end with a period
    |
 11 |   def f():
-12 |       """
-   |  _____^
+12 | /     """
 13 | |     Here's a line without a period,
 14 | |     but here's the next line
 15 | |     """
@@ -83,8 +81,7 @@ D400.py:20:5: D400 [*] First line should end with a period
 D400.py:25:5: D400 [*] First line should end with a period
    |
 24 |   def f():
-25 |       """
-   |  _____^
+25 | /     """
 26 | |     Here's a line without a period,
 27 | |     but here's the next line"""
    | |_______________________________^ D400
@@ -105,8 +102,7 @@ D400.py:25:5: D400 [*] First line should end with a period
 D400.py:32:5: D400 [*] First line should end with a period
    |
 31 |   def f():
-32 |       """
-   |  _____^
+32 | /     """
 33 | |     Here's a line without a period,
 34 | |     but here's the next line with trailing space """
    | |____________________________________________________^ D400
@@ -165,8 +161,7 @@ D400.py:44:5: D400 [*] First line should end with a period
 D400.py:49:5: D400 [*] First line should end with a period
    |
 48 |   def f():
-49 |       r"""
-   |  _____^
+49 | /     r"""
 50 | |     Here's a line without a period,
 51 | |     but here's the next line
 52 | |     """
@@ -207,8 +202,7 @@ D400.py:57:5: D400 [*] First line should end with a period
 D400.py:62:5: D400 [*] First line should end with a period
    |
 61 |   def f():
-62 |       r"""
-   |  _____^
+62 | /     r"""
 63 | |     Here's a line without a period,
 64 | |     but here's the next line"""
    | |_______________________________^ D400
@@ -229,8 +223,7 @@ D400.py:62:5: D400 [*] First line should end with a period
 D400.py:69:5: D400 [*] First line should end with a period
    |
 68 |   def f():
-69 |       r"""
-   |  _____^
+69 | /     r"""
 70 | |     Here's a line without a period,
 71 | |     but here's the next line with trailing space """
    | |____________________________________________________^ D400
@@ -251,11 +244,10 @@ D400.py:69:5: D400 [*] First line should end with a period
 D400.py:97:5: D400 [*] First line should end with a period
     |
  96 |   def f():
- 97 |       """
-    |  _____^
+ 97 | /     """
  98 | |     My example
  99 | |     ==========
-100 | | 
+100 | |
 101 | |     My example explanation
 102 | |     """
     | |_______^ D400

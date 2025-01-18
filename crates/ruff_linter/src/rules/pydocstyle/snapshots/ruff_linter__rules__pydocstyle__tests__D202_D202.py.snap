@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D202.py:57:5: D202 [*] No blank lines allowed after function docstring (found 2)
    |
@@ -46,7 +45,7 @@ D202.py:80:5: D202 [*] No blank lines allowed after function docstring (found 1)
 79 | def outer():
 80 |     """This is a docstring."""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
-81 | 
+81 |
 82 |     # This is a comment.
    |
    = help: Remove blank line(s) after function docstring

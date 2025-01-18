@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI025_1.py:10:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
    |
@@ -25,7 +24,7 @@ PYI025_1.py:14:51: PYI025 [*] Use `from collections.abc import Set as AbstractSe
 13 | def f():
 14 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
    |                                                   ^^^ PYI025
-15 | 
+15 |
 16 |     GLOBAL: Set[int] = set()
    |
    = help: Alias `Set` to `AbstractSet`

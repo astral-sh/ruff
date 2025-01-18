@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.8.5"
+version = "0.9.2"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -70,6 +70,9 @@ extend-exclude = [
 ignore = [
   # Conflicts with the formatter
   "COM812", "ISC001"
+]
+extend-select = [
+  "I",
 ]
 
 [tool.black]

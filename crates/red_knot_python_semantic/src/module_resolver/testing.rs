@@ -232,12 +232,12 @@ impl TestCaseBuilder<MockedTypeshed> {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version,
                 python_platform,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: src.clone(),
+                    src_roots: vec![src.clone()],
                     typeshed: Some(typeshed.clone()),
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                 },
@@ -290,12 +290,12 @@ impl TestCaseBuilder<VendoredTypeshed> {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version,
                 python_platform,
                 search_paths: SearchPathSettings {
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
-                    ..SearchPathSettings::new(src.clone())
+                    ..SearchPathSettings::new(vec![src.clone()])
                 },
             },
         )

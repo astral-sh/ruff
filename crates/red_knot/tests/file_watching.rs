@@ -4,37 +4,39 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
-use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion, SitePackages};
-use red_knot_workspace::db::{Db, RootDatabase};
-use red_knot_workspace::watch::{directory_watcher, ChangeEvent, WorkspaceWatcher};
-use red_knot_workspace::workspace::settings::{Configuration, SearchPathConfiguration};
-use red_knot_workspace::workspace::WorkspaceMetadata;
+use red_knot_python_semantic::{
+    resolve_module, ModuleName, PythonPlatform, PythonVersion, SitePackages,
+};
+use red_knot_workspace::db::{Db, ProjectDatabase};
+use red_knot_workspace::project::options::{EnvironmentOptions, Options};
+use red_knot_workspace::project::pyproject::{PyProject, Tool};
+use red_knot_workspace::project::ProjectMetadata;
+use red_knot_workspace::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
 
 struct TestCase {
-    db: RootDatabase,
-    watcher: Option<WorkspaceWatcher>,
+    db: ProjectDatabase,
+    watcher: Option<ProjectWatcher>,
     changes_receiver: crossbeam::channel::Receiver<Vec<ChangeEvent>>,
     /// The temporary directory that contains the test files.
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
-    configuration: Configuration,
 }
 
 impl TestCase {
-    fn workspace_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
-        SystemPath::absolute(relative, self.db.workspace().root(&self.db))
+    fn project_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
+        SystemPath::absolute(relative, self.db.project().root(&self.db))
     }
 
     fn root_path(&self) -> &SystemPath {
         &self.root_dir
     }
 
-    fn db(&self) -> &RootDatabase {
+    fn db(&self) -> &ProjectDatabase {
         &self.db
     }
 
@@ -112,19 +114,44 @@ impl TestCase {
         Ok(all_events)
     }
 
-    fn take_watch_changes(&self) -> Vec<ChangeEvent> {
-        self.try_take_watch_changes(Duration::from_secs(10))
+    fn take_watch_changes<M: MatchEvent>(&self, matcher: M) -> Vec<ChangeEvent> {
+        self.try_take_watch_changes(matcher, Duration::from_secs(10))
             .expect("Expected watch changes but observed none")
     }
 
-    fn try_take_watch_changes(&self, timeout: Duration) -> Option<Vec<ChangeEvent>> {
-        let watcher = self.watcher.as_ref()?;
+    fn try_take_watch_changes<M: MatchEvent>(
+        &self,
+        mut matcher: M,
+        timeout: Duration,
+    ) -> Result<Vec<ChangeEvent>, Vec<ChangeEvent>> {
+        let watcher = self
+            .watcher
+            .as_ref()
+            .expect("Cannot call `try_take_watch_changes` after `stop_watch`");
 
-        let mut all_events = self
-            .changes_receiver
-            .recv_timeout(timeout)
-            .unwrap_or_default();
-        watcher.flush();
+        let start = Instant::now();
+        let mut all_events = Vec::new();
+
+        loop {
+            let events = self
+                .changes_receiver
+                .recv_timeout(Duration::from_millis(100))
+                .unwrap_or_default();
+
+            if events
+                .iter()
+                .any(|event| matcher.match_event(event) || event.is_rescan())
+            {
+                all_events.extend(events);
+                break;
+            }
+
+            all_events.extend(events);
+
+            if start.elapsed() > timeout {
+                return Err(all_events);
+            }
+        }
 
         while let Ok(event) = self
             .changes_receiver
@@ -134,26 +161,28 @@ impl TestCase {
             watcher.flush();
         }
 
-        if all_events.is_empty() {
-            return None;
-        }
-        Some(all_events)
+        Ok(all_events)
     }
 
     fn apply_changes(&mut self, changes: Vec<ChangeEvent>) {
-        self.db.apply_changes(changes, Some(&self.configuration));
+        self.db.apply_changes(changes, None);
     }
 
-    fn update_search_path_settings(
-        &mut self,
-        configuration: SearchPathConfiguration,
-    ) -> anyhow::Result<()> {
-        let program = Program::get(self.db());
+    fn update_options(&mut self, options: Options) -> anyhow::Result<()> {
+        std::fs::write(
+            self.project_path("pyproject.toml").as_std_path(),
+            toml::to_string(&PyProject {
+                project: None,
+                tool: Some(Tool {
+                    knot: Some(options),
+                }),
+            })
+            .context("Failed to serialize options")?,
+        )
+        .context("Failed to write configuration")?;
 
-        let new_settings = configuration.to_settings(self.db.workspace().root(&self.db));
-        self.configuration.search_paths = configuration;
-
-        program.update_search_paths(&mut self.db, &new_settings)?;
+        let changes = self.take_watch_changes(event_for_file("pyproject.toml"));
+        self.apply_changes(changes);
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
@@ -163,9 +192,8 @@ impl TestCase {
         Ok(())
     }
 
-    fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
-        let package = self.db().workspace().package(self.db(), path).unwrap();
-        let files = package.files(self.db());
+    fn collect_project_files(&self) -> Vec<File> {
+        let files = self.db().project().files(self.db());
         let mut collected: Vec<_> = files.into_iter().collect();
         collected.sort_unstable_by_key(|file| file.path(self.db()).as_system_path().unwrap());
         collected
@@ -194,17 +222,17 @@ where
 }
 
 trait SetupFiles {
-    fn setup(self, root_path: &SystemPath, workspace_path: &SystemPath) -> anyhow::Result<()>;
+    fn setup(self, root_path: &SystemPath, project_path: &SystemPath) -> anyhow::Result<()>;
 }
 
 impl<const N: usize, P> SetupFiles for [(P, &'static str); N]
 where
     P: AsRef<SystemPath>,
 {
-    fn setup(self, _root_path: &SystemPath, workspace_path: &SystemPath) -> anyhow::Result<()> {
+    fn setup(self, _root_path: &SystemPath, project_path: &SystemPath) -> anyhow::Result<()> {
         for (relative_path, content) in self {
             let relative_path = relative_path.as_ref();
-            let absolute_path = workspace_path.join(relative_path);
+            let absolute_path = project_path.join(relative_path);
             if let Some(parent) = absolute_path.parent() {
                 std::fs::create_dir_all(parent).with_context(|| {
                     format!("Failed to create parent directory for file `{relative_path}`")
@@ -226,8 +254,8 @@ impl<F> SetupFiles for F
 where
     F: FnOnce(&SystemPath, &SystemPath) -> anyhow::Result<()>,
 {
-    fn setup(self, root_path: &SystemPath, workspace_path: &SystemPath) -> anyhow::Result<()> {
-        self(root_path, workspace_path)
+    fn setup(self, root_path: &SystemPath, project_path: &SystemPath) -> anyhow::Result<()> {
+        self(root_path, project_path)
     }
 }
 
@@ -235,14 +263,13 @@ fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
     F: SetupFiles,
 {
-    setup_with_search_paths(setup_files, |_root, _workspace_path| {
-        SearchPathConfiguration::default()
-    })
+    setup_with_options(setup_files, |_root, _project_path| None)
 }
 
-fn setup_with_search_paths<F>(
+// TODO: Replace with configuration?
+fn setup_with_options<F>(
     setup_files: F,
-    create_search_paths: impl FnOnce(&SystemPath, &SystemPath) -> SearchPathConfiguration,
+    create_options: impl FnOnce(&SystemPath, &SystemPath) -> Option<Options>,
 ) -> anyhow::Result<TestCase>
 where
     F: SetupFiles,
@@ -265,50 +292,52 @@ where
     .simplified()
     .to_path_buf();
 
-    let workspace_path = root_path.join("workspace");
+    let project_path = root_path.join("project");
 
-    std::fs::create_dir_all(workspace_path.as_std_path())
-        .with_context(|| format!("Failed to create workspace directory `{workspace_path}`"))?;
+    std::fs::create_dir_all(project_path.as_std_path())
+        .with_context(|| format!("Failed to create project directory `{project_path}`"))?;
 
     setup_files
-        .setup(&root_path, &workspace_path)
+        .setup(&root_path, &project_path)
         .context("Failed to setup test files")?;
 
-    let system = OsSystem::new(&workspace_path);
+    let system = OsSystem::new(&project_path);
 
-    let search_paths = create_search_paths(&root_path, &workspace_path);
+    if let Some(options) = create_options(&root_path, &project_path) {
+        std::fs::write(
+            project_path.join("pyproject.toml").as_std_path(),
+            toml::to_string(&PyProject {
+                project: None,
+                tool: Some(Tool {
+                    knot: Some(options),
+                }),
+            })
+            .context("Failed to serialize options")?,
+        )
+        .context("Failed to write configuration")?;
+    }
 
-    for path in search_paths
+    let project = ProjectMetadata::discover(&project_path, &system)?;
+    let program_settings = project.to_program_settings(&system);
+
+    for path in program_settings
+        .search_paths
         .extra_paths
         .iter()
-        .flatten()
-        .chain(search_paths.typeshed.iter())
-        .chain(search_paths.site_packages.iter().flat_map(|site_packages| {
-            if let SitePackages::Known(path) = site_packages {
-                path.as_slice()
-            } else {
-                &[]
-            }
-        }))
+        .chain(program_settings.search_paths.typeshed.as_ref())
+        .chain(program_settings.search_paths.site_packages.paths())
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path `{path}`"))?;
     }
 
-    let configuration = Configuration {
-        python_version: Some(PythonVersion::PY312),
-        search_paths,
-    };
-
-    let workspace = WorkspaceMetadata::discover(&workspace_path, &system, Some(&configuration))?;
-
-    let db = RootDatabase::new(workspace, system)?;
+    let db = ProjectDatabase::new(project, system)?;
 
     let (sender, receiver) = crossbeam::channel::unbounded();
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
         .with_context(|| "Failed to create directory watcher")?;
 
-    let watcher = WorkspaceWatcher::new(watcher, &db);
+    let watcher = ProjectWatcher::new(watcher, &db);
     assert!(!watcher.has_errored_paths());
 
     let test_case = TestCase {
@@ -317,12 +346,12 @@ where
         watcher: Some(watcher),
         _temp_dir: temp_dir,
         root_dir: root_path,
-        configuration,
     };
 
     // Sometimes the file watcher reports changes for events that happened before the watcher was started.
     // Do a best effort at dropping these events.
-    test_case.try_take_watch_changes(Duration::from_millis(100));
+    let _ =
+        test_case.try_take_watch_changes(|_event: &ChangeEvent| true, Duration::from_millis(100));
 
     Ok(test_case)
 }
@@ -359,12 +388,12 @@ fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()
 #[test]
 fn new_file() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
-    let bar_path = case.workspace_path("bar.py");
+    let bar_path = case.project_path("bar.py");
     let bar_file = case.system_file(&bar_path).unwrap();
-    let foo_path = case.workspace_path("foo.py");
+    let foo_path = case.project_path("foo.py");
 
     assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
-    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
+    assert_eq!(&case.collect_project_files(), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
@@ -374,7 +403,7 @@ fn new_file() -> anyhow::Result<()> {
 
     let foo = case.system_file(&foo_path).expect("foo.py to exist.");
 
-    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file, foo]);
+    assert_eq!(&case.collect_project_files(), &[bar_file, foo]);
 
     Ok(())
 }
@@ -382,12 +411,12 @@ fn new_file() -> anyhow::Result<()> {
 #[test]
 fn new_ignored_file() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", ""), (".ignore", "foo.py")])?;
-    let bar_path = case.workspace_path("bar.py");
+    let bar_path = case.project_path("bar.py");
     let bar_file = case.system_file(&bar_path).unwrap();
-    let foo_path = case.workspace_path("foo.py");
+    let foo_path = case.project_path("foo.py");
 
     assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
-    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
+    assert_eq!(&case.collect_project_files(), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
@@ -396,7 +425,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(case.system_file(&foo_path).is_ok());
-    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
+    assert_eq!(&case.collect_project_files(), &[bar_file]);
 
     Ok(())
 }
@@ -405,11 +434,11 @@ fn new_ignored_file() -> anyhow::Result<()> {
 fn changed_file() -> anyhow::Result<()> {
     let foo_source = "print('Hello, world!')";
     let mut case = setup([("foo.py", foo_source)])?;
-    let foo_path = case.workspace_path("foo.py");
+    let foo_path = case.project_path("foo.py");
 
     let foo = case.system_file(&foo_path)?;
     assert_eq!(source_text(case.db(), foo).as_str(), foo_source);
-    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
+    assert_eq!(&case.collect_project_files(), &[foo]);
 
     update_file(&foo_path, "print('Version 2')")?;
 
@@ -420,7 +449,7 @@ fn changed_file() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
-    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
+    assert_eq!(&case.collect_project_files(), &[foo]);
 
     Ok(())
 }
@@ -429,12 +458,12 @@ fn changed_file() -> anyhow::Result<()> {
 fn deleted_file() -> anyhow::Result<()> {
     let foo_source = "print('Hello, world!')";
     let mut case = setup([("foo.py", foo_source)])?;
-    let foo_path = case.workspace_path("foo.py");
+    let foo_path = case.project_path("foo.py");
 
     let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
-    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
+    assert_eq!(&case.collect_project_files(), &[foo]);
 
     std::fs::remove_file(foo_path.as_std_path())?;
 
@@ -443,7 +472,7 @@ fn deleted_file() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert_eq!(&case.collect_package_files(&foo_path), &[] as &[File]);
+    assert_eq!(&case.collect_project_files(), &[] as &[File]);
 
     Ok(())
 }
@@ -455,7 +484,7 @@ fn deleted_file() -> anyhow::Result<()> {
 fn move_file_to_trash() -> anyhow::Result<()> {
     let foo_source = "print('Hello, world!')";
     let mut case = setup([("foo.py", foo_source)])?;
-    let foo_path = case.workspace_path("foo.py");
+    let foo_path = case.project_path("foo.py");
 
     let trash_path = case.root_path().join(".trash");
     std::fs::create_dir_all(trash_path.as_std_path())?;
@@ -463,7 +492,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
-    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
+    assert_eq!(&case.collect_project_files(), &[foo]);
 
     std::fs::rename(
         foo_path.as_std_path(),
@@ -475,58 +504,50 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert_eq!(&case.collect_package_files(&foo_path), &[] as &[File]);
+    assert_eq!(&case.collect_project_files(), &[] as &[File]);
 
     Ok(())
 }
 
-/// Move a file from a non-workspace (non-watched) location into the workspace.
+/// Move a file from a non-project (non-watched) location into the project.
 #[test]
-fn move_file_to_workspace() -> anyhow::Result<()> {
+fn move_file_to_project() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
-    let bar_path = case.workspace_path("bar.py");
+    let bar_path = case.project_path("bar.py");
     let bar = case.system_file(&bar_path).unwrap();
 
     let foo_path = case.root_path().join("foo.py");
     std::fs::write(foo_path.as_std_path(), "")?;
 
-    let foo_in_workspace_path = case.workspace_path("foo.py");
+    let foo_in_project = case.project_path("foo.py");
 
     assert!(case.system_file(&foo_path).is_ok());
-    assert_eq!(&case.collect_package_files(&bar_path), &[bar]);
-    assert!(case
-        .db()
-        .workspace()
-        .package(case.db(), &foo_path)
-        .is_none());
+    assert_eq!(&case.collect_project_files(), &[bar]);
 
-    std::fs::rename(foo_path.as_std_path(), foo_in_workspace_path.as_std_path())?;
+    std::fs::rename(foo_path.as_std_path(), foo_in_project.as_std_path())?;
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
-    let foo_in_workspace = case.system_file(&foo_in_workspace_path)?;
+    let foo_in_project = case.system_file(&foo_in_project)?;
 
-    assert!(foo_in_workspace.exists(case.db()));
-    assert_eq!(
-        &case.collect_package_files(&foo_in_workspace_path),
-        &[bar, foo_in_workspace]
-    );
+    assert!(foo_in_project.exists(case.db()));
+    assert_eq!(&case.collect_project_files(), &[bar, foo_in_project]);
 
     Ok(())
 }
 
-/// Rename a workspace file.
+/// Rename a project file.
 #[test]
 fn rename_file() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", "")])?;
-    let foo_path = case.workspace_path("foo.py");
-    let bar_path = case.workspace_path("bar.py");
+    let foo_path = case.project_path("foo.py");
+    let bar_path = case.project_path("bar.py");
 
     let foo = case.system_file(&foo_path)?;
 
-    assert_eq!(case.collect_package_files(&foo_path), [foo]);
+    assert_eq!(case.collect_project_files(), [foo]);
 
     std::fs::rename(foo_path.as_std_path(), bar_path.as_std_path())?;
 
@@ -539,15 +560,15 @@ fn rename_file() -> anyhow::Result<()> {
     let bar = case.system_file(&bar_path)?;
 
     assert!(bar.exists(case.db()));
-    assert_eq!(case.collect_package_files(&foo_path), [bar]);
+    assert_eq!(case.collect_project_files(), [bar]);
 
     Ok(())
 }
 
 #[test]
-fn directory_moved_to_workspace() -> anyhow::Result<()> {
+fn directory_moved_to_project() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "import sub.a")])?;
-    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
+    let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
     let sub_original_path = case.root_path().join("sub");
     let init_original_path = sub_original_path.join("__init__.py");
@@ -565,12 +586,9 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
     );
 
     assert_eq!(sub_a_module, None);
-    assert_eq!(
-        case.collect_package_files(&case.workspace_path("bar.py")),
-        &[bar]
-    );
+    assert_eq!(case.collect_project_files(), &[bar]);
 
-    let sub_new_path = case.workspace_path("sub");
+    let sub_new_path = case.project_path("sub");
     std::fs::rename(sub_original_path.as_std_path(), sub_new_path.as_std_path())
         .with_context(|| "Failed to move sub directory")?;
 
@@ -592,10 +610,7 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
     )
     .is_some());
 
-    assert_eq!(
-        case.collect_package_files(&case.workspace_path("bar.py")),
-        &[bar, init_file, a_file]
-    );
+    assert_eq!(case.collect_project_files(), &[bar, init_file, a_file]);
 
     Ok(())
 }
@@ -607,7 +622,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
         ("sub/__init__.py", ""),
         ("sub/a.py", ""),
     ])?;
-    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
+    let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
     assert!(resolve_module(
         case.db().upcast(),
@@ -615,7 +630,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     )
     .is_some());
 
-    let sub_path = case.workspace_path("sub");
+    let sub_path = case.project_path("sub");
     let init_file = case
         .system_file(sub_path.join("__init__.py"))
         .expect("__init__.py to exist");
@@ -623,10 +638,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
         .system_file(sub_path.join("a.py"))
         .expect("a.py to exist");
 
-    assert_eq!(
-        case.collect_package_files(&case.workspace_path("bar.py")),
-        &[bar, init_file, a_file]
-    );
+    assert_eq!(case.collect_project_files(), &[bar, init_file, a_file]);
 
     std::fs::create_dir(case.root_path().join(".trash").as_std_path())?;
     let trashed_sub = case.root_path().join(".trash/sub");
@@ -647,10 +659,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
 
-    assert_eq!(
-        case.collect_package_files(&case.workspace_path("bar.py")),
-        &[bar]
-    );
+    assert_eq!(case.collect_project_files(), &[bar]);
 
     Ok(())
 }
@@ -663,7 +672,7 @@ fn directory_renamed() -> anyhow::Result<()> {
         ("sub/a.py", ""),
     ])?;
 
-    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
+    let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
     assert!(resolve_module(
         case.db().upcast(),
@@ -676,7 +685,7 @@ fn directory_renamed() -> anyhow::Result<()> {
     )
     .is_none());
 
-    let sub_path = case.workspace_path("sub");
+    let sub_path = case.project_path("sub");
     let sub_init = case
         .system_file(sub_path.join("__init__.py"))
         .expect("__init__.py to exist");
@@ -684,14 +693,11 @@ fn directory_renamed() -> anyhow::Result<()> {
         .system_file(sub_path.join("a.py"))
         .expect("a.py to exist");
 
-    assert_eq!(
-        case.collect_package_files(&sub_path),
-        &[bar, sub_init, sub_a]
-    );
+    assert_eq!(case.collect_project_files(), &[bar, sub_init, sub_a]);
 
-    let foo_baz = case.workspace_path("foo/baz");
+    let foo_baz = case.project_path("foo/baz");
 
-    std::fs::create_dir(case.workspace_path("foo").as_std_path())?;
+    std::fs::create_dir(case.project_path("foo").as_std_path())?;
     std::fs::rename(sub_path.as_std_path(), foo_baz.as_std_path())
         .with_context(|| "Failed to move the sub directory")?;
 
@@ -730,7 +736,7 @@ fn directory_renamed() -> anyhow::Result<()> {
     assert!(foo_baz_a.exists(case.db()));
 
     assert_eq!(
-        case.collect_package_files(&sub_path),
+        case.collect_project_files(),
         &[bar, foo_baz_init, foo_baz_a]
     );
 
@@ -745,7 +751,7 @@ fn directory_deleted() -> anyhow::Result<()> {
         ("sub/a.py", ""),
     ])?;
 
-    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
+    let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
     assert!(resolve_module(
         case.db().upcast(),
@@ -753,7 +759,7 @@ fn directory_deleted() -> anyhow::Result<()> {
     )
     .is_some());
 
-    let sub_path = case.workspace_path("sub");
+    let sub_path = case.project_path("sub");
 
     let init_file = case
         .system_file(sub_path.join("__init__.py"))
@@ -761,10 +767,7 @@ fn directory_deleted() -> anyhow::Result<()> {
     let a_file = case
         .system_file(sub_path.join("a.py"))
         .expect("a.py to exist");
-    assert_eq!(
-        case.collect_package_files(&sub_path),
-        &[bar, init_file, a_file]
-    );
+    assert_eq!(case.collect_project_files(), &[bar, init_file, a_file]);
 
     std::fs::remove_dir_all(sub_path.as_std_path())
         .with_context(|| "Failed to remove the sub directory")?;
@@ -782,20 +785,22 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
-    assert_eq!(case.collect_package_files(&sub_path), &[bar]);
+    assert_eq!(case.collect_project_files(), &[bar]);
 
     Ok(())
 }
 
 #[test]
 fn search_path() -> anyhow::Result<()> {
-    let mut case = setup_with_search_paths(
-        [("bar.py", "import sub.a")],
-        |root_path, _workspace_path| SearchPathConfiguration {
-            site_packages: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
-            ..SearchPathConfiguration::default()
-        },
-    )?;
+    let mut case = setup_with_options([("bar.py", "import sub.a")], |root_path, _project_path| {
+        Some(Options {
+            environment: Some(EnvironmentOptions {
+                venv_path: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        })
+    })?;
 
     let site_packages = case.root_path().join("site_packages");
 
@@ -812,8 +817,8 @@ fn search_path() -> anyhow::Result<()> {
 
     assert!(resolve_module(case.db().upcast(), &ModuleName::new_static("a").unwrap()).is_some());
     assert_eq!(
-        case.collect_package_files(&case.workspace_path("bar.py")),
-        &[case.system_file(case.workspace_path("bar.py")).unwrap()]
+        case.collect_project_files(),
+        &[case.system_file(case.project_path("bar.py")).unwrap()]
     );
 
     Ok(())
@@ -823,15 +828,18 @@ fn search_path() -> anyhow::Result<()> {
 fn add_search_path() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "import sub.a")])?;
 
-    let site_packages = case.workspace_path("site_packages");
+    let site_packages = case.project_path("site_packages");
     std::fs::create_dir_all(site_packages.as_std_path())?;
 
     assert!(resolve_module(case.db().upcast(), &ModuleName::new_static("a").unwrap()).is_none());
 
     // Register site-packages as a search path.
-    case.update_search_path_settings(SearchPathConfiguration {
-        site_packages: Some(SitePackages::Known(vec![site_packages.clone()])),
-        ..SearchPathConfiguration::default()
+    case.update_options(Options {
+        environment: Some(EnvironmentOptions {
+            venv_path: Some(SitePackages::Known(vec![site_packages.clone()])),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
     })
     .expect("Search path settings to be valid");
 
@@ -848,19 +856,22 @@ fn add_search_path() -> anyhow::Result<()> {
 
 #[test]
 fn remove_search_path() -> anyhow::Result<()> {
-    let mut case = setup_with_search_paths(
-        [("bar.py", "import sub.a")],
-        |root_path, _workspace_path| SearchPathConfiguration {
-            site_packages: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
-            ..SearchPathConfiguration::default()
-        },
-    )?;
+    let mut case = setup_with_options([("bar.py", "import sub.a")], |root_path, _project_path| {
+        Some(Options {
+            environment: Some(EnvironmentOptions {
+                venv_path: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        })
+    })?;
 
     // Remove site packages from the search path settings.
     let site_packages = case.root_path().join("site_packages");
-    case.update_search_path_settings(SearchPathConfiguration {
-        site_packages: None,
-        ..SearchPathConfiguration::default()
+
+    case.update_options(Options {
+        environment: None,
+        ..Options::default()
     })
     .expect("Search path settings to be valid");
 
@@ -874,10 +885,64 @@ fn remove_search_path() -> anyhow::Result<()> {
 }
 
 #[test]
+fn change_python_version_and_platform() -> anyhow::Result<()> {
+    let mut case = setup_with_options(
+        // `sys.last_exc` is a Python 3.12 only feature
+        // `os.getegid()` is Unix only
+        [(
+            "bar.py",
+            r#"
+import sys
+import os
+print(sys.last_exc, os.getegid())
+"#,
+        )],
+        |_root_path, _project_path| {
+            Some(Options {
+                environment: Some(EnvironmentOptions {
+                    python_version: Some(PythonVersion::PY311),
+                    python_platform: Some(PythonPlatform::Identifier("win32".to_string())),
+                    ..EnvironmentOptions::default()
+                }),
+                ..Options::default()
+            })
+        },
+    )?;
+
+    let diagnostics = case.db.check().context("Failed to check project.")?;
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0].message(),
+        "Type `<module 'sys'>` has no attribute `last_exc`"
+    );
+    assert_eq!(
+        diagnostics[1].message(),
+        "Type `<module 'os'>` has no attribute `getegid`"
+    );
+
+    // Change the python version
+    case.update_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(PythonVersion::PY312),
+            python_platform: Some(PythonPlatform::Identifier("linux".to_string())),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    })
+    .expect("Search path settings to be valid");
+
+    let diagnostics = case.db.check().context("Failed to check project.")?;
+    assert!(diagnostics.is_empty());
+
+    Ok(())
+}
+
+#[test]
 fn changed_versions_file() -> anyhow::Result<()> {
-    let mut case = setup_with_search_paths(
-        |root_path: &SystemPath, workspace_path: &SystemPath| {
-            std::fs::write(workspace_path.join("bar.py").as_std_path(), "import sub.a")?;
+    let mut case = setup_with_options(
+        |root_path: &SystemPath, project_path: &SystemPath| {
+            std::fs::write(project_path.join("bar.py").as_std_path(), "import sub.a")?;
             std::fs::create_dir_all(root_path.join("typeshed/stdlib").as_std_path())?;
             std::fs::write(root_path.join("typeshed/stdlib/VERSIONS").as_std_path(), "")?;
             std::fs::write(
@@ -887,9 +952,14 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
             Ok(())
         },
-        |root_path, _workspace_path| SearchPathConfiguration {
-            typeshed: Some(root_path.join("typeshed")),
-            ..SearchPathConfiguration::default()
+        |root_path, _project_path| {
+            Some(Options {
+                environment: Some(EnvironmentOptions {
+                    typeshed: Some(root_path.join("typeshed")),
+                    ..EnvironmentOptions::default()
+                }),
+                ..Options::default()
+            })
         },
     )?;
 
@@ -915,11 +985,11 @@ fn changed_versions_file() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Watch a workspace that contains two files where one file is a hardlink to another.
+/// Watch a project that contains two files where one file is a hardlink to another.
 ///
 /// Setup:
 /// ```text
-/// - workspace
+/// - project
 ///   |- foo.py
 ///   |- bar.py (hard link to foo.py)
 /// ```
@@ -935,22 +1005,22 @@ fn changed_versions_file() -> anyhow::Result<()> {
 /// I haven't found any documentation that states the notification behavior on Windows but what
 /// we're seeing is that Windows only emits a single event, similar to Linux.
 #[test]
-fn hard_links_in_workspace() -> anyhow::Result<()> {
-    let mut case = setup(|_root: &SystemPath, workspace: &SystemPath| {
-        let foo_path = workspace.join("foo.py");
+fn hard_links_in_project() -> anyhow::Result<()> {
+    let mut case = setup(|_root: &SystemPath, project: &SystemPath| {
+        let foo_path = project.join("foo.py");
         std::fs::write(foo_path.as_std_path(), "print('Version 1')")?;
 
         // Create a hardlink to `foo`
-        let bar_path = workspace.join("bar.py");
+        let bar_path = project.join("bar.py");
         std::fs::hard_link(foo_path.as_std_path(), bar_path.as_std_path())
             .context("Failed to create hard link from foo.py -> bar.py")?;
 
         Ok(())
     })?;
 
-    let foo_path = case.workspace_path("foo.py");
+    let foo_path = case.project_path("foo.py");
     let foo = case.system_file(&foo_path).unwrap();
-    let bar_path = case.workspace_path("bar.py");
+    let bar_path = case.project_path("bar.py");
     let bar = case.system_file(&bar_path).unwrap();
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 1')");
@@ -973,12 +1043,12 @@ fn hard_links_in_workspace() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Watch a workspace that contains one file that is a hardlink to a file outside the workspace.
+/// Watch a project that contains one file that is a hardlink to a file outside the project.
 ///
 /// Setup:
 /// ```text
 /// - foo.py
-/// - workspace
+/// - project
 ///   |- bar.py (hard link to /foo.py)
 /// ```
 ///
@@ -996,7 +1066,7 @@ fn hard_links_in_workspace() -> anyhow::Result<()> {
 /// [source](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)
 ///
 /// My interpretation of this is that Windows doesn't support observing changes made to
-/// hard linked files outside the workspace.
+/// hard linked files outside the project.
 #[test]
 #[cfg_attr(
     target_os = "linux",
@@ -1006,13 +1076,13 @@ fn hard_links_in_workspace() -> anyhow::Result<()> {
     target_os = "windows",
     ignore = "windows doesn't support observing changes to hard linked files."
 )]
-fn hard_links_to_target_outside_workspace() -> anyhow::Result<()> {
-    let mut case = setup(|root: &SystemPath, workspace: &SystemPath| {
+fn hard_links_to_target_outside_project() -> anyhow::Result<()> {
+    let mut case = setup(|root: &SystemPath, project: &SystemPath| {
         let foo_path = root.join("foo.py");
         std::fs::write(foo_path.as_std_path(), "print('Version 1')")?;
 
         // Create a hardlink to `foo`
-        let bar_path = workspace.join("bar.py");
+        let bar_path = project.join("bar.py");
         std::fs::hard_link(foo_path.as_std_path(), bar_path.as_std_path())
             .context("Failed to create hard link from foo.py -> bar.py")?;
 
@@ -1021,7 +1091,7 @@ fn hard_links_to_target_outside_workspace() -> anyhow::Result<()> {
 
     let foo_path = case.root_path().join("foo.py");
     let foo = case.system_file(&foo_path).unwrap();
-    let bar_path = case.workspace_path("bar.py");
+    let bar_path = case.project_path("bar.py");
     let bar = case.system_file(&bar_path).unwrap();
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 1')");
@@ -1044,13 +1114,13 @@ mod unix {
     //! Tests that make use of unix specific file-system features.
     use super::*;
 
-    /// Changes the metadata of the only file in the workspace.
+    /// Changes the metadata of the only file in the project.
     #[test]
     fn changed_metadata() -> anyhow::Result<()> {
         use std::os::unix::fs::PermissionsExt;
 
         let mut case = setup([("foo.py", "")])?;
-        let foo_path = case.workspace_path("foo.py");
+        let foo_path = case.project_path("foo.py");
 
         let foo = case.system_file(&foo_path)?;
         assert_eq!(
@@ -1086,14 +1156,14 @@ mod unix {
         Ok(())
     }
 
-    /// A workspace path is a symlink to a file outside the workspace.
+    /// A project path is a symlink to a file outside the project.
     ///
     /// Setup:
     /// ```text
     /// - bar
     ///   |- baz.py
     ///
-    /// - workspace
+    /// - project
     ///   |- bar -> /bar
     /// ```
     ///
@@ -1115,7 +1185,7 @@ mod unix {
         ignore = "FSEvents doesn't emit change events for symlinked directories outside of the watched paths."
     )]
     fn symlink_target_outside_watched_paths() -> anyhow::Result<()> {
-        let mut case = setup(|root: &SystemPath, workspace: &SystemPath| {
+        let mut case = setup(|root: &SystemPath, project: &SystemPath| {
             // Set up the symlink target.
             let link_target = root.join("bar");
             std::fs::create_dir_all(link_target.as_std_path())
@@ -1124,8 +1194,8 @@ mod unix {
             std::fs::write(baz_original.as_std_path(), "def baz(): ...")
                 .context("Failed to write link target file")?;
 
-            // Create a symlink inside the workspace
-            let bar = workspace.join("bar");
+            // Create a symlink inside the project
+            let bar = project.join("bar");
             std::os::unix::fs::symlink(link_target.as_std_path(), bar.as_std_path())
                 .context("Failed to create symlink to bar package")?;
 
@@ -1137,7 +1207,7 @@ mod unix {
             &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
-        let baz_workspace = case.workspace_path("bar/baz.py");
+        let baz_project = case.project_path("bar/baz.py");
 
         assert_eq!(
             source_text(case.db(), baz.file()).as_str(),
@@ -1145,7 +1215,7 @@ mod unix {
         );
         assert_eq!(
             baz.file().path(case.db()).as_system_path(),
-            Some(&*baz_workspace)
+            Some(&*baz_project)
         );
 
         let baz_original = case.root_path().join("bar/baz.py");
@@ -1154,7 +1224,7 @@ mod unix {
         update_file(baz_original, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
 
-        let changes = case.take_watch_changes();
+        let changes = case.take_watch_changes(event_for_file("baz.py"));
 
         case.apply_changes(changes);
 
@@ -1164,7 +1234,7 @@ mod unix {
         );
 
         // Write to the symlink source.
-        update_file(baz_workspace, "def baz(): print('Version 3')")
+        update_file(baz_project, "def baz(): print('Version 3')")
             .context("Failed to update bar/baz.py")?;
 
         let changes = case.stop_watch(event_for_file("baz.py"));
@@ -1179,14 +1249,14 @@ mod unix {
         Ok(())
     }
 
-    /// Workspace contains a symlink to another directory inside the workspace.
+    /// Project contains a symlink to another directory inside the project.
     /// Changes to files in the symlinked directory should be reflected
     /// to all files.
     ///
     /// Setup:
     /// ```text
-    /// - workspace
-    ///   | - bar -> /workspace/patched/bar
+    /// - project
+    ///   | - bar -> /project/patched/bar
     ///   |
     ///   | - patched
     ///   |   |-- bar
@@ -1195,10 +1265,10 @@ mod unix {
     ///   |-- foo.py
     /// ```
     #[test]
-    fn symlink_inside_workspace() -> anyhow::Result<()> {
-        let mut case = setup(|_root: &SystemPath, workspace: &SystemPath| {
+    fn symlink_inside_project() -> anyhow::Result<()> {
+        let mut case = setup(|_root: &SystemPath, project: &SystemPath| {
             // Set up the symlink target.
-            let link_target = workspace.join("patched/bar");
+            let link_target = project.join("patched/bar");
             std::fs::create_dir_all(link_target.as_std_path())
                 .context("Failed to create link target directory")?;
             let baz_original = link_target.join("baz.py");
@@ -1206,8 +1276,8 @@ mod unix {
                 .context("Failed to write link target file")?;
 
             // Create a symlink inside site-packages
-            let bar_in_workspace = workspace.join("bar");
-            std::os::unix::fs::symlink(link_target.as_std_path(), bar_in_workspace.as_std_path())
+            let bar_in_project = project.join("bar");
+            std::os::unix::fs::symlink(link_target.as_std_path(), bar_in_project.as_std_path())
                 .context("Failed to create symlink to bar package")?;
 
             Ok(())
@@ -1218,9 +1288,9 @@ mod unix {
             &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
-        let bar_baz = case.workspace_path("bar/baz.py");
+        let bar_baz = case.project_path("bar/baz.py");
 
-        let patched_bar_baz = case.workspace_path("patched/bar/baz.py");
+        let patched_bar_baz = case.project_path("patched/bar/baz.py");
         let patched_bar_baz_file = case.system_file(&patched_bar_baz).unwrap();
 
         assert_eq!(
@@ -1279,15 +1349,15 @@ mod unix {
     /// - site-packages
     ///   | - bar/baz.py
     ///
-    /// - workspace
+    /// - project
     ///   |-- .venv/lib/python3.12/site-packages -> /site-packages
     ///   |
     ///   |-- foo.py
     /// ```
     #[test]
     fn symlinked_module_search_path() -> anyhow::Result<()> {
-        let mut case = setup_with_search_paths(
-            |root: &SystemPath, workspace: &SystemPath| {
+        let mut case = setup_with_options(
+            |root: &SystemPath, project: &SystemPath| {
                 // Set up the symlink target.
                 let site_packages = root.join("site-packages");
                 let bar = site_packages.join("bar");
@@ -1298,7 +1368,7 @@ mod unix {
                     .context("Failed to write baz.py")?;
 
                 // Symlink the site packages in the venv to the global site packages
-                let venv_site_packages = workspace.join(".venv/lib/python3.12/site-packages");
+                let venv_site_packages = project.join(".venv/lib/python3.12/site-packages");
                 std::fs::create_dir_all(venv_site_packages.parent().unwrap())
                     .context("Failed to create .venv directory")?;
                 std::os::unix::fs::symlink(
@@ -1309,11 +1379,16 @@ mod unix {
 
                 Ok(())
             },
-            |_root, workspace| SearchPathConfiguration {
-                site_packages: Some(SitePackages::Known(vec![
-                    workspace.join(".venv/lib/python3.12/site-packages")
-                ])),
-                ..SearchPathConfiguration::default()
+            |_root, project| {
+                Some(Options {
+                    environment: Some(EnvironmentOptions {
+                        venv_path: Some(SitePackages::Known(vec![
+                            project.join(".venv/lib/python3.12/site-packages")
+                        ])),
+                        ..EnvironmentOptions::default()
+                    }),
+                    ..Options::default()
+                })
             },
         )?;
 
@@ -1323,7 +1398,7 @@ mod unix {
         )
         .expect("Expected bar.baz to exist in site-packages.");
         let baz_site_packages_path =
-            case.workspace_path(".venv/lib/python3.12/site-packages/bar/baz.py");
+            case.project_path(".venv/lib/python3.12/site-packages/bar/baz.py");
         let baz_site_packages = case.system_file(&baz_site_packages_path).unwrap();
         let baz_original = case.root_path().join("site-packages/bar/baz.py");
         let baz_original_file = case.system_file(&baz_original).unwrap();
@@ -1372,13 +1447,15 @@ mod unix {
 }
 
 #[test]
-fn nested_packages_delete_root() -> anyhow::Result<()> {
-    let mut case = setup(|root: &SystemPath, workspace_root: &SystemPath| {
+fn nested_projects_delete_root() -> anyhow::Result<()> {
+    let mut case = setup(|root: &SystemPath, project_root: &SystemPath| {
         std::fs::write(
-            workspace_root.join("pyproject.toml").as_std_path(),
+            project_root.join("pyproject.toml").as_std_path(),
             r#"
             [project]
             name = "inner"
+
+            [tool.knot]
             "#,
         )?;
 
@@ -1387,120 +1464,24 @@ fn nested_packages_delete_root() -> anyhow::Result<()> {
             r#"
             [project]
             name = "outer"
+
+            [tool.knot]
             "#,
         )?;
 
         Ok(())
     })?;
 
-    assert_eq!(
-        case.db().workspace().root(case.db()),
-        &*case.workspace_path("")
-    );
+    assert_eq!(case.db().project().root(case.db()), &*case.project_path(""));
 
-    std::fs::remove_file(case.workspace_path("pyproject.toml").as_std_path())?;
+    std::fs::remove_file(case.project_path("pyproject.toml").as_std_path())?;
 
     let changes = case.stop_watch(ChangeEvent::is_deleted);
 
     case.apply_changes(changes);
 
-    // It should now pick up the outer workspace.
-    assert_eq!(case.db().workspace().root(case.db()), case.root_path());
-
-    Ok(())
-}
-
-#[test]
-fn added_package() -> anyhow::Result<()> {
-    let mut case = setup([
-        (
-            "pyproject.toml",
-            r#"
-            [project]
-            name = "inner"
-
-            [tool.knot.workspace]
-            members = ["packages/*"]
-            "#,
-        ),
-        (
-            "packages/a/pyproject.toml",
-            r#"
-            [project]
-            name = "a"
-            "#,
-        ),
-    ])?;
-
-    assert_eq!(case.db().workspace().packages(case.db()).len(), 2);
-
-    std::fs::create_dir(case.workspace_path("packages/b").as_std_path())
-        .context("failed to create folder for package 'b'")?;
-
-    // It seems that the file watcher won't pick up on file changes shortly after the folder
-    // was created... I suspect this is because most file watchers don't support recursive
-    // file watching. Instead, file-watching libraries manually implement recursive file watching
-    // by setting a watcher for each directory. But doing this obviously "lags" behind.
-    case.take_watch_changes();
-
-    std::fs::write(
-        case.workspace_path("packages/b/pyproject.toml")
-            .as_std_path(),
-        r#"
-            [project]
-            name = "b"
-            "#,
-    )
-    .context("failed to write pyproject.toml for package b")?;
-
-    let changes = case.stop_watch(event_for_file("pyproject.toml"));
-
-    case.apply_changes(changes);
-
-    assert_eq!(case.db().workspace().packages(case.db()).len(), 3);
-
-    Ok(())
-}
-
-#[test]
-fn removed_package() -> anyhow::Result<()> {
-    let mut case = setup([
-        (
-            "pyproject.toml",
-            r#"
-            [project]
-            name = "inner"
-
-            [tool.knot.workspace]
-            members = ["packages/*"]
-            "#,
-        ),
-        (
-            "packages/a/pyproject.toml",
-            r#"
-            [project]
-            name = "a"
-            "#,
-        ),
-        (
-            "packages/b/pyproject.toml",
-            r#"
-            [project]
-            name = "b"
-            "#,
-        ),
-    ])?;
-
-    assert_eq!(case.db().workspace().packages(case.db()).len(), 3);
-
-    std::fs::remove_dir_all(case.workspace_path("packages/b").as_std_path())
-        .context("failed to remove package 'b'")?;
-
-    let changes = case.stop_watch(ChangeEvent::is_deleted);
-
-    case.apply_changes(changes);
-
-    assert_eq!(case.db().workspace().packages(case.db()).len(), 2);
+    // It should now pick up the outer project.
+    assert_eq!(case.db().project().root(case.db()), case.root_path());
 
     Ok(())
 }

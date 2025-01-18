@@ -1,0 +1,63 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def l():
+    while T:
+        try:
+            while ():
+                if 3:
+                    break
+        finally:
+            return
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["return\n"]
+  block3[["Loop continue"]]
+  block4["break\n"]
+  block5["if 3:
+                    break\n"]
+  block6["while ():
+                if 3:
+                    break\n"]
+  block7[["Exception raised"]]
+  block8["try:
+            while ():
+                if 3:
+                    break
+        finally:
+            return\n"]
+  block9["while T:
+        try:
+            while ():
+                if 3:
+                    break
+        finally:
+            return\n"]
+
+  start --> block9
+  block9 -- "T" --> block8
+  block9 -- "else" --> block0
+  block8 -- "Exception raised" --> block7
+  block8 -- "else" --> block6
+  block7 --> block2
+  block6 -- "()" --> block5
+  block6 -- "else" --> block2
+  block5 -- "3" --> block4
+  block5 -- "else" --> block3
+  block4 --> block2
+  block3 --> block6
+  block2 --> return
+  block1 --> block9
+  block0 --> return
+```

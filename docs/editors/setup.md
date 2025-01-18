@@ -92,13 +92,11 @@ require('lspconfig').pyright.setup {
 }
 ```
 
-By default, Ruff will not show any logs. To enable logging in Neovim, you'll need to set the
-[`trace`](https://neovim.io/doc/user/lsp.html#vim.lsp.ClientConfig) setting to either `messages` or `verbose`, and use the
-[`logLevel`](./settings.md#loglevel) setting to change the log level:
+By default, the log level for Ruff is set to `info`. To change the log level, you can set the
+[`logLevel`](./settings.md#loglevel) setting:
 
 ```lua
 require('lspconfig').ruff.setup {
-  trace = 'messages',
   init_options = {
     settings = {
       logLevel = 'debug',
@@ -107,9 +105,15 @@ require('lspconfig').ruff.setup {
 }
 ```
 
-By default, this will write logs to stderr which will be available in Neovim's LSP client log file
+By default, Ruff will write logs to stderr which will be available in Neovim's LSP client log file
 (`:lua vim.print(vim.lsp.get_log_path())`). It's also possible to divert these logs to a separate
 file with the [`logFile`](./settings.md#logfile) setting.
+
+To view the trace logs between Neovim and Ruff, set the log level for Neovim's LSP client to `debug`:
+
+```lua
+vim.lsp.set_log_level('debug')
+```
 
 ## Vim
 
@@ -274,15 +278,13 @@ preview = false
 preview = true
 ```
 
-By default, Ruff does not log anything to Helix. To enable logging, set the `RUFF_TRACE` environment
-variable to either `messages` or `verbose`, and use the [`logLevel`](./settings.md#loglevel) setting to change
-the log level:
+By default, the log level for Ruff is set to `info`. To change the log level, you can set the
+[`logLevel`](./settings.md#loglevel) setting:
 
 ```toml
 [language-server.ruff]
 command = "ruff"
 args = ["server"]
-environment = { "RUFF_TRACE" = "messages" }
 
 [language-server.ruff.config.settings]
 logLevel = "debug"
@@ -290,10 +292,11 @@ logLevel = "debug"
 
 You can also divert Ruff's logs to a separate file with the [`logFile`](./settings.md#logfile) setting.
 
-!!! note
+To view the trace logs between Helix and Ruff, pass in the `-v` (verbose) flag when starting Helix:
 
-    Setting `RUFF_TRACE=verbose` does not enable Helix's verbose mode by itself. You'll need to run
-    Helix with `-v` for verbose logging.
+```sh
+hx -v path/to/file.py
+```
 
 ## Kate
 

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E20.py:19:23: E202 [*] Whitespace before ')'
    |
@@ -152,7 +151,7 @@ E20.py:172:12: E202 [*] Whitespace before ']'
 171 | #: E202:1:12
 172 | ham[upper : ]
     |            ^ E202
-173 | 
+173 |
 174 | #: E203:1:10
     |
     = help: Remove whitespace before ']'

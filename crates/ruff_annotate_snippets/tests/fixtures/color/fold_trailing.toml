@@ -1,0 +1,28 @@
+[message]
+level = "Error"
+id = "E0308"
+title = "invalid type: integer `20`, expected a lints table"
+
+[[message.snippets]]
+source = """
+lints = 20
+
+[workspace]
+
+[package]
+name = "hello"
+version = "1.0.0"
+license = "MIT"
+rust-version = "1.70"
+edition = "2021"
+"""
+line_start = 1
+origin = "Cargo.toml"
+fold = true
+[[message.snippets.annotations]]
+label = ""
+level = "Error"
+range = [8, 10]
+
+[renderer]
+color = true

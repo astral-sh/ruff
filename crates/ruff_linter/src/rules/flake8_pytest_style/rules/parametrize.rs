@@ -4,7 +4,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
@@ -324,7 +323,7 @@ fn get_parametrize_name_range(
 ) -> Option<TextRange> {
     parenthesized_range(
         expr.into(),
-        call.arguments.as_any_node_ref(),
+        (&call.arguments).into(),
         comment_ranges,
         source,
     )
@@ -863,41 +862,23 @@ pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
     }
 
     if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-        let names = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argnames", 0)
-        } else {
-            call.arguments.find_positional(0)
-        };
-        let values = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argvalues", 1)
-        } else {
-            call.arguments.find_positional(1)
-        };
+        let names = call.arguments.find_argument_value("argnames", 0);
+        let values = call.arguments.find_argument_value("argvalues", 1);
+
         if let (Some(names), Some(values)) = (names, values) {
             check_names(checker, call, names, values);
         }
     }
     if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-        let names = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argnames", 0)
-        } else {
-            call.arguments.find_positional(0)
-        };
-        let values = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argvalues", 1)
-        } else {
-            call.arguments.find_positional(1)
-        };
+        let names = call.arguments.find_argument_value("argnames", 0);
+        let values = call.arguments.find_argument_value("argvalues", 1);
+
         if let (Some(names), Some(values)) = (names, values) {
             check_values(checker, names, values);
         }
     }
     if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = if checker.settings.preview.is_enabled() {
-            call.arguments.find_argument_value("argvalues", 1)
-        } else {
-            call.arguments.find_positional(1)
-        } {
+        if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
             check_duplicates(checker, values);
         }
     }

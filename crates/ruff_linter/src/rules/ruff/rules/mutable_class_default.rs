@@ -66,10 +66,8 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                     && !is_final_annotation(annotation, checker.semantic())
                     && !is_immutable_annotation(annotation, checker.semantic(), &[])
                 {
-                    if let Some(dataclass_kind) = dataclass_kind(class_def, checker.semantic()) {
-                        if dataclass_kind.is_stdlib() || checker.settings.preview.is_enabled() {
-                            continue;
-                        }
+                    if dataclass_kind(class_def, checker.semantic()).is_some() {
+                        continue;
                     }
 
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.

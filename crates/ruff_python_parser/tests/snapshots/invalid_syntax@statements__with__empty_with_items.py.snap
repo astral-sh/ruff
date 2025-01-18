@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/with/empty_with_items.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -62,9 +61,9 @@ Module(
 
   |
 2 | # The parser should recover from this syntax error.
-3 | 
+3 |
 4 | with : ...
   |      ^ Syntax Error: Expected the start of an expression after `with` keyword
-5 | 
+5 |
 6 | x + y
   |

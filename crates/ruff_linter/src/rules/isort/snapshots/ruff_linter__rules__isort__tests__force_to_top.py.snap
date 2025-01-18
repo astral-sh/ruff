@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 force_to_top.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -10,7 +9,7 @@ force_to_top.py:1:1: I001 [*] Import block is un-sorted or un-formatted
  4 | | import lib1
  5 | | import lib3
  6 | | import lib4
- 7 | | 
+ 7 | |
  8 | | import foo
  9 | | import z
 10 | | from foo import bar
@@ -22,11 +21,12 @@ force_to_top.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 16 | | from lib5 import lib2
 17 | | from lib4 import lib2
 18 | | from lib5 import lib1
-19 | | 
+19 | |
 20 | | import lib3.lib4
 21 | | import lib3.lib4.lib5
 22 | | from lib3.lib4 import foo
 23 | | from lib3.lib4.lib5 import foo
+   | |______________________________^ I001
    |
    = help: Organize imports
 

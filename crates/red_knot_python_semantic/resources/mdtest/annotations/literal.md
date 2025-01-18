@@ -9,8 +9,6 @@ from typing import Literal
 from enum import Enum
 
 mode: Literal["w", "r"]
-mode2: Literal["w"] | Literal["r"]
-union_var: Literal[Literal[Literal[1, 2, 3], "foo"], 5, None]
 a1: Literal[26]
 a2: Literal[0x1A]
 a3: Literal[-4]
@@ -19,7 +17,6 @@ a5: Literal[b"hello world"]
 a6: Literal[True]
 a7: Literal[None]
 a8: Literal[Literal[1]]
-a9: Literal[Literal["w"], Literal["r"], Literal[Literal["w+"]]]
 
 class Color(Enum):
     RED = 0
@@ -30,9 +27,6 @@ b1: Literal[Color.RED]
 
 def f():
     reveal_type(mode)  # revealed: Literal["w", "r"]
-    reveal_type(mode2)  # revealed: Literal["w", "r"]
-    # TODO: should be revealed: Literal[1, 2, 3, "foo", 5] | None
-    reveal_type(union_var)  # revealed: Literal[1, 2, 3, 5] | Literal["foo"] | None
     reveal_type(a1)  # revealed: Literal[26]
     reveal_type(a2)  # revealed: Literal[26]
     reveal_type(a3)  # revealed: Literal[-4]
@@ -41,7 +35,6 @@ def f():
     reveal_type(a6)  # revealed: Literal[True]
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
-    reveal_type(a9)  # revealed: Literal["w", "r", "w+"]
     # TODO: This should be Color.RED
     reveal_type(b1)  # revealed: Literal[0]
 
@@ -59,6 +52,63 @@ invalid4: Literal[
     hello,  # error: [invalid-type-form]
     (1, 2, 3),  # error: [invalid-type-form]
 ]
+```
+
+## Shortening unions of literals
+
+When a Literal is parameterized with more than one value, it’s treated as exactly to equivalent to
+the union of those types.
+
+```py
+from typing import Literal
+
+def x(
+    a1: Literal[Literal[Literal[1, 2, 3], "foo"], 5, None],
+    a2: Literal["w"] | Literal["r"],
+    a3: Literal[Literal["w"], Literal["r"], Literal[Literal["w+"]]],
+    a4: Literal[True] | Literal[1, 2] | Literal["foo"],
+):
+    reveal_type(a1)  # revealed: Literal[1, 2, 3, "foo", 5] | None
+    reveal_type(a2)  # revealed: Literal["w", "r"]
+    reveal_type(a3)  # revealed: Literal["w", "r", "w+"]
+    reveal_type(a4)  # revealed: Literal[True, 1, 2, "foo"]
+```
+
+## Display of heterogeneous unions of literals
+
+```py
+from typing import Literal, Union
+
+def foo(x: int) -> int:
+    return x + 1
+
+def bar(s: str) -> str:
+    return s
+
+class A: ...
+class B: ...
+
+def union_example(
+    x: Union[
+        # unknown type
+        # error: [unresolved-reference]
+        y,
+        Literal[-1],
+        Literal["A"],
+        Literal[b"A"],
+        Literal[b"\x00"],
+        Literal[b"\x07"],
+        Literal[0],
+        Literal[1],
+        Literal["B"],
+        Literal["foo"],
+        Literal["bar"],
+        Literal["B"],
+        Literal[True],
+        None,
+    ]
+):
+    reveal_type(x)  # revealed: Unknown | Literal[-1, "A", b"A", b"\x00", b"\x07", 0, 1, "B", "foo", "bar", True] | None
 ```
 
 ## Detecting Literal outside typing and typing_extensions

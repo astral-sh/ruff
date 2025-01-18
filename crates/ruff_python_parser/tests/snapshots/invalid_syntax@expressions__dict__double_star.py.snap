@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/double_star.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -482,7 +481,7 @@ Module(
 
   |
 2 | # the ones which are higher than that.
-3 | 
+3 |
 4 | {**x := 1}
   |      ^^ Syntax Error: Expected ',', found ':='
 5 | {a: 1, **x if True else y}
@@ -492,7 +491,7 @@ Module(
 
   |
 2 | # the ones which are higher than that.
-3 | 
+3 |
 4 | {**x := 1}
   |          ^ Syntax Error: Expected ':', found '}'
 5 | {a: 1, **x if True else y}

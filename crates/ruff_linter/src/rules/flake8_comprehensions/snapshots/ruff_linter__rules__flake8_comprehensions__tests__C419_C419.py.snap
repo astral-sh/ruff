@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
 C419.py:1:5: C419 [*] Unnecessary list comprehension
   |
@@ -84,7 +83,7 @@ C419.py:9:5: C419 [*] Unnecessary set comprehension
  8 | )  # third comment
  9 | any({x.id for x in bar})
    |     ^^^^^^^^^^^^^^^^^^^ C419
-10 | 
+10 |
 11 | # OK
    |
    = help: Remove unnecessary comprehension
@@ -103,8 +102,7 @@ C419.py:28:5: C419 [*] Unnecessary list comprehension
    |
 26 |   # Special comment handling
 27 |   any(
-28 |       [  # lbracket comment
-   |  _____^
+28 | /     [  # lbracket comment
 29 | |         # second line comment
 30 | |         i.bit_count()
 31 | |         # random middle comment
@@ -189,7 +187,7 @@ C419.py:50:5: C419 [*] Unnecessary set comprehension
 49 | any({x.id for x in bar})
 50 | all({x.id for x in bar})
    |     ^^^^^^^^^^^^^^^^^^^ C419
-51 | 
+51 |
 52 | # should be linted in preview...
    |
    = help: Remove unnecessary comprehension

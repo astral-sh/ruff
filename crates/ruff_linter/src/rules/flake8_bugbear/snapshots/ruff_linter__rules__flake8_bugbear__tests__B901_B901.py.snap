@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    |
@@ -8,7 +7,7 @@ B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can
  8 |     if True:
  9 |         return [1, 2, 3]
    |         ^^^^^^^^^^^^^^^^ B901
-10 | 
+10 |
 11 |     yield 3
    |
 

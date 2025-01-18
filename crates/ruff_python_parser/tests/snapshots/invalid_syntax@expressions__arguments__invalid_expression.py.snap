@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/invalid_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -179,14 +178,14 @@ Module(
 1 | call(x + y = 1)
 2 | call(x := 1 = 1)
   |      ^^^^^^ Syntax Error: Expected a parameter name
-3 | 
+3 |
 4 | call(yield x)
   |
 
 
   |
 2 | call(x := 1 = 1)
-3 | 
+3 |
 4 | call(yield x)
   |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
 5 | call(yield from x)

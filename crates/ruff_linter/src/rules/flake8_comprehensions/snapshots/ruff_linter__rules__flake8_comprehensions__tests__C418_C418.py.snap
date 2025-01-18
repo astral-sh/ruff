@@ -63,7 +63,7 @@ C418.py:4:1: C418 [*] Unnecessary dict comprehension passed to `dict()` (remove 
 5 | |     {'x': 1 for x in range(10)}
 6 | | )
   | |_^ C418
-7 |   
+7 |
 8 |   dict({}, a=1)
   |
   = help: Remove outer `dict()` call

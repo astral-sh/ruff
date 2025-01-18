@@ -31,7 +31,7 @@ type IntOrStr = int | str
 # TODO: This should either fall back to the specified type from typeshed,
 # which is `Any`, or be the actual type of the runtime value expression
 # `int | str`, i.e. `types.UnionType`.
-reveal_type(IntOrStr.__value__)  # revealed: @Todo(instance attributes)
+reveal_type(IntOrStr.__value__)  # revealed: @Todo(@property)
 ```
 
 ## Invalid assignment
@@ -74,5 +74,5 @@ type ListOrSet[T] = list[T] | set[T]
 
 # TODO: Should be `tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]`,
 # as specified in the `typeshed` stubs.
-reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(instance attributes)
+reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(@property)
 ```

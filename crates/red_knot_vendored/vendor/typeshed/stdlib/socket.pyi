@@ -1399,7 +1399,7 @@ def create_server(
     address: _Address, *, family: int = ..., backlog: int | None = None, reuse_port: bool = False, dualstack_ipv6: bool = False
 ) -> socket: ...
 
-# the 5th tuple item is an address
+# The 5th tuple item is the socket address, for IP4, IP6, or IP6 if Python is compiled with --disable-ipv6, respectively.
 def getaddrinfo(
     host: bytes | str | None, port: bytes | str | int | None, family: int = 0, type: int = 0, proto: int = 0, flags: int = 0
-) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int]]]: ...
+) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]: ...

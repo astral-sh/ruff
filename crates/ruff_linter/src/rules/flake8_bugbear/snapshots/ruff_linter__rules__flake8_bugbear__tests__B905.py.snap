@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
@@ -132,7 +131,7 @@ B905.py:9:1: B905 [*] `zip()` without an explicit `strict=` parameter
  8 | zip(zip("a"), strict=False)
  9 | zip(zip("a", strict=True))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
-10 | 
+10 |
 11 | # OK
    |
    = help: Add explicit value for parameter `strict=`
@@ -172,7 +171,7 @@ B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
 24 | zip([1, 2, 3], repeat(1, 1))
 25 | zip([1, 2, 3], repeat(1, times=4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
-26 | 
+26 |
 27 | import builtins
    |
    = help: Add explicit value for parameter `strict=`

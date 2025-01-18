@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flynt/mod.rs
-snapshot_kind: text
 ---
 FLY002.py:5:7: FLY002 [*] Consider `f"{a}  World"` instead of string join
   |
@@ -111,7 +110,7 @@ FLY002.py:10:7: FLY002 [*] Consider `f"{secrets.token_urlsafe()}a{secrets.token_
  9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
 10 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
-11 | 
+11 |
 12 | nok1 = "x".join({"4", "5", "yee"})  # Not OK (set)
    |
    = help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`

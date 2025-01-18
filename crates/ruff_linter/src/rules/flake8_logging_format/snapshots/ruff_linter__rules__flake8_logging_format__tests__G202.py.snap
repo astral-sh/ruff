@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
-snapshot_kind: text
 ---
 G202.py:8:38: G202 Logging statement has redundant `exc_info`
    |
@@ -8,7 +7,7 @@ G202.py:8:38: G202 Logging statement has redundant `exc_info`
  7 | except:
  8 |     logging.exception("Hello World", exc_info=True)
    |                                      ^^^^^^^^^^^^^ G202
- 9 | 
+ 9 |
 10 | try:
    |
 
@@ -18,7 +17,7 @@ G202.py:13:38: G202 Logging statement has redundant `exc_info`
 12 | except:
 13 |     logging.exception("Hello World", exc_info=sys.exc_info())
    |                                      ^^^^^^^^^^^^^^^^^^^^^^^ G202
-14 | 
+14 |
 15 | # OK
    |
 
@@ -28,7 +27,7 @@ G202.py:28:30: G202 Logging statement has redundant `exc_info`
 27 | except:
 28 |     exception("Hello World", exc_info=True)
    |                              ^^^^^^^^^^^^^ G202
-29 | 
+29 |
 30 | try:
    |
 
@@ -38,6 +37,6 @@ G202.py:33:30: G202 Logging statement has redundant `exc_info`
 32 | except:
 33 |     exception("Hello World", exc_info=sys.exc_info())
    |                              ^^^^^^^^^^^^^^^^^^^^^^^ G202
-34 | 
+34 |
 35 | # OK
    |

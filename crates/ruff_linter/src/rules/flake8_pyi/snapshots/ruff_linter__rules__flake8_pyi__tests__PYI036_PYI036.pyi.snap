@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI036.pyi:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `object`
    |
@@ -27,7 +26,7 @@ PYI036.pyi:55:24: PYI036 If there are no star-args, `__aexit__` should have at l
 54 |     def __exit__(self, *args: Any) -> None: ... # PYI036: Bad star-args annotation
 55 |     async def __aexit__(self) -> None: ... # PYI036: Missing args
    |                        ^^^^^^ PYI036
-56 | 
+56 |
 57 | class BadTwo:
    |
 
@@ -45,7 +44,7 @@ PYI036.pyi:59:48: PYI036 All keyword-only arguments in `__aexit__` must have a d
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
 59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
    |                                                ^^^^^^^^^^^^^^^^ PYI036
-60 | 
+60 |
 61 | class BadThree:
    |
 
@@ -55,54 +54,54 @@ PYI036.pyi:59:66: PYI036 All keyword-only arguments in `__aexit__` must have a d
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
 59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
    |                                                                  ^^^^^^^^^^^^^^^^ PYI036
-60 | 
+60 |
 61 | class BadThree:
    |
 
 PYI036.pyi:62:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
    |
 61 | class BadThree:
-62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation
+62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg…
    |                             ^^^^^^^^^^^^^^^^^^^ PYI036
-63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI036: Second arg has bad annotation
+63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI0…
    |
 
 PYI036.pyi:63:73: PYI036 The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
    |
 61 | class BadThree:
-62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation
-63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI036: Second arg has bad annotation
+62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg…
+63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI0…
    |                                                                         ^^^^^^^^^^^^^ PYI036
-64 | 
+64 |
 65 | class BadFour:
    |
 
 PYI036.pyi:63:94: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
    |
 61 | class BadThree:
-62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation
-63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI036: Second arg has bad annotation
+62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg…
+63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI0…
    |                                                                                              ^^^^^^^^^^^^^ PYI036
-64 | 
+64 |
 65 | class BadFour:
    |
 
 PYI036.pyi:66:111: PYI036 The third argument in `__exit__` should be annotated with `object` or `types.TracebackType | None`
    |
-65 | class BadFour:
-66 |     def __exit__(self, typ: typing.Optional[type[BaseException]], exc: typing.Union[BaseException, None], tb: TracebackType) -> None: ... # PYI036: Third arg has bad annotation
-   |                                                                                                               ^^^^^^^^^^^^^ PYI036
-67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
+65 | …
+66 | …xception]], exc: typing.Union[BaseException, None], tb: TracebackType) -> None: ... # PYI036: Third arg has bad annotation
+   |                                                          ^^^^^^^^^^^^^ PYI036
+67 | …n] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad…
    |
 
 PYI036.pyi:67:101: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
    |
-65 | class BadFour:
-66 |     def __exit__(self, typ: typing.Optional[type[BaseException]], exc: typing.Union[BaseException, None], tb: TracebackType) -> None: ... # PYI036: Third arg has bad annotation
-67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
-   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
-68 | 
-69 | class BadFive:
+65 | …
+66 | …eption]], exc: typing.Union[BaseException, None], tb: TracebackType) -> None: ... # PYI036: Third arg has bad annotation
+67 | … | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad a…
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+68 | …
+69 | …
    |
 
 PYI036.pyi:70:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
@@ -110,7 +109,7 @@ PYI036.pyi:70:29: PYI036 The first argument in `__exit__` should be annotated wi
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
    |                             ^^^^^^^^^^^^^^^^^^^^ PYI036
-71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
+71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotati…
    |
 
 PYI036.pyi:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `object`
@@ -118,7 +117,7 @@ PYI036.pyi:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `o
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
    |                                                          ^^^^^^^^^ PYI036
-71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
+71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotati…
    |
    = help: Annotate star-args with `object`
 
@@ -136,9 +135,9 @@ PYI036.pyi:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `
    |
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
-71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
+71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotati…
    |                                                                          ^^^ PYI036
-72 | 
+72 |
 73 | class BadSix:
    |
    = help: Annotate star-args with `object`
@@ -183,7 +182,7 @@ PYI036.pyi:90:95: PYI036 The third argument in `__aexit__` should be annotated w
 89 |     def __exit__(self, typ: type[Exception] | None, exc: BaseException | None, tb: TracebackType | None, /) -> None: ...
 90 |     async def __aexit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType, /) -> None: ...
    |                                                                                               ^^^^^^^^^^^^^ PYI036
-91 | 
+91 |
 92 | # Definitions not in a class scope can do whatever, we don't care
    |
 
@@ -193,7 +192,7 @@ PYI036.pyi:159:17: PYI036 Annotations for a three-argument `__exit__` overload (
 158 |     @overload
 159 |     def __exit__(self, exc_typ: Exception, exc: Exception, tb: TracebackType) -> None: ...  # PYI036
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
-160 | 
+160 |
 161 | class UnacceptableOverload2:
     |
 

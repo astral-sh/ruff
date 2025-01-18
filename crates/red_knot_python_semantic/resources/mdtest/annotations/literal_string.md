@@ -100,14 +100,14 @@ def _(flag: bool):
     foo_3: LiteralString = "foo" * 1_000_000_000
     bar_3: str = foo_2  # fine
 
-    baz_1: str = str()
+    baz_1: str = repr(object())
     qux_1: LiteralString = baz_1  # error: [invalid-assignment]
 
     baz_2: LiteralString = "baz" * 1_000_000_000
     qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
 
     baz_3 = "foo" if flag else 1
-    reveal_type(baz_3)  # revealed: Literal["foo"] | Literal[1]
+    reveal_type(baz_3)  # revealed: Literal["foo", 1]
     qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 ```
 

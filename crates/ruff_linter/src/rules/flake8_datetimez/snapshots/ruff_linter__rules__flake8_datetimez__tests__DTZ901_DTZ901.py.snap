@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
-snapshot_kind: text
 ---
 DTZ901.py:5:1: DTZ901 Use of `datetime.datetime.max` without timezone information
   |
@@ -17,7 +16,7 @@ DTZ901.py:6:1: DTZ901 Use of `datetime.datetime.min` without timezone informatio
 5 | datetime.datetime.max
 6 | datetime.datetime.min
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ901
-7 | 
+7 |
 8 | datetime.datetime.max.replace(year=...)
   |
   = help: Replace with `datetime.datetime.min.replace(tzinfo=...)`
@@ -25,7 +24,7 @@ DTZ901.py:6:1: DTZ901 Use of `datetime.datetime.min` without timezone informatio
 DTZ901.py:8:1: DTZ901 Use of `datetime.datetime.max` without timezone information
   |
 6 | datetime.datetime.min
-7 | 
+7 |
 8 | datetime.datetime.max.replace(year=...)
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ901
 9 | datetime.datetime.min.replace(hour=...)
@@ -55,7 +54,7 @@ DTZ901.py:28:1: DTZ901 Use of `datetime.datetime.min` without timezone informati
 27 | datetime.max
 28 | datetime.min
    | ^^^^^^^^^^^^ DTZ901
-29 | 
+29 |
 30 | datetime.max.replace(year=...)
    |
    = help: Replace with `datetime.datetime.min.replace(tzinfo=...)`
@@ -63,7 +62,7 @@ DTZ901.py:28:1: DTZ901 Use of `datetime.datetime.min` without timezone informati
 DTZ901.py:30:1: DTZ901 Use of `datetime.datetime.max` without timezone information
    |
 28 | datetime.min
-29 | 
+29 |
 30 | datetime.max.replace(year=...)
    | ^^^^^^^^^^^^ DTZ901
 31 | datetime.min.replace(hour=...)

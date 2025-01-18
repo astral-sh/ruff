@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
   |
@@ -494,7 +493,7 @@ UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
 UP004.py:159:15: UP004 [*] Class `Unusual` inherits from `object`
     |
 157 | import builtins
-158 | 
+158 |
 159 | class Unusual(builtins.object):
     |               ^^^^^^^^^^^^^^^ UP004
 160 |     ...

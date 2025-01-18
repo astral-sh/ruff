@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S609.py:4:10: S609 Possible wildcard injection in call due to `*` usage
   |
 2 | import subprocess
-3 | 
+3 |
 4 | os.popen("chmod +w foo*")
   |          ^^^^^^^^^^^^^^^ S609
 5 | subprocess.Popen("/bin/chown root: *", shell=True)

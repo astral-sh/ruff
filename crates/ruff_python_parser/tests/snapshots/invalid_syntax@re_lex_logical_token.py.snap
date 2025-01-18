@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -708,8 +707,8 @@ Module(
 13 | # There are multiple non-logical newlines (blank lines) in the `if` body
 14 | if call(foo
    |            ^ Syntax Error: Expected ')', found newline
-15 | 
-16 | 
+15 |
+16 |
 17 |     def bar():
    |
 
@@ -775,7 +774,7 @@ Module(
    |
 49 | # F-strings uses normal list parsing, so test those as well
 50 | if call(f"hello {x
-   |                    Syntax Error: f-string: unterminated string
+   |                   ^ Syntax Error: f-string: unterminated string
 51 |     def bar():
 52 |         pass
    |
@@ -793,7 +792,7 @@ Module(
    |
 49 | # F-strings uses normal list parsing, so test those as well
 50 | if call(f"hello {x
-   |                    Syntax Error: Expected FStringEnd, found Unknown
+   |                   ^ Syntax Error: Expected FStringEnd, found Unknown
 51 |     def bar():
 52 |         pass
    |
@@ -835,5 +834,5 @@ Module(
 55 | if call(f"hello
 56 |     def bar():
 57 |         pass
-   |              Syntax Error: Expected a statement
+   |             ^ Syntax Error: Expected a statement
    |

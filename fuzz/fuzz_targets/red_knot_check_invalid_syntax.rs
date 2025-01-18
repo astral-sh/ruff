@@ -115,10 +115,10 @@ fn setup_db() -> TestDb {
 
     Program::from_settings(
         &db,
-        &ProgramSettings {
+        ProgramSettings {
             python_version: PythonVersion::default(),
             python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(src_root),
+            search_paths: SearchPathSettings::new(vec![src_root]),
         },
     )
     .expect("Valid search path settings");

@@ -240,9 +240,7 @@ OP_SINGLE_ECDH_USE: int
 OP_NO_COMPRESSION: int
 OP_ENABLE_MIDDLEBOX_COMPAT: int
 OP_NO_RENEGOTIATION: int
-if sys.version_info >= (3, 11):
-    OP_IGNORE_UNEXPECTED_EOF: int
-elif sys.version_info >= (3, 8) and sys.platform == "linux":
+if sys.version_info >= (3, 11) or sys.platform == "linux":
     OP_IGNORE_UNEXPECTED_EOF: int
 if sys.version_info >= (3, 12):
     OP_LEGACY_SERVER_CONNECT: int

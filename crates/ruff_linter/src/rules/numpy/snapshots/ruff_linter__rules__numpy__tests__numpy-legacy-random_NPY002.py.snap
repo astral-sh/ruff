@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
-snapshot_kind: text
 ---
 NPY002.py:12:8: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
    |
 10 | from numpy import random
-11 | 
+11 |
 12 | vals = random.standard_normal(10)
    |        ^^^^^^^^^^^^^^^^^^^^^^ NPY002
 13 | more_vals = random.standard_normal(10)
@@ -23,7 +22,7 @@ NPY002.py:13:13: NPY002 Replace legacy `np.random.standard_normal` call with `np
 NPY002.py:18:1: NPY002 Replace legacy `np.random.seed` call with `np.random.Generator`
    |
 16 | import numpy
-17 | 
+17 |
 18 | numpy.random.seed()
    | ^^^^^^^^^^^^^^^^^ NPY002
 19 | numpy.random.get_state()
