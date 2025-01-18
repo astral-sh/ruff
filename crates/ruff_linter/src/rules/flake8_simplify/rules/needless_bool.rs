@@ -42,6 +42,10 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// return x > 0
 /// ```
 ///
+/// ## Preview
+/// In preview, double negations such as `not a != b`, `not a not in b`, `not a is not b`
+/// will be simplified to `a == b`, `a in b` and `a is b`, respectively.
+///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
@@ -206,19 +210,46 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            if let Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                operand,
-                ..
-            }) = if_test
-            {
-                Some((**operand).clone())
-            } else {
-                Some(Expr::UnaryOp(ast::ExprUnaryOp {
+            match if_test {
+                Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => Some((**operand).clone()),
+
+                Expr::Compare(ast::ExprCompare {
+                    ops,
+                    left,
+                    comparators,
+                    ..
+                }) if checker.settings.preview.is_enabled()
+                    && matches!(
+                        ops.as_ref(),
+                        [ast::CmpOp::Eq
+                            | ast::CmpOp::NotEq
+                            | ast::CmpOp::In
+                            | ast::CmpOp::NotIn
+                            | ast::CmpOp::Is
+                            | ast::CmpOp::IsNot]
+                    ) =>
+                {
+                    let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
+                        unreachable!("Single comparison with multiple comparators");
+                    };
+
+                    Some(Expr::Compare(ast::ExprCompare {
+                        ops: Box::new([op.negate()]),
+                        left: left.clone(),
+                        comparators: Box::new([right.clone()]),
+                        range: TextRange::default(),
+                    }))
+                }
+
+                _ => Some(Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
-                }))
+                })),
             }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
