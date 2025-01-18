@@ -123,3 +123,39 @@ def f():
     if 10 < a:
         return False
     return True
+
+
+def f():
+    if 10 in a:
+        return False
+    return True
+
+
+def f():
+    if 10 not in a:
+        return False
+    return True
+
+
+def f():
+    if a is 10:
+        return False
+    return True
+
+
+def f():
+    if a is not 10:
+        return False
+    return True
+
+
+def f():
+    if a == 10:
+        return False
+    return True
+
+
+def f():
+    if a != 10:
+        return False
+    return True
