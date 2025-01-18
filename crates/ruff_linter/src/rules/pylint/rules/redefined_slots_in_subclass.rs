@@ -69,7 +69,7 @@ pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast
     let semantic = checker.semantic();
     let mut diagnostics: Vec<_> = class_slots
         .iter()
-        .filter_map(|slot| contained_in_super_slots(class_def, semantic, slot))
+        .filter_map(|slot| check_super_slots(class_def, semantic, slot))
         .collect();
     checker.diagnostics.append(&mut diagnostics);
 }
@@ -104,7 +104,7 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn contained_in_super_slots(
+fn check_super_slots(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     slot: &Slot,
