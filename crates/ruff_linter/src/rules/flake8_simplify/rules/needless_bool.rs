@@ -42,6 +42,10 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// return x > 0
 /// ```
 ///
+/// ## Preview
+/// In preview, double negations such as `not a != b`, `not a not in b`, `not a is not b`
+/// will be simplified to `a == b`, `a in b` and `a is b`, correspondingly.
+///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
@@ -218,15 +222,16 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     left,
                     comparators,
                     ..
-                }) if matches!(
-                    ops.as_ref(),
-                    [ast::CmpOp::Eq
-                        | ast::CmpOp::NotEq
-                        | ast::CmpOp::In
-                        | ast::CmpOp::NotIn
-                        | ast::CmpOp::Is
-                        | ast::CmpOp::IsNot]
-                ) =>
+                }) if checker.settings.preview.is_enabled()
+                    && matches!(
+                        ops.as_ref(),
+                        [ast::CmpOp::Eq
+                            | ast::CmpOp::NotEq
+                            | ast::CmpOp::In
+                            | ast::CmpOp::NotIn
+                            | ast::CmpOp::Is
+                            | ast::CmpOp::IsNot]
+                    ) =>
                 {
                     let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
                         unreachable!("Single comparison with multiple comparators");
