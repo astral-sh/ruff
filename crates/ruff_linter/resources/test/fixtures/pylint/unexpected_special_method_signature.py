@@ -73,3 +73,22 @@ class TestClass:
 
     def __eq__(self, *, other=42):  # ignore positional-only args
         ...
+
+    # https://github.com/astral-sh/ruff/issues/15572
+    @property
+    def __aexit__(self):
+        return something_else.__aexit__
+
+    from functools import cached_property
+    @cached_property
+    def __aexit__(self):
+        return something_else.__aexit__
+
+    from some_package import custom_property
+    @custom_property
+    def __aexit__(self):
+        return something_else.__aexit__
+
+    @list
+    def __aexit__(self):
+        return something_else.__aexit__

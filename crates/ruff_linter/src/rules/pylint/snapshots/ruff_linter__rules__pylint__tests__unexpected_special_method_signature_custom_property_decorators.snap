@@ -72,33 +72,6 @@ unexpected_special_method_signature.py:65:9: PLE0302 The special method `__round
 66 |         ...
    |
 
-unexpected_special_method_signature.py:79:9: PLE0302 The special method `__aexit__` expects 4 parameters, 1 was given
-   |
-77 |     # https://github.com/astral-sh/ruff/issues/15572
-78 |     @property
-79 |     def __aexit__(self):
-   |         ^^^^^^^^^ PLE0302
-80 |         return something_else.__aexit__
-   |
-
-unexpected_special_method_signature.py:84:9: PLE0302 The special method `__aexit__` expects 4 parameters, 1 was given
-   |
-82 |     from functools import cached_property
-83 |     @cached_property
-84 |     def __aexit__(self):
-   |         ^^^^^^^^^ PLE0302
-85 |         return something_else.__aexit__
-   |
-
-unexpected_special_method_signature.py:89:9: PLE0302 The special method `__aexit__` expects 4 parameters, 1 was given
-   |
-87 |     from some_package import custom_property
-88 |     @custom_property
-89 |     def __aexit__(self):
-   |         ^^^^^^^^^ PLE0302
-90 |         return something_else.__aexit__
-   |
-
 unexpected_special_method_signature.py:93:9: PLE0302 The special method `__aexit__` expects 4 parameters, 1 was given
    |
 92 |     @list

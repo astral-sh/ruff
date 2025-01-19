@@ -5,6 +5,7 @@ use ruff_python_ast::{Decorator, Parameters, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
 use crate::checkers::ast::Checker;
@@ -108,6 +109,16 @@ impl ExpectedParams {
 ///         return self._books[index]
 /// ```
 ///
+/// ## Preview
+/// In preview, property-like wrappers are not reported:
+///
+/// ```python
+/// class Bookshelf:
+///     @property
+///     def __getitem__(self):
+///         return some_other_bookshelf.__getitem__
+/// ```
+///
 /// ## References
 /// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
 #[derive(ViolationMetadata)]
@@ -151,6 +162,26 @@ pub(crate) fn unexpected_special_method_signature(
     if !parameters.posonlyargs.is_empty()
         || !parameters.kwonlyargs.is_empty()
         || parameters.kwarg.is_some()
+    {
+        return;
+    }
+
+    // Avoid reporting when the method is a `@property` wrapper:
+    // ```python
+    // @property
+    // def __foo__(self):
+    //     return some_predefined_function
+    // ```
+    // https://github.com/astral-sh/ruff/issues/15572
+    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    let in_preview = checker.settings.preview.is_enabled();
+
+    if in_preview
+        && visibility::is_property(
+            decorator_list,
+            extra_property_decorators,
+            checker.semantic(),
+        )
     {
         return;
     }

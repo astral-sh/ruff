@@ -5,6 +5,7 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
@@ -13,7 +14,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::pylint;
+    use crate::rules::{pydocstyle, pylint};
 
     use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::settings::LinterSettings;
@@ -406,6 +407,25 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unexpected_special_method_signature_custom_property_decorators() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/unexpected_special_method_signature.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                pydocstyle: pydocstyle::settings::Settings {
+                    property_decorators: BTreeSet::from([
+                        "some_package.custom_property".to_string()
+                    ]),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnexpectedSpecialMethodSignature)
             },
         )?;
         assert_messages!(diagnostics);
