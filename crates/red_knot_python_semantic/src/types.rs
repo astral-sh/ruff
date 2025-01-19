@@ -3819,9 +3819,9 @@ impl<'db> Class<'db> {
     #[salsa::tracked]
     pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
-        let mut base_classes = self.fully_static_explicit_bases(db);
+        let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-        if self.inheritance_cycle(db).is_some() {
+        if base_classes.peek().is_some() && self.inheritance_cycle(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
@@ -4059,45 +4059,45 @@ impl<'db> Class<'db> {
     /// but we must be resilient to it or we could panic.
     #[salsa::tracked]
     fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
-        fn inheritance_cycle_recursive<'db>(
+        // Return `true` if the class is cyclically defined.
+        //
+        // Also, populates `visited_classes` with all base classes of `self`.
+        fn is_cyclically_defined_rec<'db>(
             db: &'db dyn Db,
-            start: Class<'db>,
             class: Class<'db>,
-            classes_to_watch: &mut IndexSet<Class<'db>>,
-            result: Option<InheritanceCycle>,
-        ) -> Option<InheritanceCycle> {
-            let mut result = result;
+            classes_on_stack: &mut IndexSet<Class<'db>>,
+            visited_classes: &mut IndexSet<Class<'db>>,
+        ) -> bool {
+            let mut result = false;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
-                // Each base must be considered in isolation.
-                // This is due to the fact that if a class uses multiple inheritance,
-                // there could easily be a situation where two bases have the same class in their MROs;
-                // that isn't enough to constitute the class being cyclically defined.
-                if !classes_to_watch.insert(explicit_base_class) {
-                    if result == Some(InheritanceCycle::Participant) || start == explicit_base_class
-                    {
-                        return Some(InheritanceCycle::Participant);
-                    }
+                if !classes_on_stack.insert(explicit_base_class) {
+                    return true;
+                }
 
-                    return Some(InheritanceCycle::Inherited);
+                if visited_classes.insert(explicit_base_class) {
+                    // If we find a cycle, keep searching to check if we can reach the starting class.
+                    result = result
+                        || is_cyclically_defined_rec(
+                            db,
+                            explicit_base_class,
+                            classes_on_stack,
+                            visited_classes,
+                        );
                 }
-                result = inheritance_cycle_recursive(
-                    db,
-                    start,
-                    explicit_base_class,
-                    classes_to_watch,
-                    result,
-                );
-                if result.is_none() {
-                    classes_to_watch.pop();
-                }
-                // If we find a cycle, keep searching to check if we can reach the starting class.
+
+                classes_on_stack.pop();
             }
             result
         }
 
-        let mut classes_to_watch = IndexSet::new();
-        classes_to_watch.insert(self);
-        inheritance_cycle_recursive(db, self, self, &mut classes_to_watch, None)
+        let visited_classes = &mut IndexSet::new();
+        if !is_cyclically_defined_rec(db, self, &mut IndexSet::new(), visited_classes) {
+            None
+        } else if visited_classes.contains(&self) {
+            Some(InheritanceCycle::Participant)
+        } else {
+            Some(InheritanceCycle::Inherited)
+        }
     }
 }
 
