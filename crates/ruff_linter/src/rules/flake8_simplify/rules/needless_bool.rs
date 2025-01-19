@@ -43,11 +43,13 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```
 ///
 /// ## Preview
-/// In preview, double negations such as `not a != b`, `not a not in b`, `not a is not b`
+/// In [preview], double negations such as `not a != b`, `not a not in b`, `not a is not b`
 /// will be simplified to `a == b`, `a in b` and `a is b`, respectively.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,

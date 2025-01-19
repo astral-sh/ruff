@@ -110,7 +110,7 @@ impl ExpectedParams {
 /// ```
 ///
 /// ## Preview
-/// In preview, property-like wrappers are not reported:
+/// In [preview], property-like wrappers are not reported:
 ///
 /// ```python
 /// class Bookshelf:
@@ -121,6 +121,8 @@ impl ExpectedParams {
 ///
 /// ## References
 /// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct UnexpectedSpecialMethodSignature {
     method_name: String,
