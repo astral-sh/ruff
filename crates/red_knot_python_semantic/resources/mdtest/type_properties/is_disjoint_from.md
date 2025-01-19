@@ -152,12 +152,6 @@ static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
-## Module literals
-
-```py
-from knot_extensions import TypeOf, is_disjoint_from, static_assert
-```
-
 ## Instance types versus `type[T]` types
 
 An instance type is disjoint from a `type[T]` type if the instance type is `@final` and the class of
