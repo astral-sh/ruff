@@ -9,6 +9,7 @@ use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use type_ordering::union_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::register_lints;
@@ -55,6 +56,7 @@ mod signatures;
 mod slots;
 mod string_annotation;
 mod subclass_of;
+mod type_ordering;
 mod unpacker;
 
 #[cfg(test)]
@@ -1112,16 +1114,15 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        if !(self.is_fully_static(db) && other.is_fully_static(db)) {
-            return false;
+        // TODO equivalent but not identical types: TypedDicts, Protocols, type aliases, etc.
+
+        match (self, other) {
+            (Type::Union(left), Type::Union(right)) => left.is_equivalent_to(db, right),
+            (Type::Intersection(left), Type::Intersection(right)) => {
+                left.is_equivalent_to(db, right)
+            }
+            _ => self.is_fully_static(db) && other.is_fully_static(db) && self == other,
         }
-
-        // TODO equivalent but not identical structural types, differently-ordered unions and
-        // intersections, other cases?
-
-        // For all other cases, types are equivalent iff they have the same internal
-        // representation.
-        self == other
     }
 
     /// Returns true if both `self` and `other` are the same gradual form
@@ -1163,16 +1164,6 @@ impl<'db> Type<'db> {
 
             (Type::Dynamic(_), Type::Dynamic(_)) => true,
 
-            (Type::Instance(instance), Type::SubclassOf(subclass))
-            | (Type::SubclassOf(subclass), Type::Instance(instance)) => {
-                let Some(base_class) = subclass.subclass_of().into_class() else {
-                    return false;
-                };
-
-                instance.class.is_known(db, KnownClass::Type)
-                    && base_class.is_known(db, KnownClass::Object)
-            }
-
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
                 match (first.subclass_of(), second.subclass_of()) {
                     (first, second) if first == second => true,
@@ -1189,34 +1180,10 @@ impl<'db> Type<'db> {
                     && iter::zip(first_elements, second_elements).all(equivalent)
             }
 
-            // TODO: Handle equivalent unions with items in different order
-            (Type::Union(first), Type::Union(second)) => {
-                let first_elements = first.elements(db);
-                let second_elements = second.elements(db);
+            (Type::Union(first), Type::Union(second)) => first.is_gradual_equivalent_to(db, second),
 
-                if first_elements.len() != second_elements.len() {
-                    return false;
-                }
-
-                iter::zip(first_elements, second_elements).all(equivalent)
-            }
-
-            // TODO: Handle equivalent intersections with items in different order
             (Type::Intersection(first), Type::Intersection(second)) => {
-                let first_positive = first.positive(db);
-                let first_negative = first.negative(db);
-
-                let second_positive = second.positive(db);
-                let second_negative = second.negative(db);
-
-                if first_positive.len() != second_positive.len()
-                    || first_negative.len() != second_negative.len()
-                {
-                    return false;
-                }
-
-                iter::zip(first_positive, second_positive).all(equivalent)
-                    && iter::zip(first_negative, second_negative).all(equivalent)
+                first.is_gradual_equivalent_to(db, second)
             }
 
             _ => false,
@@ -1476,7 +1443,7 @@ impl<'db> Type<'db> {
     }
 
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
-    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Dynamic(_) => false,
             Type::Never
@@ -1510,20 +1477,8 @@ impl<'db> Type<'db> {
 
                 true
             }
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|elem| elem.is_fully_static(db)),
-            Type::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .all(|elem| elem.is_fully_static(db))
-                    && intersection
-                        .negative(db)
-                        .iter()
-                        .all(|elem| elem.is_fully_static(db))
-            }
+            Type::Union(union) => union.is_fully_static(db),
+            Type::Intersection(intersection) => intersection.is_fully_static(db),
             Type::Tuple(tuple) => tuple
                 .elements(db)
                 .iter()
@@ -4316,10 +4271,11 @@ impl<'db> UnionType<'db> {
 
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    pub fn from_elements<T: Into<Type<'db>>>(
-        db: &'db dyn Db,
-        elements: impl IntoIterator<Item = T>,
-    ) -> Type<'db> {
+    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
         elements
             .into_iter()
             .fold(UnionBuilder::new(db), |builder, element| {
@@ -4337,6 +4293,93 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
+
+    pub fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.elements(db).iter().all(|ty| ty.is_fully_static(db))
+    }
+
+    /// Create a new union type with the elements sorted according to a canonical ordering.
+    #[must_use]
+    pub fn to_sorted_union(self, db: &'db dyn Db) -> Self {
+        let mut new_elements = self.elements(db).to_vec();
+        for element in &mut new_elements {
+            if let Type::Intersection(intersection) = element {
+                intersection.sort(db);
+            }
+        }
+        new_elements.sort_unstable_by(union_elements_ordering);
+        UnionType::new(db, new_elements.into_boxed_slice())
+    }
+
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`
+    pub fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        /// Inlined version of [`UnionType::is_fully_static`] to avoid having to lookup
+        /// `self.elements` multiple times in the Salsa db in this single method.
+        #[inline]
+        fn all_fully_static(db: &dyn Db, elements: &[Type]) -> bool {
+            elements.iter().all(|ty| ty.is_fully_static(db))
+        }
+
+        let self_elements = self.elements(db);
+        let other_elements = other.elements(db);
+
+        if self_elements.len() != other_elements.len() {
+            return false;
+        }
+
+        if !all_fully_static(db, self_elements) {
+            return false;
+        }
+
+        if !all_fully_static(db, other_elements) {
+            return false;
+        }
+
+        if self == other {
+            return true;
+        }
+
+        let sorted_self = self.to_sorted_union(db);
+
+        if sorted_self == other {
+            return true;
+        }
+
+        sorted_self == other.to_sorted_union(db)
+    }
+
+    /// Return `true` if `self` has exactly the same set of possible static materializations as `other`
+    /// (if `self` represents the same set of possible sets of possible runtime objects as `other`)
+    pub fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // TODO: `T | Unknown` should be gradually equivalent to `T | Unknown | Any`,
+        // since they have exactly the same set of possible static materializations
+        // (they represent the same set of possible sets of possible runtime objects)
+        if self.elements(db).len() != other.elements(db).len() {
+            return false;
+        }
+
+        let sorted_self = self.to_sorted_union(db);
+
+        if sorted_self == other {
+            return true;
+        }
+
+        let sorted_other = other.to_sorted_union(db);
+
+        if sorted_self == sorted_other {
+            return true;
+        }
+
+        sorted_self
+            .elements(db)
+            .iter()
+            .zip(sorted_other.elements(db))
+            .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+    }
 }
 
 #[salsa::interned]
@@ -4352,6 +4395,105 @@ pub struct IntersectionType<'db> {
     /// directly in intersections rather than as a separate type.
     #[return_ref]
     negative: FxOrderSet<Type<'db>>,
+}
+
+impl<'db> IntersectionType<'db> {
+    /// Return a new `IntersectionType` instance with the positive and negative types sorted
+    /// according to a canonical ordering.
+    #[must_use]
+    pub fn to_sorted_intersection(self, db: &'db dyn Db) -> Self {
+        let mut positive = self.positive(db).clone();
+        positive.sort_unstable_by(union_elements_ordering);
+
+        let mut negative = self.negative(db).clone();
+        negative.sort_unstable_by(union_elements_ordering);
+
+        IntersectionType::new(db, positive, negative)
+    }
+
+    /// Perform an in-place sort of this [`IntersectionType`] instance
+    /// according to a canonical ordering.
+    fn sort(&mut self, db: &'db dyn Db) {
+        *self = self.to_sorted_intersection(db);
+    }
+
+    pub fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.positive(db).iter().all(|ty| ty.is_fully_static(db))
+            && self.negative(db).iter().all(|ty| ty.is_fully_static(db))
+    }
+
+    /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
+    pub fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        /// Inlined version of [`IntersectionType::is_fully_static`] to avoid having to lookup
+        /// `positive` and `negative` multiple times in the Salsa db in this single method.
+        #[inline]
+        fn all_fully_static(db: &dyn Db, elements: &FxOrderSet<Type>) -> bool {
+            elements.iter().all(|ty| ty.is_fully_static(db))
+        }
+
+        let self_positive = self.positive(db);
+        if !all_fully_static(db, self_positive) {
+            return false;
+        }
+
+        let self_negative = self.negative(db);
+        if !all_fully_static(db, self_negative) {
+            return false;
+        }
+
+        let other_positive = other.positive(db);
+        if !all_fully_static(db, other_positive) {
+            return false;
+        }
+
+        let other_negative = other.negative(db);
+        if !all_fully_static(db, other_negative) {
+            return false;
+        }
+
+        if self == other {
+            return true;
+        }
+
+        self_positive.set_eq(other_positive) && self_negative.set_eq(other_negative)
+    }
+
+    /// Return `true` if `self` has exactly the same set of possible static materializations as `other`
+    /// (if `self` represents the same set of possible sets of possible runtime objects as `other`)
+    pub fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        if self.positive(db).len() != other.positive(db).len()
+            || self.negative(db).len() != other.negative(db).len()
+        {
+            return false;
+        }
+
+        let sorted_self = self.to_sorted_intersection(db);
+
+        if sorted_self == other {
+            return true;
+        }
+
+        let sorted_other = other.to_sorted_intersection(db);
+
+        if sorted_self == sorted_other {
+            return true;
+        }
+
+        sorted_self
+            .positive(db)
+            .iter()
+            .zip(sorted_other.positive(db))
+            .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+            && sorted_self
+                .negative(db)
+                .iter()
+                .zip(sorted_other.negative(db))
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+    }
 }
 
 #[salsa::interned]

@@ -219,15 +219,16 @@ macro_rules! type_property_test {
     };
 }
 
-fn intersection<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-    IntersectionBuilder::new(db)
-        .add_positive(s)
-        .add_positive(t)
-        .build()
+fn intersection<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type<'db> {
+    let mut builder = IntersectionBuilder::new(db);
+    for ty in tys {
+        builder = builder.add_positive(ty);
+    }
+    builder.build()
 }
 
-fn union<'db>(db: &'db TestDb, s: Type<'db>, t: Type<'db>) -> Type<'db> {
-    UnionType::from_elements(db, [s, t])
+fn union<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type<'db> {
+    UnionType::from_elements(db, tys)
 }
 
 mod stable {
@@ -253,6 +254,12 @@ mod stable {
         forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
     );
 
+    // Symmetry: If `S` is gradual equivalent to `T`, `T` is gradual equivalent to `S`.
+    type_property_test!(
+        gradual_equivalent_to_is_symmetric, db,
+        forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
+    );
+
     // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
@@ -263,6 +270,12 @@ mod stable {
     type_property_test!(
         subtype_of_is_transitive, db,
         forall types s, t, u. s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
+    );
+
+    // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
+    type_property_test!(
+        subtype_of_is_antisymmetric, db,
+        forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
     // `T` is not disjoint from itself, unless `T` is `Never`.
@@ -336,7 +349,7 @@ mod stable {
         all_fully_static_type_pairs_are_subtype_of_their_union, db,
         forall types s, t.
             s.is_fully_static(db) && t.is_fully_static(db)
-            => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
+            => s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
     );
 }
 
@@ -348,6 +361,8 @@ mod stable {
 /// tests to the `stable` section. In the meantime, it can still be useful to run these
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
+    use itertools::Itertools;
+
     use super::{intersection, union};
 
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
@@ -355,13 +370,6 @@ mod flaky {
     type_property_test!(
         assignable_to_is_reflexive, db,
         forall types t. t.is_assignable_to(db, t)
-    );
-
-    // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
-    // This very often passes now, but occasionally flakes due to https://github.com/astral-sh/ruff/issues/15380
-    type_property_test!(
-        subtype_of_is_antisymmetric, db,
-        forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
     // Negating `T` twice is equivalent to `T`.
@@ -387,7 +395,7 @@ mod flaky {
         all_fully_static_type_pairs_are_supertypes_of_their_intersection, db,
         forall types s, t.
             s.is_fully_static(db) && t.is_fully_static(db)
-            => intersection(db, s, t).is_subtype_of(db, s) && intersection(db, s, t).is_subtype_of(db, t)
+            => intersection(db, [s, t]).is_subtype_of(db, s) && intersection(db, [s, t]).is_subtype_of(db, t)
     );
 
     // And for non-fully-static types, the intersection of a pair of types
@@ -395,20 +403,42 @@ mod flaky {
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     type_property_test!(
         all_type_pairs_can_be_assigned_from_their_intersection, db,
-        forall types s, t. intersection(db, s, t).is_assignable_to(db, s) && intersection(db, s, t).is_assignable_to(db, t)
+        forall types s, t. intersection(db, [s, t]).is_assignable_to(db, s) && intersection(db, [s, t]).is_assignable_to(db, t)
     );
 
     // For *any* pair of types, whether fully static or not,
     // each of the pair should be assignable to the union of the two.
     type_property_test!(
         all_type_pairs_are_assignable_to_their_union, db,
-        forall types s, t. s.is_assignable_to(db, union(db, s, t)) && t.is_assignable_to(db, union(db, s, t))
+        forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
 
-    // Symmetry: If `S` is gradual equivalent to `T`, `T` is gradual equivalent to `S`.
+    // Equal element sets of intersections implies equivalence
+    // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
-        gradual_equivalent_to_is_symmetric, db,
-        forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
+        intersection_equivalence_not_order_dependent, db,
+        forall types s, t, u.
+            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
+            => [s, t, u]
+                .into_iter()
+                .permutations(3)
+                .map(|trio_of_types| intersection(db, trio_of_types))
+                .permutations(2)
+                .all(|vec_of_intersections| vec_of_intersections[0].is_equivalent_to(db, vec_of_intersections[1]))
+    );
+
+    // Equal element sets of unions implies equivalence
+    // flaky at laest in part because of https://github.com/astral-sh/ruff/issues/15513
+    type_property_test!(
+        union_equivalence_not_order_dependent, db,
+        forall types s, t, u.
+            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
+            => [s, t, u]
+                .into_iter()
+                .permutations(3)
+                .map(|trio_of_types| union(db, trio_of_types))
+                .permutations(2)
+                .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(db, vec_of_unions[1]))
     );
 
     // A fully static type does not have any materializations.

@@ -38,13 +38,11 @@ from knot_extensions import Intersection, Not, Unknown, is_gradual_equivalent_to
 
 static_assert(is_gradual_equivalent_to(str | int, str | int))
 static_assert(is_gradual_equivalent_to(str | int | Any, str | int | Unknown))
-
-# TODO: These should pass
-static_assert(is_gradual_equivalent_to(str | int, int | str))  # error: [static-assert-error]
-# error: [static-assert-error]
+static_assert(is_gradual_equivalent_to(str | int, int | str))
 static_assert(
     is_gradual_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]])
 )
+# TODO: `~type[Any]` shoudld be gradually equivalent to `~type[Unknown]`
 # error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))
 
