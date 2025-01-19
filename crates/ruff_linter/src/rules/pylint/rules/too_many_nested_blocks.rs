@@ -1,12 +1,10 @@
-use std::ptr;
-
-use ast::ExceptHandler;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+use std::{iter, ptr};
 
 use crate::checkers::ast::Checker;
 
@@ -54,7 +52,7 @@ pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if !current_stmt_is_first_within_parent(semantic) {
+    if !current_stmt_is_first_nested_within_block(semantic) {
         return;
     }
 
@@ -148,24 +146,50 @@ fn has_nested_block(stmt: &Stmt) -> bool {
     }
 }
 
-fn current_stmt_is_first_within_parent(semantic: &SemanticModel) -> bool {
+fn current_stmt_is_first_nested_within_block(semantic: &SemanticModel) -> bool {
     let Some(parent) = semantic.current_statement_parent() else {
         return false;
     };
     let current = semantic.current_statement();
 
-    match parent {
-        Stmt::If(ast::StmtIf { body, .. })
-        | Stmt::While(ast::StmtWhile { body, .. })
-        | Stmt::For(ast::StmtFor { body, .. })
-        | Stmt::Try(ast::StmtTry { body, .. })
-        | Stmt::With(ast::StmtWith { body, .. }) => {
-            let [first, ..] = &body[..] else {
-                return false;
-            };
+    let current_is_first_nested = |block: &Vec<Stmt>| {
+        let Some(first_nested) = block.iter().find(|stmt| is_nested_block(stmt)) else {
+            return false;
+        };
 
-            ptr::eq(first, current)
-        }
+        ptr::eq(first_nested, current)
+    };
+
+    match parent {
+        Stmt::With(ast::StmtWith { body, .. }) => current_is_first_nested(body),
+
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => iter::once(body)
+            .chain(elif_else_clauses.iter().map(|clause| &clause.body))
+            .any(current_is_first_nested),
+
+        Stmt::While(ast::StmtWhile { body, orelse, .. })
+        | Stmt::For(ast::StmtFor { body, orelse, .. }) => iter::once(body)
+            .chain(iter::once(orelse))
+            .any(current_is_first_nested),
+
+        Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => handlers
+            .iter()
+            .map(|ExceptHandler::ExceptHandler(handler)| &handler.body)
+            .chain(iter::once(body))
+            .chain(iter::once(orelse))
+            .chain(iter::once(finalbody))
+            .any(current_is_first_nested),
+
         _ => false,
     }
 }

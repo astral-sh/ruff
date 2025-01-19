@@ -5,17 +5,35 @@ too_many_nested_blocks_2.py:9:1: PLR1702 Too many nested blocks (7 > 5)
    |
  7 |                         if f:             # /
  8 |
- 9 |                             for g in z:   # This statement is the first to exceed the limit.
+ 9 |                             for g in z:   # This nested statement is the first to have
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-10 |                                 print(p)  # Thus, it is reported but not any of its substatements.
-11 |                                 pass      #
+10 |                                 print(p)  # a substatement that exceed the limit.
+11 |                                 pass      # It is reported but not any of its substatements.
    |
 
-too_many_nested_blocks_2.py:29:1: PLR1702 Too many nested blocks (7 > 5)
+too_many_nested_blocks_2.py:24:1: PLR1702 Too many nested blocks (7 > 5)
    |
-27 |                         if f:             # /
-28 |
-29 |                             if x == y:    # This statement is the first to exceed the limit.
+22 |                         if k:             # /
+23 |
+24 |                             if l:         # Unless they themselves have a branch
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-30 |                                 print(p)  # It is therefore reported.
+25 |                                 print()   # that exceeds the limit.
+   |
+
+too_many_nested_blocks_2.py:36:1: PLR1702 Too many nested blocks (7 > 5)
+   |
+34 |                         if f:             # /
+35 |
+36 |                             if x == y:    # This statement is the first to exceed the limit.
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
+37 |                                 print(p)  # It is therefore reported.
+   |
+
+too_many_nested_blocks_2.py:58:1: PLR1702 Too many nested blocks (8 > 5)
+   |
+56 |                                 print()           #
+57 |
+58 |                                 if i:             # But this branch is.
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
+59 |                                     print()       #
    |
