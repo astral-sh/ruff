@@ -423,6 +423,6 @@ mod flaky {
     type_property_test!(
         constituent_members_of_union_is_not_disjoint_from_that_union, db,
         forall types s, t.
-            !s.is_disjoint_from(db, union(db, s, t)) && !t.is_disjoint_from(db, union(db, s, t))
+            !s.is_disjoint_from(db, union(db, [s, t])) && !t.is_disjoint_from(db, union(db, [s, t]))
     );
 }
