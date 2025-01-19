@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 
-use itertools::Itertools;
-
 use super::{
     class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
     TodoType, Type,
@@ -265,11 +263,4 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
     }
-}
-
-pub(crate) fn sequence_is_sorted<'db>(sequence: impl IntoIterator<Item = &'db Type<'db>>) -> bool {
-    sequence
-        .into_iter()
-        .tuple_windows()
-        .all(|(left, right)| !union_elements_ordering(left, right).is_gt())
 }
