@@ -338,6 +338,20 @@ mod stable {
             s.is_fully_static(db) && t.is_fully_static(db)
             => s.is_subtype_of(db, union(db, s, t)) && t.is_subtype_of(db, union(db, s, t))
     );
+
+    // A fully static type does not have any materializations.
+    // Thus, two equivalent (fully static) types are also gradual equivalent.
+    type_property_test!(
+        two_equivalent_types_are_also_gradual_equivalent, db,
+        forall types s, t. s.is_equivalent_to(db, t) => s.is_gradual_equivalent_to(db, t)
+    );
+
+    // Two gradual equivalent fully static types are also equivalent.
+    type_property_test!(
+        two_gradual_equivalent_fully_static_types_are_also_equivalent, db,
+        forall types s, t.
+            s.is_fully_static(db) && s.is_gradual_equivalent_to(db, t) => s.is_equivalent_to(db, t)
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -409,19 +423,5 @@ mod flaky {
     type_property_test!(
         gradual_equivalent_to_is_symmetric, db,
         forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
-    );
-
-    // A fully static type does not have any materializations.
-    // Thus, two equivalent (fully static) types are also gradual equivalent.
-    type_property_test!(
-        two_equivalent_types_are_also_gradual_equivalent, db,
-        forall types s, t. s.is_equivalent_to(db, t) => s.is_gradual_equivalent_to(db, t)
-    );
-
-    // Two gradual equivalent fully static types are also equivalent.
-    type_property_test!(
-        two_gradual_equivalent_fully_static_types_are_also_equivalent, db,
-        forall types s, t.
-            s.is_fully_static(db) && s.is_gradual_equivalent_to(db, t) => s.is_equivalent_to(db, t)
     );
 }
