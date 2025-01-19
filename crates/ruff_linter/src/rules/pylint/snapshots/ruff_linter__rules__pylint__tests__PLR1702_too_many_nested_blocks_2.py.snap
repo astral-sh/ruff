@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_nested_blocks_2.py:9:1: PLR1702 Too many nested blocks (7 > 5)
+   |
+ 7 |                         if f:             # /
+ 8 |
+ 9 |                             for g in z:   # This statement is the first to exceed the limit.
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
+10 |                                 print(p)  # Thus, it is reported but not any of its substatements.
+11 |                                 pass      #
+   |
+
+too_many_nested_blocks_2.py:29:1: PLR1702 Too many nested blocks (7 > 5)
+   |
+27 |                         if f:             # /
+28 |
+29 |                             if x == y:    # This statement is the first to exceed the limit.
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
+30 |                                 print(p)  # It is therefore reported.
+   |
