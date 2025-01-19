@@ -424,4 +424,12 @@ mod flaky {
         forall types s, t.
             s.is_fully_static(db) && s.is_gradual_equivalent_to(db, t) => s.is_equivalent_to(db, t)
     );
+
+    // `S | T` is always a supertype of `S`.
+    // Thus, `S` is never disjoint from `S | T`.
+    type_property_test!(
+        constituent_members_of_union_is_not_disjoint_from_that_union, db,
+        forall types s, t.
+            !s.is_disjoint_from(db, union(db, s, t)) && !t.is_disjoint_from(db, union(db, s, t))
+    );
 }
