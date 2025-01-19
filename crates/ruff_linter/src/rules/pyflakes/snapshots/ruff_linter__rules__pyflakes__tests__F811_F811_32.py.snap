@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_32.py:5:5: F811 [*] Redefinition of unused `List` from line 4
+  |
+3 | from typing import (
+4 |     List,
+5 |     List,
+  |     ^^^^ F811
+6 | )
+  |
+  = help: Remove definition: `List`
+
+ℹ Safe fix
+2 2 | 
+3 3 | from typing import (
+4 4 |     List,
+5   |-    List,
+6 5 | )
+7 6 | 
+8 7 |

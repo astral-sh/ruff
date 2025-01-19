@@ -7,7 +7,7 @@ use libcst_native::{
     Codegen, CodegenState, Expression, ImportNames, NameOrAttribute, ParenthesizableWhitespace,
     SmallStatement, Statement,
 };
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{smallvec, SmallVec};
 use unicode_normalization::UnicodeNormalization;
 
@@ -81,10 +81,20 @@ pub(crate) fn remove_imports<'a>(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
-    // Remove any imports that are specified in the `imports` iterator.
-    let member_names = member_names.collect::<FxHashSet<_>>();
+    // Remove any imports that are specified in the `imports` iterator (but, e.g., if the name is
+    // provided once, only remove the first occurrence).
+    let mut counts = member_names.fold(FxHashMap::<&str, usize>::default(), |mut map, name| {
+        map.entry(name).and_modify(|c| *c += 1).or_insert(1);
+        map
+    });
     aliases.retain(|alias| {
-        !member_names.contains(qualified_name_from_name_or_attribute(&alias.name).as_str())
+        let name = qualified_name_from_name_or_attribute(&alias.name);
+        if let Some(count) = counts.get_mut(name.as_str()).filter(|count| **count > 0) {
+            *count -= 1;
+            false
+        } else {
+            true
+        }
     });
 
     // But avoid destroying any trailing comments.
