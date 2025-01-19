@@ -3,37 +3,37 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 too_many_nested_blocks_2.py:9:1: PLR1702 Too many nested blocks (7 > 5)
    |
- 7 |                         if f:             # /
+ 7 |                         if f:                     # /
  8 |
- 9 |                             for g in z:   # This nested statement is the first to have
+ 9 |                             for g in z:           # This nested statement is the first to have
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-10 |                                 print(p)  # a substatement that exceed the limit.
-11 |                                 pass      # It is reported but not any of its substatements.
+10 |                                 print(p)          # a substatement that exceed the limit.
+11 |                                 pass              # It is reported but not any of its substatements.
    |
 
 too_many_nested_blocks_2.py:24:1: PLR1702 Too many nested blocks (7 > 5)
    |
-22 |                         if k:             # /
+22 |                         if k:                     # /
 23 |
-24 |                             if l:         # Unless they themselves have a branch
+24 |                             if l:                 # Unless they themselves have a branch
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-25 |                                 print()   # that exceeds the limit.
+25 |                                 print()           # that exceeds the limit.
    |
 
 too_many_nested_blocks_2.py:36:1: PLR1702 Too many nested blocks (7 > 5)
    |
-34 |                         if f:             # /
+34 |                         if f:                     # /
 35 |
-36 |                             if x == y:    # This statement is the first to exceed the limit.
+36 |                             if x == y:            # This statement is the first to exceed the limit.
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-37 |                                 print(p)  # It is therefore reported.
+37 |                                 print(p)          # It is therefore reported.
    |
 
 too_many_nested_blocks_2.py:58:1: PLR1702 Too many nested blocks (8 > 5)
    |
-56 |                                 print()           #
+56 |                                 print()           # in the tree in question and is thus not reported.
 57 |
-58 |                                 if i:             # But this branch is.
+58 |                                 if i:             # This branch does.
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-59 |                                     print()       #
+59 |                                     print()       # 
    |
