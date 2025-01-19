@@ -35,5 +35,5 @@ too_many_nested_blocks_2.py:58:1: PLR1702 Too many nested blocks (8 > 5)
 57 |
 58 |                                 if i:             # This branch does.
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1702
-59 |                                     print()       # 
+59 |                                     print()       #
    |
