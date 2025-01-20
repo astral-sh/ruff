@@ -27,6 +27,10 @@ use super::{fmt_type_vars, TypeVar, TypeVarReferenceVisitor};
 /// `contravariant` keywords used by `TypeParam` variables. As such, rewriting a `TypeParam`
 /// variable to an in-line type parameter may change its variance.
 ///
+/// The rule currently excludes cases where it conceptually should be able to give a diagnostic. In
+/// particular, it skips generic classes with multiple base classes, and it skips generic methods in
+/// generic or non-generic classes.
+///
 /// ## Example
 ///
 /// ```python

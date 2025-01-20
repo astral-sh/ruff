@@ -56,3 +56,8 @@ class NotGeneric:
 class MixedGenerics[U]:
     def more_generic(u: U, t: T):
         pass
+
+
+# TODO(brent) we should also handle multiple base classes
+class Multiple(NotGeneric, Generic[T]):
+    pass
