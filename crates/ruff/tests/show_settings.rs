@@ -1,33 +1,58 @@
+use anyhow::Context;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use std::path::Path;
 use std::process::Command;
+use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 
 #[test]
-fn display_default_settings() {
-    // Navigate from the crate directory to the workspace root.
-    let base_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-    let base_path = base_path.to_string_lossy();
+fn display_default_settings() -> anyhow::Result<()> {
+    let tempdir = TempDir::new().context("Failed to create temp directory.")?;
 
-    // Escape the backslashes for the regex.
-    let base_path = regex::escape(&base_path);
+    // Tempdir path's on macos are symlinks, which doesn't play nicely with
+    // our snapshot filtering.
+    let project_dir = tempdir.path();
 
-    #[cfg(not(target_os = "windows"))]
-    let test_filters = &[(base_path.as_ref(), "[BASEPATH]")];
+    std::fs::write(
+        project_dir.join("pyproject.toml"),
+        r#"
+[project]
+name = "ruff"
+version = "0.9.2"
+requires-python = ">=3.7"
 
-    #[cfg(target_os = "windows")]
-    let test_filters = &[
-        (base_path.as_ref(), "[BASEPATH]"),
-        (r#"\\+(\w\w|\s|\.|")"#, "/$1"),
-    ];
+[tool.ruff]
+line-length = 100
 
-    insta::with_settings!({ filters => test_filters.to_vec() }, {
+[tool.ruff.lint]
+ignore = [
+  # Conflicts with the formatter
+  "COM812", "ISC001"
+]
+
+"#,
+    )?;
+
+    std::fs::write(project_dir.join("test.py"), r#"print("Hello")"#)
+        .context("Failed to write test.py.")?;
+
+    insta::with_settings!({filters => vec![(&*tempdir_filter(&tempdir)?, "<temp_dir>/")]}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(["check", "--show-settings", "unformatted.py"]).current_dir(Path::new("./resources/test/fixtures")));
+            .args(["check", "--show-settings", "test.py"])
+            .current_dir(project_dir));
     });
+
+    Ok(())
+}
+
+fn tempdir_filter(tempdir: &TempDir) -> anyhow::Result<String> {
+    let project_dir = tempdir
+        .path()
+        .canonicalize()
+        .context("Failed to canonical tempdir path.")?;
+
+    Ok(format!(
+        r#"{}\\?/?"#,
+        regex::escape(project_dir.to_str().unwrap())
+    ))
 }
