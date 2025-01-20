@@ -30,10 +30,13 @@ use super::{expr_name_to_type_var, TypeParamKind, TypeVar, TypeVarReferenceVisit
 /// such, rewriting a type alias using a PEP-695 `type` statement may change
 /// the variance of the alias's type parameters.
 ///
-/// Unlike `TypeVar` variables, [PEP 695]-style `type` aliases cannot be used
-/// at runtime. For example, calling `isinstance` on a `type` alias will throw
-/// a `TypeError`. As such, rewriting a `TypeVar` via the `type` keyword will
-/// cause issues for parameters that are used for such runtime checks.
+/// Unlike type aliases that use simple assignments, definitions created using
+/// [PEP 695] `type` statements cannot be used as drop-in replacements at
+/// runtime for the value on the right-hand side of the statement. This means
+/// that while for some simple old-style type aliases you can use them as the
+/// second argument to an `isinstance()` call (for example), doing the same
+/// with a [PEP 695] `type` statement will always raise `TypeError` at
+/// runtime.
 ///
 /// ## Example
 /// ```python
