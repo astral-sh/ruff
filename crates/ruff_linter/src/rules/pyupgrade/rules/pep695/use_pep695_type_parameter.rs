@@ -27,8 +27,10 @@ use super::{DisplayTypeVars, TypeVar, TypeVarReferenceVisitor};
 /// `contravariant` keywords used by `TypeVar` variables. As such, rewriting a `TypeVar` variable to
 /// an inline type parameter may change its variance.
 ///
-/// The rule currently skips generic classes with multiple base classes, and skips
-/// generic methods in generic or non-generic classes.
+/// The rule currently skips generic classes with multiple base classes, and skips generic methods
+/// in generic or non-generic classes. It also skips generic functions and classes nested inside of
+/// other functions or classes. Finally, this rule skips type parameters with the `default` argument
+/// introduced in [PEP 696] and implemented in Python 3.13.
 ///
 /// ## Example
 ///
@@ -57,6 +59,7 @@ use super::{DisplayTypeVars, TypeVar, TypeVarReferenceVisitor};
 /// variables.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
+/// [PEP 696]: https://peps.python.org/pep-0696/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695TypeParameter {
     name: String,
