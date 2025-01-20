@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from typing import Generic, ParamSpec, TypeVar, TypeVarTuple
 
+S = TypeVar("S", str, bytes)  # constrained type variable
 T = TypeVar("T", bound=float)
 Ts = TypeVarTuple("Ts")
 P = ParamSpec("P")
@@ -16,6 +17,10 @@ class B(Generic[*Ts]):
 
 
 class C(Generic[P]):
+    pass
+
+
+class Constrained(Generic[S]):
     pass
 
 

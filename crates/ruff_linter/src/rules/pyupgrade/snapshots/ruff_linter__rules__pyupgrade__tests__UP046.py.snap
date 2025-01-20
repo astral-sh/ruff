@@ -2,117 +2,135 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP046.py:10:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
- 9 | class A(Generic[T]):
+10 | class A(Generic[T]):
    |         ^^^^^^^^^^ UP046
-10 |     # Comments in a class body are preserved
-11 |     pass
+11 |     # Comments in a class body are preserved
+12 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-6  6  | P = ParamSpec("P")
-7  7  | 
+7  7  | P = ParamSpec("P")
 8  8  | 
-9     |-class A(Generic[T]):
-   9  |+class A[T: float]:
-10 10 |     # Comments in a class body are preserved
-11 11 |     pass
-12 12 | 
-
-UP046.py:14:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
-   |
-14 | class B(Generic[*Ts]):
-   |         ^^^^^^^^^^^^ UP046
-15 |     pass
-   |
-   = help: Use type parameters
-
-ℹ Safe fix
-11 11 |     pass
-12 12 | 
+9  9  | 
+10    |-class A(Generic[T]):
+   10 |+class A[T: float]:
+11 11 |     # Comments in a class body are preserved
+12 12 |     pass
 13 13 | 
-14    |-class B(Generic[*Ts]):
-   14 |+class B[*Ts]:
-15 15 |     pass
-16 16 | 
-17 17 | 
 
-UP046.py:18:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP046.py:15:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
-18 | class C(Generic[P]):
+15 | class B(Generic[*Ts]):
+   |         ^^^^^^^^^^^^ UP046
+16 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+12 12 |     pass
+13 13 | 
+14 14 | 
+15    |-class B(Generic[*Ts]):
+   15 |+class B[*Ts]:
+16 16 |     pass
+17 17 | 
+18 18 | 
+
+UP046.py:19:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+   |
+19 | class C(Generic[P]):
    |         ^^^^^^^^^^ UP046
-19 |     pass
+20 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-15 15 |     pass
-16 16 | 
+16 16 |     pass
 17 17 | 
-18    |-class C(Generic[P]):
-   18 |+class C[**P]:
-19 19 |     pass
-20 20 | 
+18 18 | 
+19    |-class C(Generic[P]):
+   19 |+class C[**P]:
+20 20 |     pass
 21 21 | 
+22 22 | 
 
-UP046.py:22:5: UP046 [*] Generic function `f` should use type parameters
+UP046.py:23:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
    |
-22 | def f(t: T):
+23 | class Constrained(Generic[S]):
+   |                   ^^^^^^^^^^ UP046
+24 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Safe fix
+20 20 |     pass
+21 21 | 
+22 22 | 
+23    |-class Constrained(Generic[S]):
+   23 |+class Constrained[S: (str, bytes)]:
+24 24 |     pass
+25 25 | 
+26 26 | 
+
+UP046.py:27:5: UP046 [*] Generic function `f` should use type parameters
+   |
+27 | def f(t: T):
    |     ^^^^^^^ UP046
-23 |     pass
+28 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-19 19 |     pass
-20 20 | 
-21 21 | 
-22    |-def f(t: T):
-   22 |+def f[T: float](t: T):
-23 23 |     pass
-24 24 | 
+24 24 |     pass
 25 25 | 
+26 26 | 
+27    |-def f(t: T):
+   27 |+def f[T: float](t: T):
+28 28 |     pass
+29 29 | 
+30 30 | 
 
-UP046.py:26:5: UP046 [*] Generic function `g` should use type parameters
+UP046.py:31:5: UP046 [*] Generic function `g` should use type parameters
    |
-26 | def g(ts: tuple[*Ts]):
+31 | def g(ts: tuple[*Ts]):
    |     ^^^^^^^^^^^^^^^^^ UP046
-27 |     pass
+32 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-23 23 |     pass
-24 24 | 
-25 25 | 
-26    |-def g(ts: tuple[*Ts]):
-   26 |+def g[*Ts](ts: tuple[*Ts]):
-27 27 |     pass
-28 28 | 
+28 28 |     pass
 29 29 | 
+30 30 | 
+31    |-def g(ts: tuple[*Ts]):
+   31 |+def g[*Ts](ts: tuple[*Ts]):
+32 32 |     pass
+33 33 | 
+34 34 | 
 
-UP046.py:30:5: UP046 [*] Generic function `h` should use type parameters
+UP046.py:35:5: UP046 [*] Generic function `h` should use type parameters
    |
-30 |   def h(
+35 |   def h(
    |  _____^
-31 | |     p: Callable[P, T],
-32 | |     # Comment in the middle of a parameter list should be preserved
-33 | |     another_param,
-34 | |     and_another,
-35 | | ):
+36 | |     p: Callable[P, T],
+37 | |     # Comment in the middle of a parameter list should be preserved
+38 | |     another_param,
+39 | |     and_another,
+40 | | ):
    | |_^ UP046
-36 |       pass
+41 |       pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-27 27 |     pass
-28 28 | 
-29 29 | 
-30    |-def h(
-   30 |+def h[**P, T: float](
-31 31 |     p: Callable[P, T],
-32 32 |     # Comment in the middle of a parameter list should be preserved
-33 33 |     another_param,
+32 32 |     pass
+33 33 | 
+34 34 | 
+35    |-def h(
+   35 |+def h[**P, T: float](
+36 36 |     p: Callable[P, T],
+37 37 |     # Comment in the middle of a parameter list should be preserved
+38 38 |     another_param,
