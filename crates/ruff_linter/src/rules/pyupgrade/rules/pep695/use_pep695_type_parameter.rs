@@ -107,7 +107,13 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
 
     // TODO(brent) only accept a single, Generic argument for now. I think it should be fine to have
     // other arguments, but this simplifies the fix just to delete the argument list for now
-    let [Expr::Subscript(ExprSubscript { value, slice, .. })] = arguments.args.as_ref() else {
+    let [Expr::Subscript(ExprSubscript {
+        value,
+        slice,
+        range,
+        ..
+    })] = arguments.args.as_ref()
+    else {
         return;
     };
 
@@ -149,7 +155,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
                 name: name.to_string(),
                 generic_kind: GenericKind::GenericClass,
             },
-            TextRange::new(name.start(), arguments.end()),
+            *range,
         )
         .with_fix(Fix::applicable_edit(
             Edit::replacement(type_params, name.end(), arguments.end()),

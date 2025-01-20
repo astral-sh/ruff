@@ -2,10 +2,10 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP046.py:9:7: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
  9 | class A(Generic[T]):
-   |       ^^^^^^^^^^^^^ UP046
+   |         ^^^^^^^^^^ UP046
 10 |     # Comments in a class body are preserved
 11 |     pass
    |
@@ -21,10 +21,10 @@ UP046.py:9:7: UP046 [*] Generic class `A` uses `Generic` subclass instead of typ
 11 11 |     pass
 12 12 | 
 
-UP046.py:14:7: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP046.py:14:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
 14 | class B(Generic[*Ts]):
-   |       ^^^^^^^^^^^^^^^ UP046
+   |         ^^^^^^^^^^^^ UP046
 15 |     pass
    |
    = help: Use type parameters
@@ -39,10 +39,10 @@ UP046.py:14:7: UP046 [*] Generic class `B` uses `Generic` subclass instead of ty
 16 16 | 
 17 17 | 
 
-UP046.py:18:7: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP046.py:18:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
 18 | class C(Generic[P]):
-   |       ^^^^^^^^^^^^^ UP046
+   |         ^^^^^^^^^^ UP046
 19 |     pass
    |
    = help: Use type parameters
