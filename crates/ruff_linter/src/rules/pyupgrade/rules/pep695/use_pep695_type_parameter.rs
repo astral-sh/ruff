@@ -49,6 +49,13 @@ use super::{DisplayTypeVars, TypeVar, TypeVarReferenceVisitor};
 ///     var: T
 /// ```
 ///
+/// ## See also
+///
+/// This rule replaces standalone type variables in class and function signatures but doesn't remove
+/// the corresponding type variables even if they are unused after the fix. See
+/// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused type
+/// variables.
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695TypeParameter {
