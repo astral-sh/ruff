@@ -180,31 +180,24 @@ fn is_immutable_newtype_call(
         return false;
     };
 
-    let Some(original_type) = newtype_base_type(value, semantic) else {
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return false;
+    };
+
+    if !semantic.match_typing_expr(func, "NewType") {
+        return false;
+    }
+
+    if arguments.len() != 2 {
+        return false;
+    }
+
+    let Some(original_type) = arguments.find_argument_value("tp", 1) else {
         return false;
     };
 
     is_immutable_annotation(original_type, semantic, extend_immutable_calls)
-}
-
-fn newtype_base_type<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Expr> {
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
-        return None;
-    };
-
-    if !semantic.match_typing_expr(func, "NewType") {
-        return None;
-    }
-
-    if !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    match arguments.args.as_ref() {
-        [Expr::StringLiteral(_), original_type] => Some(original_type),
-        _ => None,
-    }
 }

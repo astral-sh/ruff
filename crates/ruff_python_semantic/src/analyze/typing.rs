@@ -987,11 +987,6 @@ pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<TypeVarLikeChecker>(binding, semantic)
 }
 
-/// Test whether the given binding is for a `NewType`.
-pub fn is_newtype(binding: &Binding, semantic: &SemanticModel) -> bool {
-    check_type::<NewTypeChecker>(binding, semantic)
-}
-
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
 fn find_parameter<'a>(

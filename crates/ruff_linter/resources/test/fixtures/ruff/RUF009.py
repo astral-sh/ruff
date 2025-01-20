@@ -78,11 +78,12 @@ from typing import NewType
 ListOfStrings = NewType("ListOfStrs", list[str])
 StringsToInts = NewType("IntsToStrings", dict[str, int])
 
-SpecialString = NewType("SpecialString", str)
-NegativeInteger = NewType("NegInt", int)
+SpecialString = NewType(name="SpecialString", tp=str)
+NegativeInteger = NewType("NegInt", tp=int)
 
 Invalid1 = NewType(*Foo)
-Invalid2 = NewType("Invalid2", Foo, lorem="ipsum")
+Invalid2 = NewType("Invalid2", name=Foo)
+Invalid3 = NewType("Invalid3", name=Foo, lorem="ipsum")
 
 @dataclass
 class DataclassWithNewTypeFields:
@@ -91,6 +92,7 @@ class DataclassWithNewTypeFields:
     b: StringsToInts = StringsToInts()
     c: Invalid1 = Invalid1()
     d: Invalid2 = Invalid2()
+    e: Invalid3 = Invalid3()
 
     # No errors
     e: SpecialString = SpecialString("Lorem ipsum")

@@ -41,41 +41,51 @@ RUF009.py:45:34: RUF009 Do not perform function call `ImmutableType` in dataclas
 47 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
    |
 
-RUF009.py:90:24: RUF009 Do not perform function call `ListOfStrings` in dataclass defaults
+RUF009.py:91:24: RUF009 Do not perform function call `ListOfStrings` in dataclass defaults
    |
-88 | class DataclassWithNewTypeFields:
-89 |     # Errors
-90 |     a: ListOfStrings = ListOfStrings([])
+89 | class DataclassWithNewTypeFields:
+90 |     # Errors
+91 |     a: ListOfStrings = ListOfStrings([])
    |                        ^^^^^^^^^^^^^^^^^ RUF009
-91 |     b: StringsToInts = StringsToInts()
-92 |     c: Invalid1 = Invalid1()
+92 |     b: StringsToInts = StringsToInts()
+93 |     c: Invalid1 = Invalid1()
    |
 
-RUF009.py:91:24: RUF009 Do not perform function call `StringsToInts` in dataclass defaults
+RUF009.py:92:24: RUF009 Do not perform function call `StringsToInts` in dataclass defaults
    |
-89 |     # Errors
-90 |     a: ListOfStrings = ListOfStrings([])
-91 |     b: StringsToInts = StringsToInts()
+90 |     # Errors
+91 |     a: ListOfStrings = ListOfStrings([])
+92 |     b: StringsToInts = StringsToInts()
    |                        ^^^^^^^^^^^^^^^ RUF009
-92 |     c: Invalid1 = Invalid1()
-93 |     d: Invalid2 = Invalid2()
+93 |     c: Invalid1 = Invalid1()
+94 |     d: Invalid2 = Invalid2()
    |
 
-RUF009.py:92:19: RUF009 Do not perform function call `Invalid1` in dataclass defaults
+RUF009.py:93:19: RUF009 Do not perform function call `Invalid1` in dataclass defaults
    |
-90 |     a: ListOfStrings = ListOfStrings([])
-91 |     b: StringsToInts = StringsToInts()
-92 |     c: Invalid1 = Invalid1()
+91 |     a: ListOfStrings = ListOfStrings([])
+92 |     b: StringsToInts = StringsToInts()
+93 |     c: Invalid1 = Invalid1()
    |                   ^^^^^^^^^^ RUF009
-93 |     d: Invalid2 = Invalid2()
+94 |     d: Invalid2 = Invalid2()
+95 |     e: Invalid3 = Invalid3()
    |
 
-RUF009.py:93:19: RUF009 Do not perform function call `Invalid2` in dataclass defaults
+RUF009.py:94:19: RUF009 Do not perform function call `Invalid2` in dataclass defaults
    |
-91 |     b: StringsToInts = StringsToInts()
-92 |     c: Invalid1 = Invalid1()
-93 |     d: Invalid2 = Invalid2()
+92 |     b: StringsToInts = StringsToInts()
+93 |     c: Invalid1 = Invalid1()
+94 |     d: Invalid2 = Invalid2()
    |                   ^^^^^^^^^^ RUF009
-94 |
-95 |     # No errors
+95 |     e: Invalid3 = Invalid3()
+   |
+
+RUF009.py:95:19: RUF009 Do not perform function call `Invalid3` in dataclass defaults
+   |
+93 |     c: Invalid1 = Invalid1()
+94 |     d: Invalid2 = Invalid2()
+95 |     e: Invalid3 = Invalid3()
+   |                   ^^^^^^^^^^ RUF009
+96 |
+97 |     # No errors
    |
