@@ -288,7 +288,7 @@ fn definition_expression_ty<'db>(
 /// Infer the combined type from an iterator of bindings, and return it
 /// together with boundness information in a [`Symbol`].
 ///
-/// Will return a union type if there is more than one binding.
+/// The type will be a union if there are multiple bindings with different types.
 fn symbol_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
