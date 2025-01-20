@@ -2,10 +2,10 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP047.py:10:5: UP046 [*] Generic function `f` should use type parameters
+UP047.py:10:5: UP047 [*] Generic function `f` should use type parameters
    |
 10 | def f(t: T):
-   |     ^^^^^^^ UP046
+   |     ^^^^^^^ UP047
 11 |     pass
    |
    = help: Use type parameters
@@ -20,10 +20,10 @@ UP047.py:10:5: UP046 [*] Generic function `f` should use type parameters
 12 12 | 
 13 13 | 
 
-UP047.py:14:5: UP046 [*] Generic function `g` should use type parameters
+UP047.py:14:5: UP047 [*] Generic function `g` should use type parameters
    |
 14 | def g(ts: tuple[*Ts]):
-   |     ^^^^^^^^^^^^^^^^^ UP046
+   |     ^^^^^^^^^^^^^^^^^ UP047
 15 |     pass
    |
    = help: Use type parameters
@@ -38,7 +38,7 @@ UP047.py:14:5: UP046 [*] Generic function `g` should use type parameters
 16 16 | 
 17 17 | 
 
-UP047.py:18:5: UP046 [*] Generic function `h` should use type parameters
+UP047.py:18:5: UP047 [*] Generic function `h` should use type parameters
    |
 18 |   def h(
    |  _____^
@@ -47,7 +47,7 @@ UP047.py:18:5: UP046 [*] Generic function `h` should use type parameters
 21 | |     another_param,
 22 | |     and_another,
 23 | | ):
-   | |_^ UP046
+   | |_^ UP047
 24 |       pass
    |
    = help: Use type parameters
@@ -62,10 +62,10 @@ UP047.py:18:5: UP046 [*] Generic function `h` should use type parameters
 20 20 |     # Comment in the middle of a parameter list should be preserved
 21 21 |     another_param,
 
-UP047.py:27:5: UP046 [*] Generic function `i` should use type parameters
+UP047.py:27:5: UP047 [*] Generic function `i` should use type parameters
    |
 27 | def i(s: S):
-   |     ^^^^^^^ UP046
+   |     ^^^^^^^ UP047
 28 |     pass
    |
    = help: Use type parameters
