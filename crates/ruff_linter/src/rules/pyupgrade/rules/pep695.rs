@@ -25,7 +25,7 @@ enum TypeVarRestriction<'a> {
     Constraint(Vec<&'a Expr>),
 }
 
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum TypeParamKind {
     TypeVar,
     TypeVarTuple,
