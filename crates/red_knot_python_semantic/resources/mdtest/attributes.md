@@ -439,17 +439,35 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 ## Module attributes
 
 ```py path=mod.py
-global_symbol: int = 1
+global_symbol: str = "a"
 ```
 
 ```py
 import mod
 
-reveal_type(mod.global_symbol)  # revealed: int
-mod.global_symbol = 2
+reveal_type(mod.global_symbol)  # revealed: str
+mod.global_symbol = "b"
 
-# error: [invalid-assignment] "Object of type `Literal["1"]` is not assignable to `int`"
-mod.global_symbol = "1"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
+mod.global_symbol = 1
+
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
+(_, mod.global_symbol) = (..., 1)
+
+# TODO: this should be an error, but we do not understand lists yet.
+[_, mod.global_symbol] = [1, 2]
+
+class IntIterator:
+    def __next__(self) -> int:
+        return 42
+
+class IntIterable:
+    def __iter__(self) -> IntIterator:
+        return IntIterator()
+
+# error: [invalid-assignment] "Object of type `int` is not assignable to `str`"
+for mod.global_symbol in IntIterable():
+    pass
 ```
 
 ## Literal types

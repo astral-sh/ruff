@@ -3321,6 +3321,14 @@ impl<'db> IterationOutcome<'db> {
             }
         }
     }
+
+    fn unwrap_without_diagnostic(self) -> Type<'db> {
+        match self {
+            Self::Iterable { element_ty } => element_ty,
+            Self::NotIterable { .. } => Type::unknown(),
+            Self::PossiblyUnboundDunderIter { element_ty, .. } => element_ty,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
