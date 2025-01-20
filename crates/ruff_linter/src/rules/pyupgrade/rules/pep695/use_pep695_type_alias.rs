@@ -27,8 +27,8 @@ use super::{expr_name_to_type_var, TypeParamKind, TypeVar, TypeVarReferenceVisit
 /// ## Known problems
 /// [PEP 695] uses inferred variance for type parameters, instead of the
 /// `covariant` and `contravariant` keywords used by `TypeVar` variables. As
-/// such, rewriting a `TypeVar` variable to a `type` alias may change its
-/// variance.
+/// such, rewriting a type alias using a PEP-695 `type` statement may change
+/// the variance of the alias's type parameters.
 ///
 /// Unlike `TypeVar` variables, [PEP 695]-style `type` aliases cannot be used
 /// at runtime. For example, calling `isinstance` on a `type` alias will throw
