@@ -862,28 +862,6 @@ impl TypeChecker for TypeVarLikeChecker {
     }
 }
 
-pub struct NewTypeChecker;
-
-impl TypeChecker for NewTypeChecker {
-    fn match_annotation(_annotation: &Expr, _semantic: &SemanticModel) -> bool {
-        false
-    }
-
-    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
-        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
-            return false;
-        };
-        let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-            return false;
-        };
-
-        matches!(
-            qualified_name.segments(),
-            ["typing" | "typing_extensions", "NewType"]
-        )
-    }
-}
-
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
