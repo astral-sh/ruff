@@ -41,6 +41,10 @@ def h(
     pass
 
 
+def i(s: S):
+    pass
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
