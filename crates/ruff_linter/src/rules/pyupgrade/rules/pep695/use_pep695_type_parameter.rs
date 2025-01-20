@@ -118,7 +118,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
 
     // Type variables must be unique; filter while preserving order.
     let nvars = vars.len();
-    let mut type_vars = vars
+    let type_vars = vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
@@ -131,10 +131,6 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     if type_vars.len() < nvars {
         return;
     }
-
-    // generally preserve order, but sort by kind so that the order will be TypeVar...,
-    // TypeVarTuple..., ParamSpec...
-    type_vars.sort_by_key(|tv| tv.kind);
 
     // build the fix as a String to avoid removing comments from the entire function body
     let type_params = fmt_type_vars(&type_vars, checker);
@@ -207,7 +203,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
 
     // Type variables must be unique; filter while preserving order.
     let nvars = type_vars.len();
-    let mut type_vars = type_vars
+    let type_vars = type_vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
@@ -220,10 +216,6 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
     if type_vars.len() < nvars {
         return;
     }
-
-    // generally preserve order, but sort by kind so that the order will be TypeVar...,
-    // TypeVarTuple..., ParamSpec...
-    type_vars.sort_by_key(|tv| tv.kind);
 
     // build the fix as a String to avoid removing comments from the entire function body
     let type_params = fmt_type_vars(&type_vars, checker);

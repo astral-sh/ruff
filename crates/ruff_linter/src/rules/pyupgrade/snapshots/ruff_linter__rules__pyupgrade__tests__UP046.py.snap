@@ -112,7 +112,7 @@ UP046.py:30:5: UP046 [*] Generic function `h` should use type parameters
 28 28 | 
 29 29 | 
 30    |-def h(
-   30 |+def h[T: float, **P](
+   30 |+def h[**P, T: float](
 31 31 |     p: Callable[P, T],
 32 32 |     # Comment in the middle of a parameter list should be preserved
 33 33 |     another_param,
