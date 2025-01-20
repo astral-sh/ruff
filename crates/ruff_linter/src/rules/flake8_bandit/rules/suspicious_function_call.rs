@@ -841,11 +841,25 @@ pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) 
 
     match checker.semantic().current_expression_parent() {
         Some(Expr::Call(parent)) => {
+            // Avoid duplicate diagnostics. For example:
+            //
+            // ```python
+            // # vvvvvvvvvvvvvvvvvvvvvvvvv Already reported as a call expression
+            //   shelve.open(lorem, ipsum)
+            // # ^^^^^^ Should not be reported as a reference
+            // ```
             if parent.func.range().contains_range(func.range()) {
                 return;
             }
         }
         Some(Expr::Attribute(_)) => {
+            // Avoid duplicate diagnostics. For example:
+            //
+            // ```python
+            // # vvvvvvvvvvv Already reported as an attribute expression
+            //   shelve.open
+            // # ^^^^^^ Should not be reported as a reference
+            // ```
             return;
         }
         _ => {}
@@ -1008,9 +1022,9 @@ fn suspicious_function(
             // XMLETree
             ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser" | "check_docinfo"] => Some(SuspiciousXMLETreeUsage.into()),
             // Telnet
-            ["telnetlib", _, ..] => Some(SuspiciousTelnetUsage.into()),
+            ["telnetlib", ..] => Some(SuspiciousTelnetUsage.into()),
             // FTPLib
-            ["ftplib", _, ..] => Some(SuspiciousFTPLibUsage.into()),
+            ["ftplib", ..] => Some(SuspiciousFTPLibUsage.into()),
             _ => None
         }
     }) else {
