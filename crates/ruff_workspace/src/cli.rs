@@ -147,6 +147,7 @@ pub mod clap_completion {
                 let first_paragraph = doc
                     .lines()
                     .take_while(|l| !l.trim_end().is_empty())
+                    .map(|s| s.replace('"', "'"))
                     .join(" ");
 
                 PossibleValue::new(name).help(first_paragraph)
