@@ -132,21 +132,9 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         visitor.vars
     };
 
-    // Type variables must be unique; filter while preserving order.
-    let nvars = vars.len();
-    let type_vars = vars
-        .into_iter()
-        .unique_by(|TypeVar { name, .. }| name.id.as_str())
-        .collect::<Vec<_>>();
-
-    if type_vars.is_empty() {
+    let Some(type_vars) = check_type_vars(vars) else {
         return;
-    }
-
-    // non-unique type variables are runtime errors, so just bail out here
-    if type_vars.len() < nvars {
-        return;
-    }
+    };
 
     // build the fix as a String to avoid removing comments from the entire function body
     let type_params = DisplayTypeVars {
@@ -167,6 +155,27 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             Applicability::Safe,
         )),
     );
+}
+
+/// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
+fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
+    if vars.is_empty() {
+        return None;
+    }
+
+    // Type variables must be unique; filter while preserving order.
+    let nvars = vars.len();
+    let type_vars = vars
+        .into_iter()
+        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .collect::<Vec<_>>();
+
+    // non-unique type variables are runtime errors, so just bail out here
+    if type_vars.len() < nvars {
+        return None;
+    }
+
+    Some(type_vars)
 }
 
 /// UP046
@@ -221,21 +230,9 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
         }
     }
 
-    // Type variables must be unique; filter while preserving order.
-    let nvars = type_vars.len();
-    let type_vars = type_vars
-        .into_iter()
-        .unique_by(|TypeVar { name, .. }| name.id.as_str())
-        .collect::<Vec<_>>();
-
-    if type_vars.is_empty() {
+    let Some(type_vars) = check_type_vars(type_vars) else {
         return;
-    }
-
-    // non-unique type variables are runtime errors, so just bail out here
-    if type_vars.len() < nvars {
-        return;
-    }
+    };
 
     // build the fix as a String to avoid removing comments from the entire function body
     let type_params = DisplayTypeVars {
