@@ -230,6 +230,31 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::Airflow3MovedToProvider) {
                         airflow::rules::moved_to_provider_in_3(checker, expr);
                     }
+                    if checker.any_enabled(&[
+                        Rule::SuspiciousPickleUsage,
+                        Rule::SuspiciousMarshalUsage,
+                        Rule::SuspiciousInsecureHashUsage,
+                        Rule::SuspiciousInsecureCipherUsage,
+                        Rule::SuspiciousInsecureCipherModeUsage,
+                        Rule::SuspiciousMktempUsage,
+                        Rule::SuspiciousEvalUsage,
+                        Rule::SuspiciousMarkSafeUsage,
+                        Rule::SuspiciousURLOpenUsage,
+                        Rule::SuspiciousNonCryptographicRandomUsage,
+                        Rule::SuspiciousTelnetUsage,
+                        Rule::SuspiciousXMLCElementTreeUsage,
+                        Rule::SuspiciousXMLElementTreeUsage,
+                        Rule::SuspiciousXMLExpatReaderUsage,
+                        Rule::SuspiciousXMLExpatBuilderUsage,
+                        Rule::SuspiciousXMLSaxUsage,
+                        Rule::SuspiciousXMLMiniDOMUsage,
+                        Rule::SuspiciousXMLPullDOMUsage,
+                        Rule::SuspiciousXMLETreeUsage,
+                        Rule::SuspiciousFTPLibUsage,
+                        Rule::SuspiciousUnverifiedContextUsage,
+                    ]) {
+                        flake8_bandit::rules::suspicious_function_reference(checker, expr);
+                    }
 
                     // Ex) List[...]
                     if checker.any_enabled(&[
@@ -315,6 +340,34 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
         }
         Expr::Attribute(attribute) => {
+            if attribute.ctx == ExprContext::Load {
+                if checker.any_enabled(&[
+                    Rule::SuspiciousPickleUsage,
+                    Rule::SuspiciousMarshalUsage,
+                    Rule::SuspiciousInsecureHashUsage,
+                    Rule::SuspiciousInsecureCipherUsage,
+                    Rule::SuspiciousInsecureCipherModeUsage,
+                    Rule::SuspiciousMktempUsage,
+                    Rule::SuspiciousEvalUsage,
+                    Rule::SuspiciousMarkSafeUsage,
+                    Rule::SuspiciousURLOpenUsage,
+                    Rule::SuspiciousNonCryptographicRandomUsage,
+                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousXMLCElementTreeUsage,
+                    Rule::SuspiciousXMLElementTreeUsage,
+                    Rule::SuspiciousXMLExpatReaderUsage,
+                    Rule::SuspiciousXMLExpatBuilderUsage,
+                    Rule::SuspiciousXMLSaxUsage,
+                    Rule::SuspiciousXMLMiniDOMUsage,
+                    Rule::SuspiciousXMLPullDOMUsage,
+                    Rule::SuspiciousXMLETreeUsage,
+                    Rule::SuspiciousFTPLibUsage,
+                    Rule::SuspiciousUnverifiedContextUsage,
+                ]) {
+                    flake8_bandit::rules::suspicious_function_reference(checker, expr);
+                }
+            }
+
             // Ex) typing.List[...]
             if checker.any_enabled(&[
                 Rule::FutureRewritableTypeAnnotation,

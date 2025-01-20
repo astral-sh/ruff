@@ -12,6 +12,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -77,6 +78,29 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_bandit").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
+    #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
+    #[test_case(Rule::SuspiciousMarkSafeUsage, Path::new("S308.py"))]
+    #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
+    #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
+    #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

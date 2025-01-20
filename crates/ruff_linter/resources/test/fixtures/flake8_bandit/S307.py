@@ -10,3 +10,8 @@ class Class(object):
 
     def foo(self):
         self.eval()  # OK
+
+
+# https://github.com/astral-sh/ruff/issues/15522
+map(eval, [])
+foo = eval
