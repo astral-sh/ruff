@@ -27,6 +27,8 @@ use crate::registry::AsRule;
 /// payload, This will prevent an attacker from injecting arbitrary objects
 /// into the serialized data.
 ///
+/// In [preview], this rule will also flag references to `pickle` functions.
+///
 /// ## Example
 /// ```python
 /// import pickle
@@ -46,6 +48,8 @@ use crate::registry::AsRule;
 /// ## References
 /// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
 /// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousPickleUsage;
 
@@ -72,6 +76,8 @@ impl Violation for SuspiciousPickleUsage {
 /// payload. This will prevent an attacker from injecting arbitrary objects
 /// into the serialized data.
 ///
+/// In [preview], this rule will also flag references to `marshal` functions.
+///
 /// ## Example
 /// ```python
 /// import marshal
@@ -91,6 +97,8 @@ impl Violation for SuspiciousPickleUsage {
 /// ## References
 /// - [Python documentation: `marshal` — Internal Python object serialization](https://docs.python.org/3/library/marshal.html)
 /// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousMarshalUsage;
 
@@ -113,6 +121,8 @@ impl Violation for SuspiciousMarshalUsage {
 ///
 /// Avoid using weak or broken cryptographic hash functions in security
 /// contexts. Instead, use a known secure hash function such as SHA-256.
+///
+/// In [preview], this rule will also flag references to insecure hash functions.
 ///
 /// ## Example
 /// ```python
@@ -137,6 +147,8 @@ impl Violation for SuspiciousMarshalUsage {
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousInsecureHashUsage;
 
@@ -157,6 +169,8 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// Use strong, modern cryptographic ciphers instead of weak or broken ones.
 ///
+/// In [preview], this rule will also flag references to insecure ciphers.
+///
 /// ## Example
 /// ```python
 /// from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
@@ -175,6 +189,8 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousInsecureCipherUsage;
 
@@ -194,6 +210,8 @@ impl Violation for SuspiciousInsecureCipherUsage {
 /// otherwise compromise the security of the cipher, such as forgeries.
 ///
 /// Use strong, modern cryptographic ciphers instead of weak or broken ones.
+///
+/// In [preview], this rule will also flag references to insecure cipher modes.
 ///
 /// ## Example
 /// ```python
@@ -215,6 +233,8 @@ impl Violation for SuspiciousInsecureCipherUsage {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousInsecureCipherModeUsage;
 
@@ -241,6 +261,8 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 /// instead, either directly or via a context manager such as
 /// `tempfile.TemporaryFile`.
 ///
+/// In [preview], this rule will also flag references to `tempfile.mktemp`.
+///
 /// ## Example
 /// ```python
 /// import tempfile
@@ -260,6 +282,8 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 ///
 /// ## References
 /// - [Python documentation:`mktemp`](https://docs.python.org/3/library/tempfile.html#tempfile.mktemp)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousMktempUsage;
 
@@ -280,6 +304,8 @@ impl Violation for SuspiciousMktempUsage {
 /// `ast.literal_eval()` instead, which will raise an exception if the
 /// expression is not a valid Python literal.
 ///
+/// In [preview], this rule will also flag references to `eval`.
+///
 /// ## Example
 /// ```python
 /// x = eval(input("Enter a number: "))
@@ -296,6 +322,8 @@ impl Violation for SuspiciousMktempUsage {
 /// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
 /// - [Python documentation: `literal_eval`](https://docs.python.org/3/library/ast.html#ast.literal_eval)
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousEvalUsage;
 
@@ -319,6 +347,8 @@ impl Violation for SuspiciousEvalUsage {
 /// templates, bypassing XSS protection. This is dangerous because it may allow
 /// cross-site scripting attacks if the string is not properly escaped.
 ///
+/// In [preview], this rule will also flag references to `django.utils.safestring.mark_safe`.
+///
 /// ## Example
 /// ```python
 /// from django.utils.safestring import mark_safe
@@ -335,6 +365,8 @@ impl Violation for SuspiciousEvalUsage {
 /// - [Django documentation: `mark_safe`](https://docs.djangoproject.com/en/dev/ref/utils/#django.utils.safestring.mark_safe)
 /// - [Django documentation: Cross Site Scripting (XSS) protection](https://docs.djangoproject.com/en/dev/topics/security/#cross-site-scripting-xss-protection)
 /// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousMarkSafeUsage;
 
@@ -357,6 +389,8 @@ impl Violation for SuspiciousMarkSafeUsage {
 /// To mitigate this risk, audit all uses of URL open functions and ensure that
 /// only permitted schemes are used (e.g., allowing `http:` and `https:`, and
 /// disallowing `file:` and `ftp:`).
+///
+/// In [preview], this rule will also flag references to URL open functions.
 ///
 /// ## Example
 /// ```python
@@ -383,6 +417,8 @@ impl Violation for SuspiciousMarkSafeUsage {
 ///
 /// ## References
 /// - [Python documentation: `urlopen`](https://docs.python.org/3/library/urllib.request.html#urllib.request.urlopen)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousURLOpenUsage;
 
@@ -405,6 +441,8 @@ impl Violation for SuspiciousURLOpenUsage {
 /// (such as using the [`secrets` module](https://docs.python.org/3/library/secrets.html))
 /// when generating random numbers for security purposes.
 ///
+/// In [preview], this rule will also flag references to these generators.
+///
 /// ## Example
 /// ```python
 /// import random
@@ -421,6 +459,8 @@ impl Violation for SuspiciousURLOpenUsage {
 ///
 /// ## References
 /// - [Python documentation: `random` — Generate pseudo-random numbers](https://docs.python.org/3/library/random.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousNonCryptographicRandomUsage;
 
@@ -442,6 +482,8 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.etree.cElementTree import parse
@@ -461,6 +503,8 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLCElementTreeUsage;
 
@@ -482,6 +526,8 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.etree.ElementTree import parse
@@ -501,6 +547,8 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLElementTreeUsage;
 
@@ -522,6 +570,8 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.sax.expatreader import create_parser
@@ -541,6 +591,8 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLExpatReaderUsage;
 
@@ -562,6 +614,8 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.dom.expatbuilder import parse
@@ -581,6 +635,8 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 
@@ -602,6 +658,8 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.sax import make_parser
@@ -621,6 +679,8 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLSaxUsage;
 
@@ -642,6 +702,8 @@ impl Violation for SuspiciousXMLSaxUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.dom.minidom import parse
@@ -661,6 +723,8 @@ impl Violation for SuspiciousXMLSaxUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLMiniDOMUsage;
 
@@ -682,6 +746,8 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.dom.pulldom import parse
@@ -701,6 +767,8 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLPullDOMUsage;
 
@@ -719,6 +787,8 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// which cause excessive memory and CPU usage by exploiting recursion. An
 /// attacker could use such methods to access unauthorized resources.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from lxml import etree
@@ -730,6 +800,8 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// - [PyPI: `lxml`](https://pypi.org/project/lxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
@@ -754,6 +826,8 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// the previous behavior that does perform verification. Otherwise, use
 /// `ssl.create_default_context` to create a secure context.
 ///
+/// In [preview], this rule will also flag references to `ssl._create_unverified_context`.
+///
 /// ## Example
 /// ```python
 /// import ssl
@@ -773,6 +847,7 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// - [Python documentation: `ssl` — TLS/SSL wrapper for socket objects](https://docs.python.org/3/library/ssl.html)
 ///
 /// [PEP 476]: https://peps.python.org/pep-0476/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousUnverifiedContextUsage;
 
@@ -792,8 +867,12 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 ///
 /// Instead, consider using a more secure protocol such as SSH.
 ///
+/// In [preview], this rule will also flag references to Telnet-related functions.
+///
 /// ## References
 /// - [Python documentation: `telnetlib` — Telnet client](https://docs.python.org/3/library/telnetlib.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousTelnetUsage;
 
@@ -813,8 +892,12 @@ impl Violation for SuspiciousTelnetUsage {
 ///
 /// Instead, consider using FTPS (which secures FTP using SSL/TLS) or SFTP.
 ///
+/// In [preview], this rule will also flag references to FTP-related functions.
+///
 /// ## References
 /// - [Python documentation: `ftplib` — FTP protocol client](https://docs.python.org/3/library/ftplib.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousFTPLibUsage;
 
