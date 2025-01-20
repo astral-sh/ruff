@@ -69,3 +69,29 @@ class IntConversionDescriptor:
 @dataclass
 class InventoryItem:
     quantity_on_hand: IntConversionDescriptor = IntConversionDescriptor(default=100)
+
+
+# Regression tests for:
+# https://github.com/astral-sh/ruff/issues/6447
+from typing import NewType
+
+ListOfStrings = NewType("ListOfStrs", list[str])
+StringsToInts = NewType("IntsToStrings", dict[str, int])
+
+SpecialString = NewType("SpecialString", str)
+NegativeInteger = NewType("NegInt", int)
+
+Invalid1 = NewType(*Foo)
+Invalid2 = NewType("Invalid2", Foo, lorem="ipsum")
+
+@dataclass
+class DataclassWithNewTypeFields:
+    # Errors
+    a: ListOfStrings = ListOfStrings([])
+    b: StringsToInts = StringsToInts()
+    c: Invalid1 = Invalid1()
+    d: Invalid2 = Invalid2()
+
+    # No errors
+    e: SpecialString = SpecialString("Lorem ipsum")
+    f: NegativeInteger = NegativeInteger(-110)

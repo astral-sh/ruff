@@ -862,6 +862,28 @@ impl TypeChecker for TypeVarLikeChecker {
     }
 }
 
+pub struct NewTypeChecker;
+
+impl TypeChecker for NewTypeChecker {
+    fn match_annotation(_annotation: &Expr, _semantic: &SemanticModel) -> bool {
+        false
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+        let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            ["typing" | "typing_extensions", "NewType"]
+        )
+    }
+}
+
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -963,6 +985,11 @@ pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
 pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<TypeVarLikeChecker>(binding, semantic)
+}
+
+/// Test whether the given binding is for a `NewType`.
+pub fn is_newtype(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<NewTypeChecker>(binding, semantic)
 }
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
