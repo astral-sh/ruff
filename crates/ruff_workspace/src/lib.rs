@@ -1,3 +1,5 @@
+#[cfg(feature = "clap")]
+pub mod cli;
 pub mod configuration;
 pub mod options;
 pub mod pyproject;

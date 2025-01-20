@@ -23,6 +23,7 @@ use ruff_linter::settings::types::{
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
+use ruff_workspace::cli::clap_completion::{OptionString, OptionStringParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
@@ -114,7 +115,11 @@ pub enum Command {
     /// List or describe the available configuration options.
     Config {
         /// Config key to show
-        option: Option<String>,
+        #[arg(
+            value_parser = OptionStringParser,
+            hide_possible_values = false
+        )]
+        option: Option<OptionString>,
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
