@@ -3729,6 +3729,22 @@ pub struct Class<'db> {
     known: Option<KnownClass>,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum InheritanceCycle {
+    /// The class is cyclically defined and is a participant in the cycle.
+    /// i.e., it inherits either directly or indirectly from itself.
+    Participant,
+    /// The class inherits from a class that is a `Participant` in an inheritance cycle,
+    /// but is not itself a participant.
+    Inherited,
+}
+
+impl InheritanceCycle {
+    const fn is_participant(self) -> bool {
+        matches!(self, InheritanceCycle::Participant)
+    }
+}
+
 #[salsa::tracked]
 impl<'db> Class<'db> {
     /// Return `true` if this class represents `known_class`
@@ -3886,7 +3902,7 @@ impl<'db> Class<'db> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-        if base_classes.peek().is_some() && self.is_cyclically_defined(db) {
+        if base_classes.peek().is_some() && self.inheritance_cycle(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
@@ -4122,37 +4138,50 @@ impl<'db> Class<'db> {
         }
     }
 
-    /// Return `true` if this class appears to be a cyclic definition,
-    /// i.e., it inherits either directly or indirectly from itself.
+    /// Return this class' involvement in an inheritance cycle, if any.
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
     #[salsa::tracked]
-    fn is_cyclically_defined(self, db: &'db dyn Db) -> bool {
+    fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
+        /// Return `true` if the class is cyclically defined.
+        ///
+        /// Also, populates `visited_classes` with all base classes of `self`.
         fn is_cyclically_defined_recursive<'db>(
             db: &'db dyn Db,
             class: Class<'db>,
-            classes_to_watch: &mut IndexSet<Class<'db>>,
+            classes_on_stack: &mut IndexSet<Class<'db>>,
+            visited_classes: &mut IndexSet<Class<'db>>,
         ) -> bool {
-            if !classes_to_watch.insert(class) {
-                return true;
-            }
+            let mut result = false;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
-                // Each base must be considered in isolation.
-                // This is due to the fact that if a class uses multiple inheritance,
-                // there could easily be a situation where two bases have the same class in their MROs;
-                // that isn't enough to constitute the class being cyclically defined.
-                let classes_to_watch_len = classes_to_watch.len();
-                if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
+                if !classes_on_stack.insert(explicit_base_class) {
                     return true;
                 }
-                classes_to_watch.truncate(classes_to_watch_len);
+
+                if visited_classes.insert(explicit_base_class) {
+                    // If we find a cycle, keep searching to check if we can reach the starting class.
+                    result |= is_cyclically_defined_recursive(
+                        db,
+                        explicit_base_class,
+                        classes_on_stack,
+                        visited_classes,
+                    );
+                }
+
+                classes_on_stack.pop();
             }
-            false
+            result
         }
 
-        self.fully_static_explicit_bases(db)
-            .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
+        let visited_classes = &mut IndexSet::new();
+        if !is_cyclically_defined_recursive(db, self, &mut IndexSet::new(), visited_classes) {
+            None
+        } else if visited_classes.contains(&self) {
+            Some(InheritanceCycle::Participant)
+        } else {
+            Some(InheritanceCycle::Inherited)
+        }
     }
 }
 
