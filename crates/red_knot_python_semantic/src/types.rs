@@ -4059,7 +4059,7 @@ impl<'db> Class<'db> {
         /// Return `true` if the class is cyclically defined.
         ///
         /// Also, populates `visited_classes` with all base classes of `self`.
-        fn is_cyclically_defined_rec<'db>(
+        fn is_cyclically_defined_recursive<'db>(
             db: &'db dyn Db,
             class: Class<'db>,
             classes_on_stack: &mut IndexSet<Class<'db>>,
@@ -4073,13 +4073,12 @@ impl<'db> Class<'db> {
 
                 if visited_classes.insert(explicit_base_class) {
                     // If we find a cycle, keep searching to check if we can reach the starting class.
-                    result = result
-                        || is_cyclically_defined_rec(
-                            db,
-                            explicit_base_class,
-                            classes_on_stack,
-                            visited_classes,
-                        );
+                    result |= is_cyclically_defined_recursive(
+                        db,
+                        explicit_base_class,
+                        classes_on_stack,
+                        visited_classes,
+                    );
                 }
 
                 classes_on_stack.pop();
@@ -4088,7 +4087,7 @@ impl<'db> Class<'db> {
         }
 
         let visited_classes = &mut IndexSet::new();
-        if !is_cyclically_defined_rec(db, self, &mut IndexSet::new(), visited_classes) {
+        if !is_cyclically_defined_recursive(db, self, &mut IndexSet::new(), visited_classes) {
             None
         } else if visited_classes.contains(&self) {
             Some(InheritanceCycle::Participant)
