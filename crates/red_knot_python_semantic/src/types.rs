@@ -963,33 +963,27 @@ impl<'db> Type<'db> {
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
-            (
-                Type::ClassLiteral(ClassLiteralType { class: self_class }),
-                Type::Instance(InstanceType {
-                    class: target_class,
-                }),
-            ) => self_class.is_instance_of(db, target_class),
+            (Type::ClassLiteral(ClassLiteralType { class }), _) => class
+                .metaclass(db)
+                .to_instance(db)
+                .is_subtype_of(db, target),
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
             // is an instance of `type`, and so all possible subclasses of `str` will also be instances of `type`.
             //
             // Similarly `type[enum.Enum]`  is a subtype of `enum.EnumMeta` because `enum.Enum`
-            // is an instance of `enum.EnumMeta`.
-            (
-                Type::SubclassOf(subclass_of_ty),
-                Type::Instance(InstanceType {
-                    class: target_class,
-                }),
-            ) => subclass_of_ty
+            // is an instance of `enum.EnumMeta`. `type[Any]` and `type[Unknown]` do not participate in subtyping,
+            // however, as they are not fully static types.
+            (Type::SubclassOf(subclass_of_ty), _) => subclass_of_ty
                 .subclass_of()
                 .into_class()
-                .is_some_and(|subclass_class| subclass_class.is_instance_of(db, target_class)),
-
-            // Other than the cases enumerated above, `type[]` and class-literal types just delegate to `Instance("type")`
-            (Type::SubclassOf(_) | Type::ClassLiteral(_), _) => {
-                KnownClass::Type.to_instance(db).is_subtype_of(db, target)
-            }
+                .is_some_and(|class| {
+                    class
+                        .metaclass(db)
+                        .to_instance(db)
+                        .is_subtype_of(db, target)
+                }),
 
             // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::Instance(_SpecialForm)`,
             // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
