@@ -82,3 +82,14 @@ class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
 
 def default_var(v: V):
     pass
+
+
+# nested classes and functions are skipped
+class Outer:
+    class Inner(Generic[T]):
+        pass
+
+
+def outer():
+    def inner(t: T):
+        pass

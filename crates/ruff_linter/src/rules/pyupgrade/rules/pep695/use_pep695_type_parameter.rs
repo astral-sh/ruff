@@ -3,7 +3,7 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{visitor::Visitor, Expr, ExprSubscript};
-use ruff_python_ast::{StmtClassDef, StmtFunctionDef};
+use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -90,10 +90,24 @@ impl Violation for NonPEP695TypeParameter {
     }
 }
 
+/// Check if the current statement is nested within another [`StmtClassDef`] or [`StmtFunctionDef`].
+fn in_nested_context(checker: &Checker) -> bool {
+    checker
+        .semantic()
+        .current_statements()
+        .skip(1) // skip the immediate parent, we only call this within a class or function
+        .any(|stmt| matches!(stmt, Stmt::ClassDef(_) | Stmt::FunctionDef(_)))
+}
+
 /// UP046
 pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtClassDef) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.settings.target_version < PythonVersion::Py312 {
+        return;
+    }
+
+    // don't try to handle generic classes inside other functions or classes
+    if in_nested_context(checker) {
         return;
     }
 
@@ -189,6 +203,11 @@ fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
 pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &StmtFunctionDef) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.settings.target_version < PythonVersion::Py312 {
+        return;
+    }
+
+    // don't try to handle generic functions inside other functions or classes
+    if in_nested_context(checker) {
         return;
     }
 
