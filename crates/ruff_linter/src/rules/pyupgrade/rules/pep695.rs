@@ -2,6 +2,7 @@
 
 use std::fmt::Display;
 
+use itertools::Itertools;
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -13,6 +14,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 pub(crate) use use_pep695_type_alias::*;
 pub(crate) use use_pep695_type_parameter::*;
+
+use crate::checkers::ast::Checker;
 
 mod use_pep695_type_alias;
 mod use_pep695_type_parameter;
@@ -254,4 +257,34 @@ fn expr_name_to_type_var<'a>(
         _ => {}
     }
     None
+}
+
+/// Check if the current statement is nested within another [`StmtClassDef`] or [`StmtFunctionDef`].
+fn in_nested_context(checker: &Checker) -> bool {
+    checker
+        .semantic()
+        .current_statements()
+        .skip(1) // skip the immediate parent, we only call this within a class or function
+        .any(|stmt| matches!(stmt, Stmt::ClassDef(_) | Stmt::FunctionDef(_)))
+}
+
+/// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
+fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
+    if vars.is_empty() {
+        return None;
+    }
+
+    // Type variables must be unique; filter while preserving order.
+    let nvars = vars.len();
+    let type_vars = vars
+        .into_iter()
+        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .collect::<Vec<_>>();
+
+    // non-unique type variables are runtime errors, so just bail out here
+    if type_vars.len() < nvars {
+        return None;
+    }
+
+    Some(type_vars)
 }
