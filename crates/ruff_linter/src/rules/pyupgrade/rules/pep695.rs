@@ -218,6 +218,22 @@ fn expr_name_to_type_var<'a>(
                 .first()
                 .is_some_and(Expr::is_string_literal_expr)
             {
+                // TODO(brent) `default` was added in PEP 696 and Python 3.13 but can't be used in
+                // generic type parameters before that
+                //
+                // ```python
+                // T = TypeVar("T", default=Any, bound=str)
+                // class slice(Generic[T]): ...
+                // ```
+                //
+                // becomes
+                //
+                // ```python
+                // class slice[T: str = Any]: ...
+                // ```
+                if arguments.find_keyword("default").is_some() {
+                    return None;
+                }
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
                 } else if arguments.args.len() > 1 {

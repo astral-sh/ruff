@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Generic, ParamSpec, TypeVar, TypeVarTuple
+from typing import Any, Generic, ParamSpec, TypeVar, TypeVarTuple
 
 S = TypeVar("S", str, bytes)  # constrained type variable
 T = TypeVar("T", bound=float)
@@ -69,4 +69,16 @@ class MixedGenerics[U]:
 
 # TODO(brent) we should also handle multiple base classes
 class Multiple(NotGeneric, Generic[T]):
+    pass
+
+
+# TODO(brent) default requires 3.13
+V = TypeVar("V", default=Any, bound=str)
+
+
+class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
+    pass
+
+
+def default_var(v: V):
     pass
