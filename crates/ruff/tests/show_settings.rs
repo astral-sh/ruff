@@ -1,5 +1,6 @@
 use anyhow::Context;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -11,7 +12,10 @@ fn display_default_settings() -> anyhow::Result<()> {
 
     // Tempdir path's on macos are symlinks, which doesn't play nicely with
     // our snapshot filtering.
-    let project_dir = tempdir.path();
+    let project_dir = tempdir
+        .path()
+        .canonicalize()
+        .context("Failed to canonical tempdir path.")?;
 
     std::fs::write(
         project_dir.join("pyproject.toml"),
@@ -36,7 +40,10 @@ ignore = [
     std::fs::write(project_dir.join("test.py"), r#"print("Hello")"#)
         .context("Failed to write test.py.")?;
 
-    insta::with_settings!({filters => vec![(&*tempdir_filter(&tempdir)?, "<temp_dir>/")]}, {
+    insta::with_settings!({filters => vec![
+        (&*tempdir_filter(&project_dir), "<temp_dir>/"),
+        (r#"\\(\w\w|\s|\.|")"#, "/$1"),
+    ]}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(["check", "--show-settings", "test.py"])
             .current_dir(project_dir));
@@ -45,14 +52,6 @@ ignore = [
     Ok(())
 }
 
-fn tempdir_filter(tempdir: &TempDir) -> anyhow::Result<String> {
-    let project_dir = tempdir
-        .path()
-        .canonicalize()
-        .context("Failed to canonical tempdir path.")?;
-
-    Ok(format!(
-        r#"{}\\?/?"#,
-        regex::escape(project_dir.to_str().unwrap())
-    ))
+fn tempdir_filter(project_dir: &Path) -> String {
+    format!(r#"{}\\?/?"#, regex::escape(project_dir.to_str().unwrap()))
 }
