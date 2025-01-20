@@ -1,64 +1,62 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
-RUF047_while.py:4:1: RUF047 [*] Empty `else` clause
+RUF047_while.py:6:1: RUF047 [*] Empty `else` clause
   |
-2 |       loop_body_is_not_checked()
-3 |       break
-4 | / else:
-5 | |     pass
+4 |       loop_body_is_not_checked()
+5 |       break
+6 | / else:
+7 | |     pass
   | |________^ RUF047
   |
   = help: Remove `else` clause
 
 ℹ Safe fix
-1 1 | while True:
-2 2 |     loop_body_is_not_checked()
-3 3 |     break
-4   |-else:
-5   |-    pass
-6 4 | 
-7 5 | 
-8 6 | while this_comment:
+3 3 | while True:
+4 4 |     loop_body_is_not_checked()
+5 5 |     break
+6   |-else:
+7   |-    pass
+8 6 | 
+9 7 | 
+10 8 | while this_comment:
 
-RUF047_while.py:10:1: RUF047 [*] Empty `else` clause
+RUF047_while.py:12:1: RUF047 [*] Empty `else` clause
    |
- 8 |   while this_comment:
- 9 |       belongs_to()  # `for`
-10 | / else:
-11 | |     ...
+10 |   while this_comment:
+11 |       belongs_to()  # `for`
+12 | / else:
+13 | |     ...
    | |_______^ RUF047
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
-7  7  | 
-8  8  | while this_comment:
-9  9  |     belongs_to()  # `for`
-10    |-else:
-11    |-    ...
-12 10 | 
-13 11 | 
-14 12 | while this_second_comment:
+9  9  | 
+10 10 | while this_comment:
+11 11 |     belongs_to()  # `for`
+12    |-else:
+13    |-    ...
+14 12 | 
+15 13 | 
+16 14 | while of_course():
 
-RUF047_while.py:35:1: RUF047 [*] Empty `else` clause
+RUF047_while.py:46:1: RUF047 [*] Empty `else` clause
    |
-33 |   while of_course():
-34 |       this()
-35 | / else:
-36 | |     ...
+44 |   while of_course():
+45 |       this()
+46 | / else:
+47 | |     ...
    | |_______^ RUF047
-37 |       # this comment belongs to the else
+48 |       # this comment belongs to the else
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
-32 32 | 
-33 33 | while of_course():
-34 34 |     this()
-35    |-else:
-36    |-    ...
-37 35 |     # this comment belongs to the else
-38 36 | 
-39 37 | while of_course():
+43 43 | 
+44 44 | while of_course():
+45 45 |     this()
+46    |-else:
+47    |-    ...
+48 46 |     # this comment belongs to the else
+49 47 |

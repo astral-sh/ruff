@@ -1,3 +1,5 @@
+### Errors
+
 try:
     raise try_body_is_not_checked()
 except:
@@ -15,6 +17,28 @@ except:
 else:
     ...
 
+
+try:
+    of_course()
+except:
+    this()
+else:
+    ...
+# This comment belongs to finally
+finally:
+    pass
+
+
+try:
+    of_course()
+except:
+    this()
+else:
+    ...
+# This comment belongs to the statement coming after the else
+
+
+### No errors
 
 try:
     this()
@@ -50,22 +74,3 @@ else:
     # This comment belongs to else
 finally:
     pass
-
-try:
-    of_course()
-except:
-    this()
-else:
-    ...
-# This comment belongs to finally
-finally:
-    pass
-
-
-try:
-    of_course()
-except:
-    this()
-else:
-    ...
-# This comment belongs to the statement coming after the else

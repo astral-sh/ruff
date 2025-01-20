@@ -134,7 +134,7 @@ RUF047_if.py:49:5: RUF047 [*] Empty `else` clause
 50    |-        ...
 51 49 | 
 52 50 | 
-53 51 | # No errors
+53 51 | ### No errors
 
 RUF047_if.py:77:1: RUF047 [*] Empty `else` clause
    |

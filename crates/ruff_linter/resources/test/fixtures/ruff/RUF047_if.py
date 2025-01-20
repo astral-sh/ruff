@@ -1,4 +1,4 @@
-# Errors
+### Errors
 
 if False:
     condition_is_not_evaluated()
@@ -50,7 +50,7 @@ def nested():
         ...
 
 
-# No errors
+### No errors
 
 if this_second_comment():
     belongs()  # to

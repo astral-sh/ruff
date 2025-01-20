@@ -1,3 +1,5 @@
+### Errors
+
 for _ in range(0):
     loop_body_is_not_checked()
     break
@@ -10,6 +12,15 @@ for this in comment:
 else:
     ...
 
+
+for of in course():
+    this()
+else:
+    ...
+# this comment does not belong to the else
+
+
+### No errors
 
 for this in second_comment:
     belongs()  # to
@@ -36,9 +47,3 @@ for of in course():
 else:
     ...
     # too
-
-for of in course():
-    this()
-else:
-    ...
-# this comment does not belong to the else

@@ -1,65 +1,64 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
-RUF047_try.py:5:1: RUF047 [*] Empty `else` clause
+RUF047_try.py:7:1: RUF047 [*] Empty `else` clause
   |
-3 |   except:
-4 |       pass
-5 | / else:
-6 | |     pass
+5 |   except:
+6 |       pass
+7 | / else:
+8 | |     pass
   | |________^ RUF047
   |
   = help: Remove `else` clause
 
 ℹ Safe fix
-2 2 |     raise try_body_is_not_checked()
-3 3 | except:
-4 4 |     pass
-5   |-else:
-6   |-    pass
-7 5 | 
-8 6 | 
-9 7 | try:
+4 4 |     raise try_body_is_not_checked()
+5 5 | except:
+6 6 |     pass
+7   |-else:
+8   |-    pass
+9 7 | 
+10 8 | 
+11 9 | try:
 
-RUF047_try.py:15:1: RUF047 [*] Empty `else` clause
+RUF047_try.py:17:1: RUF047 [*] Empty `else` clause
    |
-13 |   except:
-14 |       to()  # `except`
-15 | / else:
-16 | |     ...
+15 |   except:
+16 |       to()  # `except`
+17 | / else:
+18 | |     ...
    | |_______^ RUF047
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
-12 12 |     belongs()
-13 13 | except:
-14 14 |     to()  # `except`
-15    |-else:
-16    |-    ...
-17 15 | 
-18 16 | 
-19 17 | try:
+14 14 |     belongs()
+15 15 | except:
+16 16 |     to()  # `except`
+17    |-else:
+18    |-    ...
+19 17 | 
+20 18 | 
+21 19 | try:
 
-RUF047_try.py:48:1: RUF047 [*] Empty `else` clause
+RUF047_try.py:72:1: RUF047 [*] Empty `else` clause
    |
-46 |   except:
-47 |       this()
-48 | / else:
-49 | |     ...
+70 |   except:
+71 |       this()
+72 | / else:
+73 | |     ...
    | |_______^ RUF047
-50 |       # This comment belongs to else
-51 |   finally:
+74 |       # This comment belongs to else
+75 |   finally:
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
-45 45 |     of_course()
-46 46 | except:
-47 47 |     this()
-48    |-else:
-49    |-    ...
-50 48 |     # This comment belongs to else
-51 49 | finally:
-52 50 |     pass
+69 69 |     of_course()
+70 70 | except:
+71 71 |     this()
+72    |-else:
+73    |-    ...
+74 72 |     # This comment belongs to else
+75 73 | finally:
+76 74 |     pass
