@@ -1,9 +1,9 @@
 ---
-source: crates/red_knot_workspace/src/project/metadata.rs
+source: crates/red_knot_project/src/metadata.rs
 expression: root
 ---
 ProjectMetadata(
-  name: Name("super-app"),
+  name: Name("project-root"),
   root: "/app",
   options: Options(
     environment: None,

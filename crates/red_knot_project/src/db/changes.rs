@@ -1,7 +1,7 @@
 use crate::db::{Db, ProjectDatabase};
-use crate::project::options::Options;
-use crate::project::{Project, ProjectMetadata};
+use crate::metadata::options::Options;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
+use crate::{Project, ProjectMetadata};
 
 use red_knot_python_semantic::Program;
 use ruff_db::files::{system_path_to_file, File, Files};

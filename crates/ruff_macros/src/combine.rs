@@ -19,14 +19,14 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                         .expect("Expected to handle named fields");
 
                     quote_spanned!(
-                        ident.span() => crate::project::combine::Combine::combine_with(&mut self.#ident, other.#ident)
+                        ident.span() => crate::combine::Combine::combine_with(&mut self.#ident, other.#ident)
                     )
                 })
                 .collect();
 
             Ok(quote! {
                 #[automatically_derived]
-                impl crate::project::combine::Combine for #ident {
+                impl crate::combine::Combine for #ident {
                     fn combine_with(&mut self, other: Self) {
                         #(
                             #output

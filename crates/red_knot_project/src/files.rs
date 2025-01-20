@@ -8,7 +8,7 @@ use salsa::Setter;
 use ruff_db::files::File;
 
 use crate::db::Db;
-use crate::project::Project;
+use crate::Project;
 
 /// Cheap cloneable hash set of files.
 type FileSet = Arc<FxHashSet<File>>;
@@ -234,8 +234,8 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::db::Db;
-    use crate::project::files::Index;
-    use crate::project::ProjectMetadata;
+    use crate::files::Index;
+    use crate::ProjectMetadata;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_ast::name::Name;

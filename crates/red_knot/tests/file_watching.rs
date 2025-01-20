@@ -4,11 +4,10 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
-use red_knot_project::db::{Db, ProjectDatabase};
-use red_knot_project::project::options::{EnvironmentOptions, Options};
-use red_knot_project::project::pyproject::{PyProject, Tool};
-use red_knot_project::project::ProjectMetadata;
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::pyproject::{PyProject, Tool};
 use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
+use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::{
     resolve_module, ModuleName, PythonPlatform, PythonVersion, SitePackages,
 };
