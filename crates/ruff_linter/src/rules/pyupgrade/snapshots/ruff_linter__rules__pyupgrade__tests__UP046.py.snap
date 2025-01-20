@@ -2,153 +2,75 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP046.py:10:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
-10 | class A(Generic[T]):
+ 9 | class A(Generic[T]):
    |         ^^^^^^^^^^ UP046
-11 |     # Comments in a class body are preserved
-12 |     pass
+10 |     # Comments in a class body are preserved
+11 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-7  7  | P = ParamSpec("P")
+6  6  | P = ParamSpec("P")
+7  7  | 
 8  8  | 
-9  9  | 
-10    |-class A(Generic[T]):
-   10 |+class A[T: float]:
-11 11 |     # Comments in a class body are preserved
-12 12 |     pass
-13 13 | 
+9     |-class A(Generic[T]):
+   9  |+class A[T: float]:
+10 10 |     # Comments in a class body are preserved
+11 11 |     pass
+12 12 | 
 
-UP046.py:15:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP046.py:14:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
-15 | class B(Generic[*Ts]):
+14 | class B(Generic[*Ts]):
    |         ^^^^^^^^^^^^ UP046
-16 |     pass
+15 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-12 12 |     pass
+11 11 |     pass
+12 12 | 
 13 13 | 
-14 14 | 
-15    |-class B(Generic[*Ts]):
-   15 |+class B[*Ts]:
-16 16 |     pass
+14    |-class B(Generic[*Ts]):
+   14 |+class B[*Ts]:
+15 15 |     pass
+16 16 | 
 17 17 | 
-18 18 | 
 
-UP046.py:19:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP046.py:18:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
-19 | class C(Generic[P]):
+18 | class C(Generic[P]):
    |         ^^^^^^^^^^ UP046
-20 |     pass
+19 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-16 16 |     pass
+15 15 |     pass
+16 16 | 
 17 17 | 
-18 18 | 
-19    |-class C(Generic[P]):
-   19 |+class C[**P]:
-20 20 |     pass
+18    |-class C(Generic[P]):
+   18 |+class C[**P]:
+19 19 |     pass
+20 20 | 
 21 21 | 
-22 22 | 
 
-UP046.py:23:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
+UP046.py:22:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
    |
-23 | class Constrained(Generic[S]):
+22 | class Constrained(Generic[S]):
    |                   ^^^^^^^^^^ UP046
-24 |     pass
+23 |     pass
    |
    = help: Use type parameters
 
 ℹ Safe fix
-20 20 |     pass
+19 19 |     pass
+20 20 | 
 21 21 | 
-22 22 | 
-23    |-class Constrained(Generic[S]):
-   23 |+class Constrained[S: (str, bytes)]:
-24 24 |     pass
-25 25 | 
-26 26 | 
-
-UP046.py:27:5: UP046 [*] Generic function `f` should use type parameters
-   |
-27 | def f(t: T):
-   |     ^^^^^^^ UP046
-28 |     pass
-   |
-   = help: Use type parameters
-
-ℹ Safe fix
-24 24 |     pass
-25 25 | 
-26 26 | 
-27    |-def f(t: T):
-   27 |+def f[T: float](t: T):
-28 28 |     pass
-29 29 | 
-30 30 | 
-
-UP046.py:31:5: UP046 [*] Generic function `g` should use type parameters
-   |
-31 | def g(ts: tuple[*Ts]):
-   |     ^^^^^^^^^^^^^^^^^ UP046
-32 |     pass
-   |
-   = help: Use type parameters
-
-ℹ Safe fix
-28 28 |     pass
-29 29 | 
-30 30 | 
-31    |-def g(ts: tuple[*Ts]):
-   31 |+def g[*Ts](ts: tuple[*Ts]):
-32 32 |     pass
-33 33 | 
-34 34 | 
-
-UP046.py:35:5: UP046 [*] Generic function `h` should use type parameters
-   |
-35 |   def h(
-   |  _____^
-36 | |     p: Callable[P, T],
-37 | |     # Comment in the middle of a parameter list should be preserved
-38 | |     another_param,
-39 | |     and_another,
-40 | | ):
-   | |_^ UP046
-41 |       pass
-   |
-   = help: Use type parameters
-
-ℹ Safe fix
-32 32 |     pass
-33 33 | 
-34 34 | 
-35    |-def h(
-   35 |+def h[**P, T: float](
-36 36 |     p: Callable[P, T],
-37 37 |     # Comment in the middle of a parameter list should be preserved
-38 38 |     another_param,
-
-UP046.py:44:5: UP046 [*] Generic function `i` should use type parameters
-   |
-44 | def i(s: S):
-   |     ^^^^^^^ UP046
-45 |     pass
-   |
-   = help: Use type parameters
-
-ℹ Safe fix
-41 41 |     pass
-42 42 | 
-43 43 | 
-44    |-def i(s: S):
-   44 |+def i[S: (str, bytes)](s: S):
-45 45 |     pass
-46 46 | 
-47 47 |
+22    |-class Constrained(Generic[S]):
+   22 |+class Constrained[S: (str, bytes)]:
+23 23 |     pass
+24 24 | 
+25 25 |

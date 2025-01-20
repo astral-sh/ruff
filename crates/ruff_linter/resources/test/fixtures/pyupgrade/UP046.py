@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import Any, Generic, ParamSpec, TypeVar, TypeVarTuple
 
 S = TypeVar("S", str, bytes)  # constrained type variable
@@ -21,27 +20,6 @@ class C(Generic[P]):
 
 
 class Constrained(Generic[S]):
-    pass
-
-
-def f(t: T):
-    pass
-
-
-def g(ts: tuple[*Ts]):
-    pass
-
-
-def h(
-    p: Callable[P, T],
-    # Comment in the middle of a parameter list should be preserved
-    another_param,
-    and_another,
-):
-    pass
-
-
-def i(s: S):
     pass
 
 
@@ -80,16 +58,7 @@ class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
     pass
 
 
-def default_var(v: V):
-    pass
-
-
 # nested classes and functions are skipped
 class Outer:
     class Inner(Generic[T]):
-        pass
-
-
-def outer():
-    def inner(t: T):
         pass
