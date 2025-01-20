@@ -62,13 +62,13 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
-    typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType,
-    FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
-    KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
-    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
-    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
+    todo_type, typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType,
+    DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
+    IterationOutcome, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate,
+    MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -859,7 +859,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
-        let declared_ty = declarations_ty(self.db(), declarations)
+        let declared_ty = symbol_from_declarations(self.db(), declarations)
             .map(|SymbolAndQualifiers(s, _)| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
@@ -894,7 +894,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = bindings_ty(self.db(), prior_bindings)
+        let inferred_ty = symbol_from_bindings(self.db(), prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_ty()) {
@@ -3310,9 +3310,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(file_scope_id);
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
-        let bindings_ty = if self.is_deferred() {
+        let inferred = if self.is_deferred() {
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
-                bindings_ty(self.db(), use_def.public_bindings(symbol))
+                symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -3322,10 +3322,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         } else {
             let use_id = name.scoped_use_id(self.db(), self.scope());
-            bindings_ty(self.db(), use_def.bindings_at_use(use_id))
+            symbol_from_bindings(self.db(), use_def.bindings_at_use(use_id))
         };
 
-        if let Symbol::Type(ty, Boundness::Bound) = bindings_ty {
+        if let Symbol::Type(ty, Boundness::Bound) = inferred {
             ty
         } else {
             match self.lookup_name(name) {
@@ -3334,12 +3334,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         report_possibly_unresolved_reference(&self.context, name);
                     }
 
-                    bindings_ty
+                    inferred
                         .ignore_possibly_unbound()
                         .map(|ty| UnionType::from_elements(self.db(), [ty, looked_up_ty]))
                         .unwrap_or(looked_up_ty)
                 }
-                Symbol::Unbound => match bindings_ty {
+                Symbol::Unbound => match inferred {
                     Symbol::Type(ty, Boundness::PossiblyUnbound) => {
                         report_possibly_unresolved_reference(&self.context, name);
                         ty
