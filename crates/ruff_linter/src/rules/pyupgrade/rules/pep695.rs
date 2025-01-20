@@ -26,9 +26,9 @@ enum TypeVarRestriction<'a> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-enum TypeVarKind {
-    Var,
-    Tuple,
+enum TypeParamKind {
+    TypeVar,
+    TypeVarTuple,
     ParamSpec,
 }
 
@@ -36,7 +36,7 @@ enum TypeVarKind {
 struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
-    kind: TypeVarKind,
+    kind: TypeParamKind,
 }
 
 /// Format a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T, *Ts, **P]`).
@@ -60,9 +60,9 @@ impl TypeVar<'_> {
     /// the `TypeVarRestriction` values for generic bounds and constraints.
     fn fmt_into(&self, s: &mut String, source: &str) {
         match self.kind {
-            TypeVarKind::Var => {}
-            TypeVarKind::Tuple => s.push('*'),
-            TypeVarKind::ParamSpec => s.push_str("**"),
+            TypeParamKind::TypeVar => {}
+            TypeParamKind::TypeVarTuple => s.push('*'),
+            TypeParamKind::ParamSpec => s.push_str("**"),
         }
         s.push_str(&self.name.id);
         if let Some(restriction) = &self.restriction {
@@ -96,7 +96,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
         }: &'a TypeVar<'a>,
     ) -> Self {
         match kind {
-            TypeVarKind::Var => {
+            TypeParamKind::TypeVar => {
                 TypeParam::TypeVar(TypeParamTypeVar {
                     range: TextRange::default(),
                     name: Identifier::new(name.id.clone(), TextRange::default()),
@@ -117,12 +117,12 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
                     default: None,
                 })
             }
-            TypeVarKind::Tuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),
                 name: Identifier::new(name.id.clone(), TextRange::default()),
                 default: None,
             }),
-            TypeVarKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
+            TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
                 range: TextRange::default(),
                 name: Identifier::new(name.id.clone(), TextRange::default()),
                 default: None,
@@ -173,7 +173,7 @@ fn expr_name_to_type_var<'a>(
                 return Some(TypeVar {
                     name,
                     restriction: None,
-                    kind: TypeVarKind::Var,
+                    kind: TypeParamKind::TypeVar,
                 });
             }
         }
@@ -181,11 +181,11 @@ fn expr_name_to_type_var<'a>(
             func, arguments, ..
         }) => {
             let kind = if semantic.match_typing_expr(func, "TypeVar") {
-                TypeVarKind::Var
+                TypeParamKind::TypeVar
             } else if semantic.match_typing_expr(func, "TypeVarTuple") {
-                TypeVarKind::Tuple
+                TypeParamKind::TypeVarTuple
             } else if semantic.match_typing_expr(func, "ParamSpec") {
-                TypeVarKind::ParamSpec
+                TypeParamKind::ParamSpec
             } else {
                 return None;
             };

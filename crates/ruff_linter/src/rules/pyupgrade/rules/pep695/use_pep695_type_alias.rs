@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
-use super::{expr_name_to_type_var, TypeVar, TypeVarKind, TypeVarReferenceVisitor};
+use super::{expr_name_to_type_var, TypeParamKind, TypeVar, TypeVarReferenceVisitor};
 
 /// ## What it does
 /// Checks for use of `TypeAlias` annotations and `TypeAliasType` assignments
@@ -132,7 +132,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
                 expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
                     name,
                     restriction: None,
-                    kind: TypeVarKind::Var,
+                    kind: TypeParamKind::TypeVar,
                 })
             })
         })
