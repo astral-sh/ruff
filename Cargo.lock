@@ -2327,9 +2327,9 @@ dependencies = [
  "insta",
  "insta-cmd",
  "rayon",
+ "red_knot_project",
  "red_knot_python_semantic",
  "red_knot_server",
- "red_knot_workspace",
  "regex",
  "ruff_db",
  "salsa",
@@ -2339,6 +2339,32 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "tracing-tree",
+]
+
+[[package]]
+name = "red_knot_project"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "crossbeam",
+ "glob",
+ "insta",
+ "notify",
+ "pep440_rs",
+ "rayon",
+ "red_knot_python_semantic",
+ "red_knot_vendored",
+ "ruff_cache",
+ "ruff_db",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_text_size",
+ "rustc-hash 2.1.0",
+ "salsa",
+ "serde",
+ "thiserror 2.0.11",
+ "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -2393,7 +2419,7 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
- "red_knot_workspace",
+ "red_knot_project",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
@@ -2448,38 +2474,12 @@ dependencies = [
  "console_log",
  "js-sys",
  "log",
+ "red_knot_project",
  "red_knot_python_semantic",
- "red_knot_workspace",
  "ruff_db",
  "ruff_notebook",
  "wasm-bindgen",
  "wasm-bindgen-test",
-]
-
-[[package]]
-name = "red_knot_workspace"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "crossbeam",
- "glob",
- "insta",
- "notify",
- "pep440_rs",
- "rayon",
- "red_knot_python_semantic",
- "red_knot_vendored",
- "ruff_cache",
- "ruff_db",
- "ruff_macros",
- "ruff_python_ast",
- "ruff_text_size",
- "rustc-hash 2.1.0",
- "salsa",
- "serde",
- "thiserror 2.0.11",
- "toml",
- "tracing",
 ]
 
 [[package]]
@@ -2661,8 +2661,8 @@ dependencies = [
  "criterion",
  "mimalloc",
  "rayon",
+ "red_knot_project",
  "red_knot_python_semantic",
- "red_knot_workspace",
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
+use red_knot_project::db::ProjectDatabase;
+use red_knot_project::project::ProjectMetadata;
 use red_knot_python_semantic::{HasTy, SemanticModel};
-use red_knot_workspace::db::ProjectDatabase;
-use red_knot_workspace::project::ProjectMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};

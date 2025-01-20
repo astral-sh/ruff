@@ -4,14 +4,14 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
+use red_knot_project::db::{Db, ProjectDatabase};
+use red_knot_project::project::options::{EnvironmentOptions, Options};
+use red_knot_project::project::pyproject::{PyProject, Tool};
+use red_knot_project::project::ProjectMetadata;
+use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use red_knot_python_semantic::{
     resolve_module, ModuleName, PythonPlatform, PythonVersion, SitePackages,
 };
-use red_knot_workspace::db::{Db, ProjectDatabase};
-use red_knot_workspace::project::options::{EnvironmentOptions, Options};
-use red_knot_workspace::project::pyproject::{PyProject, Tool};
-use red_knot_workspace::project::ProjectMetadata;
-use red_knot_workspace::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};

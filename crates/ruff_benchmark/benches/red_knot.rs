@@ -1,11 +1,11 @@
 #![allow(clippy::disallowed_names)]
 
 use rayon::ThreadPoolBuilder;
+use red_knot_project::db::{Db, ProjectDatabase};
+use red_knot_project::project::options::{EnvironmentOptions, Options};
+use red_knot_project::project::ProjectMetadata;
+use red_knot_project::watch::{ChangeEvent, ChangedKind};
 use red_knot_python_semantic::PythonVersion;
-use red_knot_workspace::db::{Db, ProjectDatabase};
-use red_knot_workspace::project::options::{EnvironmentOptions, Options};
-use red_knot_workspace::project::ProjectMetadata;
-use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::Diagnostic;

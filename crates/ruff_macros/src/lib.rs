@@ -36,8 +36,8 @@ pub fn derive_combine_options(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Automatically derives a `red_knot_workspace::project::Combine` implementation for the attributed type
-/// that calls `red_knot_workspace::project::Combine::combine` for each field.
+/// Automatically derives a `red_knot_project::project::Combine` implementation for the attributed type
+/// that calls `red_knot_project::project::Combine::combine` for each field.
 ///
 /// The derive macro can only be used on structs with named fields.
 #[proc_macro_derive(Combine)]
