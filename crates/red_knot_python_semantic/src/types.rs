@@ -4116,9 +4116,9 @@ impl<'db> Class<'db> {
                 }
                 Ok(SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
                     let bindings = use_def.public_bindings(symbol);
-                    let inferred_ty = symbol_from_bindings(db, bindings);
+                    let inferred = symbol_from_bindings(db, bindings);
 
-                    match inferred_ty {
+                    match inferred {
                         Symbol::Type(ty, _) => SymbolAndQualifiers(
                             Symbol::Type(
                                 UnionType::from_elements(db, [Type::unknown(), ty]),

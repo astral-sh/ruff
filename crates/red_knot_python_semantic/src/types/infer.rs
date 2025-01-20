@@ -3310,7 +3310,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(file_scope_id);
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
-        let bindings_symbol = if self.is_deferred() {
+        let inferred = if self.is_deferred() {
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
                 symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
             } else {
@@ -3325,7 +3325,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             symbol_from_bindings(self.db(), use_def.bindings_at_use(use_id))
         };
 
-        if let Symbol::Type(ty, Boundness::Bound) = bindings_symbol {
+        if let Symbol::Type(ty, Boundness::Bound) = inferred {
             ty
         } else {
             match self.lookup_name(name) {
@@ -3334,12 +3334,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         report_possibly_unresolved_reference(&self.context, name);
                     }
 
-                    bindings_symbol
+                    inferred
                         .ignore_possibly_unbound()
                         .map(|ty| UnionType::from_elements(self.db(), [ty, looked_up_ty]))
                         .unwrap_or(looked_up_ty)
                 }
-                Symbol::Unbound => match bindings_symbol {
+                Symbol::Unbound => match inferred {
                     Symbol::Type(ty, Boundness::PossiblyUnbound) => {
                         report_possibly_unresolved_reference(&self.context, name);
                         ty
