@@ -123,7 +123,11 @@ impl Visitor<'_> for ReturnInGeneratorVisitor {
                     self.visit_expr(value);
                 }
             },
-            Stmt::Assign(_) | Stmt::AnnAssign(_) | Stmt::AugAssign(_) => {}
+            Stmt::Assign(_) | Stmt::AnnAssign(_) | Stmt::AugAssign(_) => {
+                // For now, don't consider assignments since we might find yield
+                // expressions that are later returned, and currently return values
+                // are not checked against this.
+            }
             Stmt::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
