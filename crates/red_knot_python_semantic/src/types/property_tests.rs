@@ -454,4 +454,12 @@ mod flaky {
                 .permutations(2)
                 .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(db, vec_of_unions[1]))
     );
+
+    // `S | T` is always a supertype of `S`.
+    // Thus, `S` is never disjoint from `S | T`.
+    type_property_test!(
+        constituent_members_of_union_is_not_disjoint_from_that_union, db,
+        forall types s, t.
+            !s.is_disjoint_from(db, union(db, [s, t])) && !t.is_disjoint_from(db, union(db, [s, t]))
+    );
 }
