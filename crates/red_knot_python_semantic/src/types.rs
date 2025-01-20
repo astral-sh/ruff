@@ -95,7 +95,8 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         // on inference from bindings.
 
         let declarations = use_def.public_declarations(symbol);
-        let declared = declarations_ty(db, declarations).map(|SymbolAndQualifiers(ty, _)| ty);
+        let declared =
+            symbol_from_declarations(db, declarations).map(|SymbolAndQualifiers(ty, _)| ty);
 
         match declared {
             // Symbol is declared, trust the declared type
@@ -103,7 +104,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             // Symbol is possibly declared
             Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
                 let bindings = use_def.public_bindings(symbol);
-                let inferred = bindings_ty(db, bindings);
+                let inferred = symbol_from_bindings(db, bindings);
 
                 match inferred {
                     // Symbol is possibly undeclared and definitely unbound
@@ -123,7 +124,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             // Symbol is undeclared, return the inferred type
             Ok(Symbol::Unbound) => {
                 let bindings = use_def.public_bindings(symbol);
-                bindings_ty(db, bindings)
+                symbol_from_bindings(db, bindings)
             }
             // Symbol is possibly undeclared
             Err((declared_ty, _)) => {
@@ -287,7 +288,7 @@ fn definition_expression_ty<'db>(
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.
-fn bindings_ty<'db>(
+fn symbol_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Symbol<'db> {
@@ -391,8 +392,8 @@ impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
     }
 }
 
-/// The result of looking up a declared type from declarations; see [`declarations_ty`].
-type DeclaredTypeResult<'db> =
+/// The result of looking up a declared type from declarations; see [`symbol_from_declarations`].
+type SymbolFromDeclarationsResult<'db> =
     Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -403,10 +404,10 @@ type DeclaredTypeResult<'db> =
 ///
 /// This function also returns declaredness information (see [`Symbol`]) and a set of
 /// [`TypeQualifiers`] that have been specified on the declaration(s).
-fn declarations_ty<'db>(
+fn symbol_from_declarations<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
-) -> DeclaredTypeResult<'db> {
+) -> SymbolFromDeclarationsResult<'db> {
     let visibility_constraints = declarations.visibility_constraints;
     let mut declarations = declarations.peekable();
 
@@ -4098,7 +4099,7 @@ impl<'db> Class<'db> {
 
             let declarations = use_def.public_declarations(symbol);
 
-            match declarations_ty(db, declarations) {
+            match symbol_from_declarations(db, declarations) {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
@@ -4115,7 +4116,7 @@ impl<'db> Class<'db> {
                 }
                 Ok(SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
                     let bindings = use_def.public_bindings(symbol);
-                    let inferred_ty = bindings_ty(db, bindings);
+                    let inferred_ty = symbol_from_bindings(db, bindings);
 
                     match inferred_ty {
                         Symbol::Type(ty, _) => SymbolAndQualifiers(
