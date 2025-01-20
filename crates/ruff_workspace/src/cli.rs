@@ -1,6 +1,7 @@
 #[cfg(feature = "clap")]
 pub mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use itertools::Itertools;
     use std::str::FromStr;
 
     use crate::{
@@ -33,8 +34,10 @@ pub mod clap_completion {
                 .collect::<Vec<_>>()
                 .join(".");
 
-            self.values
-                .push((fqn, group.documentation().unwrap_or_default().to_owned()));
+            // Only add the set to completion list if it has it's own documentation.
+            if let Some(doc) = group.documentation() {
+                self.values.push((fqn, doc.to_owned()));
+            }
 
             self.parents.push(name.to_owned());
             group.record(self);
@@ -141,15 +144,12 @@ pub mod clap_completion {
             Options::metadata().record(&mut visitor);
 
             Some(Box::new(visitor.into_iter().map(|(name, doc)| {
-                let first_line = doc
+                let first_paragraph = doc
                     .lines()
-                    .next()
-                    .unwrap_or("")
-                    .chars()
-                    .take(80)
-                    .collect::<String>();
+                    .take_while(|l| !l.trim_end().is_empty())
+                    .join(" ");
 
-                PossibleValue::new(name).help(first_line)
+                PossibleValue::new(name).help(first_paragraph)
             })))
         }
     }
