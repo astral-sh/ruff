@@ -36,6 +36,11 @@ def h(
     pass
 
 
+# These cases are not handled
+class D(Generic[T, T]):  # duplicate generic variable, runtime error
+    pass
+
+
 # TODO(brent) we should also apply the fix to methods, but it will need a
 # little more work. these should be left alone for now but be fixed eventually.
 class NotGeneric:

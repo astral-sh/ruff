@@ -122,12 +122,18 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     };
 
     // Type variables must be unique; filter while preserving order.
+    let nvars = vars.len();
     let mut type_vars = vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
 
     if type_vars.is_empty() {
+        return;
+    }
+
+    // non-unique type variables are runtime errors, so just bail out here
+    if type_vars.len() < nvars {
         return;
     }
 
@@ -205,12 +211,18 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
     }
 
     // Type variables must be unique; filter while preserving order.
+    let nvars = type_vars.len();
     let mut type_vars = type_vars
         .into_iter()
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
 
     if type_vars.is_empty() {
+        return;
+    }
+
+    // non-unique type variables are runtime errors, so just bail out here
+    if type_vars.len() < nvars {
         return;
     }
 
