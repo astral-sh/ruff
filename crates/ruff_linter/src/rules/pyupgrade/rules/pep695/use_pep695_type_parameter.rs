@@ -28,16 +28,20 @@ use super::{fmt_type_vars, TypeVar, TypeVarReferenceVisitor};
 /// variable to an in-line type parameter may change its variance.
 ///
 /// ## Example
+///
 /// ```python
+/// from typing import TypeVar
+///
 /// T = TypeVar("T")
-/// class GenericClass(Generic[T]):
-///     ...
+///
+///
+/// class GenericClass(Generic[T]): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// class GenericClass[T]:
-///     ...
+/// class GenericClass[T]: ...
 /// ```
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
