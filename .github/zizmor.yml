@@ -10,3 +10,8 @@ rules:
     ignore:
       - build-docker.yml
       - publish-playground.yml
+  excessive-permissions:
+    ignore:
+      - build-docker.yml
+      - publish-playground.yml
+      - publish-docs.yml
