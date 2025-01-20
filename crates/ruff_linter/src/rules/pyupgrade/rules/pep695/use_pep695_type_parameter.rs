@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
-use super::{fmt_type_vars, TypeVar, TypeVarReferenceVisitor};
+use super::{DisplayTypeVars, TypeVar, TypeVarReferenceVisitor};
 
 /// ## What it does
 ///
@@ -148,7 +148,10 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     }
 
     // build the fix as a String to avoid removing comments from the entire function body
-    let type_params = fmt_type_vars(&type_vars, checker);
+    let type_params = DisplayTypeVars {
+        type_vars: &type_vars,
+        source: checker.source(),
+    };
 
     checker.diagnostics.push(
         Diagnostic::new(
@@ -159,7 +162,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             *range,
         )
         .with_fix(Fix::applicable_edit(
-            Edit::replacement(type_params, name.end(), arguments.end()),
+            Edit::replacement(type_params.to_string(), name.end(), arguments.end()),
             Applicability::Safe,
         )),
     );
@@ -234,7 +237,10 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
     }
 
     // build the fix as a String to avoid removing comments from the entire function body
-    let type_params = fmt_type_vars(&type_vars, checker);
+    let type_params = DisplayTypeVars {
+        type_vars: &type_vars,
+        source: checker.source(),
+    };
 
     checker.diagnostics.push(
         Diagnostic::new(
@@ -245,7 +251,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
             TextRange::new(name.start(), parameters.end()),
         )
         .with_fix(Fix::applicable_edit(
-            Edit::insertion(type_params, name.end()),
+            Edit::insertion(type_params.to_string(), name.end()),
             Applicability::Safe,
         )),
     );

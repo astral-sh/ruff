@@ -1,5 +1,7 @@
 //! Shared code for [`use_pep695_type_alias`] (UP040) and [`use_pep695_type_parameter`] (UP046)
 
+use std::fmt::Display;
+
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -8,8 +10,6 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
 
 pub(crate) use use_pep695_type_alias::*;
 pub(crate) use use_pep695_type_parameter::*;
@@ -39,51 +39,74 @@ struct TypeVar<'a> {
     kind: TypeParamKind,
 }
 
-/// Format a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T, *Ts, **P]`).
-/// See [`TypeVar::fmt_into`] for further details.
-fn fmt_type_vars(type_vars: &[TypeVar], checker: &Checker) -> String {
-    let nvars = type_vars.len();
-    let mut type_params = String::from("[");
-    for (i, tv) in type_vars.iter().enumerate() {
-        tv.fmt_into(&mut type_params, checker.source());
-        if i < nvars - 1 {
-            type_params.push_str(", ");
-        }
-    }
-    type_params.push(']');
+/// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
+/// *Ts, **P]`). See [`DisplayTypeVar`] for further details.
+struct DisplayTypeVars<'a> {
+    type_vars: &'a [TypeVar<'a>],
+    source: &'a str,
+}
 
-    type_params
+impl Display for DisplayTypeVars<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[")?;
+        let nvars = self.type_vars.len();
+        for (i, tv) in self.type_vars.iter().enumerate() {
+            write!(f, "{}", tv.display(self.source))?;
+            if i < nvars - 1 {
+                f.write_str(", ")?;
+            }
+        }
+        f.write_str("]")?;
+
+        Ok(())
+    }
+}
+
+/// Used for displaying `type_var`. `source` is the whole file, which will be sliced to recover the
+/// `TypeVarRestriction` values for generic bounds and constraints.
+struct DisplayTypeVar<'a> {
+    type_var: &'a TypeVar<'a>,
+    source: &'a str,
 }
 
 impl TypeVar<'_> {
-    /// Format `self` into `s`, where `source` is the whole file, which will be sliced to recover
-    /// the `TypeVarRestriction` values for generic bounds and constraints.
-    fn fmt_into(&self, s: &mut String, source: &str) {
-        match self.kind {
-            TypeParamKind::TypeVar => {}
-            TypeParamKind::TypeVarTuple => s.push('*'),
-            TypeParamKind::ParamSpec => s.push_str("**"),
+    fn display<'a>(&'a self, source: &'a str) -> DisplayTypeVar<'a> {
+        DisplayTypeVar {
+            type_var: self,
+            source,
         }
-        s.push_str(&self.name.id);
-        if let Some(restriction) = &self.restriction {
-            s.push_str(": ");
+    }
+}
+
+impl Display for DisplayTypeVar<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.type_var.kind {
+            TypeParamKind::TypeVar => {}
+            TypeParamKind::TypeVarTuple => f.write_str("*")?,
+            TypeParamKind::ParamSpec => f.write_str("**")?,
+        }
+        f.write_str(&self.type_var.name.id)?;
+        if let Some(restriction) = &self.type_var.restriction {
+            f.write_str(": ")?;
             match restriction {
                 TypeVarRestriction::Bound(bound) => {
-                    s.push_str(&source[bound.range()]);
+                    f.write_str(&self.source[bound.range()])?;
                 }
                 TypeVarRestriction::Constraint(vec) => {
                     let len = vec.len();
-                    s.push('(');
+                    f.write_str("(")?;
                     for (i, v) in vec.iter().enumerate() {
-                        s.push_str(&source[v.range()]);
+                        f.write_str(&self.source[v.range()])?;
                         if i < len - 1 {
-                            s.push_str(", ");
+                            f.write_str(", ")?;
                         }
                     }
-                    s.push(')');
+                    f.write_str(")")?;
                 }
             }
         }
+
+        Ok(())
     }
 }
 
