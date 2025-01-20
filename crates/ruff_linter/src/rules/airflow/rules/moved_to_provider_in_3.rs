@@ -902,6 +902,101 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: Tex
             version: "1.0.0"
         },
 
+        // apache-airflow-providers-standard
+        ["airflow", "operators", "datetime"] => Replacement::ImportPathMoved{
+            original_path: "airflow.operators.datetime",
+            new_path: "airflow.providers.standard.time.operators.datetime",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "operators", "weekday"] => Replacement::ImportPathMoved{
+            original_path: "airflow.operators.weekday",
+            new_path: "airflow.providers.standard.time.operators.weekday",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "sensors", "date_time"] => Replacement::ImportPathMoved{
+            original_path: "airflow.sensors.date_time",
+            new_path: "airflow.providers.standard.time.sensors.date_time",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "sensors", "time_sensor"] => Replacement::ImportPathMoved{
+            original_path: "airflow.sensors.time_sensor",
+            new_path: "airflow.providers.standard.time.sensors.time",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "sensors", "time_delta"] => Replacement::ImportPathMoved{
+            original_path: "airflow.sensors.time_delta",
+            new_path: "airflow.providers.standard.time.sensors.time_delta",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "sensors", "weekday"] => Replacement::ImportPathMoved{
+            original_path: "airflow.sensors.weekday",
+            new_path: "airflow.providers.standard.time.sensors.weekday",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "hooks", "filesystem"] => Replacement::ImportPathMoved{
+            original_path: "airflow.hooks.filesystem",
+            new_path: "airflow.providers.standard.hooks.filesystem",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "hooks", "package_index"] => Replacement::ImportPathMoved{
+            original_path: "airflow.hooks.package_index",
+            new_path: "airflow.providers.standard.hooks.package_index",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "hooks", "subprocess"] => Replacement::ImportPathMoved{
+            original_path: "airflow.hooks.subprocess",
+            new_path: "airflow.providers.standard.hooks.subprocess",
+            provider: "standard",
+            version: "0.0.1"
+        },
+
+        ["airflow", "triggers", "external_task"] => Replacement::ImportPathMoved{
+            original_path: "airflow.triggers.external_task",
+            new_path: "airflow.providers.standard.triggers.external_task",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "triggers", "file"] => Replacement::ImportPathMoved{
+            original_path: "airflow.triggers.file",
+            new_path: "airflow.providers.standard.triggers.file",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "triggers", "temporal"] => Replacement::ImportPathMoved{
+            original_path: "airflow.triggers.temporal",
+            new_path: "airflow.providers.standard.triggers.temporal",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.filesystem.FileSensor",
+            provider: "standard",
+            version: "0.0.2"
+        },
+        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
+            provider: "standard",
+            version: "0.0.2"
+        },
+        ["airflow", "sensors", "external_task", "ExternalTaskMarker"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "sensors", "external_task", "ExternalTaskSensor"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
+            provider: "standard",
+            version: "0.0.3"
+        },
+
         // apache-airflow-providers-sqlite
         ["airflow", "hooks", "sqlite_hook", "SqliteHook"] => Replacement::ProviderName{
             name: "airflow.providers.sqlite.hooks.sqlite.SqliteHook",
