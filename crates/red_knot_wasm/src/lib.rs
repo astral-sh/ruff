@@ -3,9 +3,9 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_project::db::{Db, ProjectDatabase};
-use red_knot_project::project::options::{EnvironmentOptions, Options};
-use red_knot_project::project::ProjectMetadata;
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::ProjectMetadata;
+use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;

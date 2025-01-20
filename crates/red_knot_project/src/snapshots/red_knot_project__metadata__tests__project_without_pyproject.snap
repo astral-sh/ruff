@@ -1,5 +1,5 @@
 ---
-source: crates/red_knot_workspace/src/project/metadata.rs
+source: crates/red_knot_project/src/metadata.rs
 expression: project
 ---
 ProjectMetadata(

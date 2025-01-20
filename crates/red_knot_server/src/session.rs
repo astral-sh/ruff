@@ -8,8 +8,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 
-use red_knot_project::db::ProjectDatabase;
-use red_knot_project::project::ProjectMetadata;
+use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
 use ruff_db::Db;

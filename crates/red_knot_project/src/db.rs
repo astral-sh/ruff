@@ -1,8 +1,8 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use crate::project::{check_file, Project, ProjectMetadata};
 use crate::DEFAULT_LINT_REGISTRY;
+use crate::{check_file, Project, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::diagnostic::Diagnostic;
@@ -179,8 +179,8 @@ pub(crate) mod tests {
     use ruff_db::{Db as SourceDb, Upcast};
 
     use crate::db::Db;
-    use crate::project::{Project, ProjectMetadata};
     use crate::DEFAULT_LINT_REGISTRY;
+    use crate::{Project, ProjectMetadata};
 
     #[salsa::db]
     #[derive(Clone)]

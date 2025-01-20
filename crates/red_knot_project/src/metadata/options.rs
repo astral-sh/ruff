@@ -16,12 +16,12 @@ pub struct Options {
 }
 
 impl Options {
-    pub(super) fn from_toml_str(content: &str) -> Result<Self, KnotTomlError> {
+    pub(crate) fn from_toml_str(content: &str) -> Result<Self, KnotTomlError> {
         let options = toml::from_str(content)?;
         Ok(options)
     }
 
-    pub(super) fn to_program_settings(
+    pub(crate) fn to_program_settings(
         &self,
         project_root: &SystemPath,
         system: &dyn System,

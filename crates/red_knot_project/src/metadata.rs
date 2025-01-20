@@ -1,13 +1,15 @@
+use red_knot_python_semantic::ProgramSettings;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
-
-use crate::project::combine::Combine;
-use crate::project::options::Options;
-use crate::project::pyproject::{Project, PyProject, PyProjectError};
-use red_knot_python_semantic::ProgramSettings;
 use thiserror::Error;
 
-use super::options::KnotTomlError;
+use crate::combine::Combine;
+use crate::metadata::pyproject::{Project, PyProject, PyProjectError};
+use options::KnotTomlError;
+use options::Options;
+
+pub mod options;
+pub mod pyproject;
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
@@ -222,7 +224,7 @@ mod tests {
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
 
-    use crate::project::{ProjectDiscoveryError, ProjectMetadata};
+    use crate::{ProjectDiscoveryError, ProjectMetadata};
 
     #[test]
     fn project_without_pyproject() -> anyhow::Result<()> {

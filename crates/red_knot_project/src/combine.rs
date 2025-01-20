@@ -148,7 +148,7 @@ impl_noop_combine!(String);
 
 #[cfg(test)]
 mod tests {
-    use crate::project::combine::Combine;
+    use crate::combine::Combine;
     use std::collections::HashMap;
 
     #[test]

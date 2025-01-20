@@ -1,10 +1,10 @@
 ---
-source: crates/red_knot_workspace/src/project/metadata.rs
-expression: root
+source: crates/red_knot_project/src/metadata.rs
+expression: sub_project
 ---
 ProjectMetadata(
-  name: Name("project-root"),
-  root: "/app",
+  name: Name("nested-project"),
+  root: "/app/packages/a",
   options: Options(
     environment: None,
     src: Some(SrcOptions(

@@ -1,5 +1,5 @@
 ---
-source: crates/red_knot_workspace/src/project/metadata.rs
+source: crates/red_knot_project/src/metadata.rs
 expression: sub_project
 ---
 ProjectMetadata(
@@ -7,8 +7,6 @@ ProjectMetadata(
   root: "/app/packages/a",
   options: Options(
     environment: None,
-    src: Some(SrcOptions(
-      root: Some("src"),
-    )),
+    src: None,
   ),
 )
