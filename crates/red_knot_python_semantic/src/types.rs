@@ -4056,9 +4056,9 @@ impl<'db> Class<'db> {
     /// but we must be resilient to it or we could panic.
     #[salsa::tracked]
     fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
-        // Return `true` if the class is cyclically defined.
-        //
-        // Also, populates `visited_classes` with all base classes of `self`.
+        /// Return `true` if the class is cyclically defined.
+        ///
+        /// Also, populates `visited_classes` with all base classes of `self`.
         fn is_cyclically_defined_rec<'db>(
             db: &'db dyn Db,
             class: Class<'db>,
