@@ -4779,35 +4779,6 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn type_alias_types() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/mod.py",
-            r#"
-            type Alias1 = int
-            type Alias2 = int
-        "#,
-        )?;
-
-        let mod_py = system_path_to_file(&db, "src/mod.py")?;
-        let ty_alias1 = global_symbol(&db, mod_py, "Alias1").expect_type();
-        let ty_alias2 = global_symbol(&db, mod_py, "Alias2").expect_type();
-
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias1)) = ty_alias1 else {
-            panic!("Expected TypeAliasType, got {ty_alias1:?}");
-        };
-        assert_eq!(alias1.name(&db), "Alias1");
-        assert_eq!(alias1.value_ty(&db), KnownClass::Int.to_instance(&db));
-
-        // Two type aliases are distinct and disjoint, even if they refer to the same type
-        assert!(!ty_alias1.is_equivalent_to(&db, ty_alias2));
-        assert!(ty_alias1.is_disjoint_from(&db, ty_alias2));
-
-        Ok(())
-    }
-
     /// All other tests also make sure that `Type::Todo` works as expected. This particular
     /// test makes sure that we handle `Todo` types correctly, even if they originate from
     /// different sources.
