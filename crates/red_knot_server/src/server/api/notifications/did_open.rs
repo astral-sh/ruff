@@ -1,7 +1,7 @@
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::DidOpenTextDocumentParams;
 
-use red_knot_workspace::watch::ChangeEvent;
+use red_knot_project::watch::ChangeEvent;
 use ruff_db::Db;
 
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};

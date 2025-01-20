@@ -2,7 +2,7 @@ use lsp_server::ErrorCode;
 use lsp_types::notification::DidOpenNotebookDocument;
 use lsp_types::DidOpenNotebookDocumentParams;
 
-use red_knot_workspace::watch::ChangeEvent;
+use red_knot_project::watch::ChangeEvent;
 use ruff_db::Db;
 
 use crate::edit::NotebookDocument;

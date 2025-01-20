@@ -11,7 +11,7 @@ use crate::edit::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use red_knot_workspace::db::{Db, ProjectDatabase};
+use red_knot_project::db::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};
 

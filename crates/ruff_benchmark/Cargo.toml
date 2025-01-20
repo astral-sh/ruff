@@ -54,7 +54,7 @@ ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 red_knot_python_semantic = { workspace = true }
-red_knot_workspace = { workspace = true }
+red_knot_project = { workspace = true }
 
 [lints]
 workspace = true
