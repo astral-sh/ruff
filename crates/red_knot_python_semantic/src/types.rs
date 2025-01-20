@@ -3656,11 +3656,8 @@ enum InheritanceCycle {
 }
 
 impl InheritanceCycle {
-    fn is_participant(self) -> bool {
-        match self {
-            Self::Participant => true,
-            Self::Inherited => false,
-        }
+    const fn is_participant(self) -> bool {
+        matches!(self, InheritanceCycle::Participant)
     }
 }
 
