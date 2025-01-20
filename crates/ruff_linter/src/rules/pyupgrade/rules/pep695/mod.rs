@@ -12,13 +12,15 @@ use ruff_python_ast::{
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+pub(crate) use use_pep695_generic_class::*;
+pub(crate) use use_pep695_generic_function::*;
 pub(crate) use use_pep695_type_alias::*;
-pub(crate) use use_pep695_type_parameter::*;
 
 use crate::checkers::ast::Checker;
 
+mod use_pep695_generic_class;
+mod use_pep695_generic_function;
 mod use_pep695_type_alias;
-mod use_pep695_type_parameter;
 
 #[derive(Debug)]
 enum TypeVarRestriction<'a> {

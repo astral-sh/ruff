@@ -376,7 +376,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::PytestParameterWithDefaultArgument) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
-            if checker.enabled(Rule::NonPEP695TypeParameter) {
+            if checker.enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }
         }
@@ -557,7 +557,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::DataclassEnum) {
                 ruff::rules::dataclass_enum(checker, class_def);
             }
-            if checker.enabled(Rule::NonPEP695TypeParameter) {
+            if checker.enabled(Rule::NonPEP695GenericClass) {
                 pyupgrade::rules::non_pep695_generic_class(checker, class_def);
             }
         }
