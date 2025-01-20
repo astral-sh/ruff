@@ -1994,6 +1994,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_standalone_expression(value);
                 }
             }
+            ast::Expr::Attribute(
+                lhs_expr @ ast::ExprAttribute {
+                    ctx: ExprContext::Store,
+                    ..
+                },
+            ) => {
+                let lhs_ty = self.infer_attribute_expression(lhs_expr);
+                self.store_expression_type(target, lhs_ty);
+
+                let rhs_ty = self.infer_standalone_expression(value);
+
+                if !rhs_ty.is_assignable_to(self.db(), lhs_ty) {
+                    report_invalid_assignment(&self.context, target.into(), lhs_ty, rhs_ty);
+                }
+            }
             _ => {
                 // TODO: Remove this once we handle all possible assignment targets.
                 self.infer_standalone_expression(value);
@@ -3416,7 +3431,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
 
-                if let Type::Instance(instance) = value_ty {
+                let symbol = if let Type::Instance(instance) = value_ty {
                     let instance_member = instance.class.instance_member(self.db(), attr);
                     if instance_member.is_class_var() {
                         self.context.report_lint(
@@ -3428,9 +3443,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ),
                         );
                     }
-                }
 
-                Type::Never
+                    instance_member.0
+                } else {
+                    value_ty.member(self.db(), attr)
+                };
+
+                // TODO: The unbound-case might also yield a diagnostic, but we can not activate
+                // this yet until we understand implicit instance attributes (those that are not
+                // defined in the class body), as there would be too many false positives.
+                symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
             }
             ExprContext::Del => {
                 self.infer_expression(value);
