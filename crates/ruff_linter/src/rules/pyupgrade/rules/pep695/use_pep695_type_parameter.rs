@@ -13,8 +13,8 @@ use super::{fmt_type_vars, TypeVar, TypeVarReferenceVisitor};
 
 /// ## What it does
 ///
-/// Checks for use of `TypeParam`, `TypeParamTuple`, and `ParamSpec` annotations on generic
-/// functions and classes.
+/// Checks for use of standalone type variables and parameter specifications in generic functions
+/// and classes.
 ///
 /// ## Why is this bad?
 ///
