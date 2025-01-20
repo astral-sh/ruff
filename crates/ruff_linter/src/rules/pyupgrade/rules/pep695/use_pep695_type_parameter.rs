@@ -27,11 +27,6 @@ use super::{fmt_type_vars, TypeVar, TypeVarReferenceVisitor};
 /// `contravariant` keywords used by `TypeParam` variables. As such, rewriting a `TypeParam`
 /// variable to an in-line type parameter may change its variance.
 ///
-/// Unlike `TypeParam` variables, [PEP 695]-style type parameters cannot be used at runtime. For
-/// example, calling `isinstance(x, T)` with type parameter `T` will raise a `TypeError`. As such,
-/// rewriting a `TypeParam` as a type parameter will cause issues for parameters that are used for
-/// such runtime checks.
-///
 /// ## Example
 /// ```python
 /// T = TypeVar("T")
