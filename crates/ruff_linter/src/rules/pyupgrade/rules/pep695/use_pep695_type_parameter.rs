@@ -24,8 +24,8 @@ use super::{fmt_type_vars, TypeVar, TypeVarReferenceVisitor};
 /// ## Known problems
 ///
 /// [PEP 695] uses inferred variance for type parameters, instead of the `covariant` and
-/// `contravariant` keywords used by `TypeParam` variables. As such, rewriting a `TypeParam`
-/// variable to an in-line type parameter may change its variance.
+/// `contravariant` keywords used by `TypeVar` variables. As such, rewriting a `TypeVar` variable to
+/// an in-line type parameter may change its variance.
 ///
 /// The rule currently excludes cases where it conceptually should be able to give a diagnostic. In
 /// particular, it skips generic classes with multiple base classes, and it skips generic methods in
