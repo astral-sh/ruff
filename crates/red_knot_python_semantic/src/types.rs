@@ -3647,11 +3647,11 @@ pub struct Class<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum InheritanceCycle {
-    // The class is cyclically defined and is a participant in the cycle.
-    // i.e., it inherits either directly or indirectly from itself.
+    /// The class is cyclically defined and is a participant in the cycle.
+    /// i.e., it inherits either directly or indirectly from itself.
     Participant,
-    // The class inherits from a class that is a `Participant` in an inheritance cycle,
-    // but is not itself a participant.
+    /// The class inherits from a class that is a `Participant` in an inheritance cycle,
+    /// but is not itself a participant.
     Inherited,
 }
 
