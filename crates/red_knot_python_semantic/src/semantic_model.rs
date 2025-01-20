@@ -8,7 +8,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::semantic_index;
-use crate::types::{binding_ty, infer_scope_types, Type};
+use crate::types::{binding_type, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -40,117 +40,117 @@ impl<'db> SemanticModel<'db> {
     }
 }
 
-pub trait HasTy {
+pub trait HasType {
     /// Returns the inferred type of `self`.
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
 }
 
-impl HasTy for ast::ExprRef<'_> {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+impl HasType for ast::ExprRef<'_> {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         let expression_id = self.scoped_expression_id(model.db, scope);
-        infer_scope_types(model.db, scope).expression_ty(expression_id)
+        infer_scope_types(model.db, scope).expression_type(expression_id)
     }
 }
 
-macro_rules! impl_expression_has_ty {
+macro_rules! impl_expression_has_type {
     ($ty: ty) => {
-        impl HasTy for $ty {
+        impl HasType for $ty {
             #[inline]
-            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let expression_ref = ExprRef::from(self);
-                expression_ref.ty(model)
+                expression_ref.inferred_type(model)
             }
         }
     };
 }
 
-impl_expression_has_ty!(ast::ExprBoolOp);
-impl_expression_has_ty!(ast::ExprNamed);
-impl_expression_has_ty!(ast::ExprBinOp);
-impl_expression_has_ty!(ast::ExprUnaryOp);
-impl_expression_has_ty!(ast::ExprLambda);
-impl_expression_has_ty!(ast::ExprIf);
-impl_expression_has_ty!(ast::ExprDict);
-impl_expression_has_ty!(ast::ExprSet);
-impl_expression_has_ty!(ast::ExprListComp);
-impl_expression_has_ty!(ast::ExprSetComp);
-impl_expression_has_ty!(ast::ExprDictComp);
-impl_expression_has_ty!(ast::ExprGenerator);
-impl_expression_has_ty!(ast::ExprAwait);
-impl_expression_has_ty!(ast::ExprYield);
-impl_expression_has_ty!(ast::ExprYieldFrom);
-impl_expression_has_ty!(ast::ExprCompare);
-impl_expression_has_ty!(ast::ExprCall);
-impl_expression_has_ty!(ast::ExprFString);
-impl_expression_has_ty!(ast::ExprStringLiteral);
-impl_expression_has_ty!(ast::ExprBytesLiteral);
-impl_expression_has_ty!(ast::ExprNumberLiteral);
-impl_expression_has_ty!(ast::ExprBooleanLiteral);
-impl_expression_has_ty!(ast::ExprNoneLiteral);
-impl_expression_has_ty!(ast::ExprEllipsisLiteral);
-impl_expression_has_ty!(ast::ExprAttribute);
-impl_expression_has_ty!(ast::ExprSubscript);
-impl_expression_has_ty!(ast::ExprStarred);
-impl_expression_has_ty!(ast::ExprName);
-impl_expression_has_ty!(ast::ExprList);
-impl_expression_has_ty!(ast::ExprTuple);
-impl_expression_has_ty!(ast::ExprSlice);
-impl_expression_has_ty!(ast::ExprIpyEscapeCommand);
+impl_expression_has_type!(ast::ExprBoolOp);
+impl_expression_has_type!(ast::ExprNamed);
+impl_expression_has_type!(ast::ExprBinOp);
+impl_expression_has_type!(ast::ExprUnaryOp);
+impl_expression_has_type!(ast::ExprLambda);
+impl_expression_has_type!(ast::ExprIf);
+impl_expression_has_type!(ast::ExprDict);
+impl_expression_has_type!(ast::ExprSet);
+impl_expression_has_type!(ast::ExprListComp);
+impl_expression_has_type!(ast::ExprSetComp);
+impl_expression_has_type!(ast::ExprDictComp);
+impl_expression_has_type!(ast::ExprGenerator);
+impl_expression_has_type!(ast::ExprAwait);
+impl_expression_has_type!(ast::ExprYield);
+impl_expression_has_type!(ast::ExprYieldFrom);
+impl_expression_has_type!(ast::ExprCompare);
+impl_expression_has_type!(ast::ExprCall);
+impl_expression_has_type!(ast::ExprFString);
+impl_expression_has_type!(ast::ExprStringLiteral);
+impl_expression_has_type!(ast::ExprBytesLiteral);
+impl_expression_has_type!(ast::ExprNumberLiteral);
+impl_expression_has_type!(ast::ExprBooleanLiteral);
+impl_expression_has_type!(ast::ExprNoneLiteral);
+impl_expression_has_type!(ast::ExprEllipsisLiteral);
+impl_expression_has_type!(ast::ExprAttribute);
+impl_expression_has_type!(ast::ExprSubscript);
+impl_expression_has_type!(ast::ExprStarred);
+impl_expression_has_type!(ast::ExprName);
+impl_expression_has_type!(ast::ExprList);
+impl_expression_has_type!(ast::ExprTuple);
+impl_expression_has_type!(ast::ExprSlice);
+impl_expression_has_type!(ast::ExprIpyEscapeCommand);
 
-impl HasTy for ast::Expr {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+impl HasType for ast::Expr {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         match self {
-            Expr::BoolOp(inner) => inner.ty(model),
-            Expr::Named(inner) => inner.ty(model),
-            Expr::BinOp(inner) => inner.ty(model),
-            Expr::UnaryOp(inner) => inner.ty(model),
-            Expr::Lambda(inner) => inner.ty(model),
-            Expr::If(inner) => inner.ty(model),
-            Expr::Dict(inner) => inner.ty(model),
-            Expr::Set(inner) => inner.ty(model),
-            Expr::ListComp(inner) => inner.ty(model),
-            Expr::SetComp(inner) => inner.ty(model),
-            Expr::DictComp(inner) => inner.ty(model),
-            Expr::Generator(inner) => inner.ty(model),
-            Expr::Await(inner) => inner.ty(model),
-            Expr::Yield(inner) => inner.ty(model),
-            Expr::YieldFrom(inner) => inner.ty(model),
-            Expr::Compare(inner) => inner.ty(model),
-            Expr::Call(inner) => inner.ty(model),
-            Expr::FString(inner) => inner.ty(model),
-            Expr::StringLiteral(inner) => inner.ty(model),
-            Expr::BytesLiteral(inner) => inner.ty(model),
-            Expr::NumberLiteral(inner) => inner.ty(model),
-            Expr::BooleanLiteral(inner) => inner.ty(model),
-            Expr::NoneLiteral(inner) => inner.ty(model),
-            Expr::EllipsisLiteral(inner) => inner.ty(model),
-            Expr::Attribute(inner) => inner.ty(model),
-            Expr::Subscript(inner) => inner.ty(model),
-            Expr::Starred(inner) => inner.ty(model),
-            Expr::Name(inner) => inner.ty(model),
-            Expr::List(inner) => inner.ty(model),
-            Expr::Tuple(inner) => inner.ty(model),
-            Expr::Slice(inner) => inner.ty(model),
-            Expr::IpyEscapeCommand(inner) => inner.ty(model),
+            Expr::BoolOp(inner) => inner.inferred_type(model),
+            Expr::Named(inner) => inner.inferred_type(model),
+            Expr::BinOp(inner) => inner.inferred_type(model),
+            Expr::UnaryOp(inner) => inner.inferred_type(model),
+            Expr::Lambda(inner) => inner.inferred_type(model),
+            Expr::If(inner) => inner.inferred_type(model),
+            Expr::Dict(inner) => inner.inferred_type(model),
+            Expr::Set(inner) => inner.inferred_type(model),
+            Expr::ListComp(inner) => inner.inferred_type(model),
+            Expr::SetComp(inner) => inner.inferred_type(model),
+            Expr::DictComp(inner) => inner.inferred_type(model),
+            Expr::Generator(inner) => inner.inferred_type(model),
+            Expr::Await(inner) => inner.inferred_type(model),
+            Expr::Yield(inner) => inner.inferred_type(model),
+            Expr::YieldFrom(inner) => inner.inferred_type(model),
+            Expr::Compare(inner) => inner.inferred_type(model),
+            Expr::Call(inner) => inner.inferred_type(model),
+            Expr::FString(inner) => inner.inferred_type(model),
+            Expr::StringLiteral(inner) => inner.inferred_type(model),
+            Expr::BytesLiteral(inner) => inner.inferred_type(model),
+            Expr::NumberLiteral(inner) => inner.inferred_type(model),
+            Expr::BooleanLiteral(inner) => inner.inferred_type(model),
+            Expr::NoneLiteral(inner) => inner.inferred_type(model),
+            Expr::EllipsisLiteral(inner) => inner.inferred_type(model),
+            Expr::Attribute(inner) => inner.inferred_type(model),
+            Expr::Subscript(inner) => inner.inferred_type(model),
+            Expr::Starred(inner) => inner.inferred_type(model),
+            Expr::Name(inner) => inner.inferred_type(model),
+            Expr::List(inner) => inner.inferred_type(model),
+            Expr::Tuple(inner) => inner.inferred_type(model),
+            Expr::Slice(inner) => inner.inferred_type(model),
+            Expr::IpyEscapeCommand(inner) => inner.inferred_type(model),
         }
     }
 }
 
 macro_rules! impl_binding_has_ty {
     ($ty: ty) => {
-        impl HasTy for $ty {
+        impl HasType for $ty {
             #[inline]
-            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
                 let binding = index.definition(self);
-                binding_ty(model.db, binding)
+                binding_type(model.db, binding)
             }
         }
     };
@@ -168,10 +168,10 @@ mod tests {
     use ruff_db::parsed::parsed_module;
 
     use crate::db::tests::TestDbBuilder;
-    use crate::{HasTy, SemanticModel};
+    use crate::{HasType, SemanticModel};
 
     #[test]
-    fn function_ty() -> anyhow::Result<()> {
+    fn function_type() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file("/src/foo.py", "def test(): pass")
             .build()?;
@@ -182,7 +182,7 @@ mod tests {
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
-        let ty = function.ty(&model);
+        let ty = function.inferred_type(&model);
 
         assert!(ty.is_function_literal());
 
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn class_ty() -> anyhow::Result<()> {
+    fn class_type() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file("/src/foo.py", "class Test: pass")
             .build()?;
@@ -201,7 +201,7 @@ mod tests {
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
-        let ty = class.ty(&model);
+        let ty = class.inferred_type(&model);
 
         assert!(ty.is_class_literal());
 
@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn alias_ty() -> anyhow::Result<()> {
+    fn alias_type() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file("/src/foo.py", "class Test: pass")
             .with_file("/src/bar.py", "from foo import Test")
@@ -222,7 +222,7 @@ mod tests {
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];
         let model = SemanticModel::new(&db, bar);
-        let ty = alias.ty(&model);
+        let ty = alias.inferred_type(&model);
 
         assert!(ty.is_class_literal());
 

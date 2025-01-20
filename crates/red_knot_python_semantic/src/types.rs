@@ -129,7 +129,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
-                declared_ty.inner_ty().into()
+                declared_ty.inner_type().into()
             }
         }
 
@@ -243,15 +243,15 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
 }
 
 /// Infer the type of a binding.
-pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.binding_ty(definition)
+    inference.binding_type(definition)
 }
 
 /// Infer the type of a declaration.
-fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
+fn declaration_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.declaration_ty(definition)
+    inference.declaration_type(definition)
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -260,7 +260,7 @@ fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQ
 ///
 /// ## Panics
 /// If the given expression is not a sub-expression of the given [`Definition`].
-fn definition_expression_ty<'db>(
+fn definition_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,
@@ -273,14 +273,14 @@ fn definition_expression_ty<'db>(
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
-        if let Some(ty) = inference.try_expression_ty(expr_id) {
+        if let Some(ty) = inference.try_expression_type(expr_id) {
             ty
         } else {
-            infer_deferred_types(db, definition).expression_ty(expr_id)
+            infer_deferred_types(db, definition).expression_type(expr_id)
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_ty(expr_id)
+        infer_scope_types(db, scope).expression_type(expr_id)
     }
 }
 
@@ -323,7 +323,7 @@ fn symbol_from_bindings<'db>(
                 .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
                 .peekable();
 
-            let binding_ty = binding_ty(db, binding);
+            let binding_ty = binding_type(db, binding);
             if constraint_tys.peek().is_some() {
                 let intersection_ty = constraint_tys
                     .fold(
@@ -432,7 +432,7 @@ fn symbol_from_declarations<'db>(
             if static_visibility.is_always_false() {
                 None
             } else {
-                Some(declaration_ty(db, declaration))
+                Some(declaration_type(db, declaration))
             }
         },
     );
@@ -440,12 +440,12 @@ fn symbol_from_declarations<'db>(
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
-            let ty_first = first.inner_ty();
+            let ty_first = first.inner_type();
             let mut qualifiers = first.qualifiers();
 
             let mut builder = UnionBuilder::new(db).add(ty_first);
             for other in std::iter::once(second).chain(types) {
-                let other_ty = other.inner_ty();
+                let other_ty = other.inner_type();
                 if !ty_first.is_equivalent_to(db, other_ty) {
                     conflicting.push(other_ty);
                 }
@@ -466,13 +466,13 @@ fn symbol_from_declarations<'db>(
             };
 
             Ok(SymbolAndQualifiers(
-                Symbol::Type(declared_ty.inner_ty(), boundness),
+                Symbol::Type(declared_ty.inner_type(), boundness),
                 declared_ty.qualifiers(),
             ))
         } else {
             Err((
                 declared_ty,
-                std::iter::once(first.inner_ty())
+                std::iter::once(first.inner_type())
                     .chain(conflicting)
                     .collect(),
             ))
@@ -1787,7 +1787,7 @@ impl<'db> Type<'db> {
 
                     if let Some(Type::BooleanLiteral(bool_val)) = bool_method
                         .call(db, &CallArguments::positional([*instance_ty]))
-                        .return_ty(db)
+                        .return_type(db)
                     {
                         bool_val.into()
                     } else {
@@ -1864,7 +1864,7 @@ impl<'db> Type<'db> {
             CallDunderResult::MethodNotAvailable => return None,
 
             CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
-                outcome.return_ty(db)?
+                outcome.return_type(db)?
             }
         };
 
@@ -1879,11 +1879,11 @@ impl<'db> Type<'db> {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), Some(self));
                 match function_type.known(db) {
                     Some(KnownFunction::RevealType) => {
-                        let revealed_ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
+                        let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
                         CallOutcome::revealed(binding, revealed_ty)
                     }
                     Some(KnownFunction::StaticAssert) => {
-                        if let Some((parameter_ty, message)) = binding.two_parameter_tys() {
+                        if let Some((parameter_ty, message)) = binding.two_parameter_types() {
                             let truthiness = parameter_ty.bool(db);
 
                             if truthiness.is_always_true() {
@@ -1914,64 +1914,64 @@ impl<'db> Type<'db> {
                     }
                     Some(KnownFunction::IsEquivalentTo) => {
                         let (ty_a, ty_b) = binding
-                            .two_parameter_tys()
+                            .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
-                            .set_return_ty(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
+                            .set_return_type(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
                         let (ty_a, ty_b) = binding
-                            .two_parameter_tys()
+                            .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_ty(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
+                        binding.set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsAssignableTo) => {
                         let (ty_a, ty_b) = binding
-                            .two_parameter_tys()
+                            .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
-                            .set_return_ty(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
+                            .set_return_type(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsDisjointFrom) => {
                         let (ty_a, ty_b) = binding
-                            .two_parameter_tys()
+                            .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
-                            .set_return_ty(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
+                            .set_return_type(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsGradualEquivalentTo) => {
                         let (ty_a, ty_b) = binding
-                            .two_parameter_tys()
+                            .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_ty(Type::BooleanLiteral(
+                        binding.set_return_type(Type::BooleanLiteral(
                             ty_a.is_gradual_equivalent_to(db, ty_b),
                         ));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsFullyStatic) => {
-                        let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
-                        binding.set_return_ty(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                        binding.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleton) => {
-                        let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
-                        binding.set_return_ty(Type::BooleanLiteral(ty.is_singleton(db)));
+                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                        binding.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
                         CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleValued) => {
-                        let ty = binding.one_parameter_ty().unwrap_or(Type::unknown());
-                        binding.set_return_ty(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                        binding.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
                         CallOutcome::callable(binding)
                     }
 
                     Some(KnownFunction::Len) => {
-                        if let Some(first_arg) = binding.one_parameter_ty() {
+                        if let Some(first_arg) = binding.one_parameter_type() {
                             if let Some(len_ty) = first_arg.len(db) {
-                                binding.set_return_ty(len_ty);
+                                binding.set_return_type(len_ty);
                             }
                         };
 
@@ -1979,15 +1979,15 @@ impl<'db> Type<'db> {
                     }
 
                     Some(KnownFunction::Repr) => {
-                        if let Some(first_arg) = binding.one_parameter_ty() {
-                            binding.set_return_ty(first_arg.repr(db));
+                        if let Some(first_arg) = binding.one_parameter_type() {
+                            binding.set_return_type(first_arg.repr(db));
                         };
 
                         CallOutcome::callable(binding)
                     }
 
                     Some(KnownFunction::AssertType) => {
-                        let Some((_, asserted_ty)) = binding.two_parameter_tys() else {
+                        let Some((_, asserted_ty)) = binding.two_parameter_types() else {
                             return CallOutcome::callable(binding);
                         };
 
@@ -1997,12 +1997,12 @@ impl<'db> Type<'db> {
                     Some(KnownFunction::Cast) => {
                         // TODO: Use `.two_parameter_tys()` exclusively
                         // when overloads are supported.
-                        if binding.two_parameter_tys().is_none() {
+                        if binding.two_parameter_types().is_none() {
                             return CallOutcome::callable(binding);
                         };
 
                         if let Some(casted_ty) = arguments.first_argument() {
-                            binding.set_return_ty(casted_ty);
+                            binding.set_return_type(casted_ty);
                         };
 
                         CallOutcome::callable(binding)
@@ -2015,7 +2015,7 @@ impl<'db> Type<'db> {
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                CallOutcome::callable(CallBinding::from_return_ty(match class.known(db) {
+                CallOutcome::callable(CallBinding::from_return_type(match class.known(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
                     // the example above.
@@ -2061,7 +2061,7 @@ impl<'db> Type<'db> {
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_ty(self)),
+            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_type(self)),
 
             Type::Union(union) => CallOutcome::union(
                 self,
@@ -2071,7 +2071,7 @@ impl<'db> Type<'db> {
                     .map(|elem| elem.call(db, arguments)),
             ),
 
-            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_ty(
+            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call()"),
             )),
 
@@ -2117,7 +2117,7 @@ impl<'db> Type<'db> {
         match dunder_iter_result {
             CallDunderResult::CallOutcome(ref call_outcome)
             | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
-                let Some(iterator_ty) = call_outcome.return_ty(db) else {
+                let Some(iterator_ty) = call_outcome.return_type(db) else {
                     return IterationOutcome::NotIterable {
                         not_iterable_ty: self,
                     };
@@ -2125,7 +2125,7 @@ impl<'db> Type<'db> {
 
                 return if let Some(element_ty) = iterator_ty
                     .call_dunder(db, "__next__", &CallArguments::positional([iterator_ty]))
-                    .return_ty(db)
+                    .return_type(db)
                 {
                     if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
                         IterationOutcome::PossiblyUnboundDunderIter {
@@ -2156,7 +2156,7 @@ impl<'db> Type<'db> {
                 "__getitem__",
                 &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
             )
-            .return_ty(db)
+            .return_type(db)
         {
             IterationOutcome::Iterable { element_ty }
         } else {
@@ -2262,7 +2262,9 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Ok(*self),
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Ok(*self),
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => Ok(alias.value_ty(db)),
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                Ok(alias.value_type(db))
+            }
             Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
                 Ok(Type::Never)
             }
@@ -2358,7 +2360,8 @@ impl<'db> Type<'db> {
                 ClassBase::Dynamic(_) => *self,
                 ClassBase::Class(class) => SubclassOfType::from(
                     db,
-                    ClassBase::try_from_ty(db, class.metaclass(db)).unwrap_or(ClassBase::unknown()),
+                    ClassBase::try_from_type(db, class.metaclass(db))
+                        .unwrap_or(ClassBase::unknown()),
                 ),
             },
 
@@ -2367,7 +2370,7 @@ impl<'db> Type<'db> {
             // TODO intersections
             Type::Intersection(_) => SubclassOfType::from(
                 db,
-                ClassBase::try_from_ty(db, todo_type!("Intersection meta-type"))
+                ClassBase::try_from_type(db, todo_type!("Intersection meta-type"))
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
@@ -2491,7 +2494,7 @@ impl<'db> TypeAndQualifiers<'db> {
     }
 
     /// Forget about type qualifiers and only return the inner type.
-    pub(crate) fn inner_ty(&self) -> Type<'db> {
+    pub(crate) fn inner_type(&self) -> Type<'db> {
         self.inner
     }
 
@@ -3778,7 +3781,7 @@ impl<'db> Class<'db> {
         class_stmt
             .bases()
             .iter()
-            .map(|base_node| definition_expression_ty(db, class_definition, base_node))
+            .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
     }
 
@@ -3807,7 +3810,7 @@ impl<'db> Class<'db> {
             .decorator_list
             .iter()
             .map(|decorator_node| {
-                definition_expression_ty(db, class_definition, &decorator_node.expression)
+                definition_expression_type(db, class_definition, &decorator_node.expression)
             })
             .collect()
     }
@@ -3866,7 +3869,7 @@ impl<'db> Class<'db> {
             .find_keyword("metaclass")?
             .value;
         let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-        let metaclass_ty = definition_expression_ty(db, class_definition, metaclass_node);
+        let metaclass_ty = definition_expression_type(db, class_definition, metaclass_node);
         Some(metaclass_ty)
     }
 
@@ -3926,7 +3929,7 @@ impl<'db> Class<'db> {
                     let return_ty = outcomes
                         .iter()
                         .fold(None, |acc, outcome| {
-                            let ty = outcome.return_ty(db);
+                            let ty = outcome.return_type(db);
 
                             match (acc, ty) {
                                 (acc, None) => {
@@ -3957,7 +3960,7 @@ impl<'db> Class<'db> {
                 CallOutcome::Callable { binding }
                 | CallOutcome::RevealType { binding, .. }
                 | CallOutcome::StaticAssertionError { binding, .. }
-                | CallOutcome::AssertType { binding, .. } => Ok(binding.return_ty()),
+                | CallOutcome::AssertType { binding, .. } => Ok(binding.return_type()),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));
@@ -4110,7 +4113,7 @@ impl<'db> Class<'db> {
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // Ignore conflicting declarations
-                    SymbolAndQualifiers(declared_ty.inner_ty().into(), declared_ty.qualifiers())
+                    SymbolAndQualifiers(declared_ty.inner_type().into(), declared_ty.qualifiers())
                 }
             }
         } else {
@@ -4176,13 +4179,13 @@ pub struct TypeAliasType<'db> {
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
     #[salsa::tracked]
-    pub fn value_ty(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
 
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
 
-        definition_expression_ty(db, definition, &type_alias_stmt_node.value)
+        definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 }
 

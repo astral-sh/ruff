@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{HasTy, SemanticModel};
+use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
@@ -197,10 +197,10 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(function) => {
-                let _ty = function.ty(&self.model);
+                let _ty = function.inferred_type(&self.model);
             }
             Stmt::ClassDef(class) => {
-                let _ty = class.ty(&self.model);
+                let _ty = class.inferred_type(&self.model);
             }
             Stmt::Assign(assign) => {
                 for target in &assign.targets {
@@ -243,25 +243,25 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
-        let _ty = expr.ty(&self.model);
+        let _ty = expr.inferred_type(&self.model);
 
         source_order::walk_expr(self, expr);
     }
 
     fn visit_parameter(&mut self, parameter: &Parameter) {
-        let _ty = parameter.ty(&self.model);
+        let _ty = parameter.inferred_type(&self.model);
 
         source_order::walk_parameter(self, parameter);
     }
 
     fn visit_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
-        let _ty = parameter_with_default.ty(&self.model);
+        let _ty = parameter_with_default.inferred_type(&self.model);
 
         source_order::walk_parameter_with_default(self, parameter_with_default);
     }
 
     fn visit_alias(&mut self, alias: &Alias) {
-        let _ty = alias.ty(&self.model);
+        let _ty = alias.inferred_type(&self.model);
 
         source_order::walk_alias(self, alias);
     }
