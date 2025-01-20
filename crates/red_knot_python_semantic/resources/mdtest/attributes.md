@@ -454,7 +454,7 @@ mod.global_symbol = 1
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
 (_, mod.global_symbol) = (..., 1)
 
-# TODO: this should be an error, but we do not understand lists yet.
+# TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
 
 class IntIterator:
