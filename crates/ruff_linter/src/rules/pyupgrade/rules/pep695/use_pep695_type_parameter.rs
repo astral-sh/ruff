@@ -25,11 +25,10 @@ use super::{DisplayTypeVars, TypeVar, TypeVarReferenceVisitor};
 ///
 /// [PEP 695] uses inferred variance for type parameters, instead of the `covariant` and
 /// `contravariant` keywords used by `TypeVar` variables. As such, rewriting a `TypeVar` variable to
-/// an in-line type parameter may change its variance.
+/// an inline type parameter may change its variance.
 ///
-/// The rule currently excludes cases where it conceptually should be able to give a diagnostic. In
-/// particular, it skips generic classes with multiple base classes, and it skips generic methods in
-/// generic or non-generic classes.
+/// The rule currently skips generic classes with multiple base classes, and skips
+/// generic methods in generic or non-generic classes.
 ///
 /// ## Example
 ///
@@ -39,13 +38,15 @@ use super::{DisplayTypeVars, TypeVar, TypeVarReferenceVisitor};
 /// T = TypeVar("T")
 ///
 ///
-/// class GenericClass(Generic[T]): ...
+/// class GenericClass(Generic[T]):
+///     var: T
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// class GenericClass[T]: ...
+/// class GenericClass[T]:
+///     var: T
 /// ```
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
