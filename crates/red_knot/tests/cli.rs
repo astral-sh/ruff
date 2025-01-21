@@ -205,6 +205,83 @@ stat = add(10, 15)
     Ok(())
 }
 
+/// The rule severity can be changed in the configuration file
+#[test]
+fn rule_severity() -> anyhow::Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let project_dir = tempdir.path().canonicalize()?;
+
+    std::fs::write(
+        project_dir.join("pyproject.toml"),
+        r#"
+[tool.knot.rules]
+division-by-zero = "warn" # demote to warn
+possibly-unresolved-reference = "ignore"
+"#,
+    )
+    .context("Failed to write `pyproject.toml`")?;
+
+    std::fs::write(
+        project_dir.join("test.py"),
+        r#"
+y = x / 0
+
+for a in range(0, 1):
+    x = a
+
+print(x)  # possibly-unresolved-reference
+"#,
+    )
+    .context("Failed to write `test.py`")?;
+
+    insta::with_settings!({filters => vec![(&*tempdir_filter(&project_dir), "<temp_dir>/")]}, {
+        assert_cmd_snapshot!(knot().current_dir(project_dir), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[lint:unresolved-reference] <temp_dir>/test.py:2:5 Name `x` used when not defined
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
+/// Red Knot warns about unknown rules
+#[test]
+fn unknown_rules() -> anyhow::Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let project_dir = tempdir.path().canonicalize()?;
+
+    std::fs::write(
+        project_dir.join("pyproject.toml"),
+        r#"
+[tool.knot.rules]
+division-by-zer = "warn" # incorrect rule name
+"#,
+    )
+    .context("Failed to write `pyproject.toml`")?;
+
+    std::fs::write(project_dir.join("test.py"), r#"print(10)"#)
+        .context("Failed to write `test.py`")?;
+
+    insta::with_settings!({filters => vec![(&*tempdir_filter(&project_dir), "<temp_dir>/")]}, {
+        assert_cmd_snapshot!(knot().current_dir(project_dir), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[unknown-rule] Unknown lint rule `division-by-zer`
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
 fn knot() -> Command {
     Command::new(get_cargo_bin("red_knot"))
 }

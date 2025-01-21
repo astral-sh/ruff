@@ -1,6 +1,10 @@
 #![allow(clippy::ref_option)]
 
-use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder};
+use crate::metadata::options::OptionDiagnostic;
+pub use db::{Db, ProjectDatabase};
+use files::{Index, Indexed, IndexedFiles};
+pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
+use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
@@ -16,10 +20,6 @@ use salsa::Durability;
 use salsa::Setter;
 use std::borrow::Cow;
 use std::sync::Arc;
-
-pub use db::{Db, ProjectDatabase};
-use files::{Index, Indexed, IndexedFiles};
-pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 
 pub mod combine;
 
@@ -68,6 +68,7 @@ pub struct Project {
     pub metadata: ProjectMetadata,
 }
 
+#[salsa::tracked]
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Self {
         Project::builder(metadata)
@@ -96,13 +97,34 @@ impl Project {
         self.reload_files(db);
     }
 
+    pub fn rule_selection(self, db: &dyn Db) -> &RuleSelection {
+        let (selection, _) = self.rule_selection_with_diagnostics(db);
+        selection
+    }
+
+    #[salsa::tracked(return_ref)]
+    fn rule_selection_with_diagnostics(
+        self,
+        db: &dyn Db,
+    ) -> (RuleSelection, Vec<OptionDiagnostic>) {
+        self.metadata(db).options().to_rule_selection(db)
+    }
+
     /// Checks all open files in the project and its dependencies.
-    pub fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn Diagnostic>> {
+    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn Diagnostic>> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
         tracing::debug!("Checking project '{name}'", name = self.name(db));
-        let result = Arc::new(std::sync::Mutex::new(Vec::new()));
+
+        let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
+        let (_, options_diagnostics) = self.rule_selection_with_diagnostics(db);
+        diagnostics.extend(options_diagnostics.iter().map(|diagnostic| {
+            let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+            diagnostic
+        }));
+
+        let result = Arc::new(std::sync::Mutex::new(diagnostics));
         let inner_result = Arc::clone(&result);
 
         let db = db.clone();
@@ -119,13 +141,30 @@ impl Project {
                     let check_file_span = tracing::debug_span!(parent: &project_span, "check_file", file=%file.path(&db));
                     let _entered = check_file_span.entered();
 
-                    let file_diagnostics = check_file(&db, file);
+                    let file_diagnostics = check_file_impl(&db, file);
                     result.lock().unwrap().extend(file_diagnostics);
                 });
             }
         });
 
         Arc::into_inner(result).unwrap().into_inner().unwrap()
+    }
+
+    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
+        let (_, options_diagnostics) = self.rule_selection_with_diagnostics(db);
+
+        let mut file_diagnostics: Vec<_> = options_diagnostics
+            .iter()
+            .map(|diagnostic| {
+                let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+                diagnostic
+            })
+            .collect();
+
+        let check_diagnostics = check_file_impl(db, file);
+        file_diagnostics.extend(check_diagnostics);
+
+        file_diagnostics
     }
 
     /// Opens a file in the project.
@@ -265,8 +304,9 @@ impl Project {
     }
 }
 
-pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
+fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
     let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
+
     // Abort checking if there are IO errors.
     let source = source_text(db.upcast(), file);
 
@@ -418,7 +458,7 @@ impl Diagnostic for IOErrorDiagnostic {
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
-    use crate::{check_file, ProjectMetadata};
+    use crate::{check_file_impl, ProjectMetadata};
     use red_knot_python_semantic::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
@@ -442,7 +482,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file(&db, file)
+            check_file_impl(&db, file)
                 .into_iter()
                 .map(|diagnostic| diagnostic.message().into_owned())
                 .collect::<Vec<_>>(),
@@ -458,7 +498,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file(&db, file)
+            check_file_impl(&db, file)
                 .into_iter()
                 .map(|diagnostic| diagnostic.message().into_owned())
                 .collect::<Vec<_>>(),

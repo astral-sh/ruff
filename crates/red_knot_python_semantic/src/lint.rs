@@ -31,6 +31,11 @@ pub struct LintMetadata {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 pub enum Level {
     /// The lint is disabled and should not run.
     Ignore,
@@ -404,7 +409,7 @@ impl From<&'static LintMetadata> for LintEntry {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuleSelection {
     /// Map with the severity for each enabled lint rule.
     ///
