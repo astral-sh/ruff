@@ -2387,18 +2387,6 @@ impl<'a> From<ModRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::ModModule> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ModModule) -> AnyNodeRef<'a> {
-        AnyNodeRef::ModModule(node)
-    }
-}
-
-impl<'a> From<&'a crate::ModExpression> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ModExpression) -> AnyNodeRef<'a> {
-        AnyNodeRef::ModExpression(node)
-    }
-}
-
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(node: &'a Stmt) -> AnyNodeRef<'a> {
         match node {
@@ -2460,6 +2448,180 @@ impl<'a> From<StmtRef<'a>> for AnyNodeRef<'a> {
             StmtRef::Continue(node) => AnyNodeRef::StmtContinue(node),
             StmtRef::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
         }
+    }
+}
+
+impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
+    fn from(node: &'a Expr) -> AnyNodeRef<'a> {
+        match node {
+            Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
+            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
+            Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
+            Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
+            Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
+            Expr::If(node) => AnyNodeRef::ExprIf(node),
+            Expr::Dict(node) => AnyNodeRef::ExprDict(node),
+            Expr::Set(node) => AnyNodeRef::ExprSet(node),
+            Expr::ListComp(node) => AnyNodeRef::ExprListComp(node),
+            Expr::SetComp(node) => AnyNodeRef::ExprSetComp(node),
+            Expr::DictComp(node) => AnyNodeRef::ExprDictComp(node),
+            Expr::Generator(node) => AnyNodeRef::ExprGenerator(node),
+            Expr::Await(node) => AnyNodeRef::ExprAwait(node),
+            Expr::Yield(node) => AnyNodeRef::ExprYield(node),
+            Expr::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
+            Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
+            Expr::Call(node) => AnyNodeRef::ExprCall(node),
+            Expr::FString(node) => AnyNodeRef::ExprFString(node),
+            Expr::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
+            Expr::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
+            Expr::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
+            Expr::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
+            Expr::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
+            Expr::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
+            Expr::Attribute(node) => AnyNodeRef::ExprAttribute(node),
+            Expr::Subscript(node) => AnyNodeRef::ExprSubscript(node),
+            Expr::Starred(node) => AnyNodeRef::ExprStarred(node),
+            Expr::Name(node) => AnyNodeRef::ExprName(node),
+            Expr::List(node) => AnyNodeRef::ExprList(node),
+            Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
+            Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
+            Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: ExprRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            ExprRef::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
+            ExprRef::Named(node) => AnyNodeRef::ExprNamed(node),
+            ExprRef::BinOp(node) => AnyNodeRef::ExprBinOp(node),
+            ExprRef::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
+            ExprRef::Lambda(node) => AnyNodeRef::ExprLambda(node),
+            ExprRef::If(node) => AnyNodeRef::ExprIf(node),
+            ExprRef::Dict(node) => AnyNodeRef::ExprDict(node),
+            ExprRef::Set(node) => AnyNodeRef::ExprSet(node),
+            ExprRef::ListComp(node) => AnyNodeRef::ExprListComp(node),
+            ExprRef::SetComp(node) => AnyNodeRef::ExprSetComp(node),
+            ExprRef::DictComp(node) => AnyNodeRef::ExprDictComp(node),
+            ExprRef::Generator(node) => AnyNodeRef::ExprGenerator(node),
+            ExprRef::Await(node) => AnyNodeRef::ExprAwait(node),
+            ExprRef::Yield(node) => AnyNodeRef::ExprYield(node),
+            ExprRef::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
+            ExprRef::Compare(node) => AnyNodeRef::ExprCompare(node),
+            ExprRef::Call(node) => AnyNodeRef::ExprCall(node),
+            ExprRef::FString(node) => AnyNodeRef::ExprFString(node),
+            ExprRef::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
+            ExprRef::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
+            ExprRef::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
+            ExprRef::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
+            ExprRef::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
+            ExprRef::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
+            ExprRef::Attribute(node) => AnyNodeRef::ExprAttribute(node),
+            ExprRef::Subscript(node) => AnyNodeRef::ExprSubscript(node),
+            ExprRef::Starred(node) => AnyNodeRef::ExprStarred(node),
+            ExprRef::Name(node) => AnyNodeRef::ExprName(node),
+            ExprRef::List(node) => AnyNodeRef::ExprList(node),
+            ExprRef::Tuple(node) => AnyNodeRef::ExprTuple(node),
+            ExprRef::Slice(node) => AnyNodeRef::ExprSlice(node),
+            ExprRef::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
+    fn from(node: &'a ExceptHandler) -> AnyNodeRef<'a> {
+        match node {
+            ExceptHandler::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: ExceptHandlerRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            ExceptHandlerRef::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
+    fn from(node: &'a FStringElement) -> AnyNodeRef<'a> {
+        match node {
+            FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
+            FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl<'a> From<FStringElementRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: FStringElementRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            FStringElementRef::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
+            FStringElementRef::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
+    fn from(node: &'a Pattern) -> AnyNodeRef<'a> {
+        match node {
+            Pattern::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
+            Pattern::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
+            Pattern::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
+            Pattern::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
+            Pattern::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
+            Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
+            Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
+            Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: PatternRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            PatternRef::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
+            PatternRef::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
+            PatternRef::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
+            PatternRef::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
+            PatternRef::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
+            PatternRef::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
+            PatternRef::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
+            PatternRef::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
+        match node {
+            TypeParam::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            TypeParam::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            TypeParam::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
+    fn from(node: TypeParamRef<'a>) -> AnyNodeRef<'a> {
+        match node {
+            TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl<'a> From<&'a crate::ModModule> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ModModule) -> AnyNodeRef<'a> {
+        AnyNodeRef::ModModule(node)
+    }
+}
+
+impl<'a> From<&'a crate::ModExpression> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ModExpression) -> AnyNodeRef<'a> {
+        AnyNodeRef::ModExpression(node)
     }
 }
 
@@ -2610,84 +2772,6 @@ impl<'a> From<&'a crate::StmtContinue> for AnyNodeRef<'a> {
 impl<'a> From<&'a crate::StmtIpyEscapeCommand> for AnyNodeRef<'a> {
     fn from(node: &'a crate::StmtIpyEscapeCommand) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtIpyEscapeCommand(node)
-    }
-}
-
-impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
-    fn from(node: &'a Expr) -> AnyNodeRef<'a> {
-        match node {
-            Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
-            Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
-            Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
-            Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            Expr::If(node) => AnyNodeRef::ExprIf(node),
-            Expr::Dict(node) => AnyNodeRef::ExprDict(node),
-            Expr::Set(node) => AnyNodeRef::ExprSet(node),
-            Expr::ListComp(node) => AnyNodeRef::ExprListComp(node),
-            Expr::SetComp(node) => AnyNodeRef::ExprSetComp(node),
-            Expr::DictComp(node) => AnyNodeRef::ExprDictComp(node),
-            Expr::Generator(node) => AnyNodeRef::ExprGenerator(node),
-            Expr::Await(node) => AnyNodeRef::ExprAwait(node),
-            Expr::Yield(node) => AnyNodeRef::ExprYield(node),
-            Expr::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
-            Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
-            Expr::Call(node) => AnyNodeRef::ExprCall(node),
-            Expr::FString(node) => AnyNodeRef::ExprFString(node),
-            Expr::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
-            Expr::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
-            Expr::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
-            Expr::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
-            Expr::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
-            Expr::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
-            Expr::Attribute(node) => AnyNodeRef::ExprAttribute(node),
-            Expr::Subscript(node) => AnyNodeRef::ExprSubscript(node),
-            Expr::Starred(node) => AnyNodeRef::ExprStarred(node),
-            Expr::Name(node) => AnyNodeRef::ExprName(node),
-            Expr::List(node) => AnyNodeRef::ExprList(node),
-            Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
-            Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
-            Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: ExprRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            ExprRef::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            ExprRef::Named(node) => AnyNodeRef::ExprNamed(node),
-            ExprRef::BinOp(node) => AnyNodeRef::ExprBinOp(node),
-            ExprRef::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
-            ExprRef::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            ExprRef::If(node) => AnyNodeRef::ExprIf(node),
-            ExprRef::Dict(node) => AnyNodeRef::ExprDict(node),
-            ExprRef::Set(node) => AnyNodeRef::ExprSet(node),
-            ExprRef::ListComp(node) => AnyNodeRef::ExprListComp(node),
-            ExprRef::SetComp(node) => AnyNodeRef::ExprSetComp(node),
-            ExprRef::DictComp(node) => AnyNodeRef::ExprDictComp(node),
-            ExprRef::Generator(node) => AnyNodeRef::ExprGenerator(node),
-            ExprRef::Await(node) => AnyNodeRef::ExprAwait(node),
-            ExprRef::Yield(node) => AnyNodeRef::ExprYield(node),
-            ExprRef::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
-            ExprRef::Compare(node) => AnyNodeRef::ExprCompare(node),
-            ExprRef::Call(node) => AnyNodeRef::ExprCall(node),
-            ExprRef::FString(node) => AnyNodeRef::ExprFString(node),
-            ExprRef::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
-            ExprRef::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
-            ExprRef::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
-            ExprRef::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
-            ExprRef::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
-            ExprRef::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
-            ExprRef::Attribute(node) => AnyNodeRef::ExprAttribute(node),
-            ExprRef::Subscript(node) => AnyNodeRef::ExprSubscript(node),
-            ExprRef::Starred(node) => AnyNodeRef::ExprStarred(node),
-            ExprRef::Name(node) => AnyNodeRef::ExprName(node),
-            ExprRef::List(node) => AnyNodeRef::ExprList(node),
-            ExprRef::Tuple(node) => AnyNodeRef::ExprTuple(node),
-            ExprRef::Slice(node) => AnyNodeRef::ExprSlice(node),
-            ExprRef::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
-        }
     }
 }
 
@@ -2883,43 +2967,9 @@ impl<'a> From<&'a crate::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
-    fn from(node: &'a ExceptHandler) -> AnyNodeRef<'a> {
-        match node {
-            ExceptHandler::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
-        }
-    }
-}
-
-impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: ExceptHandlerRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            ExceptHandlerRef::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
-        }
-    }
-}
-
 impl<'a> From<&'a crate::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a crate::ExceptHandlerExceptHandler) -> AnyNodeRef<'a> {
         AnyNodeRef::ExceptHandlerExceptHandler(node)
-    }
-}
-
-impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
-    fn from(node: &'a FStringElement) -> AnyNodeRef<'a> {
-        match node {
-            FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
-            FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
-        }
-    }
-}
-
-impl<'a> From<FStringElementRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: FStringElementRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            FStringElementRef::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
-            FStringElementRef::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
-        }
     }
 }
 
@@ -2932,36 +2982,6 @@ impl<'a> From<&'a crate::FStringExpressionElement> for AnyNodeRef<'a> {
 impl<'a> From<&'a crate::FStringLiteralElement> for AnyNodeRef<'a> {
     fn from(node: &'a crate::FStringLiteralElement) -> AnyNodeRef<'a> {
         AnyNodeRef::FStringLiteralElement(node)
-    }
-}
-
-impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
-    fn from(node: &'a Pattern) -> AnyNodeRef<'a> {
-        match node {
-            Pattern::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
-            Pattern::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
-            Pattern::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
-            Pattern::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
-            Pattern::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
-            Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
-            Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
-            Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
-        }
-    }
-}
-
-impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: PatternRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            PatternRef::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
-            PatternRef::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
-            PatternRef::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
-            PatternRef::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
-            PatternRef::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
-            PatternRef::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
-            PatternRef::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
-            PatternRef::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
-        }
     }
 }
 
@@ -3010,26 +3030,6 @@ impl<'a> From<&'a crate::PatternMatchAs> for AnyNodeRef<'a> {
 impl<'a> From<&'a crate::PatternMatchOr> for AnyNodeRef<'a> {
     fn from(node: &'a crate::PatternMatchOr) -> AnyNodeRef<'a> {
         AnyNodeRef::PatternMatchOr(node)
-    }
-}
-
-impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
-    fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
-        match node {
-            TypeParam::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
-            TypeParam::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
-            TypeParam::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
-        }
-    }
-}
-
-impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: TypeParamRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
-            TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
-            TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
-        }
     }
 }
 

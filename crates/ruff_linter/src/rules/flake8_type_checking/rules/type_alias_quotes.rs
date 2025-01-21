@@ -289,10 +289,7 @@ pub(crate) fn quoted_type_alias(
     let range = annotation_expr.range();
     let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
     let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
-    if checker
-        .comment_ranges()
-        .has_comments(expr, checker.source())
-    {
+    if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));

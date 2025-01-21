@@ -10,7 +10,6 @@ use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::SitePackages;
 use red_knot_server::run_server;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
@@ -77,9 +76,7 @@ impl Args {
                 venv_path: self
                     .venv_path
                     .as_ref()
-                    .map(|venv_path| SitePackages::Derived {
-                        venv_path: SystemPath::absolute(venv_path, cli_cwd),
-                    }),
+                    .map(|venv_path| SystemPath::absolute(venv_path, cli_cwd)),
                 typeshed: self
                     .typeshed
                     .as_ref()

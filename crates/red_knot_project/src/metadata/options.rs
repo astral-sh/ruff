@@ -74,7 +74,9 @@ impl Options {
             extra_paths: extra_paths.unwrap_or_default(),
             src_roots,
             typeshed,
-            site_packages: python.unwrap_or(SitePackages::Known(vec![])),
+            site_packages: python
+                .map(|venv_path| SitePackages::Derived { venv_path })
+                .unwrap_or(SitePackages::Known(vec![])),
         }
     }
 }
@@ -98,7 +100,7 @@ pub struct EnvironmentOptions {
 
     // TODO: Rename to python, see https://github.com/astral-sh/ruff/issues/15530
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub venv_path: Option<SitePackages>,
+    pub venv_path: Option<SystemPathBuf>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
