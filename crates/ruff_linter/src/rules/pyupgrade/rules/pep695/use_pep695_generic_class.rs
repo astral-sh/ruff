@@ -228,7 +228,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                     ])),
                     kind: TypeParamKind::TypeVar,
                     default: None,
-                })
+                });
             }
             Expr::Name(name) if name.ctx.is_load() => {
                 if let Some(var) = expr_name_to_type_var(self.semantic, name) {

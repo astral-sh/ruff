@@ -105,7 +105,7 @@ impl Display for DisplayTypeVar<'_> {
                     for (i, v) in vec.iter().enumerate() {
                         // typing.AnyStr special case doesn't have a real range
                         if let Expr::Name(name) = v {
-                            f.write_str(&name.id.to_string())?;
+                            f.write_str(name.id.as_ref())?;
                         } else {
                             f.write_str(&self.source[v.range()])?;
                         }
@@ -203,7 +203,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                     ])),
                     kind: TypeParamKind::TypeVar,
                     default: None,
-                })
+                });
             }
             Expr::Name(name) if name.ctx.is_load() => {
                 self.vars.extend(expr_name_to_type_var(self.semantic, name));
@@ -281,7 +281,7 @@ fn expr_name_to_type_var<'a>(
                     Some(TypeVarRestriction::Bound(&bound.value))
                 } else if arguments.args.len() > 1 {
                     Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().cloned().skip(1).collect(),
+                        arguments.args.iter().skip(1).cloned().collect(),
                     ))
                 } else {
                     None
