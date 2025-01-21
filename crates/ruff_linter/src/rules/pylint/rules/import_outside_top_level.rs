@@ -3,7 +3,9 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::{
+    checkers::ast::Checker, codes::Rule, rules::flake8_tidy_imports::matchers::NameMatchPolicy,
+};
 
 /// ## What it does
 /// Checks for `import` statements outside of a module's top-level scope, such
@@ -53,8 +55,38 @@ impl Violation for ImportOutsideTopLevel {
 }
 
 /// C0415
-pub(crate) fn import_outside_top_level(checker: &mut Checker, stmt: &Stmt) {
-    if !checker.semantic().current_scope().kind.is_module() {
+pub(crate) fn import_outside_top_level(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    pkg: Option<NameMatchPolicy>,
+    modules: &Vec<NameMatchPolicy>,
+) {
+    if !checker.semantic().current_scope().kind.is_module()
+        && (!checker.enabled(Rule::BannedModuleLevelImports)
+            || (pkg.is_some_and(|policy| {
+                policy
+                    .find(
+                        checker
+                            .settings
+                            .flake8_tidy_imports
+                            .banned_module_level_imports
+                            .iter()
+                            .map(AsRef::as_ref),
+                    )
+                    .is_none()
+            }) && modules.iter().any(|policy| {
+                policy
+                    .find(
+                        checker
+                            .settings
+                            .flake8_tidy_imports
+                            .banned_module_level_imports
+                            .iter()
+                            .map(AsRef::as_ref),
+                    )
+                    .is_none()
+            })))
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));

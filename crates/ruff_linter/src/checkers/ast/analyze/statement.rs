@@ -563,7 +563,21 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
             if checker.enabled(Rule::ImportOutsideTopLevel) {
-                pylint::rules::import_outside_top_level(checker, stmt);
+                pylint::rules::import_outside_top_level(
+                    checker,
+                    stmt,
+                    None,
+                    &names
+                        .iter()
+                        .map(|alias| {
+                            flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
+                                flake8_tidy_imports::matchers::MatchNameOrParent {
+                                    module: &alias.name,
+                                },
+                            )
+                        })
+                        .collect(),
+                );
             }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {
@@ -752,7 +766,36 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
             if checker.enabled(Rule::ImportOutsideTopLevel) {
-                pylint::rules::import_outside_top_level(checker, stmt);
+                if let Some(module) = helpers::resolve_imported_module_path(
+                    level,
+                    module,
+                    checker.module.qualified_name(),
+                ) {
+                    pylint::rules::import_outside_top_level(
+                        checker,
+                        stmt,
+                        Some(
+                            flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
+                                flake8_tidy_imports::matchers::MatchNameOrParent {
+                                    module: &module,
+                                },
+                            ),
+                        ),
+                        &names
+                            .iter()
+                            .map(|alias| {
+                                flake8_tidy_imports::matchers::NameMatchPolicy::MatchName(
+                                    flake8_tidy_imports::matchers::MatchName {
+                                        module: &module,
+                                        member: &alias.name,
+                                    },
+                                )
+                            })
+                            .collect(),
+                    );
+                } else {
+                    pylint::rules::import_outside_top_level(checker, stmt, None, &Vec::new());
+                }
             }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {

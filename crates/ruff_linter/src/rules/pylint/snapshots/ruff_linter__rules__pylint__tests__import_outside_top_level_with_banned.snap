@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+import_outside_top_level_with_banned.py:7:5: PLC0415 `import` should be at the top-level of a file
+  |
+6 |     # this should still trigger an error due to multiple imports
+7 |     from pkg import foo_allowed, bar_banned
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+  |
