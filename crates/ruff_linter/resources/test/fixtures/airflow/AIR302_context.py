@@ -120,5 +120,3 @@ def print_context(ds=None, **kwargs):
     """Print the Airflow context and ds variable from the context."""
     print(ds)
     print(kwargs.get("tomorrow_ds"))
-
-run_this = print_context()
