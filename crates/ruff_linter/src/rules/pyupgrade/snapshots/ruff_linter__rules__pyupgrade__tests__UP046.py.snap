@@ -73,4 +73,14 @@ UP046.py:22:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass in
    22 |+class Constrained[S: (str, bytes)]:
 23 23 |     pass
 24 24 | 
-25 25 |
+25 25 | 
+
+UP046.py:28:20: UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
+   |
+26 | # This case gets a diagnostic but not a fix because we can't look up the bounds
+27 | # or constraints on the generic type from another module
+28 | class ExternalType(Generic[T, SupportsRichComparisonT]):
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP046
+29 |     pass
+   |
+   = help: Use type parameters

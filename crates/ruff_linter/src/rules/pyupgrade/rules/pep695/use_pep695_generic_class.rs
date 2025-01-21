@@ -1,13 +1,14 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::{visitor, StmtClassDef};
 use ruff_python_ast::{visitor::Visitor, Expr, ExprSubscript};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
-use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
+use super::{check_type_vars, expr_name_to_type_var, in_nested_context, DisplayTypeVars, TypeVar};
 
 /// ## What it does
 ///
@@ -28,6 +29,10 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// generic classes nested inside of other
 /// functions or classes. Finally, this rule skips type parameters with the `default` argument
 /// introduced in [PEP 696] and implemented in Python 3.13.
+///
+/// This rule can only offer a fix if all of the generic types in the class definition are defined
+/// in the current module. For external type parameters, a diagnostic is emitted without a suggested
+/// fix.
 ///
 /// ## Example
 ///
@@ -66,7 +71,7 @@ pub(crate) struct NonPEP695GenericClass {
 }
 
 impl Violation for NonPEP695GenericClass {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -124,35 +129,80 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         return;
     }
 
-    let vars = {
-        let mut visitor = TypeVarReferenceVisitor {
-            vars: vec![],
-            semantic: checker.semantic(),
+    let mut diagnostic = Diagnostic::new(
+        NonPEP695GenericClass {
+            name: name.to_string(),
+        },
+        *range,
+    );
+
+    let mut visitor = TypeVarReferenceVisitor {
+        vars: vec![],
+        semantic: checker.semantic(),
+        any_skipped: false,
+    };
+    visitor.visit_expr(slice);
+
+    // if any of the parameters have been skipped, this indicates that we could not resolve the type
+    // to a `TypeVar`, `TypeVarTuple`, or `ParamSpec`, and thus our fix would remove it from the
+    // signature incorrectly. We can still offer the diagnostic created above without a Fix. For
+    // example,
+    //
+    // ```python
+    // from somewhere import SomethingElse
+    //
+    // T = TypeVar("T")
+    //
+    // class Class(Generic[T, SomethingElse]): ...
+    // ```
+    //
+    // should not be converted to
+    //
+    // ```python
+    // class Class[T]: ...
+    // ```
+    //
+    // just because we can't confirm that `SomethingElse` is a `TypeVar`
+    if !visitor.any_skipped {
+        let Some(type_vars) = check_type_vars(visitor.vars) else {
+            return;
         };
-        visitor.visit_expr(slice);
-        visitor.vars
-    };
 
-    let Some(type_vars) = check_type_vars(vars) else {
-        return;
-    };
+        // build the fix as a String to avoid removing comments from the entire function body
+        let type_params = DisplayTypeVars {
+            type_vars: &type_vars,
+            source: checker.source(),
+        };
 
-    // build the fix as a String to avoid removing comments from the entire function body
-    let type_params = DisplayTypeVars {
-        type_vars: &type_vars,
-        source: checker.source(),
-    };
-
-    checker.diagnostics.push(
-        Diagnostic::new(
-            NonPEP695GenericClass {
-                name: name.to_string(),
-            },
-            *range,
-        )
-        .with_fix(Fix::applicable_edit(
+        diagnostic.set_fix(Fix::applicable_edit(
             Edit::replacement(type_params.to_string(), name.end(), arguments.end()),
             Applicability::Safe,
-        )),
-    );
+        ));
+    }
+
+    checker.diagnostics.push(diagnostic);
+}
+
+/// Copy of [`super::TypeVarReferenceVisitor`] with additional tracking of non-TypeVars encountered
+/// to avoid replacing generic parameters when an unknown `TypeVar` is encountered.
+struct TypeVarReferenceVisitor<'a> {
+    vars: Vec<TypeVar<'a>>,
+    semantic: &'a SemanticModel<'a>,
+    any_skipped: bool,
+}
+
+/// Recursively collects the names of type variable references present in an expression.
+impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Name(name) if name.ctx.is_load() => {
+                if let Some(var) = expr_name_to_type_var(self.semantic, name) {
+                    self.vars.push(var);
+                } else {
+                    self.any_skipped = true;
+                }
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
 }

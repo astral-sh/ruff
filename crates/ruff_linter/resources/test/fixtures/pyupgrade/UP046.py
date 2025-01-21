@@ -23,6 +23,12 @@ class Constrained(Generic[S]):
     pass
 
 
+# This case gets a diagnostic but not a fix because we can't look up the bounds
+# or constraints on the generic type from another module
+class ExternalType(Generic[T, SupportsRichComparisonT]):
+    pass
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
