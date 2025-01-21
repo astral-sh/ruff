@@ -31,7 +31,7 @@ class MDTestRunner:
         self.mdtest_executable = None
         self.console = Console()
 
-    def _run_cargo_test(self, message_format: Literal["human", "json"]) -> str:
+    def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
             [
                 "cargo",
