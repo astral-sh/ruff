@@ -11,31 +11,31 @@ readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
 keywords = [
-  "automation",
-  "flake8",
-  "pycodestyle",
-  "pyflakes",
-  "pylint",
-  "clippy",
+    "automation",
+    "flake8",
+    "pycodestyle",
+    "pyflakes",
+    "pylint",
+    "clippy",
 ]
 classifiers = [
-  "Development Status :: 5 - Production/Stable",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Rust",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Software Development :: Quality Assurance",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
 ]
 
 [project.urls]
@@ -50,45 +50,46 @@ module-name = "ruff"
 python-source = "python"
 strip = true
 exclude = [
-  "crates/ruff_linter/resources/test/fixtures/**/*",
-  "crates/ruff_linter/src/rules/*/snapshots/**/*"
+    "crates/ruff_linter/resources/test/fixtures/**/*",
+    "crates/ruff_linter/src/rules/*/snapshots/**/*"
 ]
 include = [
-  "rust-toolchain.toml"
+    "rust-toolchain.toml"
 ]
 
 [tool.ruff]
 target-version = "py38"
 extend-exclude = [
-  "crates/red_knot_vendored/vendor/",
-  "crates/ruff/resources/",
-  "crates/ruff_linter/resources/",
-  "crates/ruff_python_formatter/resources/",
-  "crates/ruff_python_parser/resources/"
+    "crates/red_knot_vendored/vendor/",
+    "crates/ruff/resources/",
+    "crates/ruff_linter/resources/",
+    "crates/ruff_python_formatter/resources/",
+    "crates/ruff_python_parser/resources/"
 ]
 
 [tool.ruff.lint]
 select = [
-  "E", # pycodestyle (error)
-  "F", # pyflakes
-  "B", # bugbear
-  "B9",
-  "C4", # flake8-comprehensions
-  "SIM", # flake8-simplify
-  "I", # isort
-  "UP", # pyupgrade
-  "PIE", # flake8-pie
-  "PGH", # pygrep-hooks
-  "PYI", # flake8-pyi
-  "RUF",
+    "E", # pycodestyle (error)
+    "F", # pyflakes
+    "B", # bugbear
+    "B9",
+    "C4", # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "I", # isort
+    "UP", # pyupgrade
+    "PIE", # flake8-pie
+    "PGH", # pygrep-hooks
+    "PYI", # flake8-pyi
+    "RUF",
 ]
 
 ignore = [
-  # Conflicts with the formatter
-  "COM812",
-  # only relevant if you run a script with `python -0`,
-  # which seems unlikely for any of the scripts in this repo
-  "B011",
+    # only relevant if you run a script with `python -0`,
+    # which seems unlikely for any of the scripts in this repo
+    "B011",
+    # Leave it to the formatter to split long lines and
+    # the judgement of all of us.
+    "E501"
 ]
 
 [tool.ruff.lint.isort]
@@ -131,11 +132,11 @@ changelog_sections.__unknown__ = "Other changes"
 changelog_contributors = false
 
 version_files = [
-  "README.md",
-  "docs/integrations.md",
-  "docs/tutorial.md",
-  "crates/ruff/Cargo.toml",
-  "crates/ruff_linter/Cargo.toml",
-  "crates/ruff_wasm/Cargo.toml",
-  "scripts/benchmarks/pyproject.toml",
+    "README.md",
+    "docs/integrations.md",
+    "docs/tutorial.md",
+    "crates/ruff/Cargo.toml",
+    "crates/ruff_linter/Cargo.toml",
+    "crates/ruff_wasm/Cargo.toml",
+    "scripts/benchmarks/pyproject.toml",
 ]

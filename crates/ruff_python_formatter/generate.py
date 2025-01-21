@@ -113,7 +113,7 @@ for group, group_nodes in nodes_grouped.items():
                     write!(f, [verbatim_text(item)])
                 }}
             }}
-            """.strip()  # noqa: E501
+            """.strip()
 
         node_path.write_text(rustfmt(code))
 
@@ -128,7 +128,7 @@ use crate::{AsFormat, FormatNodeRule, IntoFormat, PyFormatter};
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
 use ruff_python_ast as ast;
 
-"""  # noqa: E501
+"""
 for node in nodes:
     text = f"""
         impl FormatRule<ast::{node}, PyFormatContext<'_>>
@@ -170,7 +170,7 @@ for node in nodes:
                 )
             }}
         }}
-    """  # noqa: E501
+    """
     generated += text
 
 out.write_text(rustfmt(generated))
