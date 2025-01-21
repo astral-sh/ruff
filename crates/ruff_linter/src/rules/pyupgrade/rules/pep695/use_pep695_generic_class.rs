@@ -1,18 +1,14 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{visitor, ExprName, StmtClassDef};
-use ruff_python_ast::{visitor::Visitor, Expr, ExprSubscript};
-use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
-use super::{
-    check_type_vars, expr_name_to_type_var, in_nested_context, DisplayTypeVars, TypeParamKind,
-    TypeVar, TypeVarRestriction,
-};
+use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
 
 /// ## What it does
 ///
@@ -187,57 +183,4 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     }
 
     checker.diagnostics.push(diagnostic);
-}
-
-/// Copy of [`super::TypeVarReferenceVisitor`] with additional tracking of non-TypeVars encountered
-/// to avoid replacing generic parameters when an unknown `TypeVar` is encountered.
-struct TypeVarReferenceVisitor<'a> {
-    vars: Vec<TypeVar<'a>>,
-    semantic: &'a SemanticModel<'a>,
-    any_skipped: bool,
-}
-
-/// Recursively collects the names of type variable references present in an expression.
-impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            // special case for typing.AnyStr, which is a commonly-imported type variable in the
-            // standard library with the definition:
-            //
-            // ```python
-            // AnyStr = TypeVar('AnyStr', bytes, str)
-            // ```
-            //
-            // As of 01/2025, this line hasn't been modified in 8 years, so hopefully there won't be
-            // much to keep updated here. See
-            // https://github.com/python/cpython/blob/383af395af828f40d9543ee0a8fdc5cc011d43db/Lib/typing.py#L2806
-            e @ Expr::Name(name) if self.semantic.match_typing_expr(e, "AnyStr") => {
-                self.vars.push(TypeVar {
-                    name,
-                    restriction: Some(TypeVarRestriction::Constraint(vec![
-                        Expr::Name(ExprName {
-                            range: TextRange::default(),
-                            id: Name::from("bytes"),
-                            ctx: ruff_python_ast::ExprContext::Load,
-                        }),
-                        Expr::Name(ExprName {
-                            range: TextRange::default(),
-                            id: Name::from("str"),
-                            ctx: ruff_python_ast::ExprContext::Load,
-                        }),
-                    ])),
-                    kind: TypeParamKind::TypeVar,
-                    default: None,
-                });
-            }
-            Expr::Name(name) if name.ctx.is_load() => {
-                if let Some(var) = expr_name_to_type_var(self.semantic, name) {
-                    self.vars.push(var);
-                } else {
-                    self.any_skipped = true;
-                }
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
-    }
 }

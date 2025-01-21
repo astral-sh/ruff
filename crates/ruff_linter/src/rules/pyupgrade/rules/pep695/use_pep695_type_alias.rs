@@ -190,6 +190,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         let mut visitor = TypeVarReferenceVisitor {
             vars: vec![],
             semantic: checker.semantic(),
+            any_skipped: false,
         };
         visitor.visit_expr(value);
         visitor.vars

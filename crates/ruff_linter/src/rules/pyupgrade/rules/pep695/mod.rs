@@ -170,6 +170,9 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
 struct TypeVarReferenceVisitor<'a> {
     vars: Vec<TypeVar<'a>>,
     semantic: &'a SemanticModel<'a>,
+    /// Tracks whether any non-TypeVars are have been seen to avoid replacing generic parameters
+    /// when an unknown `TypeVar` is encountered.
+    any_skipped: bool,
 }
 
 /// Recursively collects the names of type variable references present in an expression.
@@ -206,7 +209,11 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                 });
             }
             Expr::Name(name) if name.ctx.is_load() => {
-                self.vars.extend(expr_name_to_type_var(self.semantic, name));
+                if let Some(var) = expr_name_to_type_var(self.semantic, name) {
+                    self.vars.push(var);
+                } else {
+                    self.any_skipped = true;
+                }
             }
             _ => visitor::walk_expr(self, expr),
         }

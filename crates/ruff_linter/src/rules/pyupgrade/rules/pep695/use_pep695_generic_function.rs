@@ -134,6 +134,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
                 let mut visitor = TypeVarReferenceVisitor {
                     vars: vec![],
                     semantic: checker.semantic(),
+                    any_skipped: false,
                 };
                 visitor.visit_expr(annotation);
                 visitor.vars
