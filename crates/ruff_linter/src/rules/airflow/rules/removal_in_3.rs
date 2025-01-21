@@ -349,15 +349,42 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
     }
 }
 
-/// Check whether a removed context key is access through context.get("key").
+/// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
 ///
+/// Specifically, it flags two scenarios for task decorated function:
+/// 1. A removed context variable passed in as a function parameter name (e.g., `execution_date`).
+/// 2. A removed context key accessed via `context.get("...")`.
+///
+/// # Examples
+///
+/// **Removed key used in `context.get(...)`:**
 /// ```python
 /// from airflow.decorators import task
 ///
+/// @task
+/// def my_task(**context):
+///     # 'conf' is removed in Airflow 3.0
+///     print(context.get("conf"))
+/// ```
+///
+/// **Removed context variable as a parameter:**
+/// ```python
+/// from airflow.decorators import task
 ///
 /// @task
-/// def access_invalid_key_task_out_of_dag(**context):
-///     print("access invalid key", context.get("conf"))
+/// def another_task(execution_date, **kwargs):
+///     # 'execution_date' is removed in Airflow 3.0
+///     pass
+/// ```
+///
+/// **Accessing multiple keys:**
+/// ```python
+/// from airflow.decorators import task
+///
+/// @task
+/// def more_keys(**context):
+///     # 'prev_ds' is also removed in Airflow 3.0
+///     print(context.get("prev_ds"))
 /// ```
 fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
     if !is_taskflow(checker) {
@@ -368,9 +395,21 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
         return;
     };
 
-    if !value.as_name_expr().is_some_and(|name| {
+    let is_named_context = value.as_name_expr().is_some_and(|name| {
         matches!(name.id.as_str(), "context" | "kwargs") || name.id.as_str().starts_with("**")
-    }) {
+    });
+
+    let is_assigned_from_gcc =
+        if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
+            matches!(
+                qualname.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        } else {
+            false
+        };
+
+    if !(is_named_context || is_assigned_from_gcc) {
         return;
     }
 
