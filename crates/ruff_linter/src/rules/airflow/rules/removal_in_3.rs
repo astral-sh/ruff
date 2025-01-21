@@ -365,7 +365,9 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
 ///     print("access invalid key", context.get("conf"))
 /// ```
 fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
-    detect_removed_context_keys_in_task_decorators(checker);
+    if !is_taskflow(checker) {
+        return;
+    }
 
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
         return;
@@ -381,18 +383,111 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
         return;
     }
 
-    for removed_key in REMOVED_CONTEXT_KEYS {
-        if let Some(argument) = call_expr.arguments.find_argument_value(removed_key, 0) {
-            checker.diagnostics.push(Diagnostic::new(
-                Airflow3Removal {
-                    deprecated: removed_key.to_string(),
-                    replacement: Replacement::None,
-                },
-                argument.range(),
-            ));
-            return;
+    let function_def = {
+        let mut parents = checker.semantic().current_statements();
+        parents.find_map(|stmt| {
+            if let Stmt::FunctionDef(func_def) = stmt {
+                Some(func_def.clone())
+            } else {
+                None
+            }
+        })
+    };
+
+    if let Some(func_def) = function_def {
+        let param_names = extract_task_function_arguments(&func_def);
+
+        for param_name in param_names {
+            if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
+                checker.diagnostics.push(Diagnostic::new(
+                    Airflow3Removal {
+                        deprecated: param_name,
+                        replacement: Replacement::None,
+                    },
+                    func_def.name.range(),
+                ));
+            }
         }
     }
+
+    for removed_key in REMOVED_CONTEXT_KEYS {
+        if let Some(argument) = call_expr.arguments.find_argument_value(removed_key, 0) {
+            if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = argument {
+                if value == removed_key {
+                    checker.diagnostics.push(Diagnostic::new(
+                        Airflow3Removal {
+                            deprecated: removed_key.to_string(),
+                            replacement: Replacement::None,
+                        },
+                        argument.range(),
+                    ));
+                }
+            }
+        }
+    }
+}
+
+/// Extracts the names of all parameters (positional‐only, regular, and keyword‐only)
+/// from the given function definition.
+///
+/// # Example
+/// ```python
+/// @task
+/// def my_function(x, y, *, z=None):
+///     pass
+/// ```
+/// Calling `extract_task_function_arguments` on the AST node for `my_function` returns:
+/// ```plaintext
+/// ["x", "y", "z"]
+/// ```
+fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
+    let mut arguments = Vec::new();
+
+    for param in &stmt.parameters.posonlyargs {
+        arguments.push(param.parameter.name.to_string());
+    }
+
+    for param in &stmt.parameters.args {
+        arguments.push(param.parameter.name.to_string());
+    }
+
+    for param in &stmt.parameters.kwonlyargs {
+        arguments.push(param.parameter.name.to_string());
+    }
+
+    arguments
+}
+
+/// Check whether the function is decorated by @task
+///
+///
+/// Examples for the above patterns:
+/// ```python
+/// from airflow.decorators import task
+///
+///
+/// @task
+/// def access_invalid_key_task_out_of_dag(**context):
+///     print("access invalid key", context.get("conf"))
+/// ```
+fn is_taskflow(checker: &mut Checker) -> bool {
+    let mut parents = checker.semantic().current_statements();
+    if let Some(Stmt::FunctionDef(StmtFunctionDef { decorator_list, .. })) =
+        parents.find(|stmt| stmt.is_function_def_stmt())
+    {
+        for decorator in decorator_list {
+            if checker
+                .semantic()
+                .resolve_qualified_name(map_callable(&decorator.expression))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
+                })
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Check whether a removed Airflow class method is called.
@@ -1002,75 +1097,4 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
 
         _ => false,
     }
-}
-
-/// Check for the usage of removed Airflow context keys and deprecated arguments in decorator-based functions.
-///
-/// This function scans the current scope for functions decorated with the `@task` decorator
-/// and examines their arguments and context keys. If any deprecated arguments or context keys
-/// listed in `REMOVED_CONTEXT_KEYS` are found, it emits a diagnostic error.
-///
-/// ### Example
-/// ```python
-/// from airflow.decorators import task
-///
-/// @task
-/// def access_invalid_argument_task_out_of_dag(execution_date, **context):  # Deprecated argument
-///     print("execution date", execution_date)
-///     print("access invalid key", context.get("conf"))  # Deprecated context key
-///
-/// @task(task_id="print_the_context")
-/// def print_context(ds=None, **kwargs):
-///     """Print the Airflow context and ds variable from the context."""
-///     print(ds)
-///     print(kwargs.get("tomorrow_ds"))  # Deprecated context key
-/// ```
-fn detect_removed_context_keys_in_task_decorators(checker: &mut Checker) -> bool {
-    let parents: Vec<_> = checker.semantic().current_statements().collect();
-
-    for stmt in parents {
-        let Stmt::FunctionDef(function_def) = stmt else {
-            continue;
-        };
-
-        if !has_task_decorator(checker, function_def) {
-            continue;
-        }
-
-        let arguments = extract_task_function_arguments(function_def);
-
-        for arg in arguments {
-            if REMOVED_CONTEXT_KEYS.contains(&arg.as_str()) {
-                checker.diagnostics.push(Diagnostic::new(
-                    Airflow3Removal {
-                        deprecated: arg,
-                        replacement: Replacement::None,
-                    },
-                    function_def.name.range(),
-                ));
-            }
-        }
-    }
-
-    false
-}
-
-fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
-    let mut arguments = Vec::new();
-
-    for param in &stmt.parameters.args {
-        arguments.push(param.parameter.name.to_string());
-    }
-    arguments
-}
-
-fn has_task_decorator(checker: &mut Checker, stmt: &StmtFunctionDef) -> bool {
-    stmt.decorator_list.iter().any(|decorator| {
-        checker
-            .semantic()
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
-            })
-    })
 }
