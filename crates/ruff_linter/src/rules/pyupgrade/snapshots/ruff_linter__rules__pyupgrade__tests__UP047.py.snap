@@ -2,80 +2,100 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP047.py:10:5: UP047 [*] Generic function `f` should use type parameters
+UP047.py:12:5: UP047 [*] Generic function `f` should use type parameters
    |
-10 | def f(t: T):
+12 | def f(t: T):
    |     ^^^^^^^ UP047
-11 |     pass
+13 |     pass
    |
    = help: Use type parameters
 
-ℹ Safe fix
-7  7  | P = ParamSpec("P")
-8  8  | 
-9  9  | 
-10    |-def f(t: T):
-   10 |+def f[T: float](t: T):
-11 11 |     pass
-12 12 | 
-13 13 | 
+ℹ Unsafe fix
+9  9  | P = ParamSpec("P")
+10 10 | 
+11 11 | 
+12    |-def f(t: T):
+   12 |+def f[T: float](t: T):
+13 13 |     pass
+14 14 | 
+15 15 | 
 
-UP047.py:14:5: UP047 [*] Generic function `g` should use type parameters
+UP047.py:16:5: UP047 [*] Generic function `g` should use type parameters
    |
-14 | def g(ts: tuple[*Ts]):
+16 | def g(ts: tuple[*Ts]):
    |     ^^^^^^^^^^^^^^^^^ UP047
-15 |     pass
+17 |     pass
    |
    = help: Use type parameters
 
-ℹ Safe fix
-11 11 |     pass
-12 12 | 
-13 13 | 
-14    |-def g(ts: tuple[*Ts]):
-   14 |+def g[*Ts](ts: tuple[*Ts]):
-15 15 |     pass
-16 16 | 
-17 17 | 
+ℹ Unsafe fix
+13 13 |     pass
+14 14 | 
+15 15 | 
+16    |-def g(ts: tuple[*Ts]):
+   16 |+def g[*Ts](ts: tuple[*Ts]):
+17 17 |     pass
+18 18 | 
+19 19 | 
 
-UP047.py:18:5: UP047 [*] Generic function `h` should use type parameters
+UP047.py:20:5: UP047 [*] Generic function `h` should use type parameters
    |
-18 |   def h(
+20 |   def h(
    |  _____^
-19 | |     p: Callable[P, T],
-20 | |     # Comment in the middle of a parameter list should be preserved
-21 | |     another_param,
-22 | |     and_another,
-23 | | ):
+21 | |     p: Callable[P, T],
+22 | |     # Comment in the middle of a parameter list should be preserved
+23 | |     another_param,
+24 | |     and_another,
+25 | | ):
    | |_^ UP047
-24 |       pass
+26 |       pass
    |
    = help: Use type parameters
 
-ℹ Safe fix
-15 15 |     pass
-16 16 | 
-17 17 | 
-18    |-def h(
-   18 |+def h[**P, T: float](
-19 19 |     p: Callable[P, T],
-20 20 |     # Comment in the middle of a parameter list should be preserved
-21 21 |     another_param,
+ℹ Unsafe fix
+17 17 |     pass
+18 18 | 
+19 19 | 
+20    |-def h(
+   20 |+def h[**P, T: float](
+21 21 |     p: Callable[P, T],
+22 22 |     # Comment in the middle of a parameter list should be preserved
+23 23 |     another_param,
 
-UP047.py:27:5: UP047 [*] Generic function `i` should use type parameters
+UP047.py:29:5: UP047 [*] Generic function `i` should use type parameters
    |
-27 | def i(s: S):
+29 | def i(s: S):
    |     ^^^^^^^ UP047
-28 |     pass
+30 |     pass
    |
    = help: Use type parameters
 
-ℹ Safe fix
-24 24 |     pass
-25 25 | 
-26 26 | 
-27    |-def i(s: S):
-   27 |+def i[S: (str, bytes)](s: S):
-28 28 |     pass
-29 29 | 
-30 30 |
+ℹ Unsafe fix
+26 26 |     pass
+27 27 | 
+28 28 | 
+29    |-def i(s: S):
+   29 |+def i[S: (str, bytes)](s: S):
+30 30 |     pass
+31 31 | 
+32 32 | 
+
+UP047.py:39:5: UP047 [*] Generic function `broken_fix` should use type parameters
+   |
+37 | # TypeVars with the new-style generic syntax and will be rejected by type
+38 | # checkers
+39 | def broken_fix(okay: T, bad: Something):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP047
+40 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+36 36 | # generic type parameter. This leads to code that mixes old-style standalone
+37 37 | # TypeVars with the new-style generic syntax and will be rejected by type
+38 38 | # checkers
+39    |-def broken_fix(okay: T, bad: Something):
+   39 |+def broken_fix[T: float](okay: T, bad: Something):
+40 40 |     pass
+41 41 | 
+42 42 |

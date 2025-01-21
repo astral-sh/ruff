@@ -21,10 +21,6 @@ use super::{check_type_vars, expr_name_to_type_var, in_nested_context, DisplayTy
 ///
 /// ## Known problems
 ///
-/// [PEP 695] uses inferred variance for type parameters, instead of the `covariant` and
-/// `contravariant` keywords used by `TypeVar` variables. As such, replacing a `TypeVar` variable
-/// with an inline type parameter may change its variance.
-///
 /// The rule currently skips generic classes with multiple base classes. It also skips
 /// generic classes nested inside of other
 /// functions or classes. Finally, this rule skips type parameters with the `default` argument
@@ -33,6 +29,12 @@ use super::{check_type_vars, expr_name_to_type_var, in_nested_context, DisplayTy
 /// This rule can only offer a fix if all of the generic types in the class definition are defined
 /// in the current module. For external type parameters, a diagnostic is emitted without a suggested
 /// fix.
+///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe, as [PEP 695] uses inferred variance for type parameters, instead
+/// of the `covariant` and `contravariant` keywords used by `TypeVar` variables. As such, replacing
+/// a `TypeVar` variable with an inline type parameter may change its variance.
 ///
 /// ## Example
 ///
@@ -176,7 +178,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
 
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::replacement(type_params.to_string(), name.end(), arguments.end()),
-            Applicability::Safe,
+            Applicability::Unsafe,
         ));
     }
 

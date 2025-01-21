@@ -11,7 +11,7 @@ UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of typ
    |
    = help: Use type parameters
 
-ℹ Safe fix
+ℹ Unsafe fix
 6  6  | P = ParamSpec("P")
 7  7  | 
 8  8  | 
@@ -29,7 +29,7 @@ UP046.py:14:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of ty
    |
    = help: Use type parameters
 
-ℹ Safe fix
+ℹ Unsafe fix
 11 11 |     pass
 12 12 | 
 13 13 | 
@@ -47,7 +47,7 @@ UP046.py:18:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of ty
    |
    = help: Use type parameters
 
-ℹ Safe fix
+ℹ Unsafe fix
 15 15 |     pass
 16 16 | 
 17 17 | 
@@ -65,7 +65,7 @@ UP046.py:22:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass in
    |
    = help: Use type parameters
 
-ℹ Safe fix
+ℹ Unsafe fix
 19 19 |     pass
 20 20 | 
 21 21 | 

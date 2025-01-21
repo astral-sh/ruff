@@ -20,13 +20,20 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// ## Known problems
 ///
-/// [PEP 695] uses inferred variance for type parameters, instead of the `covariant` and
-/// `contravariant` keywords used by `TypeVar` variables. As such, replacing a `TypeVar` variable
-/// with an inline type parameter may change its variance.
-///
 /// The rule currently skips generic functions nested inside of other functions or classes and those
 /// with type parameters containing the `default` argument introduced in [PEP 696] and implemented
 /// in Python 3.13.
+///
+/// ## Fix safety
+///
+/// This fix is marked unsafe, as [PEP 695] uses inferred variance for type parameters, instead of
+/// the `covariant` and `contravariant` keywords used by `TypeVar` variables. As such, replacing a
+/// `TypeVar` variable with an inline type parameter may change its variance.
+///
+/// Additionally, if the rule cannot determine whether a parameter annotation corresponds to a type
+/// variable (e.g. for a type imported from another module), it will not add the type to the generic
+/// type parameter list. This causes the function to have a mix of old-style type variables and
+/// new-style generic type parameters, which will be rejected by type checkers.
 ///
 /// ## Example
 ///
@@ -154,7 +161,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
         )
         .with_fix(Fix::applicable_edit(
             Edit::insertion(type_params.to_string(), name.end()),
-            Applicability::Safe,
+            Applicability::Unsafe,
         )),
     );
 }
