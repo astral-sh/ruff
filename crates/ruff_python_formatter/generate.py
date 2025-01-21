@@ -3,6 +3,7 @@
 """See CONTRIBUTING.md"""
 
 # %%
+from __future__ import annotations
 
 import re
 from collections import defaultdict
@@ -34,8 +35,8 @@ nodes = []
 for node_line in node_lines:
     node = node_line.split("(")[1].split(")")[0].split("::")[-1].removeprefix("&'a ")
     # `FString` has a custom implementation while the formatting for
-    # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are handled by the `FString`
-    # implementation.
+    # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are
+    # handled by the `FString` implementation.
     if node in (
         "FStringLiteralElement",
         "FStringExpressionElement",
