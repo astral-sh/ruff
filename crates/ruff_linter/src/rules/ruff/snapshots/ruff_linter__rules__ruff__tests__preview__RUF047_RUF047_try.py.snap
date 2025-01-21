@@ -40,25 +40,3 @@ RUF047_try.py:17:1: RUF047 [*] Empty `else` clause
 19 17 | 
 20 18 | 
 21 19 | try:
-
-RUF047_try.py:72:1: RUF047 [*] Empty `else` clause
-   |
-70 |   except:
-71 |       this()
-72 | / else:
-73 | |     ...
-   | |_______^ RUF047
-74 |       # This comment belongs to else
-75 |   finally:
-   |
-   = help: Remove `else` clause
-
-ℹ Safe fix
-69 69 |     of_course()
-70 70 | except:
-71 71 |     this()
-72    |-else:
-73    |-    ...
-74 72 |     # This comment belongs to else
-75 73 | finally:
-76 74 |     pass

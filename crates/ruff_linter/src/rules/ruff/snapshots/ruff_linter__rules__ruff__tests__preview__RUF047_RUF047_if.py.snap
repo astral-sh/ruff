@@ -135,24 +135,3 @@ RUF047_if.py:49:5: RUF047 [*] Empty `else` clause
 51 49 | 
 52 50 | 
 53 51 | ### No errors
-
-RUF047_if.py:77:1: RUF047 [*] Empty `else` clause
-   |
-75 |   if of_course():
-76 |       this()
-77 | / else:
-78 | |     ...
-   | |_______^ RUF047
-79 |       # comment
-   |
-   = help: Remove `else` clause
-
-ℹ Safe fix
-74 74 | 
-75 75 | if of_course():
-76 76 |     this()
-77    |-else:
-78    |-    ...
-79 77 |     # comment
-80 78 | 
-81 79 |

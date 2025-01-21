@@ -40,22 +40,3 @@ RUF047_for.py:12:1: RUF047 [*] Empty `else` clause
 14 12 | 
 15 13 | 
 16 14 | for of in course():
-
-RUF047_for.py:47:1: RUF047 [*] Empty `else` clause
-   |
-45 |   for of in course():
-46 |       this()
-47 | / else:
-48 | |     ...
-   | |_______^ RUF047
-49 |       # too
-   |
-   = help: Remove `else` clause
-
-ℹ Safe fix
-44 44 | 
-45 45 | for of in course():
-46 46 |     this()
-47    |-else:
-48    |-    ...
-49 47 |     # too

@@ -7,7 +7,7 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -59,41 +59,12 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: AnyNodeWithOrElse) {
         return;
     };
 
-    let Some(preceding_stmt) = stmt.body_before_else().last() else {
-        return;
-    };
-
-    let before_else_full_end = source.full_line_end(preceding_stmt.end());
-    let else_start = else_range.start();
-    let else_full_end = source.full_line_end(else_range.end());
-
-    for token in tokens.in_range(TextRange::new(before_else_full_end, else_start)) {
-        if token.kind() != TokenKind::Comment {
-            continue;
-        }
-
-        let comment_indentation =
-            comment_indentation_after(preceding_stmt.into(), token.range(), source);
-
-        let preceding_indentation = indentation(source, &preceding_stmt)
-            .unwrap_or_default()
-            .text_len();
-
-        match comment_indentation.cmp(&preceding_indentation) {
-            Ordering::Greater => continue,
-            Ordering::Equal => return,
-            Ordering::Less => return,
-        }
-    }
-
-    if checker
-        .comment_ranges()
-        .intersects(TextRange::new(else_range.start(), else_full_end))
-    {
+    if else_branch_should_not_be_reported(stmt, else_range, checker) {
         return;
     }
 
     let else_line_start = source.line_start(else_range.start());
+    let else_full_end = source.full_line_end(else_range.end());
     let remove_range = TextRange::new(else_line_start, else_full_end);
 
     let edit = Edit::range_deletion(remove_range);
@@ -111,6 +82,104 @@ fn body_is_no_op(body: &[Stmt]) -> bool {
         [Stmt::Expr(StmtExpr { value, .. })] => value.is_ellipsis_literal_expr(),
         _ => false,
     }
+}
+
+fn else_branch_should_not_be_reported(
+    stmt: AnyNodeWithOrElse,
+    else_range: TextRange,
+    checker: &Checker,
+) -> bool {
+    let Some(preceding_stmt) = stmt.body_before_else().last() else {
+        return true;
+    };
+    let Some(else_last_stmt) = stmt.else_body().last() else {
+        return true;
+    };
+
+    if else_branch_has_preceding_comment(preceding_stmt, else_range, checker) {
+        return true;
+    }
+
+    let else_full_end = checker.source().full_line_end(else_range.end());
+    let commentable_range = TextRange::new(else_range.start(), else_full_end);
+
+    if checker.comment_ranges().intersects(commentable_range) {
+        return true;
+    }
+
+    if else_branch_has_trailing_comment(else_last_stmt, else_full_end, checker) {
+        return true;
+    }
+
+    false
+}
+
+fn else_branch_has_preceding_comment(
+    preceding_stmt: &Stmt,
+    else_range: TextRange,
+    checker: &Checker,
+) -> bool {
+    let (tokens, source) = (checker.tokens(), checker.source());
+
+    let before_else_full_end = source.full_line_end(preceding_stmt.end());
+    let else_start = else_range.start();
+
+    let preceding_indentation = indentation(source, &preceding_stmt)
+        .unwrap_or_default()
+        .text_len();
+
+    for token in tokens.in_range(TextRange::new(before_else_full_end, else_start)) {
+        if token.kind() != TokenKind::Comment {
+            continue;
+        }
+
+        let comment_indentation =
+            comment_indentation_after(preceding_stmt.into(), token.range(), source);
+
+        match comment_indentation.cmp(&preceding_indentation) {
+            Ordering::Greater => continue,
+            Ordering::Equal => return true,
+            Ordering::Less => return true,
+        }
+    }
+
+    false
+}
+
+fn else_branch_has_trailing_comment(
+    preceding_stmt: &Stmt,
+    else_full_end: TextSize,
+    checker: &Checker,
+) -> bool {
+    let (tokens, source) = (checker.tokens(), checker.source());
+
+    let preceding_indentation = indentation(source, &preceding_stmt)
+        .unwrap_or_default()
+        .text_len();
+
+    for token in tokens.after(else_full_end) {
+        match token.kind() {
+            TokenKind::Comment => {
+                let comment_indentation =
+                    comment_indentation_after(preceding_stmt.into(), token.range(), source);
+
+                match comment_indentation.cmp(&preceding_indentation) {
+                    Ordering::Greater => return true,
+                    Ordering::Equal => return true,
+                    Ordering::Less => break,
+                }
+            }
+
+            TokenKind::NonLogicalNewline
+            | TokenKind::Newline
+            | TokenKind::Indent
+            | TokenKind::Dedent => {}
+
+            _ => break,
+        }
+    }
+
+    false
 }
 
 #[derive(Copy, Clone, Debug)]

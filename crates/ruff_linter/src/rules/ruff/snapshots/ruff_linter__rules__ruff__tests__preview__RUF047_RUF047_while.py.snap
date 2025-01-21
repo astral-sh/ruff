@@ -40,23 +40,3 @@ RUF047_while.py:12:1: RUF047 [*] Empty `else` clause
 14 12 | 
 15 13 | 
 16 14 | while of_course():
-
-RUF047_while.py:46:1: RUF047 [*] Empty `else` clause
-   |
-44 |   while of_course():
-45 |       this()
-46 | / else:
-47 | |     ...
-   | |_______^ RUF047
-48 |       # this comment belongs to the else
-   |
-   = help: Remove `else` clause
-
-ℹ Safe fix
-43 43 | 
-44 44 | while of_course():
-45 45 |     this()
-46    |-else:
-47    |-    ...
-48 46 |     # this comment belongs to the else
-49 47 |
