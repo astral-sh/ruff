@@ -241,7 +241,12 @@ impl<'a> ReFunc<'a> {
             // pattern in string
             ReFuncKind::Search => Some(self.compare_expr(CmpOp::In)),
             // string == pattern
-            ReFuncKind::Fullmatch => Some(self.compare_expr(CmpOp::Eq)),
+            ReFuncKind::Fullmatch => Some(Expr::Compare(ExprCompare {
+                range: TextRange::default(),
+                left: Box::new(self.string.clone()),
+                ops: Box::new([CmpOp::Eq]),
+                comparators: Box::new([self.pattern.clone()]),
+            })),
             // string.split(pattern)
             ReFuncKind::Split => Some(self.method_expr("split", vec![self.pattern.clone()])),
         }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF055_0.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
   |
@@ -68,14 +69,14 @@ RUF055_0.py:34:4: RUF055 [*] Plain string pattern passed to `re` function
 35 |     pass
 36 | re.fullmatch("abc", s)  # this should not be replaced
    |
-   = help: Replace with `"abc" == s`
+   = help: Replace with `s == "abc"`
 
 ℹ Safe fix
 31 31 | re.search("abc", s)  # this should not be replaced
 32 32 | 
 33 33 | # this should be replaced with "abc" == s
 34    |-if re.fullmatch("abc", s):
-   34 |+if "abc" == s:
+   34 |+if s == "abc":
 35 35 |     pass
 36 36 | re.fullmatch("abc", s)  # this should not be replaced
 37 37 | 
