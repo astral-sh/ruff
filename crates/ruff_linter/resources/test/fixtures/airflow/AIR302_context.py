@@ -3,21 +3,17 @@ from airflow.models import DAG
 from airflow.operators.dummy import DummyOperator
 from datetime import datetime
 from airflow.plugins_manager import AirflowPlugin
-from airflow.decorators import task, get_current_context
 from airflow.models.baseoperator import BaseOperator
 from airflow.decorators import dag, task
 from airflow.providers.standard.operators.python import PythonOperator
-
+from airflow.utils.context import get_current_context
 
 def access_invalid_key_in_context(**context):
     print("access invalid key", context["conf"])
 
-
 @task
 def access_invalid_key_task_out_of_dag(**context):
     print("access invalid key", context.get("conf"))
-
-
 
 @dag(
     schedule=None,
@@ -36,7 +32,6 @@ def invalid_dag():
     )
     access_invalid_key_task() >> task1
     access_invalid_key_task_out_of_dag()
-
 
 invalid_dag()
 
@@ -120,3 +115,5 @@ def print_context(ds=None, **kwargs):
     """Print the Airflow context and ds variable from the context."""
     print(ds)
     print(kwargs.get("tomorrow_ds"))
+    c = get_current_context()
+    c.get("execution_date")
