@@ -21,11 +21,11 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// ## Known problems
 ///
 /// [PEP 695] uses inferred variance for type parameters, instead of the `covariant` and
-/// `contravariant` keywords used by `TypeVar` variables. As such, rewriting a `TypeVar` variable to
-/// an inline type parameter may change its variance.
+/// `contravariant` keywords used by `TypeVar` variables. As such, replacing a `TypeVar` variable
+/// with an inline type parameter may change its variance.
 ///
-/// The rule currently skips generic classes with multiple base classes, and skips generic methods
-/// in generic or non-generic classes. It also skips generic classes nested inside of other
+/// The rule currently skips generic classes with multiple base classes. It also skips
+/// generic classes nested inside of other
 /// functions or classes. Finally, this rule skips type parameters with the `default` argument
 /// introduced in [PEP 696] and implemented in Python 3.13.
 ///
@@ -50,10 +50,10 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// ## See also
 ///
-/// This rule replaces standalone type variables in class and function signatures but doesn't remove
+/// This rule replaces standalone type variables in classes but doesn't remove
 /// the corresponding type variables even if they are unused after the fix. See
-/// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused type
-/// variables.
+/// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused
+/// private type variables.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
