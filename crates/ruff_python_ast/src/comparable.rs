@@ -18,12 +18,53 @@
 use crate as ast;
 use crate::{Expr, Number};
 use std::borrow::Cow;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+
+trait Comparable: Eq + PartialEq + Hash {}
+
+impl<T> Comparable for T where T: Eq + PartialEq + Hash {}
+
+struct ComparableIterator<T>(T);
+
+impl<T> Eq for ComparableIterator<T>
+where
+    T: Clone + Iterator,
+    T::Item: Eq,
+{
+}
+
+impl<T> PartialEq for ComparableIterator<T>
+where
+    T: Clone + Iterator,
+    T::Item: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0.clone().eq(other.0.clone())
+    }
+}
+
+impl<T> Hash for ComparableIterator<T>
+where
+    T: Clone + ExactSizeIterator,
+    T::Item: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let iter = self.0.clone();
+        state.write_usize(iter.len());
+        iter.for_each(|elem| elem.hash(state));
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableAlias<'a> {
     name: &'a str,
     asname: Option<&'a str>,
+}
+
+impl ast::Alias {
+    fn comparable(&self) -> impl Comparable + '_ {
+        (self.name.as_str(), self.asname.as_deref())
+    }
 }
 
 impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
