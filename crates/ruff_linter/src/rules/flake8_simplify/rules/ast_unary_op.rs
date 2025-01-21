@@ -25,6 +25,9 @@ use crate::checkers::ast::Checker;
 /// a != b
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe, as `a == b` and/or `a != b` might not return a boolean.
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
@@ -61,6 +64,9 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ```python
 /// a == b
 /// ```
+///
+/// ## Fix safety
+/// The fix is marked as unsafe, as `a != b` and/or `a == b` might not return a boolean.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
