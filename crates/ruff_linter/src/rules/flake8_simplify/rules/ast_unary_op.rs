@@ -26,7 +26,9 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// The fix is marked as unsafe, as `a == b` and/or `a != b` might not return a boolean.
+/// The fix is marked as unsafe, as it might change the behaviour
+/// if `a` and/or `b` overrides `__eq__`/`__ne__`
+/// in such a manner that they don't return booleans.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -66,7 +68,9 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ```
 ///
 /// ## Fix safety
-/// The fix is marked as unsafe, as `a != b` and/or `a == b` might not return a boolean.
+/// The fix is marked as unsafe, as it might change the behaviour
+/// if `a` and/or `b` overrides `__ne__`/`__eq__`
+/// in such a manner that they don't return booleans.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
