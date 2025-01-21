@@ -36,8 +36,6 @@ jobs:
       code: ${{ steps.changed.outputs.code_any_changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.changed.outputs.fuzz_any_changed }}
-    permissions:
-      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -102,8 +100,6 @@ jobs:
     name: "cargo fmt"
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,8 +112,6 @@ jobs:
     name: "cargo clippy"
     runs-on: ubuntu-latest
     needs: determine_changes
-    permissions:
-      contents: read
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
@@ -138,8 +132,6 @@ jobs:
     name: "cargo test (linux)"
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    permissions:
-      contents: read
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
@@ -188,8 +180,6 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -245,8 +235,6 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 10
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -275,8 +263,6 @@ jobs:
     name: "cargo build (release)"
     runs-on: macos-latest
     if: ${{ github.ref == 'refs/heads/main' }}
-    permissions:
-      contents: read
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -294,8 +280,6 @@ jobs:
     name: "cargo build (msrv)"
     runs-on: ubuntu-latest
     needs: determine_changes
-    permissions:
-      contents: read
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
@@ -548,8 +532,6 @@ jobs:
     name: "cargo shear"
     runs-on: ubuntu-latest
     needs: determine_changes
-    permissions:
-      contents: read
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
@@ -563,8 +545,6 @@ jobs:
     name: "python package"
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -592,8 +572,6 @@ jobs:
     name: "pre-commit"
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -736,8 +714,6 @@ jobs:
     needs: determine_changes
     if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    permissions:
-      contents: read
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@v4
