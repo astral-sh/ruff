@@ -1,7 +1,7 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExpressionRef};
+use ruff_python_ast::{Expr, ExprRef};
 use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
@@ -48,7 +48,7 @@ pub trait HasTy {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
 }
 
-impl HasTy for ast::ExpressionRef<'_> {
+impl HasTy for ast::ExprRef<'_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let file_scope = index.expression_scope_id(*self);
@@ -64,7 +64,7 @@ macro_rules! impl_expression_has_ty {
         impl HasTy for $ty {
             #[inline]
             fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-                let expression_ref = ExpressionRef::from(self);
+                let expression_ref = ExprRef::from(self);
                 expression_ref.ty(model)
             }
         }
