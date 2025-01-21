@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{ExprBinOp, ExpressionRef, Operator};
+use ruff_python_ast::{ExprBinOp, ExprRef, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -146,7 +146,7 @@ fn augmented_assignment(
 ) -> Edit {
     let locator = checker.locator();
 
-    let right_operand_ref = ExpressionRef::from(right_operand);
+    let right_operand_ref = ExprRef::from(right_operand);
     let parent = original_expr.into();
     let comment_ranges = checker.comment_ranges();
     let source = checker.source();

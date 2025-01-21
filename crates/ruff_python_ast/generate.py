@@ -44,7 +44,6 @@ class Group:
     name: str
     nodes: list[Node]
     owned_enum_ty: str
-    ref_enum_ty: str
 
     add_suffix_to_is_methods: bool
     anynode_is_label: str
@@ -53,7 +52,7 @@ class Group:
     def __init__(self, group_name: str, group: dict[str, Any]) -> None:
         self.name = group_name
         self.owned_enum_ty = group_name
-        self.ref_enum_ty = group.get("ref_enum_ty", group_name + "Ref")
+        self.ref_enum_ty = group_name + "Ref"
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
         self.anynode_is_label = group.get("anynode_is_label", to_snake_case(group_name))
         self.rustdoc = group.get("rustdoc")
@@ -205,7 +204,6 @@ def write_ref_enum(out: list[str], groups: list[Group]) -> None:
     - `impl Ranged for TypeParamRef<'_>`
     - `fn TypeParamRef::is_type_var() -> bool`
 
-    The name of the enum can be customized via the `ref_enum_ty` group option.
     The name of each variant can be customized via the `variant` node option. If
     the `add_suffix_to_is_methods` group option is true, then the `is_type_var`
     method will be named `is_type_var_type_param`.
