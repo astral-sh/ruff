@@ -24,10 +24,11 @@ MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 
 
 class MDTestRunner:
-    mdtest_executable: Path
+    mdtest_executable: Path | None
     console: Console
 
     def __init__(self) -> None:
+        self.mdtest_executable = None
         self.console = Console()
 
     def _run_cargo_test(self, message_format: Literal["human", "json"]) -> str:
@@ -84,8 +85,10 @@ class MDTestRunner:
             )
 
     def _run_mdtest(
-        self, arguments: list[str] | None = None, capture_output: bool = False
+        self, arguments: list[str] | None = None, *, capture_output: bool = False
     ) -> subprocess.CompletedProcess:
+        assert self.mdtest_executable is not None
+
         arguments = arguments or []
         return subprocess.run(
             [self.mdtest_executable, *arguments],
