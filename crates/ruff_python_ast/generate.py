@@ -174,7 +174,7 @@ def write_owned_enum(out: list[str], groups: list[Group]) -> None:
         """)
         for node in group.nodes:
             out.append(
-                f"""{group.owned_enum_ty}::{node.variant}(node) => node.visit_source_order(visitor),"""
+                f"{group.owned_enum_ty}::{node.variant}(node) => node.visit_source_order(visitor),"
             )
         out.append("""
                     }
@@ -234,7 +234,7 @@ def write_ref_enum(out: list[str], groups: list[Group]) -> None:
         """)
         for node in group.nodes:
             out.append(
-                f"""{group.owned_enum_ty}::{node.variant}(node) => {group.ref_enum_ty}::{node.variant}(node),"""
+                f"{group.owned_enum_ty}::{node.variant}(node) => {group.ref_enum_ty}::{node.variant}(node),"
             )
         out.append("""
                     }
@@ -311,7 +311,7 @@ def write_anynoderef(out: list[str], groups: list[Group]) -> None:
             """)
             for node in group.nodes:
                 out.append(
-                    f"""{group.owned_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"""
+                    f"{group.owned_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"
                 )
             out.append("""
                     }
@@ -326,7 +326,7 @@ def write_anynoderef(out: list[str], groups: list[Group]) -> None:
             """)
             for node in group.nodes:
                 out.append(
-                    f"""{group.ref_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"""
+                    f"{group.ref_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"
                 )
             out.append("""
                     }
@@ -365,7 +365,7 @@ def write_anynoderef(out: list[str], groups: list[Group]) -> None:
     for group in groups:
         for node in group.nodes:
             out.append(
-                f"""AnyNodeRef::{node.name}(node) => std::ptr::NonNull::from(*node).cast(),"""
+                f"AnyNodeRef::{node.name}(node) => std::ptr::NonNull::from(*node).cast(),"
             )
     out.append("""
                 }
@@ -385,7 +385,7 @@ def write_anynoderef(out: list[str], groups: list[Group]) -> None:
     for group in groups:
         for node in group.nodes:
             out.append(
-                f"""AnyNodeRef::{node.name}(node) => node.visit_source_order(visitor),"""
+                f"AnyNodeRef::{node.name}(node) => node.visit_source_order(visitor),"
             )
     out.append("""
                 }
