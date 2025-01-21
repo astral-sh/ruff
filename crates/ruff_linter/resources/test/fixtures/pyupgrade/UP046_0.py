@@ -49,6 +49,10 @@ class MultipleBaseClasses(list, Generic[T]):
     var: T
 
 
+class Multiple(NotGeneric, Generic[T]):
+    pass
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
@@ -69,11 +73,6 @@ class NotGeneric:
 class MixedGenerics[U]:
     def more_generic(u: U, t: T) -> tuple[U, T]:
         return (u, t)
-
-
-# TODO(brent) we should also handle multiple base classes
-class Multiple(NotGeneric, Generic[T]):
-    pass
 
 
 # TODO(brent) default requires 3.13
