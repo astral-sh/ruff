@@ -98,4 +98,22 @@ UP047.py:39:5: UP047 [*] Generic function `broken_fix` should use type parameter
    39 |+def broken_fix[T: float](okay: T, bad: Something):
 40 40 |     pass
 41 41 | 
-42 42 |
+42 42 | 
+
+UP047.py:43:5: UP047 [*] Generic function `any_str_param` should use type parameters
+   |
+43 | def any_str_param(s: AnyStr):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ UP047
+44 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+40 40 |     pass
+41 41 | 
+42 42 | 
+43    |-def any_str_param(s: AnyStr):
+   43 |+def any_str_param[AnyStr: (bytes, str)](s: AnyStr):
+44 44 |     pass
+45 45 | 
+46 46 |

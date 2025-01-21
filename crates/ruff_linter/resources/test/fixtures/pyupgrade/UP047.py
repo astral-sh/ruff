@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, ParamSpec, TypeVar, TypeVarTuple
+from typing import Any, AnyStr, ParamSpec, TypeVar, TypeVarTuple
 
 from somewhere import Something
 
@@ -37,6 +37,10 @@ def i(s: S):
 # TypeVars with the new-style generic syntax and will be rejected by type
 # checkers
 def broken_fix(okay: T, bad: Something):
+    pass
+
+
+def any_str_param(s: AnyStr):
     pass
 
 

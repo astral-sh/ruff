@@ -5,6 +5,7 @@ use std::fmt::Display;
 use itertools::Itertools;
 use ruff_python_ast::{
     self as ast,
+    name::Name,
     visitor::{self, Visitor},
     Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAssign, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
@@ -27,7 +28,7 @@ enum TypeVarRestriction<'a> {
     /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
     Bound(&'a Expr),
     /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
-    Constraint(Vec<&'a Expr>),
+    Constraint(Vec<Expr>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -102,7 +103,12 @@ impl Display for DisplayTypeVar<'_> {
                     let len = vec.len();
                     f.write_str("(")?;
                     for (i, v) in vec.iter().enumerate() {
-                        f.write_str(&self.source[v.range()])?;
+                        // typing.AnyStr special case doesn't have a real range
+                        if let Expr::Name(name) = v {
+                            f.write_str(&name.id.to_string())?;
+                        } else {
+                            f.write_str(&self.source[v.range()])?;
+                        }
                         if i < len - 1 {
                             f.write_str(", ")?;
                         }
@@ -170,6 +176,35 @@ struct TypeVarReferenceVisitor<'a> {
 impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
+            // special case for typing.AnyStr, which is a commonly-imported type variable in the
+            // standard library with the definition:
+            //
+            // ```python
+            // AnyStr = TypeVar('AnyStr', bytes, str)
+            // ```
+            //
+            // As of 01/2025, this line hasn't been modified in 8 years, so hopefully there won't be
+            // much to keep updated here. See
+            // https://github.com/python/cpython/blob/383af395af828f40d9543ee0a8fdc5cc011d43db/Lib/typing.py#L2806
+            e @ Expr::Name(name) if self.semantic.match_typing_expr(e, "AnyStr") => {
+                self.vars.push(TypeVar {
+                    name,
+                    restriction: Some(TypeVarRestriction::Constraint(vec![
+                        Expr::Name(ExprName {
+                            range: TextRange::default(),
+                            id: Name::from("bytes"),
+                            ctx: ruff_python_ast::ExprContext::Load,
+                        }),
+                        Expr::Name(ExprName {
+                            range: TextRange::default(),
+                            id: Name::from("str"),
+                            ctx: ruff_python_ast::ExprContext::Load,
+                        }),
+                    ])),
+                    kind: TypeParamKind::TypeVar,
+                    default: None,
+                })
+            }
             Expr::Name(name) if name.ctx.is_load() => {
                 self.vars.extend(expr_name_to_type_var(self.semantic, name));
             }
@@ -246,7 +281,7 @@ fn expr_name_to_type_var<'a>(
                     Some(TypeVarRestriction::Bound(&bound.value))
                 } else if arguments.args.len() > 1 {
                     Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
+                        arguments.args.iter().cloned().skip(1).collect(),
                     ))
                 } else {
                     None

@@ -84,3 +84,23 @@ UP046.py:28:20: UP046 Generic class `ExternalType` uses `Generic` subclass inste
 29 |     pass
    |
    = help: Use type parameters
+
+UP046.py:34:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
+   |
+32 | # typing.AnyStr is a common external type variable, so treat it specially as a
+33 | # known TypeVar
+34 | class MyStr(Generic[AnyStr]):
+   |             ^^^^^^^^^^^^^^^ UP046
+35 |     pass
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+31 31 | 
+32 32 | # typing.AnyStr is a common external type variable, so treat it specially as a
+33 33 | # known TypeVar
+34    |-class MyStr(Generic[AnyStr]):
+   34 |+class MyStr[AnyStr: (bytes, str)]:
+35 35 |     pass
+36 36 | 
+37 37 |

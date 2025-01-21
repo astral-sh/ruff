@@ -1,4 +1,4 @@
-from typing import Any, Generic, ParamSpec, TypeVar, TypeVarTuple
+from typing import Any, AnyStr, Generic, ParamSpec, TypeVar, TypeVarTuple
 
 S = TypeVar("S", str, bytes)  # constrained type variable
 T = TypeVar("T", bound=float)
@@ -26,6 +26,12 @@ class Constrained(Generic[S]):
 # This case gets a diagnostic but not a fix because we can't look up the bounds
 # or constraints on the generic type from another module
 class ExternalType(Generic[T, SupportsRichComparisonT]):
+    pass
+
+
+# typing.AnyStr is a common external type variable, so treat it specially as a
+# known TypeVar
+class MyStr(Generic[AnyStr]):
     pass
 
 
