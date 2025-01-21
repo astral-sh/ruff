@@ -30,3 +30,7 @@ E = Enum("E", {"A", "B", "C"})
 E = Enum("E", ["A", ("B", 2), "C"])
 E = Enum("E", ["A", *a])
 E = Enum("E", {"A": 1, **a})
+
+E = Enum("E", {
+    "A": 1,  # Comment
+})

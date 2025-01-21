@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::pyupgrade::rules::create_class_def_stmt;
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -44,6 +44,10 @@ use smallvec::{smallvec, SmallVec};
 ///     B = auto()
 ///     C = auto()
 /// ```
+///
+/// ## Fix safety
+/// The fix will be marked as unsafe if there are any comments
+/// within the original assignment statement, as these will be removed.
 #[derive(ViolationMetadata)]
 pub(crate) struct FunctionalEnum;
 
@@ -219,10 +223,7 @@ fn enum_members_from_string(string: &ExprStringLiteral) -> Option<Vec<EnumMember
     let normalized = string.value.to_string().replace(',', " ");
 
     for name in normalized.split_whitespace() {
-        let Some(member) = EnumMember::from(name.to_string(), None) else {
-            return None;
-        };
-
+        let member = EnumMember::from(name.to_string(), None)?;
         members.push(member);
     }
 
@@ -321,7 +322,20 @@ fn convert_to_class_syntax(
     let new_content = checker.generator().stmt(&class);
     let replace_with_class = Edit::range_replacement(new_content, range);
 
-    Some(Fix::unsafe_edits(replace_with_class, other_edits))
+    let applicability = if checker
+        .comment_ranges()
+        .has_comments(&range, checker.source())
+    {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edits(
+        replace_with_class,
+        other_edits,
+        applicability,
+    ))
 }
 
 #[inline]

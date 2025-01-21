@@ -12,7 +12,7 @@ UP048.py:6:1: UP048 [*] Enum declared using functional syntax
   |
   = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 1     |-from enum import Enum
    1  |+from enum import Enum, auto
 2  2  | 
@@ -38,7 +38,7 @@ UP048.py:7:1: UP048 [*] Enum declared using functional syntax
   |
   = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 1     |-from enum import Enum
    1  |+from enum import Enum, auto
 2  2  | 
@@ -65,7 +65,7 @@ UP048.py:8:1: UP048 [*] Enum declared using functional syntax
   |
   = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 5  5  | 
 6  6  | E = Enum("E", "A B C")
 7  7  | E = Enum("E", "A,B,C")
@@ -87,7 +87,7 @@ UP048.py:9:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 1     |-from enum import Enum
    1  |+from enum import Enum, auto
 2  2  | 
@@ -117,7 +117,7 @@ UP048.py:11:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 1     |-from enum import Enum
    1  |+from enum import Enum, auto
 2  2  | 
@@ -146,7 +146,7 @@ UP048.py:12:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 1     |-from enum import Enum
    1  |+from enum import Enum, auto
 2  2  | 
@@ -176,7 +176,7 @@ UP048.py:13:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 10 10 | 
 11 11 | E = Enum("E", ["A", "B", "C"])
 12 12 | E = Enum("E", ("A", "B", "C"))
@@ -199,7 +199,7 @@ UP048.py:14:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 11 11 | E = Enum("E", ["A", "B", "C"])
 12 12 | E = Enum("E", ("A", "B", "C"))
 13 13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
@@ -223,7 +223,7 @@ UP048.py:15:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 12 12 | E = Enum("E", ("A", "B", "C"))
 13 13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
 14 14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
@@ -247,7 +247,7 @@ UP048.py:17:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 14 14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
 15 15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
 16 16 | 
@@ -267,7 +267,7 @@ UP048.py:18:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 15 15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
 16 16 | 
 17 17 | E = Enum("E", [])
@@ -287,7 +287,7 @@ UP048.py:19:1: UP048 [*] Enum declared using functional syntax
    |
    = help: Replace with class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 16 16 | 
 17 17 | E = Enum("E", [])
 18 18 | E = Enum("E", ())
@@ -297,3 +297,24 @@ UP048.py:19:1: UP048 [*] Enum declared using functional syntax
 20 21 | 
 21 22 | 
 22 23 | ### No errors
+
+UP048.py:34:1: UP048 [*] Enum declared using functional syntax
+   |
+32 |   E = Enum("E", {"A": 1, **a})
+33 |
+34 | / E = Enum("E", {
+35 | |     "A": 1,  # Comment
+36 | | })
+   | |__^ UP048
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+31 31 | E = Enum("E", ["A", *a])
+32 32 | E = Enum("E", {"A": 1, **a})
+33 33 | 
+34    |-E = Enum("E", {
+35    |-    "A": 1,  # Comment
+36    |-})
+   34 |+class E(Enum):
+   35 |+    A = 1
