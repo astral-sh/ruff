@@ -58,7 +58,7 @@ include = [
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py38"
 extend-exclude = [
   "crates/red_knot_vendored/vendor/",
   "crates/ruff/resources/",
