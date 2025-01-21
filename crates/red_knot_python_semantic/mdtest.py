@@ -13,7 +13,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Final, Literal, Never
+from typing import Final, Literal, Never, assert_never
 
 from rich.console import Console
 from watchfiles import Change, watch
@@ -178,6 +178,11 @@ class MDTestRunner:
                             new_md_files.add(relative_path)
                     case Change.modified:
                         changed_md_files.add(relative_path)
+                    case Change.deleted:
+                        # No need to do anything when a Markdown test is deleted
+                        pass
+                    case _ as unreachable:
+                        assert_never(unreachable)
 
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
