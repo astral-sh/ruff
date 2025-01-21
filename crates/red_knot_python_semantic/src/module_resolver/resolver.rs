@@ -223,7 +223,10 @@ impl SearchPaths {
 
         let site_packages_paths = match site_packages_paths {
             SitePackages::Derived { venv_path } => {
-                // TODO: Warn if venv python version isn't compatible.
+                // TODO: We may want to warn here if the venv's python version is older
+                //  than the one resolved in the program settings because it indicates
+                //  that the `target-version` is incorrectly configured or that the
+                //  venv is out of date.
                 VirtualEnvironment::new(venv_path, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
