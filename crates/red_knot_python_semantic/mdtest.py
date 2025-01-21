@@ -7,6 +7,8 @@
 # ]
 # ///
 
+from __future__ import annotations
+
 import json
 import os
 import subprocess
@@ -82,8 +84,9 @@ class MDTestRunner:
             )
 
     def _run_mdtest(
-        self, arguments: list[str] = [], capture_output: bool = False
+        self, arguments: list[str] | None = None, capture_output: bool = False
     ) -> subprocess.CompletedProcess:
+        arguments = arguments or []
         return subprocess.run(
             [self.mdtest_executable, *arguments],
             cwd=CRATE_ROOT,
