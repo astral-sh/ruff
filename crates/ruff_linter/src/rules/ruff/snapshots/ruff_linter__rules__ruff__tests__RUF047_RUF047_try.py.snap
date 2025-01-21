@@ -9,7 +9,7 @@ RUF047_try.py:7:1: RUF047 [*] Empty `else` clause
 8 | |     pass
   | |________^ RUF047
   |
-  = help: Remove `else` clause
+  = help: Remove the `else` clause
 
 ℹ Safe fix
 4 4 |     raise try_body_is_not_checked()
@@ -29,7 +29,7 @@ RUF047_try.py:17:1: RUF047 [*] Empty `else` clause
 18 | |     ...
    | |_______^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 14 14 |     belongs()

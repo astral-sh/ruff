@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for NeedlessElse {
     }
 
     fn fix_title(&self) -> String {
-        "Remove `else` clause".to_string()
+        "Remove the `else` clause".to_string()
     }
 }
 

@@ -9,7 +9,7 @@ RUF047_while.py:6:1: RUF047 [*] Empty `else` clause
 7 | |     pass
   | |________^ RUF047
   |
-  = help: Remove `else` clause
+  = help: Remove the `else` clause
 
 ℹ Safe fix
 3 3 | while True:
@@ -29,7 +29,7 @@ RUF047_while.py:12:1: RUF047 [*] Empty `else` clause
 13 | |     ...
    | |_______^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 9  9  | 

@@ -9,7 +9,7 @@ RUF047_if.py:5:1: RUF047 [*] Empty `else` clause
 6 | |     pass
   | |________^ RUF047
   |
-  = help: Remove `else` clause
+  = help: Remove the `else` clause
 
 ℹ Safe fix
 2 2 | 
@@ -29,7 +29,7 @@ RUF047_if.py:11:1: RUF047 [*] Empty `else` clause
 12 | |     ...
    | |_______^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 8  8  | 
@@ -49,7 +49,7 @@ RUF047_if.py:19:1: RUF047 [*] Empty `else` clause
 20 | |     pass
    | |________^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 16 16 |     treated()
@@ -71,7 +71,7 @@ RUF047_if.py:26:1: RUF047 [*] Empty `else` clause
 28 |
 29 |   if this_second_comment():
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 23 23 | if this_second_comment():
@@ -91,7 +91,7 @@ RUF047_if.py:32:1: RUF047 [*] Empty `else` clause
 33 | |     pass
    | |________^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 29 29 | if this_second_comment():
@@ -109,7 +109,7 @@ RUF047_if.py:44:1: RUF047 [*] Empty `else` clause
 44 | else: ...
    | ^^^^^^^^^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 41 41 | 
@@ -127,7 +127,7 @@ RUF047_if.py:49:1: RUF047 [*] Empty `else` clause
 49 | else: ...
    | ^^^^^^^^^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 46 46 | 
@@ -146,7 +146,7 @@ RUF047_if.py:55:5: RUF047 [*] Empty `else` clause
 56 | |         ...
    | |___________^ RUF047
    |
-   = help: Remove `else` clause
+   = help: Remove the `else` clause
 
 ℹ Safe fix
 52 52 | def nested():
