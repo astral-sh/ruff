@@ -222,8 +222,11 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match site_packages_paths {
-            SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
-                .and_then(|venv| venv.site_packages_directories(system))?,
+            SitePackages::Derived { venv_path } => {
+                // TODO: Warn if venv python version isn't compatible.
+                VirtualEnvironment::new(venv_path, system)
+                    .and_then(|venv| venv.site_packages_directories(system))?
+            }
             SitePackages::Known(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))

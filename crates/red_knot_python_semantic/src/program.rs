@@ -134,12 +134,3 @@ pub enum SitePackages {
     /// Resolved site packages paths
     Known(Vec<SystemPathBuf>),
 }
-
-impl SitePackages {
-    pub fn paths(&self) -> &[SystemPathBuf] {
-        match self {
-            SitePackages::Derived { venv_path } => std::slice::from_ref(venv_path),
-            SitePackages::Known(paths) => paths,
-        }
-    }
-}
