@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::StmtFunctionDef;
@@ -160,9 +160,9 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
             },
             TextRange::new(name.start(), parameters.end()),
         )
-        .with_fix(Fix::applicable_edit(
-            Edit::insertion(type_params.to_string(), name.end()),
-            Applicability::Unsafe,
-        )),
+        .with_fix(Fix::unsafe_edit(Edit::insertion(
+            type_params.to_string(),
+            name.end(),
+        ))),
     );
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::StmtClassDef;
@@ -176,10 +176,11 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             source: checker.source(),
         };
 
-        diagnostic.set_fix(Fix::applicable_edit(
-            Edit::replacement(type_params.to_string(), name.end(), arguments.end()),
-            Applicability::Unsafe,
-        ));
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
+            type_params.to_string(),
+            name.end(),
+            arguments.end(),
+        )));
     }
 
     checker.diagnostics.push(diagnostic);
