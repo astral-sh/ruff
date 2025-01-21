@@ -377,7 +377,6 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
     if attr.as_str() != "get" {
         return;
     }
-
     let function_def = {
         let mut parents = checker.semantic().current_statements();
         parents.find_map(|stmt| {
@@ -390,13 +389,30 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
     };
 
     if let Some(func_def) = function_def {
-        let param_names = extract_task_function_arguments(&func_def);
-
-        for param_name in param_names {
-            if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
+        for param_name in func_def
+            .parameters
+            .posonlyargs
+            .iter()
+            .map(|p| p.parameter.name.as_str())
+            .chain(
+                func_def
+                    .parameters
+                    .args
+                    .iter()
+                    .map(|p| p.parameter.name.as_str()),
+            )
+            .chain(
+                func_def
+                    .parameters
+                    .kwonlyargs
+                    .iter()
+                    .map(|p| p.parameter.name.as_str()),
+            )
+        {
+            if REMOVED_CONTEXT_KEYS.contains(&param_name) {
                 checker.diagnostics.push(Diagnostic::new(
                     Airflow3Removal {
-                        deprecated: param_name,
+                        deprecated: param_name.to_string(),
                         replacement: Replacement::None,
                     },
                     func_def.name.range(),
@@ -420,37 +436,6 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
             }
         }
     }
-}
-
-/// Extracts the names of all parameters (positional‐only, regular, and keyword‐only)
-/// from the given function definition.
-///
-/// # Example
-/// ```python
-/// @task
-/// def my_function(x, y, *, z=None):
-///     pass
-/// ```
-/// Calling `extract_task_function_arguments` on the AST node for `my_function` returns:
-/// ```plaintext
-/// ["x", "y", "z"]
-/// ```
-fn extract_task_function_arguments(stmt: &StmtFunctionDef) -> Vec<String> {
-    let mut arguments = Vec::new();
-
-    for param in &stmt.parameters.posonlyargs {
-        arguments.push(param.parameter.name.to_string());
-    }
-
-    for param in &stmt.parameters.args {
-        arguments.push(param.parameter.name.to_string());
-    }
-
-    for param in &stmt.parameters.kwonlyargs {
-        arguments.push(param.parameter.name.to_string());
-    }
-
-    arguments
 }
 
 /// Check whether the function is decorated by @task
