@@ -103,6 +103,7 @@ mod tests {
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
+    #[test_case(Rule::FunctionalEnum, Path::new("UP048.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(

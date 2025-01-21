@@ -1,0 +1,299 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP048.py:6:1: UP048 [*] Enum can be declared using functional syntax
+  |
+4 | ### Errors
+5 |
+6 | E = Enum("E", "A B C")
+  | ^^^^^^^^^^^^^^^^^^^^^^ UP048
+7 | E = Enum("E", "A,B,C")
+8 | E = Enum("E", "")
+  |
+  = help: Replace with class syntax
+
+ℹ Unsafe fix
+1     |-from enum import Enum
+   1  |+from enum import Enum, auto
+2  2  | 
+3  3  | 
+4  4  | ### Errors
+5  5  | 
+6     |-E = Enum("E", "A B C")
+   6  |+class E(Enum):
+   7  |+    A = auto()
+   8  |+    B = auto()
+   9  |+    C = auto()
+7  10 | E = Enum("E", "A,B,C")
+8  11 | E = Enum("E", "")
+9  12 | E = Enum("E", " A B, C")
+
+UP048.py:7:1: UP048 [*] Enum can be declared using functional syntax
+  |
+6 | E = Enum("E", "A B C")
+7 | E = Enum("E", "A,B,C")
+  | ^^^^^^^^^^^^^^^^^^^^^^ UP048
+8 | E = Enum("E", "")
+9 | E = Enum("E", " A B, C")
+  |
+  = help: Replace with class syntax
+
+ℹ Unsafe fix
+1     |-from enum import Enum
+   1  |+from enum import Enum, auto
+2  2  | 
+3  3  | 
+4  4  | ### Errors
+5  5  | 
+6  6  | E = Enum("E", "A B C")
+7     |-E = Enum("E", "A,B,C")
+   7  |+class E(Enum):
+   8  |+    A = auto()
+   9  |+    B = auto()
+   10 |+    C = auto()
+8  11 | E = Enum("E", "")
+9  12 | E = Enum("E", " A B, C")
+10 13 | 
+
+UP048.py:8:1: UP048 [*] Enum can be declared using functional syntax
+  |
+6 | E = Enum("E", "A B C")
+7 | E = Enum("E", "A,B,C")
+8 | E = Enum("E", "")
+  | ^^^^^^^^^^^^^^^^^ UP048
+9 | E = Enum("E", " A B, C")
+  |
+  = help: Replace with class syntax
+
+ℹ Unsafe fix
+5  5  | 
+6  6  | E = Enum("E", "A B C")
+7  7  | E = Enum("E", "A,B,C")
+8     |-E = Enum("E", "")
+   8  |+class E(Enum):
+   9  |+    pass
+9  10 | E = Enum("E", " A B, C")
+10 11 | 
+11 12 | E = Enum("E", ["A", "B", "C"])
+
+UP048.py:9:1: UP048 [*] Enum can be declared using functional syntax
+   |
+ 7 | E = Enum("E", "A,B,C")
+ 8 | E = Enum("E", "")
+ 9 | E = Enum("E", " A B, C")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP048
+10 |
+11 | E = Enum("E", ["A", "B", "C"])
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+1     |-from enum import Enum
+   1  |+from enum import Enum, auto
+2  2  | 
+3  3  | 
+4  4  | ### Errors
+--------------------------------------------------------------------------------
+6  6  | E = Enum("E", "A B C")
+7  7  | E = Enum("E", "A,B,C")
+8  8  | E = Enum("E", "")
+9     |-E = Enum("E", " A B, C")
+   9  |+class E(Enum):
+   10 |+    A = auto()
+   11 |+    B = auto()
+   12 |+    C = auto()
+10 13 | 
+11 14 | E = Enum("E", ["A", "B", "C"])
+12 15 | E = Enum("E", ("A", "B", "C"))
+
+UP048.py:11:1: UP048 [*] Enum can be declared using functional syntax
+   |
+ 9 | E = Enum("E", " A B, C")
+10 |
+11 | E = Enum("E", ["A", "B", "C"])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP048
+12 | E = Enum("E", ("A", "B", "C"))
+13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+1     |-from enum import Enum
+   1  |+from enum import Enum, auto
+2  2  | 
+3  3  | 
+4  4  | ### Errors
+--------------------------------------------------------------------------------
+8  8  | E = Enum("E", "")
+9  9  | E = Enum("E", " A B, C")
+10 10 | 
+11    |-E = Enum("E", ["A", "B", "C"])
+   11 |+class E(Enum):
+   12 |+    A = auto()
+   13 |+    B = auto()
+   14 |+    C = auto()
+12 15 | E = Enum("E", ("A", "B", "C"))
+13 16 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14 17 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+
+UP048.py:12:1: UP048 [*] Enum can be declared using functional syntax
+   |
+11 | E = Enum("E", ["A", "B", "C"])
+12 | E = Enum("E", ("A", "B", "C"))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP048
+13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+1     |-from enum import Enum
+   1  |+from enum import Enum, auto
+2  2  | 
+3  3  | 
+4  4  | ### Errors
+--------------------------------------------------------------------------------
+9  9  | E = Enum("E", " A B, C")
+10 10 | 
+11 11 | E = Enum("E", ["A", "B", "C"])
+12    |-E = Enum("E", ("A", "B", "C"))
+   12 |+class E(Enum):
+   13 |+    A = auto()
+   14 |+    B = auto()
+   15 |+    C = auto()
+13 16 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14 17 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+15 18 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+
+UP048.py:13:1: UP048 [*] Enum can be declared using functional syntax
+   |
+11 | E = Enum("E", ["A", "B", "C"])
+12 | E = Enum("E", ("A", "B", "C"))
+13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP048
+14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+10 10 | 
+11 11 | E = Enum("E", ["A", "B", "C"])
+12 12 | E = Enum("E", ("A", "B", "C"))
+13    |-E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+   13 |+class E(Enum):
+   14 |+    A = 1
+   15 |+    B = 2
+   16 |+    C = 3
+14 17 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+15 18 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+16 19 | 
+
+UP048.py:14:1: UP048 [*] Enum can be declared using functional syntax
+   |
+12 | E = Enum("E", ("A", "B", "C"))
+13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP048
+15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+11 11 | E = Enum("E", ["A", "B", "C"])
+12 12 | E = Enum("E", ("A", "B", "C"))
+13 13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14    |-E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+   14 |+class E(Enum):
+   15 |+    A = 1
+   16 |+    B = 2
+   17 |+    C = 3
+15 18 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+16 19 | 
+17 20 | E = Enum("E", [])
+
+UP048.py:15:1: UP048 [*] Enum can be declared using functional syntax
+   |
+13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP048
+16 |
+17 | E = Enum("E", [])
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+12 12 | E = Enum("E", ("A", "B", "C"))
+13 13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
+14 14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+15    |-E = Enum("E", {"A": 1, "B": 2, "C": 3})
+   15 |+class E(Enum):
+   16 |+    A = 1
+   17 |+    B = 2
+   18 |+    C = 3
+16 19 | 
+17 20 | E = Enum("E", [])
+18 21 | E = Enum("E", ())
+
+UP048.py:17:1: UP048 [*] Enum can be declared using functional syntax
+   |
+15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+16 |
+17 | E = Enum("E", [])
+   | ^^^^^^^^^^^^^^^^^ UP048
+18 | E = Enum("E", ())
+19 | E = Enum("E", {})
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+14 14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
+15 15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+16 16 | 
+17    |-E = Enum("E", [])
+   17 |+class E(Enum):
+   18 |+    pass
+18 19 | E = Enum("E", ())
+19 20 | E = Enum("E", {})
+20 21 | 
+
+UP048.py:18:1: UP048 [*] Enum can be declared using functional syntax
+   |
+17 | E = Enum("E", [])
+18 | E = Enum("E", ())
+   | ^^^^^^^^^^^^^^^^^ UP048
+19 | E = Enum("E", {})
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+15 15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
+16 16 | 
+17 17 | E = Enum("E", [])
+18    |-E = Enum("E", ())
+   18 |+class E(Enum):
+   19 |+    pass
+19 20 | E = Enum("E", {})
+20 21 | 
+21 22 | 
+
+UP048.py:19:1: UP048 [*] Enum can be declared using functional syntax
+   |
+17 | E = Enum("E", [])
+18 | E = Enum("E", ())
+19 | E = Enum("E", {})
+   | ^^^^^^^^^^^^^^^^^ UP048
+   |
+   = help: Replace with class syntax
+
+ℹ Unsafe fix
+16 16 | 
+17 17 | E = Enum("E", [])
+18 18 | E = Enum("E", ())
+19    |-E = Enum("E", {})
+   19 |+class E(Enum):
+   20 |+    pass
+20 21 | 
+21 22 | 
+22 23 | ### No errors
