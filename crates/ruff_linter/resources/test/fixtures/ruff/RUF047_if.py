@@ -22,7 +22,13 @@ else:
 
 if this_second_comment():
     belongs()  # to
-     # `if`
+      # `if`
+else:
+    pass
+
+if this_second_comment():
+    belongs()  # to
+    # `if`
 else:
     pass
 
@@ -51,12 +57,6 @@ def nested():
 
 
 ### No errors
-
-if this_second_comment():
-    belongs()  # to
-    # `else`
-else:
-    pass
 
 
 if this_second_comment():

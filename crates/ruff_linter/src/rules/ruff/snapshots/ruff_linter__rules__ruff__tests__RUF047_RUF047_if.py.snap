@@ -64,74 +64,96 @@ RUF047_if.py:19:1: RUF047 [*] Empty `else` clause
 RUF047_if.py:26:1: RUF047 [*] Empty `else` clause
    |
 24 |       belongs()  # to
-25 |        # `if`
+25 |         # `if`
 26 | / else:
 27 | |     pass
    | |________^ RUF047
+28 |
+29 |   if this_second_comment():
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
 23 23 | if this_second_comment():
 24 24 |     belongs()  # to
-25 25 |      # `if`
+25 25 |       # `if`
 26    |-else:
 27    |-    pass
 28 26 | 
-29 27 | 
-30 28 | if of_course():
+29 27 | if this_second_comment():
+30 28 |     belongs()  # to
 
-RUF047_if.py:38:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:32:1: RUF047 [*] Empty `else` clause
    |
-37 | if of_course: this()
-38 | else: ...
+30 |       belongs()  # to
+31 |       # `if`
+32 | / else:
+33 | |     pass
+   | |________^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+29 29 | if this_second_comment():
+30 30 |     belongs()  # to
+31 31 |     # `if`
+32    |-else:
+33    |-    pass
+34 32 | 
+35 33 | 
+36 34 | if of_course():
+
+RUF047_if.py:44:1: RUF047 [*] Empty `else` clause
+   |
+43 | if of_course: this()
+44 | else: ...
    | ^^^^^^^^^ RUF047
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
-35 35 | 
-36 36 | 
-37 37 | if of_course: this()
-38    |-else: ...
-39 38 | 
-40 39 | 
-41 40 | if of_course:
-
-RUF047_if.py:43:1: RUF047 [*] Empty `else` clause
-   |
-41 | if of_course:
-42 |     this() # comment
-43 | else: ...
-   | ^^^^^^^^^ RUF047
-   |
-   = help: Remove `else` clause
-
-ℹ Safe fix
-40 40 | 
-41 41 | if of_course:
-42 42 |     this() # comment
-43    |-else: ...
-44 43 | 
+41 41 | 
+42 42 | 
+43 43 | if of_course: this()
+44    |-else: ...
 45 44 | 
-46 45 | def nested():
+46 45 | 
+47 46 | if of_course:
 
-RUF047_if.py:49:5: RUF047 [*] Empty `else` clause
+RUF047_if.py:49:1: RUF047 [*] Empty `else` clause
    |
-47 |       if a:
-48 |           b()
-49 | /     else:
-50 | |         ...
+47 | if of_course:
+48 |     this() # comment
+49 | else: ...
+   | ^^^^^^^^^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+46 46 | 
+47 47 | if of_course:
+48 48 |     this() # comment
+49    |-else: ...
+50 49 | 
+51 50 | 
+52 51 | def nested():
+
+RUF047_if.py:55:5: RUF047 [*] Empty `else` clause
+   |
+53 |       if a:
+54 |           b()
+55 | /     else:
+56 | |         ...
    | |___________^ RUF047
    |
    = help: Remove `else` clause
 
 ℹ Safe fix
-46 46 | def nested():
-47 47 |     if a:
-48 48 |         b()
-49    |-    else:
-50    |-        ...
-51 49 | 
-52 50 | 
-53 51 | ### No errors
+52 52 | def nested():
+53 53 |     if a:
+54 54 |         b()
+55    |-    else:
+56    |-        ...
+57 55 | 
+58 56 | 
+59 57 | ### No errors

@@ -59,7 +59,7 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: AnyNodeWithOrElse) {
         return;
     };
 
-    if else_branch_should_not_be_reported(stmt, else_range, checker) {
+    if else_contains_comments(stmt, else_range, checker) {
         return;
     }
 
@@ -84,36 +84,47 @@ fn body_is_no_op(body: &[Stmt]) -> bool {
     }
 }
 
-fn else_branch_should_not_be_reported(
+fn else_contains_comments(
     stmt: AnyNodeWithOrElse,
     else_range: TextRange,
     checker: &Checker,
 ) -> bool {
-    let Some(preceding_stmt) = stmt.body_before_else().last() else {
-        return true;
-    };
-    let Some(else_last_stmt) = stmt.else_body().last() else {
-        return true;
-    };
-
-    if else_branch_has_preceding_comment(preceding_stmt, else_range, checker) {
-        return true;
-    }
-
     let else_full_end = checker.source().full_line_end(else_range.end());
     let commentable_range = TextRange::new(else_range.start(), else_full_end);
 
+    // A comment after the `else` keyword or after the dummy statement.
+    //
+    // ```python
+    // if ...:
+    //  ...
+    // else: # comment
+    //  pass # comment
+    // ```
     if checker.comment_ranges().intersects(commentable_range) {
         return true;
     }
 
-    if else_branch_has_trailing_comment(else_last_stmt, else_full_end, checker) {
-        return true;
-    }
+    let Some(preceding_stmt) = stmt.body_before_else().last() else {
+        return false;
+    };
 
-    false
+    let Some(else_last_stmt) = stmt.else_body().last() else {
+        return false;
+    };
+
+    else_branch_has_preceding_comment(preceding_stmt, else_range, checker)
+        || else_branch_has_trailing_comment(else_last_stmt, else_full_end, checker)
 }
 
+/// Returns `true` if the `else` clause header has a leading own-line comment.
+///
+/// ```python
+/// if ...:
+///     ...
+/// # some comment
+/// else:
+///     pass
+/// ```
 fn else_branch_has_preceding_comment(
     preceding_stmt: &Stmt,
     else_range: TextRange,
@@ -122,13 +133,12 @@ fn else_branch_has_preceding_comment(
     let (tokens, source) = (checker.tokens(), checker.source());
 
     let before_else_full_end = source.full_line_end(preceding_stmt.end());
-    let else_start = else_range.start();
 
     let preceding_indentation = indentation(source, &preceding_stmt)
         .unwrap_or_default()
         .text_len();
 
-    for token in tokens.in_range(TextRange::new(before_else_full_end, else_start)) {
+    for token in tokens.in_range(TextRange::new(before_else_full_end, else_range.start())) {
         if token.kind() != TokenKind::Comment {
             continue;
         }
@@ -137,8 +147,8 @@ fn else_branch_has_preceding_comment(
             comment_indentation_after(preceding_stmt.into(), token.range(), source);
 
         match comment_indentation.cmp(&preceding_indentation) {
-            Ordering::Greater => continue,
-            Ordering::Equal => return true,
+            // Comment belongs to preceding statement.
+            Ordering::Greater | Ordering::Equal => continue,
             Ordering::Less => return true,
         }
     }
@@ -146,14 +156,23 @@ fn else_branch_has_preceding_comment(
     false
 }
 
+/// Returns `true` if the `else` branch has a trailing own line comment:
+///
+/// ```python
+/// if ...:
+///     ...
+/// else:
+///     pass
+///     # some comment
+/// ```
 fn else_branch_has_trailing_comment(
-    preceding_stmt: &Stmt,
+    last_else_stmt: &Stmt,
     else_full_end: TextSize,
     checker: &Checker,
 ) -> bool {
     let (tokens, source) = (checker.tokens(), checker.source());
 
-    let preceding_indentation = indentation(source, &preceding_stmt)
+    let preceding_indentation = indentation(source, &last_else_stmt)
         .unwrap_or_default()
         .text_len();
 
@@ -161,11 +180,10 @@ fn else_branch_has_trailing_comment(
         match token.kind() {
             TokenKind::Comment => {
                 let comment_indentation =
-                    comment_indentation_after(preceding_stmt.into(), token.range(), source);
+                    comment_indentation_after(last_else_stmt.into(), token.range(), source);
 
                 match comment_indentation.cmp(&preceding_indentation) {
-                    Ordering::Greater => return true,
-                    Ordering::Equal => return true,
+                    Ordering::Greater | Ordering::Equal => return true,
                     Ordering::Less => break,
                 }
             }
