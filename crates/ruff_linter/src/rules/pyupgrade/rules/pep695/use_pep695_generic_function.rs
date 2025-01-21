@@ -54,6 +54,9 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused
 /// private type variables.
 ///
+/// This rule only applies to generic functions and does not include generic classes. See
+/// [`non-pep695-generic-class`](non-pep695-generic-class.md) for the class version.
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 #[derive(ViolationMetadata)]
