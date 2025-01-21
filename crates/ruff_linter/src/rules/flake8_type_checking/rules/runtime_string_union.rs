@@ -190,10 +190,7 @@ pub(crate) fn runtime_string_union_preview(
                 checker.stylist(),
                 checker.locator(),
             );
-            let fix = if checker
-                .comment_ranges()
-                .has_comments(extended_expr, checker.source())
-            {
+            let fix = if checker.comment_ranges().intersects(extended_expr.range()) {
                 Fix::unsafe_edit(edit)
             } else {
                 Fix::safe_edit(edit)
@@ -225,10 +222,7 @@ pub(crate) fn runtime_string_union_preview(
         annotation_expr.range(),
     );
     let edit = Edit::range_replacement(annotation_expr.value.to_string(), annotation_expr.range());
-    if checker
-        .comment_ranges()
-        .has_comments(annotation_expr, checker.source())
-    {
+    if checker.comment_ranges().intersects(annotation_expr.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
