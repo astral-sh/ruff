@@ -122,10 +122,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
             checker.locator(),
         );
         let parent = expr.range().start();
-        let fix = if checker
-            .comment_ranges()
-            .has_comments(expr, checker.source())
-        {
+        let fix = if checker.comment_ranges().intersects(expr.range()) {
             Fix::unsafe_edit(edit)
         } else {
             Fix::safe_edit(edit)
@@ -161,10 +158,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
                 .as_string_literal_expr()
                 .expect("Expected string literal");
             let edit = Edit::range_replacement(string.value.to_string(), string.range());
-            if checker
-                .comment_ranges()
-                .has_comments(string, checker.source())
-            {
+            if checker.comment_ranges().intersects(string.range()) {
                 diagnostic.set_fix(Fix::unsafe_edit(edit));
             } else {
                 diagnostic.set_fix(Fix::safe_edit(edit));

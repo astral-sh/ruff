@@ -48,7 +48,7 @@ TC010_2.py:5:20: TC010 [*] Invalid string member in `X | Y`-style union type
   |
   = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 2 2 | 
 3 3 | 
 4 4 | x: "int" | str  # TC010

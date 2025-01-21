@@ -10,7 +10,7 @@ TC010_3.py:9:4: TC010 [*] Invalid string member in `X | Y`-style union type
    |
    = help: Extend quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 6  6  |     from foo import Foo
 7  7  | 
 8  8  | 
@@ -29,7 +29,7 @@ TC010_3.py:10:5: TC010 [*] Invalid string member in `X | Y`-style union type
    |
    = help: Extend quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 7  7  | 
 8  8  | 
 9  9  | x: "Foo" | str  # TC010
@@ -48,7 +48,7 @@ TC010_3.py:10:20: TC010 [*] Invalid string member in `X | Y`-style union type
    |
    = help: Extend quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 7  7  | 
 8  8  | 
 9  9  | x: "Foo" | str  # TC010
