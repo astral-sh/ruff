@@ -20,108 +20,6 @@ use crate::{Expr, Number};
 use std::borrow::Cow;
 use std::hash::Hash;
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableBoolOp {
-    And,
-    Or,
-}
-
-impl From<ast::BoolOp> for ComparableBoolOp {
-    fn from(op: ast::BoolOp) -> Self {
-        match op {
-            ast::BoolOp::And => Self::And,
-            ast::BoolOp::Or => Self::Or,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableOperator {
-    Add,
-    Sub,
-    Mult,
-    MatMult,
-    Div,
-    Mod,
-    Pow,
-    LShift,
-    RShift,
-    BitOr,
-    BitXor,
-    BitAnd,
-    FloorDiv,
-}
-
-impl From<ast::Operator> for ComparableOperator {
-    fn from(op: ast::Operator) -> Self {
-        match op {
-            ast::Operator::Add => Self::Add,
-            ast::Operator::Sub => Self::Sub,
-            ast::Operator::Mult => Self::Mult,
-            ast::Operator::MatMult => Self::MatMult,
-            ast::Operator::Div => Self::Div,
-            ast::Operator::Mod => Self::Mod,
-            ast::Operator::Pow => Self::Pow,
-            ast::Operator::LShift => Self::LShift,
-            ast::Operator::RShift => Self::RShift,
-            ast::Operator::BitOr => Self::BitOr,
-            ast::Operator::BitXor => Self::BitXor,
-            ast::Operator::BitAnd => Self::BitAnd,
-            ast::Operator::FloorDiv => Self::FloorDiv,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableUnaryOp {
-    Invert,
-    Not,
-    UAdd,
-    USub,
-}
-
-impl From<ast::UnaryOp> for ComparableUnaryOp {
-    fn from(op: ast::UnaryOp) -> Self {
-        match op {
-            ast::UnaryOp::Invert => Self::Invert,
-            ast::UnaryOp::Not => Self::Not,
-            ast::UnaryOp::UAdd => Self::UAdd,
-            ast::UnaryOp::USub => Self::USub,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableCmpOp {
-    Eq,
-    NotEq,
-    Lt,
-    LtE,
-    Gt,
-    GtE,
-    Is,
-    IsNot,
-    In,
-    NotIn,
-}
-
-impl From<ast::CmpOp> for ComparableCmpOp {
-    fn from(op: ast::CmpOp) -> Self {
-        match op {
-            ast::CmpOp::Eq => Self::Eq,
-            ast::CmpOp::NotEq => Self::NotEq,
-            ast::CmpOp::Lt => Self::Lt,
-            ast::CmpOp::LtE => Self::LtE,
-            ast::CmpOp::Gt => Self::Gt,
-            ast::CmpOp::GtE => Self::GtE,
-            ast::CmpOp::Is => Self::Is,
-            ast::CmpOp::IsNot => Self::IsNot,
-            ast::CmpOp::In => Self::In,
-            ast::CmpOp::NotIn => Self::NotIn,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableAlias<'a> {
     name: &'a str,
@@ -719,7 +617,7 @@ impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBoolOp<'a> {
-    op: ComparableBoolOp,
+    op: ast::BoolOp,
     values: Vec<ComparableExpr<'a>>,
 }
 
@@ -732,13 +630,13 @@ pub struct ExprNamed<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBinOp<'a> {
     left: Box<ComparableExpr<'a>>,
-    op: ComparableOperator,
+    op: ast::Operator,
     right: Box<ComparableExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprUnaryOp<'a> {
-    op: ComparableUnaryOp,
+    op: ast::UnaryOp,
     operand: Box<ComparableExpr<'a>>,
 }
 
@@ -823,7 +721,7 @@ pub struct ExprYieldFrom<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprCompare<'a> {
     left: Box<ComparableExpr<'a>>,
-    ops: Vec<ComparableCmpOp>,
+    ops: Vec<ast::CmpOp>,
     comparators: Vec<ComparableExpr<'a>>,
 }
 
@@ -968,7 +866,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 values,
                 range: _,
             }) => Self::BoolOp(ExprBoolOp {
-                op: (*op).into(),
+                op: *op,
                 values: values.iter().map(Into::into).collect(),
             }),
             ast::Expr::Named(ast::ExprNamed {
@@ -986,7 +884,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 range: _,
             }) => Self::BinOp(ExprBinOp {
                 left: left.into(),
-                op: (*op).into(),
+                op: *op,
                 right: right.into(),
             }),
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
@@ -994,7 +892,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 operand,
                 range: _,
             }) => Self::UnaryOp(ExprUnaryOp {
-                op: (*op).into(),
+                op: *op,
                 operand: operand.into(),
             }),
             ast::Expr::Lambda(ast::ExprLambda {
@@ -1306,7 +1204,7 @@ pub struct StmtAssign<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAugAssign<'a> {
     target: ComparableExpr<'a>,
-    op: ComparableOperator,
+    op: ast::Operator,
     value: ComparableExpr<'a>,
 }
 
