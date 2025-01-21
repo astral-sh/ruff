@@ -7,6 +7,6 @@ fail-fast = false
 
 status-level = "skip"
 
-# Mark tests that take longer than 10s as slow.
-# Terminate after 90s as a stop-gap measure to terminate on deadlock.
-slow-timeout =  { period = "10s", terminate-after = 9 }
+# Mark tests that take longer than 1s as slow.
+# Terminate after 60s as a stop-gap measure to terminate on deadlock.
+slow-timeout =  { period = "1s", terminate-after = 60 }
