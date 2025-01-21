@@ -125,22 +125,27 @@ class MDTestRunner:
                 f"Test for [bold red]{markdown_file}[/bold red] failed",
                 style="gray",
             )
-            # Skip 'cargo test' boilerplate at the beginning:
-            lines = output.stdout.splitlines()
-            start_index = 0
-            for i, line in enumerate(lines):
-                if f"{test_name} stdout" in line:
-                    start_index = i
-                    break
+            self._print_trimmed_cargo_test_output(
+                output.stdout + output.stderr, test_name
+            )
 
-            for line in lines[start_index + 1 :]:
-                if "MDTEST_TEST_FILTER" in line:
-                    continue
-                if line.strip() == "-" * 50:
-                    # Skip 'cargo test' boilerplate at the end
-                    break
+    def _print_trimmed_cargo_test_output(self, output: str, test_name: str) -> None:
+        # Skip 'cargo test' boilerplate at the beginning:
+        lines = output.splitlines()
+        start_index = 0
+        for i, line in enumerate(lines):
+            if f"{test_name} stdout" in line:
+                start_index = i
+                break
 
-                print(line)
+        for line in lines[start_index + 1 :]:
+            if "MDTEST_TEST_FILTER" in line:
+                continue
+            if line.strip() == "-" * 50:
+                # Skip 'cargo test' boilerplate at the end
+                break
+
+            print(line)
 
     def watch(self) -> Never:
         self._recompile_tests("Compiling tests...", message_on_success=False)
