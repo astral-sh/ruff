@@ -42,6 +42,7 @@ struct TypeVar<'a> {
     name: &'a ExprName,
     restriction: Option<TypeVarRestriction<'a>>,
     kind: TypeParamKind,
+    default: Option<&'a Expr>,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
@@ -121,6 +122,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             name,
             restriction,
             kind,
+            default: _, // TODO(brent) see below
         }: &'a TypeVar<'a>,
     ) -> Self {
         match kind {
@@ -202,6 +204,7 @@ fn expr_name_to_type_var<'a>(
                     name,
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
+                    default: None,
                 });
             }
         }
@@ -236,9 +239,9 @@ fn expr_name_to_type_var<'a>(
                 // ```python
                 // class slice[T: str = Any]: ...
                 // ```
-                if arguments.find_keyword("default").is_some() {
-                    return None;
-                }
+                let default = arguments
+                    .find_keyword("default")
+                    .map(|default| &default.value);
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
                 } else if arguments.args.len() > 1 {
@@ -253,6 +256,7 @@ fn expr_name_to_type_var<'a>(
                     name,
                     restriction,
                     kind,
+                    default,
                 });
             }
         }
@@ -276,7 +280,14 @@ fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
         return None;
     }
 
-    // If any type variables were not unique, just bail out here
-    // this is a runtime error and we can't predict what the user wanted
-    (vars.iter().unique_by(|tvar| &tvar.name.id).count() == vars.len()).then_some(vars)
+    // If any type variables were not unique, just bail out here. this is a runtime error and we
+    // can't predict what the user wanted. also bail out if any Python 3.13+ default values are
+    // found on the type parameters
+    (vars
+        .iter()
+        .unique_by(|tvar| &tvar.name.id)
+        .filter(|tvar| tvar.default.is_none())
+        .count()
+        == vars.len())
+    .then_some(vars)
 }

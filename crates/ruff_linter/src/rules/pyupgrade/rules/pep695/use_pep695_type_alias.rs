@@ -136,6 +136,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
                     name,
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
+                    default: None,
                 })
             })
         })
