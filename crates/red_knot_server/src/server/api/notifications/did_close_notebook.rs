@@ -1,7 +1,7 @@
 use lsp_types::notification::DidCloseNotebookDocument;
 use lsp_types::DidCloseNotebookDocumentParams;
 
-use red_knot_workspace::watch::ChangeEvent;
+use red_knot_project::watch::ChangeEvent;
 
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::api::LSPResult;

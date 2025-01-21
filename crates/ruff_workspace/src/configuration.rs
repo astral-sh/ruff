@@ -25,7 +25,7 @@ use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
-use ruff_linter::rules::pycodestyle;
+use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
@@ -49,7 +49,7 @@ use crate::options::{
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -232,6 +232,21 @@ impl Configuration {
 
         let line_length = self.line_length.unwrap_or_default();
 
+        let rules = lint.as_rule_table(lint_preview)?;
+
+        // LinterSettings validation
+        let isort = lint
+            .isort
+            .map(IsortOptions::try_into_settings)
+            .transpose()?
+            .unwrap_or_default();
+        let flake8_import_conventions = lint
+            .flake8_import_conventions
+            .map(Flake8ImportConventionsOptions::into_settings)
+            .unwrap_or_default();
+
+        conflicting_import_settings(&isort, &flake8_import_conventions)?;
+
         Ok(Settings {
             cache_dir: self
                 .cache_dir
@@ -259,7 +274,7 @@ impl Configuration {
 
             #[allow(deprecated)]
             linter: LinterSettings {
-                rules: lint.as_rule_table(lint_preview)?,
+                rules,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
@@ -341,10 +356,7 @@ impl Configuration {
                     .flake8_implicit_str_concat
                     .map(Flake8ImplicitStrConcatOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_import_conventions: lint
-                    .flake8_import_conventions
-                    .map(Flake8ImportConventionsOptions::into_settings)
-                    .unwrap_or_default(),
+                flake8_import_conventions,
                 flake8_pytest_style: lint
                     .flake8_pytest_style
                     .map(Flake8PytestStyleOptions::try_into_settings)
@@ -374,11 +386,7 @@ impl Configuration {
                     .flake8_gettext
                     .map(Flake8GetTextOptions::into_settings)
                     .unwrap_or_default(),
-                isort: lint
-                    .isort
-                    .map(IsortOptions::try_into_settings)
-                    .transpose()?
-                    .unwrap_or_default(),
+                isort,
                 mccabe: lint
                     .mccabe
                     .map(McCabeOptions::into_settings)
@@ -396,6 +404,10 @@ impl Configuration {
                         ..pycodestyle::settings::Settings::default()
                     }
                 },
+                pydoclint: lint
+                    .pydoclint
+                    .map(PydoclintOptions::into_settings)
+                    .unwrap_or_default(),
                 pydocstyle: lint
                     .pydocstyle
                     .map(PydocstyleOptions::into_settings)
@@ -627,6 +639,7 @@ pub struct LintConfiguration {
     pub mccabe: Option<McCabeOptions>,
     pub pep8_naming: Option<Pep8NamingOptions>,
     pub pycodestyle: Option<PycodestyleOptions>,
+    pub pydoclint: Option<PydoclintOptions>,
     pub pydocstyle: Option<PydocstyleOptions>,
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
@@ -739,6 +752,7 @@ impl LintConfiguration {
             mccabe: options.common.mccabe,
             pep8_naming: options.common.pep8_naming,
             pycodestyle: options.common.pycodestyle,
+            pydoclint: options.pydoclint,
             pydocstyle: options.common.pydocstyle,
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
@@ -1133,6 +1147,7 @@ impl LintConfiguration {
             mccabe: self.mccabe.combine(config.mccabe),
             pep8_naming: self.pep8_naming.combine(config.pep8_naming),
             pycodestyle: self.pycodestyle.combine(config.pycodestyle),
+            pydoclint: self.pydoclint.combine(config.pydoclint),
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
@@ -1551,6 +1566,34 @@ fn warn_about_deprecated_top_level_lint_options(
         "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. \
         Please update the following options in {thing_to_update}:\n  {options_mapping}",
     );
+}
+
+/// Detect conflicts between I002 (missing-required-import) and ICN001 (unconventional-import-alias)
+fn conflicting_import_settings(
+    isort: &isort::settings::Settings,
+    flake8_import_conventions: &flake8_import_conventions::settings::Settings,
+) -> Result<()> {
+    use std::fmt::Write;
+    let mut err_body = String::new();
+    for required_import in &isort.required_imports {
+        let name = required_import.qualified_name().to_string();
+        if let Some(alias) = flake8_import_conventions.aliases.get(&name) {
+            writeln!(err_body, "    - `{name}` -> `{alias}`").unwrap();
+        }
+    }
+
+    if !err_body.is_empty() {
+        return Err(anyhow!(
+            "Required import specified in `lint.isort.required-imports` (I002) \
+            conflicts with the required import alias specified in either \
+            `lint.flake8-import-conventions.aliases` or \
+            `lint.flake8-import-conventions.extend-aliases` (ICN001):\
+                \n{err_body}\n\
+            Help: Remove the required import or alias from your configuration."
+        ));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

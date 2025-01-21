@@ -5,7 +5,7 @@ order_by_type_with_custom_constants.py:1:1: I001 [*] Import block is un-sorted o
   |
 1 | / from sklearn.svm import XYZ, func, variable, Const, Klass, constant
 2 | | from subprocess import First, var, func, Class, konst, A_constant, Last, STDOUT
-  | |________________________________________________________________________________^ I001
+  | |_______________________________________________________________________________^ I001
   |
   = help: Organize imports
 

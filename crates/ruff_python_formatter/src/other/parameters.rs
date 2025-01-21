@@ -1,6 +1,5 @@
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::Parameters;
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, Parameters};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -165,7 +164,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                     token("*"),
                     vararg.format()
                 ]);
-                last_node = Some(vararg.as_any_node_ref());
+                last_node = Some(vararg.as_ref().into());
             } else if !kwonlyargs.is_empty() {
                 // Given very strange comment placement, comments here may not actually have been
                 // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
@@ -201,7 +200,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                     token("**"),
                     kwarg.format()
                 ]);
-                last_node = Some(kwarg.as_any_node_ref());
+                last_node = Some(kwarg.as_ref().into());
             }
 
             joiner.finish()?;

@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -194,6 +195,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         }
 
         if checker.enabled(Rule::RedefinedWhileUnused) {
+            // Index the redefined bindings by statement.
+            let mut redefinitions = FxHashMap::default();
+
             for (name, binding_id) in scope.bindings() {
                 for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
                     // If the shadowing binding is a loop variable, abort, to avoid overlap
@@ -271,9 +275,62 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         continue;
                     }
 
+                    redefinitions
+                        .entry(binding.source)
+                        .or_insert_with(Vec::new)
+                        .push((shadowed, binding));
+                }
+            }
+
+            // Create a fix for each source statement.
+            let mut fixes = FxHashMap::default();
+            for (source, entries) in &redefinitions {
+                let Some(source) = source else {
+                    continue;
+                };
+
+                let member_names = entries
+                    .iter()
+                    .filter_map(|(shadowed, binding)| {
+                        if let Some(shadowed_import) = shadowed.as_any_import() {
+                            if let Some(import) = binding.as_any_import() {
+                                if shadowed_import.qualified_name() == import.qualified_name() {
+                                    return Some(import.member_name());
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .collect::<Vec<_>>();
+
+                if !member_names.is_empty() {
+                    let statement = checker.semantic.statement(*source);
+                    let parent = checker.semantic.parent_statement(*source);
+                    let Ok(edit) = fix::edits::remove_unused_imports(
+                        member_names.iter().map(std::convert::AsRef::as_ref),
+                        statement,
+                        parent,
+                        checker.locator(),
+                        checker.stylist(),
+                        checker.indexer(),
+                    ) else {
+                        continue;
+                    };
+                    fixes.insert(
+                        *source,
+                        Fix::safe_edit(edit).isolate(Checker::isolation(
+                            checker.semantic().parent_statement_id(*source),
+                        )),
+                    );
+                }
+            }
+
+            // Create diagnostics for each statement.
+            for (source, entries) in &redefinitions {
+                for (shadowed, binding) in entries {
                     let mut diagnostic = Diagnostic::new(
                         pyflakes::rules::RedefinedWhileUnused {
-                            name: (*name).to_string(),
+                            name: binding.name(checker.source()).to_string(),
                             row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
@@ -283,30 +340,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         diagnostic.set_parent(range.start());
                     }
 
-                    // Remove the import if the binding and the shadowed binding are both imports,
-                    // and both point to the same qualified name.
-                    if let Some(shadowed_import) = shadowed.as_any_import() {
-                        if let Some(import) = binding.as_any_import() {
-                            if shadowed_import.qualified_name() == import.qualified_name() {
-                                if let Some(source) = binding.source {
-                                    diagnostic.try_set_fix(|| {
-                                        let statement = checker.semantic().statement(source);
-                                        let parent = checker.semantic().parent_statement(source);
-                                        let edit = fix::edits::remove_unused_imports(
-                                            std::iter::once(import.member_name().as_ref()),
-                                            statement,
-                                            parent,
-                                            checker.locator(),
-                                            checker.stylist(),
-                                            checker.indexer(),
-                                        )?;
-                                        Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-                                            checker.semantic().parent_statement_id(source),
-                                        )))
-                                    });
-                                }
-                            }
-                        }
+                    if let Some(fix) = source.as_ref().and_then(|source| fixes.get(source)) {
+                        diagnostic.set_fix(fix.clone());
                     }
 
                     diagnostics.push(diagnostic);

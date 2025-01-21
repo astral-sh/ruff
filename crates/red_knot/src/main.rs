@@ -6,13 +6,12 @@ use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use python_version::PythonVersion;
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::watch;
+use red_knot_project::watch::ProjectWatcher;
+use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::SitePackages;
 use red_knot_server::run_server;
-use red_knot_workspace::db::ProjectDatabase;
-use red_knot_workspace::project::settings::Configuration;
-use red_knot_workspace::project::ProjectMetadata;
-use red_knot_workspace::watch;
-use red_knot_workspace::watch::ProjectWatcher;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
@@ -71,31 +70,30 @@ struct Args {
 }
 
 impl Args {
-    fn to_configuration(&self, cli_cwd: &SystemPath) -> Configuration {
-        let mut configuration = Configuration::default();
-
-        if let Some(python_version) = self.python_version {
-            configuration.python_version = Some(python_version.into());
+    fn to_options(&self, cli_cwd: &SystemPath) -> Options {
+        Options {
+            environment: Some(EnvironmentOptions {
+                python_version: self.python_version.map(Into::into),
+                venv_path: self
+                    .venv_path
+                    .as_ref()
+                    .map(|venv_path| SitePackages::Derived {
+                        venv_path: SystemPath::absolute(venv_path, cli_cwd),
+                    }),
+                typeshed: self
+                    .typeshed
+                    .as_ref()
+                    .map(|typeshed| SystemPath::absolute(typeshed, cli_cwd)),
+                extra_paths: self.extra_search_path.as_ref().map(|extra_search_paths| {
+                    extra_search_paths
+                        .iter()
+                        .map(|path| SystemPath::absolute(path, cli_cwd))
+                        .collect()
+                }),
+                ..EnvironmentOptions::default()
+            }),
+            ..Default::default()
         }
-
-        if let Some(venv_path) = &self.venv_path {
-            configuration.search_paths.site_packages = Some(SitePackages::Derived {
-                venv_path: SystemPath::absolute(venv_path, cli_cwd),
-            });
-        }
-
-        if let Some(typeshed) = &self.typeshed {
-            configuration.search_paths.typeshed = Some(SystemPath::absolute(typeshed, cli_cwd));
-        }
-
-        if let Some(extra_search_paths) = &self.extra_search_path {
-            configuration.search_paths.extra_paths = extra_search_paths
-                .iter()
-                .map(|path| Some(SystemPath::absolute(path, cli_cwd)))
-                .collect();
-        }
-
-        configuration
     }
 }
 
@@ -164,18 +162,13 @@ fn run() -> anyhow::Result<ExitStatus> {
         .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd.clone());
-    let cli_configuration = args.to_configuration(&cwd);
-    let workspace_metadata = ProjectMetadata::discover(
-        system.current_directory(),
-        &system,
-        Some(&cli_configuration),
-    )?;
+    let cli_options = args.to_options(&cwd);
+    let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
+    workspace_metadata.apply_cli_options(cli_options.clone());
 
-    // TODO: Use the `program_settings` to compute the key for the database's persistent
-    //   cache and load the cache if it exists.
     let mut db = ProjectDatabase::new(workspace_metadata, system)?;
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_configuration);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -228,11 +221,11 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    cli_configuration: Configuration,
+    cli_options: Options,
 }
 
 impl MainLoop {
-    fn new(cli_configuration: Configuration) -> (Self, MainLoopCancellationToken) {
+    fn new(cli_options: Options) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -240,7 +233,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                cli_configuration,
+                cli_options,
             },
             MainLoopCancellationToken { sender },
         )
@@ -324,7 +317,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes, Some(&self.cli_configuration));
+                    db.apply_changes(changes, Some(&self.cli_options));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }

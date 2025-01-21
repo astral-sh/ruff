@@ -66,6 +66,15 @@ class_as_data_structure.py:91:1: B903 Class could be dataclass or namedtuple
 95 | |         self.foo = foo
 96 | |         self.bar = bar
    | |______________________^ B903
-97 |
-98 |   # <-- end flake8-bugbear tests
    |
+
+class_as_data_structure.py:99:1: B903 Class could be dataclass or namedtuple
+    |
+ 99 | / class KeywordOnly: # OK with python3.9 or less, not OK starting python3.10
+100 | |     def __init__(self, *, foo: int, bar: int):
+101 | |         self.foo = foo
+102 | |         self.bar = bar 
+    | |______________________^ B903
+103 |
+104 |   # <-- end flake8-bugbear tests
+    |

@@ -17,6 +17,7 @@ from airflow.hooks.dbapi import ConnectorProtocol, DbApiHook
 from airflow.hooks.dbapi_hook import DbApiHook as DbApiHook2
 from airflow.hooks.docker_hook import DockerHook
 from airflow.hooks.druid_hook import DruidDbApiHook, DruidHook
+from airflow.hooks.filesystem import FSHook
 from airflow.hooks.hive_hooks import (
     HIVE_QUEUE_PRIORITIES,
     HiveCliHook,
@@ -28,6 +29,7 @@ from airflow.hooks.jdbc_hook import JdbcHook, jaydebeapi
 from airflow.hooks.mssql_hook import MsSqlHook
 from airflow.hooks.mysql_hook import MySqlHook
 from airflow.hooks.oracle_hook import OracleHook
+from airflow.hooks.package_index import PackageIndexHook
 from airflow.hooks.pig_hook import PigCliHook
 from airflow.hooks.postgres_hook import PostgresHook
 from airflow.hooks.presto_hook import PrestoHook
@@ -35,6 +37,7 @@ from airflow.hooks.S3_hook import S3Hook, provide_bucket_name
 from airflow.hooks.samba_hook import SambaHook
 from airflow.hooks.slack_hook import SlackHook
 from airflow.hooks.sqlite_hook import SqliteHook
+from airflow.hooks.subprocess import SubprocessHook
 from airflow.hooks.webhdfs_hook import WebHDFSHook
 from airflow.hooks.zendesk_hook import ZendeskHook
 from airflow.kubernetes.k8s_model import K8SModel, append_to_pod
@@ -87,6 +90,7 @@ from airflow.operators.check_operator import (
     ThresholdCheckOperator,
     ValueCheckOperator,
 )
+from airflow.operators.datetime import BranchDateTimeOperator
 from airflow.operators.docker_operator import DockerOperator
 from airflow.operators.druid_check_operator import DruidCheckOperator
 from airflow.operators.gcs_to_s3 import GCSToS3Operator
@@ -145,6 +149,11 @@ from airflow.operators.sql import (
     parse_boolean,
 )
 from airflow.operators.sqlite_operator import SqliteOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.operators.weekday import BranchDayOfWeekOperator
+from airflow.sensors.date_time import DateTimeSensor
+from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
+from airflow.sensors.filesystem import FileSensor
 from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 from airflow.sensors.http_sensor import HttpSensor
 from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
@@ -152,7 +161,13 @@ from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
 from airflow.sensors.s3_key_sensor import S3KeySensor
 from airflow.sensors.sql import SqlSensor
 from airflow.sensors.sql_sensor import SqlSensor2
+from airflow.sensors.time_delta import TimeDeltaSensor
+from airflow.sensors.time_sensor import TimeSensor
 from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
+from airflow.sensors.weekday import DayOfWeekSensor
+from airflow.triggers.external_task import WorkflowTrigger
+from airflow.triggers.file import FileTrigger
+from airflow.triggers.temporal import DateTimeTrigger
 from airflow.www.security import FabAirflowSecurityManagerOverride
 
 # apache-airflow-providers-amazon
@@ -349,3 +364,20 @@ SqliteOperator()
 
 # apache-airflow-providers-zendesk
 ZendeskHook()
+
+# apache-airflow-providers-standard
+FileSensor()
+TriggerDagRunOperator()
+ExternalTaskMarker(), ExternalTaskSensor()
+BranchDateTimeOperator()
+BranchDayOfWeekOperator()
+DateTimeSensor()
+TimeSensor()
+TimeDeltaSensor()
+DayOfWeekSensor()
+FSHook()
+PackageIndexHook()
+SubprocessHook()
+WorkflowTrigger()
+FileTrigger()
+DateTimeTrigger()

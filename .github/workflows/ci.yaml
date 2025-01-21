@@ -386,6 +386,12 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
+      # Run all code generation scripts, and verify that the current output is
+      # already checked into git.
+      - run: python crates/ruff_python_ast/generate.py
+      - run: python crates/ruff_python_formatter/generate.py
+      - run: test -z "$(git status --porcelain)"
+      # Verify that adding a plugin or rule produces clean code.
       - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes
       - run: cargo check
       - run: cargo fmt --all --check

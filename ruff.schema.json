@@ -2296,6 +2296,17 @@
             }
           ]
         },
+        "pydoclint": {
+          "description": "Options for the `pydoclint` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PydoclintOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "pydocstyle": {
           "description": "Options for the `pydocstyle` plugin.",
           "anyOf": [
@@ -2540,6 +2551,19 @@
             {
               "type": "null"
             }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PydoclintOptions": {
+      "type": "object",
+      "properties": {
+        "ignore-one-line-docstrings": {
+          "description": "Skip docstrings which fit on a single line.\n\nNote: The corresponding setting in `pydoclint` is named `skip-checking-short-docstrings`.",
+          "type": [
+            "boolean",
+            "null"
           ]
         }
       },
@@ -3277,6 +3301,7 @@
         "FURB116",
         "FURB118",
         "FURB12",
+        "FURB122",
         "FURB129",
         "FURB13",
         "FURB131",
@@ -3644,6 +3669,7 @@
         "PLW021",
         "PLW0211",
         "PLW024",
+        "PLW0244",
         "PLW0245",
         "PLW04",
         "PLW040",
@@ -3895,6 +3921,7 @@
         "RUF041",
         "RUF043",
         "RUF046",
+        "RUF047",
         "RUF048",
         "RUF049",
         "RUF05",
@@ -3903,6 +3930,7 @@
         "RUF055",
         "RUF056",
         "RUF057",
+        "RUF058",
         "RUF1",
         "RUF10",
         "RUF100",

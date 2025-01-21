@@ -14,5 +14,7 @@ crates/ruff_python_parser/resources/invalid/re_lex_logical_token_mac_eol.py text
 
 crates/ruff_python_parser/resources/inline linguist-generated=true
 
-ruff.schema.json linguist-generated=true text=auto eol=lf
+ruff.schema.json -diff linguist-generated=true text=auto eol=lf
+crates/ruff_python_ast/src/generated.rs -diff linguist-generated=true text=auto eol=lf
+crates/ruff_python_formatter/src/generated.rs -diff linguist-generated=true text=auto eol=lf
 *.md.snap linguist-language=Markdown

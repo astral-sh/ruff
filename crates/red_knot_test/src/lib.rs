@@ -97,7 +97,7 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
 }
 
 fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
-    let workspace_root = db.workspace_root().to_path_buf();
+    let project_root = db.project_root().to_path_buf();
 
     let test_files: Vec<_> = test
         .files()
@@ -110,7 +110,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 matches!(embedded.lang, "py" | "pyi"),
                 "Non-Python files not supported yet."
             );
-            let full_path = workspace_root.join(embedded.path);
+            let full_path = project_root.join(embedded.path);
             db.write_file(&full_path, embedded.code).unwrap();
             let file = system_path_to_file(db, full_path).unwrap();
 

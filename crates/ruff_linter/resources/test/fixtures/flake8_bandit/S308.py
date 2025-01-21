@@ -20,3 +20,8 @@ def some_func():
 @mark_safe
 def some_func():
     return '<script>alert("evil!")</script>'
+
+
+# https://github.com/astral-sh/ruff/issues/15522
+map(mark_safe, [])
+foo = mark_safe

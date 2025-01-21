@@ -73,3 +73,44 @@ def test_error_try():
             foo()
         except:
             raise
+
+
+# https://github.com/astral-sh/ruff/issues/9730
+def test_for_loops():
+
+    ## Errors
+
+    with pytest.warns(RuntimeError):
+        for a in b:
+            print()
+
+    with pytest.warns(RuntimeError):
+        for a in b:
+            assert foo
+
+    with pytest.warns(RuntimeError):
+        async for a in b:
+            print()
+
+    with pytest.warns(RuntimeError):
+        async for a in b:
+            assert foo
+
+
+    ## No errors in preview
+
+    with pytest.warns(RuntimeError):
+        for a in b:
+            pass
+
+    with pytest.warns(RuntimeError):
+        for a in b:
+            ...
+
+    with pytest.warns(RuntimeError):
+        async for a in b:
+            pass
+
+    with pytest.warns(RuntimeError):
+        async for a in b:
+            ...

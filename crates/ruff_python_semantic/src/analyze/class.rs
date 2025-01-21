@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use rustc_hash::FxHashSet;
 
 use crate::analyze::typing;
@@ -70,46 +72,62 @@ pub fn any_base_class(
     inner(class_def, semantic, func, &mut FxHashSet::default())
 }
 
-/// Return `true` if any base class matches an [`ast::StmtClassDef`] predicate.
+/// Returns an iterator over all base classes, beginning with the
+/// given class.
+///
+/// The traversal of the class hierarchy is breadth-first, since
+/// this graph tends to have small width but could be rather deep.
+pub fn iter_super_class<'stmt>(
+    class_def: &'stmt ast::StmtClassDef,
+    semantic: &'stmt SemanticModel,
+) -> impl Iterator<Item = &'stmt ast::StmtClassDef> {
+    struct SuperClassIterator<'stmt> {
+        semantic: &'stmt SemanticModel<'stmt>,
+        to_visit: VecDeque<&'stmt ast::StmtClassDef>,
+        seen: FxHashSet<BindingId>,
+    }
+
+    impl<'a> Iterator for SuperClassIterator<'a> {
+        type Item = &'a ast::StmtClassDef;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let current = self.to_visit.pop_front()?;
+
+            // Add all base classes to the to_visit list
+            for expr in current.bases() {
+                if let Some(id) = self.semantic.lookup_attribute(map_subscript(expr)) {
+                    if self.seen.insert(id) {
+                        let binding = self.semantic.binding(id);
+                        if let Some(base_class) = binding
+                            .kind
+                            .as_class_definition()
+                            .map(|id| &self.semantic.scopes[*id])
+                            .and_then(|scope| scope.kind.as_class())
+                        {
+                            self.to_visit.push_back(base_class);
+                        }
+                    }
+                }
+            }
+            Some(current)
+        }
+    }
+
+    SuperClassIterator {
+        semantic,
+        to_visit: VecDeque::from([class_def]),
+        seen: FxHashSet::default(),
+    }
+}
+
+/// Return `true` if any base class, including the given class,
+/// matches an [`ast::StmtClassDef`] predicate.
 pub fn any_super_class(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     func: &dyn Fn(&ast::StmtClassDef) -> bool,
 ) -> bool {
-    fn inner(
-        class_def: &ast::StmtClassDef,
-        semantic: &SemanticModel,
-        func: &dyn Fn(&ast::StmtClassDef) -> bool,
-        seen: &mut FxHashSet<BindingId>,
-    ) -> bool {
-        // If the function itself matches the pattern, then this does too.
-        if func(class_def) {
-            return true;
-        }
-
-        // Otherwise, check every base class.
-        class_def.bases().iter().any(|expr| {
-            // If the base class extends a class that matches the pattern, then this does too.
-            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
-                if seen.insert(id) {
-                    let binding = semantic.binding(id);
-                    if let Some(base_class) = binding
-                        .kind
-                        .as_class_definition()
-                        .map(|id| &semantic.scopes[*id])
-                        .and_then(|scope| scope.kind.as_class())
-                    {
-                        if inner(base_class, semantic, func, seen) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        })
-    }
-
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    iter_super_class(class_def, semantic).any(func)
 }
 
 #[derive(Clone, Debug)]

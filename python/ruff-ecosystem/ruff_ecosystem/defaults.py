@@ -121,6 +121,7 @@ DEFAULT_TARGETS = [
             # These notebooks contain syntax errors because certain plain text / markdown
             # cells are marked as code cells.
             "exclude": [
+                "examples/Assistants_API_overview_python.ipynb",
                 "examples/Chat_finetuning_data_prep.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb",

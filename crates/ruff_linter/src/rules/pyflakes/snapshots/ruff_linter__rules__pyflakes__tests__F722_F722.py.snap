@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F722.py:9:12: F722 Syntax error in forward annotation: `///`
+F722.py:9:12: F722 Syntax error in forward annotation: Expected an expression
    |
  9 | def g() -> "///":
    |            ^^^^^ F722
 10 |     pass
    |
 
-F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
+F722.py:13:4: F722 Syntax error in forward annotation: Got unexpected token ☃
    |
 13 | X: """List[int]"""'☃' = []
    |    ^^^^^^^^^^^^^^^^^^ F722
@@ -17,10 +16,7 @@ F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
 15 | # Type annotations with triple quotes can contain newlines and indentation
    |
 
-F722.py:30:11: F722 Syntax error in forward annotation: `
-		int |
-str)
-`
+F722.py:30:11: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
    |
 28 |   """
 29 |
@@ -34,10 +30,7 @@ str)
 35 |   invalid2: """
    |
 
-F722.py:35:11: F722 Syntax error in forward annotation: `
-		int) |
-str
-`
+F722.py:35:11: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
    |
 33 |   """
 34 |
@@ -51,9 +44,7 @@ str
 40 |           ((int)
    |
 
-F722.py:39:11: F722 Syntax error in forward annotation: `
-		((int)
-`
+F722.py:39:11: F722 Syntax error in forward annotation: unexpected EOF while parsing
    |
 37 |   str
 38 |   """
@@ -66,9 +57,7 @@ F722.py:39:11: F722 Syntax error in forward annotation: `
 43 |           (int
    |
 
-F722.py:42:11: F722 Syntax error in forward annotation: `
-		(int
-`
+F722.py:42:11: F722 Syntax error in forward annotation: unexpected EOF while parsing
    |
 40 |           ((int)
 41 |   """

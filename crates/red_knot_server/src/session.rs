@@ -8,8 +8,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 
-use red_knot_workspace::db::ProjectDatabase;
-use red_knot_workspace::project::ProjectMetadata;
+use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
 use ruff_db::Db;
@@ -69,7 +68,7 @@ impl Session {
             let system = LSPSystem::new(index.clone());
 
             // TODO(dhruvmanila): Get the values from the client settings
-            let metadata = ProjectMetadata::discover(system_path, &system, None)?;
+            let metadata = ProjectMetadata::discover(system_path, &system)?;
             // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
             workspaces.insert(path, ProjectDatabase::new(metadata, system)?);
         }

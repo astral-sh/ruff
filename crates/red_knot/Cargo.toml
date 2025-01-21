@@ -13,7 +13,7 @@ license.workspace = true
 
 [dependencies]
 red_knot_python_semantic = { workspace = true }
-red_knot_workspace = { workspace = true, features = ["zstd"] }
+red_knot_project = { workspace = true, features = ["zstd"] }
 red_knot_server = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
 
@@ -32,9 +32,14 @@ tracing-flame = { workspace = true }
 tracing-tree = { workspace = true }
 
 [dev-dependencies]
-filetime = { workspace = true }
-tempfile = { workspace = true }
 ruff_db = { workspace = true, features = ["testing"] }
+
+insta = { workspace = true, features = ["filters"] }
+insta-cmd = { workspace = true }
+filetime = { workspace = true }
+regex = { workspace = true }
+tempfile = { workspace = true }
+toml = { workspace = true }
 
 [lints]
 workspace = true

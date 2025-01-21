@@ -129,6 +129,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_29.pyi"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -284,6 +285,35 @@ mod tests {
         )
         .0;
         assert_messages!(snapshot, diagnostics);
+    }
+
+    // Regression test for https://github.com/astral-sh/ruff/issues/12897
+    #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
+    fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let settings = LinterSettings {
+            preview: PreviewMode::Enabled,
+            isort: isort::settings::Settings {
+                // Like `f401_preview_first_party_submodule`, this test requires the input module to
+                // be first-party
+                known_modules: isort::categorize::KnownModules::new(
+                    vec!["F401_*".parse()?],
+                    vec![],
+                    vec![],
+                    vec![],
+                    FxHashMap::default(),
+                ),
+                ..isort::settings::Settings::default()
+            },
+            ..LinterSettings::for_rule(rule_code)
+        };
+        let diagnostics = test_path(Path::new("pyflakes").join(path).as_path(), &settings)?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
     }
 
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]

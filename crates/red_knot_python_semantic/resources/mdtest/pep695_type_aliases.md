@@ -31,7 +31,7 @@ type IntOrStr = int | str
 # TODO: This should either fall back to the specified type from typeshed,
 # which is `Any`, or be the actual type of the runtime value expression
 # `int | str`, i.e. `types.UnionType`.
-reveal_type(IntOrStr.__value__)  # revealed: @Todo(instance attributes)
+reveal_type(IntOrStr.__value__)  # revealed: @Todo(@property)
 ```
 
 ## Invalid assignment
@@ -74,5 +74,22 @@ type ListOrSet[T] = list[T] | set[T]
 
 # TODO: Should be `tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]`,
 # as specified in the `typeshed` stubs.
-reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(instance attributes)
+reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(@property)
+```
+
+## `TypeAliasType` properties
+
+Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
+
+```py
+from knot_extensions import static_assert, is_equivalent_to, is_disjoint_from, TypeOf
+
+type Alias1 = int
+type Alias2 = int
+
+type TypeAliasType1 = TypeOf[Alias1]
+type TypeAliasType2 = TypeOf[Alias2]
+
+static_assert(not is_equivalent_to(TypeAliasType1, TypeAliasType2))
+static_assert(is_disjoint_from(TypeAliasType1, TypeAliasType2))
 ```

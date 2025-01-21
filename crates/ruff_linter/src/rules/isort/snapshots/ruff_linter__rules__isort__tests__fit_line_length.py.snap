@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-fit_line_length.py:7:1: I001 [*] Import block is un-sorted or un-formatted
+fit_line_length.py:7:5: I001 [*] Import block is un-sorted or un-formatted
    |
  6 |   if indented:
  7 | /     from line_with_88 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -12,7 +12,7 @@ fit_line_length.py:7:1: I001 [*] Import block is un-sorted or un-formatted
 12 | |     from line_with_93 import (
 13 | |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 14 | |     )
-   | |______^ I001
+   | |_____^ I001
    |
    = help: Organize imports
 

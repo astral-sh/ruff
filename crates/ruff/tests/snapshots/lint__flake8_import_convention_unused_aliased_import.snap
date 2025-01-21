@@ -1,0 +1,31 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--config"
+    - "lint.isort.required-imports = [\"import pandas\"]"
+    - "--select"
+    - "I002,ICN001,F401"
+    - "--stdin-filename"
+    - test.py
+    - "--unsafe-fixes"
+    - "--fix"
+    - "-"
+  stdin: "1"
+snapshot_kind: text
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+ruff failed
+  Cause: Required import specified in `lint.isort.required-imports` (I002) conflicts with the required import alias specified in either `lint.flake8-import-conventions.aliases` or `lint.flake8-import-conventions.extend-aliases` (ICN001):
+    - `pandas` -> `pd`
+
+Help: Remove the required import or alias from your configuration.

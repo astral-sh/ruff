@@ -41,7 +41,7 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
 red_knot_server = { path = "crates/red_knot_server" }
 red_knot_test = { path = "crates/red_knot_test" }
-red_knot_workspace = { path = "crates/red_knot_workspace", default-features = false }
+red_knot_project = { path = "crates/red_knot_project", default-features = false }
 
 aho-corasick = { version = "1.1.3" }
 anstream = { version = "0.6.18" }
@@ -105,7 +105,7 @@ matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
-notify = { version = "7.0.0" }
+notify = { version = "8.0.0" }
 ordermap = { version = "0.5.0" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
