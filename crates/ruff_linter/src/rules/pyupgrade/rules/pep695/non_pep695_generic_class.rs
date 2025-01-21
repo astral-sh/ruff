@@ -21,10 +21,9 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// ## Known problems
 ///
-/// The rule currently skips generic classes with multiple base classes. It also skips
-/// generic classes nested inside of other
-/// functions or classes. Finally, this rule skips type parameters with the `default` argument
-/// introduced in [PEP 696] and implemented in Python 3.13.
+/// The rule currently skips generic classes nested inside of other functions or classes. It also
+/// skips type parameters with the `default` argument introduced in [PEP 696] and implemented in
+/// Python 3.13.
 ///
 /// This rule can only offer a fix if all of the generic types in the class definition are defined
 /// in the current module. For external type parameters, a diagnostic is emitted without a suggested
@@ -64,6 +63,10 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// the corresponding type variables even if they are unused after the fix. See
 /// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused
 /// private type variables.
+///
+/// This rule will correctly handle classes with multiple base classes, as long as the single
+/// `Generic` base class is at the end of the argument list, as checked by
+/// [`generic-not-last-base-class`](generic-not-last-base-class.md).
 ///
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`](non-pep695-generic-function.md) for the function version.
