@@ -115,10 +115,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     // we can proceed with the str method replacement
     let new_expr = re_func.replacement();
 
-    let repl = new_expr.map(|expr| {
-        // dbg!(&expr);
-        checker.generator().expr(&expr)
-    });
+    let repl = new_expr.map(|expr| checker.generator().expr(&expr));
     let mut diagnostic = Diagnostic::new(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
@@ -244,26 +241,12 @@ impl<'a> ReFunc<'a> {
             // pattern in string
             ReFuncKind::Search => Some(self.compare_expr(CmpOp::In)),
             // string == pattern
-            ReFuncKind::Fullmatch => {
-                let old_expr = self.compare_expr(CmpOp::Eq);
-                // Make it string == pattern instead of pattern == string
-                if let Expr::Compare(ExprCompare {
-                    left,
-                    ops,
-                    comparators,
-                    ..
-                }) = old_expr
-                {
-                    Some(Expr::Compare(ExprCompare {
-                        range: TextRange::default(),
-                        left: Box::new(comparators[0].clone()),
-                        ops,
-                        comparators: Box::new([*left]),
-                    }))
-                } else {
-                    None
-                }
-            }
+            ReFuncKind::Fullmatch => Some(Expr::Compare(ExprCompare {
+                range: TextRange::default(),
+                left: Box::new(self.string.clone()),
+                ops: Box::new([CmpOp::Eq]),
+                comparators: Box::new([self.pattern.clone()]),
+            })),
             // string.split(pattern)
             ReFuncKind::Split => Some(self.method_expr("split", vec![self.pattern.clone()])),
         }
