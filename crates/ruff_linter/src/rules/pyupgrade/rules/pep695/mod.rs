@@ -170,8 +170,8 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
 struct TypeVarReferenceVisitor<'a> {
     vars: Vec<TypeVar<'a>>,
     semantic: &'a SemanticModel<'a>,
-    /// Tracks whether any non-TypeVars are have been seen to avoid replacing generic parameters
-    /// when an unknown `TypeVar` is encountered.
+    /// Tracks whether any non-TypeVars have been seen to avoid replacing generic parameters when an
+    /// unknown `TypeVar` is encountered.
     any_skipped: bool,
 }
 
