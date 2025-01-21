@@ -118,9 +118,9 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         return;
     };
 
-    // TODO(brent) only accept a single, Generic argument for now. I think it should be fine to have
-    // other arguments, but this simplifies the fix just to delete the argument list for now
-    let [Expr::Subscript(ExprSubscript {
+    // only handle the case where Generic is at the end of the argument list, in line with PYI059
+    // (generic-not-last-base-class)
+    let [base_classes @ .., Expr::Subscript(ExprSubscript {
         value,
         slice,
         range,
@@ -179,11 +179,32 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             source: checker.source(),
         };
 
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-            type_params.to_string(),
-            name.end(),
-            arguments.end(),
-        )));
+        if base_classes.is_empty() {
+            // avoid debug_assert for empty range_replacement by using range_deletion here
+            diagnostic.set_fix(Fix::unsafe_edits(
+                Edit::insertion(type_params.to_string(), name.end()),
+                [Edit::range_deletion(arguments.range)],
+            ));
+        } else {
+            // also build the replacement argument list as a String, if there are any remaining base
+            // classes
+            let base_classes = {
+                let mut s = String::from("(");
+                for (i, arg) in base_classes.iter().enumerate() {
+                    s.push_str(&checker.source()[arg.range()]);
+                    if i < base_classes.len() - 1 {
+                        s.push_str(", ");
+                    }
+                }
+                s.push(')');
+                s
+            };
+
+            diagnostic.set_fix(Fix::unsafe_edits(
+                Edit::insertion(type_params.to_string(), name.end()),
+                [Edit::range_replacement(base_classes, arguments.range)],
+            ));
+        };
     }
 
     checker.diagnostics.push(diagnostic);
