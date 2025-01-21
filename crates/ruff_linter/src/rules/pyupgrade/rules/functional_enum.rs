@@ -77,7 +77,7 @@ pub(crate) fn functional_enum(checker: &mut Checker, stmt: &StmtAssign) {
     let mut diagnostic = Diagnostic::new(FunctionalEnum, stmt.range);
 
     let (name, enum_func, range) = (name.as_str(), &call.func, stmt.range());
-    if let Some(fix) = convert_to_class_syntax(name, enum_func, members, range, checker) {
+    if let Some(fix) = convert_to_class_syntax(name, enum_func, &members, range, checker) {
         diagnostic.set_fix(fix);
     }
 
@@ -92,6 +92,10 @@ enum EnumMember<'a> {
 
 impl<'a> EnumMember<'a> {
     fn from(name: String, value: Option<&'a Expr>) -> Option<Self> {
+        if !is_identifier(&name) {
+            return None;
+        }
+
         if matches!(value, Some(Expr::Starred(_))) {
             return None;
         }
@@ -109,15 +113,11 @@ impl<'a> EnumMember<'a> {
 
         let name = string.value.to_string();
 
-        if !is_identifier(&name) {
-            return None;
-        }
-
         Self::from(name, value)
     }
 }
 
-impl<'a> EnumMember<'a> {
+impl EnumMember<'_> {
     fn name(&self) -> &str {
         match self {
             EnumMember::NameOnly(name) => name,
@@ -237,10 +237,7 @@ fn enum_members_from_iterable_of_strings(elements: &[Expr]) -> Option<Vec<EnumMe
     let mut members = vec![];
 
     for element in elements {
-        let Some(member) = EnumMember::from_exprs(element, None) else {
-            return None;
-        };
-
+        let member = EnumMember::from_exprs(element, None)?;
         members.push(member);
     }
 
@@ -264,9 +261,7 @@ fn enum_members_from_iterable_of_pairs(elements: &[Expr]) -> Option<Vec<EnumMemb
         let [name, value] = &elts[..] else {
             return None;
         };
-        let Some(member) = EnumMember::from_exprs(name, Some(value)) else {
-            return None;
-        };
+        let member = EnumMember::from_exprs(name, Some(value))?;
 
         members.push(member);
     }
@@ -285,10 +280,7 @@ fn enum_members_from_dict_items(items: &[DictItem]) -> Option<Vec<EnumMember>> {
             return None;
         };
 
-        let Some(member) = EnumMember::from_exprs(name_expr, Some(&item.value)) else {
-            return None;
-        };
-
+        let member = EnumMember::from_exprs(name_expr, Some(&item.value))?;
         members.push(member);
     }
 
@@ -298,7 +290,7 @@ fn enum_members_from_dict_items(items: &[DictItem]) -> Option<Vec<EnumMember>> {
 fn convert_to_class_syntax(
     name: &str,
     enum_func: &Expr,
-    members: Vec<EnumMember>,
+    members: &[EnumMember],
     range: TextRange,
     checker: &Checker,
 ) -> Option<Fix> {
@@ -312,10 +304,7 @@ fn convert_to_class_syntax(
         })]
     } else {
         let auto = if matches!(members.first(), Some(EnumMember::NameOnly(_))) {
-            let Some((edit, binding)) = import_enum_auto(range.start(), checker) else {
-                return None;
-            };
-
+            let (edit, binding) = import_enum_auto(range.start(), checker)?;
             other_edits.push(edit);
             binding
         } else {

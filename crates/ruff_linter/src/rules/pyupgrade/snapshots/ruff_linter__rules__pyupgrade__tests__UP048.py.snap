@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP048.py:6:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:6:1: UP048 [*] Enum declared using functional syntax
   |
 4 | ### Errors
 5 |
@@ -28,7 +28,7 @@ UP048.py:6:1: UP048 [*] Enum can be declared using functional syntax
 8  11 | E = Enum("E", "")
 9  12 | E = Enum("E", " A B, C")
 
-UP048.py:7:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:7:1: UP048 [*] Enum declared using functional syntax
   |
 6 | E = Enum("E", "A B C")
 7 | E = Enum("E", "A,B,C")
@@ -55,7 +55,7 @@ UP048.py:7:1: UP048 [*] Enum can be declared using functional syntax
 9  12 | E = Enum("E", " A B, C")
 10 13 | 
 
-UP048.py:8:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:8:1: UP048 [*] Enum declared using functional syntax
   |
 6 | E = Enum("E", "A B C")
 7 | E = Enum("E", "A,B,C")
@@ -76,7 +76,7 @@ UP048.py:8:1: UP048 [*] Enum can be declared using functional syntax
 10 11 | 
 11 12 | E = Enum("E", ["A", "B", "C"])
 
-UP048.py:9:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:9:1: UP048 [*] Enum declared using functional syntax
    |
  7 | E = Enum("E", "A,B,C")
  8 | E = Enum("E", "")
@@ -106,7 +106,7 @@ UP048.py:9:1: UP048 [*] Enum can be declared using functional syntax
 11 14 | E = Enum("E", ["A", "B", "C"])
 12 15 | E = Enum("E", ("A", "B", "C"))
 
-UP048.py:11:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:11:1: UP048 [*] Enum declared using functional syntax
    |
  9 | E = Enum("E", " A B, C")
 10 |
@@ -136,7 +136,7 @@ UP048.py:11:1: UP048 [*] Enum can be declared using functional syntax
 13 16 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
 14 17 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
 
-UP048.py:12:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:12:1: UP048 [*] Enum declared using functional syntax
    |
 11 | E = Enum("E", ["A", "B", "C"])
 12 | E = Enum("E", ("A", "B", "C"))
@@ -165,7 +165,7 @@ UP048.py:12:1: UP048 [*] Enum can be declared using functional syntax
 14 17 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
 15 18 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
 
-UP048.py:13:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:13:1: UP048 [*] Enum declared using functional syntax
    |
 11 | E = Enum("E", ["A", "B", "C"])
 12 | E = Enum("E", ("A", "B", "C"))
@@ -189,7 +189,7 @@ UP048.py:13:1: UP048 [*] Enum can be declared using functional syntax
 15 18 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
 16 19 | 
 
-UP048.py:14:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:14:1: UP048 [*] Enum declared using functional syntax
    |
 12 | E = Enum("E", ("A", "B", "C"))
 13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
@@ -212,7 +212,7 @@ UP048.py:14:1: UP048 [*] Enum can be declared using functional syntax
 16 19 | 
 17 20 | E = Enum("E", [])
 
-UP048.py:15:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:15:1: UP048 [*] Enum declared using functional syntax
    |
 13 | E = Enum("E", [("A", 1), ("B", 2), ("C", 3)])
 14 | E = Enum("E", (("A", 1), ("B", 2), ("C", 3)))
@@ -236,7 +236,7 @@ UP048.py:15:1: UP048 [*] Enum can be declared using functional syntax
 17 20 | E = Enum("E", [])
 18 21 | E = Enum("E", ())
 
-UP048.py:17:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:17:1: UP048 [*] Enum declared using functional syntax
    |
 15 | E = Enum("E", {"A": 1, "B": 2, "C": 3})
 16 |
@@ -258,7 +258,7 @@ UP048.py:17:1: UP048 [*] Enum can be declared using functional syntax
 19 20 | E = Enum("E", {})
 20 21 | 
 
-UP048.py:18:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:18:1: UP048 [*] Enum declared using functional syntax
    |
 17 | E = Enum("E", [])
 18 | E = Enum("E", ())
@@ -278,7 +278,7 @@ UP048.py:18:1: UP048 [*] Enum can be declared using functional syntax
 20 21 | 
 21 22 | 
 
-UP048.py:19:1: UP048 [*] Enum can be declared using functional syntax
+UP048.py:19:1: UP048 [*] Enum declared using functional syntax
    |
 17 | E = Enum("E", [])
 18 | E = Enum("E", ())
