@@ -1,15 +1,18 @@
 use red_knot_python_semantic::ProgramSettings;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
+use std::sync::Arc;
 use thiserror::Error;
 
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError};
+use crate::metadata::value::ValueSource;
 use options::KnotTomlError;
 use options::Options;
 
 pub mod options;
 pub mod pyproject;
+pub mod value;
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
@@ -87,7 +90,10 @@ impl ProjectMetadata {
             let pyproject_path = project_root.join("pyproject.toml");
 
             let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
-                match PyProject::from_toml_str(&pyproject_str) {
+                match PyProject::from_toml_str(
+                    &pyproject_str,
+                    ValueSource::File(Arc::new(pyproject_path.clone())),
+                ) {
                     Ok(pyproject) => Some(pyproject),
                     Err(error) => {
                         return Err(ProjectDiscoveryError::InvalidPyProject {
@@ -103,7 +109,10 @@ impl ProjectMetadata {
             // A `knot.toml` takes precedence over a `pyproject.toml`.
             let knot_toml_path = project_root.join("knot.toml");
             if let Ok(knot_str) = system.read_to_string(&knot_toml_path) {
-                let options = match Options::from_toml_str(&knot_str) {
+                let options = match Options::from_toml_str(
+                    &knot_str,
+                    ValueSource::File(Arc::new(knot_toml_path.clone())),
+                ) {
                     Ok(options) => options,
                     Err(error) => {
                         return Err(ProjectDiscoveryError::InvalidKnotToml {

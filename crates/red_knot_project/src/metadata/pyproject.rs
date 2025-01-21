@@ -4,6 +4,7 @@ use std::ops::Deref;
 use thiserror::Error;
 
 use crate::metadata::options::Options;
+use crate::metadata::value::{ValueSource, ValueSourceGuard};
 
 /// A `pyproject.toml` as specified in PEP 517.
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -28,7 +29,11 @@ pub enum PyProjectError {
 }
 
 impl PyProject {
-    pub(crate) fn from_toml_str(content: &str) -> Result<Self, PyProjectError> {
+    pub(crate) fn from_toml_str(
+        content: &str,
+        source: ValueSource,
+    ) -> Result<Self, PyProjectError> {
+        let _guard = ValueSourceGuard::new(source);
         toml::from_str(content).map_err(PyProjectError::TomlSyntax)
     }
 }
