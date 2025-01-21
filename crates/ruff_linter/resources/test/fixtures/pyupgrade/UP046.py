@@ -35,6 +35,10 @@ class MyStr(Generic[AnyStr]):
     pass
 
 
+class MultipleGenerics(Generic[S, T, Ts, P]):
+    pass
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
