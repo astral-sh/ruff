@@ -276,17 +276,7 @@ fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
         return None;
     }
 
-    // Type variables must be unique; filter while preserving order.
-    let nvars = vars.len();
-    let type_vars = vars
-        .into_iter()
-        .unique_by(|TypeVar { name, .. }| name.id.as_str())
-        .collect::<Vec<_>>();
-
-    // non-unique type variables are runtime errors, so just bail out here
-    if type_vars.len() < nvars {
-        return None;
-    }
-
-    Some(type_vars)
+    // If any type varaibles were not unique, just bail out here
+    // this is a runtime error and we can't predict what the user wanted
+    (vars.iter().unique_by(|tvar| &tvar.name.id).count() == vars.len()).then_some(vars)
 }
