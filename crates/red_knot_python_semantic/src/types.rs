@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::iter;
 
 use bitflags::bitflags;
 use context::InferContext;
@@ -1123,6 +1122,7 @@ impl<'db> Type<'db> {
             (Type::Intersection(left), Type::Intersection(right)) => {
                 left.is_equivalent_to(db, right)
             }
+            (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
             _ => self.is_fully_static(db) && other.is_fully_static(db) && self == other,
         }
     }
@@ -1158,12 +1158,11 @@ impl<'db> Type<'db> {
     ///
     /// [Summary of type relations]: https://typing.readthedocs.io/en/latest/spec/concepts.html#summary-of-type-relations
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        let equivalent =
-            |(first, second): (&Type<'db>, &Type<'db>)| first.is_gradual_equivalent_to(db, *second);
+        if self == other {
+            return true;
+        }
 
         match (self, other) {
-            (_, _) if self == other => true,
-
             (Type::Dynamic(_), Type::Dynamic(_)) => true,
 
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
@@ -1174,13 +1173,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::Tuple(first), Type::Tuple(second)) => {
-                let first_elements = first.elements(db);
-                let second_elements = second.elements(db);
-
-                first_elements.len() == second_elements.len()
-                    && iter::zip(first_elements, second_elements).all(equivalent)
-            }
+            (Type::Tuple(first), Type::Tuple(second)) => first.is_gradual_equivalent_to(db, second),
 
             (Type::Union(first), Type::Union(second)) => first.is_gradual_equivalent_to(db, second),
 
@@ -4586,6 +4579,26 @@ impl<'db> TupleType<'db> {
         }
 
         Type::Tuple(Self::new(db, elements.into_boxed_slice()))
+    }
+
+    pub fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_elements = self.elements(db);
+        let other_elements = other.elements(db);
+        self_elements.len() == other_elements.len()
+            && self_elements
+                .iter()
+                .zip(other_elements)
+                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+    }
+
+    pub fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_elements = self.elements(db);
+        let other_elements = other.elements(db);
+        self_elements.len() == other_elements.len()
+            && self_elements
+                .iter()
+                .zip(other_elements)
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
     }
 
     pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
