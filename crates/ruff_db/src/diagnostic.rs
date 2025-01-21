@@ -152,7 +152,7 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     fn message(&self) -> Cow<str>;
 
-    fn file(&self) -> File;
+    fn file(&self) -> Option<File>;
 
     fn range(&self) -> Option<TextRange>;
 
@@ -197,16 +197,15 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             Severity::Fatal => f.write_str("fatal")?,
         }
 
-        write!(
-            f,
-            "[{rule}] {path}",
-            rule = self.diagnostic.id(),
-            path = self.diagnostic.file().path(self.db)
-        )?;
+        write!(f, "[{rule}]", rule = self.diagnostic.id())?;
 
-        if let Some(range) = self.diagnostic.range() {
-            let index = line_index(self.db, self.diagnostic.file());
-            let source = source_text(self.db, self.diagnostic.file());
+        if let Some(file) = self.diagnostic.file() {
+            write!(f, " {path}", path = file.path(self.db))?;
+        }
+
+        if let (Some(file), Some(range)) = (self.diagnostic.file(), self.diagnostic.range()) {
+            let index = line_index(self.db, file);
+            let source = source_text(self.db, file);
 
             let start = index.source_location(range.start(), &source);
 
@@ -229,7 +228,7 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> File {
+    fn file(&self) -> Option<File> {
         (**self).file()
     }
 
@@ -254,7 +253,7 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> File {
+    fn file(&self) -> Option<File> {
         (**self).file()
     }
 
@@ -276,7 +275,7 @@ impl Diagnostic for Box<dyn Diagnostic> {
         (**self).message()
     }
 
-    fn file(&self) -> File {
+    fn file(&self) -> Option<File> {
         (**self).file()
     }
 
@@ -310,8 +309,8 @@ impl Diagnostic for ParseDiagnostic {
         self.error.error.to_string().into()
     }
 
-    fn file(&self) -> File {
-        self.file
+    fn file(&self) -> Option<File> {
+        Some(self.file)
     }
 
     fn range(&self) -> Option<TextRange> {
