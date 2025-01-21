@@ -48,14 +48,14 @@ class MDTestRunner:
 
     def _recompile_tests(
         self, status_message: str, message_on_success: bool = True
-    ) -> None:
+    ) -> bool:
         with self.console.status(status_message):
             # Run it with 'human' format in case there are errors:
             try:
                 self._run_cargo_test(message_format="human")
             except subprocess.CalledProcessError as e:
                 print(e.output)
-                return
+                return False
 
             # Run it again with 'json' format to find the mdtest executable:
             json_output = self._run_cargo_test(message_format="json")
@@ -65,6 +65,7 @@ class MDTestRunner:
 
         if message_on_success:
             self.console.print("[dim]Tests compiled successfully[/dim]")
+        return True
 
     def _get_executable_path_from_json(self, json_output: str) -> None:
         for json_line in json_output.splitlines():
@@ -135,9 +136,6 @@ class MDTestRunner:
 
                 print(line)
 
-    def _run_all_mdtests(self) -> None:
-        self._run_mdtest()
-
     def watch(self) -> Never:
         self._recompile_tests("Compiling tests...", message_on_success=False)
         self.console.print("[dim]Ready to watch for changes...[/dim]")
@@ -176,8 +174,8 @@ class MDTestRunner:
                         changed_md_files.add(relative_path)
 
             if rust_code_has_changed:
-                self._recompile_tests("Rust code has changed, recompiling tests...")
-                self._run_all_mdtests()
+                if self._recompile_tests("Rust code has changed, recompiling tests..."):
+                    self._run_mdtest()
             elif new_md_files:
                 files = " ".join(file.as_posix() for file in new_md_files)
                 self._recompile_tests(
