@@ -13,14 +13,14 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Literal, Never
+from typing import Final, Literal, Never
 
 from rich.console import Console
 from watchfiles import Change, watch
 
-CRATE_NAME = "red_knot_python_semantic"
-CRATE_ROOT = Path(__file__).resolve().parent
-MDTEST_DIR = CRATE_ROOT / "resources" / "mdtest"
+CRATE_NAME: Final = "red_knot_python_semantic"
+CRATE_ROOT: Final = Path(__file__).resolve().parent
+MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 
 
 class MDTestRunner:
@@ -49,7 +49,7 @@ class MDTestRunner:
         )
 
     def _recompile_tests(
-        self, status_message: str, message_on_success: bool = True
+        self, status_message: str, *, message_on_success: bool = True
     ) -> bool:
         with self.console.status(status_message):
             # Run it with 'human' format in case there are errors:
