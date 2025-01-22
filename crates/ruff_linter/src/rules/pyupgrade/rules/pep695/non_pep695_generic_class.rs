@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::ExprSubscript;
 use ruff_python_ast::{Arguments, StmtClassDef};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -124,7 +125,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     };
 
     let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. })) =
-        find_generic(arguments, checker)
+        find_generic(arguments, checker.semantic())
     else {
         return;
     };
@@ -205,23 +206,17 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     checker.diagnostics.push(diagnostic);
 }
 
-/// Search `arguments` for a `typing.Generic` base class. Returns the `Generic` expression (if any),
-/// along with its index in `arguments`.
+/// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
+/// any), along with its index in the class's bases tuple.
 fn find_generic<'a>(
-    arguments: &'a Arguments,
-    checker: &mut Checker,
+    class_bases: &'a Arguments,
+    semantic: &SemanticModel,
 ) -> Option<(usize, &'a ExprSubscript)> {
-    arguments
-        .args
-        .as_ref()
-        .iter()
-        .enumerate()
-        .find_map(|(idx, expr)| {
-            expr.as_subscript_expr().and_then(|sub_expr| {
-                checker
-                    .semantic()
-                    .match_typing_expr(&sub_expr.value, "Generic")
-                    .then_some((idx, sub_expr))
-            })
+    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
+        expr.as_subscript_expr().and_then(|sub_expr| {
+            semantic
+                .match_typing_expr(&sub_expr.value, "Generic")
+                .then_some((idx, sub_expr))
         })
+    })
 }
