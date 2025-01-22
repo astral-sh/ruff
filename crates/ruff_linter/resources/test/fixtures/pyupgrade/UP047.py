@@ -9,12 +9,12 @@ Ts = TypeVarTuple("Ts")
 P = ParamSpec("P")
 
 
-def f(t: T):
-    pass
+def f(t: T) -> T:
+    return t
 
 
-def g(ts: tuple[*Ts]):
-    pass
+def g(ts: tuple[*Ts]) -> tuple[*Ts]:
+    return ts
 
 
 def h(
@@ -22,12 +22,12 @@ def h(
     # Comment in the middle of a parameter list should be preserved
     another_param,
     and_another,
-):
-    pass
+) -> Callable[P, T]:
+    return p
 
 
-def i(s: S):
-    pass
+def i(s: S) -> S:
+    return s
 
 
 # NOTE this case is the reason the fix is marked unsafe. If we can't confirm
@@ -36,12 +36,12 @@ def i(s: S):
 # generic type parameter. This leads to code that mixes old-style standalone
 # TypeVars with the new-style generic syntax and will be rejected by type
 # checkers
-def broken_fix(okay: T, bad: Something):
-    pass
+def broken_fix(okay: T, bad: Something) -> tuple[T, Something]:
+    return (okay, bad)
 
 
-def any_str_param(s: AnyStr):
-    pass
+def any_str_param(s: AnyStr) -> AnyStr:
+    return s
 
 
 # these cases are not handled
@@ -50,10 +50,10 @@ def any_str_param(s: AnyStr):
 V = TypeVar("V", default=Any, bound=str)
 
 
-def default_var(v: V):
-    pass
+def default_var(v: V) -> V:
+    return v
 
 
 def outer():
-    def inner(t: T):
-        pass
+    def inner(t: T) -> T:
+        return t
