@@ -1,4 +1,4 @@
-use super::{definition_expression_ty, Type};
+use super::{definition_expression_type, Type};
 use crate::Db;
 use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
@@ -39,7 +39,7 @@ impl<'db> Signature<'db> {
             if function_node.is_async {
                 todo_type!("generic types.CoroutineType")
             } else {
-                definition_expression_ty(db, definition, returns.as_ref())
+                definition_expression_type(db, definition, returns.as_ref())
             }
         });
 
@@ -97,7 +97,7 @@ impl<'db> Parameters<'db> {
             parameter_with_default
                 .default
                 .as_deref()
-                .map(|default| definition_expression_ty(db, definition, default))
+                .map(|default| definition_expression_type(db, definition, default))
         };
         let positional_only = posonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
@@ -245,7 +245,7 @@ impl<'db> Parameter<'db> {
             annotated_ty: parameter
                 .annotation
                 .as_deref()
-                .map(|annotation| definition_expression_ty(db, definition, annotation)),
+                .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
         }
     }
@@ -276,7 +276,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Annotated type of the parameter, if annotated.
-    pub(crate) fn annotated_ty(&self) -> Option<Type<'db>> {
+    pub(crate) fn annotated_type(&self) -> Option<Type<'db>> {
         self.annotated_ty
     }
 
@@ -295,7 +295,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Default-value type of the parameter, if any.
-    pub(crate) fn default_ty(&self) -> Option<Type<'db>> {
+    pub(crate) fn default_type(&self) -> Option<Type<'db>> {
         match self.kind {
             ParameterKind::PositionalOnly { default_ty } => default_ty,
             ParameterKind::PositionalOrKeyword { default_ty } => default_ty,

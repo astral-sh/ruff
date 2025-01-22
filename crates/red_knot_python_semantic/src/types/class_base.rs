@@ -62,7 +62,7 @@ impl<'db> ClassBase<'db> {
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
-    pub(super) fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
@@ -112,40 +112,40 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Any => Some(Self::any()),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 KnownInstanceType::Dict => {
-                    Self::try_from_ty(db, KnownClass::Dict.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))
                 }
                 KnownInstanceType::List => {
-                    Self::try_from_ty(db, KnownClass::List.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::List.to_class_literal(db))
                 }
                 KnownInstanceType::Type => {
-                    Self::try_from_ty(db, KnownClass::Type.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db))
                 }
                 KnownInstanceType::Tuple => {
-                    Self::try_from_ty(db, KnownClass::Tuple.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
                 }
                 KnownInstanceType::Set => {
-                    Self::try_from_ty(db, KnownClass::Set.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::Set.to_class_literal(db))
                 }
                 KnownInstanceType::FrozenSet => {
-                    Self::try_from_ty(db, KnownClass::FrozenSet.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::FrozenSet.to_class_literal(db))
                 }
                 KnownInstanceType::ChainMap => {
-                    Self::try_from_ty(db, KnownClass::ChainMap.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::ChainMap.to_class_literal(db))
                 }
                 KnownInstanceType::Counter => {
-                    Self::try_from_ty(db, KnownClass::Counter.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::Counter.to_class_literal(db))
                 }
                 KnownInstanceType::DefaultDict => {
-                    Self::try_from_ty(db, KnownClass::DefaultDict.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::DefaultDict.to_class_literal(db))
                 }
                 KnownInstanceType::Deque => {
-                    Self::try_from_ty(db, KnownClass::Deque.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::Deque.to_class_literal(db))
                 }
                 KnownInstanceType::OrderedDict => {
-                    Self::try_from_ty(db, KnownClass::OrderedDict.to_class_literal(db))
+                    Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
                 KnownInstanceType::Callable => {
-                    Self::try_from_ty(db, todo_type!("Support for Callable as a base class"))
+                    Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
             },
         }

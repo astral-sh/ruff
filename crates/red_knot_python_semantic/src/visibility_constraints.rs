@@ -294,8 +294,8 @@ impl<'db> VisibilityConstraints<'db> {
             ConstraintNode::Expression(test_expr) => {
                 let inference = infer_expression_types(db, test_expr);
                 let scope = test_expr.scope(db);
-                let ty =
-                    inference.expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
+                let ty = inference
+                    .expression_type(test_expr.node_ref(db).scoped_expression_id(db, scope));
 
                 ty.bool(db).negate_if(!constraint.is_positive)
             }
@@ -304,7 +304,7 @@ impl<'db> VisibilityConstraints<'db> {
                     let subject_expression = inner.subject(db);
                     let inference = infer_expression_types(db, *subject_expression);
                     let scope = subject_expression.scope(db);
-                    let subject_ty = inference.expression_ty(
+                    let subject_ty = inference.expression_type(
                         subject_expression
                             .node_ref(db)
                             .scoped_expression_id(db, scope),
@@ -312,8 +312,8 @@ impl<'db> VisibilityConstraints<'db> {
 
                     let inference = infer_expression_types(db, *value);
                     let scope = value.scope(db);
-                    let value_ty =
-                        inference.expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
+                    let value_ty = inference
+                        .expression_type(value.node_ref(db).scoped_expression_id(db, scope));
 
                     if subject_ty.is_single_valued(db) {
                         let truthiness =
