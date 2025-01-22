@@ -179,3 +179,74 @@ UP046_0.py:66:52: UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generi
 67 67 |     var: S
 68 68 |     typ: T
 69 69 |     tup: tuple[*Ts]
+
+UP046_0.py:73:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+   |
+73 | class A(Generic[T]): ...
+   |         ^^^^^^^^^^ UP046
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+70 70 |     pep: P
+71 71 | 
+72 72 | 
+73    |-class A(Generic[T]): ...
+   73 |+class A[T: float]: ...
+74 74 | 
+75 75 | 
+76 76 | class B(A[S], Generic[S]):
+
+UP046_0.py:76:15: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+   |
+76 | class B(A[S], Generic[S]):
+   |               ^^^^^^^^^^ UP046
+77 |     var: S
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+73 73 | class A(Generic[T]): ...
+74 74 | 
+75 75 | 
+76    |-class B(A[S], Generic[S]):
+   76 |+class B[S: (str, bytes)](A[S]):
+77 77 |     var: S
+78 78 | 
+79 79 | 
+
+UP046_0.py:80:15: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+   |
+80 | class C(A[S], Generic[S, T]):
+   |               ^^^^^^^^^^^^^ UP046
+81 |     var: tuple[S, T]
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+77 77 |     var: S
+78 78 | 
+79 79 | 
+80    |-class C(A[S], Generic[S, T]):
+   80 |+class C[S: (str, bytes), T: float](A[S]):
+81 81 |     var: tuple[S, T]
+82 82 | 
+83 83 | 
+
+UP046_0.py:84:17: UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
+   |
+84 | class D(A[int], Generic[T]):
+   |                 ^^^^^^^^^^ UP046
+85 |     var: T
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+81 81 |     var: tuple[S, T]
+82 82 | 
+83 83 | 
+84    |-class D(A[int], Generic[T]):
+   84 |+class D[T: float](A[int]):
+85 85 |     var: T
+86 86 | 
+87 87 |

@@ -70,6 +70,21 @@ class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):
     pep: P
 
 
+class A(Generic[T]): ...
+
+
+class B(A[S], Generic[S]):
+    var: S
+
+
+class C(A[S], Generic[S, T]):
+    var: tuple[S, T]
+
+
+class D(A[int], Generic[T]):
+    var: T
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
