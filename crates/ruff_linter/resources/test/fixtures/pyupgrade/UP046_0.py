@@ -93,6 +93,13 @@ class Sandwich(Base1, Generic[T], Base2):
     var: T
 
 
+# runtime `TypeError` to inherit from `Generic` multiple times, but we still
+# emit a diagnostic
+class TooManyGenerics(Generic[T], Generic[S]):
+    var: T
+    var: S
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass

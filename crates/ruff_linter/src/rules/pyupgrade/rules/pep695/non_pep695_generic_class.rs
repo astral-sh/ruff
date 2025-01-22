@@ -141,6 +141,9 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     // it's not *strictly* necessary for `Generic` to come last in the bases tuple, but it would
     // cause more complication for us to handle stubs specially, and probably isn't worth the
     // bother. we still offer a diagnostic here but not a fix
+    //
+    // because `find_generic` also finds the *first* Generic argument, this has the additional
+    // benefit of bailing out with a diagnostic if multiple Generic arguments are present
     if generic_idx != arguments.len() - 1 {
         checker.diagnostics.push(diagnostic);
         return;

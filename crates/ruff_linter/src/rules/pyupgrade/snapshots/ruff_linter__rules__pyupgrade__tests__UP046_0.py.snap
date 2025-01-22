@@ -266,3 +266,14 @@ UP046_0.py:92:23: UP046 Generic class `Sandwich` uses `Generic` subclass instead
 93 |     var: T
    |
    = help: Use type parameters
+
+UP046_0.py:98:23: UP046 Generic class `TooManyGenerics` uses `Generic` subclass instead of type parameters
+    |
+ 96 | # runtime `TypeError` to inherit from `Generic` multiple times, but we still
+ 97 | # emit a diagnostic
+ 98 | class TooManyGenerics(Generic[T], Generic[S]):
+    |                       ^^^^^^^^^^ UP046
+ 99 |     var: T
+100 |     var: S
+    |
+    = help: Use type parameters
