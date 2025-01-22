@@ -188,19 +188,18 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             source: checker.source(),
         };
 
-        let Ok(edit) = remove_argument(
-            generic_expr,
-            arguments,
-            Parentheses::Remove,
-            checker.source(),
-        ) else {
-            return;
-        };
-
-        diagnostic.set_fix(Fix::unsafe_edits(
-            Edit::insertion(type_params.to_string(), name.end()),
-            [edit],
-        ));
+        diagnostic.try_set_fix(|| {
+            let removal_edit = remove_argument(
+                generic_expr,
+                arguments,
+                Parentheses::Remove,
+                checker.source(),
+            )?;
+            Ok(Fix::unsafe_edits(
+                Edit::insertion(type_params.to_string(), name.end()),
+                [removal_edit],
+            ))
+        });
     }
 
     checker.diagnostics.push(diagnostic);
