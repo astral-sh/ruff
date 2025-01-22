@@ -202,6 +202,11 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
+    // TODO(brent) handle `default` arg for Python 3.13+
+    if vars.iter().any(|tv| tv.default.is_some()) {
+        return;
+    }
+
     checker.diagnostics.push(create_diagnostic(
         checker.generator(),
         stmt.range(),
