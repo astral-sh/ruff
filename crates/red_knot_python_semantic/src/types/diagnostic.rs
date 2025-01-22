@@ -984,12 +984,11 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
     );
 }
 
-pub(super) fn report_invalid_assignment(
+fn report_invalid_assignment_with_message(
     context: &InferContext,
     node: AnyNodeRef,
     target_ty: Type,
-    source_ty: Type,
-    target_description: Option<&'static str>,
+    message: std::fmt::Arguments,
 ) {
     match target_ty {
         Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -1003,23 +1002,46 @@ pub(super) fn report_invalid_assignment(
                     function.name(context.db())));
         }
         _ => {
-            let source_ty = source_ty.display(context.db());
-            let target_ty = target_ty.display(context.db());
-
-            match target_description {
-                Some(target) => context.report_lint(
-                    &INVALID_ASSIGNMENT,
-                    node,
-                    format_args!("Object of type `{source_ty}` is not assignable to {target} of type `{target_ty}`")
-                ),
-                None => context.report_lint(
-                    &INVALID_ASSIGNMENT,
-                    node,
-                    format_args!("Object of type `{source_ty}` is not assignable to `{target_ty}`")
-                ),
-            }
+            context.report_lint(&INVALID_ASSIGNMENT, node, message);
         }
     }
+}
+
+pub(super) fn report_invalid_assignment(
+    context: &InferContext,
+    node: AnyNodeRef,
+    target_ty: Type,
+    source_ty: Type,
+) {
+    report_invalid_assignment_with_message(
+        context,
+        node,
+        target_ty,
+        format_args!(
+            "Object of type `{}` is not assignable to `{}`",
+            source_ty.display(context.db()),
+            target_ty.display(context.db()),
+        ),
+    );
+}
+
+pub(super) fn report_invalid_attribute_assignment(
+    context: &InferContext,
+    node: AnyNodeRef,
+    target_ty: Type,
+    source_ty: Type,
+    attribute_name: &'_ str,
+) {
+    report_invalid_assignment_with_message(
+        context,
+        node,
+        target_ty,
+        format_args!(
+            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+            source_ty.display(context.db()),
+            target_ty.display(context.db()),
+        ),
+    );
 }
 
 pub(super) fn report_possibly_unresolved_reference(

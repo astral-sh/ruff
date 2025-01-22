@@ -51,11 +51,12 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
-    report_invalid_arguments_to_annotated, report_invalid_assignment, report_unresolved_module,
-    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
-    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    report_invalid_arguments_to_annotated, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
+    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
+    INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER,
+    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
@@ -878,7 +879,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ty.inner_type()
             });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
-            report_invalid_assignment(&self.context, node, declared_ty, bound_ty, None);
+            report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         };
@@ -939,7 +940,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         node,
                         declared_ty.inner_type(),
                         inferred_ty,
-                        None,
                     );
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_ty.inner_type())
@@ -2023,6 +2023,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(
                 lhs_expr @ ast::ExprAttribute {
                     ctx: ExprContext::Store,
+                    attr,
                     ..
                 },
             ) => {
@@ -2031,12 +2032,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 if let Some(assigned_ty) = assigned_ty {
                     if !assigned_ty.is_assignable_to(self.db(), attribute_expr_ty) {
-                        report_invalid_assignment(
+                        report_invalid_attribute_assignment(
                             &self.context,
                             target.into(),
                             attribute_expr_ty,
                             assigned_ty,
-                            Some("attribute"),
+                            attr.as_str(),
                         );
                     }
                 }

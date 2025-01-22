@@ -102,7 +102,7 @@ reveal_type(C.pure_instance_variable)  # revealed: str
 # and pyright allow this.
 C.pure_instance_variable = "overwritten on class"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `pure_instance_variable` of type `str`"
 c_instance.pure_instance_variable = 1
 ```
 
@@ -191,7 +191,7 @@ c_instance.pure_class_variable1 = "value set on instance"
 
 C.pure_class_variable1 = "overwritten on class"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `pure_class_variable1` of type `str`"
 C.pure_class_variable1 = 1
 
 class Subclass(C):
@@ -448,10 +448,10 @@ import mod
 reveal_type(mod.global_symbol)  # revealed: str
 mod.global_symbol = "b"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 mod.global_symbol = 1
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 (_, mod.global_symbol) = (..., 1)
 
 # TODO: this should be an error, but we do not understand list unpackings yet.
@@ -465,7 +465,7 @@ class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
 
-# error: [invalid-assignment] "Object of type `int` is not assignable to attribute of type `str`"
+# error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
 for mod.global_symbol in IntIterable():
     pass
 ```
