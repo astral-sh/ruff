@@ -1,4 +1,6 @@
-//! Shared code for [`use_pep695_type_alias`] (UP040) and [`use_pep695_type_parameter`] (UP046)
+//! Shared code for [`use_pep695_type_alias`] (UP040),
+//! [`use_pep695_generic_class`] (UP046), and [`use_pep695_generic_function`]
+//! (UP047)
 
 use std::fmt::Display;
 
