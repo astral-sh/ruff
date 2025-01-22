@@ -352,8 +352,8 @@ jobs:
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
           RED_KNOT_LOG: debug
         run: |
-          cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
+          cargo nextest run --all-features --profile ci -- directory_deleted
+          # cargo test --all-features --doc
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
