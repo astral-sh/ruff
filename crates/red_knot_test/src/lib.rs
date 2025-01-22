@@ -3,7 +3,7 @@ use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::Program;
+use red_knot_python_semantic::{Program, SearchPathSettings, SitePackages};
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
@@ -50,13 +50,6 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        Program::get(&db)
-            .set_python_version(&mut db)
-            .to(test.configuration().python_version().unwrap_or_default());
-        Program::get(&db)
-            .set_python_platform(&mut db)
-            .to(test.configuration().python_platform().unwrap_or_default());
-
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();
         Files::sync_all(&mut db);
@@ -98,6 +91,10 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
 
 fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
     let project_root = db.project_root().to_path_buf();
+    let src_path = SystemPathBuf::from("/src");
+    let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
+    let mut typeshed_files = vec![];
+    let mut has_custom_versions_file = false;
 
     let test_files: Vec<_> = test
         .files()
@@ -107,11 +104,33 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi"),
-                "Non-Python files not supported yet."
+                matches!(embedded.lang, "py" | "pyi" | "text"),
+                "Supported file types are: py, pyi, text"
             );
-            let full_path = project_root.join(embedded.path);
+
+            let full_path = if embedded.path.starts_with("/") {
+                SystemPathBuf::from(embedded.path)
+            } else {
+                project_root.join(embedded.path)
+            };
+
+            if let Some(ref typeshed_path) = custom_typeshed_path {
+                if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
+                    if relative_path.as_str() == "VERSIONS" {
+                        has_custom_versions_file = true;
+                    } else if relative_path.extension().is_some_and(|ext| ext == "pyi") {
+                        typeshed_files.push(relative_path.to_path_buf());
+                    }
+                }
+            }
+
             db.write_file(&full_path, embedded.code).unwrap();
+
+            if !full_path.starts_with(&src_path) || embedded.lang == "text" {
+                // These files need to be written to the file system (above), but we don't run any checks on them.
+                return None;
+            }
+
             let file = system_path_to_file(db, full_path).unwrap();
 
             Some(TestFile {
@@ -120,6 +139,41 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             })
         })
         .collect();
+
+    // Create a custom typeshed `VERSIONS` file if none was provided.
+    if let Some(ref typeshed_path) = custom_typeshed_path {
+        if !has_custom_versions_file {
+            let versions_file = typeshed_path.join("stdlib/VERSIONS");
+            let contents = typeshed_files
+                .iter()
+                .map(|path| {
+                    let module_path = path.as_str().trim_end_matches(".pyi").replace("/", ".");
+                    format!("{module_path}: 3.8-\n")
+                })
+                .collect::<String>();
+            dbg!(&contents);
+            db.write_file(&versions_file, contents).unwrap();
+        }
+    }
+
+    Program::get(db)
+        .set_python_version(db)
+        .to(test.configuration().python_version().unwrap_or_default());
+    Program::get(db)
+        .set_python_platform(db)
+        .to(test.configuration().python_platform().unwrap_or_default());
+
+    Program::get(db)
+        .update_search_paths(
+            db,
+            &SearchPathSettings {
+                src_roots: vec![src_path],
+                extra_paths: vec![],
+                typeshed: custom_typeshed_path,
+                site_packages: SitePackages::Known(vec![]),
+            },
+        )
+        .expect("Failed to update search paths in TestDb");
 
     let failures: Failures = test_files
         .into_iter()
