@@ -90,27 +90,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
 /// SIM108
 pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &ast::StmtIf) {
-    let ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        range: _,
-    } = stmt_if;
-
-    // `test: None` to only match an `else` clause
-    let [ElifElseClause {
-        body: else_body,
-        test: None,
-        ..
-    }] = elif_else_clauses.as_slice()
-    else {
-        return;
-    };
-
-    let Some(body_assignment) = SimplifiableAssignment::from_body(body) else {
-        return;
-    };
-    let Some(else_assignment) = SimplifiableAssignment::from_body(else_body) else {
+    let Some((test, body_assignment, else_assignment)) = test_and_assignments(stmt_if) else {
         return;
     };
 
@@ -235,6 +215,32 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         )));
     }
     checker.diagnostics.push(diagnostic);
+}
+
+fn test_and_assignments(
+    stmt_if: &ast::StmtIf,
+) -> Option<(&Expr, SimplifiableAssignment, SimplifiableAssignment)> {
+    let ast::StmtIf {
+        test,
+        body,
+        elif_else_clauses,
+        range: _,
+    } = stmt_if;
+
+    // `test: None` to only match an `else` clause
+    let [ElifElseClause {
+        body: else_body,
+        test: None,
+        ..
+    }] = elif_else_clauses.as_slice()
+    else {
+        return None;
+    };
+
+    let body_assignment = SimplifiableAssignment::from_body(body)?;
+    let else_assignment = SimplifiableAssignment::from_body(else_body)?;
+
+    Some((test, body_assignment, else_assignment))
 }
 
 struct SimplifiableAssignment<'a> {
