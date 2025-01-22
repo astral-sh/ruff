@@ -49,13 +49,13 @@ use crate::fix::edits::fits;
 ///
 /// Assignments with annotations will also be simplified in [preview],
 /// but only if the first branch have an annotation while the second does not:
-/// 
+///
 /// ```python
 /// if foo:
 ///     bar: int = x
 /// else:
 ///     bar = y
-/// 
+///
 /// # After
 /// bar: int = x if foo else y
 /// ```
