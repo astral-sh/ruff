@@ -30,6 +30,9 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// in the current module. For external type parameters, a diagnostic is emitted without a suggested
 /// fix.
 ///
+/// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
+/// cause type checking to fail.
+///
 /// ## Fix safety
 ///
 /// This fix is marked as unsafe, as [PEP 695] uses inferred variance for type parameters, instead
