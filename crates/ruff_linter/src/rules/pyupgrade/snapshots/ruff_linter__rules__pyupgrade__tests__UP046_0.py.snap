@@ -258,3 +258,11 @@ UP046_0.py:88:15: UP046 Generic class `NotLast` uses `Generic` subclass instead 
 89 |     var: T
    |
    = help: Use type parameters
+
+UP046_0.py:92:23: UP046 Generic class `Sandwich` uses `Generic` subclass instead of type parameters
+   |
+92 | class Sandwich(Base1, Generic[T], Base2):
+   |                       ^^^^^^^^^^ UP046
+93 |     var: T
+   |
+   = help: Use type parameters

@@ -89,6 +89,10 @@ class NotLast(Generic[T], Base1):
     var: T
 
 
+class Sandwich(Base1, Generic[T], Base2):
+    var: T
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
