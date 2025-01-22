@@ -987,10 +987,11 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
 pub(super) fn report_invalid_assignment(
     context: &InferContext,
     node: AnyNodeRef,
-    declared_ty: Type,
-    assigned_ty: Type,
+    target_ty: Type,
+    source_ty: Type,
+    target_description: Option<&'static str>,
 ) {
-    match declared_ty {
+    match target_ty {
         Type::ClassLiteral(ClassLiteralType { class }) => {
             context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
                     "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
@@ -1002,15 +1003,21 @@ pub(super) fn report_invalid_assignment(
                     function.name(context.db())));
         }
         _ => {
-            context.report_lint(
-                &INVALID_ASSIGNMENT,
-                node,
-                format_args!(
-                    "Object of type `{}` is not assignable to `{}`",
-                    assigned_ty.display(context.db()),
-                    declared_ty.display(context.db()),
+            let source_ty = source_ty.display(context.db());
+            let target_ty = target_ty.display(context.db());
+
+            match target_description {
+                Some(target) => context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    node,
+                    format_args!("Object of type `{source_ty}` is not assignable to {target} of type `{target_ty}`")
                 ),
-            );
+                None => context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    node,
+                    format_args!("Object of type `{source_ty}` is not assignable to `{target_ty}`")
+                ),
+            }
         }
     }
 }

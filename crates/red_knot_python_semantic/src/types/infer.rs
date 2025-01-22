@@ -878,7 +878,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ty.inner_type()
             });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
-            report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
+            report_invalid_assignment(&self.context, node, declared_ty, bound_ty, None);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         };
@@ -939,6 +939,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         node,
                         declared_ty.inner_type(),
                         inferred_ty,
+                        None,
                     );
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_ty.inner_type())
@@ -2035,6 +2036,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             target.into(),
                             attribute_expr_ty,
                             assigned_ty,
+                            Some("attribute"),
                         );
                     }
                 }
