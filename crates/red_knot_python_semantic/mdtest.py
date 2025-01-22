@@ -61,7 +61,13 @@ class MDTestRunner:
                 return False
 
             # Run it again with 'json' format to find the mdtest executable:
-            json_output = self._run_cargo_test(message_format="json")
+            try:
+                json_output = self._run_cargo_test(message_format="json")
+            except subprocess.CalledProcessError as _:
+                # `cargo test` can still fail if something changed in between the two runs.
+                # Here we don't have a human-readable output, so just show a generic message:
+                self.console.print("[red]Error[/red]: Failed to compile tests")
+                return False
 
             if json_output:
                 self._get_executable_path_from_json(json_output)
