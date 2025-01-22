@@ -106,47 +106,23 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     else {
         return;
     };
-    let [Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    })] = body.as_slice()
-    else {
+
+    let Some(body_assignment) = SimplifiableAssignment::from_body(body) else {
         return;
     };
-    let [Stmt::Assign(ast::StmtAssign {
-        targets: else_targets,
-        value: else_value,
-        ..
-    })] = else_body.as_slice()
-    else {
+    let Some(else_assignment) = SimplifiableAssignment::from_body(else_body) else {
         return;
     };
-    let ([body_target], [else_target]) = (body_targets.as_slice(), else_targets.as_slice()) else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: else_id, .. }) = else_target else {
-        return;
-    };
-    if body_id != else_id {
+
+    if body_assignment.id != else_assignment.id {
         return;
     }
 
-    // Avoid suggesting ternary for `if (yield ...)`-style checks.
-    // TODO(charlie): Fix precedence handling for yields in generator.
-    if matches!(
-        body_value.as_ref(),
-        Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
-    ) {
+    let (annotation, None) = (body_assignment.annotation, else_assignment.annotation) else {
         return;
-    }
-    if matches!(
-        else_value.as_ref(),
-        Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
-    ) {
+    };
+
+    if annotation.is_some() && checker.settings.preview.is_disabled() {
         return;
     }
 
@@ -180,39 +156,56 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     //     - If `test == not body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - If `not test == body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) =
-        match (checker.settings.preview.is_enabled(), test, body_value) {
-            (true, test_node, body_node)
-                if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
-                    && !contains_effect(test_node, |id| {
-                        checker.semantic().has_builtin_binding(id)
-                    }) =>
-            {
-                let target_var = &body_target;
-                let binary = assignment_binary_or(target_var, body_value, else_value);
-                (checker.generator().stmt(&binary), AssignmentKind::Binary)
-            }
-            (true, test_node, body_node)
-                if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
-                    op_expr.op.is_not()
-                        && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
-                }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
-                    op_expr.op.is_not()
-                        && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
-                })) && !contains_effect(test_node, |id| {
-                    checker.semantic().has_builtin_binding(id)
-                }) =>
-            {
-                let target_var = &body_target;
-                let binary = assignment_binary_and(target_var, body_value, else_value);
-                (checker.generator().stmt(&binary), AssignmentKind::Binary)
-            }
-            _ => {
-                let target_var = &body_target;
-                let ternary = assignment_ternary(target_var, body_value, test, else_value);
-                (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
-            }
-        };
+    let (contents, assignment_kind) = match (
+        checker.settings.preview.is_enabled(),
+        test,
+        body_assignment.value,
+    ) {
+        (true, test_node, body_node)
+            if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
+                && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
+        {
+            let target_var = &body_assignment.target;
+            let binary = assignment_binary_or(
+                target_var,
+                annotation,
+                body_assignment.value,
+                else_assignment.value,
+            );
+            (checker.generator().stmt(&binary), AssignmentKind::Binary)
+        }
+        (true, test_node, body_node)
+            if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
+                op_expr.op.is_not()
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
+            }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
+                op_expr.op.is_not()
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+            })) && !contains_effect(test_node, |id| {
+                checker.semantic().has_builtin_binding(id)
+            }) =>
+        {
+            let target_var = &body_assignment.target;
+            let binary = assignment_binary_and(
+                target_var,
+                annotation,
+                body_assignment.value,
+                else_assignment.value,
+            );
+            (checker.generator().stmt(&binary), AssignmentKind::Binary)
+        }
+        _ => {
+            let target_var = &body_assignment.target;
+            let ternary = assignment_ternary(
+                target_var,
+                annotation,
+                body_assignment.value,
+                test,
+                else_assignment.value,
+            );
+            (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
+        }
+    };
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(
@@ -244,6 +237,81 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     checker.diagnostics.push(diagnostic);
 }
 
+struct SimplifiableAssignment<'a> {
+    target: &'a Expr,
+    id: &'a ast::name::Name,
+    annotation: Option<&'a Expr>,
+    value: &'a Expr,
+}
+
+impl<'a> SimplifiableAssignment<'a> {
+    fn from_body(body: &'a [Stmt]) -> Option<Self> {
+        match body {
+            [Stmt::Assign(assign)] => Self::from_assign(assign),
+            [Stmt::AnnAssign(ann_assign)] => Self::from_ann_assign(ann_assign),
+            _ => None,
+        }
+    }
+
+    fn from_assign(stmt: &'a ast::StmtAssign) -> Option<Self> {
+        let ast::StmtAssign { targets, value, .. } = stmt;
+
+        let [target @ Expr::Name(ast::ExprName { id, .. })] = &targets[..] else {
+            return None;
+        };
+        let annotation = None;
+
+        if expr_is_yield_or_await(value) {
+            return None;
+        }
+
+        Some(Self {
+            target,
+            id,
+            annotation,
+            value,
+        })
+    }
+
+    fn from_ann_assign(stmt: &'a ast::StmtAnnAssign) -> Option<Self> {
+        let ast::StmtAnnAssign {
+            target,
+            annotation,
+            value,
+            ..
+        } = stmt;
+
+        let target = target.as_ref();
+        let Expr::Name(ast::ExprName { id, .. }) = target else {
+            return None;
+        };
+
+        let annotation = Some(annotation.as_ref());
+
+        let Some(value) = value else {
+            return None;
+        };
+        let value = value.as_ref();
+
+        if expr_is_yield_or_await(value) {
+            return None;
+        }
+
+        Some(Self {
+            target,
+            id,
+            annotation,
+            value,
+        })
+    }
+}
+
+const fn expr_is_yield_or_await(expr: &Expr) -> bool {
+    // Avoid suggesting ternary for `if (yield ...)`-style checks.
+    // TODO(charlie): Fix precedence handling for yields in generator.
+    matches!(expr, Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentKind {
     Binary,
@@ -252,6 +320,7 @@ enum AssignmentKind {
 
 fn assignment_ternary(
     target_var: &Expr,
+    annotation: Option<&Expr>,
     body_value: &Expr,
     test: &Expr,
     orelse_value: &Expr,
@@ -262,40 +331,84 @@ fn assignment_ternary(
         orelse: Box::new(orelse_value.clone()),
         range: TextRange::default(),
     };
-    let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
-        range: TextRange::default(),
-    };
-    node1.into()
+
+    if let Some(annotation) = annotation {
+        ast::StmtAnnAssign {
+            target: Box::new(target_var.clone()),
+            annotation: Box::new(annotation.clone()),
+            value: Some(Box::new(node.into())),
+            simple: true,
+            range: TextRange::default(),
+        }
+        .into()
+    } else {
+        ast::StmtAssign {
+            targets: vec![target_var.clone()],
+            value: Box::new(node.into()),
+            range: TextRange::default(),
+        }
+        .into()
+    }
 }
 
-fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+fn assignment_binary_and(
+    target_var: &Expr,
+    annotation: Option<&Expr>,
+    left_value: &Expr,
+    right_value: &Expr,
+) -> Stmt {
     let node = ast::ExprBoolOp {
         op: BoolOp::And,
         values: vec![left_value.clone(), right_value.clone()],
         range: TextRange::default(),
     };
-    let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
-        range: TextRange::default(),
-    };
-    node1.into()
+
+    if let Some(annotation) = annotation {
+        ast::StmtAnnAssign {
+            target: Box::new(target_var.clone()),
+            annotation: Box::new(annotation.clone()),
+            value: Some(Box::new(node.into())),
+            simple: true,
+            range: TextRange::default(),
+        }
+        .into()
+    } else {
+        ast::StmtAssign {
+            targets: vec![target_var.clone()],
+            value: Box::new(node.into()),
+            range: TextRange::default(),
+        }
+        .into()
+    }
 }
 
-fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
-    (ast::StmtAssign {
+fn assignment_binary_or(
+    target_var: &Expr,
+    annotation: Option<&Expr>,
+    left_value: &Expr,
+    right_value: &Expr,
+) -> Stmt {
+    let node = ast::ExprBoolOp {
         range: TextRange::default(),
-        targets: vec![target_var.clone()],
-        value: Box::new(
-            (ast::ExprBoolOp {
-                range: TextRange::default(),
-                op: BoolOp::Or,
-                values: vec![left_value.clone(), right_value.clone()],
-            })
-            .into(),
-        ),
-    })
-    .into()
+        op: BoolOp::Or,
+        values: vec![left_value.clone(), right_value.clone()],
+    };
+
+    if let Some(annotation) = annotation {
+        ast::StmtAnnAssign {
+            target: Box::new(target_var.clone()),
+            annotation: Box::new(annotation.clone()),
+            value: Some(Box::new(node.into())),
+            simple: true,
+            range: TextRange::default(),
+        }
+        .into()
+    } else {
+        ast::StmtAssign {
+            targets: vec![target_var.clone()],
+            value: Box::new(node.into()),
+            range: TextRange::default(),
+        }
+        .into()
+    }
 }
