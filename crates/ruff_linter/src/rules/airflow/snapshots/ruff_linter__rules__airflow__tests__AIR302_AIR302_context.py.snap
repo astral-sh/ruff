@@ -7,7 +7,7 @@ AIR302_context.py:12:41: AIR302 `conf` is removed in Airflow 3.0
 11 | def access_invalid_key_in_context(**context):
 12 |     print("access invalid key", context["conf"])
    |                                         ^^^^^^ AIR302
-13 | 
+13 |
 14 | @task
    |
 
@@ -17,7 +17,7 @@ AIR302_context.py:16:45: AIR302 `conf` is removed in Airflow 3.0
 15 | def access_invalid_key_task_out_of_dag(**context):
 16 |     print("access invalid key", context.get("conf"))
    |                                             ^^^^^^ AIR302
-17 | 
+17 |
 18 | @dag(
    |
 
@@ -27,7 +27,7 @@ AIR302_context.py:27:49: AIR302 `conf` is removed in Airflow 3.0
 26 |     def access_invalid_key_task(**context):
 27 |         print("access invalid key", context.get("conf"))
    |                                                 ^^^^^^ AIR302
-28 | 
+28 |
 29 |     task1 = PythonOperator(
    |
 
@@ -135,7 +135,7 @@ AIR302_context.py:54:35: AIR302 `yesterday_ds_nodash` is removed in Airflow 3.0
 53 |     yesterday_ds = context["yesterday_ds"]
 54 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
    |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
-55 | 
+55 |
 56 | with DAG(
    |
 
@@ -295,7 +295,7 @@ AIR302_context.py:92:35: AIR302 `yesterday_ds_nodash` is removed in Airflow 3.0
 91 |     yesterday_ds = context["yesterday_ds"]
 92 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
    |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
-93 | 
+93 |
 94 | class CustomOperator(BaseOperator):
    |
 
@@ -404,7 +404,7 @@ AIR302_context.py:106:39: AIR302 `yesterday_ds_nodash` is removed in Airflow 3.0
 105 |         yesterday_ds = context["yesterday_ds"]
 106 |         yesterday_ds_nodash = context["yesterday_ds_nodash"]
     |                                       ^^^^^^^^^^^^^^^^^^^^^ AIR302
-107 | 
+107 |
 108 | @task
     |
 
@@ -423,7 +423,7 @@ AIR302_context.py:111:45: AIR302 `conf` is removed in Airflow 3.0
 110 |     print("execution date", execution_date)
 111 |     print("access invalid key", context.get("conf"))
     |                                             ^^^^^^ AIR302
-112 | 
+112 |
 113 | @task(task_id="print_the_context")
     |
 
