@@ -93,48 +93,8 @@ fn extract_name_from_slice(slice: &Expr) -> Option<String> {
     }
 }
 
-/// Checks for the use of deprecated Airflow context variables.
-///
-/// The function handles context keys accessed:
-/// - Directly using `context["key"]` or context.get("key").
-/// - Using `.get()` with variables derived from `get_current_context()`.
-/// - In custom operators, task decorators, and within templates or macros.
-///
-/// ## Examples
-///
-/// The following Python code would raise lint errors:
-///
-/// ```python
-/// @task
-/// def access_invalid_key_task(**context):
-///     print("access invalid key", context.get("execution_date"))  # Deprecated
-///
-/// @task
-/// def print_config(**context):
-///     execution_date = context["execution_date"]  # Deprecated
-///     prev_ds = context["prev_ds"]  # Deprecated
-///
-/// @task
-/// def print_config_from_context():
-///     context = get_current_context()
-///     execution_date = context["execution_date"]  # Deprecated
-/// ```
-/// In templates or custom plugins:
-///
-/// ```python
-/// task1 = DummyOperator(
-///     task_id="example_task",
-///     params={
-///         "execution_date": "{{ execution_date }}",  # Deprecated
-///     },
-/// )
-///
-/// class CustomMacrosPlugin(AirflowPlugin):
-///     name = "custom_macros"
-///     macros = {
-///         "execution_date_macro": lambda context: context["execution_date"],  # Deprecated
-///     }
-/// ```
+/// Check if a subscript expression accesses a removed Airflow context variable.
+/// If a removed key is found, push a corresponding diagnostic.
 fn removed_context_variable(checker: &mut Checker, subscript: &ExprSubscript) {
     let ExprSubscript { value, slice, .. } = subscript;
 
@@ -428,33 +388,21 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
     };
 
     if let Some(func_def) = function_def {
-        for param_name in func_def
+        for param in func_def
             .parameters
             .posonlyargs
             .iter()
-            .map(|p| p.parameter.name.as_str())
-            .chain(
-                func_def
-                    .parameters
-                    .args
-                    .iter()
-                    .map(|p| p.parameter.name.as_str()),
-            )
-            .chain(
-                func_def
-                    .parameters
-                    .kwonlyargs
-                    .iter()
-                    .map(|p| p.parameter.name.as_str()),
-            )
+            .chain(func_def.parameters.args.iter())
+            .chain(func_def.parameters.kwonlyargs.iter())
         {
+            let param_name = param.parameter.name.as_str();
             if REMOVED_CONTEXT_KEYS.contains(&param_name) {
                 checker.diagnostics.push(Diagnostic::new(
                     Airflow3Removal {
                         deprecated: param_name.to_string(),
                         replacement: Replacement::None,
                     },
-                    func_def.name.range(),
+                    param.parameter.name.range(),
                 ));
             }
         }

@@ -106,7 +106,7 @@ class CustomOperator(BaseOperator):
         yesterday_ds_nodash = context["yesterday_ds_nodash"]
 
 @task
-def access_invalid_argument_task_out_of_dag(execution_date, **context):
+def access_invalid_argument_task_out_of_dag(execution_date, tomorrow_ds, logical_date, **context):
     print("execution date", execution_date)
     print("access invalid key", context.get("conf"))
 
