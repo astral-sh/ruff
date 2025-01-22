@@ -7,7 +7,7 @@ UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of typ
  9 | class A(Generic[T]):
    |         ^^^^^^^^^^ UP046
 10 |     # Comments in a class body are preserved
-11 |     pass
+11 |     var: T
    |
    = help: Use type parameters
 
@@ -18,24 +18,24 @@ UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of typ
 9     |-class A(Generic[T]):
    9  |+class A[T: float]:
 10 10 |     # Comments in a class body are preserved
-11 11 |     pass
+11 11 |     var: T
 12 12 | 
 
 UP046.py:14:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
 14 | class B(Generic[*Ts]):
    |         ^^^^^^^^^^^^ UP046
-15 |     pass
+15 |     var: tuple[*Ts]
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-11 11 |     pass
+11 11 |     var: T
 12 12 | 
 13 13 | 
 14    |-class B(Generic[*Ts]):
    14 |+class B[*Ts]:
-15 15 |     pass
+15 15 |     var: tuple[*Ts]
 16 16 | 
 17 17 | 
 
@@ -43,17 +43,17 @@ UP046.py:18:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of ty
    |
 18 | class C(Generic[P]):
    |         ^^^^^^^^^^ UP046
-19 |     pass
+19 |     var: P
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-15 15 |     pass
+15 15 |     var: tuple[*Ts]
 16 16 | 
 17 17 | 
 18    |-class C(Generic[P]):
    18 |+class C[**P]:
-19 19 |     pass
+19 19 |     var: P
 20 20 | 
 21 21 | 
 
@@ -61,17 +61,17 @@ UP046.py:22:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass in
    |
 22 | class Constrained(Generic[S]):
    |                   ^^^^^^^^^^ UP046
-23 |     pass
+23 |     var: S
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-19 19 |     pass
+19 19 |     var: P
 20 20 | 
 21 21 | 
 22    |-class Constrained(Generic[S]):
    22 |+class Constrained[S: (str, bytes)]:
-23 23 |     pass
+23 23 |     var: S
 24 24 | 
 25 25 | 
 
@@ -81,44 +81,46 @@ UP046.py:28:20: UP046 Generic class `ExternalType` uses `Generic` subclass inste
 27 | # or constraints on the generic type from another module
 28 | class ExternalType(Generic[T, SupportsRichComparisonT]):
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP046
-29 |     pass
+29 |     var: T
+30 |     compare: SupportsRichComparisonT
    |
    = help: Use type parameters
 
-UP046.py:34:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
+UP046.py:35:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
    |
-32 | # typing.AnyStr is a common external type variable, so treat it specially as a
-33 | # known TypeVar
-34 | class MyStr(Generic[AnyStr]):
+33 | # typing.AnyStr is a common external type variable, so treat it specially as a
+34 | # known TypeVar
+35 | class MyStr(Generic[AnyStr]):
    |             ^^^^^^^^^^^^^^^ UP046
-35 |     pass
+36 |     s: AnyStr
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-31 31 | 
-32 32 | # typing.AnyStr is a common external type variable, so treat it specially as a
-33 33 | # known TypeVar
-34    |-class MyStr(Generic[AnyStr]):
-   34 |+class MyStr[AnyStr: (bytes, str)]:
-35 35 |     pass
-36 36 | 
+32 32 | 
+33 33 | # typing.AnyStr is a common external type variable, so treat it specially as a
+34 34 | # known TypeVar
+35    |-class MyStr(Generic[AnyStr]):
+   35 |+class MyStr[AnyStr: (bytes, str)]:
+36 36 |     s: AnyStr
 37 37 | 
+38 38 | 
 
-UP046.py:38:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
+UP046.py:39:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
    |
-38 | class MultipleGenerics(Generic[S, T, Ts, P]):
+39 | class MultipleGenerics(Generic[S, T, Ts, P]):
    |                        ^^^^^^^^^^^^^^^^^^^^ UP046
-39 |     pass
+40 |     var: S
+41 |     typ: T
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-35 35 |     pass
-36 36 | 
+36 36 |     s: AnyStr
 37 37 | 
-38    |-class MultipleGenerics(Generic[S, T, Ts, P]):
-   38 |+class MultipleGenerics[S: (str, bytes), T: float, *Ts, **P]:
-39 39 |     pass
-40 40 | 
-41 41 |
+38 38 | 
+39    |-class MultipleGenerics(Generic[S, T, Ts, P]):
+   39 |+class MultipleGenerics[S: (str, bytes), T: float, *Ts, **P]:
+40 40 |     var: S
+41 41 |     typ: T
+42 42 |     tup: tuple[*Ts]
