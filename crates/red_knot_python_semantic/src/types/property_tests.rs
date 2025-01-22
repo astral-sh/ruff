@@ -461,6 +461,12 @@ mod stable {
         forall types s, t.
             s.is_fully_static(db) && s.is_gradual_equivalent_to(db, t) => s.is_equivalent_to(db, t)
     );
+
+    // `T` can be assigned to itself.
+    type_property_test!(
+        assignable_to_is_reflexive, db,
+        forall types t. t.is_assignable_to(db, t)
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -474,13 +480,6 @@ mod flaky {
     use itertools::Itertools;
 
     use super::{intersection, union};
-
-    // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
-    // `T` can be assigned to itself.
-    type_property_test!(
-        assignable_to_is_reflexive, db,
-        forall types t. t.is_assignable_to(db, t)
-    );
 
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
