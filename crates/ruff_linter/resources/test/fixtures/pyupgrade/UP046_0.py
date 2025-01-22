@@ -49,10 +49,6 @@ class MultipleBaseClasses(list, Generic[T]):
     var: T
 
 
-class Multiple(NotGeneric, Generic[T]):
-    pass
-
-
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
