@@ -196,6 +196,8 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         };
 
         if base_classes.is_empty() {
+            // this means that `Generic[]` was the only base class;
+            // we just replace the whole bases tuple with the type parameters
             diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                 type_params.to_string(),
                 name.end(),
