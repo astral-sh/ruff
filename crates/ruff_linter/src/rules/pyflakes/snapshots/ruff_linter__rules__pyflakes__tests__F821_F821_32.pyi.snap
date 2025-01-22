@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_32.pyi:11:9: F821 Undefined name `C`
+   |
+ 9 |     bound=C,    # => Type
+10 |     default=C,  # => Type
+11 |     foo=C       # => Value
+   |         ^ F821
+12 | )
+   |

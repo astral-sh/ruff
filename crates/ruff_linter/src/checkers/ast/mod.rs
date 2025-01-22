@@ -1326,7 +1326,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 range: _,
                             } = keyword;
                             if let Some(id) = arg {
-                                if id.as_str() == "bound" {
+                                if id.as_str() == "bound" || id.as_str() == "default" {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
