@@ -183,11 +183,11 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         };
 
         if base_classes.is_empty() {
-            // avoid debug_assert for empty range_replacement by using range_deletion here
-            diagnostic.set_fix(Fix::unsafe_edits(
-                Edit::insertion(type_params.to_string(), name.end()),
-                [Edit::range_deletion(arguments.range)],
-            ));
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
+                type_params.to_string(),
+                name.end(),
+                arguments.end(),
+            )));
         } else {
             // also build the replacement argument list as a String, if there are any remaining base
             // classes
