@@ -241,17 +241,11 @@ fn expr_name_to_type_var<'a>(
     semantic: &'a SemanticModel,
     name: &'a ExprName,
 ) -> Option<TypeVar<'a>> {
-    let Some(Stmt::Assign(StmtAssign { value, .. })) = semantic
+    let StmtAssign { value, .. } = semantic
         .lookup_symbol(name.id.as_str())
-        .and_then(|binding_id| {
-            semantic
-                .binding(binding_id)
-                .source
-                .map(|node_id| semantic.statement(node_id))
-        })
-    else {
-        return None;
-    };
+        .and_then(|binding_id| semantic.binding(binding_id).source)
+        .map(|node_id| semantic.statement(node_id))?
+        .as_assign_stmt()?;
 
     match value.as_ref() {
         Expr::Subscript(ExprSubscript {
