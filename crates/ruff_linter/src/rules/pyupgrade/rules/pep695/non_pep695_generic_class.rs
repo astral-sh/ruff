@@ -6,6 +6,7 @@ use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 use crate::settings::types::PythonVersion;
 
 use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
@@ -127,7 +128,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     // it's not *strictly* necessary for `Generic` to come last in the bases tuple, but it would
     // cause more complication for us to handle stubs specially, and probably isn't worth the
     // bother.
-    let [base_classes @ .., Expr::Subscript(ExprSubscript {
+    let [.., generic_expr @ Expr::Subscript(ExprSubscript {
         value,
         slice,
         range,
@@ -195,34 +196,19 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             source: checker.source(),
         };
 
-        if base_classes.is_empty() {
-            // this means that `Generic[]` was the only base class;
-            // we just replace the whole bases tuple with the type parameters
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-                type_params.to_string(),
-                name.end(),
-                arguments.end(),
-            )));
-        } else {
-            // also build the replacement argument list as a String, if there are any remaining base
-            // classes
-            let base_classes = {
-                let mut s = String::from("(");
-                for (i, arg) in base_classes.iter().enumerate() {
-                    s.push_str(&checker.source()[arg.range()]);
-                    if i < base_classes.len() - 1 {
-                        s.push_str(", ");
-                    }
-                }
-                s.push(')');
-                s
-            };
-
-            diagnostic.set_fix(Fix::unsafe_edits(
-                Edit::insertion(type_params.to_string(), name.end()),
-                [Edit::range_replacement(base_classes, arguments.range)],
-            ));
+        let Ok(edit) = remove_argument(
+            generic_expr,
+            arguments,
+            Parentheses::Remove,
+            checker.source(),
+        ) else {
+            return;
         };
+
+        diagnostic.set_fix(Fix::unsafe_edits(
+            Edit::insertion(type_params.to_string(), name.end()),
+            [edit],
+        ));
     }
 
     checker.diagnostics.push(diagnostic);
