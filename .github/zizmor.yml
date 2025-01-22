@@ -10,3 +10,10 @@ rules:
     ignore:
       - build-docker.yml
       - publish-playground.yml
+  excessive-permissions:
+    # it's hard to test what the impact of removing these ignores would be
+    # without actually running the release workflow...
+    ignore:
+      - build-docker.yml
+      - publish-playground.yml
+      - publish-docs.yml
