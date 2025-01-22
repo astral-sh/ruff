@@ -7,7 +7,7 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use python_version::PythonVersion;
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::value::RelativePathBuf;
+use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
@@ -73,7 +73,9 @@ impl Args {
     fn to_options(&self) -> Options {
         Options {
             environment: Some(EnvironmentOptions {
-                python_version: self.python_version.map(Into::into),
+                python_version: self
+                    .python_version
+                    .map(|version| RangedValue::cli(version.into())),
                 venv_path: self.venv_path.as_ref().map(RelativePathBuf::cli),
                 typeshed: self.typeshed.as_ref().map(RelativePathBuf::cli),
                 extra_paths: self.extra_search_path.as_ref().map(|extra_search_paths| {

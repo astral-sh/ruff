@@ -1,11 +1,11 @@
-use crate::metadata::value::{RelativePathBuf, ValueSource, ValueSourceGuard};
+use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
-use red_knot_python_semantic::lint::{GetLintError, Level, RuleSelection};
+use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use red_knot_python_semantic::{
     ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
 };
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::files::File;
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
 use ruff_text_size::TextRange;
@@ -44,7 +44,12 @@ impl Options {
         let (python_version, python_platform) = self
             .environment
             .as_ref()
-            .map(|env| (env.python_version, env.python_platform.as_ref()))
+            .map(|env| {
+                (
+                    env.python_version.as_deref().copied(),
+                    env.python_platform.as_deref(),
+                )
+            })
             .unwrap_or_default();
 
         ProgramSettings {
@@ -116,27 +121,42 @@ impl Options {
             .flat_map(|rules| rules.inner.iter());
 
         for (rule_name, level) in rules {
+            let source = rule_name.source();
             match registry.get(rule_name) {
                 Ok(lint) => {
-                    if let Ok(severity) = Severity::try_from(*level) {
-                        selection.enable(lint, severity);
+                    let lint_source = match source {
+                        ValueSource::File(_) => LintSource::File,
+                        ValueSource::Cli => LintSource::Cli,
+                    };
+                    if let Ok(severity) = Severity::try_from(**level) {
+                        selection.enable(lint, severity, lint_source);
                     } else {
                         selection.disable(lint);
                     }
                 }
-                Err(GetLintError::Unknown(_)) => {
-                    diagnostics.push(OptionDiagnostic::new(
-                        DiagnosticId::UnknownRule,
-                        format!("Unknown lint rule `{rule_name}`"),
-                        Severity::Warning,
-                    ));
-                }
-                Err(GetLintError::Removed(_)) => {
-                    diagnostics.push(OptionDiagnostic::new(
-                        DiagnosticId::UnknownRule,
-                        format!("The lint rule `{rule_name}` has been removed and is no longer supported"),
-                        Severity::Warning,
-                    ));
+                Err(error) => {
+                    // `system_path_to_file` can return `Err` if the file was deleted since the configuration
+                    // was read. This should be rare and it should be okay to default to not showing a configuration
+                    // file in that case.
+                    let file = source
+                        .file()
+                        .and_then(|path| system_path_to_file(db.upcast(), path).ok());
+
+                    // TODO: Add a note if the value was configured on the CLI
+                    let diagnostic = match error {
+                        GetLintError::Unknown(_) => OptionDiagnostic::new(
+                            DiagnosticId::UnknownRule,
+                            format!("Unknown lint rule `{rule_name}`"),
+                            Severity::Warning,
+                        ),
+                        GetLintError::Removed(_) => OptionDiagnostic::new(
+                            DiagnosticId::UnknownRule,
+                            format!("Unknown lint rule `{rule_name}`"),
+                            Severity::Warning,
+                        ),
+                    };
+
+                    diagnostics.push(diagnostic.with_file(file).with_range(rule_name.range()));
                 }
             }
         }
@@ -149,10 +169,10 @@ impl Options {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub python_version: Option<PythonVersion>,
+    pub python_version: Option<RangedValue<PythonVersion>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub python_platform: Option<PythonPlatform>,
+    pub python_platform: Option<RangedValue<PythonPlatform>>,
 
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -183,7 +203,7 @@ pub struct SrcOptions {
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
-    inner: FxHashMap<String, Level>,
+    inner: FxHashMap<RangedValue<String>, RangedValue<Level>>,
 }
 
 #[derive(Error, Debug)]
@@ -197,6 +217,8 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
+    file: Option<File>,
+    range: Option<TextRange>,
 }
 
 impl OptionDiagnostic {
@@ -205,7 +227,21 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
+            file: None,
+            range: None,
         }
+    }
+
+    #[must_use]
+    fn with_file(mut self, file: Option<File>) -> Self {
+        self.file = file;
+        self
+    }
+
+    #[must_use]
+    fn with_range(mut self, range: Option<TextRange>) -> Self {
+        self.range = range;
+        self
     }
 }
 
@@ -219,11 +255,11 @@ impl Diagnostic for OptionDiagnostic {
     }
 
     fn file(&self) -> Option<File> {
-        None
+        self.file
     }
 
     fn range(&self) -> Option<TextRange> {
-        None
+        self.range
     }
 
     fn severity(&self) -> Severity {

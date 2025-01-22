@@ -287,7 +287,7 @@ division-by-zer = "warn" # incorrect rule name
         success: false
         exit_code: 1
         ----- stdout -----
-        warning[unknown-rule] Unknown lint rule `division-by-zer`
+        warning[unknown-rule] <temp_dir>/pyproject.toml:3:1 Unknown lint rule `division-by-zer`
 
         ----- stderr -----
         ");

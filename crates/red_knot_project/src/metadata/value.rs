@@ -23,6 +23,15 @@ pub enum ValueSource {
     Cli,
 }
 
+impl ValueSource {
+    pub fn file(&self) -> Option<&SystemPath> {
+        match self {
+            ValueSource::File(path) => Some(&**path),
+            ValueSource::Cli => None,
+        }
+    }
+}
+
 thread_local! {
     /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
     /// but we want to associate each deserialized [`RelativePath`] with the source from
@@ -53,7 +62,7 @@ impl Drop for ValueSourceGuard {
     }
 }
 
-/// A configuration value that tracks where it originates from and the range in the source document.
+/// A value that "remembers" where it comes from (source) and its range in source.
 ///
 /// ## Equality, Hash, and Ordering
 /// The equality, hash, and ordering are solely based on the value. They disregard the value's range
@@ -65,6 +74,11 @@ impl Drop for ValueSourceGuard {
 pub struct RangedValue<T> {
     value: T,
     source: ValueSource,
+
+    /// The byte range of `value` in `source`.
+    ///
+    /// Can be `None` because not all sources support a range.
+    /// For example, arguments provided on the CLI won't have a range attached.
     range: Option<TextRange>,
 }
 
@@ -87,6 +101,10 @@ impl<T> RangedValue<T> {
 
     pub fn range(&self) -> Option<TextRange> {
         self.range
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        &self.source
     }
 
     #[must_use]
