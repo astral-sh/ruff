@@ -147,7 +147,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body, keywords, and base class.
-fn create_class_def_stmt(
+pub(crate) fn create_class_def_stmt(
     class_name: &str,
     body: Vec<Stmt>,
     total_keyword: Option<&Keyword>,
