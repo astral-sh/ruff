@@ -47,6 +47,19 @@ use crate::fix::edits::fits;
 /// z = cond or other_cond
 /// ```
 ///
+/// Assignments with annotations will also be simplified in [preview],
+/// but only if the first branch have an annotation while the second does not:
+/// 
+/// ```python
+/// if foo:
+///     bar: int = x
+/// else:
+///     bar = y
+/// 
+/// # After
+/// bar: int = x if foo else y
+/// ```
+///
 /// ## Known issues
 /// This is an opinionated style rule that may not always be to everyone's
 /// taste, especially for code that makes use of complex `if` conditions.
