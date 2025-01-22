@@ -78,7 +78,7 @@ UP046_0.py:24:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass 
 UP046_0.py:30:20: UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
    |
 28 | # This case gets a diagnostic but not a fix because we can't look up the bounds
-29 | # or constraints on the generic type from another module
+29 | # or constraints on the TypeVar imported from another module
 30 | class ExternalType(Generic[T, SupportsRichComparisonT]):
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP046
 31 |     var: T
@@ -108,8 +108,8 @@ UP046_0.py:37:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instea
 
 UP046_0.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
    |
-41 | class MultipleGenerics(Generic[S, T, Ts, P]):
-   |                        ^^^^^^^^^^^^^^^^^^^^ UP046
+41 | class MultipleGenerics(Generic[S, T, *Ts, P]):
+   |                        ^^^^^^^^^^^^^^^^^^^^^ UP046
 42 |     var: S
 43 |     typ: T
    |
@@ -119,7 +119,7 @@ UP046_0.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subc
 38 38 |     s: AnyStr
 39 39 | 
 40 40 | 
-41    |-class MultipleGenerics(Generic[S, T, Ts, P]):
+41    |-class MultipleGenerics(Generic[S, T, *Ts, P]):
    41 |+class MultipleGenerics[S: (str, bytes), T: float, *Ts, **P]:
 42 42 |     var: S
 43 43 |     typ: T
