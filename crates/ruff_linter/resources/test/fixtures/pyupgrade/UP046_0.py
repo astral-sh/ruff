@@ -49,6 +49,27 @@ class MultipleBaseClasses(list, Generic[T]):
     var: T
 
 
+# these are just for the MoreBaseClasses and MultipleBaseAndGenerics cases
+class Base1: ...
+
+
+class Base2: ...
+
+
+class Base3: ...
+
+
+class MoreBaseClasses(Base1, Base2, Base3, Generic[T]):
+    var: T
+
+
+class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):
+    var: S
+    typ: T
+    tup: tuple[*Ts]
+    pep: P
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
