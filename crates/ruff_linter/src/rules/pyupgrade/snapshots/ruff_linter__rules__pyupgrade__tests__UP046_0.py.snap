@@ -249,4 +249,12 @@ UP046_0.py:84:17: UP046 [*] Generic class `D` uses `Generic` subclass instead of
    84 |+class D[T: float](A[int]):
 85 85 |     var: T
 86 86 | 
-87 87 |
+87 87 | 
+
+UP046_0.py:88:15: UP046 Generic class `NotLast` uses `Generic` subclass instead of type parameters
+   |
+88 | class NotLast(Generic[T], Base1):
+   |               ^^^^^^^^^^ UP046
+89 |     var: T
+   |
+   = help: Use type parameters

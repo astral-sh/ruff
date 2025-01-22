@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::{Arguments, StmtClassDef};
 use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
@@ -133,6 +133,15 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         ..
     })] = arguments.args.as_ref()
     else {
+        // If Generic is present but not at the end of the list, emit a diagnostic without a fix.
+        if let Some(generic_expr) = find_generic(arguments, checker) {
+            checker.diagnostics.push(Diagnostic::new(
+                NonPEP695GenericClass {
+                    name: name.to_string(),
+                },
+                generic_expr.range,
+            ));
+        }
         return;
     };
 
@@ -214,4 +223,16 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     }
 
     checker.diagnostics.push(diagnostic);
+}
+
+/// Search `arguments` for a `typing.Generic` base class.
+fn find_generic<'a>(arguments: &'a Arguments, checker: &mut Checker) -> Option<&'a ExprSubscript> {
+    arguments.args.as_ref().iter().find_map(|expr| {
+        expr.as_subscript_expr().and_then(|sub_expr| {
+            checker
+                .semantic()
+                .match_typing_expr(&sub_expr.value, "Generic")
+                .then_some(sub_expr)
+        })
+    })
 }

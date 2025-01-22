@@ -85,6 +85,10 @@ class D(A[int], Generic[T]):
     var: T
 
 
+class NotLast(Generic[T], Base1):
+    var: T
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
