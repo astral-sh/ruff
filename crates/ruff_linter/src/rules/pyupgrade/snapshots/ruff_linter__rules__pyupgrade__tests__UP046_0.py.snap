@@ -141,23 +141,4 @@ UP046_0.py:48:33: UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` s
    48 |+class MultipleBaseClasses[T: float](list):
 49 49 |     var: T
 50 50 | 
-51 51 | 
-
-UP046_0.py:75:28: UP046 [*] Generic class `Multiple` uses `Generic` subclass instead of type parameters
-   |
-74 | # TODO(brent) we should also handle multiple base classes
-75 | class Multiple(NotGeneric, Generic[T]):
-   |                            ^^^^^^^^^^ UP046
-76 |     pass
-   |
-   = help: Use type parameters
-
-ℹ Unsafe fix
-72 72 | 
-73 73 | 
-74 74 | # TODO(brent) we should also handle multiple base classes
-75    |-class Multiple(NotGeneric, Generic[T]):
-   75 |+class Multiple[T: float](NotGeneric):
-76 76 |     pass
-77 77 | 
-78 78 |
+51 51 |
