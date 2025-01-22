@@ -38,7 +38,7 @@ class MyStr(Generic[AnyStr]):
     s: AnyStr
 
 
-class MultipleGenerics(Generic[S, T, Ts, P]):
+class MultipleGenerics(Generic[S, T, *Ts, P]):
     var: S
     typ: T
     tup: tuple[*Ts]
