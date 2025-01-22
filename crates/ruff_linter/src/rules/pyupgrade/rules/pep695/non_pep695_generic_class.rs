@@ -122,7 +122,10 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     };
 
     // only handle the case where Generic is at the end of the argument list, in line with PYI059
-    // (generic-not-last-base-class)
+    // (generic-not-last-base-class). If it comes elsewhere, it results in a runtime error. In stubs
+    // it's not *strictly* necessary for `Generic` to come last in the bases tuple, but it would
+    // cause more complication for us to handle stubs specially, and probably isn't worth the
+    // bother.
     let [base_classes @ .., Expr::Subscript(ExprSubscript {
         value,
         slice,
