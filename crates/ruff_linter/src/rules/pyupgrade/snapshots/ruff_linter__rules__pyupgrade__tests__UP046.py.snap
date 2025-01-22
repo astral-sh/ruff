@@ -124,3 +124,11 @@ UP046.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subcla
 42 42 |     var: S
 43 43 |     typ: T
 44 44 |     tup: tuple[*Ts]
+
+UP046.py:100:14: UP046 Generic class `BadStr` uses `Generic` subclass instead of type parameters
+    |
+100 | class BadStr(Generic[AnyStr]):
+    |              ^^^^^^^^^^^^^^^ UP046
+101 |     var: AnyStr
+    |
+    = help: Use type parameters

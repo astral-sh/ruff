@@ -206,7 +206,13 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
         // As of 01/2025, this line hasn't been modified in 8 years, so hopefully there won't be
         // much to keep updated here. See
         // https://github.com/python/cpython/blob/383af395af828f40d9543ee0a8fdc5cc011d43db/Lib/typing.py#L2806
-        if self.semantic.match_typing_expr(expr, "AnyStr") {
+        //
+        // to replace AnyStr with an annotation like [AnyStr: (bytes, str)], we also have to make
+        // sure that `bytes` and `str` have their builtin values and have not been shadowed
+        if self.semantic.match_typing_expr(expr, "AnyStr")
+            && self.semantic.has_builtin_binding("bytes")
+            && self.semantic.has_builtin_binding("str")
+        {
             self.vars.push(TypeVar {
                 name: "AnyStr",
                 restriction: Some(TypeVarRestriction::AnyStr),
