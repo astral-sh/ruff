@@ -17,18 +17,20 @@ def f(cond: bool) -> str:
 def g(cond: bool):
     if cond:
         x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
     else:
         x = "unreachable"
+        reveal_type(x)  # revealed: Literal["unreachable"]
         raise ValueError
     reveal_type(x)  # revealed: Literal["test"]
 ```
 
-In `f`, we should be able to determine that the `else` ends in a terminal statement, and that the
-`return` statement can only be executed when the condition is true. Even though `x` is only bound in
-the true branch, we should therefore consider the reference always bound.
+In `f`, we should be able to determine that the `else` branch ends in a terminal statement, and that
+the `return` statement can only be executed when the condition is true. We should therefore consider
+the reference always bound, even though `x` is only bound in the true branch.
 
 Similarly, in `g`, we should see that the assignment of the value `"unreachable"` can never be seen
-by the `reveal_type`.
+by the final `reveal_type`.
 
 ## `return` is terminal
 
@@ -43,8 +45,10 @@ def f(cond: bool) -> str:
 def g(cond: bool):
     if cond:
         x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
     else:
         x = "unreachable"
+        reveal_type(x)  # revealed: Literal["unreachable"]
         return
     reveal_type(x)  # revealed: Literal["test"]
 ```
@@ -60,14 +64,18 @@ def f(cond: bool) -> str:
             continue
         return x
 
-def g(cond: bool):
-    while True:
+def g(cond: bool, i: int):
+    x = "before"
+    while i < 5:
         if cond:
-            x = "test"
+            x = "loop"
+            reveal_type(x)  # revealed: Literal["loop"]
         else:
-            x = "unreachable"
+            x = "continue"
+            reveal_type(x)  # revealed: Literal["continue"]
             continue
-        reveal_type(x)  # revealed: Literal["test"]
+        reveal_type(x)  # revealed: Literal["loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop"]
 ```
 
 ## `break` is terminal within its loop scope
@@ -82,14 +90,18 @@ def f(cond: bool) -> str:
         return x
     return "late"
 
-def g(cond: bool):
-    while True:
+def g(cond: bool, i: int):
+    x = "before"
+    while i < 5:
         if cond:
-            x = "test"
+            x = "loop"
+            reveal_type(x)  # revealed: Literal["loop"]
         else:
-            x = "unreachable"
+            x = "break"
+            reveal_type(x)  # revealed: Literal["break"]
             break
-        reveal_type(x)  # revealed: Literal["test"]
+        reveal_type(x)  # revealed: Literal["loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop", "break"]
 ```
 
 ## `return` is terminal in nested scopes
@@ -109,10 +121,14 @@ def g(cond1: bool, cond2: bool):
     if cond1:
         if cond2:
             x = "test1"
+            reveal_type(x)  # revealed: Literal["test1"]
         else:
             x = "unreachable"
+            reveal_type(x)  # revealed: Literal["unreachable"]
             return
+        reveal_type(x)  # revealed: Literal["test1"]
     else:
         x = "test2"
+        reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
 ```
