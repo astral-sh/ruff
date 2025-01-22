@@ -138,6 +138,11 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
                 "sla_miss_callback",
                 None,
             ));
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "fail_stop",
+                Some("fail_fast"),
+            ));
         }
         _ => {
             if is_airflow_auth_manager(qualname.segments()) {

@@ -984,13 +984,13 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
     );
 }
 
-pub(super) fn report_invalid_assignment(
+fn report_invalid_assignment_with_message(
     context: &InferContext,
     node: AnyNodeRef,
-    declared_ty: Type,
-    assigned_ty: Type,
+    target_ty: Type,
+    message: std::fmt::Arguments,
 ) {
-    match declared_ty {
+    match target_ty {
         Type::ClassLiteral(ClassLiteralType { class }) => {
             context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
                     "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
@@ -1002,17 +1002,46 @@ pub(super) fn report_invalid_assignment(
                     function.name(context.db())));
         }
         _ => {
-            context.report_lint(
-                &INVALID_ASSIGNMENT,
-                node,
-                format_args!(
-                    "Object of type `{}` is not assignable to `{}`",
-                    assigned_ty.display(context.db()),
-                    declared_ty.display(context.db()),
-                ),
-            );
+            context.report_lint(&INVALID_ASSIGNMENT, node, message);
         }
     }
+}
+
+pub(super) fn report_invalid_assignment(
+    context: &InferContext,
+    node: AnyNodeRef,
+    target_ty: Type,
+    source_ty: Type,
+) {
+    report_invalid_assignment_with_message(
+        context,
+        node,
+        target_ty,
+        format_args!(
+            "Object of type `{}` is not assignable to `{}`",
+            source_ty.display(context.db()),
+            target_ty.display(context.db()),
+        ),
+    );
+}
+
+pub(super) fn report_invalid_attribute_assignment(
+    context: &InferContext,
+    node: AnyNodeRef,
+    target_ty: Type,
+    source_ty: Type,
+    attribute_name: &'_ str,
+) {
+    report_invalid_assignment_with_message(
+        context,
+        node,
+        target_ty,
+        format_args!(
+            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+            source_ty.display(context.db()),
+            target_ty.display(context.db()),
+        ),
+    );
 }
 
 pub(super) fn report_possibly_unresolved_reference(

@@ -12,7 +12,16 @@ use crate::checkers::ast::Checker;
 use crate::Locator;
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")
+    Regex::new(
+        r"(?isx)
+        \b
+        (select\s+.*\s+from\s
+        |delete\s+from\s
+        |(insert|replace)\s+.*\s+values\s
+        |update\s+.*\s+set\s
+        )
+    ",
+    )
     .unwrap()
 });
 

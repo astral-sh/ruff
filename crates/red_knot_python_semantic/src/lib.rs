@@ -10,7 +10,7 @@ pub use module_resolver::{resolve_module, system_module_search_paths, KnownModul
 pub use program::{Program, ProgramSettings, SearchPathSettings, SitePackages};
 pub use python_platform::PythonPlatform;
 pub use python_version::PythonVersion;
-pub use semantic_model::{HasTy, SemanticModel};
+pub use semantic_model::{HasType, SemanticModel};
 
 pub mod ast_node_ref;
 mod db;

@@ -263,15 +263,12 @@ static_assert(not is_assignable_to(int, Not[int]))
 static_assert(not is_assignable_to(int, Not[Literal[1]]))
 
 static_assert(not is_assignable_to(Intersection[Any, Parent], Unrelated))
+static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Any]))
+static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
 
 # TODO: The following assertions should not fail (see https://github.com/astral-sh/ruff/issues/14899)
 # error: [static-assert-error]
 static_assert(is_assignable_to(Intersection[Any, int], int))
-
-# error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Any]))
-# error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
 # error: [static-assert-error]
 static_assert(is_assignable_to(Intersection[Unrelated, Any], Not[tuple[Unrelated, Any]]))
 ```

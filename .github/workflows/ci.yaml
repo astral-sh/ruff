@@ -118,11 +118,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
@@ -132,12 +132,13 @@ jobs:
     name: "cargo test (linux)"
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -150,7 +151,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
@@ -178,12 +178,13 @@ jobs:
     name: "cargo test (linux, release)"
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -196,7 +197,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
@@ -205,24 +205,25 @@ jobs:
 
   cargo-test-windows:
     name: "cargo test (windows)"
-    runs-on: windows-latest-xlarge
+    runs-on: github-windows-2025-x86_64-16
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
+          NEXTEST_PROFILE: "ci"
           # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
@@ -233,12 +234,13 @@ jobs:
     name: "cargo test (wasm)"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v4
@@ -249,7 +251,6 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: v0.13.1
-      - uses: Swatinem/rust-cache@v2
       - name: "Test ruff_wasm"
         run: |
           cd crates/ruff_wasm
@@ -268,11 +269,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@v1
-      - uses: Swatinem/rust-cache@v2
       - name: "Build"
         run: cargo build --release --locked
 
@@ -280,7 +281,7 @@ jobs:
     name: "cargo build (msrv)"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -291,6 +292,7 @@ jobs:
         with:
           file: "Cargo.toml"
           field: "workspace.package.rust-version"
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
@@ -305,7 +307,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
@@ -323,11 +324,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: "Install Rust toolchain"
-        run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "fuzz -> target"
+      - name: "Install Rust toolchain"
+        run: rustup show
       - name: "Install cargo-binstall"
         uses: cargo-bins/cargo-binstall@main
         with:
@@ -343,7 +344,7 @@ jobs:
     needs:
       - cargo-test-linux
       - determine_changes
-    if: ${{ needs.determine_changes.outputs.parser == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.parser == 'true' }}
     timeout-minutes: 20
     env:
       FORCE_COLOR: 1
@@ -379,15 +380,15 @@ jobs:
     name: "test scripts"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
-      - uses: Swatinem/rust-cache@v2
       # Run all code generation scripts, and verify that the current output is
       # already checked into git.
       - run: python crates/ruff_python_ast/generate.py
@@ -411,7 +412,7 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
-    if: ${{ github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -545,6 +546,7 @@ jobs:
     name: "python package"
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -579,9 +581,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
@@ -613,6 +615,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - uses: Swatinem/rust-cache@v2
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         uses: webfactory/ssh-agent@v0.9.0
@@ -622,7 +625,6 @@ jobs:
         run: rustup show
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-      - uses: Swatinem/rust-cache@v2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: uv pip install -r docs/requirements-insiders.txt --system
@@ -646,16 +648,15 @@ jobs:
     name: "formatter instabilities and black similarity"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Cache rust"
-        uses: Swatinem/rust-cache@v2
       - name: "Run checks"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
@@ -670,7 +671,7 @@ jobs:
     needs:
       - cargo-test-linux
       - determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     steps:
       - uses: extractions/setup-just@v2
         env:
@@ -712,13 +713,15 @@ jobs:
   benchmarks:
     runs-on: ubuntu-22.04
     needs: determine_changes
-    if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -727,8 +730,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-codspeed
-
-      - uses: Swatinem/rust-cache@v2
 
       - name: "Build benchmarks"
         run: cargo codspeed build --features codspeed -p ruff_benchmark

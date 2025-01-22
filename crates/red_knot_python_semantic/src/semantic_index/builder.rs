@@ -603,8 +603,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let definition = self.add_definition(symbol, parameter);
 
-        // Insert a mapping from the inner Parameter node to the same definition.
-        // This ensures that calling `HasTy::ty` on the inner parameter returns
+        // Insert a mapping from the inner Parameter node to the same definition. This
+        // ensures that calling `HasType::inferred_type` on the inner parameter returns
         // a valid type (and doesn't panic)
         let existing_definition = self
             .definitions_by_node

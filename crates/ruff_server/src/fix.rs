@@ -12,7 +12,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
     packaging::detect_package_root,
-    settings::{flags, types::UnsafeFixes, LinterSettings},
+    settings::{flags, LinterSettings},
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
@@ -71,7 +71,7 @@ pub(crate) fn fix_all(
         &query.virtual_file_path(),
         package,
         flags::Noqa::Enabled,
-        UnsafeFixes::Disabled,
+        query.settings().unsafe_fixes(),
         linter_settings,
         &source_kind,
         source_type,

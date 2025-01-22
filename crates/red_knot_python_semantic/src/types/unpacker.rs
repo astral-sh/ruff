@@ -43,7 +43,7 @@ impl<'db> Unpacker<'db> {
         );
 
         let mut value_ty = infer_expression_types(self.db(), value.expression())
-            .expression_ty(value.scoped_expression_id(self.db(), self.scope));
+            .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
         if value.is_assign()
             && self.context.in_stub()

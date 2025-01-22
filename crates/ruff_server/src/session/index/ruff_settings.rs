@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::{
     display_settings, fs::normalize_path_to, settings::types::FilePattern,
     settings::types::PreviewMode,
@@ -23,6 +24,8 @@ pub struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
     path: Option<PathBuf>,
+    /// Toggle for unsafe fixes.
+    unsafe_fixes: UnsafeFixes,
     /// Settings used to manage file inclusion and exclusion.
     file_resolver: ruff_workspace::FileResolverSettings,
     /// Settings to pass into the Ruff linter.
@@ -77,6 +80,7 @@ impl RuffSettings {
 
         RuffSettings {
             path,
+            unsafe_fixes: fallback.unsafe_fixes,
             file_resolver: fallback.file_resolver,
             formatter: fallback.formatter,
             linter: fallback.linter,
@@ -96,6 +100,11 @@ impl RuffSettings {
     /// Return the [`ruff_workspace::FormatterSettings`] for this [`RuffSettings`].
     pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
         &self.formatter
+    }
+
+    /// Return the [`UnsafeFixes`] for this [`RuffSettings`].
+    pub(crate) fn unsafe_fixes(&self) -> UnsafeFixes {
+        self.unsafe_fixes
     }
 }
 
@@ -143,6 +152,7 @@ impl RuffSettingsIndex {
                                 directory.to_path_buf(),
                                 Arc::new(RuffSettings {
                                     path: Some(pyproject),
+                                    unsafe_fixes: settings.unsafe_fixes,
                                     file_resolver: settings.file_resolver,
                                     linter: settings.linter,
                                     formatter: settings.formatter,
@@ -267,6 +277,7 @@ impl RuffSettingsIndex {
                                     directory,
                                     Arc::new(RuffSettings {
                                         path: Some(pyproject),
+                                        unsafe_fixes: settings.unsafe_fixes,
                                         file_resolver: settings.file_resolver,
                                         linter: settings.linter,
                                         formatter: settings.formatter,
