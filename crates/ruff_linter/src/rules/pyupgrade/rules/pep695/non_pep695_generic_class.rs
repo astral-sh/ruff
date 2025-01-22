@@ -1,8 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::ExprSubscript;
-use ruff_python_ast::{Arguments, StmtClassDef};
+use ruff_python_ast::{Arguments, ExprSubscript, StmtClassDef};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
