@@ -1972,33 +1972,75 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value);
+            self.infer_target(target, value, |_, ty| ty);
         }
     }
 
-    /// Infer the definition types involved in a `target` expression.
+    /// Infer the (definition) types involved in a `target` expression.
     ///
     /// This is used for assignment statements, for statements, etc. with a single or multiple
-    /// targets (unpacking).
+    /// targets (unpacking). If `target` is an attribute expression, we check that the assignment
+    /// is valid. For 'target's that are definitions, this check happens elsewhere.
+    ///
+    /// The `to_assigned_ty` function is used to convert the inferred type of the `value` expression
+    /// to the type that is eventually assigned to the `target`.
     ///
     /// # Panics
     ///
     /// If the `value` is not a standalone expression.
-    fn infer_target(&mut self, target: &ast::Expr, value: &ast::Expr) {
+    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, to_assigned_ty: F)
+    where
+        F: Fn(&'db dyn Db, Type<'db>) -> Type<'db>,
+    {
+        let assigned_ty = match target {
+            ast::Expr::Name(_) => None,
+            _ => {
+                let value_ty = self.infer_standalone_expression(value);
+
+                Some(to_assigned_ty(self.db(), value_ty))
+            }
+        };
+        self.infer_target_impl(target, assigned_ty);
+    }
+
+    fn infer_target_impl(&mut self, target: &ast::Expr, assigned_ty: Option<Type<'db>>) {
         match target {
             ast::Expr::Name(name) => self.infer_definition(name),
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let mut assigned_tys = match assigned_ty {
+                    Some(Type::Tuple(tuple)) => {
+                        Either::Left(tuple.elements(self.db()).into_iter().copied())
+                    }
+                    Some(_) | None => Either::Right(std::iter::empty()),
+                };
+
                 for element in elts {
-                    self.infer_target(element, value);
+                    self.infer_target_impl(element, assigned_tys.next());
                 }
-                if elts.is_empty() {
-                    self.infer_standalone_expression(value);
+            }
+            ast::Expr::Attribute(
+                lhs_expr @ ast::ExprAttribute {
+                    ctx: ExprContext::Store,
+                    ..
+                },
+            ) => {
+                let attribute_expr_ty = self.infer_attribute_expression(lhs_expr);
+                self.store_expression_type(target, attribute_expr_ty);
+
+                if let Some(assigned_ty) = assigned_ty {
+                    if !assigned_ty.is_assignable_to(self.db(), attribute_expr_ty) {
+                        report_invalid_assignment(
+                            &self.context,
+                            target.into(),
+                            attribute_expr_ty,
+                            assigned_ty,
+                        );
+                    }
                 }
             }
             _ => {
                 // TODO: Remove this once we handle all possible assignment targets.
-                self.infer_standalone_expression(value);
                 self.infer_expression(target);
             }
         }
@@ -2267,7 +2309,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_target(target, iter);
+        self.infer_target(target, iter, |db, iter_ty| {
+            iter_ty.iterate(db).unwrap_without_diagnostic()
+        });
+
         self.infer_body(body);
         self.infer_body(orelse);
     }
@@ -3418,7 +3463,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
 
-                if let Type::Instance(instance) = value_ty {
+                let symbol = if let Type::Instance(instance) = value_ty {
                     let instance_member = instance.class.instance_member(self.db(), attr);
                     if instance_member.is_class_var() {
                         self.context.report_lint(
@@ -3430,9 +3475,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ),
                         );
                     }
-                }
 
-                Type::Never
+                    instance_member.0
+                } else {
+                    value_ty.member(self.db(), attr)
+                };
+
+                // TODO: The unbound-case might also yield a diagnostic, but we can not activate
+                // this yet until we understand implicit instance attributes (those that are not
+                // defined in the class body), as there would be too many false positives.
+                symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
             }
             ExprContext::Del => {
                 self.infer_expression(value);

@@ -102,7 +102,7 @@ reveal_type(C.pure_instance_variable)  # revealed: str
 # and pyright allow this.
 C.pure_instance_variable = "overwritten on class"
 
-# TODO: this should be an error (incompatible types in assignment)
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
 c_instance.pure_instance_variable = 1
 ```
 
@@ -191,7 +191,7 @@ c_instance.pure_class_variable1 = "value set on instance"
 
 C.pure_class_variable1 = "overwritten on class"
 
-# TODO: should raise an error (incompatible types in assignment)
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
 C.pure_class_variable1 = 1
 
 class Subclass(C):
@@ -434,6 +434,40 @@ reveal_type(f.__class__)  # revealed: Literal[FunctionType]
 class Foo: ...
 
 reveal_type(Foo.__class__)  # revealed: Literal[type]
+```
+
+## Module attributes
+
+```py path=mod.py
+global_symbol: str = "a"
+```
+
+```py
+import mod
+
+reveal_type(mod.global_symbol)  # revealed: str
+mod.global_symbol = "b"
+
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
+mod.global_symbol = 1
+
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
+(_, mod.global_symbol) = (..., 1)
+
+# TODO: this should be an error, but we do not understand list unpackings yet.
+[_, mod.global_symbol] = [1, 2]
+
+class IntIterator:
+    def __next__(self) -> int:
+        return 42
+
+class IntIterable:
+    def __iter__(self) -> IntIterator:
+        return IntIterator()
+
+# error: [invalid-assignment] "Object of type `int` is not assignable to `str`"
+for mod.global_symbol in IntIterable():
+    pass
 ```
 
 ## Literal types
