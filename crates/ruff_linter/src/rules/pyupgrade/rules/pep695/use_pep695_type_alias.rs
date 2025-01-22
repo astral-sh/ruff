@@ -133,7 +133,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         .map(|expr| {
             expr.as_name_expr().map(|name| {
                 expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
-                    name,
+                    name: &name.id,
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
@@ -199,7 +199,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     // Type variables must be unique; filter while preserving order.
     let vars = vars
         .into_iter()
-        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
     checker.diagnostics.push(create_diagnostic(

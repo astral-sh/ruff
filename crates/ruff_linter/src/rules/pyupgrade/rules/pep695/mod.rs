@@ -28,7 +28,10 @@ enum TypeVarRestriction<'a> {
     /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
     Bound(&'a Expr),
     /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
-    Constraint(Vec<Expr>),
+    Constraint(Vec<&'a Expr>),
+    /// `AnyStr` is a special case: the only public `TypeVar` defined in the standard library,
+    /// and thus the only one that we recognise when imported from another module.
+    AnyStr,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -40,7 +43,7 @@ enum TypeParamKind {
 
 #[derive(Debug)]
 struct TypeVar<'a> {
-    name: &'a ExprName,
+    name: &'a str,
     restriction: Option<TypeVarRestriction<'a>>,
     kind: TypeParamKind,
     default: Option<&'a Expr>,
@@ -92,23 +95,19 @@ impl Display for DisplayTypeVar<'_> {
             TypeParamKind::TypeVarTuple => f.write_str("*")?,
             TypeParamKind::ParamSpec => f.write_str("**")?,
         }
-        f.write_str(&self.type_var.name.id)?;
+        f.write_str(self.type_var.name)?;
         if let Some(restriction) = &self.type_var.restriction {
             f.write_str(": ")?;
             match restriction {
                 TypeVarRestriction::Bound(bound) => {
                     f.write_str(&self.source[bound.range()])?;
                 }
+                TypeVarRestriction::AnyStr => f.write_str("(bytes, str)")?,
                 TypeVarRestriction::Constraint(vec) => {
                     let len = vec.len();
                     f.write_str("(")?;
                     for (i, v) in vec.iter().enumerate() {
-                        // typing.AnyStr special case doesn't have a real range
-                        if let Expr::Name(name) = v {
-                            f.write_str(name.id.as_ref())?;
-                        } else {
-                            f.write_str(&self.source[v.range()])?;
-                        }
+                        f.write_str(&self.source[v.range()])?;
                         if i < len - 1 {
                             f.write_str(", ")?;
                         }
@@ -135,13 +134,32 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             TypeParamKind::TypeVar => {
                 TypeParam::TypeVar(TypeParamTypeVar {
                     range: TextRange::default(),
-                    name: Identifier::new(name.id.clone(), TextRange::default()),
+                    name: Identifier::new(*name, TextRange::default()),
                     bound: match restriction {
                         Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
                         Some(TypeVarRestriction::Constraint(constraints)) => {
                             Some(Box::new(Expr::Tuple(ast::ExprTuple {
                                 range: TextRange::default(),
                                 elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
+                                ctx: ast::ExprContext::Load,
+                                parenthesized: true,
+                            })))
+                        }
+                        Some(TypeVarRestriction::AnyStr) => {
+                            Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                                range: TextRange::default(),
+                                elts: vec![
+                                    Expr::Name(ExprName {
+                                        range: TextRange::default(),
+                                        id: Name::from("str"),
+                                        ctx: ast::ExprContext::Load,
+                                    }),
+                                    Expr::Name(ExprName {
+                                        range: TextRange::default(),
+                                        id: Name::from("bytes"),
+                                        ctx: ast::ExprContext::Load,
+                                    }),
+                                ],
                                 ctx: ast::ExprContext::Load,
                                 parenthesized: true,
                             })))
@@ -155,12 +173,12 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             }
             TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),
-                name: Identifier::new(name.id.clone(), TextRange::default()),
+                name: Identifier::new(*name, TextRange::default()),
                 default: None,
             }),
             TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
                 range: TextRange::default(),
-                name: Identifier::new(name.id.clone(), TextRange::default()),
+                name: Identifier::new(*name, TextRange::default()),
                 default: None,
             }),
         }
@@ -178,36 +196,27 @@ struct TypeVarReferenceVisitor<'a> {
 /// Recursively collects the names of type variable references present in an expression.
 impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
+        // special case for typing.AnyStr, which is a commonly-imported type variable in the
+        // standard library with the definition:
+        //
+        // ```python
+        // AnyStr = TypeVar('AnyStr', bytes, str)
+        // ```
+        //
+        // As of 01/2025, this line hasn't been modified in 8 years, so hopefully there won't be
+        // much to keep updated here. See
+        // https://github.com/python/cpython/blob/383af395af828f40d9543ee0a8fdc5cc011d43db/Lib/typing.py#L2806
+        if self.semantic.match_typing_expr(expr, "AnyStr") {
+            self.vars.push(TypeVar {
+                name: "AnyStr",
+                restriction: Some(TypeVarRestriction::AnyStr),
+                kind: TypeParamKind::TypeVar,
+                default: None,
+            });
+            return;
+        }
+
         match expr {
-            // special case for typing.AnyStr, which is a commonly-imported type variable in the
-            // standard library with the definition:
-            //
-            // ```python
-            // AnyStr = TypeVar('AnyStr', bytes, str)
-            // ```
-            //
-            // As of 01/2025, this line hasn't been modified in 8 years, so hopefully there won't be
-            // much to keep updated here. See
-            // https://github.com/python/cpython/blob/383af395af828f40d9543ee0a8fdc5cc011d43db/Lib/typing.py#L2806
-            e @ Expr::Name(name) if self.semantic.match_typing_expr(e, "AnyStr") => {
-                self.vars.push(TypeVar {
-                    name,
-                    restriction: Some(TypeVarRestriction::Constraint(vec![
-                        Expr::Name(ExprName {
-                            range: TextRange::default(),
-                            id: Name::from("bytes"),
-                            ctx: ruff_python_ast::ExprContext::Load,
-                        }),
-                        Expr::Name(ExprName {
-                            range: TextRange::default(),
-                            id: Name::from("str"),
-                            ctx: ruff_python_ast::ExprContext::Load,
-                        }),
-                    ])),
-                    kind: TypeParamKind::TypeVar,
-                    default: None,
-                });
-            }
             Expr::Name(name) if name.ctx.is_load() => {
                 if let Some(var) = expr_name_to_type_var(self.semantic, name) {
                     self.vars.push(var);
@@ -243,7 +252,7 @@ fn expr_name_to_type_var<'a>(
         }) => {
             if semantic.match_typing_expr(subscript_value, "TypeVar") {
                 return Some(TypeVar {
-                    name,
+                    name: &name.id,
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
@@ -288,14 +297,14 @@ fn expr_name_to_type_var<'a>(
                     Some(TypeVarRestriction::Bound(&bound.value))
                 } else if arguments.args.len() > 1 {
                     Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).cloned().collect(),
+                        arguments.args.iter().skip(1).collect(),
                     ))
                 } else {
                     None
                 };
 
                 return Some(TypeVar {
-                    name,
+                    name: &name.id,
                     restriction,
                     kind,
                     default,
@@ -327,7 +336,7 @@ fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
     // found on the type parameters
     (vars
         .iter()
-        .unique_by(|tvar| &tvar.name.id)
+        .unique_by(|tvar| tvar.name)
         .filter(|tvar| tvar.default.is_none())
         .count()
         == vars.len())
