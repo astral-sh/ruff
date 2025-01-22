@@ -421,6 +421,7 @@ mod tests {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     banned_module_level_imports: vec![
                         "foo_banned".to_string(),
+                        "pkg_banned".to_string(),
                         "pkg.bar_banned".to_string(),
                     ],
                     ..Default::default()

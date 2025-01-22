@@ -1,9 +1,94 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-import_outside_top_level_with_banned.py:7:5: PLC0415 `import` should be at the top-level of a file
-  |
-6 |     # this should still trigger an error due to multiple imports
-7 |     from pkg import foo_allowed, bar_banned
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
-  |
+import_outside_top_level_with_banned.py:9:5: PLC0415 `import` should be at the top-level of a file
+   |
+ 8 | def import_in_function():
+ 9 |     import symtable  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^ PLC0415
+10 |     import os, sys  # [import-outside-toplevel]
+11 |     import time as thyme  # [import-outside-toplevel]
+   |
+
+import_outside_top_level_with_banned.py:10:5: PLC0415 `import` should be at the top-level of a file
+   |
+ 8 | def import_in_function():
+ 9 |     import symtable  # [import-outside-toplevel]
+10 |     import os, sys  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^ PLC0415
+11 |     import time as thyme  # [import-outside-toplevel]
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+   |
+
+import_outside_top_level_with_banned.py:11:5: PLC0415 `import` should be at the top-level of a file
+   |
+ 9 |     import symtable  # [import-outside-toplevel]
+10 |     import os, sys  # [import-outside-toplevel]
+11 |     import time as thyme  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^ PLC0415
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+13 |     from collections import defaultdict # [import-outside-toplevel]
+   |
+
+import_outside_top_level_with_banned.py:12:5: PLC0415 `import` should be at the top-level of a file
+   |
+10 |     import os, sys  # [import-outside-toplevel]
+11 |     import time as thyme  # [import-outside-toplevel]
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+13 |     from collections import defaultdict # [import-outside-toplevel]
+14 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |
+
+import_outside_top_level_with_banned.py:13:5: PLC0415 `import` should be at the top-level of a file
+   |
+11 |     import time as thyme  # [import-outside-toplevel]
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+13 |     from collections import defaultdict # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+14 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |
+
+import_outside_top_level_with_banned.py:14:5: PLC0415 `import` should be at the top-level of a file
+   |
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+13 |     from collections import defaultdict # [import-outside-toplevel]
+14 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+15 |
+16 |     # these should be allowed due to TID253 top-level ban
+   |
+
+import_outside_top_level_with_banned.py:24:5: PLC0415 `import` should be at the top-level of a file
+   |
+23 |     # this should still trigger an error due to multiple imports
+24 |     from pkg import foo_allowed, bar_banned # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+25 |
+26 | class ClassWithImports:
+   |
+
+import_outside_top_level_with_banned.py:27:5: PLC0415 `import` should be at the top-level of a file
+   |
+26 | class ClassWithImports:
+27 |     import tokenize  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^ PLC0415
+28 |
+29 |     def __init__(self):
+   |
+
+import_outside_top_level_with_banned.py:30:9: PLC0415 `import` should be at the top-level of a file
+   |
+29 |     def __init__(self):
+30 |         import trace  # [import-outside-toplevel]
+   |         ^^^^^^^^^^^^ PLC0415
+31 |
+32 |         # these should be allowed due to TID253 top-level ban
+   |
+
+import_outside_top_level_with_banned.py:40:9: PLC0415 `import` should be at the top-level of a file
+   |
+39 |         # this should still trigger an error due to multiple imports
+40 |         from pkg import foo_allowed, bar_banned # [import-outside-toplevel]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+   |
