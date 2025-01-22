@@ -139,7 +139,7 @@ reveal_type(not AlwaysFalse())
 
 # We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
 class BoolIsBool:
-    __bool__ = bool
+    __bool__: type[bool] = bool
 
 # revealed: bool
 reveal_type(not BoolIsBool())

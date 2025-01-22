@@ -175,7 +175,7 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-# TODO: this should be `Literal[1]`, or `Unknown | Literal[1]`.
+# TODO: Should be `Unknown | Literal[1]`.
 reveal_type(C.pure_class_variable2)  # revealed: Unknown
 
 c_instance = C()
@@ -252,8 +252,7 @@ class C:
 
 reveal_type(C.variable_with_class_default1)  # revealed: str
 
-# TODO: this should be `Unknown | Literal[1]`.
-reveal_type(C.variable_with_class_default2)  # revealed: Literal[1]
+reveal_type(C.variable_with_class_default2)  # revealed: Unknown | Literal[1]
 
 c_instance = C()
 
@@ -296,8 +295,8 @@ def _(flag: bool):
         else:
             x = 4
 
-    reveal_type(C1.x)  # revealed: Literal[1, 2]
-    reveal_type(C2.x)  # revealed: Literal[3, 4]
+    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
 ```
 
 ## Inherited class attributes
@@ -311,7 +310,7 @@ class A:
 class B(A): ...
 class C(B): ...
 
-reveal_type(C.X)  # revealed: Literal["foo"]
+reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
 ```
 
 ### Multiple inheritance
@@ -334,7 +333,7 @@ class A(B, C): ...
 reveal_type(A.__mro__)
 
 # `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
-reveal_type(A.X)  # revealed: Literal[42]
+reveal_type(A.X)  # revealed: Unknown | Literal[42]
 ```
 
 ## Unions with possibly unbound paths
@@ -356,7 +355,7 @@ def _(flag1: bool, flag2: bool):
     C = C1 if flag1 else C2 if flag2 else C3
 
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
-    reveal_type(C.x)  # revealed: Literal[1, 3]
+    reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 ```
 
 ### Possibly-unbound within a class
@@ -379,7 +378,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
     C = C1 if flag1 else C2 if flag2 else C3
 
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
-    reveal_type(C.x)  # revealed: Literal[1, 2, 3]
+    reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 ```
 
 ### Unions with all paths unbound

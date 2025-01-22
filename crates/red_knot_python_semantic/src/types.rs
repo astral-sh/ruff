@@ -7,7 +7,7 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use type_ordering::union_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -86,23 +86,23 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
-        symbol: ScopedSymbolId,
+        considered_non_modifiable: bool,
+        symbol_id: ScopedSymbolId,
     ) -> Symbol<'db> {
         let use_def = use_def_map(db, scope);
 
         // If the symbol is declared, the public type is based on declarations; otherwise, it's based
         // on inference from bindings.
 
-        let declarations = use_def.public_declarations(symbol);
-        let declared =
-            symbol_from_declarations(db, declarations).map(|SymbolAndQualifiers(ty, _)| ty);
+        let declarations = use_def.public_declarations(symbol_id);
+        let declared = symbol_from_declarations(db, declarations);
 
         match declared {
             // Symbol is declared, trust the declared type
-            Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
+            Ok(SymbolAndQualifiers(symbol @ Symbol::Type(_, Boundness::Bound), _)) => symbol,
             // Symbol is possibly declared
-            Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
-                let bindings = use_def.public_bindings(symbol);
+            Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::PossiblyUnbound), _)) => {
+                let bindings = use_def.public_bindings(symbol_id);
                 let inferred = symbol_from_bindings(db, bindings);
 
                 match inferred {
@@ -120,12 +120,23 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                     ),
                 }
             }
-            // Symbol is undeclared, return the inferred type
-            Ok(Symbol::Unbound) => {
-                let bindings = use_def.public_bindings(symbol);
-                symbol_from_bindings(db, bindings)
+            // Symbol is undeclared, return the union of `Unknown` with the inferred type
+            Ok(symbol @ SymbolAndQualifiers(Symbol::Unbound, _)) => {
+                let bindings = use_def.public_bindings(symbol_id);
+                let inferred = symbol_from_bindings(db, bindings);
+
+                if symbol.is_final()
+                    || considered_non_modifiable
+                    || inferred
+                        .ignore_possibly_unbound()
+                        .is_some_and(|ty| matches!(ty, Type::KnownInstance(_)))
+                {
+                    inferred
+                } else {
+                    inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
+                }
             }
-            // Symbol is possibly undeclared
+            // Symbol is conflicting declared types
             Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
@@ -177,9 +188,10 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     }
 
     let table = symbol_table(db, scope);
+    let considered_non_modifiable = name == "__slots__";
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, scope, symbol))
+        .map(|symbol| symbol_by_id(db, scope, considered_non_modifiable, symbol))
         .unwrap_or(Symbol::Unbound)
 }
 
@@ -377,6 +389,10 @@ pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 impl SymbolAndQualifiers<'_> {
     fn is_class_var(&self) -> bool {
         self.1.contains(TypeQualifiers::CLASS_VAR)
+    }
+
+    fn is_final(&self) -> bool {
+        self.1.contains(TypeQualifiers::FINAL)
     }
 }
 
@@ -4108,16 +4124,10 @@ impl<'db> Class<'db> {
                     let bindings = use_def.public_bindings(symbol);
                     let inferred = symbol_from_bindings(db, bindings);
 
-                    match inferred {
-                        Symbol::Type(ty, _) => SymbolAndQualifiers(
-                            Symbol::Type(
-                                UnionType::from_elements(db, [Type::unknown(), ty]),
-                                Boundness::Bound,
-                            ),
-                            qualifiers,
-                        ),
-                        Symbol::Unbound => SymbolAndQualifiers(Symbol::Unbound, qualifiers),
-                    }
+                    SymbolAndQualifiers(
+                        inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty])),
+                        qualifiers,
+                    )
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // Ignore conflicting declarations
@@ -4694,7 +4704,10 @@ pub(crate) mod tests {
         let bar = system_path_to_file(&db, "src/bar.py")?;
         let a = global_symbol(&db, bar, "a");
 
-        assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+        assert_eq!(
+            a.expect_type(),
+            UnionType::from_elements(&db, [Type::unknown(), KnownClass::Int.to_instance(&db)])
+        );
 
         // Add a docstring to foo to trigger a re-run.
         // The bar-call site of foo should not be re-run because of that
@@ -4710,7 +4723,10 @@ pub(crate) mod tests {
 
         let a = global_symbol(&db, bar, "a");
 
-        assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+        assert_eq!(
+            a.expect_type(),
+            UnionType::from_elements(&db, [Type::unknown(), KnownClass::Int.to_instance(&db)])
+        );
         let events = db.take_salsa_events();
 
         let call = &*parsed_module(&db, bar).syntax().body[1]

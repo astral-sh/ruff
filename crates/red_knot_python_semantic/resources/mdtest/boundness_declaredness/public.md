@@ -160,7 +160,8 @@ reveal_type(x)  # revealed: int
 
 ### Undeclared but bound
 
-We use the inferred type as the public type, if a symbol has no declared type.
+We use the union of `Unknown` with the inferred type as the public type, if a symbol has no declared
+type.
 
 ```py path=mod.py
 x = 1
@@ -169,7 +170,7 @@ x = 1
 ```py
 from mod import x
 
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ### Undeclared and possibly unbound
@@ -189,7 +190,7 @@ if flag:
 # on top of this document.
 from mod import x
 
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ### Undeclared and unbound
