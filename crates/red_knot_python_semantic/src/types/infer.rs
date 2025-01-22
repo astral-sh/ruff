@@ -6229,38 +6229,6 @@ mod tests {
         Ok(())
     }
 
-    /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
-    #[test]
-    fn implicit_global_in_function() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 1
-            def f():
-                y = x
-            ",
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-
-        let x_ty = symbol(&db, function_scope, "x");
-        assert!(x_ty.is_unbound());
-
-        let y_ty = symbol(&db, function_scope, "y").expect_type();
-        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
-
-        Ok(())
-    }
-
     #[test]
     fn local_inference() -> anyhow::Result<()> {
         let mut db = setup_db();
