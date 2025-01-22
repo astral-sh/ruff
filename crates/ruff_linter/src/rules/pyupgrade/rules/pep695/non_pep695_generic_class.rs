@@ -66,7 +66,8 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// This rule will correctly handle classes with multiple base classes, as long as the single
 /// `Generic` base class is at the end of the argument list, as checked by
-/// [`generic-not-last-base-class`](generic-not-last-base-class.md).
+/// [`generic-not-last-base-class`](generic-not-last-base-class.md). If a `Generic` base class is
+/// found outside of the last position, a diagnostic is emitted without a suggested fix.
 ///
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`](non-pep695-generic-function.md) for the function version.
