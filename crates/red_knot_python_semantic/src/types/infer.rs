@@ -6008,7 +6008,6 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
-    use crate::{HasType, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
@@ -6225,25 +6224,6 @@ mod tests {
         assert_public_type(&db, "src/a.py", "w", "LiteralString");
         assert_public_type(&db, "src/a.py", "x", "LiteralString");
         assert_public_type(&db, "src/a.py", "z", "LiteralString");
-
-        Ok(())
-    }
-
-    #[test]
-    fn local_inference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "x = 10")?;
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        let parsed = parsed_module(&db, a);
-
-        let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
-        let model = SemanticModel::new(&db, a);
-
-        let literal_ty = statement.value.inferred_type(&model);
-
-        assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
 
         Ok(())
     }
