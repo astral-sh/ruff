@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::ExprSubscript;
 use ruff_python_ast::{Arguments, StmtClassDef};
-use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -123,33 +123,11 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         return;
     };
 
-    // only handle the case where Generic is at the end of the argument list, in line with PYI059
-    // (generic-not-last-base-class). If it comes elsewhere, it results in a runtime error. In stubs
-    // it's not *strictly* necessary for `Generic` to come last in the bases tuple, but it would
-    // cause more complication for us to handle stubs specially, and probably isn't worth the
-    // bother.
-    let [.., generic_expr @ Expr::Subscript(ExprSubscript {
-        value,
-        slice,
-        range,
-        ..
-    })] = arguments.args.as_ref()
+    let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. })) =
+        find_generic(arguments, checker)
     else {
-        // If Generic is present but not at the end of the list, emit a diagnostic without a fix.
-        if let Some(generic_expr) = find_generic(arguments, checker) {
-            checker.diagnostics.push(Diagnostic::new(
-                NonPEP695GenericClass {
-                    name: name.to_string(),
-                },
-                generic_expr.range,
-            ));
-        }
         return;
     };
-
-    if !checker.semantic().match_typing_expr(value, "Generic") {
-        return;
-    }
 
     let mut diagnostic = Diagnostic::new(
         NonPEP695GenericClass {
@@ -157,6 +135,16 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         },
         *range,
     );
+
+    // only handle the case where Generic is at the end of the argument list, in line with PYI059
+    // (generic-not-last-base-class). If it comes elsewhere, it results in a runtime error. In stubs
+    // it's not *strictly* necessary for `Generic` to come last in the bases tuple, but it would
+    // cause more complication for us to handle stubs specially, and probably isn't worth the
+    // bother. we still offer a diagnostic here but not a fix
+    if generic_idx != arguments.len() - 1 {
+        checker.diagnostics.push(diagnostic);
+        return;
+    }
 
     let mut visitor = TypeVarReferenceVisitor {
         vars: vec![],
@@ -214,14 +202,23 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     checker.diagnostics.push(diagnostic);
 }
 
-/// Search `arguments` for a `typing.Generic` base class.
-fn find_generic<'a>(arguments: &'a Arguments, checker: &mut Checker) -> Option<&'a ExprSubscript> {
-    arguments.args.as_ref().iter().find_map(|expr| {
-        expr.as_subscript_expr().and_then(|sub_expr| {
-            checker
-                .semantic()
-                .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some(sub_expr)
+/// Search `arguments` for a `typing.Generic` base class. Returns the `Generic` expression (if any),
+/// along with its index in `arguments`.
+fn find_generic<'a>(
+    arguments: &'a Arguments,
+    checker: &mut Checker,
+) -> Option<(usize, &'a ExprSubscript)> {
+    arguments
+        .args
+        .as_ref()
+        .iter()
+        .enumerate()
+        .find_map(|(idx, expr)| {
+            expr.as_subscript_expr().and_then(|sub_expr| {
+                checker
+                    .semantic()
+                    .match_typing_expr(&sub_expr.value, "Generic")
+                    .then_some((idx, sub_expr))
+            })
         })
-    })
 }
