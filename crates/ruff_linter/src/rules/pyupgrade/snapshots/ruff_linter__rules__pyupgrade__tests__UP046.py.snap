@@ -2,125 +2,125 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP046.py:9:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP046.py:11:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
- 9 | class A(Generic[T]):
+11 | class A(Generic[T]):
    |         ^^^^^^^^^^ UP046
-10 |     # Comments in a class body are preserved
-11 |     var: T
+12 |     # Comments in a class body are preserved
+13 |     var: T
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-6  6  | P = ParamSpec("P")
-7  7  | 
-8  8  | 
-9     |-class A(Generic[T]):
-   9  |+class A[T: float]:
-10 10 |     # Comments in a class body are preserved
-11 11 |     var: T
-12 12 | 
+8  8  | P = ParamSpec("P")
+9  9  | 
+10 10 | 
+11    |-class A(Generic[T]):
+   11 |+class A[T: float]:
+12 12 |     # Comments in a class body are preserved
+13 13 |     var: T
+14 14 | 
 
-UP046.py:14:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP046.py:16:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
-14 | class B(Generic[*Ts]):
+16 | class B(Generic[*Ts]):
    |         ^^^^^^^^^^^^ UP046
-15 |     var: tuple[*Ts]
+17 |     var: tuple[*Ts]
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-11 11 |     var: T
-12 12 | 
-13 13 | 
-14    |-class B(Generic[*Ts]):
-   14 |+class B[*Ts]:
-15 15 |     var: tuple[*Ts]
-16 16 | 
-17 17 | 
+13 13 |     var: T
+14 14 | 
+15 15 | 
+16    |-class B(Generic[*Ts]):
+   16 |+class B[*Ts]:
+17 17 |     var: tuple[*Ts]
+18 18 | 
+19 19 | 
 
-UP046.py:18:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP046.py:20:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
-18 | class C(Generic[P]):
+20 | class C(Generic[P]):
    |         ^^^^^^^^^^ UP046
-19 |     var: P
+21 |     var: P
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-15 15 |     var: tuple[*Ts]
-16 16 | 
-17 17 | 
-18    |-class C(Generic[P]):
-   18 |+class C[**P]:
-19 19 |     var: P
-20 20 | 
-21 21 | 
+17 17 |     var: tuple[*Ts]
+18 18 | 
+19 19 | 
+20    |-class C(Generic[P]):
+   20 |+class C[**P]:
+21 21 |     var: P
+22 22 | 
+23 23 | 
 
-UP046.py:22:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
+UP046.py:24:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
    |
-22 | class Constrained(Generic[S]):
+24 | class Constrained(Generic[S]):
    |                   ^^^^^^^^^^ UP046
-23 |     var: S
+25 |     var: S
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-19 19 |     var: P
-20 20 | 
-21 21 | 
-22    |-class Constrained(Generic[S]):
-   22 |+class Constrained[S: (str, bytes)]:
-23 23 |     var: S
-24 24 | 
-25 25 | 
+21 21 |     var: P
+22 22 | 
+23 23 | 
+24    |-class Constrained(Generic[S]):
+   24 |+class Constrained[S: (str, bytes)]:
+25 25 |     var: S
+26 26 | 
+27 27 | 
 
-UP046.py:28:20: UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
+UP046.py:30:20: UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
    |
-26 | # This case gets a diagnostic but not a fix because we can't look up the bounds
-27 | # or constraints on the generic type from another module
-28 | class ExternalType(Generic[T, SupportsRichComparisonT]):
+28 | # This case gets a diagnostic but not a fix because we can't look up the bounds
+29 | # or constraints on the generic type from another module
+30 | class ExternalType(Generic[T, SupportsRichComparisonT]):
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP046
-29 |     var: T
-30 |     compare: SupportsRichComparisonT
+31 |     var: T
+32 |     compare: SupportsRichComparisonT
    |
    = help: Use type parameters
 
-UP046.py:35:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
+UP046.py:37:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
    |
-33 | # typing.AnyStr is a common external type variable, so treat it specially as a
-34 | # known TypeVar
-35 | class MyStr(Generic[AnyStr]):
+35 | # typing.AnyStr is a common external type variable, so treat it specially as a
+36 | # known TypeVar
+37 | class MyStr(Generic[AnyStr]):
    |             ^^^^^^^^^^^^^^^ UP046
-36 |     s: AnyStr
+38 |     s: AnyStr
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-32 32 | 
-33 33 | # typing.AnyStr is a common external type variable, so treat it specially as a
-34 34 | # known TypeVar
-35    |-class MyStr(Generic[AnyStr]):
-   35 |+class MyStr[AnyStr: (bytes, str)]:
-36 36 |     s: AnyStr
-37 37 | 
-38 38 | 
+34 34 | 
+35 35 | # typing.AnyStr is a common external type variable, so treat it specially as a
+36 36 | # known TypeVar
+37    |-class MyStr(Generic[AnyStr]):
+   37 |+class MyStr[AnyStr: (bytes, str)]:
+38 38 |     s: AnyStr
+39 39 | 
+40 40 | 
 
-UP046.py:39:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
+UP046.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
    |
-39 | class MultipleGenerics(Generic[S, T, Ts, P]):
+41 | class MultipleGenerics(Generic[S, T, Ts, P]):
    |                        ^^^^^^^^^^^^^^^^^^^^ UP046
-40 |     var: S
-41 |     typ: T
+42 |     var: S
+43 |     typ: T
    |
    = help: Use type parameters
 
 ℹ Unsafe fix
-36 36 |     s: AnyStr
-37 37 | 
-38 38 | 
-39    |-class MultipleGenerics(Generic[S, T, Ts, P]):
-   39 |+class MultipleGenerics[S: (str, bytes), T: float, *Ts, **P]:
-40 40 |     var: S
-41 41 |     typ: T
-42 42 |     tup: tuple[*Ts]
+38 38 |     s: AnyStr
+39 39 | 
+40 40 | 
+41    |-class MultipleGenerics(Generic[S, T, Ts, P]):
+   41 |+class MultipleGenerics[S: (str, bytes), T: float, *Ts, **P]:
+42 42 |     var: S
+43 43 |     typ: T
+44 44 |     tup: tuple[*Ts]

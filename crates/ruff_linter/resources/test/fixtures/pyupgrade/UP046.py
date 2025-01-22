@@ -1,5 +1,7 @@
 from typing import Any, AnyStr, Generic, ParamSpec, TypeVar, TypeVarTuple
 
+from somewhere import SupportsRichComparisonT
+
 S = TypeVar("S", str, bytes)  # constrained type variable
 T = TypeVar("T", bound=float)
 Ts = TypeVarTuple("Ts")
@@ -43,7 +45,7 @@ class MultipleGenerics(Generic[S, T, Ts, P]):
     pep: P
 
 
-class Multiple(NotGeneric, Generic[T]):
+class MultipleBaseClasses(list, Generic[T]):
     var: T
 
 
