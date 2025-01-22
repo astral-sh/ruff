@@ -88,14 +88,3 @@ class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
 class Outer:
     class Inner(Generic[T]):
         var: T
-
-
-# replacing AnyStr requires specifying the constraints `str` and `bytes`, so it
-# can't be replaced if these have been shadowed. this test should stay at the
-# bottom of the file because it doesn't seem possible to restore `str` to its
-# builtin state
-str = "string"
-
-
-class BadStr(Generic[AnyStr]):
-    var: AnyStr

@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP046.py:11:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+UP046_0.py:11:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
 11 | class A(Generic[T]):
    |         ^^^^^^^^^^ UP046
@@ -21,7 +21,7 @@ UP046.py:11:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of ty
 13 13 |     var: T
 14 14 | 
 
-UP046.py:16:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+UP046_0.py:16:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
 16 | class B(Generic[*Ts]):
    |         ^^^^^^^^^^^^ UP046
@@ -39,7 +39,7 @@ UP046.py:16:9: UP046 [*] Generic class `B` uses `Generic` subclass instead of ty
 18 18 | 
 19 19 | 
 
-UP046.py:20:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+UP046_0.py:20:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
 20 | class C(Generic[P]):
    |         ^^^^^^^^^^ UP046
@@ -57,7 +57,7 @@ UP046.py:20:9: UP046 [*] Generic class `C` uses `Generic` subclass instead of ty
 22 22 | 
 23 23 | 
 
-UP046.py:24:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
+UP046_0.py:24:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
    |
 24 | class Constrained(Generic[S]):
    |                   ^^^^^^^^^^ UP046
@@ -75,7 +75,7 @@ UP046.py:24:19: UP046 [*] Generic class `Constrained` uses `Generic` subclass in
 26 26 | 
 27 27 | 
 
-UP046.py:30:20: UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
+UP046_0.py:30:20: UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
    |
 28 | # This case gets a diagnostic but not a fix because we can't look up the bounds
 29 | # or constraints on the generic type from another module
@@ -86,7 +86,7 @@ UP046.py:30:20: UP046 Generic class `ExternalType` uses `Generic` subclass inste
    |
    = help: Use type parameters
 
-UP046.py:37:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
+UP046_0.py:37:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead of type parameters
    |
 35 | # typing.AnyStr is a common external type variable, so treat it specially as a
 36 | # known TypeVar
@@ -106,7 +106,7 @@ UP046.py:37:13: UP046 [*] Generic class `MyStr` uses `Generic` subclass instead 
 39 39 | 
 40 40 | 
 
-UP046.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
+UP046_0.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
    |
 41 | class MultipleGenerics(Generic[S, T, Ts, P]):
    |                        ^^^^^^^^^^^^^^^^^^^^ UP046
@@ -124,11 +124,3 @@ UP046.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subcla
 42 42 |     var: S
 43 43 |     typ: T
 44 44 |     tup: tuple[*Ts]
-
-UP046.py:100:14: UP046 Generic class `BadStr` uses `Generic` subclass instead of type parameters
-    |
-100 | class BadStr(Generic[AnyStr]):
-    |              ^^^^^^^^^^^^^^^ UP046
-101 |     var: AnyStr
-    |
-    = help: Use type parameters

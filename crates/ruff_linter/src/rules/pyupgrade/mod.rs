@@ -103,7 +103,8 @@ mod tests {
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
-    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
