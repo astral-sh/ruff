@@ -368,6 +368,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
     }
 
+    /// Records that all remaining statements in the current block are unreachable.
+    fn record_unreachable_visibility(&mut self) -> ScopedVisibilityConstraintId {
+        let id = self.add_visibility_constraint(VisibilityConstraint::AlwaysTrue);
+        self.record_negated_visibility_constraint(id)
+    }
+
     /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
     fn record_ambiguous_visibility(&mut self) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
@@ -1019,11 +1025,6 @@ where
                 }
                 self.visit_body(body);
             }
-            ast::Stmt::Break(_) => {
-                if self.loop_state().is_inside() {
-                    self.loop_break_states.push(self.flow_snapshot());
-                }
-            }
 
             ast::Stmt::For(
                 for_stmt @ ast::StmtFor {
@@ -1270,6 +1271,21 @@ where
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
                 self.visit_body(finalbody);
             }
+
+            ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
+                walk_stmt(self, stmt);
+                // Everything in the current block after a terminal statement is unreachable.
+                self.record_unreachable_visibility();
+            }
+
+            ast::Stmt::Break(_) => {
+                if self.loop_state().is_inside() {
+                    self.loop_break_states.push(self.flow_snapshot());
+                }
+                // Everything in the current block after a terminal statement is unreachable.
+                self.record_unreachable_visibility();
+            }
+
             _ => {
                 walk_stmt(self, stmt);
             }

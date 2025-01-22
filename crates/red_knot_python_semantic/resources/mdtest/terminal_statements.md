@@ -12,8 +12,6 @@ def f(cond: bool) -> str:
         x = "test"
     else:
         raise ValueError
-    # TODO: no error
-    # error: [possibly-unresolved-reference]
     return x
 
 def g(cond: bool):
@@ -22,8 +20,7 @@ def g(cond: bool):
     else:
         x = "unreachable"
         raise ValueError
-    # TODO: Literal["test"]
-    reveal_type(x)  # revealed: Literal["test", "unreachable"]
+    reveal_type(x)  # revealed: Literal["test"]
 ```
 
 In `f`, we should be able to determine that the `else` ends in a terminal statement, and that the
@@ -41,8 +38,6 @@ def f(cond: bool) -> str:
         x = "test"
     else:
         return "early"
-    # TODO: no error
-    # error: [possibly-unresolved-reference]
     return x
 
 def g(cond: bool):
@@ -51,8 +46,7 @@ def g(cond: bool):
     else:
         x = "unreachable"
         return
-    # TODO: Literal["test"]
-    reveal_type(x)  # revealed: Literal["test", "unreachable"]
+    reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ## `continue` is terminal within its loop scope
@@ -64,8 +58,6 @@ def f(cond: bool) -> str:
             x = "test"
         else:
             continue
-        # TODO: no error
-        # error: [possibly-unresolved-reference]
         return x
 
 def g(cond: bool):
@@ -75,8 +67,7 @@ def g(cond: bool):
         else:
             x = "unreachable"
             continue
-        # TODO: Literal["test"]
-        reveal_type(x)  # revealed: Literal["test", "unreachable"]
+        reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ## `break` is terminal within its loop scope
@@ -88,8 +79,6 @@ def f(cond: bool) -> str:
             x = "test"
         else:
             break
-        # TODO: no error
-        # error: [possibly-unresolved-reference]
         return x
     return "late"
 
@@ -100,8 +89,7 @@ def g(cond: bool):
         else:
             x = "unreachable"
             break
-        # TODO: Literal["test"]
-        reveal_type(x)  # revealed: Literal["test", "unreachable"]
+        reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ## `return` is terminal in nested scopes
@@ -115,8 +103,6 @@ def f(cond1: bool, cond2: bool) -> str:
             return "early"
     else:
         x = "test2"
-    # TODO: no error
-    # error: [possibly-unresolved-reference]
     return x
 
 def g(cond1: bool, cond2: bool):
@@ -128,7 +114,5 @@ def g(cond1: bool, cond2: bool):
             return
     else:
         x = "test2"
-    # TODO: no error
-    # TODO: Literal["test"]
-    reveal_type(x)  # revealed: Literal["test1", "unreachable", "test2"]
+    reveal_type(x)  # revealed: Literal["test1", "test2"]
 ```
