@@ -4,17 +4,16 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast,
-    visitor::{self, Visitor},
-    Expr, ExprCall, ExprName, ExprSubscript, Identifier, Keyword, Stmt, StmtAnnAssign, StmtAssign,
-    StmtTypeAlias, TypeParam, TypeParamTypeVar,
+    self as ast, visitor::Visitor, Expr, ExprCall, ExprName, Keyword, Stmt, StmtAnnAssign,
+    StmtAssign, StmtTypeAlias, TypeParam,
 };
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
+
+use super::{expr_name_to_type_var, TypeParamKind, TypeVar, TypeVarReferenceVisitor};
 
 /// ## What it does
 /// Checks for use of `TypeAlias` annotations and `TypeAliasType` assignments
@@ -27,14 +26,17 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Known problems
 /// [PEP 695] uses inferred variance for type parameters, instead of the
-/// `covariant` and `contravariant` keywords used by `TypeParam` variables. As
-/// such, rewriting a `TypeParam` variable to a `type` alias may change its
-/// variance.
+/// `covariant` and `contravariant` keywords used by `TypeVar` variables. As
+/// such, rewriting a type alias using a PEP-695 `type` statement may change
+/// the variance of the alias's type parameters.
 ///
-/// Unlike `TypeParam` variables, [PEP 695]-style `type` aliases cannot be used
-/// at runtime. For example, calling `isinstance` on a `type` alias will throw
-/// a `TypeError`. As such, rewriting a `TypeParam` via the `type` keyword will
-/// cause issues for parameters that are used for such runtime checks.
+/// Unlike type aliases that use simple assignments, definitions created using
+/// [PEP 695] `type` statements cannot be used as drop-in replacements at
+/// runtime for the value on the right-hand side of the statement. This means
+/// that while for some simple old-style type aliases you can use them as the
+/// second argument to an `isinstance()` call (for example), doing the same
+/// with a [PEP 695] `type` statement will always raise `TypeError` at
+/// runtime.
 ///
 /// ## Example
 /// ```python
@@ -131,8 +133,10 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         .map(|expr| {
             expr.as_name_expr().map(|name| {
                 expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
-                    name,
+                    name: &name.id,
                     restriction: None,
+                    kind: TypeParamKind::TypeVar,
+                    default: None,
                 })
             })
         })
@@ -186,6 +190,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         let mut visitor = TypeVarReferenceVisitor {
             vars: vec![],
             semantic: checker.semantic(),
+            any_skipped: false,
         };
         visitor.visit_expr(value);
         visitor.vars
@@ -194,8 +199,13 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     // Type variables must be unique; filter while preserving order.
     let vars = vars
         .into_iter()
-        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
+
+    // TODO(brent) handle `default` arg for Python 3.13+
+    if vars.iter().any(|tv| tv.default.is_some()) {
+        return;
+    }
 
     checker.diagnostics.push(create_diagnostic(
         checker.generator(),
@@ -224,40 +234,6 @@ fn create_diagnostic(
     applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
-    let type_params = if vars.is_empty() {
-        None
-    } else {
-        Some(ast::TypeParams {
-            range: TextRange::default(),
-            type_params: vars
-                .iter()
-                .map(|TypeVar { name, restriction }| {
-                    TypeParam::TypeVar(TypeParamTypeVar {
-                        range: TextRange::default(),
-                        name: Identifier::new(name.id.clone(), TextRange::default()),
-                        bound: match restriction {
-                            Some(TypeVarRestriction::Bound(bound)) => {
-                                Some(Box::new((*bound).clone()))
-                            }
-                            Some(TypeVarRestriction::Constraint(constraints)) => {
-                                Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                    range: TextRange::default(),
-                                    elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
-                                    ctx: ast::ExprContext::Load,
-                                    parenthesized: true,
-                                })))
-                            }
-                            None => None,
-                        },
-                        // We don't handle defaults here yet. Should perhaps be a different rule since
-                        // defaults are only valid in 3.13+.
-                        default: None,
-                    })
-                })
-                .collect(),
-        })
-    };
-
     Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
@@ -274,7 +250,7 @@ fn create_diagnostic(
                     id: name,
                     ctx: ast::ExprContext::Load,
                 })),
-                type_params,
+                type_params: create_type_params(vars),
                 value: Box::new(value.clone()),
             })),
             stmt_range,
@@ -283,88 +259,13 @@ fn create_diagnostic(
     ))
 }
 
-#[derive(Debug)]
-enum TypeVarRestriction<'a> {
-    /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
-    Bound(&'a Expr),
-    /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
-    Constraint(Vec<&'a Expr>),
-}
-
-#[derive(Debug)]
-struct TypeVar<'a> {
-    name: &'a ExprName,
-    restriction: Option<TypeVarRestriction<'a>>,
-}
-
-struct TypeVarReferenceVisitor<'a> {
-    vars: Vec<TypeVar<'a>>,
-    semantic: &'a SemanticModel<'a>,
-}
-
-/// Recursively collects the names of type variable references present in an expression.
-impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(name) if name.ctx.is_load() => {
-                self.vars.extend(expr_name_to_type_var(self.semantic, name));
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
-    }
-}
-
-fn expr_name_to_type_var<'a>(
-    semantic: &'a SemanticModel,
-    name: &'a ExprName,
-) -> Option<TypeVar<'a>> {
-    let Some(Stmt::Assign(StmtAssign { value, .. })) = semantic
-        .lookup_symbol(name.id.as_str())
-        .and_then(|binding_id| {
-            semantic
-                .binding(binding_id)
-                .source
-                .map(|node_id| semantic.statement(node_id))
-        })
-    else {
+fn create_type_params(vars: &[TypeVar]) -> Option<ruff_python_ast::TypeParams> {
+    if vars.is_empty() {
         return None;
-    };
-
-    match value.as_ref() {
-        Expr::Subscript(ExprSubscript {
-            value: ref subscript_value,
-            ..
-        }) => {
-            if semantic.match_typing_expr(subscript_value, "TypeVar") {
-                return Some(TypeVar {
-                    name,
-                    restriction: None,
-                });
-            }
-        }
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
-            if semantic.match_typing_expr(func, "TypeVar")
-                && arguments
-                    .args
-                    .first()
-                    .is_some_and(Expr::is_string_literal_expr)
-            {
-                let restriction = if let Some(bound) = arguments.find_keyword("bound") {
-                    Some(TypeVarRestriction::Bound(&bound.value))
-                } else if arguments.args.len() > 1 {
-                    Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
-                    ))
-                } else {
-                    None
-                };
-
-                return Some(TypeVar { name, restriction });
-            }
-        }
-        _ => {}
     }
-    None
+
+    Some(ast::TypeParams {
+        range: TextRange::default(),
+        type_params: vars.iter().map(TypeParam::from).collect(),
+    })
 }
