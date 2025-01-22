@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, helpers, BoolOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -90,6 +90,9 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
 /// SIM108
 pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let semantic = checker.semantic();
+    let in_preview = checker.settings.preview.is_enabled();
+
     let Some((test, body_assignment, else_assignment)) = test_and_assignments(stmt_if) else {
         return;
     };
@@ -102,17 +105,17 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         return;
     };
 
-    if annotation.is_some() && checker.settings.preview.is_disabled() {
+    if annotation.is_some() && !in_preview {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if is_sys_version_block(stmt_if, checker.semantic()) {
+    if is_sys_version_block(stmt_if, semantic) {
         return;
     }
 
     // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
-    if is_type_checking_block(stmt_if, checker.semantic()) {
+    if is_type_checking_block(stmt_if, semantic) {
         return;
     }
 
@@ -136,14 +139,10 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     //     - If `test == not body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - If `not test == body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) = match (
-        checker.settings.preview.is_enabled(),
-        test,
-        body_assignment.value,
-    ) {
+    let (contents, assignment_kind) = match (in_preview, test, body_assignment.value) {
         (true, test_node, body_node)
             if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
-                && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
+                && !contains_effect(test_node, semantic) =>
         {
             let target_var = &body_assignment.target;
             let binary = assignment_binary_or(
@@ -152,18 +151,13 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
                 body_assignment.value,
                 else_assignment.value,
             );
+
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
+
         (true, test_node, body_node)
-            if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
-            }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
-            })) && !contains_effect(test_node, |id| {
-                checker.semantic().has_builtin_binding(id)
-            }) =>
+            if (is_inverted_of(test_node, body_node) || is_inverted_of(body_node, test_node))
+                && !contains_effect(test_node, semantic) =>
         {
             let target_var = &body_assignment.target;
             let binary = assignment_binary_and(
@@ -172,8 +166,10 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
                 body_assignment.value,
                 else_assignment.value,
             );
+
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
+
         _ => {
             let target_var = &body_assignment.target;
             let ternary = assignment_ternary(
@@ -183,6 +179,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
                 test,
                 else_assignment.value,
             );
+
             (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
         }
     };
@@ -241,6 +238,18 @@ fn test_and_assignments(
     let else_assignment = SimplifiableAssignment::from_body(else_body)?;
 
     Some((test, body_assignment, else_assignment))
+}
+
+fn contains_effect(expr: &Expr, semantic: &SemanticModel) -> bool {
+    helpers::contains_effect(expr, |id| semantic.has_builtin_binding(id))
+}
+
+fn is_inverted_of(first: &Expr, second: &Expr) -> bool {
+    let Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) = first else {
+        return false;
+    };
+
+    op.is_not() && ComparableExpr::from(operand) == ComparableExpr::from(second)
 }
 
 struct SimplifiableAssignment<'a> {
