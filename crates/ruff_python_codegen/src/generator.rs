@@ -1733,6 +1733,7 @@ class Foo:
     #[test]
     fn raw() {
         assert_round_trip!(r#"r"a\.b""#); // https://github.com/astral-sh/ruff/issues/9663
+        assert_round_trip!(r#"R"a\.b""#);
     }
 
     #[test]
