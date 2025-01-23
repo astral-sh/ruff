@@ -21,17 +21,22 @@ pub(crate) struct Args {
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.
-    Check(CheckArgs),
+    Check(CheckCommand),
 
     /// Start the language server
     Server,
 }
 
 #[derive(Debug, Parser)]
-pub(crate) struct CheckArgs {
-    /// Run in watch mode by re-running whenever files change.
-    #[arg(long, short = 'W')]
-    pub(crate) watch: bool,
+pub(crate) struct CheckCommand {
+    /// Run the command within the given project directory.
+    ///
+    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
+    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
+    ///
+    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
+    #[arg(long, value_name = "PROJECT")]
+    pub(crate) project: Option<SystemPathBuf>,
 
     /// Path to the virtual environment the project uses.
     ///
@@ -53,22 +58,17 @@ pub(crate) struct CheckArgs {
     pub(crate) python_version: Option<PythonVersion>,
 
     #[clap(flatten)]
-    pub(crate) rules: RulesArg,
-
-    /// Run the command within the given project directory.
-    ///
-    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
-    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
-    ///
-    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
-    #[arg(long, value_name = "PROJECT")]
-    pub(crate) project: Option<SystemPathBuf>,
+    pub(crate) verbosity: Verbosity,
 
     #[clap(flatten)]
-    pub(crate) verbosity: Verbosity,
+    pub(crate) rules: RulesArg,
+
+    /// Run in watch mode by re-running whenever files change.
+    #[arg(long, short = 'W')]
+    pub(crate) watch: bool,
 }
 
-impl CheckArgs {
+impl CheckCommand {
     pub(crate) fn into_options(self) -> Options {
         let rules = if self.rules.is_empty() {
             None

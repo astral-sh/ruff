@@ -1,5 +1,5 @@
 use anyhow::Context;
-use insta::Settings;
+use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -28,24 +28,22 @@ fn config_override() -> anyhow::Result<()> {
         ),
     ])?;
 
-    case.insta_settings().bind(|| {
-        assert_cmd_snapshot!(case.command(), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            error[lint:unresolved-attribute] <temp_dir>/test.py:5:7 Type `<module 'sys'>` has no attribute `last_exc`
+    assert_cmd_snapshot!(case.command(), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[lint:unresolved-attribute] <temp_dir>/test.py:5:7 Type `<module 'sys'>` has no attribute `last_exc`
 
-            ----- stderr -----
-        ");
+        ----- stderr -----
+    ");
 
-        assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
-            success: true
-            exit_code: 0
-            ----- stdout -----
+    assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
 
-            ----- stderr -----
-        ");
-    });
+        ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -92,25 +90,23 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
         ),
     ])?;
 
-    case.insta_settings().bind(|| {
-        // Make sure that the CLI fails when the `libs` directory is not in the search path.
-        assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r#"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            error[lint:unresolved-import] <temp_dir>/child/test.py:2:1 Cannot resolve import `utils`
+    // Make sure that the CLI fails when the `libs` directory is not in the search path.
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[lint:unresolved-import] <temp_dir>/child/test.py:2:1 Cannot resolve import `utils`
 
-            ----- stderr -----
-        "#);
+        ----- stderr -----
+    "#);
 
-        assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")).arg("--extra-search-path").arg("../libs"), @r"
-            success: true
-            exit_code: 0
-            ----- stdout -----
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")).arg("--extra-search-path").arg("../libs"), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
 
-            ----- stderr -----
-        ");
-    });
+        ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -156,15 +152,13 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
         ),
     ])?;
 
-    case.insta_settings().bind(|| {
-        assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r"
-            success: true
-            exit_code: 0
-            ----- stdout -----
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
 
-            ----- stderr -----
-        ");
-    });
+        ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -184,36 +178,37 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
             "#,
     )?;
 
-    case.insta_settings().bind(|| {
-        // Assert that there's a possibly unresolved reference diagnostic
-        // and that division-by-zero has a severity of error by default.
-        assert_cmd_snapshot!(case.command(), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
-            warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+    // Assert that there's a possibly unresolved reference diagnostic
+    // and that division-by-zero has a severity of error by default.
+    assert_cmd_snapshot!(case.command(), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
 
-            ----- stderr -----
-        ");
+        ----- stderr -----
+    ");
 
-        case.write_file("pyproject.toml", r#"
-            [tool.knot.rules]
-            division-by-zero = "warn" # demote to warn
-            possibly-unresolved-reference = "ignore"
-        "#)?;
+    case.write_file(
+        "pyproject.toml",
+        r#"
+        [tool.knot.rules]
+        division-by-zero = "warn" # demote to warn
+        possibly-unresolved-reference = "ignore"
+    "#,
+    )?;
 
-        assert_cmd_snapshot!(case.command(), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+    assert_cmd_snapshot!(case.command(), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
 
-            ----- stderr -----
-        ");
+        ----- stderr -----
+    ");
 
-        Ok(())
-    })
+    Ok(())
 }
 
 /// The rule severity can be changed using `--ignore`, `--warn`, and `--error`
@@ -233,10 +228,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         "#,
     )?;
 
-    case.insta_settings().bind(|| {
-        // Assert that there's a possibly unresolved reference diagnostic
-        // and that division-by-zero has a severity of error by default.
-        assert_cmd_snapshot!(case.command(), @r"
+    // Assert that there's a possibly unresolved reference diagnostic
+    // and that division-by-zero has a severity of error by default.
+    assert_cmd_snapshot!(case.command(), @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -245,31 +239,29 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:9:7 Name `x` used when possibly not defined
 
         ----- stderr -----
-        ");
+    ");
 
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("possibly-unresolved-reference")
+            .arg("--warn")
+            .arg("division-by-zero")
+            .arg("--warn")
+            .arg("unresolved-import"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
+    warning[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
 
-        assert_cmd_snapshot!(
-            case
-                .command()
-                .arg("--ignore")
-                .arg("possibly-unresolved-reference")
-                .arg("--warn")
-                .arg("division-by-zero")
-                .arg("--warn")
-                .arg("unresolved-import"),
-            @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        warning[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
-        warning[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
+    ----- stderr -----
+    "
+    );
 
-        ----- stderr -----
-        "
-        );
-
-        Ok(())
-    })
+    Ok(())
 }
 
 /// The rule severity can be changed using `--ignore`, `--warn`, and `--error` and
@@ -288,42 +280,39 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         "#,
     )?;
 
-    case.insta_settings().bind(|| {
-        // Assert that there's a possibly unresolved reference diagnostic
-        // and that division-by-zero has a severity of error by default.
-        assert_cmd_snapshot!(case.command(), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
-            warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+    // Assert that there's a possibly unresolved reference diagnostic
+    // and that division-by-zero has a severity of error by default.
+    assert_cmd_snapshot!(case.command(), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
 
-            ----- stderr -----
-        ");
+        ----- stderr -----
+    ");
 
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--error")
+            .arg("possibly-unresolved-reference")
+            .arg("--warn")
+            .arg("division-by-zero")
+            // Override the error severity with warning
+            .arg("--ignore")
+            .arg("possibly-unresolved-reference"),
+        @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
 
-        assert_cmd_snapshot!(
-            case
-                .command()
-                .arg("--error")
-                .arg("possibly-unresolved-reference")
-                .arg("--warn")
-                .arg("division-by-zero")
-                .arg("--ignore")
-                .arg("possibly-unresolved-reference"),
-                // Override the error severity with warning
-            @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+        ----- stderr -----
+        "
+    );
 
-            ----- stderr -----
-            "
-        );
-
-        Ok(())
-    })
+    Ok(())
 }
 
 /// Red Knot warns about unknown rules specified in a configuration file
@@ -340,16 +329,14 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         ("test.py", "print(10)"),
     ])?;
 
-    case.insta_settings().bind(|| {
-        assert_cmd_snapshot!(case.command(), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            warning[unknown-rule] <temp_dir>/pyproject.toml:3:1 Unknown lint rule `division-by-zer`
+    assert_cmd_snapshot!(case.command(), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[unknown-rule] <temp_dir>/pyproject.toml:3:1 Unknown lint rule `division-by-zer`
 
-            ----- stderr -----
-        ");
-    });
+        ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -359,22 +346,21 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", "print(10)")?;
 
-    case.insta_settings().bind(|| {
-        assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
         success: false
         exit_code: 1
         ----- stdout -----
         warning[unknown-rule] Unknown lint rule `division-by-zer`
 
         ----- stderr -----
-        ");
-    });
+    ");
 
     Ok(())
 }
 
 struct TestCase {
     _temp_dir: TempDir,
+    _settings_scope: SettingsBindDropGuard,
     project_dir: PathBuf,
 }
 
@@ -389,9 +375,16 @@ impl TestCase {
             .canonicalize()
             .context("Failed to canonicalize project path")?;
 
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
+        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+
+        let settings_scope = settings.bind_to_scope();
+
         Ok(Self {
             project_dir,
             _temp_dir: temp_dir,
+            _settings_scope: settings_scope,
         })
     }
 
@@ -434,14 +427,6 @@ impl TestCase {
 
     fn project_dir(&self) -> &Path {
         &self.project_dir
-    }
-
-    // Returns the insta filters to escape paths in snapshots
-    fn insta_settings(&self) -> Settings {
-        let mut settings = insta::Settings::clone_current();
-        settings.add_filter(&tempdir_filter(&self.project_dir), "<temp_dir>/");
-        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
-        settings
     }
 
     fn command(&self) -> Command {

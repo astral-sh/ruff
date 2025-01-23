@@ -1,7 +1,7 @@
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
-use crate::args::{Args, CheckArgs, Command};
+use crate::args::{Args, CheckCommand, Command};
 use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::Parser;
@@ -52,7 +52,7 @@ fn run() -> anyhow::Result<ExitStatus> {
     }
 }
 
-fn run_check(args: CheckArgs) -> anyhow::Result<ExitStatus> {
+fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
