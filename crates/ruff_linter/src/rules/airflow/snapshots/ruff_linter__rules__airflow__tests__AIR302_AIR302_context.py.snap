@@ -21,6 +21,26 @@ AIR302_context.py:19:45: AIR302 `conf` is removed in Airflow 3.0
 21 | @dag(
    |
 
+AIR302_context.py:19:45: AIR302 `conf` is removed in Airflow 3.0
+   |
+17 | @task
+18 | def access_invalid_key_task_out_of_dag(**context):
+19 |     print("access invalid key", context.get("conf"))
+   |                                             ^^^^^^ AIR302
+20 |
+21 | @dag(
+   |
+
+AIR302_context.py:30:49: AIR302 `conf` is removed in Airflow 3.0
+   |
+28 |     @task()
+29 |     def access_invalid_key_task(**context):
+30 |         print("access invalid key", context.get("conf"))
+   |                                                 ^^^^^^ AIR302
+31 |
+32 |     task1 = PythonOperator(
+   |
+
 AIR302_context.py:30:49: AIR302 `conf` is removed in Airflow 3.0
    |
 28 |     @task()
@@ -436,6 +456,16 @@ AIR302_context.py:114:45: AIR302 `conf` is removed in Airflow 3.0
 116 | @task(task_id="print_the_context")
     |
 
+AIR302_context.py:114:45: AIR302 `conf` is removed in Airflow 3.0
+    |
+112 | def access_invalid_argument_task_out_of_dag(execution_date, tomorrow_ds, logical_date, **context):
+113 |     print("execution date", execution_date)
+114 |     print("access invalid key", context.get("conf"))
+    |                                             ^^^^^^ AIR302
+115 |
+116 | @task(task_id="print_the_context")
+    |
+
 AIR302_context.py:120:22: AIR302 `tomorrow_ds` is removed in Airflow 3.0
     |
 118 |     """Print the Airflow context and ds variable from the context."""
@@ -452,4 +482,33 @@ AIR302_context.py:122:11: AIR302 `execution_date` is removed in Airflow 3.0
 121 |     c = get_current_context()
 122 |     c.get("execution_date")
     |           ^^^^^^^^^^^^^^^^ AIR302
+123 |
+124 | class CustomOperatorNew(BaseOperator):
+    |
+
+AIR302_context.py:122:11: AIR302 `execution_date` is removed in Airflow 3.0
+    |
+120 |     print(kwargs.get("tomorrow_ds"))
+121 |     c = get_current_context()
+122 |     c.get("execution_date")
+    |           ^^^^^^^^^^^^^^^^ AIR302
+123 |
+124 | class CustomOperatorNew(BaseOperator):
+    |
+
+AIR302_context.py:126:38: AIR302 `execution_date` is removed in Airflow 3.0
+    |
+124 | class CustomOperatorNew(BaseOperator):
+125 |     def execute(self, context):
+126 |         execution_date = context.get("execution_date")
+    |                                      ^^^^^^^^^^^^^^^^ AIR302
+127 |         next_ds = context.get("next_ds")
+    |
+
+AIR302_context.py:127:31: AIR302 `next_ds` is removed in Airflow 3.0
+    |
+125 |     def execute(self, context):
+126 |         execution_date = context.get("execution_date")
+127 |         next_ds = context.get("next_ds")
+    |                               ^^^^^^^^^ AIR302
     |

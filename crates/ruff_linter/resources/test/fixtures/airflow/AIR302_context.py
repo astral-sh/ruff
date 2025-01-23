@@ -120,3 +120,8 @@ def print_context(ds=None, **kwargs):
     print(kwargs.get("tomorrow_ds"))
     c = get_current_context()
     c.get("execution_date")
+
+class CustomOperatorNew(BaseOperator):
+    def execute(self, context):
+        execution_date = context.get("execution_date")
+        next_ds = context.get("next_ds")

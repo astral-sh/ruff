@@ -131,7 +131,53 @@ fn check_context_variable(checker: &mut Checker, subscript: &ExprSubscript) {
     }
 }
 
-/// AIR302
+// Function to handle `var.get(...)` outside of @task-decorated functions
+fn check_removed_context_keys_get_anywhere(checker: &mut Checker, call_expr: &ExprCall) {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {
+        return;
+    };
+
+    if attr.as_str() != "get" {
+        return;
+    }
+
+    // Check if the value is a context argument
+    let is_context_arg = if let Expr::Name(ExprName { id, .. }) = &**value {
+        id.as_str() == "context" || id.as_str().starts_with("**")
+    } else {
+        false
+    };
+
+    let is_current_context =
+        if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
+            matches!(
+                qualname.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        } else {
+            false
+        };
+
+    if is_context_arg || is_current_context {
+        for removed_key in REMOVED_CONTEXT_KEYS {
+            if let Some(argument) = call_expr.arguments.find_argument_value(removed_key, 0) {
+                if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = argument {
+                    if value == removed_key {
+                        checker.diagnostics.push(Diagnostic::new(
+                            Airflow3Removal {
+                                deprecated: removed_key.to_string(),
+                                replacement: Replacement::None,
+                            },
+                            argument.range(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Modify the `removed_in_3` function to call the new check for `var.get(...)`
 pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -148,6 +194,7 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
             };
             check_method(checker, call_expr);
             check_removed_context_keys_usage(checker, call_expr);
+            check_removed_context_keys_get_anywhere(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { attr, .. }) => {
             check_name(checker, expr, attr.range());
