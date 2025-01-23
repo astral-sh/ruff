@@ -158,8 +158,8 @@ impl<'a> Generator<'a> {
         escape.bytes_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
     }
 
-    fn p_str_repr(&mut self, s: &str) {
-        let escape = UnicodeEscape::with_preferred_quote(s, self.quote);
+    fn p_str_repr(&mut self, s: &str, quote: Quote) {
+        let escape = UnicodeEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1295,7 +1295,7 @@ impl<'a> Generator<'a> {
             if flags.prefix().is_unicode() {
                 self.p("u");
             }
-            self.p_str_repr(value);
+            self.p_str_repr(value, flags.quote_style());
         }
     }
 
@@ -1403,7 +1403,7 @@ impl<'a> Generator<'a> {
                 Generator::new(self.indent, self.quote.opposite(), self.line_ending);
             generator.unparse_f_string_body(values);
             let body = &generator.buffer;
-            self.p_str_repr(body);
+            self.p_str_repr(body, self.quote);
         }
     }
 
