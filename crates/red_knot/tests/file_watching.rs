@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::pyproject::{PyProject, Tool};
+use red_knot_project::metadata::value::RelativePathBuf;
 use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform, PythonVersion};
@@ -791,7 +792,7 @@ fn search_path() -> anyhow::Result<()> {
     let mut case = setup_with_options([("bar.py", "import sub.a")], |root_path, _project_path| {
         Some(Options {
             environment: Some(EnvironmentOptions {
-                extra_paths: Some(vec![root_path.join("site_packages")]),
+                extra_paths: Some(vec![RelativePathBuf::cli(root_path.join("site_packages"))]),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -832,7 +833,7 @@ fn add_search_path() -> anyhow::Result<()> {
     // Register site-packages as a search path.
     case.update_options(Options {
         environment: Some(EnvironmentOptions {
-            extra_paths: Some(vec![site_packages.clone()]),
+            extra_paths: Some(vec![RelativePathBuf::cli("site_packages")]),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -855,7 +856,7 @@ fn remove_search_path() -> anyhow::Result<()> {
     let mut case = setup_with_options([("bar.py", "import sub.a")], |root_path, _project_path| {
         Some(Options {
             environment: Some(EnvironmentOptions {
-                extra_paths: Some(vec![root_path.join("site_packages")]),
+                extra_paths: Some(vec![RelativePathBuf::cli(root_path.join("site_packages"))]),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -951,7 +952,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
         |root_path, _project_path| {
             Some(Options {
                 environment: Some(EnvironmentOptions {
-                    typeshed: Some(root_path.join("typeshed")),
+                    typeshed: Some(RelativePathBuf::cli(root_path.join("typeshed"))),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -1375,10 +1376,12 @@ mod unix {
 
                 Ok(())
             },
-            |_root, project| {
+            |_root, _project| {
                 Some(Options {
                     environment: Some(EnvironmentOptions {
-                        extra_paths: Some(vec![project.join(".venv/lib/python3.12/site-packages")]),
+                        extra_paths: Some(vec![RelativePathBuf::cli(
+                            ".venv/lib/python3.12/site-packages",
+                        )]),
                         python_version: Some(PythonVersion::PY312),
                         ..EnvironmentOptions::default()
                     }),

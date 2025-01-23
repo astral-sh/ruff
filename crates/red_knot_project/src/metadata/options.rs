@@ -1,7 +1,8 @@
+use crate::metadata::value::{RelativePathBuf, ValueSource, ValueSourceGuard};
 use red_knot_python_semantic::{
     ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
 };
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -16,7 +17,8 @@ pub struct Options {
 }
 
 impl Options {
-    pub(crate) fn from_toml_str(content: &str) -> Result<Self, KnotTomlError> {
+    pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, KnotTomlError> {
+        let _guard = ValueSourceGuard::new(source);
         let options = toml::from_str(content)?;
         Ok(options)
     }
@@ -44,19 +46,19 @@ impl Options {
         project_root: &SystemPath,
         system: &dyn System,
     ) -> SearchPathSettings {
-        let src_roots =
-            if let Some(src_root) = self.src.as_ref().and_then(|src| src.root.as_deref()) {
-                vec![src_root.to_path_buf()]
-            } else {
-                let src = project_root.join("src");
+        let src_roots = if let Some(src_root) = self.src.as_ref().and_then(|src| src.root.as_ref())
+        {
+            vec![src_root.absolute(project_root, system)]
+        } else {
+            let src = project_root.join("src");
 
-                // Default to `src` and the project root if `src` exists and the root hasn't been specified.
-                if system.is_directory(&src) {
-                    vec![project_root.to_path_buf(), src]
-                } else {
-                    vec![project_root.to_path_buf()]
-                }
-            };
+            // Default to `src` and the project root if `src` exists and the root hasn't been specified.
+            if system.is_directory(&src) {
+                vec![project_root.to_path_buf(), src]
+            } else {
+                vec![project_root.to_path_buf()]
+            }
+        };
 
         let (extra_paths, python, typeshed) = self
             .environment
@@ -71,11 +73,17 @@ impl Options {
             .unwrap_or_default();
 
         SearchPathSettings {
-            extra_paths: extra_paths.unwrap_or_default(),
+            extra_paths: extra_paths
+                .unwrap_or_default()
+                .into_iter()
+                .map(|path| path.absolute(project_root, system))
+                .collect(),
             src_roots,
-            typeshed,
+            typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             site_packages: python
-                .map(|venv_path| SitePackages::Derived { venv_path })
+                .map(|venv_path| SitePackages::Derived {
+                    venv_path: venv_path.absolute(project_root, system),
+                })
                 .unwrap_or(SitePackages::Known(vec![])),
         }
     }
@@ -91,23 +99,23 @@ pub struct EnvironmentOptions {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
     /// or pyright's stubPath configuration setting.
-    pub extra_paths: Option<Vec<SystemPathBuf>>,
+    pub extra_paths: Option<Vec<RelativePathBuf>>,
 
     /// Optional path to a "typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
-    pub typeshed: Option<SystemPathBuf>,
+    pub typeshed: Option<RelativePathBuf>,
 
     // TODO: Rename to python, see https://github.com/astral-sh/ruff/issues/15530
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub venv_path: Option<SystemPathBuf>,
+    pub venv_path: Option<RelativePathBuf>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
-    pub root: Option<SystemPathBuf>,
+    pub root: Option<RelativePathBuf>,
 }
 
 #[derive(Error, Debug)]
