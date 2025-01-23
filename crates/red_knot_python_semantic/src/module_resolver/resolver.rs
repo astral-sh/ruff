@@ -169,7 +169,7 @@ impl SearchPaths {
         let SearchPathSettings {
             extra_paths,
             src_roots,
-            typeshed,
+            custom_typeshed: typeshed,
             site_packages: site_packages_paths,
         } = settings;
 
@@ -1308,7 +1308,7 @@ mod tests {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
-                    typeshed: Some(custom_typeshed),
+                    custom_typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
             },
@@ -1814,7 +1814,7 @@ not_a_directory
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![SystemPathBuf::from("/src")],
-                    typeshed: None,
+                    custom_typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,
                         system_site_packages,

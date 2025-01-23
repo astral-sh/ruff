@@ -1008,7 +1008,7 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        if self.is_equivalent_to(db, target) {
+        if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
         match (self, target) {

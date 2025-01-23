@@ -8,11 +8,6 @@ ProjectMetadata(
   options: Options(
     environment: Some(EnvironmentOptions(
       r#python-version: Some("3.10"),
-      r#python-platform: None,
-      r#extra-paths: None,
-      typeshed: None,
-      r#venv-path: None,
     )),
-    src: None,
   ),
 )

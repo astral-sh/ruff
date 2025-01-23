@@ -20,12 +20,12 @@ from a import b.c
 
 # TODO: Should these be inferred as Unknown?
 reveal_type(b)  # revealed: <module 'a.b'>
-reveal_type(b.c)  # revealed: Literal[1]
+reveal_type(b.c)  # revealed: int
 ```
 
 ```py path=a/__init__.py
 ```
 
 ```py path=a/b.py
-c = 1
+c: int = 1
 ```

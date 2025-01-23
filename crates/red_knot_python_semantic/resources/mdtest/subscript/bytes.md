@@ -31,7 +31,7 @@ def _(n: int):
 ## Slices
 
 ```py
-b = b"\x00abc\xff"
+b: bytes = b"\x00abc\xff"
 
 reveal_type(b[0:2])  # revealed: Literal[b"\x00a"]
 reveal_type(b[-3:])  # revealed: Literal[b"bc\xff"]

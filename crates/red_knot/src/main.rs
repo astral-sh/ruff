@@ -7,6 +7,7 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use python_version::PythonVersion;
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
@@ -69,22 +70,18 @@ struct Args {
 }
 
 impl Args {
-    fn to_options(&self, cli_cwd: &SystemPath) -> Options {
+    fn to_options(&self) -> Options {
         Options {
             environment: Some(EnvironmentOptions {
-                python_version: self.python_version.map(Into::into),
-                venv_path: self
-                    .venv_path
-                    .as_ref()
-                    .map(|venv_path| SystemPath::absolute(venv_path, cli_cwd)),
-                typeshed: self
-                    .typeshed
-                    .as_ref()
-                    .map(|typeshed| SystemPath::absolute(typeshed, cli_cwd)),
+                python_version: self
+                    .python_version
+                    .map(|version| RangedValue::cli(version.into())),
+                venv_path: self.venv_path.as_ref().map(RelativePathBuf::cli),
+                typeshed: self.typeshed.as_ref().map(RelativePathBuf::cli),
                 extra_paths: self.extra_search_path.as_ref().map(|extra_search_paths| {
                     extra_search_paths
                         .iter()
-                        .map(|path| SystemPath::absolute(path, cli_cwd))
+                        .map(RelativePathBuf::cli)
                         .collect()
                 }),
                 ..EnvironmentOptions::default()
@@ -158,8 +155,8 @@ fn run() -> anyhow::Result<ExitStatus> {
         .transpose()?
         .unwrap_or_else(|| cli_base_path.clone());
 
-    let system = OsSystem::new(cwd.clone());
-    let cli_options = args.to_options(&cwd);
+    let system = OsSystem::new(cwd);
+    let cli_options = args.to_options();
     let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
     workspace_metadata.apply_cli_options(cli_options.clone());
 

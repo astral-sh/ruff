@@ -802,8 +802,8 @@ impl Diagnostic for TypeCheckDiagnostic {
         TypeCheckDiagnostic::message(self).into()
     }
 
-    fn file(&self) -> File {
-        TypeCheckDiagnostic::file(self)
+    fn file(&self) -> Option<File> {
+        Some(TypeCheckDiagnostic::file(self))
     }
 
     fn range(&self) -> Option<TextRange> {

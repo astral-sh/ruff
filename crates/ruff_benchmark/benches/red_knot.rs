@@ -2,6 +2,7 @@
 
 use rayon::ThreadPoolBuilder;
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::watch::{ChangeEvent, ChangedKind};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::PythonVersion;
@@ -60,7 +61,7 @@ fn setup_case() -> Case {
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
     metadata.apply_cli_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(PythonVersion::PY312),
+            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()

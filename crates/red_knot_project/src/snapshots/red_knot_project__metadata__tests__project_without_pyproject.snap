@@ -5,8 +5,5 @@ expression: project
 ProjectMetadata(
   name: Name("app"),
   root: "/app",
-  options: Options(
-    environment: None,
-    src: None,
-  ),
+  options: Options(),
 )

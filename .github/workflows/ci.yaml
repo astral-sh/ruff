@@ -1,5 +1,7 @@
 name: CI
 
+permissions: {}
+
 on:
   push:
     branches: [main]
@@ -59,6 +61,7 @@ jobs:
               - Cargo.toml
               - Cargo.lock
               - crates/**
+              - "!crates/red_knot*/**"
               - "!crates/ruff_python_formatter/**"
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"

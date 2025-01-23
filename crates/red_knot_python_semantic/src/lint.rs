@@ -31,6 +31,11 @@ pub struct LintMetadata {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 pub enum Level {
     /// The lint is disabled and should not run.
     Ignore,
@@ -404,12 +409,12 @@ impl From<&'static LintMetadata> for LintEntry {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuleSelection {
     /// Map with the severity for each enabled lint rule.
     ///
     /// If a rule isn't present in this map, then it should be considered disabled.
-    lints: FxHashMap<LintId, Severity>,
+    lints: FxHashMap<LintId, (Severity, LintSource)>,
 }
 
 impl RuleSelection {
@@ -422,7 +427,7 @@ impl RuleSelection {
             .filter_map(|lint| {
                 Severity::try_from(lint.default_level())
                     .ok()
-                    .map(|severity| (*lint, severity))
+                    .map(|severity| (*lint, (severity, LintSource::Default)))
             })
             .collect();
 
@@ -436,12 +441,14 @@ impl RuleSelection {
 
     /// Returns an iterator over all enabled lints and their severity.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + '_ {
-        self.lints.iter().map(|(&lint, &severity)| (lint, severity))
+        self.lints
+            .iter()
+            .map(|(&lint, &(severity, _))| (lint, severity))
     }
 
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
     pub fn severity(&self, lint: LintId) -> Option<Severity> {
-        self.lints.get(&lint).copied()
+        self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
     /// Returns `true` if the `lint` is enabled.
@@ -452,19 +459,25 @@ impl RuleSelection {
     /// Enables `lint` and configures with the given `severity`.
     ///
     /// Overrides any previous configuration for the lint.
-    pub fn enable(&mut self, lint: LintId, severity: Severity) {
-        self.lints.insert(lint, severity);
+    pub fn enable(&mut self, lint: LintId, severity: Severity, source: LintSource) {
+        self.lints.insert(lint, (severity, source));
     }
 
     /// Disables `lint` if it was previously enabled.
     pub fn disable(&mut self, lint: LintId) {
         self.lints.remove(&lint);
     }
+}
 
-    /// Merges the enabled lints from `other` into this selection.
-    ///
-    /// Lints from `other` will override any existing configuration.
-    pub fn merge(&mut self, other: &RuleSelection) {
-        self.lints.extend(other.iter());
-    }
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum LintSource {
+    /// The user didn't enable the rule explicitly, instead it's enabled by default.
+    #[default]
+    Default,
+
+    /// The rule was enabled by using a CLI argument
+    Cli,
+
+    /// The rule was enabled in a configuration file.
+    File,
 }

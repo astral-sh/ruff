@@ -6003,30 +6003,16 @@ fn perform_membership_test_comparison<'db>(
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
+    use crate::db::tests::{setup_db, TestDb};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
-    use crate::{HasType, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use super::*;
-
-    #[track_caller]
-    fn assert_public_type(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
-        let file = system_path_to_file(db, file_name).expect("file to exist");
-
-        let ty = global_symbol(db, file, symbol_name).expect_type();
-        assert_eq!(
-            ty.display(db).to_string(),
-            expected,
-            "Mismatch for symbol '{symbol_name}' in '{file_name}'"
-        );
-    }
 
     #[track_caller]
     fn get_symbol<'db>(
@@ -6053,18 +6039,6 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_scope_type(
-        db: &TestDb,
-        file_name: &str,
-        scopes: &[&str],
-        symbol_name: &str,
-        expected: &str,
-    ) {
-        let ty = get_symbol(db, file_name, scopes, symbol_name).expect_type();
-        assert_eq!(ty.display(db).to_string(), expected);
-    }
-
-    #[track_caller]
     fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
         let messages: Vec<&str> = diagnostics
             .iter()
@@ -6082,48 +6056,23 @@ mod tests {
     }
 
     #[test]
-    fn resolve_method() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/mod.py",
-            "
-            class C:
-                def f(self): pass
-            ",
-        )?;
-
-        let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let class_ty = global_symbol(&db, mod_file, "C")
-            .expect_type()
-            .expect_class_literal();
-        let member_ty = class_ty.member(&db, "f").expect_type();
-        let func = member_ty.expect_function_literal();
-
-        assert_eq!(func.name(&db), "f");
-        Ok(())
-    }
-
-    #[test]
     fn not_literal_string() -> anyhow::Result<()> {
         let mut db = setup_db();
         let content = format!(
             r#"
-        v = not "{y}"
-        w = not 10*"{y}"
-        x = not "{y}"*10
-        z = not 0*"{y}"
-        u = not (-100)*"{y}"
-        "#,
+            from typing_extensions import assert_type
+
+            assert_type(not "{y}", bool)
+            assert_type(not 10*"{y}", bool)
+            assert_type(not "{y}"*10, bool)
+            assert_type(not 0*"{y}", Literal[True])
+            assert_type(not (-100)*"{y}", Literal[True])
+            "#,
             y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
         );
         db.write_dedented("src/a.py", &content)?;
 
-        assert_public_type(&db, "src/a.py", "v", "bool");
-        assert_public_type(&db, "src/a.py", "w", "bool");
-        assert_public_type(&db, "src/a.py", "x", "bool");
-        assert_public_type(&db, "src/a.py", "z", "Literal[True]");
-        assert_public_type(&db, "src/a.py", "u", "Literal[True]");
+        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
     }
@@ -6131,37 +6080,24 @@ mod tests {
     #[test]
     fn multiplied_string() -> anyhow::Result<()> {
         let mut db = setup_db();
+        let content = format!(
+            r#"
+            from typing_extensions import assert_type
 
-        db.write_dedented(
-            "src/a.py",
-            &format!(
-                r#"
-            w = 2 * "hello"
-            x = "goodbye" * 3
-            y = "a" * {y}
-            z = {z} * "b"
-            a = 0 * "hello"
-            b = -3 * "hello"
+            assert_type(2 * "hello", Literal["hellohello"])
+            assert_type("goodbye" * 3, Literal["goodbyegoodbyegoodbye"])
+            assert_type("a" * {y}, Literal["{a_repeated}"])
+            assert_type({z} * "b", LiteralString)
+            assert_type(0 * "hello", Literal[""])
+            assert_type(-3 * "hello", Literal[""])
             "#,
-                y = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE,
-                z = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1
-            ),
-        )?;
-
-        assert_public_type(&db, "src/a.py", "w", r#"Literal["hellohello"]"#);
-        assert_public_type(&db, "src/a.py", "x", r#"Literal["goodbyegoodbyegoodbye"]"#);
-        assert_public_type(
-            &db,
-            "src/a.py",
-            "y",
-            &format!(
-                r#"Literal["{}"]"#,
-                "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE)
-            ),
+            y = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE,
+            z = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1,
+            a_repeated = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE),
         );
-        assert_public_type(&db, "src/a.py", "z", "LiteralString");
-        assert_public_type(&db, "src/a.py", "a", r#"Literal[""]"#);
-        assert_public_type(&db, "src/a.py", "b", r#"Literal[""]"#);
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
     }
@@ -6171,21 +6107,20 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-        v = "{y}"
-        w = 10*"{y}"
-        x = "{y}"*10
-        z = 0*"{y}"
-        u = (-100)*"{y}"
-        "#,
+            from typing_extensions import assert_type
+
+            assert_type("{y}", LiteralString)
+            assert_type(10*"{y}", LiteralString)
+            assert_type("{y}"*10, LiteralString)
+            assert_type(0*"{y}", Literal[""])
+            assert_type((-100)*"{y}", Literal[""])
+            "#,
             y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
         );
         db.write_dedented("src/a.py", &content)?;
 
-        assert_public_type(&db, "src/a.py", "v", "LiteralString");
-        assert_public_type(&db, "src/a.py", "w", "LiteralString");
-        assert_public_type(&db, "src/a.py", "x", "LiteralString");
-        assert_public_type(&db, "src/a.py", "z", r#"Literal[""]"#);
-        assert_public_type(&db, "src/a.py", "u", r#"Literal[""]"#);
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
         Ok(())
     }
 
@@ -6194,16 +6129,17 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-        w = "{y}"
-        x = "a" + "{z}"
-        "#,
+            from typing_extensions import assert_type
+
+            assert_type("{y}", LiteralString)
+            assert_type("a" + "{z}", LiteralString)
+            "#,
             y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
             z = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE),
         );
         db.write_dedented("src/a.py", &content)?;
 
-        assert_public_type(&db, "src/a.py", "w", "LiteralString");
-        assert_public_type(&db, "src/a.py", "x", "LiteralString");
+        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
     }
@@ -6213,574 +6149,20 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-        v = "{y}"
-        w = "{y}" + "a"
-        x = "a" + "{y}"
-        z = "{y}" + "{y}"
-        "#,
+            from typing_extensions import assert_type
+
+            assert_type("{y}", LiteralString)
+            assert_type("{y}" + "a", LiteralString)
+            assert_type("a" + "{y}", LiteralString)
+            assert_type("{y}" + "{y}", LiteralString)
+            "#,
             y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
         );
         db.write_dedented("src/a.py", &content)?;
 
-        assert_public_type(&db, "src/a.py", "v", "LiteralString");
-        assert_public_type(&db, "src/a.py", "w", "LiteralString");
-        assert_public_type(&db, "src/a.py", "x", "LiteralString");
-        assert_public_type(&db, "src/a.py", "z", "LiteralString");
-
-        Ok(())
-    }
-
-    /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
-    #[test]
-    fn implicit_global_in_function() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 1
-            def f():
-                y = x
-            ",
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-
-        let x_ty = symbol(&db, function_scope, "x");
-        assert!(x_ty.is_unbound());
-
-        let y_ty = symbol(&db, function_scope, "y").expect_type();
-        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn local_inference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "x = 10")?;
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        let parsed = parsed_module(&db, a);
-
-        let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
-        let model = SemanticModel::new(&db, a);
-
-        let literal_ty = statement.value.inferred_type(&model);
-
-        assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn builtin_symbol_vendored_stdlib() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "c = chr")?;
-
-        assert_public_type(&db, "/src/a.py", "c", "Literal[chr]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_custom_typeshed("/typeshed")
-            .with_file("/src/a.py", "c = copyright")
-            .with_file(
-                "/typeshed/stdlib/builtins.pyi",
-                "def copyright() -> None: ...",
-            )
-            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
-            .build()?;
-
-        assert_public_type(&db, "/src/a.py", "c", "Literal[copyright]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn unknown_builtin_later_defined() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_custom_typeshed("/typeshed")
-            .with_file("/src/a.py", "x = foo")
-            .with_file("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1")
-            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
-            .build()?;
-
-        assert_public_type(&db, "/src/a.py", "x", "Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn str_builtin() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_file("/src/a.py", "x = str")?;
-        assert_public_type(&db, "/src/a.py", "x", "Literal[str]");
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotation_builtin() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_file("/src/a.pyi", "class C(object): pass")?;
-        let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
-        let ty = global_symbol(&db, file, "C").expect_type();
-        let base = ty
-            .expect_class_literal()
-            .class
-            .iter_mro(&db)
-            .nth(1)
-            .unwrap();
-        assert_eq!(base.display(&db).to_string(), "<class 'object'>");
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotation_in_stubs_always_resolve() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        // Stub files should always resolve deferred annotations
-        db.write_dedented(
-            "/src/stub.pyi",
-            "
-            def get_foo() -> Foo: ...
-            class Foo: ...
-            foo = get_foo()
-            ",
-        )?;
-        assert_public_type(&db, "/src/stub.pyi", "foo", "Foo");
-
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotations_regular_source_fails() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        // In (regular) source files, annotations are *not* deferred
-        // Also tests imports from `__future__` that are not annotations
-        db.write_dedented(
-            "/src/source.py",
-            "
-            from __future__ import with_statement as annotations
-            def get_foo() -> Foo: ...
-            class Foo: ...
-            foo = get_foo()
-            ",
-        )?;
-        assert_public_type(&db, "/src/source.py", "foo", "Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotation_in_sources_with_future_resolves() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        // In source files with `__future__.annotations`, deferred annotations are resolved
-        db.write_dedented(
-            "/src/source_with_future.py",
-            "
-            from __future__ import annotations
-            def get_foo() -> Foo: ...
-            class Foo: ...
-            foo = get_foo()
-            ",
-        )?;
-        assert_public_type(&db, "/src/source_with_future.py", "foo", "Foo");
-
-        Ok(())
-    }
-
-    #[test]
-    fn basic_comprehension() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                [x for y in IterableOfIterables() for x in y]
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-
-            class IteratorOfIterables:
-                def __next__(self) -> IntIterable:
-                    return IntIterable()
-
-            class IterableOfIterables:
-                def __iter__(self) -> IteratorOfIterables:
-                    return IteratorOfIterables()
-            ",
-        )?;
-
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "x", "int");
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "y", "IntIterable");
-
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_inside_comprehension() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                [[x for x in iter1] for y in iter2]
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-
-            iter1 = IntIterable()
-            iter2 = IntIterable()
-            ",
-        )?;
-
-        assert_scope_type(
-            &db,
-            "src/a.py",
-            &["foo", "<listcomp>", "<listcomp>"],
-            "x",
-            "int",
-        );
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "y", "int");
-
-        Ok(())
-    }
-
-    #[test]
-    fn inner_comprehension_referencing_outer_comprehension() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                [[x for x in y] for y in z]
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-
-            class IteratorOfIterables:
-                def __next__(self) -> IntIterable:
-                    return IntIterable()
-
-            class IterableOfIterables:
-                def __iter__(self) -> IteratorOfIterables:
-                    return IteratorOfIterables()
-
-            z = IterableOfIterables()
-            ",
-        )?;
-
-        assert_scope_type(
-            &db,
-            "src/a.py",
-            &["foo", "<listcomp>", "<listcomp>"],
-            "x",
-            "int",
-        );
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "y", "IntIterable");
-
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_with_unbound_iter() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented("src/a.py", "[z for z in x]")?;
-
-        let x = get_symbol(&db, "src/a.py", &["<listcomp>"], "x");
-        assert!(x.is_unbound());
-
-        // Iterating over an unbound iterable yields `Unknown`:
-        assert_scope_type(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
-
-        assert_file_diagnostics(&db, "src/a.py", &["Name `x` used when not defined"]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_with_not_iterable_iter_in_second_comprehension() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                [z for x in IntIterable() for z in x]
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-            ",
-        )?;
-
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "x", "int");
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unknown");
-        assert_file_diagnostics(&db, "src/a.py", &["Object of type `int` is not iterable"]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn dict_comprehension_variable_key() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                {x: 0 for x in IntIterable()}
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-            ",
-        )?;
-
-        assert_scope_type(&db, "src/a.py", &["foo", "<dictcomp>"], "x", "int");
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
-    }
-
-    #[test]
-    fn dict_comprehension_variable_value() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                {0: x for x in IntIterable()}
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-            ",
-        )?;
-
-        assert_scope_type(&db, "src/a.py", &["foo", "<dictcomp>"], "x", "int");
-        assert_file_diagnostics(&db, "src/a.py", &[]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_with_missing_in_keyword() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                [z for z IntIterable()]
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-            ",
-        )?;
-
-        // We'll emit a diagnostic separately for invalid syntax,
-        // but it's reasonably clear here what they *meant* to write,
-        // so we'll still infer the correct type:
-        assert_scope_type(&db, "src/a.py", &["foo", "<listcomp>"], "z", "int");
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_with_missing_iter() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            def foo():
-                [z for in IntIterable()]
-
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-            ",
-        )?;
-
-        let z = get_symbol(&db, "src/a.py", &["foo", "<listcomp>"], "z");
-        assert!(z.is_unbound());
-
-        // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
-        assert_file_diagnostics(&db, "src/a.py", &["Name `z` used when not defined"]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_with_missing_for() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented("src/a.py", "[z for z in]")?;
-        assert_scope_type(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
-        Ok(())
-    }
-
-    #[test]
-    fn comprehension_with_missing_in_keyword_and_missing_iter() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented("src/a.py", "[z for z]")?;
-        assert_scope_type(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
-        Ok(())
-    }
-
-    /// This tests that we understand that `async` comprehensions
-    /// do not work according to the synchronous iteration protocol
-    #[test]
-    fn invalid_async_comprehension() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            async def foo():
-                [x async for x in Iterable()]
-            class Iterator:
-                def __next__(self) -> int:
-                    return 42
-            class Iterable:
-                def __iter__(self) -> Iterator:
-                    return Iterator()
-            ",
-        )?;
-
-        // We currently return `Todo` for all async comprehensions,
-        // including comprehensions that have invalid syntax
-        assert_scope_type(
-            &db,
-            "src/a.py",
-            &["foo", "<listcomp>"],
-            "x",
-            if cfg!(debug_assertions) {
-                "@Todo(async iterables/iterators)"
-            } else {
-                "@Todo"
-            },
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn basic_async_comprehension() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            async def foo():
-                [x async for x in AsyncIterable()]
-            class AsyncIterator:
-                async def __anext__(self) -> int:
-                    return 42
-            class AsyncIterable:
-                def __aiter__(self) -> AsyncIterator:
-                    return AsyncIterator()
-            ",
-        )?;
-
-        // TODO async iterables/iterators! --Alex
-        assert_scope_type(
-            &db,
-            "src/a.py",
-            &["foo", "<listcomp>"],
-            "x",
-            if cfg!(debug_assertions) {
-                "@Todo(async iterables/iterators)"
-            } else {
-                "@Todo"
-            },
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn starred_expressions_must_be_iterable() {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            class NotIterable: pass
-
-            class Iterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class Iterable:
-                def __iter__(self) -> Iterator: ...
-
-            x = [*NotIterable()]
-            y = [*Iterable()]
-            ",
-        )
-        .unwrap();
-
-        assert_file_diagnostics(
-            &db,
-            "/src/a.py",
-            &["Object of type `NotIterable` is not iterable"],
-        );
     }
 
     #[test]
@@ -6865,22 +6247,22 @@ mod tests {
 
         db.write_files([
             ("/src/a.py", "from foo import x"),
-            ("/src/foo.py", "x = 10\ndef foo(): ..."),
+            ("/src/foo.py", "x: int = 10\ndef foo(): ..."),
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
         let x_ty = global_symbol(&db, a, "x").expect_type();
 
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
+        assert_eq!(x_ty.display(&db).to_string(), "int");
 
         // Change `x` to a different value
-        db.write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
+        db.write_file("/src/foo.py", "x: bool = True\ndef foo(): ...")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
         let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
-        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
+        assert_eq!(x_ty_2.display(&db).to_string(), "bool");
 
         Ok(())
     }
@@ -6891,15 +6273,15 @@ mod tests {
 
         db.write_files([
             ("/src/a.py", "from foo import x"),
-            ("/src/foo.py", "x = 10\ndef foo(): y = 1"),
+            ("/src/foo.py", "x: int = 10\ndef foo(): y = 1"),
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
         let x_ty = global_symbol(&db, a, "x").expect_type();
 
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
+        assert_eq!(x_ty.display(&db).to_string(), "int");
 
-        db.write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
+        db.write_file("/src/foo.py", "x: int = 10\ndef foo(): pass")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
@@ -6907,7 +6289,7 @@ mod tests {
 
         let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
-        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
+        assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
         let events = db.take_salsa_events();
 
@@ -6927,15 +6309,15 @@ mod tests {
 
         db.write_files([
             ("/src/a.py", "from foo import x"),
-            ("/src/foo.py", "x = 10\ny = 20"),
+            ("/src/foo.py", "x: int = 10\ny: bool = True"),
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
         let x_ty = global_symbol(&db, a, "x").expect_type();
 
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
+        assert_eq!(x_ty.display(&db).to_string(), "int");
 
-        db.write_file("/src/foo.py", "x = 10\ny = 30")?;
+        db.write_file("/src/foo.py", "x: int = 10\ny: bool = False")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
@@ -6943,7 +6325,7 @@ mod tests {
 
         let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
-        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
+        assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
         let events = db.take_salsa_events();
 

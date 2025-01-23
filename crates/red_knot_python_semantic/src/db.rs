@@ -136,7 +136,7 @@ pub(crate) mod tests {
         /// Target Python platform
         python_platform: PythonPlatform,
         /// Path to a custom typeshed directory
-        custom_typeshed: Option<SystemPathBuf>,
+        typeshed: Option<SystemPathBuf>,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
     }
@@ -146,18 +146,13 @@ pub(crate) mod tests {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
-                custom_typeshed: None,
+                typeshed: None,
                 files: vec![],
             }
         }
 
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
-            self
-        }
-
-        pub(crate) fn with_custom_typeshed(mut self, path: &str) -> Self {
-            self.custom_typeshed = Some(SystemPathBuf::from(path));
             self
         }
 
@@ -176,7 +171,7 @@ pub(crate) mod tests {
                 .context("Failed to write test files")?;
 
             let mut search_paths = SearchPathSettings::new(vec![src_root]);
-            search_paths.typeshed = self.custom_typeshed;
+            search_paths.custom_typeshed = self.typeshed;
 
             Program::from_settings(
                 &db,
