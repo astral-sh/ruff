@@ -73,7 +73,6 @@ const INLINE_BINDING_BLOCKS: usize = 3;
 
 /// A [`BitSet`] of [`ScopedDefinitionId`], representing live bindings of a symbol in a scope.
 type Bindings = BitSet<INLINE_BINDING_BLOCKS>;
-type BindingsIterator<'a> = BitSetIterator<'a, INLINE_BINDING_BLOCKS>;
 
 /// Can reference this * 64 total declarations inline; more will fall back to the heap.
 const INLINE_DECLARATION_BLOCKS: usize = 3;
@@ -95,9 +94,6 @@ type InlineConstraintArray = [Constraints; INLINE_BINDINGS_PER_SYMBOL];
 
 /// One [`BitSet`] of applicable [`ScopedConstraintId`]s per live binding.
 type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
-
-/// Iterate over all constraints for a single binding.
-type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
 
 /// A newtype-index for a visibility constraint in a particular scope.
 #[newtype_index]
@@ -279,12 +275,19 @@ impl SymbolBindings {
     }
 
     /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter(&self) -> BindingIdWithConstraintsIterator {
-        BindingIdWithConstraintsIterator {
-            definitions: self.live_bindings.iter(),
-            constraints: self.constraints.iter(),
-            visibility_constraints: self.visibility_constraints.iter(),
-        }
+    pub(super) fn iter(&self) -> impl Iterator<Item = BindingIdWithConstraints<'_>> + '_ {
+        let i = (self.live_bindings.iter())
+            .zip(self.constraints.iter())
+            .zip(self.visibility_constraints.iter());
+        i.map(
+            |((def, constraints), visibility_constraint_id)| BindingIdWithConstraints {
+                definition: ScopedDefinitionId::from_u32(def),
+                constraint_ids: ConstraintIdIterator {
+                    wrapped: constraints.iter(),
+                },
+                visibility_constraint: *visibility_constraint_id,
+            },
+        )
     }
 
     fn merge(&mut self, mut b: Self, visibility_constraints: &mut VisibilityConstraints) {
@@ -426,40 +429,6 @@ pub(super) struct BindingIdWithConstraints<'map> {
     pub(super) constraint_ids: ConstraintIdIterator<'map>,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
-
-#[derive(Debug)]
-pub(super) struct BindingIdWithConstraintsIterator<'map> {
-    definitions: BindingsIterator<'map>,
-    constraints: ConstraintsIterator<'map>,
-    visibility_constraints: VisibilityConstraintsIterator<'map>,
-}
-
-impl<'map> Iterator for BindingIdWithConstraintsIterator<'map> {
-    type Item = BindingIdWithConstraints<'map>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (
-            self.definitions.next(),
-            self.constraints.next(),
-            self.visibility_constraints.next(),
-        ) {
-            (None, None, None) => None,
-            (Some(def), Some(constraints), Some(visibility_constraint_id)) => {
-                Some(BindingIdWithConstraints {
-                    definition: ScopedDefinitionId::from_u32(def),
-                    constraint_ids: ConstraintIdIterator {
-                        wrapped: constraints.iter(),
-                    },
-                    visibility_constraint: *visibility_constraint_id,
-                })
-            }
-            // SAFETY: see above.
-            _ => unreachable!("definitions and constraints length mismatch"),
-        }
-    }
-}
-
-impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_> {}
 
 #[derive(Debug)]
 pub(super) struct ConstraintIdIterator<'a> {
