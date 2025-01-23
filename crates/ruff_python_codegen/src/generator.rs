@@ -1444,6 +1444,24 @@ mod tests {
         generator.generate()
     }
 
+    /// Like [`round_trip`] but configure the [`Generator`] with the requested `indentation`,
+    /// `quote`, and `line_ending` settings.
+    ///
+    /// Note that quoting styles for string literals are taken from their [`StringLiteralFlags`],
+    /// not from the [`Generator`] itself, so using this function on a plain string literal can give
+    /// surprising results.
+    ///
+    /// ```rust
+    /// assert_eq!(
+    ///     round_trip_with(
+    ///         &Indentation::default(),
+    ///         Quote::Double,
+    ///         LineEnding::default(),
+    ///         r#"'hello'"#
+    ///     ),
+    ///     r#"'hello'"#
+    /// );
+    /// ```
     fn round_trip_with(
         indentation: &Indentation,
         quote: Quote,
@@ -1768,46 +1786,6 @@ if True:
 "
             .trim()
             .replace('\n', LineEnding::default().as_str())
-        );
-    }
-
-    #[test]
-    fn set_quote() {
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Double,
-                LineEnding::default(),
-                r#""hello""#
-            ),
-            r#""hello""#
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Single,
-                LineEnding::default(),
-                r#""hello""#
-            ),
-            r"'hello'"
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Double,
-                LineEnding::default(),
-                r"'hello'"
-            ),
-            r#""hello""#
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Single,
-                LineEnding::default(),
-                r"'hello'"
-            ),
-            r"'hello'"
         );
     }
 
