@@ -213,6 +213,33 @@ fn rule_severity() -> anyhow::Result<()> {
     let project_dir = tempdir.path().canonicalize()?;
 
     std::fs::write(
+        project_dir.join("test.py"),
+        r#"
+y = 4 / 0
+
+for a in range(0, y):
+    x = a
+
+print(x)  # possibly-unresolved-reference
+"#,
+    )
+    .context("Failed to write `test.py`")?;
+
+    // Assert that there's a possibly unresolved reference diagnostic
+    // and that division-by-zero has a severity of error by default.
+    insta::with_settings!({filters => vec![(&*tempdir_filter(&project_dir), "<temp_dir>/")]}, {
+        assert_cmd_snapshot!(knot().current_dir(&project_dir), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+
+        ----- stderr -----
+        ");
+    });
+
+    std::fs::write(
         project_dir.join("pyproject.toml"),
         r#"
 [tool.knot.rules]
@@ -222,25 +249,12 @@ possibly-unresolved-reference = "ignore"
     )
     .context("Failed to write `pyproject.toml`")?;
 
-    std::fs::write(
-        project_dir.join("test.py"),
-        r#"
-y = x / 0
-
-for a in range(0, 1):
-    x = a
-
-print(x)  # possibly-unresolved-reference
-"#,
-    )
-    .context("Failed to write `test.py`")?;
-
     insta::with_settings!({filters => vec![(&*tempdir_filter(&project_dir), "<temp_dir>/")]}, {
         assert_cmd_snapshot!(knot().current_dir(project_dir), @r"
         success: false
         exit_code: 1
         ----- stdout -----
-        warning[lint:unresolved-reference] <temp_dir>/test.py:2:5 Name `x` used when not defined
+        warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
 
         ----- stderr -----
         ");
