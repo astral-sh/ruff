@@ -25,6 +25,10 @@ class BuiltinClass: ...
 builtin_symbol: BuiltinClass
 ```
 
+```pyi path=/typeshed/stdlib/sys/__init__.pyi
+version = "my custom Python"
+```
+
 And finally write a normal Python code block that makes use of the custom stubs:
 
 ```py
@@ -33,6 +37,9 @@ b: BuiltinClass = builtin_symbol
 class OtherClass: ...
 
 o: OtherClass = builtin_symbol  # error: [invalid-assignment]
+
+# Make sure that 'sys' has a proper entry in the auto-generated 'VERSIONS' file
+import sys
 ```
 
 ## Custom `VERSIONS` file

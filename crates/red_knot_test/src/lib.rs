@@ -147,7 +147,12 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             let contents = typeshed_files
                 .iter()
                 .map(|path| {
-                    let module_path = path.as_str().trim_end_matches(".pyi").replace("/", ".");
+                    // This is intentionally kept simple:
+                    let module_path = path
+                        .as_str()
+                        .trim_end_matches(".pyi")
+                        .trim_end_matches("/__init__")
+                        .replace("/", ".");
                     format!("{module_path}: 3.8-\n")
                 })
                 .collect::<String>();
