@@ -470,6 +470,30 @@ for mod.global_symbol in IntIterable():
     pass
 ```
 
+## Nested attributes
+
+```py path=outer/__init__.py
+```
+
+```py path=outer/nested/__init__.py
+```
+
+```py path=outer/nested/inner.py
+class Outer:
+    class Nested:
+        class Inner:
+            attr: int = 1
+```
+
+```py
+import outer.nested.inner
+
+reveal_type(outer.nested.inner.Outer.Nested.Inner.attr)  # revealed: int
+
+# error: [invalid-assignment]
+outer.nested.inner.Outer.Nested.Inner.attr = "a"
+```
+
 ## Literal types
 
 ### Function-literal attributes
