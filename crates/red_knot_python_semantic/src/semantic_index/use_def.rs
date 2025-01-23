@@ -255,10 +255,8 @@
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
-use self::symbol_state::{
-    ConstraintIdIterator, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
-};
 pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstraintId};
+use self::symbol_state::{ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState};
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
@@ -309,24 +307,27 @@ pub(crate) struct UseDefMap<'db> {
 }
 
 impl<'db> UseDefMap<'db> {
-    pub(crate) fn bindings_at_use<'map>(
-        &'map self,
+    pub(crate) fn bindings_at_use(
+        &self,
         use_id: ScopedUseId,
-    ) -> impl Iterator<Item = BindingWithConstraints<'map, 'db>> + 'map {
+    ) -> impl Iterator<Item = BindingWithConstraints<'db, impl Iterator<Item = Constraint<'db>> + '_>> + '_
+    {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    pub(crate) fn public_bindings<'map>(
-        &'map self,
+    pub(crate) fn public_bindings(
+        &self,
         symbol: ScopedSymbolId,
-    ) -> impl Iterator<Item = BindingWithConstraints<'map, 'db>> + 'map {
+    ) -> impl Iterator<Item = BindingWithConstraints<'db, impl Iterator<Item = Constraint<'db>> + '_>> + '_
+    {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
-    pub(crate) fn bindings_at_declaration<'map>(
-        &'map self,
+    pub(crate) fn bindings_at_declaration(
+        &self,
         declaration: Definition<'db>,
-    ) -> impl Iterator<Item = BindingWithConstraints<'map, 'db>> + 'map {
+    ) -> impl Iterator<Item = BindingWithConstraints<'db, impl Iterator<Item = Constraint<'db>> + '_>> + '_
+    {
         if let SymbolDefinitions::Bindings(bindings) = &self.definitions_by_definition[&declaration]
         {
             self.bindings_iterator(bindings)
@@ -359,15 +360,16 @@ impl<'db> UseDefMap<'db> {
     fn bindings_iterator<'map>(
         &'map self,
         bindings: &'map SymbolBindings,
-    ) -> impl Iterator<Item = BindingWithConstraints<'map, 'db>> + 'map {
+    ) -> impl Iterator<
+        Item = BindingWithConstraints<'db, impl Iterator<Item = Constraint<'db>> + 'map>,
+    > + 'map {
         bindings
             .iter()
             .map(|binding_id_with_constraints| BindingWithConstraints {
                 binding: self.all_definitions[binding_id_with_constraints.definition],
-                constraints: ConstraintsIterator {
-                    all_constraints: &self.all_constraints,
-                    constraint_ids: binding_id_with_constraints.constraint_ids,
-                },
+                constraints: binding_id_with_constraints
+                    .constraint_ids
+                    .map(|constraint_id| self.all_constraints[constraint_id]),
                 visibility_constraint: binding_id_with_constraints.visibility_constraint,
             })
     }
@@ -397,28 +399,11 @@ enum SymbolDefinitions {
     Declarations(SymbolDeclarations),
 }
 
-pub(crate) struct BindingWithConstraints<'map, 'db> {
+pub(crate) struct BindingWithConstraints<'db, I> {
     pub(crate) binding: Option<Definition<'db>>,
-    pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+    pub(crate) constraints: I,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
-
-pub(crate) struct ConstraintsIterator<'map, 'db> {
-    all_constraints: &'map AllConstraints<'db>,
-    constraint_ids: ConstraintIdIterator<'map>,
-}
-
-impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
-    type Item = Constraint<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.constraint_ids
-            .next()
-            .map(|constraint_id| self.all_constraints[constraint_id])
-    }
-}
-
-impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: Option<Definition<'db>>,

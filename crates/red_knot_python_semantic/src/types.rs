@@ -23,6 +23,7 @@ pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::constraint::Constraint;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -323,7 +324,9 @@ fn definition_expression_type<'db>(
 fn symbol_from_bindings<'map, 'db: 'map>(
     db: &'db dyn Db,
     use_def: &UseDefMap<'map>,
-    bindings_with_constraints: impl Iterator<Item = BindingWithConstraints<'map, 'db>>,
+    bindings_with_constraints: impl Iterator<
+        Item = BindingWithConstraints<'db, impl Iterator<Item = Constraint<'db>>>,
+    >,
 ) -> Symbol<'db> {
     let visibility_constraints = &use_def.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
