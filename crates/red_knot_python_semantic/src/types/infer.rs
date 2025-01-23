@@ -897,7 +897,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = symbol_from_bindings(self.db(), prior_bindings)
+        let inferred_ty = symbol_from_bindings(self.db(), use_def.as_ref(), prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
@@ -3362,7 +3362,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let inferred = if self.is_deferred() {
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
-                symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
+                symbol_from_bindings(self.db(), use_def.as_ref(), use_def.public_bindings(symbol))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -3372,7 +3372,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         } else {
             let use_id = name.scoped_use_id(self.db(), self.scope());
-            symbol_from_bindings(self.db(), use_def.bindings_at_use(use_id))
+            symbol_from_bindings(self.db(), use_def.as_ref(), use_def.bindings_at_use(use_id))
         };
 
         if let Symbol::Type(ty, Boundness::Bound) = inferred {

@@ -27,7 +27,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint, UseDefMap,
+    BindingWithConstraints, DeclarationWithConstraint, UseDefMap,
 };
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
@@ -127,7 +127,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             // Symbol is possibly declared
             Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
                 let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings(db, bindings);
+                let inferred = symbol_from_bindings(db, use_def.as_ref(), bindings);
 
                 match inferred {
                     // Symbol is possibly undeclared and definitely unbound
@@ -147,7 +147,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             // Symbol is undeclared, return the union of `Unknown` with the inferred type
             Ok(Symbol::Unbound) => {
                 let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings(db, bindings);
+                let inferred = symbol_from_bindings(db, use_def.as_ref(), bindings);
 
                 widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots || is_final)
             }
@@ -320,11 +320,12 @@ fn definition_expression_type<'db>(
 /// together with boundness information in a [`Symbol`].
 ///
 /// The type will be a union if there are multiple bindings with different types.
-fn symbol_from_bindings<'db>(
+fn symbol_from_bindings<'map, 'db: 'map>(
     db: &'db dyn Db,
-    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    use_def: &UseDefMap<'map>,
+    bindings_with_constraints: impl Iterator<Item = BindingWithConstraints<'map, 'db>>,
 ) -> Symbol<'db> {
-    let visibility_constraints = bindings_with_constraints.visibility_constraints;
+    let visibility_constraints = &use_def.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let unbound_visibility = if let Some(BindingWithConstraints {
@@ -4143,7 +4144,7 @@ impl<'db> Class<'db> {
                 }
                 Ok(symbol @ SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
                     let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
+                    let inferred = symbol_from_bindings(db, use_def.as_ref(), bindings);
 
                     SymbolAndQualifiers(
                         widen_type_for_undeclared_public_symbol(db, inferred, symbol.is_final()),
