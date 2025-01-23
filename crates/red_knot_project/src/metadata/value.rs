@@ -139,7 +139,7 @@ where
     }
 }
 
-// The type already has a `into_iter` method thanks to `Deref`.
+// The type already has an `iter` method thanks to `Deref`.
 #[allow(clippy::into_iter_without_iter)]
 impl<'a, T> IntoIterator for &'a RangedValue<T>
 where
