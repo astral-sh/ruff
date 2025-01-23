@@ -6,8 +6,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    WithItem,
+    Singleton, Stmt, StringFlags, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -1288,9 +1288,9 @@ impl<'a> Generator<'a> {
         // replacement here
         if flags.prefix().is_raw() {
             self.p(flags.prefix().as_str());
-            self.p(self.quote.as_str());
+            self.p(flags.quote_str());
             self.p(value);
-            self.p(self.quote.as_str());
+            self.p(flags.quote_str());
         } else {
             if flags.prefix().is_unicode() {
                 self.p("u");
@@ -1721,7 +1721,7 @@ class Foo:
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
         assert_eq!(round_trip(r"'hello'"), r#""hello""#);
         assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
-        assert_eq!(round_trip(r"r'hello'"), r#"r"hello""#);
+        assert_round_trip!(r"r'hello'");
         assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
