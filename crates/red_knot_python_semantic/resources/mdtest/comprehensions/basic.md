@@ -43,6 +43,7 @@ class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
 
+# TODO: This could be a `tuple[int, int]` if we model that `y` can not be modified in the outer comprehension scope
 # revealed: tuple[int, Unknown | int]
 [[reveal_type((x, y)) for x in IntIterable()] for y in IntIterable()]
 ```
@@ -66,6 +67,7 @@ class IterableOfIterables:
     def __iter__(self) -> IteratorOfIterables:
         return IteratorOfIterables()
 
+# TODO: This could be a `tuple[int, int]` (see above)
 # revealed: tuple[int, Unknown | IntIterable]
 [[reveal_type((x, y)) for x in y] for y in IterableOfIterables()]
 ```
