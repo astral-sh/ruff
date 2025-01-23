@@ -862,7 +862,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
-        let declared_ty = symbol_from_declarations(self.db(), declarations)
+        let declared_ty = symbol_from_declarations(self.db(), use_def.as_ref(), declarations)
             .map(|SymbolAndQualifiers(s, _)| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?

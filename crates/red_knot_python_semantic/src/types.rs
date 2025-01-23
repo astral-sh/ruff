@@ -27,8 +27,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint, UseDefMap,
 };
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
@@ -118,7 +117,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         // on inference from bindings.
 
         let declarations = use_def.public_declarations(symbol_id);
-        let declared = symbol_from_declarations(db, declarations);
+        let declared = symbol_from_declarations(db, use_def.as_ref(), declarations);
         let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
         let declared = declared.map(|SymbolAndQualifiers(symbol, _)| symbol);
 
@@ -433,7 +432,7 @@ impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
 type SymbolFromDeclarationsResult<'db> =
     Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
 
-/// Build a declared type from a [`DeclarationsIterator`].
+/// Build a declared type from an iterator of [`DeclarationWithConstraint`]s.
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
 /// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with
@@ -443,9 +442,10 @@ type SymbolFromDeclarationsResult<'db> =
 /// [`TypeQualifiers`] that have been specified on the declaration(s).
 fn symbol_from_declarations<'db>(
     db: &'db dyn Db,
-    declarations: DeclarationsIterator<'_, 'db>,
+    use_def: &UseDefMap,
+    declarations: impl Iterator<Item = DeclarationWithConstraint<'db>>,
 ) -> SymbolFromDeclarationsResult<'db> {
-    let visibility_constraints = declarations.visibility_constraints;
+    let visibility_constraints = &use_def.visibility_constraints;
     let mut declarations = declarations.peekable();
 
     let undeclared_visibility = if let Some(DeclarationWithConstraint {
@@ -4126,7 +4126,7 @@ impl<'db> Class<'db> {
 
             let declarations = use_def.public_declarations(symbol_id);
 
-            match symbol_from_declarations(db, declarations) {
+            match symbol_from_declarations(db, use_def.as_ref(), declarations) {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is

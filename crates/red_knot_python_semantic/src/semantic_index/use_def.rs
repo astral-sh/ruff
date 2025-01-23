@@ -256,8 +256,8 @@
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
 use self::symbol_state::{
-    BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
-    ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
+    BindingIdWithConstraintsIterator, ConstraintIdIterator, ScopedDefinitionId, SymbolBindings,
+    SymbolDeclarations, SymbolState,
 };
 pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstraintId};
 use crate::semantic_index::ast_ids::ScopedUseId;
@@ -286,7 +286,7 @@ pub(crate) struct UseDefMap<'db> {
     all_constraints: AllConstraints<'db>,
 
     /// Array of [`VisibilityConstraint`]s in this scope.
-    visibility_constraints: VisibilityConstraints<'db>,
+    pub(crate) visibility_constraints: VisibilityConstraints<'db>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -336,10 +336,10 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    pub(crate) fn declarations_at_binding<'map>(
-        &'map self,
+    pub(crate) fn declarations_at_binding(
+        &self,
         binding: Definition<'db>,
-    ) -> DeclarationsIterator<'map, 'db> {
+    ) -> impl Iterator<Item = DeclarationWithConstraint<'db>> + '_ {
         if let SymbolDefinitions::Declarations(declarations) =
             &self.definitions_by_definition[&binding]
         {
@@ -349,10 +349,10 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    pub(crate) fn public_declarations<'map>(
-        &'map self,
+    pub(crate) fn public_declarations(
+        &self,
         symbol: ScopedSymbolId,
-    ) -> DeclarationsIterator<'map, 'db> {
+    ) -> impl Iterator<Item = DeclarationWithConstraint<'db>> + '_ {
         let declarations = self.public_symbols[symbol].declarations();
         self.declarations_iterator(declarations)
     }
@@ -372,12 +372,18 @@ impl<'db> UseDefMap<'db> {
     fn declarations_iterator<'map>(
         &'map self,
         declarations: &'map SymbolDeclarations,
-    ) -> DeclarationsIterator<'map, 'db> {
-        DeclarationsIterator {
-            all_definitions: &self.all_definitions,
-            visibility_constraints: &self.visibility_constraints,
-            inner: declarations.iter(),
-        }
+    ) -> impl Iterator<Item = DeclarationWithConstraint<'db>> + 'map {
+        declarations.iter().map(
+            move |DeclarationIdWithConstraint {
+                      definition,
+                      visibility_constraint,
+                  }| {
+                DeclarationWithConstraint {
+                    declaration: self.all_definitions[definition],
+                    visibility_constraint,
+                }
+            },
+        )
     }
 }
 
@@ -440,36 +446,10 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
-pub(crate) struct DeclarationsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
-    inner: DeclarationIdIterator<'map>,
-}
-
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: Option<Definition<'db>>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
-
-impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
-    type Item = DeclarationWithConstraint<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(
-            |DeclarationIdWithConstraint {
-                 definition,
-                 visibility_constraint,
-             }| {
-                DeclarationWithConstraint {
-                    declaration: self.all_definitions[definition],
-                    visibility_constraint,
-                }
-            },
-        )
-    }
-}
-
-impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
