@@ -106,10 +106,11 @@ class Iterator:
 class Iterable:
     def __iter__(self) -> Iterator: ...
 
-# error: [not-iterable] "Object of type `NotIterable` is not iterable"
-x = [*NotIterable()]
+# This is fine:
+x = [*Iterable()]
 
-y = [*Iterable()]
+# error: [not-iterable] "Object of type `NotIterable` is not iterable"
+y = [*NotIterable()]
 ```
 
 ## Async comprehensions
