@@ -80,13 +80,36 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     diagnostics
 }
 
+/// Computes a possibly-widened type from the inferred type of a symbol.
+///
+/// When accessing a symbol from another scope that has no declared type, we use this to
+/// compute the union `Unknown | T_inferred`, unless the symbol is considered non-modifiable.
+fn widen_type_for_undeclared_public_symbol<'db>(
+    db: &'db dyn Db,
+    inferred: Symbol<'db>,
+    is_considered_non_modifiable: bool,
+) -> Symbol<'db> {
+    // We special-case known-instance types here since symbols like `typing.Any` are typically
+    // not declared in the stubs (e.g. `Any = object()`), but we still want to treat them as
+    // such.
+    let is_known_instance = inferred
+        .ignore_possibly_unbound()
+        .is_some_and(|ty| matches!(ty, Type::KnownInstance(_)));
+
+    if is_considered_non_modifiable || is_known_instance {
+        inferred
+    } else {
+        inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
+    }
+}
+
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     #[salsa::tracked]
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
-        considered_non_modifiable: bool,
+        is_dunder_slots: bool,
         symbol_id: ScopedSymbolId,
     ) -> Symbol<'db> {
         let use_def = use_def_map(db, scope);
@@ -96,12 +119,14 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
 
         let declarations = use_def.public_declarations(symbol_id);
         let declared = symbol_from_declarations(db, declarations);
+        let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
+        let declared = declared.map(|SymbolAndQualifiers(symbol, _)| symbol);
 
         match declared {
             // Symbol is declared, trust the declared type
-            Ok(SymbolAndQualifiers(symbol @ Symbol::Type(_, Boundness::Bound), _)) => symbol,
+            Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
             // Symbol is possibly declared
-            Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::PossiblyUnbound), _)) => {
+            Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
                 let bindings = use_def.public_bindings(symbol_id);
                 let inferred = symbol_from_bindings(db, bindings);
 
@@ -121,22 +146,13 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                 }
             }
             // Symbol is undeclared, return the union of `Unknown` with the inferred type
-            Ok(symbol @ SymbolAndQualifiers(Symbol::Unbound, _)) => {
+            Ok(Symbol::Unbound) => {
                 let bindings = use_def.public_bindings(symbol_id);
                 let inferred = symbol_from_bindings(db, bindings);
 
-                if symbol.is_final()
-                    || considered_non_modifiable
-                    || inferred
-                        .ignore_possibly_unbound()
-                        .is_some_and(|ty| matches!(ty, Type::KnownInstance(_)))
-                {
-                    inferred
-                } else {
-                    inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
-                }
+                widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots || is_final)
             }
-            // Symbol is conflicting declared types
+            // Symbol has conflicting declared types
             Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
@@ -188,10 +204,10 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     }
 
     let table = symbol_table(db, scope);
-    let considered_non_modifiable = name == "__slots__";
+    let is_dunder_slots = name == "__slots__";
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, scope, considered_non_modifiable, symbol))
+        .map(|symbol| symbol_by_id(db, scope, is_dunder_slots, symbol))
         .unwrap_or(Symbol::Unbound)
 }
 
@@ -4092,7 +4108,7 @@ impl<'db> Class<'db> {
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         // TODO: There are many things that are not yet implemented here:
-        // - `typing.ClassVar` and `typing.Final`
+        // - `typing.Final`
         // - Proper diagnostics
         // - Handling of possibly-undeclared/possibly-unbound attributes
         // - The descriptor protocol
@@ -4100,10 +4116,10 @@ impl<'db> Class<'db> {
         let body_scope = self.body_scope(db);
         let table = symbol_table(db, body_scope);
 
-        if let Some(symbol) = table.symbol_id_by_name(name) {
+        if let Some(symbol_id) = table.symbol_id_by_name(name) {
             let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.public_declarations(symbol);
+            let declarations = use_def.public_declarations(symbol_id);
 
             match symbol_from_declarations(db, declarations) {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
@@ -4120,12 +4136,12 @@ impl<'db> Class<'db> {
                         SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
                     }
                 }
-                Ok(SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
-                    let bindings = use_def.public_bindings(symbol);
+                Ok(symbol @ SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
+                    let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
 
                     SymbolAndQualifiers(
-                        inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty])),
+                        widen_type_for_undeclared_public_symbol(db, inferred, symbol.is_final()),
                         qualifiers,
                     )
                 }
