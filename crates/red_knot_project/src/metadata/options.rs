@@ -5,6 +5,7 @@ use red_knot_python_semantic::{
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use thiserror::Error;
 
 /// The options for the project.
