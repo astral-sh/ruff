@@ -148,12 +148,12 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 .iter()
                 .fold(String::new(), |mut content, path| {
                     // This is intentionally kept simple:
-                    let module_path = path
+                    let module_name = path
                         .as_str()
                         .trim_end_matches(".pyi")
                         .trim_end_matches("/__init__")
                         .replace('/', ".");
-                    let _ = writeln!(content, "{module_path}: 3.8-");
+                    let _ = writeln!(content, "{module_name}: 3.8-");
                     content
                 });
             db.write_file(&versions_file, contents).unwrap();
