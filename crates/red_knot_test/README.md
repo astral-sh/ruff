@@ -255,7 +255,7 @@ typeshed = "/typeshed"
 ```
 ````
 
-For more details, take a look at the `mdtest_custom_typeshed.md` test.
+For more details, take a look at the [custom-typeshed Markdown test].
 
 ## Documentation of tests
 
@@ -433,4 +433,5 @@ cold, to validate equivalence of cold and incremental check results.
 [^extensions]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
     also, treat it as part of the standard library.
 
+[custom-typeshed markdown test]: ../red_knot_python_semantic/resources/mdtest/mdtest_custom_typeshed.md
 [typeshed `versions`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18%3E
