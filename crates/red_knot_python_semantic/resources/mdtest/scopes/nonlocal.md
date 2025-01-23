@@ -43,3 +43,14 @@ def f():
         def h():
             reveal_type(x)  # revealed: Literal[1]
 ```
+
+## Implicit global in function
+
+A name reference to a never-defined symbol in a function is implicitly a global lookup.
+
+```py
+x = 1
+
+def f():
+    reveal_type(x)  # revealed: Literal[1]
+```

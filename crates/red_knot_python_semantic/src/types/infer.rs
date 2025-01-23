@@ -6008,7 +6008,6 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
-    use crate::{HasType, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
@@ -6078,29 +6077,6 @@ mod tests {
         let diagnostics = check_types(db, file);
 
         assert_diagnostic_messages(diagnostics, expected);
-    }
-
-    #[test]
-    fn resolve_method() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/mod.py",
-            "
-            class C:
-                def f(self): pass
-            ",
-        )?;
-
-        let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let class_ty = global_symbol(&db, mod_file, "C")
-            .expect_type()
-            .expect_class_literal();
-        let member_ty = class_ty.member(&db, "f").expect_type();
-        let func = member_ty.expect_function_literal();
-
-        assert_eq!(func.name(&db), "f");
-        Ok(())
     }
 
     #[test]
@@ -6225,130 +6201,6 @@ mod tests {
         assert_public_type(&db, "src/a.py", "w", "LiteralString");
         assert_public_type(&db, "src/a.py", "x", "LiteralString");
         assert_public_type(&db, "src/a.py", "z", "LiteralString");
-
-        Ok(())
-    }
-
-    /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
-    #[test]
-    fn implicit_global_in_function() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 1
-            def f():
-                y = x
-            ",
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-
-        let x_ty = symbol(&db, function_scope, "x");
-        assert!(x_ty.is_unbound());
-
-        let y_ty = symbol(&db, function_scope, "y").expect_type();
-        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn local_inference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "x = 10")?;
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        let parsed = parsed_module(&db, a);
-
-        let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
-        let model = SemanticModel::new(&db, a);
-
-        let literal_ty = statement.value.inferred_type(&model);
-
-        assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotation_builtin() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_file("/src/a.pyi", "class C(object): pass")?;
-        let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
-        let ty = global_symbol(&db, file, "C").expect_type();
-        let base = ty
-            .expect_class_literal()
-            .class
-            .iter_mro(&db)
-            .nth(1)
-            .unwrap();
-        assert_eq!(base.display(&db).to_string(), "<class 'object'>");
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotation_in_stubs_always_resolve() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        // Stub files should always resolve deferred annotations
-        db.write_dedented(
-            "/src/stub.pyi",
-            "
-            def get_foo() -> Foo: ...
-            class Foo: ...
-            foo = get_foo()
-            ",
-        )?;
-        assert_public_type(&db, "/src/stub.pyi", "foo", "Foo");
-
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotations_regular_source_fails() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        // In (regular) source files, annotations are *not* deferred
-        // Also tests imports from `__future__` that are not annotations
-        db.write_dedented(
-            "/src/source.py",
-            "
-            from __future__ import with_statement as annotations
-            def get_foo() -> Foo: ...
-            class Foo: ...
-            foo = get_foo()
-            ",
-        )?;
-        assert_public_type(&db, "/src/source.py", "foo", "Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn deferred_annotation_in_sources_with_future_resolves() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        // In source files with `__future__.annotations`, deferred annotations are resolved
-        db.write_dedented(
-            "/src/source_with_future.py",
-            "
-            from __future__ import annotations
-            def get_foo() -> Foo: ...
-            class Foo: ...
-            foo = get_foo()
-            ",
-        )?;
-        assert_public_type(&db, "/src/source_with_future.py", "foo", "Foo");
 
         Ok(())
     }
