@@ -2,6 +2,7 @@ use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::AnyParameterRef;
 use ruff_python_ast::{
     name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName,
     ExprStringLiteral, ExprSubscript, Stmt, StmtClassDef, StmtFunctionDef,
@@ -9,6 +10,7 @@ use ruff_python_ast::{
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
@@ -309,6 +311,19 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
     }
 }
 
+/// Finds the parameter definition for a given name expression in a function.
+fn find_parameter<'a>(
+    semantic: &'a SemanticModel,
+    name: &'a ExprName,
+) -> Option<AnyParameterRef<'a>> {
+    let binding_id = semantic.only_binding(name)?;
+    let binding = semantic.binding(binding_id);
+    let StmtFunctionDef { parameters, .. } = binding.statement(semantic)?.as_function_def_stmt()?;
+    parameters
+        .iter()
+        .find(|parameter| parameter.name().range() == binding.range())
+}
+
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
 ///
 /// Specifically, it flags two scenarios for task decorated function:
@@ -355,9 +370,16 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
         return;
     };
 
-    let is_named_context = value.as_name_expr().is_some_and(|name| {
-        matches!(name.id.as_str(), "context" | "kwargs") || name.id.as_str().starts_with("**")
-    });
+    let is_named_context = if let Expr::Name(name) = &**value {
+        if let Some(parameter) = find_parameter(checker.semantic(), name) {
+            matches!(parameter.name().as_str(), "context" | "kwargs")
+                || parameter.name().as_str().starts_with("**")
+        } else {
+            false
+        }
+    } else {
+        false
+    };
 
     let is_assigned_from_gcc =
         if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
