@@ -169,7 +169,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 search_paths: SearchPathSettings {
                     src_roots: vec![src_path],
                     extra_paths: vec![],
-                    typeshed: custom_typeshed_path,
+                    custom_typeshed: custom_typeshed_path,
                     site_packages: SitePackages::Known(vec![]),
                 },
             },

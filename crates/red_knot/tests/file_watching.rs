@@ -322,7 +322,7 @@ where
         .search_paths
         .extra_paths
         .iter()
-        .chain(program_settings.search_paths.typeshed.as_ref())
+        .chain(program_settings.search_paths.custom_typeshed.as_ref())
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path `{path}`"))?;

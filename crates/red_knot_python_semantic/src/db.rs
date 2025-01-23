@@ -171,7 +171,7 @@ pub(crate) mod tests {
                 .context("Failed to write test files")?;
 
             let mut search_paths = SearchPathSettings::new(vec![src_root]);
-            search_paths.typeshed = self.typeshed;
+            search_paths.custom_typeshed = self.typeshed;
 
             Program::from_settings(
                 &db,

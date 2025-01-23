@@ -92,7 +92,7 @@ impl Options {
                 .map(|path| path.absolute(project_root, system))
                 .collect(),
             src_roots,
-            typeshed: typeshed.map(|path| path.absolute(project_root, system)),
+            custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             site_packages: python
                 .map(|venv_path| SitePackages::Derived {
                     venv_path: venv_path.absolute(project_root, system),

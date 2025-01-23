@@ -238,7 +238,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
-                    typeshed: Some(typeshed.clone()),
+                    custom_typeshed: Some(typeshed.clone()),
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                 },
             },
