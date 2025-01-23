@@ -3,7 +3,7 @@ use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{Program, SearchPathSettings, SitePackages};
+use red_knot_python_semantic::{Program, ProgramSettings, SearchPathSettings, SitePackages};
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
@@ -156,23 +156,20 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
     }
 
     Program::get(db)
-        .set_python_version(db)
-        .to(test.configuration().python_version().unwrap_or_default());
-    Program::get(db)
-        .set_python_platform(db)
-        .to(test.configuration().python_platform().unwrap_or_default());
-
-    Program::get(db)
-        .update_search_paths(
+        .update_from_settings(
             db,
-            &SearchPathSettings {
-                src_roots: vec![src_path],
-                extra_paths: vec![],
-                typeshed: custom_typeshed_path,
-                site_packages: SitePackages::Known(vec![]),
+            ProgramSettings {
+                python_version: test.configuration().python_version().unwrap_or_default(),
+                python_platform: test.configuration().python_platform().unwrap_or_default(),
+                search_paths: SearchPathSettings {
+                    src_roots: vec![src_path],
+                    extra_paths: vec![],
+                    typeshed: custom_typeshed_path,
+                    site_packages: SitePackages::Known(vec![]),
+                },
             },
         )
-        .expect("Failed to update search paths in TestDb");
+        .expect("Failed to update Program settings in TestDb");
 
     let failures: Failures = test_files
         .into_iter()
