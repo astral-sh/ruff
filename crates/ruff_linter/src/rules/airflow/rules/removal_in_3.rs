@@ -160,7 +160,7 @@ fn check_removed_context_keys_get_anywhere(checker: &mut Checker, call_expr: &Ex
 
     if is_context_arg || is_current_context {
         for removed_key in REMOVED_CONTEXT_KEYS {
-            if let Some(argument) = call_expr.arguments.find_argument_value(removed_key, 0) {
+            if let Some(argument) = call_expr.arguments.find_positional(0) {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = argument {
                     if value == removed_key {
                         checker.diagnostics.push(Diagnostic::new(
@@ -442,7 +442,7 @@ fn check_removed_context_keys_usage(checker: &mut Checker, call_expr: &ExprCall)
     }
 
     for removed_key in REMOVED_CONTEXT_KEYS {
-        if let Some(argument) = call_expr.arguments.find_argument_value(removed_key, 0) {
+        if let Some(argument) = call_expr.arguments.find_positional(0) {
             if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = argument {
                 if value == removed_key {
                     checker.diagnostics.push(Diagnostic::new(
