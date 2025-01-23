@@ -9,7 +9,7 @@ under a certain directory as test suites.
 A Markdown test suite can contain any number of tests. A test consists of one or more embedded
 "files", each defined by a triple-backticks fenced code block. The code block must have a tag string
 specifying its language. We currently support `py` (Python files) and `pyi` (type stub files), as
-well as typeshed `VERSIONS` files and `toml` for configuration.
+well as [typeshed `VERSIONS`] files and `toml` for configuration.
 
 The simplest possible test suite consists of just a single test, with a single embedded file:
 
@@ -432,3 +432,5 @@ cold, to validate equivalence of cold and incremental check results.
 
 [^extensions]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
     also, treat it as part of the standard library.
+
+[typeshed `versions`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18%3E
