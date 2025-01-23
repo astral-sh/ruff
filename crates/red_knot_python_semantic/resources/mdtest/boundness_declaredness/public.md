@@ -161,7 +161,9 @@ reveal_type(x)  # revealed: int
 ### Undeclared but bound
 
 We use the union of `Unknown` with the inferred type as the public type, if a symbol has no declared
-type.
+type. If there is no declaration, then the symbol can be reassigned to any type from another scope;
+the union with `Unknown` reflects that its type must at least be as large as the type of the
+assigned value, but could be arbitrarily larger.
 
 ```py path=mod.py
 x = 1
