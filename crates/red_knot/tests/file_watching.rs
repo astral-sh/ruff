@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::pyproject::{PyProject, Tool};
-use red_knot_project::metadata::value::RelativePathBuf;
+use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform, PythonVersion};
@@ -897,8 +897,10 @@ print(sys.last_exc, os.getegid())
         |_root_path, _project_path| {
             Some(Options {
                 environment: Some(EnvironmentOptions {
-                    python_version: Some(PythonVersion::PY311),
-                    python_platform: Some(PythonPlatform::Identifier("win32".to_string())),
+                    python_version: Some(RangedValue::cli(PythonVersion::PY311)),
+                    python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
+                        "win32".to_string(),
+                    ))),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -921,8 +923,10 @@ print(sys.last_exc, os.getegid())
     // Change the python version
     case.update_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(PythonVersion::PY312),
-            python_platform: Some(PythonPlatform::Identifier("linux".to_string())),
+            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
+                "linux".to_string(),
+            ))),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -1382,7 +1386,7 @@ mod unix {
                         extra_paths: Some(vec![RelativePathBuf::cli(
                             ".venv/lib/python3.12/site-packages",
                         )]),
-                        python_version: Some(PythonVersion::PY312),
+                        python_version: Some(RangedValue::cli(PythonVersion::PY312)),
                         ..EnvironmentOptions::default()
                     }),
                     ..Options::default()

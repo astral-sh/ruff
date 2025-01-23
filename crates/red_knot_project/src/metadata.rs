@@ -55,7 +55,7 @@ impl ProjectMetadata {
     ) -> Self {
         let name = project
             .and_then(|project| project.name.as_ref())
-            .map(|name| Name::new(&**name))
+            .map(|name| Name::new(&***name))
             .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
 
         // TODO(https://github.com/astral-sh/ruff/issues/15491): Respect requires-python

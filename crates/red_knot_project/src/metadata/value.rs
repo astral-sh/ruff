@@ -1,11 +1,15 @@
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
-
 use crate::combine::Combine;
 use crate::Db;
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_text_size::{TextRange, TextSize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use toml::Spanned;
 
 #[derive(Clone, Debug)]
 pub enum ValueSource {
@@ -17,6 +21,15 @@ pub enum ValueSource {
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
+}
+
+impl ValueSource {
+    pub fn file(&self) -> Option<&SystemPath> {
+        match self {
+            ValueSource::File(path) => Some(&**path),
+            ValueSource::Cli => None,
+        }
+    }
 }
 
 thread_local! {
@@ -49,6 +62,222 @@ impl Drop for ValueSourceGuard {
     }
 }
 
+/// A value that "remembers" where it comes from (source) and its range in source.
+///
+/// ## Equality, Hash, and Ordering
+/// The equality, hash, and ordering are solely based on the value. They disregard the value's range
+/// or source.
+///
+/// This ensures that two resolved configurations are identical even if the position of a value has changed
+/// or if the values were loaded from different sources.
+#[derive(Clone)]
+pub struct RangedValue<T> {
+    value: T,
+    source: ValueSource,
+
+    /// The byte range of `value` in `source`.
+    ///
+    /// Can be `None` because not all sources support a range.
+    /// For example, arguments provided on the CLI won't have a range attached.
+    range: Option<TextRange>,
+}
+
+impl<T> RangedValue<T> {
+    pub fn new(value: T, source: ValueSource) -> Self {
+        Self::with_range(value, source, TextRange::default())
+    }
+
+    pub fn cli(value: T) -> Self {
+        Self::with_range(value, ValueSource::Cli, TextRange::default())
+    }
+
+    pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
+        Self {
+            value,
+            range: Some(range),
+            source,
+        }
+    }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.range
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        &self.source
+    }
+
+    #[must_use]
+    pub fn with_source(mut self, source: ValueSource) -> Self {
+        self.source = source;
+        self
+    }
+
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+}
+
+impl<T> Combine for RangedValue<T> {
+    fn combine(self, _other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        self
+    }
+    fn combine_with(&mut self, _other: Self) {}
+}
+
+impl<T> IntoIterator for RangedValue<T>
+where
+    T: IntoIterator,
+{
+    type Item = T::Item;
+    type IntoIter = T::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+// The type already has an `iter` method thanks to `Deref`.
+#[allow(clippy::into_iter_without_iter)]
+impl<'a, T> IntoIterator for &'a RangedValue<T>
+where
+    &'a T: IntoIterator,
+{
+    type Item = <&'a T as IntoIterator>::Item;
+    type IntoIter = <&'a T as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+// The type already has a `into_iter_mut` method thanks to `DerefMut`.
+#[allow(clippy::into_iter_without_iter)]
+impl<'a, T> IntoIterator for &'a mut RangedValue<T>
+where
+    &'a mut T: IntoIterator,
+{
+    type Item = <&'a mut T as IntoIterator>::Item;
+    type IntoIter = <&'a mut T as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+impl<T> fmt::Debug for RangedValue<T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<T> fmt::Display for RangedValue<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<T> Deref for RangedValue<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for RangedValue<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+impl<T, U: ?Sized> AsRef<U> for RangedValue<T>
+where
+    T: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.value.as_ref()
+    }
+}
+
+impl<T: PartialEq> PartialEq for RangedValue<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+impl<T: PartialEq<T>> PartialEq<T> for RangedValue<T> {
+    fn eq(&self, other: &T) -> bool {
+        self.value.eq(other)
+    }
+}
+
+impl<T: Eq> Eq for RangedValue<T> {}
+
+impl<T: Hash> Hash for RangedValue<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for RangedValue<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.value.partial_cmp(&other.value)
+    }
+}
+
+impl<T: PartialOrd<T>> PartialOrd<T> for RangedValue<T> {
+    fn partial_cmp(&self, other: &T) -> Option<Ordering> {
+        self.value.partial_cmp(other)
+    }
+}
+
+impl<T: Ord> Ord for RangedValue<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.value.cmp(&other.value)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for RangedValue<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let spanned: Spanned<T> = Spanned::deserialize(deserializer)?;
+        let span = spanned.span();
+        let range = TextRange::new(
+            TextSize::try_from(span.start).expect("Configuration file to be smaller than 4GB"),
+            TextSize::try_from(span.end).expect("Configuration file to be smaller than 4GB"),
+        );
+
+        Ok(VALUE_SOURCE.with_borrow(|source| {
+            let source = source.clone().unwrap();
+
+            Self::with_range(spanned.into_inner(), source, range)
+        }))
+    }
+}
+
+impl<T> Serialize for RangedValue<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
+}
+
 /// A possibly relative path in a configuration file.
 ///
 /// Relative paths in configuration files or from CLI options
@@ -56,18 +285,15 @@ impl Drop for ValueSourceGuard {
 ///
 /// * CLI: The path is relative to the current working directory
 /// * Configuration file: The path is relative to the project's root.
-#[derive(Debug, Clone)]
-pub struct RelativePathBuf {
-    path: SystemPathBuf,
-    source: ValueSource,
-}
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
+#[serde(transparent)]
+pub struct RelativePathBuf(RangedValue<SystemPathBuf>);
 
 impl RelativePathBuf {
     pub fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-            source,
-        }
+        Self(RangedValue::new(path.as_ref().to_path_buf(), source))
     }
 
     pub fn cli(path: impl AsRef<SystemPath>) -> Self {
@@ -76,12 +302,12 @@ impl RelativePathBuf {
 
     /// Returns the relative path as specified by the user.
     pub fn path(&self) -> &SystemPath {
-        &self.path
+        &self.0
     }
 
     /// Returns the owned relative path.
     pub fn into_path_buf(self) -> SystemPathBuf {
-        self.path
+        self.0.into_inner()
     }
 
     /// Resolves the absolute path for `self` based on its origin.
@@ -91,73 +317,21 @@ impl RelativePathBuf {
 
     /// Resolves the absolute path for `self` based on its origin.
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
-        let relative_to = match &self.source {
+        let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
             ValueSource::Cli => system.current_directory(),
         };
 
-        SystemPath::absolute(&self.path, relative_to)
+        SystemPath::absolute(&self.0, relative_to)
     }
 }
 
-// TODO(micha): Derive most of those implementations once `RelativePath` uses `Value`.
-//   and use `serde(transparent, deny_unknown_fields)`
 impl Combine for RelativePathBuf {
-    fn combine(self, _other: Self) -> Self {
-        self
+    fn combine(self, other: Self) -> Self {
+        Self(self.0.combine(other.0))
     }
 
-    #[inline(always)]
-    fn combine_with(&mut self, _other: Self) {}
-}
-
-impl Hash for RelativePathBuf {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.path.hash(state);
-    }
-}
-
-impl PartialEq for RelativePathBuf {
-    fn eq(&self, other: &Self) -> bool {
-        self.path.eq(&other.path)
-    }
-}
-
-impl Eq for RelativePathBuf {}
-
-impl PartialOrd for RelativePathBuf {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for RelativePathBuf {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.path.cmp(&other.path)
-    }
-}
-
-impl Serialize for RelativePathBuf {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.path.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for RelativePathBuf {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let path = SystemPathBuf::deserialize(deserializer)?;
-        Ok(VALUE_SOURCE.with_borrow(|source| {
-            let source = source
-                .clone()
-                .expect("Thread local `VALUE_SOURCE` to be set. Use `ValueSourceGuard` to set the value source before calling serde/toml `from_str`.");
-
-            Self { path, source }
-        }))
+    fn combine_with(&mut self, other: Self) {
+        self.0.combine_with(other.0);
     }
 }
