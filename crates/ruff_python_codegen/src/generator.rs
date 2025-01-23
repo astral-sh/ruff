@@ -1284,10 +1284,20 @@ impl<'a> Generator<'a> {
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         let ast::StringLiteral { value, flags, .. } = string_literal;
-        if flags.prefix().is_unicode() {
-            self.p("u");
+        // for raw strings, we don't want to perform the UnicodeEscape in `p_str_repr`, so build the
+        // replacement here
+        if flags.prefix().is_raw() {
+            self.p(&format!(
+                "{prefix}{quote}{value}{quote}",
+                prefix = flags.prefix(),
+                quote = self.quote,
+            ));
+        } else {
+            if flags.prefix().is_unicode() {
+                self.p("u");
+            }
+            self.p_str_repr(value);
         }
-        self.p_str_repr(value);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -1712,12 +1722,17 @@ class Foo:
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
         assert_eq!(round_trip(r"'hello'"), r#""hello""#);
         assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
-        assert_eq!(round_trip(r"r'hello'"), r#""hello""#);
+        assert_eq!(round_trip(r"r'hello'"), r#"r"hello""#);
         assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
+    }
+
+    #[test]
+    fn raw() {
+        assert_round_trip!(r#"r"a\.b""#); // https://github.com/astral-sh/ruff/issues/9663
     }
 
     #[test]

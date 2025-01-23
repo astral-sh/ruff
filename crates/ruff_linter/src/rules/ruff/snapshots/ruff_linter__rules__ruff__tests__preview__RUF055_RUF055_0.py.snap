@@ -142,14 +142,14 @@ RUF055_0.py:89:1: RUF055 [*] Plain string pattern passed to `re` function
 90 | re.sub(r"a", r"\n", "a")
 91 | re.sub(r"a", "\a", "a")
    |
-   = help: Replace with `"a".replace("a", "\n")`
+   = help: Replace with `"a".replace(r"a", "\n")`
 
 ℹ Safe fix
 86 86 | # `re.sub(r"a", r"\n", some_string)` is fixed to `some_string.replace("a", "\n")`
 87 87 | # *not* `some_string.replace("a", "\\n")`.
 88 88 | # We currently emit diagnostics for some of these without fixing them.
 89    |-re.sub(r"a", "\n", "a")
-   89 |+"a".replace("a", "\n")
+   89 |+"a".replace(r"a", "\n")
 90 90 | re.sub(r"a", r"\n", "a")
 91 91 | re.sub(r"a", "\a", "a")
 92 92 | re.sub(r"a", r"\a", "a")
@@ -172,14 +172,14 @@ RUF055_0.py:91:1: RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
 92 | re.sub(r"a", r"\a", "a")
    |
-   = help: Replace with `"a".replace("a", "\x07")`
+   = help: Replace with `"a".replace(r"a", "\x07")`
 
 ℹ Safe fix
 88 88 | # We currently emit diagnostics for some of these without fixing them.
 89 89 | re.sub(r"a", "\n", "a")
 90 90 | re.sub(r"a", r"\n", "a")
 91    |-re.sub(r"a", "\a", "a")
-   91 |+"a".replace("a", "\x07")
+   91 |+"a".replace(r"a", "\x07")
 92 92 | re.sub(r"a", r"\a", "a")
 93 93 | 
 94 94 | re.sub(r"a", "\?", "a")
@@ -202,14 +202,14 @@ RUF055_0.py:94:1: RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
 95 | re.sub(r"a", r"\?", "a")
    |
-   = help: Replace with `"a".replace("a", "\\?")`
+   = help: Replace with `"a".replace(r"a", "\\?")`
 
 ℹ Safe fix
 91 91 | re.sub(r"a", "\a", "a")
 92 92 | re.sub(r"a", r"\a", "a")
 93 93 | 
 94    |-re.sub(r"a", "\?", "a")
-   94 |+"a".replace("a", "\\?")
+   94 |+"a".replace(r"a", "\\?")
 95 95 | re.sub(r"a", r"\?", "a")
 
 RUF055_0.py:95:1: RUF055 [*] Plain string pattern passed to `re` function
@@ -218,11 +218,11 @@ RUF055_0.py:95:1: RUF055 [*] Plain string pattern passed to `re` function
 95 | re.sub(r"a", r"\?", "a")
    | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
    |
-   = help: Replace with `"a".replace("a", "\\?")`
+   = help: Replace with `"a".replace(r"a", r"\?")`
 
 ℹ Safe fix
 92 92 | re.sub(r"a", r"\a", "a")
 93 93 | 
 94 94 | re.sub(r"a", "\?", "a")
 95    |-re.sub(r"a", r"\?", "a")
-   95 |+"a".replace("a", "\\?")
+   95 |+"a".replace(r"a", r"\?")

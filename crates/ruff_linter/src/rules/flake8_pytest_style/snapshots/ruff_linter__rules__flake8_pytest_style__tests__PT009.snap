@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT009.py:11:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
@@ -498,7 +499,7 @@ PT009.py:73:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 71 71 | 
 72 72 |     def test_assert_regex(self):
 73    |-        self.assertRegex("abc", r"def")  # Error
-   73 |+        assert re.search("def", "abc")  # Error
+   73 |+        assert re.search(r"def", "abc")  # Error
 74 74 | 
 75 75 |     def test_assert_not_regex(self):
 76 76 |         self.assertNotRegex("abc", r"abc")  # Error
@@ -518,7 +519,7 @@ PT009.py:76:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 74 74 | 
 75 75 |     def test_assert_not_regex(self):
 76    |-        self.assertNotRegex("abc", r"abc")  # Error
-   76 |+        assert not re.search("abc", "abc")  # Error
+   76 |+        assert not re.search(r"abc", "abc")  # Error
 77 77 | 
 78 78 |     def test_assert_regexp_matches(self):
 79 79 |         self.assertRegexpMatches("abc", r"def")  # Error
@@ -538,7 +539,7 @@ PT009.py:79:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 77 77 | 
 78 78 |     def test_assert_regexp_matches(self):
 79    |-        self.assertRegexpMatches("abc", r"def")  # Error
-   79 |+        assert re.search("def", "abc")  # Error
+   79 |+        assert re.search(r"def", "abc")  # Error
 80 80 | 
 81 81 |     def test_assert_not_regexp_matches(self):
 82 82 |         self.assertNotRegex("abc", r"abc")  # Error
@@ -558,7 +559,7 @@ PT009.py:82:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 80 80 | 
 81 81 |     def test_assert_not_regexp_matches(self):
 82    |-        self.assertNotRegex("abc", r"abc")  # Error
-   82 |+        assert not re.search("abc", "abc")  # Error
+   82 |+        assert not re.search(r"abc", "abc")  # Error
 83 83 | 
 84 84 |     def test_fail_if(self):
 85 85 |         self.failIf("abc")  # Error
