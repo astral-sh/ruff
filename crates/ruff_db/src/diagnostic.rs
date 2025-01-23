@@ -152,8 +152,18 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     fn message(&self) -> Cow<str>;
 
+    /// The file this diagnostic is associated with.
+    ///
+    /// File can be `None` for diagnostics that don't originate from a file.
+    /// For example:
+    /// * A diagnostic indicating that a directory couldn't be read.
+    /// * A diagnostic related to a CLI argument
     fn file(&self) -> Option<File>;
 
+    /// The primary range of the diagnostic in `file`.
+    ///
+    /// The range can be `None` if the diagnostic doesn't have a file
+    /// or it applies to the entire file (e.g. the file should be executable but isn't).
     fn range(&self) -> Option<TextRange>;
 
     fn severity(&self) -> Severity;
