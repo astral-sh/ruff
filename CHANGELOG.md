@@ -12,25 +12,24 @@
 - \[`pyflakes`\] Fix infinite loop with unused local import in `__init__.py` (`F401`) ([#15517](https://github.com/astral-sh/ruff/pull/15517))
 - \[`pylint`\] Do not report methods with only one `EM101`-compatible `raise` (`PLR6301`) ([#15507](https://github.com/astral-sh/ruff/pull/15507))
 - \[`pylint`\] Implement `redefined-slots-in-subclass` (`W0244`) ([#9640](https://github.com/astral-sh/ruff/pull/9640))
-- \[`pyupgrade`\] Add rules to use PEP 695 generics in classes and functions (`UP046`, `UP047`) ([#15565](https://github.com/astral-sh/ruff/pull/15565))
-- \[`pyupgrade`\] Handle multiple base classes for PEP 695 generics (`UP046`) ([#15659](https://github.com/astral-sh/ruff/pull/15659))
+- \[`pyupgrade`\] Add rules to use PEP 695 generics in classes and functions (`UP046`, `UP047`) ([#15565](https://github.com/astral-sh/ruff/pull/15565), [#15659](https://github.com/astral-sh/ruff/pull/15659))
 - \[`refurb`\] Implement `for-loop-writes` (`FURB122`) ([#10630](https://github.com/astral-sh/ruff/pull/10630))
-- \[`ruff`\] Needless `else` clause (`RUF047`) ([#15051](https://github.com/astral-sh/ruff/pull/15051))
+- \[`ruff`\] Implement `needless-else` clause (`RUF047`) ([#15051](https://github.com/astral-sh/ruff/pull/15051))
 - \[`ruff`\] Implement `starmap-zip` (`RUF058`) ([#15483](https://github.com/astral-sh/ruff/pull/15483))
 
 ### Rule changes
 
-- Apply redefinition fixes by source code order (`F811`) ([#15575](https://github.com/astral-sh/ruff/pull/15575))
-- Avoid removing too many imports in `redefined-while-unused` (`F811`) ([#15585](https://github.com/astral-sh/ruff/pull/15585))
-- Group redefinition fixes by source statement (`F811`) ([#15574](https://github.com/astral-sh/ruff/pull/15574))
 - \[`flake8-bugbear`\] Do not raise error if keyword argument is present and target-python version is less or equals than 3.9 (`B903`) ([#15549](https://github.com/astral-sh/ruff/pull/15549))
 - \[`flake8-comprehensions`\] strip parentheses around generators in `unnecessary-generator-set` (`C401`) ([#15553](https://github.com/astral-sh/ruff/pull/15553))
 - \[`flake8-simplify`\] Mark fixes as unsafe (`SIM201`, `SIM202`) ([#15626](https://github.com/astral-sh/ruff/pull/15626))
 - \[`flake8-type-checking`\] Fix some safe fixes being labeled unsafe (`TC006`,`TC008`) ([#15638](https://github.com/astral-sh/ruff/pull/15638))
 - \[`isort`\] Omit trailing whitespace in `unsorted-imports` (`I001`) ([#15518](https://github.com/astral-sh/ruff/pull/15518))
 - \[`pydoclint`\] Allow ignoring one line docstrings for `DOC` rules ([#13302](https://github.com/astral-sh/ruff/pull/13302))
+- \[`pyflakes`\] Apply redefinition fixes by source code order (`F811`) ([#15575](https://github.com/astral-sh/ruff/pull/15575))
+- \[`pyflakes`\] Avoid removing too many imports in `redefined-while-unused` (`F811`) ([#15585](https://github.com/astral-sh/ruff/pull/15585))
+- \[`pyflakes`\] Group redefinition fixes by source statement (`F811`) ([#15574](https://github.com/astral-sh/ruff/pull/15574))
 - \[`pylint`\] Include name of base class in message for `redefined-slots-in-subclass` (`W0244`) ([#15559](https://github.com/astral-sh/ruff/pull/15559))
-- feat: Update RUF055 to do var == value ([#15605](https://github.com/astral-sh/ruff/pull/15605))
+- \[`ruff`\] Update fix for `RUF055` to use `var == value` ([#15605](https://github.com/astral-sh/ruff/pull/15605))
 
 ### Formatter
 
