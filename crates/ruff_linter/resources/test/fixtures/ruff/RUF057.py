@@ -64,3 +64,20 @@ round(lorem, -2)                                  # No error
 round(lorem, inferred_int)                        # No error
 round(lorem, 3 + 4)                               # No error
 round(lorem, foo)                                 # No error
+
+# Fixes should preserve parentheses when argument
+# contains newline.
+# See https://github.com/astral-sh/ruff/issues/15598
+round(-
+1)
+round(1
+*1
+)
+
+# fix should be unsafe if comment is in call range
+round(# a comment
+17
+)
+round(
+    17 # a comment
+)
