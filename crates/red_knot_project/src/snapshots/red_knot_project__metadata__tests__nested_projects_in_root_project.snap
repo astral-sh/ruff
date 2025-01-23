@@ -6,7 +6,6 @@ ProjectMetadata(
   name: Name("project-root"),
   root: "/app",
   options: Options(
-    environment: None,
     src: Some(SrcOptions(
       root: Some("src"),
     )),

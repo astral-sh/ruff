@@ -73,6 +73,9 @@ pub enum DiagnosticId {
 
     /// A revealed type: Created by `reveal_type(expression)`.
     RevealedType,
+
+    /// No rule with the given name exists.
+    UnknownRule,
 }
 
 impl DiagnosticId {
@@ -112,15 +115,18 @@ impl DiagnosticId {
     }
 
     pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
-        match self {
-            DiagnosticId::Io => Ok("io"),
-            DiagnosticId::InvalidSyntax => Ok("invalid-syntax"),
-            DiagnosticId::Lint(name) => Err(DiagnosticAsStrError::Category {
-                category: "lint",
-                name: name.as_str(),
-            }),
-            DiagnosticId::RevealedType => Ok("revealed-type"),
-        }
+        Ok(match self {
+            DiagnosticId::Io => "io",
+            DiagnosticId::InvalidSyntax => "invalid-syntax",
+            DiagnosticId::Lint(name) => {
+                return Err(DiagnosticAsStrError::Category {
+                    category: "lint",
+                    name: name.as_str(),
+                })
+            }
+            DiagnosticId::RevealedType => "revealed-type",
+            DiagnosticId::UnknownRule => "unknown-rule",
+        })
     }
 }
 

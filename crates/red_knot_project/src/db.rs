@@ -2,7 +2,7 @@ use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
 use crate::DEFAULT_LINT_REGISTRY;
-use crate::{check_file, Project, ProjectMetadata};
+use crate::{Project, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::diagnostic::Diagnostic;
@@ -27,7 +27,6 @@ pub struct ProjectDatabase {
     storage: salsa::Storage<ProjectDatabase>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
-    rule_selection: Arc<RuleSelection>,
 }
 
 impl ProjectDatabase {
@@ -35,14 +34,11 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let rule_selection = RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY);
-
         let mut db = Self {
             project: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
             system: Arc::new(system),
-            rule_selection: Arc::new(rule_selection),
         };
 
         // TODO: Use the `program_settings` to compute the key for the database's persistent
@@ -66,7 +62,7 @@ impl ProjectDatabase {
     pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
         let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
 
-        self.with_db(|db| check_file(db, file))
+        self.with_db(|db| self.project().check_file(db, file))
     }
 
     /// Returns a mutable reference to the system.
@@ -119,7 +115,7 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
+        self.project().rule_selection(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
