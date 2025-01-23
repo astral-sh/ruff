@@ -206,6 +206,16 @@ pub struct Rules {
     inner: FxHashMap<RangedValue<String>, RangedValue<Level>>,
 }
 
+impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
+    fn from_iter<T: IntoIterator<Item = (RangedValue<String>, RangedValue<Level>)>>(
+        iter: T,
+    ) -> Self {
+        Self {
+            inner: iter.into_iter().collect(),
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum KnotTomlError {
     #[error(transparent)]

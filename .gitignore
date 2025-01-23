@@ -30,7 +30,7 @@ tracing-flamechart.svg
 tracing-flamegraph.svg
 
 # insta
-.rs.pending-snap
+*.rs.pending-snap
 
 
 ###

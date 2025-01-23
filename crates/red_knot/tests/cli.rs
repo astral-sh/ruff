@@ -171,7 +171,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
 
 /// The rule severity can be changed in the configuration file
 #[test]
-fn rule_severity() -> anyhow::Result<()> {
+fn configuration_rule_severity() -> anyhow::Result<()> {
     let case = TestCase::with_file(
         "test.py",
         r#"
@@ -216,9 +216,115 @@ fn rule_severity() -> anyhow::Result<()> {
     })
 }
 
-/// Red Knot warns about unknown rules
+/// The rule severity can be changed using `--ignore`, `--warn`, and `--error`
 #[test]
-fn unknown_rules() -> anyhow::Result<()> {
+fn cli_rule_severity() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        y = 4 / 0
+
+        for a in range(0, y):
+            x = a
+
+        print(x)  # possibly-unresolved-reference
+        "#,
+    )?;
+
+    case.insta_settings().bind(|| {
+        // Assert that there's a possibly unresolved reference diagnostic
+        // and that division-by-zero has a severity of error by default.
+        assert_cmd_snapshot!(case.command(), @r"
+            success: false
+            exit_code: 1
+            ----- stdout -----
+            error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+            warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+
+            ----- stderr -----
+        ");
+
+
+        assert_cmd_snapshot!(
+            case
+                .command()
+                .arg("--ignore")
+                .arg("possibly-unresolved-reference")
+                .arg("--warn")
+                .arg("division-by-zero")
+                .arg("--warn")
+                .arg("unresolved-import"),
+            @r"
+            success: false
+            exit_code: 1
+            ----- stdout -----
+            warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+
+            ----- stderr -----
+            "
+        );
+
+        Ok(())
+    })
+}
+
+/// The rule severity can be changed using `--ignore`, `--warn`, and `--error` and
+/// values specified last override previous severities.
+#[test]
+fn cli_rule_severity_precedence() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        y = 4 / 0
+
+        for a in range(0, y):
+            x = a
+
+        print(x)  # possibly-unresolved-reference
+        "#,
+    )?;
+
+    case.insta_settings().bind(|| {
+        // Assert that there's a possibly unresolved reference diagnostic
+        // and that division-by-zero has a severity of error by default.
+        assert_cmd_snapshot!(case.command(), @r"
+            success: false
+            exit_code: 1
+            ----- stdout -----
+            error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+            warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+
+            ----- stderr -----
+        ");
+
+
+        assert_cmd_snapshot!(
+            case
+                .command()
+                // Override the error severity with warning
+                .arg("--error")
+                .arg("possibly-unresolved-reference")
+                .arg("--warn")
+                .arg("division-by-zero")
+                .arg("--ignore")
+                .arg("possibly-unresolved-reference"),
+            @r"
+            success: false
+            exit_code: 1
+            ----- stdout -----
+            warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+
+            ----- stderr -----
+            "
+        );
+
+        Ok(())
+    })
+}
+
+/// Red Knot warns about unknown rules specified in a configuration file
+#[test]
+fn configuration_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (
             "pyproject.toml",
@@ -238,6 +344,25 @@ fn unknown_rules() -> anyhow::Result<()> {
             warning[unknown-rule] <temp_dir>/pyproject.toml:3:1 Unknown lint rule `division-by-zer`
 
             ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
+/// Red Knot warns about unknown rules specified in a CLI argument
+#[test]
+fn cli_unknown_rules() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", "print(10)")?;
+
+    case.insta_settings().bind(|| {
+        assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[unknown-rule] Unknown lint rule `division-by-zer`
+
+        ----- stderr -----
         ");
     });
 
