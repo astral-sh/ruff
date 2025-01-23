@@ -940,18 +940,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pytest_style::rules::parametrize(checker, call);
             }
             if checker.enabled(Rule::PytestUnittestAssertion) {
-                if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
-                    checker, expr, func, args, keywords,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_pytest_style::rules::unittest_assertion(checker, expr, func, args, keywords);
             }
             if checker.enabled(Rule::PytestUnittestRaisesAssertion) {
-                if let Some(diagnostic) =
-                    flake8_pytest_style::rules::unittest_raises_assertion(checker, call)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_pytest_style::rules::unittest_raises_assertion_call(checker, call);
             }
             if checker.enabled(Rule::SubprocessPopenPreexecFn) {
                 pylint::rules::subprocess_popen_preexec_fn(checker, call);
