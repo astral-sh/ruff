@@ -366,21 +366,20 @@ impl Violation for PytestUnittestRaisesAssertion {
 }
 
 /// PT027
-pub(crate) fn unittest_raises_assertion_call(
-    checker: &Checker,
-    call: &ast::ExprCall,
-) -> Option<Diagnostic> {
+pub(crate) fn unittest_raises_assertion_call(checker: &mut Checker, call: &ast::ExprCall) {
     // Bindings in `with` statements are handled by `unittest_raises_assertion_with`.
     if let Stmt::With(ast::StmtWith { items, .. }) = checker.semantic().current_statement() {
         if items
             .iter()
             .any(|item| item.context_expr.range() == call.range && item.optional_vars.is_some())
         {
-            return None;
+            return;
         }
     }
 
-    unittest_raises_assertion(call, [], checker)
+    if let Some(diagnostic) = unittest_raises_assertion(call, [], checker) {
+        checker.diagnostics.push(diagnostic);
+    }
 }
 
 /// PT027
