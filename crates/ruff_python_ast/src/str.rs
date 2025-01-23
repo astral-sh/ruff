@@ -24,6 +24,14 @@ impl Quote {
         }
     }
 
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Single => "'",
+            Self::Double => "\"",
+        }
+    }
+
     #[must_use]
     #[inline]
     pub const fn opposite(self) -> Self {

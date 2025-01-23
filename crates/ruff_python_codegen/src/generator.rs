@@ -1287,11 +1287,10 @@ impl<'a> Generator<'a> {
         // for raw strings, we don't want to perform the UnicodeEscape in `p_str_repr`, so build the
         // replacement here
         if flags.prefix().is_raw() {
-            self.p(&format!(
-                "{prefix}{quote}{value}{quote}",
-                prefix = flags.prefix(),
-                quote = self.quote,
-            ));
+            self.p(flags.prefix().as_str());
+            self.p(self.quote.as_str());
+            self.p(value);
+            self.p(self.quote.as_str());
         } else {
             if flags.prefix().is_unicode() {
                 self.p("u");
