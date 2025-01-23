@@ -6003,14 +6003,13 @@ fn perform_membership_test_comparison<'db>(
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
+    use crate::db::tests::{setup_db, TestDb};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
     use crate::{HasType, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
 
@@ -6278,56 +6277,6 @@ mod tests {
 
         assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
 
-        Ok(())
-    }
-
-    #[test]
-    fn builtin_symbol_vendored_stdlib() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "c = chr")?;
-
-        assert_public_type(&db, "/src/a.py", "c", "Literal[chr]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_custom_typeshed("/typeshed")
-            .with_file("/src/a.py", "c = copyright")
-            .with_file(
-                "/typeshed/stdlib/builtins.pyi",
-                "def copyright() -> None: ...",
-            )
-            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
-            .build()?;
-
-        assert_public_type(&db, "/src/a.py", "c", "Literal[copyright]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn unknown_builtin_later_defined() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_custom_typeshed("/typeshed")
-            .with_file("/src/a.py", "x = foo")
-            .with_file("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1")
-            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
-            .build()?;
-
-        assert_public_type(&db, "/src/a.py", "x", "Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn str_builtin() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_file("/src/a.py", "x = str")?;
-        assert_public_type(&db, "/src/a.py", "x", "Literal[str]");
         Ok(())
     }
 

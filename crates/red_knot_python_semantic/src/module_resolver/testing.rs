@@ -73,7 +73,7 @@ pub(crate) struct UnspecifiedTypeshed;
 ///
 /// For tests checking that standard-library module resolution is working
 /// correctly, you should usually create a [`MockedTypeshed`] instance
-/// and pass it to the [`TestCaseBuilder::with_custom_typeshed`] method.
+/// and pass it to the [`TestCaseBuilder::with_mocked_typeshed`] method.
 /// If you need to check something that involves the vendored typeshed stubs
 /// we include as part of the binary, you can instead use the
 /// [`TestCaseBuilder::with_vendored_typeshed`] method.
@@ -238,7 +238,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
-                    typeshed: Some(typeshed.clone()),
+                    custom_typeshed: Some(typeshed.clone()),
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                 },
             },

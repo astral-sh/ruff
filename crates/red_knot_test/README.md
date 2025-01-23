@@ -8,8 +8,8 @@ under a certain directory as test suites.
 
 A Markdown test suite can contain any number of tests. A test consists of one or more embedded
 "files", each defined by a triple-backticks fenced code block. The code block must have a tag string
-specifying its language; currently only `py` (Python files) and `pyi` (type stub files) are
-supported.
+specifying its language. We currently support `py` (Python files) and `pyi` (type stub files), as
+well as [typeshed `VERSIONS`] files and `toml` for configuration.
 
 The simplest possible test suite consists of just a single test, with a single embedded file:
 
@@ -243,6 +243,20 @@ section. Nested sections can override configurations from their parent sections.
 
 See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/red_knot_test/src/config.rs) for the full list of supported configuration options.
 
+### Specifying a custom typeshed
+
+Some tests will need to override the default typeshed with custom files. The `[environment]`
+configuration option `typeshed` can be used to do this:
+
+````markdown
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+````
+
+For more details, take a look at the [custom-typeshed Markdown test].
+
 ## Documentation of tests
 
 Arbitrary Markdown syntax (including of course normal prose paragraphs) is permitted (and ignored by
@@ -294,36 +308,6 @@ The column assertion `6` on the ending line should be optional.
 In cases of overlapping such assertions, resolve ambiguity using more angle brackets: `<<<<` begins
 an assertion ended by `>>>>`, etc.
 
-### Non-Python files
-
-Some tests may need to specify non-Python embedded files: typeshed `stdlib/VERSIONS`, `pth` files,
-`py.typed` files, `pyvenv.cfg` files...
-
-We will allow specifying any of these using the `text` language in the code block tag string:
-
-````markdown
-```text path=/third-party/foo/py.typed
-partial
-```
-````
-
-We may want to also support testing Jupyter notebooks as embedded files; exact syntax for this is
-yet to be determined.
-
-Of course, red-knot is only run directly on `py` and `pyi` files, and assertion comments are only
-possible in these files.
-
-A fenced code block with no language will always be an error.
-
-### Running just a single test from a suite
-
-Having each test in a suite always run as a distinct Rust test would require writing our own test
-runner or code-generating tests in a build script; neither of these is planned.
-
-We could still allow running just a single test from a suite, for debugging purposes, either via
-some "focus" syntax that could be easily temporarily added to a test, or via an environment
-variable.
-
 ### Configuring search paths and kinds
 
 The red-knot TOML configuration format hasn't been finalized, and we may want to implement
@@ -345,38 +329,6 @@ Paths for `workspace-root` and `third-party-root` must be absolute.
 
 Relative embedded-file paths are relative to the workspace root, even if it is explicitly set to a
 non-default value using the `workspace-root` config.
-
-### Specifying a custom typeshed
-
-Some tests will need to override the default typeshed with custom files. The `[environment]`
-configuration option `typeshed-path` can be used to do this:
-
-````markdown
-```toml
-[environment]
-typeshed-path = "/typeshed"
-```
-
-This file is importable as part of our custom typeshed, because it is within `/typeshed`, which we
-configured above as our custom typeshed root:
-
-```py path=/typeshed/stdlib/builtins.pyi
-I_AM_THE_ONLY_BUILTIN = 1
-```
-
-This file is written to `/src/test.py`, because the default workspace root is `/src/ and the default
-file path is `test.py`:
-
-```py
-reveal_type(I_AM_THE_ONLY_BUILTIN)  # revealed: Literal[1]
-```
-
-````
-
-A fenced code block with language `text` can be used to provide a `stdlib/VERSIONS` file in the
-custom typeshed root. If no such file is created explicitly, one should be created implicitly
-including entries enabling all specified `<typeshed-root>/stdlib` files for all supported Python
-versions.
 
 ### I/O errors
 
@@ -480,3 +432,6 @@ cold, to validate equivalence of cold and incremental check results.
 
 [^extensions]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
     also, treat it as part of the standard library.
+
+[custom-typeshed markdown test]: ../red_knot_python_semantic/resources/mdtest/mdtest_custom_typeshed.md
+[typeshed `versions`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18%3E
