@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
-snapshot_kind: text
 ---
 PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
   |

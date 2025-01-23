@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF055_1.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
    |
