@@ -2332,6 +2332,7 @@ dependencies = [
  "red_knot_server",
  "regex",
  "ruff_db",
+ "ruff_python_trivia",
  "salsa",
  "tempfile",
  "toml",
