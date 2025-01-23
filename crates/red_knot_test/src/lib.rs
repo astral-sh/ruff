@@ -151,7 +151,6 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                     format!("{module_path}: 3.8-\n")
                 })
                 .collect::<String>();
-            dbg!(&contents);
             db.write_file(&versions_file, contents).unwrap();
         }
     }
