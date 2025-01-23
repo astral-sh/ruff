@@ -107,8 +107,14 @@ stat = add(10, 15)
     )
     .context("Failed to write `child/test.py`")?;
 
+    let project_filter = tempdir_filter(&project_dir);
+    let filters = vec![
+        (&*project_filter, "<temp_dir>/"),
+        (r#"\\(\w\w|\s|\.|")"#, "/$1"),
+    ];
+
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    insta::with_settings!({filters => vec![(&*tempdir_filter(&project_dir), "<temp_dir>/")]}, {
+    insta::with_settings!({filters => filters}, {
         assert_cmd_snapshot!(knot().current_dir(&child), @r#"
         success: false
         exit_code: 1
