@@ -12,11 +12,11 @@ this behavior is questionable and might change in the future. See the TODOs in `
 In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
 "undeclared-and-possibly-unbound" cases (marked with a "?").
 
-| **Public type**  | declared     | possibly-undeclared        | undeclared   |
-| ---------------- | ------------ | -------------------------- | ------------ |
-| bound            | `T_declared` | `T_declared \| T_inferred` | `T_inferred` |
-| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `T_inferred` |
-| unbound          | `T_declared` | `T_declared`               | `Unknown`    |
+| **Public type**  | declared     | possibly-undeclared        | undeclared              |
+| ---------------- | ------------ | -------------------------- | ----------------------- |
+| bound            | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
+| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
+| unbound          | `T_declared` | `T_declared`               | `Unknown`               |
 
 | **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
 | ---------------- | -------- | ------------------------- | ------------------- |
