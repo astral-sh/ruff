@@ -49,6 +49,57 @@ class MultipleBaseClasses(list, Generic[T]):
     var: T
 
 
+# these are just for the MoreBaseClasses and MultipleBaseAndGenerics cases
+class Base1: ...
+
+
+class Base2: ...
+
+
+class Base3: ...
+
+
+class MoreBaseClasses(Base1, Base2, Base3, Generic[T]):
+    var: T
+
+
+class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):
+    var: S
+    typ: T
+    tup: tuple[*Ts]
+    pep: P
+
+
+class A(Generic[T]): ...
+
+
+class B(A[S], Generic[S]):
+    var: S
+
+
+class C(A[S], Generic[S, T]):
+    var: tuple[S, T]
+
+
+class D(A[int], Generic[T]):
+    var: T
+
+
+class NotLast(Generic[T], Base1):
+    var: T
+
+
+class Sandwich(Base1, Generic[T], Base2):
+    var: T
+
+
+# runtime `TypeError` to inherit from `Generic` multiple times, but we still
+# emit a diagnostic
+class TooManyGenerics(Generic[T], Generic[S]):
+    var: T
+    var: S
+
+
 # These cases are not handled
 class D(Generic[T, T]):  # duplicate generic variable, runtime error
     pass
@@ -69,11 +120,6 @@ class NotGeneric:
 class MixedGenerics[U]:
     def more_generic(u: U, t: T) -> tuple[U, T]:
         return (u, t)
-
-
-# TODO(brent) we should also handle multiple base classes
-class Multiple(NotGeneric, Generic[T]):
-    pass
 
 
 # TODO(brent) default requires 3.13

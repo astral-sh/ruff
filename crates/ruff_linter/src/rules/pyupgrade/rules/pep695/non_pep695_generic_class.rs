@@ -1,11 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::StmtClassDef;
-use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_python_ast::{Arguments, ExprSubscript, StmtClassDef};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 use crate::settings::types::PythonVersion;
 
 use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
@@ -21,10 +22,9 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// ## Known problems
 ///
-/// The rule currently skips generic classes with multiple base classes. It also skips
-/// generic classes nested inside of other
-/// functions or classes. Finally, this rule skips type parameters with the `default` argument
-/// introduced in [PEP 696] and implemented in Python 3.13.
+/// The rule currently skips generic classes nested inside of other functions or classes. It also
+/// skips type parameters with the `default` argument introduced in [PEP 696] and implemented in
+/// Python 3.13.
 ///
 /// This rule can only offer a fix if all of the generic types in the class definition are defined
 /// in the current module. For external type parameters, a diagnostic is emitted without a suggested
@@ -64,6 +64,11 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// the corresponding type variables even if they are unused after the fix. See
 /// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused
 /// private type variables.
+///
+/// This rule will correctly handle classes with multiple base classes, as long as the single
+/// `Generic` base class is at the end of the argument list, as checked by
+/// [`generic-not-last-base-class`](generic-not-last-base-class.md). If a `Generic` base class is
+/// found outside of the last position, a diagnostic is emitted without a suggested fix.
 ///
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`](non-pep695-generic-function.md) for the function version.
@@ -118,21 +123,11 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         return;
     };
 
-    // TODO(brent) only accept a single, Generic argument for now. I think it should be fine to have
-    // other arguments, but this simplifies the fix just to delete the argument list for now
-    let [Expr::Subscript(ExprSubscript {
-        value,
-        slice,
-        range,
-        ..
-    })] = arguments.args.as_ref()
+    let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. })) =
+        find_generic(arguments, checker.semantic())
     else {
         return;
     };
-
-    if !checker.semantic().match_typing_expr(value, "Generic") {
-        return;
-    }
 
     let mut diagnostic = Diagnostic::new(
         NonPEP695GenericClass {
@@ -140,6 +135,19 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         },
         *range,
     );
+
+    // only handle the case where Generic is at the end of the argument list, in line with PYI059
+    // (generic-not-last-base-class). If it comes elsewhere, it results in a runtime error. In stubs
+    // it's not *strictly* necessary for `Generic` to come last in the bases tuple, but it would
+    // cause more complication for us to handle stubs specially, and probably isn't worth the
+    // bother. we still offer a diagnostic here but not a fix
+    //
+    // because `find_generic` also finds the *first* Generic argument, this has the additional
+    // benefit of bailing out with a diagnostic if multiple Generic arguments are present
+    if generic_idx != arguments.len() - 1 {
+        checker.diagnostics.push(diagnostic);
+        return;
+    }
 
     let mut visitor = TypeVarReferenceVisitor {
         vars: vec![],
@@ -179,12 +187,34 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
             source: checker.source(),
         };
 
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-            type_params.to_string(),
-            name.end(),
-            arguments.end(),
-        )));
+        diagnostic.try_set_fix(|| {
+            let removal_edit = remove_argument(
+                generic_expr,
+                arguments,
+                Parentheses::Remove,
+                checker.source(),
+            )?;
+            Ok(Fix::unsafe_edits(
+                Edit::insertion(type_params.to_string(), name.end()),
+                [removal_edit],
+            ))
+        });
     }
 
     checker.diagnostics.push(diagnostic);
+}
+
+/// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
+/// any), along with its index in the class's bases tuple.
+fn find_generic<'a>(
+    class_bases: &'a Arguments,
+    semantic: &SemanticModel,
+) -> Option<(usize, &'a ExprSubscript)> {
+    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
+        expr.as_subscript_expr().and_then(|sub_expr| {
+            semantic
+                .match_typing_expr(&sub_expr.value, "Generic")
+                .then_some((idx, sub_expr))
+        })
+    })
 }

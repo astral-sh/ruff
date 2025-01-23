@@ -124,3 +124,156 @@ UP046_0.py:41:24: UP046 [*] Generic class `MultipleGenerics` uses `Generic` subc
 42 42 |     var: S
 43 43 |     typ: T
 44 44 |     tup: tuple[*Ts]
+
+UP046_0.py:48:33: UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` subclass instead of type parameters
+   |
+48 | class MultipleBaseClasses(list, Generic[T]):
+   |                                 ^^^^^^^^^^ UP046
+49 |     var: T
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+45 45 |     pep: P
+46 46 | 
+47 47 | 
+48    |-class MultipleBaseClasses(list, Generic[T]):
+   48 |+class MultipleBaseClasses[T: float](list):
+49 49 |     var: T
+50 50 | 
+51 51 | 
+
+UP046_0.py:62:44: UP046 [*] Generic class `MoreBaseClasses` uses `Generic` subclass instead of type parameters
+   |
+62 | class MoreBaseClasses(Base1, Base2, Base3, Generic[T]):
+   |                                            ^^^^^^^^^^ UP046
+63 |     var: T
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+59 59 | class Base3: ...
+60 60 | 
+61 61 | 
+62    |-class MoreBaseClasses(Base1, Base2, Base3, Generic[T]):
+   62 |+class MoreBaseClasses[T: float](Base1, Base2, Base3):
+63 63 |     var: T
+64 64 | 
+65 65 | 
+
+UP046_0.py:66:52: UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generic` subclass instead of type parameters
+   |
+66 | class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):
+   |                                                    ^^^^^^^^^^^^^^^^^^^^^ UP046
+67 |     var: S
+68 |     typ: T
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+63 63 |     var: T
+64 64 | 
+65 65 | 
+66    |-class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):
+   66 |+class MultipleBaseAndGenerics[S: (str, bytes), T: float, *Ts, **P](Base1, Base2, Base3):
+67 67 |     var: S
+68 68 |     typ: T
+69 69 |     tup: tuple[*Ts]
+
+UP046_0.py:73:9: UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
+   |
+73 | class A(Generic[T]): ...
+   |         ^^^^^^^^^^ UP046
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+70 70 |     pep: P
+71 71 | 
+72 72 | 
+73    |-class A(Generic[T]): ...
+   73 |+class A[T: float]: ...
+74 74 | 
+75 75 | 
+76 76 | class B(A[S], Generic[S]):
+
+UP046_0.py:76:15: UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
+   |
+76 | class B(A[S], Generic[S]):
+   |               ^^^^^^^^^^ UP046
+77 |     var: S
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+73 73 | class A(Generic[T]): ...
+74 74 | 
+75 75 | 
+76    |-class B(A[S], Generic[S]):
+   76 |+class B[S: (str, bytes)](A[S]):
+77 77 |     var: S
+78 78 | 
+79 79 | 
+
+UP046_0.py:80:15: UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
+   |
+80 | class C(A[S], Generic[S, T]):
+   |               ^^^^^^^^^^^^^ UP046
+81 |     var: tuple[S, T]
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+77 77 |     var: S
+78 78 | 
+79 79 | 
+80    |-class C(A[S], Generic[S, T]):
+   80 |+class C[S: (str, bytes), T: float](A[S]):
+81 81 |     var: tuple[S, T]
+82 82 | 
+83 83 | 
+
+UP046_0.py:84:17: UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
+   |
+84 | class D(A[int], Generic[T]):
+   |                 ^^^^^^^^^^ UP046
+85 |     var: T
+   |
+   = help: Use type parameters
+
+ℹ Unsafe fix
+81 81 |     var: tuple[S, T]
+82 82 | 
+83 83 | 
+84    |-class D(A[int], Generic[T]):
+   84 |+class D[T: float](A[int]):
+85 85 |     var: T
+86 86 | 
+87 87 | 
+
+UP046_0.py:88:15: UP046 Generic class `NotLast` uses `Generic` subclass instead of type parameters
+   |
+88 | class NotLast(Generic[T], Base1):
+   |               ^^^^^^^^^^ UP046
+89 |     var: T
+   |
+   = help: Use type parameters
+
+UP046_0.py:92:23: UP046 Generic class `Sandwich` uses `Generic` subclass instead of type parameters
+   |
+92 | class Sandwich(Base1, Generic[T], Base2):
+   |                       ^^^^^^^^^^ UP046
+93 |     var: T
+   |
+   = help: Use type parameters
+
+UP046_0.py:98:23: UP046 Generic class `TooManyGenerics` uses `Generic` subclass instead of type parameters
+    |
+ 96 | # runtime `TypeError` to inherit from `Generic` multiple times, but we still
+ 97 | # emit a diagnostic
+ 98 | class TooManyGenerics(Generic[T], Generic[S]):
+    |                       ^^^^^^^^^^ UP046
+ 99 |     var: T
+100 |     var: S
+    |
+    = help: Use type parameters
