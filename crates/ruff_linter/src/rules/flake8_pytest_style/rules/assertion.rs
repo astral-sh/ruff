@@ -268,12 +268,12 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 
 /// PT009
 pub(crate) fn unittest_assertion(
-    checker: &Checker,
+    checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Option<Diagnostic> {
+) {
     match func {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
@@ -302,12 +302,10 @@ pub(crate) fn unittest_assertion(
                         )));
                     }
                 }
-                Some(diagnostic)
-            } else {
-                None
+                checker.diagnostics.push(diagnostic);
             }
         }
-        _ => None,
+        _ => {}
     }
 }
 

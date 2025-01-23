@@ -940,11 +940,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pytest_style::rules::parametrize(checker, call);
             }
             if checker.enabled(Rule::PytestUnittestAssertion) {
-                if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
-                    checker, expr, func, args, keywords,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_pytest_style::rules::unittest_assertion(checker, expr, func, args, keywords);
             }
             if checker.enabled(Rule::PytestUnittestRaisesAssertion) {
                 flake8_pytest_style::rules::unittest_raises_assertion_call(checker, call);
