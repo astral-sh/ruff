@@ -1,7 +1,6 @@
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::RefCell;
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -20,19 +19,10 @@ pub enum ValueSource {
     Cli,
 }
 
-impl fmt::Display for ValueSource {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::File(p) => fmt::Display::fmt(p, f),
-            Self::Cli => write!(f, "--config cli option"),
-        }
-    }
-}
-
 thread_local! {
     /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
     /// but we want to associate each deserialized [`RelativePath`] with the source from
-    /// where it origins. We use a thread local variable to work around this limitation.
+    /// which it originated. We use a thread local variable to work around this limitation.
     ///
     /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
     /// deserialization code. It ensures that the thread local variable gets cleaned up
@@ -94,12 +84,12 @@ impl RelativePathBuf {
         self.path
     }
 
-    /// Resolves the absolute path for `self` based on from where the value origins.
+    /// Resolves the absolute path for `self` based on its origin.
     pub fn absolute_with_db(&self, db: &dyn Db) -> SystemPathBuf {
         self.absolute(db.project().root(db), db.system())
     }
 
-    /// Resolves the absolute path for `self` based on from where the value origins.
+    /// Resolves the absolute path for `self` based on its origin.
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.source {
             ValueSource::File(_) => project_root,
