@@ -466,7 +466,7 @@ fn unittest_raises_assertion(
 
     if !checker
         .comment_ranges()
-        .has_comments(&call.range, checker.source())
+        .has_comments(call, checker.source())
     {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
