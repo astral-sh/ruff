@@ -1,7 +1,7 @@
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
-use crate::args::Args;
+use crate::args::{Args, CheckArgs, Command};
 use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::Parser;
@@ -20,12 +20,6 @@ mod args;
 mod logging;
 mod python_version;
 mod verbosity;
-
-#[derive(Debug, clap::Subcommand)]
-pub enum Command {
-    /// Start the language server
-    Server,
-}
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
@@ -52,10 +46,13 @@ pub fn main() -> ExitStatus {
 fn run() -> anyhow::Result<ExitStatus> {
     let args = Args::parse_from(std::env::args());
 
-    if matches!(args.command, Some(Command::Server)) {
-        return run_server().map(|()| ExitStatus::Success);
+    match args.command {
+        Command::Server => run_server().map(|()| ExitStatus::Success),
+        Command::Check(check_args) => run_check(check_args),
     }
+}
 
+fn run_check(args: CheckArgs) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
@@ -86,7 +83,8 @@ fn run() -> anyhow::Result<ExitStatus> {
         .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd);
-    let cli_options = args.to_options();
+    let watch = args.watch;
+    let cli_options = args.into_options();
     let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
     workspace_metadata.apply_cli_options(cli_options.clone());
 
@@ -104,7 +102,7 @@ fn run() -> anyhow::Result<ExitStatus> {
         }
     })?;
 
-    let exit_status = if args.watch {
+    let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
         main_loop.run(&mut db)

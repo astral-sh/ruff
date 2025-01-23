@@ -446,7 +446,7 @@ impl TestCase {
 
     fn command(&self) -> Command {
         let mut command = Command::new(get_cargo_bin("red_knot"));
-        command.current_dir(&self.project_dir);
+        command.current_dir(&self.project_dir).arg("check");
         command
     }
 }

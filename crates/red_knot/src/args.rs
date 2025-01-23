@@ -1,6 +1,5 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
-use crate::Command;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -16,16 +15,23 @@ use ruff_db::system::SystemPathBuf;
 #[command(version)]
 pub(crate) struct Args {
     #[command(subcommand)]
-    pub(crate) command: Option<Command>,
+    pub(crate) command: Command,
+}
 
-    /// Run the command within the given project directory.
-    ///
-    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
-    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
-    ///
-    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
-    #[arg(long, value_name = "PROJECT")]
-    pub(crate) project: Option<SystemPathBuf>,
+#[derive(Debug, clap::Subcommand)]
+pub(crate) enum Command {
+    /// Check a project for type errors.
+    Check(CheckArgs),
+
+    /// Start the language server
+    Server,
+}
+
+#[derive(Debug, Parser)]
+pub(crate) struct CheckArgs {
+    /// Run in watch mode by re-running whenever files change.
+    #[arg(long, short = 'W')]
+    pub(crate) watch: bool,
 
     /// Path to the virtual environment the project uses.
     ///
@@ -47,27 +53,30 @@ pub(crate) struct Args {
     pub(crate) python_version: Option<PythonVersion>,
 
     #[clap(flatten)]
-    pub(crate) verbosity: Verbosity,
-
-    #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
-    /// Run in watch mode by re-running whenever files change.
-    #[arg(long, short = 'W')]
-    pub(crate) watch: bool,
+    /// Run the command within the given project directory.
+    ///
+    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
+    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
+    ///
+    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
+    #[arg(long, value_name = "PROJECT")]
+    pub(crate) project: Option<SystemPathBuf>,
+
+    #[clap(flatten)]
+    pub(crate) verbosity: Verbosity,
 }
 
-impl Args {
-    pub(crate) fn to_options(&self) -> Options {
+impl CheckArgs {
+    pub(crate) fn into_options(self) -> Options {
         let rules = if self.rules.is_empty() {
             None
         } else {
             Some(
                 self.rules
-                    .iter()
-                    .map(|(rule, level)| {
-                        (RangedValue::cli(rule.to_string()), RangedValue::cli(level))
-                    })
+                    .into_iter()
+                    .map(|(rule, level)| (RangedValue::cli(rule), RangedValue::cli(level)))
                     .collect(),
             )
         };
@@ -77,11 +86,11 @@ impl Args {
                 python_version: self
                     .python_version
                     .map(|version| RangedValue::cli(version.into())),
-                venv_path: self.venv_path.as_ref().map(RelativePathBuf::cli),
-                typeshed: self.typeshed.as_ref().map(RelativePathBuf::cli),
-                extra_paths: self.extra_search_path.as_ref().map(|extra_search_paths| {
+                venv_path: self.venv_path.map(RelativePathBuf::cli),
+                typeshed: self.typeshed.map(RelativePathBuf::cli),
+                extra_paths: self.extra_search_path.map(|extra_search_paths| {
                     extra_search_paths
-                        .iter()
+                        .into_iter()
                         .map(RelativePathBuf::cli)
                         .collect()
                 }),
@@ -105,8 +114,8 @@ impl RulesArg {
         self.0.is_empty()
     }
 
-    fn iter(&self) -> impl Iterator<Item = (&str, lint::Level)> {
-        self.0.iter().map(|(rule, level)| (rule.as_str(), *level))
+    fn into_iter(self) -> impl Iterator<Item = (String, lint::Level)> {
+        self.0.into_iter()
     }
 }
 
