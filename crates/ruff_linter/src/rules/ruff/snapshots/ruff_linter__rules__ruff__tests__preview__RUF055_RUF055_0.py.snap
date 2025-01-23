@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF055_0.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
   |
@@ -211,12 +210,16 @@ RUF055_0.py:94:1: RUF055 [*] Plain string pattern passed to `re` function
 94    |-re.sub(r"a", "\?", "a")
    94 |+"a".replace(r"a", "\\?")
 95 95 | re.sub(r"a", r"\?", "a")
+96 96 | 
+97 97 | # these double as tests for preserving raw string quoting style
 
 RUF055_0.py:95:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 94 | re.sub(r"a", "\?", "a")
 95 | re.sub(r"a", r"\?", "a")
    | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+96 |
+97 | # these double as tests for preserving raw string quoting style
    |
    = help: Replace with `"a".replace(r"a", r"\?")`
 
@@ -226,3 +229,59 @@ RUF055_0.py:95:1: RUF055 [*] Plain string pattern passed to `re` function
 94 94 | re.sub(r"a", "\?", "a")
 95    |-re.sub(r"a", r"\?", "a")
    95 |+"a".replace(r"a", r"\?")
+96 96 | 
+97 97 | # these double as tests for preserving raw string quoting style
+98 98 | re.sub(r'abc', "", s)
+
+RUF055_0.py:98:1: RUF055 [*] Plain string pattern passed to `re` function
+    |
+ 97 | # these double as tests for preserving raw string quoting style
+ 98 | re.sub(r'abc', "", s)
+    | ^^^^^^^^^^^^^^^^^^^^^ RUF055
+ 99 | re.sub(r"""abc""", "", s)
+100 | re.sub(r'''abc''', "", s)
+    |
+    = help: Replace with `s.replace(r'abc', "")`
+
+ℹ Safe fix
+95 95 | re.sub(r"a", r"\?", "a")
+96 96 | 
+97 97 | # these double as tests for preserving raw string quoting style
+98    |-re.sub(r'abc', "", s)
+   98 |+s.replace(r'abc', "")
+99 99 | re.sub(r"""abc""", "", s)
+100 100 | re.sub(r'''abc''', "", s)
+
+RUF055_0.py:99:1: RUF055 [*] Plain string pattern passed to `re` function
+    |
+ 97 | # these double as tests for preserving raw string quoting style
+ 98 | re.sub(r'abc', "", s)
+ 99 | re.sub(r"""abc""", "", s)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+100 | re.sub(r'''abc''', "", s)
+    |
+    = help: Replace with `s.replace(r"""abc""", "")`
+
+ℹ Safe fix
+96  96  | 
+97  97  | # these double as tests for preserving raw string quoting style
+98  98  | re.sub(r'abc', "", s)
+99      |-re.sub(r"""abc""", "", s)
+    99  |+s.replace(r"""abc""", "")
+100 100 | re.sub(r'''abc''', "", s)
+
+RUF055_0.py:100:1: RUF055 [*] Plain string pattern passed to `re` function
+    |
+ 98 | re.sub(r'abc', "", s)
+ 99 | re.sub(r"""abc""", "", s)
+100 | re.sub(r'''abc''', "", s)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+    |
+    = help: Replace with `s.replace(r'''abc''', "")`
+
+ℹ Safe fix
+97  97  | # these double as tests for preserving raw string quoting style
+98  98  | re.sub(r'abc', "", s)
+99  99  | re.sub(r"""abc""", "", s)
+100     |-re.sub(r'''abc''', "", s)
+    100 |+s.replace(r'''abc''', "")
