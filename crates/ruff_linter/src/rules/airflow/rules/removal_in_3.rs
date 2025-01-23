@@ -347,16 +347,6 @@ fn find_parameter<'a>(
 ///     print(context.get("conf"))
 /// ```
 ///
-/// **Removed context variable as a parameter:**
-/// ```python
-/// from airflow.decorators import task
-///
-/// @task
-/// def another_task(execution_date, **kwargs):
-///     # 'execution_date' is removed in Airflow 3.0
-///     pass
-/// ```
-///
 /// **Accessing multiple keys:**
 /// ```python
 /// from airflow.decorators import task
@@ -402,37 +392,6 @@ fn check_removed_context_keys_usage(checker: &mut Checker, call_expr: &ExprCall)
 
     if attr.as_str() != "get" {
         return;
-    }
-    let function_def = {
-        let mut parents = checker.semantic().current_statements();
-        parents.find_map(|stmt| {
-            if let Stmt::FunctionDef(func_def) = stmt {
-                Some(func_def.clone())
-            } else {
-                None
-            }
-        })
-    };
-
-    if let Some(func_def) = function_def {
-        for param in func_def
-            .parameters
-            .posonlyargs
-            .iter()
-            .chain(func_def.parameters.args.iter())
-            .chain(func_def.parameters.kwonlyargs.iter())
-        {
-            let param_name = param.parameter.name.as_str();
-            if REMOVED_CONTEXT_KEYS.contains(&param_name) {
-                checker.diagnostics.push(Diagnostic::new(
-                    Airflow3Removal {
-                        deprecated: param_name.to_string(),
-                        replacement: Replacement::None,
-                    },
-                    param.parameter.name.range(),
-                ));
-            }
-        }
     }
 
     for removed_key in REMOVED_CONTEXT_KEYS {
@@ -1091,4 +1050,55 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
 
         _ => false,
     }
+}
+
+/// AIR302 Check the function argument for removed context variable.
+/// For example:
+/// **Removed context variable as a parameter:**
+/// ```python
+/// from airflow.decorators import task
+///
+/// @task
+/// def another_task(execution_date, **kwargs):
+///     # 'execution_date' is removed in Airflow 3.0
+///     pass
+/// ```
+pub(crate) fn removed_in_3_function_def(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
+    if !is_airflow_task(function_def, checker.semantic()) {
+        return;
+    }
+
+    for param in function_def
+        .parameters
+        .posonlyargs
+        .iter()
+        .chain(function_def.parameters.args.iter())
+        .chain(function_def.parameters.kwonlyargs.iter())
+    {
+        let param_name = param.parameter.name.as_str();
+        if REMOVED_CONTEXT_KEYS.contains(&param_name) {
+            checker.diagnostics.push(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: param_name.to_string(),
+                    replacement: Replacement::None,
+                },
+                param.parameter.name.range(),
+            ));
+        }
+    }
+}
+
+/// Returns `true` if the given function is decorated with `@airflow.decorators.task`.
+fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
+            })
+    })
 }
