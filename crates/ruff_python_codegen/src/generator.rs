@@ -1719,7 +1719,7 @@ class Foo:
     #[test]
     fn quote() {
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
-        assert_eq!(round_trip(r"'hello'"), r#""hello""#);
+        assert_round_trip!(r"'hello'");
         assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
         assert_round_trip!(r"r'hello'");
         assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
