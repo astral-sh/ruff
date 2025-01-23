@@ -1,17 +1,5 @@
 # Deferred annotations
 
-## Basic deferred annotation
-
-```pyi path=mod.pyi
-class C(object): ...
-```
-
-```py
-from mod import C
-
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[object]]
-```
-
 ## Deferred annotations in stubs always resolve
 
 ```pyi path=mod.pyi
