@@ -12,7 +12,7 @@ use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextSize;
-use salsa::Setter;
+use std::fmt::Write;
 
 mod assertion;
 mod config;
@@ -108,7 +108,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 "Supported file types are: py, pyi, text"
             );
 
-            let full_path = if embedded.path.starts_with("/") {
+            let full_path = if embedded.path.starts_with('/') {
                 SystemPathBuf::from(embedded.path)
             } else {
                 project_root.join(embedded.path)
@@ -146,16 +146,16 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             let versions_file = typeshed_path.join("stdlib/VERSIONS");
             let contents = typeshed_files
                 .iter()
-                .map(|path| {
+                .fold(String::new(), |mut content, path| {
                     // This is intentionally kept simple:
                     let module_path = path
                         .as_str()
                         .trim_end_matches(".pyi")
                         .trim_end_matches("/__init__")
-                        .replace("/", ".");
-                    format!("{module_path}: 3.8-\n")
-                })
-                .collect::<String>();
+                        .replace('/', ".");
+                    let _ = writeln!(content, "{module_path}: 3.8-");
+                    content
+                });
             db.write_file(&versions_file, contents).unwrap();
         }
     }
