@@ -274,39 +274,42 @@ pub(crate) fn unittest_assertion(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    match func {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-            if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
-                let mut diagnostic = Diagnostic::new(
-                    PytestUnittestAssertion {
-                        assertion: unittest_assert.to_string(),
-                    },
-                    func.range(),
-                );
-                // We're converting an expression to a statement, so avoid applying the fix if
-                // the assertion is part of a larger expression.
-                if checker.semantic().current_statement().is_expr_stmt()
-                    && checker.semantic().current_expression_parent().is_none()
-                    && !checker.comment_ranges().intersects(expr.range())
-                {
-                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            checker.generator().stmt(&stmt),
-                            parenthesized_range(
-                                expr.into(),
-                                checker.semantic().current_statement().into(),
-                                checker.comment_ranges(),
-                                checker.locator().contents(),
-                            )
-                            .unwrap_or(expr.range()),
-                        )));
-                    }
-                }
-                checker.diagnostics.push(diagnostic);
-            }
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+        return;
+    };
+
+    let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(
+        PytestUnittestAssertion {
+            assertion: unittest_assert.to_string(),
+        },
+        func.range(),
+    );
+
+    // We're converting an expression to a statement, so avoid applying the fix if
+    // the assertion is part of a larger expression.
+    if checker.semantic().current_statement().is_expr_stmt()
+        && checker.semantic().current_expression_parent().is_none()
+        && !checker.comment_ranges().intersects(expr.range())
+    {
+        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&stmt),
+                parenthesized_range(
+                    expr.into(),
+                    checker.semantic().current_statement().into(),
+                    checker.comment_ranges(),
+                    checker.locator().contents(),
+                )
+                .unwrap_or(expr.range()),
+            )));
         }
-        _ => {}
     }
+
+    checker.diagnostics.push(diagnostic);
 }
 
 /// ## What it does
