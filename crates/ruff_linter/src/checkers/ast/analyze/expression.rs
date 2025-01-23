@@ -948,7 +948,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PytestUnittestRaisesAssertion) {
                 if let Some(diagnostic) =
-                    flake8_pytest_style::rules::unittest_raises_assertion(checker, call)
+                    flake8_pytest_style::rules::unittest_raises_assertion_call(checker, call)
                 {
                     checker.diagnostics.push(diagnostic);
                 }
