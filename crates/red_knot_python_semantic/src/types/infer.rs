@@ -6080,29 +6080,6 @@ mod tests {
     }
 
     #[test]
-    fn resolve_method() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/mod.py",
-            "
-            class C:
-                def f(self): pass
-            ",
-        )?;
-
-        let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let class_ty = global_symbol(&db, mod_file, "C")
-            .expect_type()
-            .expect_class_literal();
-        let member_ty = class_ty.member(&db, "f").expect_type();
-        let func = member_ty.expect_function_literal();
-
-        assert_eq!(func.name(&db), "f");
-        Ok(())
-    }
-
-    #[test]
     fn not_literal_string() -> anyhow::Result<()> {
         let mut db = setup_db();
         let content = format!(
