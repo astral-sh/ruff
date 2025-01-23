@@ -6,8 +6,8 @@ use hashbrown::hash_map::RawEntryMut;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast};
 use rustc_hash::FxHasher;
 
 use crate::ast_node_ref::AstNodeRef;
