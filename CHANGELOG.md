@@ -16,17 +16,17 @@
 - [`pyupgrade`] Handle multiple base classes for PEP 695 generics (`UP046`) ([#15659](https://github.com/astral-sh/ruff/pull/15659))
 - [`refurb`] Implement `for-loop-writes` (`FURB122`) ([#10630](https://github.com/astral-sh/ruff/pull/10630))
 - [`ruff`] Needless `else` clause (`RUF047`) ([#15051](https://github.com/astral-sh/ruff/pull/15051))
-- [`ruff`] `itertools.starmap(..., zip(...))` (`RUF058`) ([#15483](https://github.com/astral-sh/ruff/pull/15483))
+- [`ruff`] Implement `starmap-zip` (`RUF058`) ([#15483](https://github.com/astral-sh/ruff/pull/15483))
 
 ### Rule changes
 
-- Apply redefinition fixes by source code order ([#15575](https://github.com/astral-sh/ruff/pull/15575))
-- Avoid removing too many imports in `redefined-while-unused` ([#15585](https://github.com/astral-sh/ruff/pull/15585))
-- Group redefinition fixes by source statement ([#15574](https://github.com/astral-sh/ruff/pull/15574))
+- Apply redefinition fixes by source code order (`F811`) ([#15575](https://github.com/astral-sh/ruff/pull/15575))
+- Avoid removing too many imports in `redefined-while-unused` (`F811`) ([#15585](https://github.com/astral-sh/ruff/pull/15585))
+- Group redefinition fixes by source statement (`F811`) ([#15574](https://github.com/astral-sh/ruff/pull/15574))
 - [`flake8-bugbear`] Do not raise error if keyword argument is present and target-python version is less or equals than 3.9 (`B903`) ([#15549](https://github.com/astral-sh/ruff/pull/15549))
 - [`flake8-comprehensions`] strip parentheses around generators in `unnecessary-generator-set` (`C401`) ([#15553](https://github.com/astral-sh/ruff/pull/15553))
 - [`flake8-simplify`] Mark fixes as unsafe (`SIM201`, `SIM202`) ([#15626](https://github.com/astral-sh/ruff/pull/15626))
-- [`flake8-type-checking`] Fix some safe fixes being labeled unsafe ([#15638](https://github.com/astral-sh/ruff/pull/15638))
+- [`flake8-type-checking`] Fix some safe fixes being labeled unsafe (`TC006`,`TC008`) ([#15638](https://github.com/astral-sh/ruff/pull/15638))
 - [`isort`] Omit trailing whitespace in `unsorted-imports` (`I001`) ([#15518](https://github.com/astral-sh/ruff/pull/15518))
 - [`pydoclint`] Allow ignoring one line docstrings for `DOC` rules ([#13302](https://github.com/astral-sh/ruff/pull/13302))
 - [`pylint`] Include name of base class in message for `redefined-slots-in-subclass` (`W0244`) ([#15559](https://github.com/astral-sh/ruff/pull/15559))
@@ -43,25 +43,21 @@
 
 ### Server
 
-- Consider `unsafe-fixes` settings for code actions ([#15666](https://github.com/astral-sh/ruff/pull/15666))
+- Allow `unsafe-fixes` settings for code actions ([#15666](https://github.com/astral-sh/ruff/pull/15666))
 
 ### Bug fixes
 
 - [`flake8-bandit`] Add missing single-line/dotall regex flag (`S608`) ([#15654](https://github.com/astral-sh/ruff/pull/15654))
 - [`flake8-simplify`] Do not emit diagnostics for expressions inside string type annotations (`SIM222`, `SIM223`) ([#15405](https://github.com/astral-sh/ruff/pull/15405))
 - [`pyflakes`] Treat arguments passed to the `default=` parameter of `TypeVar` as type expressions (`F821`) ([#15679](https://github.com/astral-sh/ruff/pull/15679))
-- [`pyupgrade`] Avoid syntax error when the iterable is an non-parenthesized tuple (`UP028`) ([#15543](https://github.com/astral-sh/ruff/pull/15543))
+- [`pyupgrade`] Avoid syntax error when the iterable is a non-parenthesized tuple (`UP028`) ([#15543](https://github.com/astral-sh/ruff/pull/15543))
 - [`ruff`] Exempt `NewType` calls where the original type is immutable (`RUF009`) ([#15588](https://github.com/astral-sh/ruff/pull/15588))
-- [`unconventional-import-alias`] Fix infinite loop between ICN001 and I002 (`ICN001`) ([#15480](https://github.com/astral-sh/ruff/pull/15480))
+- [`unconventional-import-alias`] Fix infinite loop between `ICN001` and `I002` (`ICN001`) ([#15480](https://github.com/astral-sh/ruff/pull/15480))
 
 ### Documentation
 
 - Generate documentation redirects for lowercase rule codes ([#15564](https://github.com/astral-sh/ruff/pull/15564))
-- TRY300: Add some extra notes on not catching exceptions you didn't expect ([#15036](https://github.com/astral-sh/ruff/pull/15036))
-
-### Other changes
-
-- [red-knot] Migrate `is_gradual_equivalent_to` unit tests to Markdown tests ([#15563](https://github.com/astral-sh/ruff/pull/15563))
+- `TRY300`: Add some extra notes on not catching exceptions you didn't expect ([#15036](https://github.com/astral-sh/ruff/pull/15036))
 
 ## 0.9.2
 
