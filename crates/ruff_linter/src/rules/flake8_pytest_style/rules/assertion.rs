@@ -14,7 +14,7 @@ use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
+    self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
@@ -368,17 +368,18 @@ impl Violation for PytestUnittestRaisesAssertion {
 
 /// PT027
 pub(crate) fn unittest_raises_assertion_call(checker: &mut Checker, call: &ast::ExprCall) {
-    // Bindings in `with` statements are handled by `unittest_raises_assertion_with`.
+    // Bindings in `with` statements are handled by `unittest_raises_assertion_bindings`.
     if let Stmt::With(ast::StmtWith { items, .. }) = checker.semantic().current_statement() {
-        if items
-            .iter()
-            .any(|item| item.context_expr.range() == call.range && item.optional_vars.is_some())
-        {
+        let call_ref = AnyNodeRef::from(call);
+
+        if items.iter().any(|item| {
+            AnyNodeRef::from(&item.context_expr).ptr_eq(call_ref) && item.optional_vars.is_some()
+        }) {
             return;
         }
     }
 
-    if let Some(diagnostic) = unittest_raises_assertion(call, [], checker) {
+    if let Some(diagnostic) = unittest_raises_assertion(call, vec![], checker) {
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -404,6 +405,18 @@ pub(crate) fn unittest_raises_assertion_binding(
 
     let mut edits = vec![];
 
+    // Rewrite all references to `.exception` to `.value`:
+    // ```py
+    // # Before
+    // with self.assertRaises(Exception) as e:
+    //     ...
+    // print(e.exception)
+    //
+    // # After
+    // with pytest.raises(Exception) as e:
+    //     ...
+    // print(e.value)
+    // ```
     for reference_id in binding.references() {
         let reference = semantic.reference(reference_id);
         let node_id = reference.expression_id()?;
@@ -422,7 +435,6 @@ pub(crate) fn unittest_raises_assertion_binding(
     unittest_raises_assertion(call, edits, checker)
 }
 
-#[inline]
 fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) -> Option<&'a Expr> {
     with.items.iter().find_map(|item| {
         let Some(optional_var) = &item.optional_vars else {
@@ -443,7 +455,7 @@ fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) ->
 
 fn unittest_raises_assertion(
     call: &ast::ExprCall,
-    extra_edits: impl IntoIterator<Item = Edit>,
+    extra_edits: Vec<Edit>,
     checker: &Checker,
 ) -> Option<Diagnostic> {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
