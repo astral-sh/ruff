@@ -46,6 +46,7 @@
 use crate::semantic_index::use_def::VisibilityConstraints;
 
 use super::bitset::{BitSet, BitSetIterator};
+use itertools::{izip, EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
 
@@ -96,7 +97,6 @@ type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
 
 /// Iterate over all constraints for a single binding.
 type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
-type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 
 /// A newtype-index for a visibility constraint in a particular scope.
 #[newtype_index]
@@ -123,11 +123,9 @@ type VisibilityConstraintPerBinding = SmallVec<InlineVisibilityConstraintsArray>
 /// Iterator over the visibility constraints for all live bindings/declarations.
 type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityConstraintId>;
 
-type VisibilityConstraintsIntoIterator = smallvec::IntoIter<InlineVisibilityConstraintsArray>;
-
 /// Live declarations for a single symbol at some point in control flow, with their
 /// corresponding visibility constraints.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     pub(crate) live_declarations: Declarations,
@@ -173,11 +171,45 @@ impl SymbolDeclarations {
             visibility_constraints: self.visibility_constraints.iter(),
         }
     }
+
+    fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
+        let mut a = Self::default();
+        std::mem::swap(&mut a, self);
+        let a = izip!(
+            a.live_declarations.iter(),
+            a.visibility_constraints.into_iter()
+        );
+        let b = izip!(
+            b.live_declarations.iter(),
+            b.visibility_constraints.into_iter()
+        );
+        for zipped in a.merge_join_by(b, |(a_decl, _), (b_decl, _)| a_decl.cmp(b_decl)) {
+            match zipped {
+                EitherOrBoth::Both((decl, a_vis_constraint), (_, b_vis_constraint)) => {
+                    let vis_constraint = visibility_constraints
+                        .add_or_constraint(a_vis_constraint, b_vis_constraint);
+                    self.add_via_merge(decl, vis_constraint);
+                }
+
+                EitherOrBoth::Left((decl, vis_constraint))
+                | EitherOrBoth::Right((decl, vis_constraint)) => {
+                    self.add_via_merge(decl, vis_constraint);
+                }
+            }
+        }
+    }
+
+    fn add_via_merge(&mut self, decl: u32, vis_constraint: ScopedVisibilityConstraintId) {
+        // SAFETY: This can only be called from `merge`, since it assumes that we are adding
+        // elements in order, sorted by `decl`.
+        self.live_declarations.insert(decl);
+        self.visibility_constraints.push(vis_constraint);
+    }
 }
 
 /// Live bindings for a single symbol at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a visibility constraint.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SymbolBindings {
     /// [`BitSet`]: which bindings (as [`ScopedDefinitionId`]) can reach the current location?
     live_bindings: Bindings,
@@ -242,6 +274,59 @@ impl SymbolBindings {
             visibility_constraints: self.visibility_constraints.iter(),
         }
     }
+
+    fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
+        let mut a = Self::default();
+        std::mem::swap(&mut a, self);
+        let a = izip!(
+            a.live_bindings.iter(),
+            a.constraints.into_iter(),
+            a.visibility_constraints.into_iter()
+        );
+        let b = izip!(
+            b.live_bindings.iter(),
+            b.constraints.into_iter(),
+            b.visibility_constraints.into_iter()
+        );
+        for zipped in a.merge_join_by(b, |(a_def, _, _), (b_def, _, _)| a_def.cmp(b_def)) {
+            match zipped {
+                EitherOrBoth::Both(
+                    (def, a_constraints, a_vis_constraint),
+                    (_, b_constraints, b_vis_constraint),
+                ) => {
+                    // If the same definition is visible through both paths, any constraint
+                    // that applies on only one path is irrelevant to the resulting type from
+                    // unioning the two paths, so we intersect the constraints.
+                    let mut constraints = a_constraints;
+                    constraints.intersect(&b_constraints);
+
+                    // For visibility constraints, we merge them using a ternary OR operation:
+                    let vis_constraint = visibility_constraints
+                        .add_or_constraint(a_vis_constraint, b_vis_constraint);
+
+                    self.add_via_merge(def, constraints, vis_constraint);
+                }
+
+                EitherOrBoth::Left((def, constraints, vis_constraint))
+                | EitherOrBoth::Right((def, constraints, vis_constraint)) => {
+                    self.add_via_merge(def, constraints, vis_constraint);
+                }
+            }
+        }
+    }
+
+    fn add_via_merge(
+        &mut self,
+        def: u32,
+        constraints: Constraints,
+        vis_constraint: ScopedVisibilityConstraintId,
+    ) {
+        // SAFETY: This can only be called from `merge`, since it assumes that we are adding
+        // elements in order, sorted by `def`.
+        self.live_bindings.insert(def);
+        self.constraints.push(constraints);
+        self.visibility_constraints.push(vis_constraint);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -303,202 +388,9 @@ impl SymbolState {
         b: SymbolState,
         visibility_constraints: &mut VisibilityConstraints,
     ) {
-        let mut a = Self {
-            bindings: SymbolBindings {
-                live_bindings: Bindings::default(),
-                constraints: ConstraintsPerBinding::default(),
-                visibility_constraints: VisibilityConstraintPerBinding::default(),
-            },
-            declarations: SymbolDeclarations {
-                live_declarations: self.declarations.live_declarations.clone(),
-                visibility_constraints: VisibilityConstraintPerDeclaration::default(),
-            },
-        };
-
-        std::mem::swap(&mut a, self);
+        self.bindings.merge(b.bindings, visibility_constraints);
         self.declarations
-            .live_declarations
-            .union(&b.declarations.live_declarations);
-
-        let mut a_defs_iter = a.bindings.live_bindings.iter();
-        let mut b_defs_iter = b.bindings.live_bindings.iter();
-        let mut a_constraints_iter = a.bindings.constraints.into_iter();
-        let mut b_constraints_iter = b.bindings.constraints.into_iter();
-        let mut a_vis_constraints_iter = a.bindings.visibility_constraints.into_iter();
-        let mut b_vis_constraints_iter = b.bindings.visibility_constraints.into_iter();
-
-        let mut opt_a_def: Option<u32> = a_defs_iter.next();
-        let mut opt_b_def: Option<u32> = b_defs_iter.next();
-
-        // Iterate through the definitions from `a` and `b`, always processing the lower definition
-        // ID first, and pushing each definition onto the merged `SymbolState` with its
-        // constraints. If a definition is found in both `a` and `b`, push it with the intersection
-        // of the constraints from the two paths; a constraint that applies from only one possible
-        // path is irrelevant.
-
-        // Helper to push `def`, with constraints in `constraints_iter`, onto `self`.
-        let push = |def,
-                    constraints_iter: &mut ConstraintsIntoIterator,
-                    visibility_constraints_iter: &mut VisibilityConstraintsIntoIterator,
-                    merged: &mut Self| {
-            merged.bindings.live_bindings.insert(def);
-            // SAFETY: we only ever create SymbolState using [`SymbolState::undefined`], which adds
-            // one "unbound" definition with corresponding narrowing and visibility constraints, or
-            // using [`SymbolState::record_binding`] or [`SymbolState::record_declaration`], which
-            // similarly add one definition with corresponding constraints. [`SymbolState::merge`]
-            // always pushes one definition and one constraint bitset and one visibility constraint
-            // together (just below), so the number of definitions and the number of constraints can
-            // never get out of sync.
-            // get out of sync.
-            let constraints = constraints_iter
-                .next()
-                .expect("definitions and constraints length mismatch");
-            let visibility_constraints = visibility_constraints_iter
-                .next()
-                .expect("definitions and visibility_constraints length mismatch");
-            merged.bindings.constraints.push(constraints);
-            merged
-                .bindings
-                .visibility_constraints
-                .push(visibility_constraints);
-        };
-
-        loop {
-            match (opt_a_def, opt_b_def) {
-                (Some(a_def), Some(b_def)) => match a_def.cmp(&b_def) {
-                    std::cmp::Ordering::Less => {
-                        // Next definition ID is only in `a`, push it to `self` and advance `a`.
-                        push(
-                            a_def,
-                            &mut a_constraints_iter,
-                            &mut a_vis_constraints_iter,
-                            self,
-                        );
-                        opt_a_def = a_defs_iter.next();
-                    }
-                    std::cmp::Ordering::Greater => {
-                        // Next definition ID is only in `b`, push it to `self` and advance `b`.
-                        push(
-                            b_def,
-                            &mut b_constraints_iter,
-                            &mut b_vis_constraints_iter,
-                            self,
-                        );
-                        opt_b_def = b_defs_iter.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        // Next definition is in both; push to `self` and intersect constraints.
-                        push(
-                            a_def,
-                            &mut b_constraints_iter,
-                            &mut b_vis_constraints_iter,
-                            self,
-                        );
-
-                        // SAFETY: see comment in `push` above.
-                        let a_constraints = a_constraints_iter
-                            .next()
-                            .expect("definitions and constraints length mismatch");
-                        let current_constraints = self.bindings.constraints.last_mut().unwrap();
-
-                        // If the same definition is visible through both paths, any constraint
-                        // that applies on only one path is irrelevant to the resulting type from
-                        // unioning the two paths, so we intersect the constraints.
-                        current_constraints.intersect(&a_constraints);
-
-                        // For visibility constraints, we merge them using a ternary OR operation:
-                        let a_vis_constraint = a_vis_constraints_iter
-                            .next()
-                            .expect("visibility_constraints length mismatch");
-                        let current_vis_constraint =
-                            self.bindings.visibility_constraints.last_mut().unwrap();
-                        *current_vis_constraint = visibility_constraints
-                            .add_or_constraint(*current_vis_constraint, a_vis_constraint);
-
-                        opt_a_def = a_defs_iter.next();
-                        opt_b_def = b_defs_iter.next();
-                    }
-                },
-                (Some(a_def), None) => {
-                    // We've exhausted `b`, just push the def from `a` and move on to the next.
-                    push(
-                        a_def,
-                        &mut a_constraints_iter,
-                        &mut a_vis_constraints_iter,
-                        self,
-                    );
-                    opt_a_def = a_defs_iter.next();
-                }
-                (None, Some(b_def)) => {
-                    // We've exhausted `a`, just push the def from `b` and move on to the next.
-                    push(
-                        b_def,
-                        &mut b_constraints_iter,
-                        &mut b_vis_constraints_iter,
-                        self,
-                    );
-                    opt_b_def = b_defs_iter.next();
-                }
-                (None, None) => break,
-            }
-        }
-
-        // Same as above, but for declarations.
-        let mut a_decls_iter = a.declarations.live_declarations.iter();
-        let mut b_decls_iter = b.declarations.live_declarations.iter();
-        let mut a_vis_constraints_iter = a.declarations.visibility_constraints.into_iter();
-        let mut b_vis_constraints_iter = b.declarations.visibility_constraints.into_iter();
-
-        let mut opt_a_decl: Option<u32> = a_decls_iter.next();
-        let mut opt_b_decl: Option<u32> = b_decls_iter.next();
-
-        let push = |vis_constraints_iter: &mut VisibilityConstraintsIntoIterator,
-                    merged: &mut Self| {
-            let vis_constraints = vis_constraints_iter
-                .next()
-                .expect("declarations and visibility_constraints length mismatch");
-            merged
-                .declarations
-                .visibility_constraints
-                .push(vis_constraints);
-        };
-
-        loop {
-            match (opt_a_decl, opt_b_decl) {
-                (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
-                    std::cmp::Ordering::Less => {
-                        push(&mut a_vis_constraints_iter, self);
-                        opt_a_decl = a_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Greater => {
-                        push(&mut b_vis_constraints_iter, self);
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        push(&mut b_vis_constraints_iter, self);
-
-                        let a_vis_constraint = a_vis_constraints_iter
-                            .next()
-                            .expect("declarations and visibility_constraints length mismatch");
-                        let current = self.declarations.visibility_constraints.last_mut().unwrap();
-                        *current =
-                            visibility_constraints.add_or_constraint(*current, a_vis_constraint);
-
-                        opt_a_decl = a_decls_iter.next();
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                },
-                (Some(_), None) => {
-                    push(&mut a_vis_constraints_iter, self);
-                    opt_a_decl = a_decls_iter.next();
-                }
-                (None, Some(_)) => {
-                    push(&mut b_vis_constraints_iter, self);
-                    opt_b_decl = b_decls_iter.next();
-                }
-                (None, None) => break,
-            }
-        }
+            .merge(b.declarations, visibility_constraints);
     }
 
     pub(super) fn bindings(&self) -> &SymbolBindings {
