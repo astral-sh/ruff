@@ -80,26 +80,27 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     diagnostics
 }
 
-/// Computes a possibly-widened type from the inferred type of a symbol.
+/// Unions the type inside the symbol with `Unknown`, unless the type is a known-instance type
+/// or the symbol is considered non-modifiable.
 ///
 /// When accessing a symbol from another scope that has no declared type, we use this to
 /// compute the union `Unknown | T_inferred`, unless the symbol is considered non-modifiable.
-fn widen_type_for_undeclared_public_symbol<'db>(
+fn union_public_type_with_unknown<'db>(
     db: &'db dyn Db,
-    inferred: Symbol<'db>,
+    symbol: Symbol<'db>,
     is_considered_non_modifiable: bool,
 ) -> Symbol<'db> {
     // We special-case known-instance types here since symbols like `typing.Any` are typically
     // not declared in the stubs (e.g. `Any = object()`), but we still want to treat them as
     // such.
-    let is_known_instance = inferred
+    let is_known_instance = symbol
         .ignore_possibly_unbound()
         .is_some_and(|ty| matches!(ty, Type::KnownInstance(_)));
 
     if is_considered_non_modifiable || is_known_instance {
-        inferred
+        symbol
     } else {
-        inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
+        symbol.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
     }
 }
 
@@ -120,12 +121,14 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         let declarations = use_def.public_declarations(symbol_id);
         let declared = symbol_from_declarations(db, declarations);
         let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
+        let union_with_unknown =
+            |db, symbol| union_public_type_with_unknown(db, symbol, is_dunder_slots || is_final);
         let declared = declared.map(|SymbolAndQualifiers(symbol, _)| symbol);
 
         match declared {
             // Symbol is declared, trust the declared type
             Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
-            // Symbol is possibly declared
+            // Symbol is possibly undeclared
             Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
                 let bindings = use_def.public_bindings(symbol_id);
                 let inferred = symbol_from_bindings(db, bindings);
@@ -136,12 +139,18 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                         // TODO: We probably don't want to report `Bound` here. This requires a bit of
                         // design work though as we might want a different behavior for stubs and for
                         // normal modules.
-                        Symbol::Type(declared_ty, Boundness::Bound)
+                        union_with_unknown(db, Symbol::Type(declared_ty, Boundness::Bound))
                     }
                     // Symbol is possibly undeclared and (possibly) bound
-                    Symbol::Type(inferred_ty, boundness) => Symbol::Type(
-                        UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
-                        boundness,
+                    Symbol::Type(inferred_ty, boundness) => union_with_unknown(
+                        db,
+                        Symbol::Type(
+                            UnionType::from_elements(
+                                db,
+                                [inferred_ty, declared_ty].iter().copied(),
+                            ),
+                            boundness,
+                        ),
                     ),
                 }
             }
@@ -150,7 +159,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                 let bindings = use_def.public_bindings(symbol_id);
                 let inferred = symbol_from_bindings(db, bindings);
 
-                widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots || is_final)
+                union_with_unknown(db, inferred)
             }
             // Symbol has conflicting declared types
             Err((declared_ty, _)) => {
@@ -4141,7 +4150,7 @@ impl<'db> Class<'db> {
                     let inferred = symbol_from_bindings(db, bindings);
 
                     SymbolAndQualifiers(
-                        widen_type_for_undeclared_public_symbol(db, inferred, symbol.is_final()),
+                        union_public_type_with_unknown(db, inferred, symbol.is_final()),
                         qualifiers,
                     )
                 }

@@ -53,7 +53,7 @@ Importing an annotated name prefers the declared type over the inferred type:
 from maybe_unbound_annotated import x, y
 
 reveal_type(x)  # revealed: Unknown | Literal[3]
-reveal_type(y)  # revealed: int
+reveal_type(y)  # revealed: Unknown | int
 ```
 
 ## Maybe undeclared
@@ -71,7 +71,7 @@ if coinflip():
 ```py
 from maybe_undeclared import x
 
-reveal_type(x)  # revealed: int
+reveal_type(x)  # revealed: Unknown | int
 ```
 
 ## Reimport
@@ -119,5 +119,5 @@ else:
 ```py
 from b import x
 
-reveal_type(x)  # revealed: int
+reveal_type(x)  # revealed: Unknown | int
 ```

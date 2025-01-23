@@ -79,7 +79,7 @@ def _(flag: bool):
     # that `Foo.__iadd__` may be unbound as additional context.
     f += "Hello, world!"
 
-    reveal_type(f)  # revealed: int | Unknown
+    reveal_type(f)  # revealed: Unknown | int
 ```
 
 ## Partially bound with `__add__`
@@ -96,7 +96,7 @@ def _(flag: bool):
     f = Foo()
     f += "Hello, world!"
 
-    reveal_type(f)  # revealed: int | str
+    reveal_type(f)  # revealed: Unknown | int | str
 ```
 
 ## Partially bound target union
@@ -116,7 +116,7 @@ def _(flag1: bool, flag2: bool):
         f = 42.0
     f += 12
 
-    reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: Unknown | int | str | float
 ```
 
 ## Target union
@@ -160,5 +160,5 @@ def f(flag: bool, flag2: bool):
         f = Bar()
     f += 12
 
-    reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: Unknown | int | str | float
 ```

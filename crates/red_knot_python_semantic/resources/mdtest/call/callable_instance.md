@@ -29,7 +29,7 @@ def _(flag: bool):
 
     a = PossiblyNotCallable()
     result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
-    reveal_type(result)  # revealed: int
+    reveal_type(result)  # revealed: Unknown | int
 ```
 
 ## Possibly unbound callable
@@ -67,7 +67,7 @@ def _(flag: bool):
             def __call__(self) -> int: ...
 
     a = NonCallable()
-    # error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
+    # error: "Object of type `Unknown | Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
     reveal_type(a())  # revealed: Unknown | int
 ```
 
