@@ -371,8 +371,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Records that all remaining statements in the current block are unreachable, and therefore
     /// not visible.
     fn record_unreachable_visibility(&mut self) -> ScopedVisibilityConstraintId {
-        let id = self.add_visibility_constraint(VisibilityConstraint::AlwaysTrue);
-        self.record_negated_visibility_constraint(id)
+        self.record_negated_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_TRUE)
     }
 
     /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
