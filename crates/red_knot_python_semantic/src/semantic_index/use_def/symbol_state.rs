@@ -275,16 +275,17 @@ impl SymbolBindings {
     }
 
     /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter(&self) -> impl Iterator<Item = BindingIdWithConstraints<'_>> + '_ {
+    pub(super) fn iter(
+        &self,
+    ) -> impl Iterator<Item = BindingIdWithConstraints<impl Iterator<Item = ScopedConstraintId> + '_>> + '_
+    {
         let i = (self.live_bindings.iter())
             .zip(self.constraints.iter())
             .zip(self.visibility_constraints.iter());
         i.map(
             |((def, constraints), visibility_constraint_id)| BindingIdWithConstraints {
                 definition: ScopedDefinitionId::from_u32(def),
-                constraint_ids: ConstraintIdIterator {
-                    wrapped: constraints.iter(),
-                },
+                constraint_ids: constraints.iter().map(ScopedConstraintId::from_u32),
                 visibility_constraint: *visibility_constraint_id,
             },
         )
@@ -424,26 +425,11 @@ impl SymbolState {
 /// narrowing constraints ([`ScopedConstraintId`]) and a corresponding visibility
 /// visibility constraint ([`ScopedVisibilityConstraintId`]).
 #[derive(Debug)]
-pub(super) struct BindingIdWithConstraints<'map> {
+pub(super) struct BindingIdWithConstraints<I> {
     pub(super) definition: ScopedDefinitionId,
-    pub(super) constraint_ids: ConstraintIdIterator<'map>,
+    pub(super) constraint_ids: I,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
-
-#[derive(Debug)]
-pub(super) struct ConstraintIdIterator<'a> {
-    wrapped: BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>,
-}
-
-impl Iterator for ConstraintIdIterator<'_> {
-    type Item = ScopedConstraintId;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.wrapped.next().map(ScopedConstraintId::from_u32)
-    }
-}
-
-impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
 /// A single declaration (as [`ScopedDefinitionId`]) with a corresponding visibility
 /// visibility constraint ([`ScopedVisibilityConstraintId`]).
