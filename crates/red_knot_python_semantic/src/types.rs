@@ -7,7 +7,7 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use type_ordering::union_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
