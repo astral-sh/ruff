@@ -1,12 +1,15 @@
-import pendulum
-from airflow.models import DAG
-from airflow.operators.dummy import DummyOperator
 from datetime import datetime
-from airflow.plugins_manager import AirflowPlugin
-from airflow.models.baseoperator import BaseOperator
+
+import pendulum
+
 from airflow.decorators import dag, task
+from airflow.models import DAG
+from airflow.models.baseoperator import BaseOperator
+from airflow.operators.dummy import DummyOperator
+from airflow.plugins_manager import AirflowPlugin
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.utils.context import get_current_context
+
 
 def access_invalid_key_in_context(**context):
     print("access invalid key", context["conf"])

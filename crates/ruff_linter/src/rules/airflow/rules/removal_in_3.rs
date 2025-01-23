@@ -97,7 +97,7 @@ fn extract_name_from_slice(slice: &Expr) -> Option<String> {
 
 /// Check if a subscript expression accesses a removed Airflow context variable.
 /// If a removed key is found, push a corresponding diagnostic.
-fn removed_context_variable(checker: &mut Checker, subscript: &ExprSubscript) {
+fn check_context_variable(checker: &mut Checker, subscript: &ExprSubscript) {
     let ExprSubscript { value, slice, .. } = subscript;
 
     let is_context_arg = if let Expr::Name(ExprName { id, .. }) = &**value {
@@ -147,7 +147,7 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 check_call_arguments(checker, &qualname, arguments);
             };
             check_method(checker, call_expr);
-            check_context_get(checker, call_expr);
+            check_removed_context_keys_usage(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { attr, .. }) => {
             check_name(checker, expr, attr.range());
@@ -162,7 +162,7 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
             }
         }
         Expr::Subscript(subscript_expr) => {
-            removed_context_variable(checker, subscript_expr);
+            check_context_variable(checker, subscript_expr);
         }
         _ => {}
     }
@@ -366,7 +366,7 @@ fn find_parameter<'a>(
 ///     # 'prev_ds' is also removed in Airflow 3.0
 ///     print(context.get("prev_ds"))
 /// ```
-fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
+fn check_removed_context_keys_usage(checker: &mut Checker, call_expr: &ExprCall) {
     if !is_taskflow(checker) {
         return;
     }
@@ -386,7 +386,7 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
         false
     };
 
-    let is_assigned_from_gcc =
+    let is_assigned_from_get_current_context =
         if let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) {
             matches!(
                 qualname.segments(),
@@ -396,7 +396,7 @@ fn check_context_get(checker: &mut Checker, call_expr: &ExprCall) {
             false
         };
 
-    if !(is_named_context || is_assigned_from_gcc) {
+    if !(is_named_context || is_assigned_from_get_current_context) {
         return;
     }
 
