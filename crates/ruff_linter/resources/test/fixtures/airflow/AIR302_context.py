@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 import pendulum
-
 from airflow.decorators import dag, task
 from airflow.models import DAG
 from airflow.models.baseoperator import BaseOperator
@@ -13,30 +14,22 @@ from airflow.utils.context import get_current_context
 
 def access_invalid_key_in_context(**context):
     print("access invalid key", context["conf"])
+    print("access invalid key", context.get("conf"))
+
 
 @task
 def access_invalid_key_task_out_of_dag(**context):
+    print("access invalid key", context["conf"])
     print("access invalid key", context.get("conf"))
 
-@dag(
-    schedule=None,
-    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
-    catchup=False,
-    tags=[""],
-)
-def invalid_dag():
-    @task()
-    def access_invalid_key_task(**context):
-        print("access invalid key", context.get("conf"))
 
-    task1 = PythonOperator(
-        task_id="task1",
-        python_callable=access_invalid_key_in_context,
-    )
-    access_invalid_key_task() >> task1
-    access_invalid_key_task_out_of_dag()
+@task
+def access_invalid_argument_task_out_of_dag(
+    execution_date, tomorrow_ds, logical_date, **context
+):
+    print("execution date", execution_date)
+    print("access invalid key", context.get("conf"))
 
-invalid_dag()
 
 @task
 def print_config(**context):
@@ -56,31 +49,9 @@ def print_config(**context):
     yesterday_ds = context["yesterday_ds"]
     yesterday_ds_nodash = context["yesterday_ds_nodash"]
 
-with DAG(
-    dag_id="example_dag",
-    schedule_interval="@daily",
-    start_date=datetime(2023, 1, 1),
-    template_searchpath=["/templates"],
-) as dag:
-    task1 = DummyOperator(
-        task_id="task1",
-        params={
-            # Removed variables in template
-            "execution_date": "{{ execution_date }}",
-            "next_ds": "{{ next_ds }}",
-            "prev_ds": "{{ prev_ds }}"
-        },
-    )
-
-class CustomMacrosPlugin(AirflowPlugin):
-    name = "custom_macros"
-    macros = {
-        "execution_date_macro": lambda context: context["execution_date"],
-        "next_ds_macro": lambda context: context["next_ds"]
-    }
 
 @task
-def print_config():
+def print_config_with_get_current_context():
     context = get_current_context()
     execution_date = context["execution_date"]
     next_ds = context["next_ds"]
@@ -94,8 +65,74 @@ def print_config():
     yesterday_ds = context["yesterday_ds"]
     yesterday_ds_nodash = context["yesterday_ds_nodash"]
 
+
+@task(task_id="print_the_context")
+def print_context(ds=None, **kwargs):
+    """Print the Airflow context and ds variable from the context."""
+    print(ds)
+    print(kwargs.get("tomorrow_ds"))
+    c = get_current_context()
+    c.get("execution_date")
+
+
+@dag(
+    schedule=None,
+    start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+    catchup=False,
+    tags=[""],
+)
+def invalid_dag():
+    @task()
+    def access_invalid_key_task(**context):
+        print("access invalid key", context.get("conf"))
+
+    @task()
+    def access_invalid_key_explicit_task(execution_date):
+        print(execution_date)
+
+    task1 = PythonOperator(
+        task_id="task1",
+        python_callable=access_invalid_key_in_context,
+    )
+
+    access_invalid_key_task() >> task1
+    access_invalid_key_explicit_task()
+    access_invalid_argument_task_out_of_dag()
+    access_invalid_key_task_out_of_dag()
+    print_config()
+    print_config_with_get_current_context()
+    print_context()
+
+
+invalid_dag()
+
+with DAG(
+    dag_id="example_dag",
+    schedule_interval="@daily",
+    start_date=datetime(2023, 1, 1),
+    template_searchpath=["/templates"],
+) as dag:
+    task1 = DummyOperator(
+        task_id="task1",
+        params={
+            # Removed variables in template
+            "execution_date": "{{ execution_date }}",
+            "next_ds": "{{ next_ds }}",
+            "prev_ds": "{{ prev_ds }}",
+        },
+    )
+
+
+class CustomMacrosPlugin(AirflowPlugin):
+    name = "custom_macros"
+    macros = {
+        "execution_date_macro": lambda context: context["execution_date"],
+        "next_ds_macro": lambda context: context["next_ds"],
+    }
+
+
 class CustomOperator(BaseOperator):
-    def execute(self, context):
+    def execute(self, next_ds, context):
         execution_date = context["execution_date"]
         next_ds = context["next_ds"]
         next_ds_nodash = context["next_ds_nodash"]
@@ -108,18 +145,6 @@ class CustomOperator(BaseOperator):
         yesterday_ds = context["yesterday_ds"]
         yesterday_ds_nodash = context["yesterday_ds_nodash"]
 
-@task
-def access_invalid_argument_task_out_of_dag(execution_date, tomorrow_ds, logical_date, **context):
-    print("execution date", execution_date)
-    print("access invalid key", context.get("conf"))
-
-@task(task_id="print_the_context")
-def print_context(ds=None, **kwargs):
-    """Print the Airflow context and ds variable from the context."""
-    print(ds)
-    print(kwargs.get("tomorrow_ds"))
-    c = get_current_context()
-    c.get("execution_date")
 
 class CustomOperatorNew(BaseOperator):
     def execute(self, context):
