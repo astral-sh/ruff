@@ -294,6 +294,15 @@ impl SymbolBindings {
 
         // Invariant: These zips are well-formed since we maintain an invariant that all of our
         // fields are sets/vecs with the same length.
+        //
+        // Performance: We iterate over the `constraints` smallvecs via mut reference, because the
+        // individual elements are `BitSet`s (currently 24 bytes in size), and we don't want to
+        // move them by value multiple times during iteration. By iterating by reference, we only
+        // have to copy single pointers around.  In the loop below, the `std::mem::take` calls
+        // specify precisely where we want to move them into the merged `constraints` smallvec.
+        //
+        // We don't need a similar optimization for `visibility_constraints`, since those elements
+        // are 32-bit IndexVec IDs, and so are already cheap to move/copy.
         let a = (a.live_bindings.iter())
             .zip(a.constraints.iter_mut())
             .zip(a.visibility_constraints);
