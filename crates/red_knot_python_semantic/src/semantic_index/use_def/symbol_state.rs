@@ -184,21 +184,15 @@ impl SymbolDeclarations {
                 EitherOrBoth::Both((_, a_vis_constraint), (_, b_vis_constraint)) => {
                     let vis_constraint = visibility_constraints
                         .add_or_constraint(a_vis_constraint, b_vis_constraint);
-                    self.add_via_merge(vis_constraint);
+                    self.visibility_constraints.push(vis_constraint);
                 }
 
                 EitherOrBoth::Left((_, vis_constraint))
                 | EitherOrBoth::Right((_, vis_constraint)) => {
-                    self.add_via_merge(vis_constraint);
+                    self.visibility_constraints.push(vis_constraint);
                 }
             }
         }
-    }
-
-    fn add_via_merge(&mut self, vis_constraint: ScopedVisibilityConstraintId) {
-        // SAFETY: This can only be called from `merge`, since it assumes that we are adding
-        // elements in order, sorted by `decl`.
-        self.visibility_constraints.push(vis_constraint);
     }
 }
 
@@ -291,31 +285,21 @@ impl SymbolBindings {
                     // unioning the two paths, so we intersect the constraints.
                     let mut constraints = a_constraints;
                     constraints.intersect(&b_constraints);
+                    self.constraints.push(constraints);
 
                     // For visibility constraints, we merge them using a ternary OR operation:
                     let vis_constraint = visibility_constraints
                         .add_or_constraint(a_vis_constraint, b_vis_constraint);
-
-                    self.add_via_merge(constraints, vis_constraint);
+                    self.visibility_constraints.push(vis_constraint);
                 }
 
                 EitherOrBoth::Left(((_, constraints), vis_constraint))
                 | EitherOrBoth::Right(((_, constraints), vis_constraint)) => {
-                    self.add_via_merge(constraints, vis_constraint);
+                    self.constraints.push(constraints);
+                    self.visibility_constraints.push(vis_constraint);
                 }
             }
         }
-    }
-
-    fn add_via_merge(
-        &mut self,
-        constraints: Constraints,
-        vis_constraint: ScopedVisibilityConstraintId,
-    ) {
-        // SAFETY: This can only be called from `merge`, since it assumes that we are adding
-        // elements in order, sorted by `def`.
-        self.constraints.push(constraints);
-        self.visibility_constraints.push(vis_constraint);
     }
 }
 
