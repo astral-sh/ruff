@@ -60,7 +60,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let applicability = match rounded_value {
+    let mut applicability = match rounded_value {
         // ```python
         // some_int: int
         //
@@ -85,6 +85,10 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         RoundedValue::Int(InferredType::AssignableTo) => Applicability::Unsafe,
 
         _ => return,
+    };
+
+    if checker.comment_ranges().intersects(call.range()) {
+        applicability = Applicability::Unsafe;
     };
 
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
