@@ -135,13 +135,8 @@ def g(cond1: bool, cond2: bool):
 
 ## Terminal statement after a list comprehension
 
-This currently gives the wrong result because list comprehensions introduce an “eager” scope, which
-we don't handle correctly yet.  (The use in the list comprehension resolves relative to the _end_ of
-the containing function scope, not relative to the point in the scope where the comprehension
-appears.)
-
 ```py
 def f(x: str) -> int:
-    y = [x for i in range(len(x))] # error: [unresolved-reference]
+    y = [x for i in range(len(x))]
     return 4
 ```

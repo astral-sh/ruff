@@ -526,12 +526,6 @@ impl Default for UseDefMapBuilder<'_> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
         self.reachable = false;
-        let num_symbols = self.symbol_states.len();
-        self.symbol_states.truncate(0);
-        self.symbol_states.resize(
-            num_symbols,
-            SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_FALSE),
-        );
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
@@ -701,15 +695,21 @@ impl<'db> UseDefMapBuilder<'db> {
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
     pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+        // Unreachable snapshots should not be merged: If the current snapshot is unreachable, it
+        // should be completely overwritten by the snapshot we're merging in. If the other snapshot
+        // is unreachable, we should return without merging.
+        if !self.reachable {
+            self.restore(snapshot);
+            return;
+        }
+        if !snapshot.reachable {
+            return;
+        }
+
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
-
-        self.reachable |= snapshot.reachable;
-        if !snapshot.reachable {
-            return;
-        }
 
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
@@ -727,6 +727,9 @@ impl<'db> UseDefMapBuilder<'db> {
         self.scope_start_visibility = self
             .visibility_constraints
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
+
+        // At least one of the two snapshots was reachable, so the merged result is too.
+        self.reachable = true;
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
