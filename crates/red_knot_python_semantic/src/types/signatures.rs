@@ -543,7 +543,10 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         // TODO resolution should not be deferred; we should see A not B
-        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "B");
+        assert_eq!(
+            a_annotated_ty.unwrap().display(&db).to_string(),
+            "Unknown | B"
+        );
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
 
@@ -583,7 +586,10 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         // Parameter resolution deferred; we should see B
-        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "B");
+        assert_eq!(
+            a_annotated_ty.unwrap().display(&db).to_string(),
+            "Unknown | B"
+        );
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
 

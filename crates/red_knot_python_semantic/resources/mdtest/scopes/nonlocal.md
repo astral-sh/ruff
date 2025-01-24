@@ -6,7 +6,7 @@
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ## Two levels up
@@ -16,7 +16,7 @@ def f():
     x = 1
     def g():
         def h():
-            reveal_type(x)  # revealed: Literal[1]
+            reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ## Skips class scope
@@ -28,7 +28,7 @@ def f():
     class C:
         x = 2
         def g():
-            reveal_type(x)  # revealed: Literal[1]
+            reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ## Skips annotation-only assignment
@@ -41,7 +41,7 @@ def f():
         # name is otherwise not defined; maybe should be an error?
         x: int
         def h():
-            reveal_type(x)  # revealed: Literal[1]
+            reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ## Implicit global in function
@@ -52,5 +52,5 @@ A name reference to a never-defined symbol in a function is implicitly a global 
 x = 1
 
 def f():
-    reveal_type(x)  # revealed: Literal[1]
+    reveal_type(x)  # revealed: Unknown | Literal[1]
 ```

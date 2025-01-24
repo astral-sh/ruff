@@ -14,7 +14,8 @@ a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscri
 class NotSubscriptable:
     __getitem__ = None
 
-a = NotSubscriptable()[0]  # error: "Method `__getitem__` of type `None` is not callable on object of type `NotSubscriptable`"
+# error: "Method `__getitem__` of type `Unknown | None` is not callable on object of type `NotSubscriptable`"
+a = NotSubscriptable()[0]
 ```
 
 ## Valid getitem
