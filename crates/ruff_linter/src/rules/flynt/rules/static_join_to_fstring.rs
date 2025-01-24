@@ -80,8 +80,14 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                 })
                 .join(joiner)
                 .into_boxed_str(),
-            flags: flags.unwrap_or_default(),
-            ..ast::StringLiteral::default()
+            range: TextRange::default(),
+            flags: joinees
+                .first()
+                .unwrap()
+                .as_string_literal_expr()
+                .unwrap()
+                .value
+                .flags(),
         };
         return Some(node.into());
     }

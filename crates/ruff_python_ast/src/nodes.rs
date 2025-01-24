@@ -1221,14 +1221,14 @@ impl fmt::Debug for FStringElements {
 
 /// An AST node that represents either a single string literal or an implicitly
 /// concatenated string literals.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ExprStringLiteral {
     pub range: TextRange,
     pub value: StringLiteralValue,
 }
 
 /// The value representing a [`ExprStringLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteralValue {
     inner: StringLiteralValueInner,
 }
@@ -1239,6 +1239,18 @@ impl StringLiteralValue {
         Self {
             inner: StringLiteralValueInner::Single(string),
         }
+    }
+
+    /// Returns the [`StringLiteralFlags`] associated with this string literal.
+    ///
+    /// For an implicitly concatenated string, it returns the flags for the first literal.
+    pub fn flags(&self) -> StringLiteralFlags {
+        self.iter()
+            .next()
+            .expect(
+                "There should always be at least one string literal in an `ExprStringLiteral` node",
+            )
+            .flags
     }
 
     /// Creates a new string literal with the given values that represents an
@@ -1271,13 +1283,6 @@ impl StringLiteralValue {
         self.iter()
             .next()
             .is_some_and(|part| part.flags.prefix().is_unicode())
-    }
-
-    /// Returns the [`StringLiteralFlags`] associated with this string literal.
-    ///
-    /// For an implicitly concatenated string, it returns the flags for the first literal.
-    pub fn flags(&self) -> StringLiteralFlags {
-        self.iter().next().map(|s| s.flags).unwrap_or_default()
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -1378,12 +1383,6 @@ enum StringLiteralValueInner {
     Concatenated(ConcatenatedStringLiteral),
 }
 
-impl Default for StringLiteralValueInner {
-    fn default() -> Self {
-        Self::Single(StringLiteral::default())
-    }
-}
-
 bitflags! {
     #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct StringLiteralFlagsInner: u8 {
@@ -1425,10 +1424,14 @@ bitflags! {
 
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for a string literal.
-#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
+    pub fn empty() -> Self {
+        Self(StringLiteralFlagsInner::empty())
+    }
+
     #[must_use]
     pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
         self.0
@@ -1541,7 +1544,7 @@ impl fmt::Debug for StringLiteralFlags {
 
 /// An AST node that represents a single string literal which is part of an
 /// [`ExprStringLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
     pub value: Box<str>,
@@ -1567,7 +1570,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            flags: StringLiteralFlags::default().with_invalid(),
+            flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
 }
@@ -2136,7 +2139,7 @@ impl From<AnyStringFlags> for StringLiteralFlags {
                 value.prefix()
             )
         };
-        let new = StringLiteralFlags::default()
+        let new = StringLiteralFlags::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(prefix);
         if value.is_triple_quoted() {

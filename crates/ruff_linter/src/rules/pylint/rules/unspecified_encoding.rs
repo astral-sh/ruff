@@ -163,8 +163,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(ast::StringLiteral {
                         value: "utf-8".to_string().into_boxed_str(),
-                        flags: StringLiteralFlags::default()
-                            .with_quote_style(checker.stylist().quote()),
+                        flags: StringLiteralFlags::from(checker.stylist()),
                         range: TextRange::default(),
                     }),
                     range: TextRange::default(),
