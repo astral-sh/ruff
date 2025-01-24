@@ -88,7 +88,7 @@ def f(cond: bool) -> str:
         else:
             break
         return x
-    return "late"
+    return x  # error: [unresolved-reference]
 
 def g(cond: bool, i: int):
     x = "before"
