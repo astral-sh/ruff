@@ -102,17 +102,24 @@ def flag() -> bool: ...
 
 x = 1
 y = 2
+z = 3
 if flag():
-    x: Any
+    x: int
+    y: Any
     # error: [invalid-declaration]
-    y: str
+    z: str
 ```
 
 ```py
-from mod import x, y
+from mod import x, y, z
 
-reveal_type(x)  # revealed: Literal[1] | Any
-reveal_type(y)  # revealed: Literal[2] | Unknown
+reveal_type(x)  # revealed: int
+reveal_type(y)  # revealed: Literal[2] | Any
+reveal_type(z)  # revealed: Literal[3] | Unknown
+
+# External modifications of `x` that violate the declared type are not allowed:
+# error: [invalid-assignment]
+x = None
 ```
 
 ### Possibly undeclared and possibly unbound
@@ -139,6 +146,10 @@ from mod import x, y
 
 reveal_type(x)  # revealed: Literal[1] | Any
 reveal_type(y)  # revealed: Literal[2] | str
+
+# External modifications of `y` that violate the declared type are not allowed:
+# error: [invalid-assignment]
+y = None
 ```
 
 ### Possibly undeclared and unbound
@@ -159,6 +170,10 @@ if flag():
 from mod import x
 
 reveal_type(x)  # revealed: int
+
+# External modifications to `x` that violate the declared type are not allowed:
+# error: [invalid-assignment]
+x = None
 ```
 
 ## Undeclared
@@ -173,6 +188,9 @@ x = 1
 from mod import x
 
 reveal_type(x)  # revealed: Unknown | Literal[1]
+
+# All external modifications of `x` are allowed:
+x = None
 ```
 
 ### Undeclared and possibly unbound
@@ -193,6 +211,9 @@ if flag:
 from mod import x
 
 reveal_type(x)  # revealed: Unknown | Literal[1]
+
+# All external modifications of `x` are allowed:
+x = None
 ```
 
 ### Undeclared and unbound
@@ -209,4 +230,7 @@ if False:
 from mod import x
 
 reveal_type(x)  # revealed: Unknown
+
+# Modifications allowed in this case:
+x = None
 ```
