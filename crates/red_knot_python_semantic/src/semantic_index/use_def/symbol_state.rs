@@ -48,7 +48,7 @@ use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
 
-use crate::semantic_index::use_def::bitset::{BitSet, BitSetIterator};
+use crate::semantic_index::use_def::bitset::BitSet;
 use crate::semantic_index::use_def::VisibilityConstraints;
 
 /// A newtype-index for a definition in a particular scope.
@@ -79,7 +79,6 @@ const INLINE_DECLARATION_BLOCKS: usize = 3;
 
 /// A [`BitSet`] of [`ScopedDefinitionId`], representing live declarations of a symbol in a scope.
 type Declarations = BitSet<INLINE_DECLARATION_BLOCKS>;
-type DeclarationsIterator<'a> = BitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
 
 /// Can reference this * 64 total constraints inline; more will fall back to the heap.
 const INLINE_CONSTRAINT_BLOCKS: usize = 2;
@@ -116,9 +115,6 @@ type VisibilityConstraintPerDeclaration = SmallVec<InlineVisibilityConstraintsAr
 
 /// One [`ScopedVisibilityConstraintId`] per live binding.
 type VisibilityConstraintPerBinding = SmallVec<InlineVisibilityConstraintsArray>;
-
-/// Iterator over the visibility constraints for all live bindings/declarations.
-type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityConstraintId>;
 
 /// Live declarations for a single symbol at some point in control flow, with their
 /// corresponding visibility constraints.
@@ -169,11 +165,15 @@ impl SymbolDeclarations {
     }
 
     /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter(&self) -> DeclarationIdIterator {
-        DeclarationIdIterator {
-            declarations: self.live_declarations.iter(),
-            visibility_constraints: self.visibility_constraints.iter(),
-        }
+    pub(super) fn iter(&self) -> impl Iterator<Item = DeclarationIdWithConstraint> + '_ {
+        (self.live_declarations.iter())
+            .zip(self.visibility_constraints.iter())
+            .map(
+                |(declaration, &visibility_constraint)| DeclarationIdWithConstraint {
+                    definition: ScopedDefinitionId::from_u32(declaration),
+                    visibility_constraint,
+                },
+            )
     }
 
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
@@ -438,31 +438,6 @@ pub(super) struct DeclarationIdWithConstraint {
     pub(super) definition: ScopedDefinitionId,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
-
-pub(super) struct DeclarationIdIterator<'map> {
-    pub(crate) declarations: DeclarationsIterator<'map>,
-    pub(crate) visibility_constraints: VisibilityConstraintsIterator<'map>,
-}
-
-impl Iterator for DeclarationIdIterator<'_> {
-    type Item = DeclarationIdWithConstraint;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (self.declarations.next(), self.visibility_constraints.next()) {
-            (None, None) => None,
-            (Some(declaration), Some(&visibility_constraint)) => {
-                Some(DeclarationIdWithConstraint {
-                    definition: ScopedDefinitionId::from_u32(declaration),
-                    visibility_constraint,
-                })
-            }
-            // SAFETY: see above.
-            _ => unreachable!("declarations and visibility_constraints length mismatch"),
-        }
-    }
-}
-
-impl std::iter::FusedIterator for DeclarationIdIterator<'_> {}
 
 #[cfg(test)]
 mod tests {
