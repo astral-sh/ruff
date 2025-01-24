@@ -6,6 +6,7 @@ use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -59,7 +60,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let applicability = match rounded_value {
+    let mut applicability = match rounded_value {
         // ```python
         // some_int: int
         //
@@ -84,6 +85,10 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         RoundedValue::Int(InferredType::AssignableTo) => Applicability::Unsafe,
 
         _ => return,
+    };
+
+    if checker.comment_ranges().intersects(call.range()) {
+        applicability = Applicability::Unsafe;
     };
 
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
@@ -196,13 +201,13 @@ fn unwrap_round_call(
     locator: &Locator,
 ) -> Edit {
     let rounded_expr = locator.slice(rounded.range());
-
     let has_parent_expr = semantic.current_expression_parent().is_some();
-    let new_content = if has_parent_expr || rounded.is_named_expr() {
-        format!("({rounded_expr})")
-    } else {
-        rounded_expr.to_string()
-    };
+    let new_content =
+        if has_parent_expr || rounded.is_named_expr() || find_newline(rounded_expr).is_some() {
+            format!("({rounded_expr})")
+        } else {
+            rounded_expr.to_string()
+        };
 
     Edit::range_replacement(new_content, call.range)
 }
