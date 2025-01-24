@@ -418,8 +418,15 @@ impl<'s> Parser<'s> {
                 if matches!(path, "test.py" | "test.pyi") {
                     return Err(anyhow::anyhow!(
                         "Test `{}` has duplicate files named `{path}`. \
-                                (This is the default filename; \
-                                 consider giving some files an explicit name with `path=...`.)",
+                        This is the default filename; \
+                        consider giving some files an explicit name:\n\
+                        \n\
+                        `path.py`:\n\
+                        \n\
+                        ```py\n\
+                        x = 1\n\
+                        ```\n\
+                        ",
                         self.sections[section].title
                     ));
                 }
@@ -815,8 +822,14 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "Test `file.md` has duplicate files named `test.py`. \
-            (This is the default filename; consider giving some files an explicit name \
-            with `path=...`.)"
+            This is the default filename; consider giving some files an explicit name:\n\
+            \n\
+            `path.py`:\n\
+            \n\
+            ```py\n\
+            x = 1\n\
+            ```\n\
+            "
         );
     }
 
@@ -857,8 +870,14 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "Test `file.md` has duplicate files named `test.pyi`. \
-            (This is the default filename; consider giving some files an explicit name \
-            with `path=...`.)"
+            This is the default filename; consider giving some files an explicit name:\n\
+            \n\
+            `path.py`:\n\
+            \n\
+            ```py\n\
+            x = 1\n\
+            ```\n\
+            "
         );
     }
 
