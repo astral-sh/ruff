@@ -175,16 +175,14 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-# TODO: Should be `Unknown | Literal[1]`.
-reveal_type(C.pure_class_variable2)  # revealed: Unknown
+reveal_type(C.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
 c_instance = C()
 
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
-# TODO: Should be `Unknown | Literal[1]`.
-reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown
+reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"

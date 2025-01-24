@@ -18,7 +18,7 @@ def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     # TODO: should understand the annotation
     reveal_type(args)  # revealed: tuple
 
-    reveal_type(Alias)  # revealed: @Todo(Unsupported or invalid type in a type expression)
+    reveal_type(Alias)  # revealed: @Todo(Unsupported or invalid type in a type expression) | Literal[int]
 
 def g() -> TypeGuard[int]: ...
 def h() -> TypeIs[int]: ...

@@ -11,7 +11,7 @@ x: Any = 1
 x = "foo"
 
 def f():
-    reveal_type(x)  # revealed: Any
+    reveal_type(x)  # revealed: Any | Literal["foo"]
 ```
 
 ## Aliased to a different name
@@ -25,7 +25,7 @@ x: RenamedAny = 1
 x = "foo"
 
 def f():
-    reveal_type(x)  # revealed: Any
+    reveal_type(x)  # revealed: Any | Literal["foo"]
 ```
 
 ## Shadowed class

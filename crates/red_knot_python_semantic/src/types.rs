@@ -103,6 +103,54 @@ fn widen_type_for_undeclared_public_symbol<'db>(
     }
 }
 
+/// Computes a possibly more precise public type for a (possibly) declared symbol where
+/// we also have an inferred type from visible bindings.
+///
+/// Below, we build the type `declared_ty | declared_ty & inferred_ty`. This represents
+/// the fact that we want to return a type that is no larger than and no smaller than
+/// `declared_ty`. If `declared_ty` is a fully static type, this means that we will
+/// simply return `declared_ty`. But if `declared_ty` is an arbitrary gradual type, this
+/// can make the public type more specific by including information about `inferred_ty`.
+///
+/// We have a special handling for the following cases, both for performance reasons
+/// and to construct the easiest possible representation of a type:
+///
+/// ```txt
+///         inferred_ty = Any/Unknown
+///        
+///             => declared_ty | declared_ty & Any = declared_ty
+///        
+///         declared_ty = Any/Unknown
+///        
+///             => Any | Any & inferred_ty = Any | inferred_ty
+/// ```
+fn widen_type_for_declared_public_symbol<'db>(
+    db: &'db dyn Db,
+    declared_ty: Type<'db>,
+    inferred: &Symbol<'db>,
+) -> Type<'db> {
+    match inferred.ignore_possibly_unbound() {
+        Some(inferred_ty) => {
+            if inferred_ty.is_dynamic() {
+                declared_ty
+            } else if declared_ty.is_dynamic() {
+                UnionType::from_elements(db, [declared_ty, inferred_ty])
+            } else if declared_ty.is_fully_static(db) {
+                declared_ty
+            } else {
+                IntersectionBuilder::new(db)
+                    .add_positive(UnionType::from_elements(
+                        db,
+                        [declared_ty, inferred_ty].iter().copied(),
+                    ))
+                    .add_positive(declared_ty)
+                    .build()
+            }
+        }
+        None => declared_ty,
+    }
+}
+
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     #[salsa::tracked]
@@ -122,14 +170,17 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
         let declared = declared.map(|SymbolAndQualifiers(symbol, _)| symbol);
 
+        let bindings = use_def.public_bindings(symbol_id);
+        let inferred = symbol_from_bindings(db, bindings);
+
         match declared {
-            // Symbol is declared, trust the declared type
-            Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
+            // Symbol is declared
+            Ok(Symbol::Type(declared_ty, Boundness::Bound)) => Symbol::Type(
+                widen_type_for_declared_public_symbol(db, declared_ty, &inferred),
+                Boundness::Bound,
+            ),
             // Symbol is possibly declared
             Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
-                let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings(db, bindings);
-
                 match inferred {
                     // Symbol is possibly undeclared and definitely unbound
                     Symbol::Unbound => {
@@ -644,6 +695,10 @@ impl<'db> Type<'db> {
 
     pub const fn is_todo(&self) -> bool {
         matches!(self, Type::Dynamic(DynamicType::Todo(_)))
+    }
+
+    pub const fn is_dynamic(&self) -> bool {
+        matches!(self, Type::Dynamic(_))
     }
 
     pub const fn class_literal(class: Class<'db>) -> Self {
@@ -4125,8 +4180,12 @@ impl<'db> Class<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.public_declarations(symbol_id);
+            let declared = symbol_from_declarations(db, declarations);
 
-            match symbol_from_declarations(db, declarations) {
+            let bindings = use_def.public_bindings(symbol_id);
+            let inferred = symbol_from_bindings(db, bindings);
+
+            match declared {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
@@ -4138,13 +4197,16 @@ impl<'db> Class<'db> {
                             todo_type!("bound method").into()
                         }
                     } else {
-                        SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
+                        SymbolAndQualifiers(
+                            Symbol::Type(
+                                widen_type_for_declared_public_symbol(db, declared_ty, &inferred),
+                                Boundness::Bound,
+                            ),
+                            qualifiers,
+                        )
                     }
                 }
                 Ok(symbol @ SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
-                    let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
-
                     SymbolAndQualifiers(
                         widen_type_for_undeclared_public_symbol(db, inferred, symbol.is_final()),
                         qualifiers,
