@@ -3174,7 +3174,6 @@ name = "ruff_workspace"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "clap",
  "colored 3.0.0",
  "etcetera",
  "glob",

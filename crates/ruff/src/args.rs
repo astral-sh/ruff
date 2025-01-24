@@ -23,13 +23,14 @@ use ruff_linter::settings::types::{
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
-use ruff_workspace::cli::clap_completion::{OptionString, OptionStringParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
+
+use crate::commands::completions::config::{OptionString, OptionStringParser};
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
@@ -117,7 +118,7 @@ pub enum Command {
         /// Config key to show
         #[arg(
             value_parser = OptionStringParser,
-            hide_possible_values = false
+            hide_possible_values = true
         )]
         option: Option<OptionString>,
         /// Output format
