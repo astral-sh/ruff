@@ -62,8 +62,10 @@ pub(crate) fn split_static_string(
     checker: &mut Checker,
     attr: &str,
     call: &ExprCall,
-    str_value: &str,
+    str_value: &StringLiteralValue,
 ) {
+    let flags = str_value.flags();
+    let str_value = str_value.to_str();
     let ExprCall { arguments, .. } = call;
 
     let maxsplit_arg = arguments.find_argument_value("maxsplit", 1);
@@ -81,7 +83,7 @@ pub(crate) fn split_static_string(
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
-            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value),
+            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, flags),
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
                 Some(split_sep(
@@ -89,6 +91,7 @@ pub(crate) fn split_static_string(
                     sep_value_str,
                     maxsplit_value,
                     direction,
+                    flags,
                 ))
             }
             // Ignore names until type inference is available.
@@ -97,7 +100,7 @@ pub(crate) fn split_static_string(
             }
         }
     } else {
-        split_default(str_value, maxsplit_value)
+        split_default(str_value, maxsplit_value, flags)
     };
 
     let mut diagnostic = Diagnostic::new(SplitStaticString, call.range());
@@ -115,7 +118,7 @@ pub(crate) fn split_static_string(
     checker.diagnostics.push(diagnostic);
 }
 
-fn construct_replacement(elts: &[&str]) -> Expr {
+fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     Expr::List(ExprList {
         elts: elts
             .iter()
@@ -124,7 +127,7 @@ fn construct_replacement(elts: &[&str]) -> Expr {
                     value: StringLiteralValue::single(StringLiteral {
                         value: (*elt).to_string().into_boxed_str(),
                         range: TextRange::default(),
-                        flags: StringLiteralFlags::default(),
+                        flags,
                     }),
                     range: TextRange::default(),
                 })
@@ -135,7 +138,7 @@ fn construct_replacement(elts: &[&str]) -> Expr {
     })
 }
 
-fn split_default(str_value: &str, max_split: i32) -> Option<Expr> {
+fn split_default(str_value: &str, max_split: i32, flags: StringLiteralFlags) -> Option<Expr> {
     // From the Python documentation:
     // > If sep is not specified or is None, a different splitting algorithm is applied: runs of
     // > consecutive whitespace are regarded as a single separator, and the result will contain
@@ -152,16 +155,22 @@ fn split_default(str_value: &str, max_split: i32) -> Option<Expr> {
         }
         Ordering::Equal => {
             let list_items: Vec<&str> = vec![str_value];
-            Some(construct_replacement(&list_items))
+            Some(construct_replacement(&list_items, flags))
         }
         Ordering::Less => {
             let list_items: Vec<&str> = str_value.split_whitespace().collect();
-            Some(construct_replacement(&list_items))
+            Some(construct_replacement(&list_items, flags))
         }
     }
 }
 
-fn split_sep(str_value: &str, sep_value: &str, max_split: i32, direction: Direction) -> Expr {
+fn split_sep(
+    str_value: &str,
+    sep_value: &str,
+    max_split: i32,
+    direction: Direction,
+    flags: StringLiteralFlags,
+) -> Expr {
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match direction {
             Direction::Left => str_value.splitn(split_n + 1, sep_value).collect(),
@@ -174,7 +183,7 @@ fn split_sep(str_value: &str, sep_value: &str, max_split: i32, direction: Direct
         }
     };
 
-    construct_replacement(&list_items)
+    construct_replacement(&list_items, flags)
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.
