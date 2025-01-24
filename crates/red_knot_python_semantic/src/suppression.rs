@@ -214,7 +214,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
     );
 
     // Collect all suppressions that are unused after type-checking.
-    for suppression in all {
+    for suppression in all.iter() {
         if context.diagnostics.is_used(suppression.id()) {
             continue;
         }
@@ -401,20 +401,8 @@ impl Suppressions {
             })
     }
 
-    fn iter(&self) -> SuppressionsIter {
+    fn iter(&self) -> impl Iterator<Item = &Suppression> + '_ {
         self.file.iter().chain(&self.line)
-    }
-}
-
-pub(crate) type SuppressionsIter<'a> =
-    std::iter::Chain<std::slice::Iter<'a, Suppression>, std::slice::Iter<'a, Suppression>>;
-
-impl<'a> IntoIterator for &'a Suppressions {
-    type Item = &'a Suppression;
-    type IntoIter = SuppressionsIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
 
