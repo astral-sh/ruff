@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_db::diagnostic::{LintName, Severity};
+use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
 use rustc_hash::FxHashMap;
 use std::hash::Hasher;
 use thiserror::Error;
@@ -345,7 +345,18 @@ impl LintRegistry {
                 }
             }
             Some(LintEntry::Removed(lint)) => Err(GetLintError::Removed(lint.name())),
-            None => Err(GetLintError::Unknown(code.to_string())),
+            None => {
+                if let Some(without_prefix) = DiagnosticId::strip_category(code) {
+                    if let Some(entry) = self.by_name.get(without_prefix) {
+                        return Err(GetLintError::PrefixedWithCategory {
+                            prefixed: code.to_string(),
+                            suggestion: entry.id().name.to_string(),
+                        });
+                    }
+                }
+
+                Err(GetLintError::Unknown(code.to_string()))
+            }
         }
     }
 
@@ -382,12 +393,20 @@ impl LintRegistry {
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
-    #[error("lint {0} has been removed")]
+    #[error("lint `{0}` has been removed")]
     Removed(LintName),
 
     /// No lint with the given name is known.
-    #[error("unknown lint {0}")]
+    #[error("unknown lint `{0}`")]
     Unknown(String),
+
+    /// The name uses the full qualified diagnostic id `lint:<rule>` instead of just `rule`.
+    /// The String is the name without the `lint:` category prefix.
+    #[error("unknown lint `{prefixed}`. Did you mean `{suggestion}`?")]
+    PrefixedWithCategory {
+        prefixed: String,
+        suggestion: String,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -397,6 +416,16 @@ pub enum LintEntry {
     /// A lint rule that has been removed.
     Removed(LintId),
     Alias(LintId),
+}
+
+impl LintEntry {
+    fn id(self) -> LintId {
+        match self {
+            LintEntry::Lint(id) => id,
+            LintEntry::Removed(id) => id,
+            LintEntry::Alias(id) => id,
+        }
+    }
 }
 
 impl From<&'static LintMetadata> for LintEntry {

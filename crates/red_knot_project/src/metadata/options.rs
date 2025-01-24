@@ -149,6 +149,16 @@ impl Options {
                             format!("Unknown lint rule `{rule_name}`"),
                             Severity::Warning,
                         ),
+                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
+                            OptionDiagnostic::new(
+                                DiagnosticId::UnknownRule,
+                                format!(
+                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
+                                ),
+                                Severity::Warning,
+                            )
+                        }
+
                         GetLintError::Removed(_) => OptionDiagnostic::new(
                             DiagnosticId::UnknownRule,
                             format!("Unknown lint rule `{rule_name}`"),
