@@ -51,7 +51,7 @@ In type stubs, classes can reference themselves in their base class definitions.
 
 This should hold true even with generics at play.
 
-```py path=a.pyi
+```pyi
 class Seq[T]: ...
 
 # TODO not error on the subscripting
