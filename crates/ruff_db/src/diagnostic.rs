@@ -94,6 +94,10 @@ impl DiagnosticId {
         matches!(self, DiagnosticId::Lint(self_name) if self_name == name)
     }
 
+    pub fn strip_category(code: &str) -> Option<&str> {
+        code.split_once(':').map(|(_, rest)| rest)
+    }
+
     /// Returns `true` if this `DiagnosticId` matches the given name.
     ///
     /// ## Examples
