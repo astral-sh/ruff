@@ -154,7 +154,7 @@ const REMOVED_CONTEXT_KEYS: [&str; 12] = [
 ///     pass
 /// ```
 fn check_parameters_in_function_def(checker: &mut Checker, function_def: &StmtFunctionDef) {
-    if !is_airflow_task(function_def, checker.semantic())
+    if !is_decorated_by_airflow_task(function_def, checker.semantic())
         && !is_execute_method_inherits_from_airflow_operator(function_def, checker.semantic())
     {
         return;
@@ -1065,11 +1065,11 @@ fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
     semantic
         .current_statements()
         .find_map(|stmt| stmt.as_function_def_stmt())
-        .is_some_and(|function_def| is_airflow_task(function_def, semantic))
+        .is_some_and(|function_def| is_decorated_by_airflow_task(function_def, semantic))
 }
 
 /// Returns `true` if the given function is decorated with `@airflow.decorators.task`.
-fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+fn is_decorated_by_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
