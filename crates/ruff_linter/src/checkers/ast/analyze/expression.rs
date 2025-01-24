@@ -176,7 +176,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::use_pep646_unpack(checker, subscript);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_expr_in_3(checker, expr);
+                airflow::rules::airflow_3_removal_expr(checker, expr);
             }
             pandas_vet::rules::subscript(checker, value, expr);
         }
@@ -227,7 +227,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         refurb::rules::regex_flag_alias(checker, expr);
                     }
                     if checker.enabled(Rule::Airflow3Removal) {
-                        airflow::rules::removed_expr_in_3(checker, expr);
+                        airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
                     if checker.enabled(Rule::Airflow3MovedToProvider) {
                         airflow::rules::moved_to_provider_in_3(checker, expr);
@@ -311,7 +311,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::Airflow3Removal) {
-                        airflow::rules::removed_expr_in_3(checker, expr);
+                        airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
                     if checker.enabled(Rule::MixedCaseVariableInGlobalScope) {
                         if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
@@ -449,7 +449,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_expr_in_3(checker, expr);
+                airflow::rules::airflow_3_removal_expr(checker, expr);
             }
         }
         Expr::Call(
@@ -1150,7 +1150,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_expr_in_3(checker, expr);
+                airflow::rules::airflow_3_removal_expr(checker, expr);
             }
             if checker.enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);

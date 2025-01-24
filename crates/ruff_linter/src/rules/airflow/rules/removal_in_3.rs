@@ -80,7 +80,7 @@ enum Replacement {
 }
 
 /// AIR302
-pub(crate) fn removed_expr_in_3(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn airflow_3_removal_expr(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -117,7 +117,10 @@ pub(crate) fn removed_expr_in_3(checker: &mut Checker, expr: &Expr) {
 }
 
 /// AIR302
-pub(crate) fn removed_function_def_in_3(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn airflow_3_removal_function_def(
+    checker: &mut Checker,
+    function_def: &StmtFunctionDef,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
