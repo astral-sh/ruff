@@ -1273,6 +1273,13 @@ impl StringLiteralValue {
             .is_some_and(|part| part.flags.prefix().is_unicode())
     }
 
+    /// Returns the [`StringLiteralFlags`] associated with this string literal.
+    ///
+    /// For an implicitly concatenated string, it returns the flags for the first literal.
+    pub fn flags(&self) -> StringLiteralFlags {
+        self.iter().next().map(|s| s.flags).unwrap_or_default()
+    }
+
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
     pub fn as_slice(&self) -> &[StringLiteral] {
         match &self.inner {
