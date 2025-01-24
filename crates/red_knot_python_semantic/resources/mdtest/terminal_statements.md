@@ -66,7 +66,7 @@ def f(cond: bool) -> str:
 
 def g(cond: bool, i: int):
     x = "before"
-    while i < 5:
+    for _ in range(i):
         if cond:
             x = "loop"
             reveal_type(x)  # revealed: Literal["loop"]
@@ -92,7 +92,7 @@ def f(cond: bool) -> str:
 
 def g(cond: bool, i: int):
     x = "before"
-    while i < 5:
+    for _ in range(i):
         if cond:
             x = "loop"
             reveal_type(x)  # revealed: Literal["loop"]
