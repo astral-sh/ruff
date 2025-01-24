@@ -327,3 +327,12 @@ AIR302_context.py:115:13: AIR302 `airflow.operators.dummy.DummyOperator` is remo
 117 |         params={
     |
     = help: Use `airflow.operators.empty.EmptyOperator` instead
+
+AIR302_context.py:135:23: AIR302 `next_ds` is removed in Airflow 3.0
+    |
+134 | class CustomOperator(BaseOperator):
+135 |     def execute(self, next_ds, context):
+    |                       ^^^^^^^ AIR302
+136 |         execution_date = context["execution_date"]
+137 |         next_ds = context["next_ds"]
+    |
