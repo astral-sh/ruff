@@ -186,7 +186,10 @@ pub(crate) struct VisibilityConstraints<'db> {
 impl Default for VisibilityConstraints<'_> {
     fn default() -> Self {
         Self {
-            constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
+            constraints: IndexVec::from_iter([
+                VisibilityConstraint::AlwaysTrue,
+                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
+            ]),
         }
     }
 }

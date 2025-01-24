@@ -370,8 +370,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     /// Records that all remaining statements in the current block are unreachable, and therefore
     /// not visible.
-    fn record_unreachable_visibility(&mut self) -> ScopedVisibilityConstraintId {
-        self.record_negated_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_TRUE)
+    fn mark_unreachable(&mut self) {
+        self.current_use_def_map_mut().mark_unreachable();
     }
 
     /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
@@ -1275,7 +1275,7 @@ where
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
                 walk_stmt(self, stmt);
                 // Everything in the current block after a terminal statement is unreachable.
-                self.record_unreachable_visibility();
+                self.mark_unreachable();
             }
 
             ast::Stmt::Break(_) => {
@@ -1283,7 +1283,7 @@ where
                     self.loop_break_states.push(self.flow_snapshot());
                 }
                 // Everything in the current block after a terminal statement is unreachable.
-                self.record_unreachable_visibility();
+                self.mark_unreachable();
             }
 
             _ => {

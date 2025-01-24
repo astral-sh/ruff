@@ -476,6 +476,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
+    reachable: bool,
 }
 
 #[derive(Debug)]
@@ -503,6 +504,8 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Currently live bindings and declarations for each symbol.
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
+
+    reachable: bool,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -515,11 +518,22 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
+            reachable: true,
         }
     }
 }
 
 impl<'db> UseDefMapBuilder<'db> {
+    pub(super) fn mark_unreachable(&mut self) {
+        self.reachable = false;
+        let num_symbols = self.symbol_states.len();
+        self.symbol_states.truncate(0);
+        self.symbol_states.resize(
+            num_symbols,
+            SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_FALSE),
+        );
+    }
+
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
         let new_symbol = self
             .symbol_states
@@ -656,6 +670,7 @@ impl<'db> UseDefMapBuilder<'db> {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
             scope_start_visibility: self.scope_start_visibility,
+            reachable: self.reachable,
         }
     }
 
@@ -678,6 +693,8 @@ impl<'db> UseDefMapBuilder<'db> {
             num_symbols,
             SymbolState::undefined(self.scope_start_visibility),
         );
+
+        self.reachable = snapshot.reachable;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -688,6 +705,11 @@ impl<'db> UseDefMapBuilder<'db> {
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
+
+        self.reachable |= snapshot.reachable;
+        if !snapshot.reachable {
+            return;
+        }
 
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {

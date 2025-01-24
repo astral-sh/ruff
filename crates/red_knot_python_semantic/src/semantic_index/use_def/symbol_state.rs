@@ -108,6 +108,12 @@ impl ScopedVisibilityConstraintId {
     /// present at index 0.
     pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
         ScopedVisibilityConstraintId::from_u32(0);
+
+    /// A special ID that is used for an "always false" / "never visible" constraint.
+    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
+    /// present at index 1.
+    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId::from_u32(1);
 }
 
 const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
