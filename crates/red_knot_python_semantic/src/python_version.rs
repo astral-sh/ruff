@@ -31,6 +31,20 @@ impl PythonVersion {
         minor: 13,
     };
 
+    pub fn iter() -> impl Iterator<Item = PythonVersion> {
+        [
+            PythonVersion::PY37,
+            PythonVersion::PY38,
+            PythonVersion::PY39,
+            PythonVersion::PY310,
+            PythonVersion::PY311,
+            PythonVersion::PY312,
+            PythonVersion::PY313,
+        ]
+        .iter()
+        .copied()
+    }
+
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
     }
@@ -69,40 +83,81 @@ impl fmt::Display for PythonVersion {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for PythonVersion {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let as_str = String::deserialize(deserializer)?;
+mod serde {
+    use crate::PythonVersion;
 
-        if let Some((major, minor)) = as_str.split_once('.') {
-            let major = major
-                .parse()
-                .map_err(|err| serde::de::Error::custom(format!("invalid major version: {err}")))?;
-            let minor = minor
-                .parse()
-                .map_err(|err| serde::de::Error::custom(format!("invalid minor version: {err}")))?;
+    impl<'de> serde::Deserialize<'de> for PythonVersion {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let as_str = String::deserialize(deserializer)?;
 
-            Ok((major, minor).into())
-        } else {
-            let major = as_str.parse().map_err(|err| {
-                serde::de::Error::custom(format!(
-                    "invalid python-version: {err}, expected: `major.minor`"
-                ))
-            })?;
+            if let Some((major, minor)) = as_str.split_once('.') {
+                let major = major.parse().map_err(|err| {
+                    serde::de::Error::custom(format!("invalid major version: {err}"))
+                })?;
+                let minor = minor.parse().map_err(|err| {
+                    serde::de::Error::custom(format!("invalid minor version: {err}"))
+                })?;
 
-            Ok((major, 0).into())
+                Ok((major, minor).into())
+            } else {
+                let major = as_str.parse().map_err(|err| {
+                    serde::de::Error::custom(format!(
+                        "invalid python-version: {err}, expected: `major.minor`"
+                    ))
+                })?;
+
+                Ok((major, 0).into())
+            }
+        }
+    }
+
+    impl serde::Serialize for PythonVersion {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_str(&self.to_string())
         }
     }
 }
 
-#[cfg(feature = "serde")]
-impl serde::Serialize for PythonVersion {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
+#[cfg(feature = "schemars")]
+mod schemars {
+    use super::PythonVersion;
+    use schemars::schema::{Schema, SchemaObject, SubschemaValidation};
+    use schemars::JsonSchema;
+
+    impl JsonSchema for PythonVersion {
+        fn schema_name() -> String {
+            "PythonVersion".to_string()
+        }
+
+        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+            Schema::Object(SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                subschemas: Some(Box::new(SubschemaValidation {
+                    any_of: Some(vec![
+                        Schema::Object(SchemaObject {
+                            instance_type: Some(schemars::schema::InstanceType::String.into()),
+                            enum_values: Some(Self::iter().map(|v| v.to_string().into()).collect()),
+                            ..Default::default()
+                        }),
+                        Schema::Object(SchemaObject {
+                            instance_type: Some(schemars::schema::InstanceType::String.into()),
+                            string: Some(Box::new(schemars::schema::StringValidation {
+                                pattern: Some(r"^\d+\.\d+$".to_string()),
+                                ..Default::default()
+                            })),
+                            ..Default::default()
+                        }),
+                    ]),
+                    ..Default::default()
+                })),
+                ..SchemaObject::default()
+            })
+        }
     }
 }

@@ -471,6 +471,11 @@ impl ToOwned for SystemPath {
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
 #[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(transparent)
+)]
 pub struct SystemPathBuf(Utf8PathBuf);
 
 impl SystemPathBuf {
@@ -658,24 +663,14 @@ impl ruff_cache::CacheKey for SystemPathBuf {
     }
 }
 
-#[cfg(feature = "serde")]
-impl serde::Serialize for SystemPath {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for SystemPathBuf {
+    fn schema_name() -> String {
+        "SystemPathBuf".to_string()
     }
-}
 
-#[cfg(feature = "serde")]
-impl serde::Serialize for SystemPathBuf {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for SystemPathBuf {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Utf8PathBuf::deserialize(deserializer).map(SystemPathBuf)
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(gen)
     }
 }
 

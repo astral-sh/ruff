@@ -11,6 +11,7 @@ pub enum PythonPlatform {
     /// Do not make any assumptions about the target platform.
     #[default]
     All,
+
     /// Assume a specific target platform like `linux`, `darwin` or `win32`.
     ///
     /// We use a string (instead of individual enum variants), as the set of possible platforms
@@ -25,6 +26,49 @@ impl Display for PythonPlatform {
         match self {
             PythonPlatform::All => f.write_str("all"),
             PythonPlatform::Identifier(name) => f.write_str(name),
+        }
+    }
+}
+
+#[cfg(feature = "schemars")]
+mod schema {
+    use crate::PythonPlatform;
+    use schemars::gen::SchemaGenerator;
+    use schemars::schema::{Schema, SchemaObject, SubschemaValidation};
+    use schemars::JsonSchema;
+
+    impl JsonSchema for PythonPlatform {
+        fn schema_name() -> String {
+            "PythonPlatform".to_string()
+        }
+
+        fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+            Schema::Object(SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+
+                // Hard code some well known values, but allow any other string as well.
+                subschemas: Some(Box::new(SubschemaValidation {
+                    any_of: Some(vec![
+                        Schema::Object(SchemaObject {
+                            instance_type: Some(schemars::schema::InstanceType::String.into()),
+                            enum_values: Some(vec![
+                                "all".to_string().into(),
+                                "linux".to_string().into(),
+                                "darwin".to_string().into(),
+                                "win32".to_string().into(),
+                            ]),
+                            ..SchemaObject::default()
+                        }),
+                        Schema::Object(SchemaObject {
+                            instance_type: Some(schemars::schema::InstanceType::String.into()),
+                            ..SchemaObject::default()
+                        }),
+                    ]),
+                    ..SubschemaValidation::default()
+                })),
+
+                ..SchemaObject::default()
+            })
         }
     }
 }

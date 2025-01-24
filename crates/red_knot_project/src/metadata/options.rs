@@ -18,13 +18,16 @@ use thiserror::Error;
 /// The options for the project.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
+    /// Configures the type checking environment.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<EnvironmentOptions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub src: Option<SrcOptions>,
 
+    /// Configures the enabled lints and their severity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Rules>,
 }
@@ -177,6 +180,7 @@ impl Options {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_version: Option<RangedValue<PythonVersion>>,
@@ -204,6 +208,7 @@ pub struct EnvironmentOptions {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -212,7 +217,9 @@ pub struct SrcOptions {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
+    #[cfg_attr(feature = "schemars", schemars(schema_with = "schema::rules"))]
     inner: FxHashMap<RangedValue<String>, RangedValue<Level>>,
 }
 
@@ -223,6 +230,57 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
         Self {
             inner: iter.into_iter().collect(),
         }
+    }
+}
+
+#[cfg(feature = "schemars")]
+mod schema {
+    use crate::DEFAULT_LINT_REGISTRY;
+    use red_knot_python_semantic::lint::Level;
+    use schemars::gen::SchemaGenerator;
+    use schemars::schema::{
+        InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
+    };
+
+    pub(super) fn rules(gen: &mut SchemaGenerator) -> Schema {
+        let registry = &*DEFAULT_LINT_REGISTRY;
+
+        let level_schema = gen.subschema_for::<Level>();
+
+        let properties: schemars::Map<String, Schema> = registry
+            .lints()
+            .iter()
+            .map(|lint| {
+                (
+                    lint.name().to_string(),
+                    Schema::Object(SchemaObject {
+                        subschemas: Some(Box::new(SubschemaValidation {
+                            any_of: Some(vec![level_schema.clone()]),
+                            ..Default::default()
+                        })),
+                        metadata: Some(Box::new(Metadata {
+                            title: Some(lint.summary().to_string()),
+                            description: Some(lint.documentation()),
+                            deprecated: lint.status.is_deprecated(),
+                            default: Some(lint.default_level.to_string().into()),
+                            ..Metadata::default()
+                        })),
+                        ..Default::default()
+                    }),
+                )
+            })
+            .collect();
+
+        Schema::Object(SchemaObject {
+            instance_type: Some(InstanceType::Object.into()),
+            object: Some(Box::new(ObjectValidation {
+                properties,
+                additional_properties: Some(Box::new(Schema::Bool(false))),
+                ..ObjectValidation::default()
+            })),
+
+            ..Default::default()
+        })
     }
 }
 
