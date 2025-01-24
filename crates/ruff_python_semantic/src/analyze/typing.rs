@@ -328,28 +328,31 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
+    // TODO: This form is no longer supported by mypy/pyright, do we still support it?
     // Ex) `if False:`
     if is_const_false(test) {
         return true;
     }
 
-    // Ex) `if 0:`
-    if matches!(
-        test.as_ref(),
+    match test.as_ref() {
+        // TODO: This is also no longer supported
+        // Ex) `if 0:`
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(Int::ZERO),
             ..
-        })
-    ) {
-        return true;
+        }) => true,
+        // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
+        // for this specific check even if it's defined somewhere else, like the current module.
+        // Ex) `if TYPE_CHECKING:`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            id.as_str() == "TYPE_CHECKING"
+            // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
+            || semantic.match_typing_expr(test, "TYPE_CHECKING")
+        }
+        // Ex) `if typing.TYPE_CHECKING:`
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str() == "TYPE_CHECKING",
+        _ => false,
     }
-
-    // Ex) `if typing.TYPE_CHECKING:`
-    if semantic.match_typing_expr(test, "TYPE_CHECKING") {
-        return true;
-    }
-
-    false
 }
 
 /// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).

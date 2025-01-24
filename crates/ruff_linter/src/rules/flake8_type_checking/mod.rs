@@ -517,6 +517,18 @@ mod tests {
     ",
         "tc010_precedence_over_tc008"
     )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        TYPE_CHECKING = False
+        if TYPE_CHECKING:
+            from types import TracebackType
+
+        def foo(tb: TracebackType): ...
+    ",
+        "github_issue_15681_regression_test"
+    )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
