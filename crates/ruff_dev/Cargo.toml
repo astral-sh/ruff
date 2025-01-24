@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+red_knot_project = { workspace = true, features = ["schemars"] }
 ruff = { workspace = true }
 ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }
