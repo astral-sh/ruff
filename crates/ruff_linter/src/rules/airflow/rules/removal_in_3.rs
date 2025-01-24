@@ -1102,15 +1102,11 @@ fn is_execute_method_inherits_from_airflow_operator(
         return false;
     };
 
-    if !class_def.bases().iter().any(|class_base| {
+    class_def.bases().iter().any(|class_base| {
         semantic
             .resolve_qualified_name(class_base)
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
             })
-    }) {
-        return false;
-    };
-
-    true
+    })
 }
