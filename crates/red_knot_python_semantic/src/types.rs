@@ -80,11 +80,10 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     diagnostics
 }
 
-/// Computes a possibly-widened type from the inferred type of a symbol, unless the type is
-/// a known-instance type or the symbol is considered non-modifiable.
-///
-/// When accessing a symbol from another scope that has no declared type, we use this to
-/// compute the union `Unknown | T_inferred`, unless the symbol is considered non-modifiable.
+/// Computes a possibly-widened type `Unknown | T_inferred` from the inferred type `T_inferred`
+/// of a symbol, unless the type is a known-instance type (e.g. `typing.Any`) or the symbol is
+/// considered non-modifiable (e.g. when the symbol is `@Final`). We need this for public uses
+/// of symbols that have no declared type.
 fn widen_type_for_undeclared_public_symbol<'db>(
     db: &'db dyn Db,
     inferred: Symbol<'db>,
@@ -205,6 +204,11 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     }
 
     let table = symbol_table(db, scope);
+    // `__slots__` is a symbol with special behavior in Python's runtime. It can be
+    // modified externally, but those changes do not take effect. We therefore issue
+    // a diagnostic if we see it being modified externally. In type inference, we
+    // can assign a "narrow" type to it even if it is not *declared*. This means, we
+    // do not have to call [`widen_type_for_undeclared_public_symbol`].
     let is_dunder_slots = name == "__slots__";
     table
         .symbol_id_by_name(name)
