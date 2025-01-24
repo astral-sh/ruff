@@ -316,7 +316,7 @@ impl SymbolBindings {
                     // that applies on only one path is irrelevant to the resulting type from
                     // unioning the two paths, so we intersect the constraints.
                     let constraints = a_constraints;
-                    constraints.intersect(&b_constraints);
+                    constraints.intersect(b_constraints);
                     self.constraints.push(std::mem::take(constraints));
 
                     // For visibility constraints, we merge them using a ternary OR operation:
