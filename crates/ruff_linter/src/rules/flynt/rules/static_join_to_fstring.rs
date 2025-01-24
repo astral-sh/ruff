@@ -1,8 +1,8 @@
 use ast::FStringFlags;
 use itertools::Itertools;
 
-use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::{fits, pad};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
@@ -35,7 +35,9 @@ pub(crate) struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysFixableViolation for StaticJoinToFString {
+impl Violation for StaticJoinToFString {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let StaticJoinToFString { expression } = self;
@@ -46,12 +48,12 @@ impl AlwaysFixableViolation for StaticJoinToFString {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let StaticJoinToFString { expression } = self;
         if let Some(expression) = expression.full_display() {
-            format!("Replace with `{expression}`")
+            Some(format!("Replace with `{expression}`"))
         } else {
-            "Replace with f-string".to_string()
+            Some("Replace with f-string".to_string())
         }
     }
 }
@@ -143,9 +145,21 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        pad(contents, expr.range(), checker.locator()),
-        expr.range(),
-    )));
+
+    if checker.settings.preview.is_disabled()
+        || fits(
+            &contents,
+            expr.into(),
+            checker.locator(),
+            checker.settings.pycodestyle.max_line_length,
+            checker.settings.tab_size,
+        )
+    {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            pad(contents, expr.range(), checker.locator()),
+            expr.range(),
+        )));
+    }
+
     checker.diagnostics.push(diagnostic);
 }
