@@ -133,6 +133,22 @@ def g(cond1: bool, cond2: bool):
     reveal_type(x)  # revealed: Literal["test1", "test2"]
 ```
 
+## Terminal in a `finally` block
+
+Control-flow through finally isn't working right yet:
+
+```py
+def f():
+    x = 1
+    while True:
+        try:
+            break
+        finally:
+            x = 2
+    # TODO: should be Literal[2]
+    reveal_type(x)  # revealed: Literal[1]
+```
+
 ## Terminal statement after a list comprehension
 
 ```py
