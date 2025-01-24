@@ -4,10 +4,10 @@ This document demonstrates how type-inference and diagnostics work for *public* 
 that is, a use of a symbol from another scope. If a symbol has a declared type in its local scope
 (e.g. `int`), we use that as the symbol's "public type" (the type of the symbol from the perspective
 of other scopes). If there is an inferred type in addition (i.e. if we also see bindings for this
-symbol, not just declarations), we build the union of the declared and inferred types. For fully-
-static types, the inferred type must be a subtype of the declared type (otherwise we would issue
-diagnostics). For dynamic types, however, this can lead to more precise types with lower bounds
-given by the inferred type (e.g. `Any | Literal[1]` for a symbol defined as `x: Any = 1`).
+symbol, not just declarations), we use `T_decl | T_decl & T_inf` as the public type, which
+simplifies to `T_decl` for `T_inf = Unknown` (the unbound case).
+
+[TODO: more explanation]
 
 If a symbol has no declared type, we use the union of `Unknown` with the inferred type as the public
 type. If there is no declaration, then the symbol can be reassigned to any type from another scope;
@@ -21,11 +21,11 @@ this behavior is questionable and might change in the future. See the TODOs in `
 In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
 "undeclared-and-possibly-unbound" cases (marked with a "?").
 
-| **Public type**  | declared                   | possibly-undeclared        | undeclared         |
-| ---------------- | -------------------------- | -------------------------- | ------------------ |
-| bound            | `T_decl \| T_decl & T_inf` | `T_decl \| T_decl & T_inf` | `Unknown \| T_inf` |
-| possibly-unbound | `T_decl \| T_decl & T_inf` | `T_decl \| T_decl & T_inf` | `Unknown \| T_inf` |
-| unbound          | `T_decl`                   | `T_decl`                   | `Unknown`          |
+| **Public type**  | declared                   | possibly-undeclared | undeclared         |
+| ---------------- | -------------------------- | ------------------- | ------------------ |
+| bound            | `T_decl \| T_decl & T_inf` | `T_decl \| T_inf`   | `Unknown \| T_inf` |
+| possibly-unbound | `T_decl \| T_decl & T_inf` | `T_decl \| T_inf`   | `Unknown \| T_inf` |
+| unbound          | `T_decl`                   | `T_decl`            | `Unknown`          |
 
 | **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
 | ---------------- | -------- | ------------------------- | ------------------- |
