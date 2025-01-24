@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    str::Quote, Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringFlags,
-    StringLiteral, StringLiteralFlags, StringLiteralValue, UnaryOp,
+    Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringLiteral,
+    StringLiteralFlags, StringLiteralValue, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -115,7 +115,7 @@ pub(crate) fn split_static_string(
     checker.diagnostics.push(diagnostic);
 }
 
-fn construct_replacement(elts: &[&str], quote: Quote) -> Expr {
+fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     Expr::List(ExprList {
         elts: elts
             .iter()
@@ -124,7 +124,7 @@ fn construct_replacement(elts: &[&str], quote: Quote) -> Expr {
                     value: StringLiteralValue::single(StringLiteral {
                         value: Box::from(*elt),
                         range: TextRange::default(),
-                        flags: StringLiteralFlags::empty().with_quote_style(quote),
+                        flags,
                     }),
                     range: TextRange::default(),
                 })
@@ -152,17 +152,11 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr>
         }
         Ordering::Equal => {
             let list_items: Vec<&str> = vec![str_value.to_str()];
-            Some(construct_replacement(
-                &list_items,
-                str_value.flags().quote_style(),
-            ))
+            Some(construct_replacement(&list_items, str_value.flags()))
         }
         Ordering::Less => {
             let list_items: Vec<&str> = str_value.to_str().split_whitespace().collect();
-            Some(construct_replacement(
-                &list_items,
-                str_value.flags().quote_style(),
-            ))
+            Some(construct_replacement(&list_items, str_value.flags()))
         }
     }
 }
@@ -174,7 +168,6 @@ fn split_sep(
     direction: Direction,
 ) -> Expr {
     let value = str_value.to_str();
-    let quote = str_value.flags().quote_style();
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match direction {
             Direction::Left => value.splitn(split_n + 1, sep_value).collect(),
@@ -187,7 +180,7 @@ fn split_sep(
         }
     };
 
-    construct_replacement(&list_items, quote)
+    construct_replacement(&list_items, str_value.flags())
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.
