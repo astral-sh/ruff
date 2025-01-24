@@ -1738,13 +1738,13 @@ class Foo:
     fn quote() {
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
         assert_round_trip!(r"'hello'");
-        assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
+        assert_round_trip!(r"u'hello'");
         assert_round_trip!(r"r'hello'");
         assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
-        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
+        assert_round_trip!(r#"f'abc{"def"}{1}'"#);
     }
 
     #[test]
