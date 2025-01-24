@@ -173,8 +173,7 @@ impl SymbolDeclarations {
     }
 
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
-        let mut a = Self::default();
-        std::mem::swap(&mut a, self);
+        let mut a = std::mem::take(self);
         self.live_declarations = a.live_declarations.clone();
         self.live_declarations.union(&b.live_declarations);
         let a = izip!(
@@ -277,8 +276,7 @@ impl SymbolBindings {
     }
 
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
-        let mut a = Self::default();
-        std::mem::swap(&mut a, self);
+        let mut a = std::mem::take(self);
         self.live_bindings = a.live_bindings.clone();
         self.live_bindings.union(&b.live_bindings);
         let a = izip!(
