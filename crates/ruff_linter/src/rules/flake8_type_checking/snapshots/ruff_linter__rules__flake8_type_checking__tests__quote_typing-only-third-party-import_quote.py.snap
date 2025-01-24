@@ -201,7 +201,7 @@ quote.py:47:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 47    |-    from pandas import DataFrame
 48 51 | 
 49    |-    def baz() -> DataFrame[Literal["int"]]:
-   52 |+    def baz() -> "DataFrame[Literal['int']]":
+   52 |+    def baz() -> 'DataFrame[Literal["int"]]':
 50 53 |         ...
 51 54 | 
 52 55 | 
