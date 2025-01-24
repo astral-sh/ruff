@@ -132,3 +132,16 @@ def g(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
 ```
+
+## Terminal statement after a list comprehension
+
+This currently gives the wrong result because list comprehensions introduce an “eager” scope, which
+we don't handle correctly yet.  (The use in the list comprehension resolves relative to the _end_ of
+the containing function scope, not relative to the point in the scope where the comprehension
+appears.)
+
+```py
+def f(x: str) -> int:
+    y = [x for i in range(len(x))] # error: [unresolved-reference]
+    return 4
+```
