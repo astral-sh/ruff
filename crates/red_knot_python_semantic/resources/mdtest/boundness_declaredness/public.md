@@ -17,11 +17,11 @@ this behavior is questionable and might change in the future. See the TODOs in `
 In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
 "undeclared-and-possibly-unbound" cases (marked with a "?").
 
-| **Public type**  | declared     | possibly-undeclared                   | undeclared              |
-| ---------------- | ------------ | ------------------------------------- | ----------------------- |
-| bound            | `T_declared` | `Unknown \| T_declared \| T_inferred` | `Unknown \| T_inferred` |
-| possibly-unbound | `T_declared` | `Unknown \| T_declared \| T_inferred` | `Unknown \| T_inferred` |
-| unbound          | `T_declared` | `Unknown \| T_declared`               | `Unknown`               |
+| **Public type**  | declared     | possibly-undeclared        | undeclared              |
+| ---------------- | ------------ | -------------------------- | ----------------------- |
+| bound            | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
+| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
+| unbound          | `T_declared` | `T_declared`               | `Unknown`               |
 
 | **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
 | ---------------- | -------- | ------------------------- | ------------------- |
@@ -111,8 +111,8 @@ if flag():
 ```py
 from mod import x, y
 
-reveal_type(x)  # revealed: Unknown | Literal[1] | Any
-reveal_type(y)  # revealed: Unknown | Literal[2]
+reveal_type(x)  # revealed: Literal[1] | Any
+reveal_type(y)  # revealed: Literal[2] | Unknown
 ```
 
 ### Possibly undeclared and possibly unbound
@@ -137,8 +137,8 @@ else:
 # error: [possibly-unbound-import]
 from mod import x, y
 
-reveal_type(x)  # revealed: Unknown | Literal[1] | Any
-reveal_type(y)  # revealed: Unknown | Literal[2] | str
+reveal_type(x)  # revealed: Literal[1] | Any
+reveal_type(y)  # revealed: Literal[2] | str
 ```
 
 ### Possibly undeclared and unbound
@@ -158,7 +158,7 @@ if flag():
 # on top of this document.
 from mod import x
 
-reveal_type(x)  # revealed: Unknown | int
+reveal_type(x)  # revealed: int
 ```
 
 ## Undeclared

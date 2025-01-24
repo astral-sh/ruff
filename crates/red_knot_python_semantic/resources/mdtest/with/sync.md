@@ -130,5 +130,5 @@ def _(flag: bool):
 
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
     with Manager() as f:
-        reveal_type(f)  # revealed: Unknown | str
+        reveal_type(f)  # revealed: str
 ```
