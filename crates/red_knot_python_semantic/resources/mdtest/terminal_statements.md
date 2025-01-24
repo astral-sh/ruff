@@ -40,7 +40,7 @@ def f(cond: bool) -> str:
         x = "test"
     else:
         return "early"
-    return x
+    return x  # no possibly-unresolved-reference diagnostic!
 
 def g(cond: bool):
     if cond:
@@ -104,7 +104,7 @@ def g(cond: bool, i: int):
     reveal_type(x)  # revealed: Literal["before", "loop", "break"]
 ```
 
-## `return` is terminal in nested scopes
+## `return` is terminal in nested conditionals
 
 ```py
 def f(cond1: bool, cond2: bool) -> str:
