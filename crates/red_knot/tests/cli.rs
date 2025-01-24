@@ -222,6 +222,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     let case = TestCase::with_file(
         "test.py",
         r#"
+        import does_not_exit
+
         y = 4 / 0
 
         for a in range(0, y):
@@ -235,13 +237,14 @@ fn cli_rule_severity() -> anyhow::Result<()> {
         // Assert that there's a possibly unresolved reference diagnostic
         // and that division-by-zero has a severity of error by default.
         assert_cmd_snapshot!(case.command(), @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
-            warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
+        error[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
+        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:9:7 Name `x` used when possibly not defined
 
-            ----- stderr -----
+        ----- stderr -----
         ");
 
 
@@ -255,13 +258,14 @@ fn cli_rule_severity() -> anyhow::Result<()> {
                 .arg("--warn")
                 .arg("unresolved-import"),
             @r"
-            success: false
-            exit_code: 1
-            ----- stdout -----
-            warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
+        warning[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
 
-            ----- stderr -----
-            "
+        ----- stderr -----
+        "
         );
 
         Ok(())
@@ -301,13 +305,13 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         assert_cmd_snapshot!(
             case
                 .command()
-                // Override the error severity with warning
                 .arg("--error")
                 .arg("possibly-unresolved-reference")
                 .arg("--warn")
                 .arg("division-by-zero")
                 .arg("--ignore")
                 .arg("possibly-unresolved-reference"),
+                // Override the error severity with warning
             @r"
             success: false
             exit_code: 1

@@ -119,17 +119,16 @@ impl clap::FromArgMatches for RulesArg {
             (lint::Level::Warn, "warn"),
             (lint::Level::Error, "error"),
         ] {
+            let indices = matches.indices_of(arg_id).into_iter().flatten();
+            let levels = matches.get_many::<String>(arg_id).into_iter().flatten();
             rules.extend(
-                matches
-                    .indices_of(arg_id)
-                    .into_iter()
-                    .flatten()
-                    .zip(matches.get_many::<String>(arg_id).into_iter().flatten())
+                indices
+                    .zip(levels)
                     .map(|(index, rule)| (index, rule, level)),
             );
         }
 
-        // Sorty by their index so that values specified later override earlier ones.
+        // Sort by their index so that values specified later override earlier ones.
         rules.sort_by_key(|(index, _, _)| *index);
 
         Ok(Self(
@@ -154,7 +153,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("List of rules to enable with an error severity")
+                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -162,7 +161,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("List of rules to enable with a warning severity")
+                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -170,7 +169,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("List of rule codes to disable")
+                .help("Disables the rule. Can be specified multiple times.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
