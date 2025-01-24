@@ -43,12 +43,13 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::VisibilityConstraints;
 
-use super::bitset::{BitSet, BitSetIterator};
-use itertools::{izip, EitherOrBoth, Itertools};
+use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
+
+use crate::semantic_index::use_def::bitset::{BitSet, BitSetIterator};
+use crate::semantic_index::use_def::VisibilityConstraints;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
@@ -176,14 +177,8 @@ impl SymbolDeclarations {
         let a = std::mem::take(self);
         self.live_declarations = a.live_declarations.clone();
         self.live_declarations.union(&b.live_declarations);
-        let a = izip!(
-            a.live_declarations.iter(),
-            a.visibility_constraints.into_iter()
-        );
-        let b = izip!(
-            b.live_declarations.iter(),
-            b.visibility_constraints.into_iter()
-        );
+        let a = (a.live_declarations.iter()).zip(a.visibility_constraints);
+        let b = (b.live_declarations.iter()).zip(b.visibility_constraints);
         for zipped in a.merge_join_by(b, |(a_decl, _), (b_decl, _)| a_decl.cmp(b_decl)) {
             match zipped {
                 EitherOrBoth::Both((_, a_vis_constraint), (_, b_vis_constraint)) => {
@@ -279,21 +274,17 @@ impl SymbolBindings {
         let a = std::mem::take(self);
         self.live_bindings = a.live_bindings.clone();
         self.live_bindings.union(&b.live_bindings);
-        let a = izip!(
-            a.live_bindings.iter(),
-            a.constraints.into_iter(),
-            a.visibility_constraints.into_iter()
-        );
-        let b = izip!(
-            b.live_bindings.iter(),
-            b.constraints.into_iter(),
-            b.visibility_constraints.into_iter()
-        );
-        for zipped in a.merge_join_by(b, |(a_def, _, _), (b_def, _, _)| a_def.cmp(b_def)) {
+        let a = (a.live_bindings.iter())
+            .zip(a.constraints)
+            .zip(a.visibility_constraints);
+        let b = (b.live_bindings.iter())
+            .zip(b.constraints)
+            .zip(b.visibility_constraints);
+        for zipped in a.merge_join_by(b, |((a_def, _), _), ((b_def, _), _)| a_def.cmp(b_def)) {
             match zipped {
                 EitherOrBoth::Both(
-                    (_, a_constraints, a_vis_constraint),
-                    (_, b_constraints, b_vis_constraint),
+                    ((_, a_constraints), a_vis_constraint),
+                    ((_, b_constraints), b_vis_constraint),
                 ) => {
                     // If the same definition is visible through both paths, any constraint
                     // that applies on only one path is irrelevant to the resulting type from
@@ -308,8 +299,8 @@ impl SymbolBindings {
                     self.add_via_merge(constraints, vis_constraint);
                 }
 
-                EitherOrBoth::Left((_, constraints, vis_constraint))
-                | EitherOrBoth::Right((_, constraints, vis_constraint)) => {
+                EitherOrBoth::Left(((_, constraints), vis_constraint))
+                | EitherOrBoth::Right(((_, constraints), vis_constraint)) => {
                     self.add_via_merge(constraints, vis_constraint);
                 }
             }
