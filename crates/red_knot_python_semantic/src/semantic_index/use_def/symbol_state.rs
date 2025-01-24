@@ -129,6 +129,13 @@ type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityCo
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
+    ///
+    /// Invariant: Because this is a `BitSet`, it can be viewed as a _sorted_ set of definition
+    /// IDs. The `visibility_constraints` field stores constraints for each definition. Therefore
+    /// those fields must always have the same `len()` as `live_declarations`, and the elements
+    /// must appear in the same order.  Effectively, this means that elements must always be added
+    /// in sorted order, or via a binary search that determines the correct place to insert new
+    /// constraints.
     pub(crate) live_declarations: Declarations,
 
     /// For each live declaration, which visibility constraint applies to it?
@@ -177,8 +184,17 @@ impl SymbolDeclarations {
         let a = std::mem::take(self);
         self.live_declarations = a.live_declarations.clone();
         self.live_declarations.union(&b.live_declarations);
+
+        // Invariant: These zips are well-formed since we maintain an invariant that all of our
+        // fields are sets/vecs with the same length.
         let a = (a.live_declarations.iter()).zip(a.visibility_constraints);
         let b = (b.live_declarations.iter()).zip(b.visibility_constraints);
+
+        // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
+        // the definition IDs and constraints line up correctly in the merged result. If a
+        // definition is found in both `a` and `b`, we compose the constraints from the two paths
+        // in an appropriate way (intersection for narrowing constraints; ternary OR for visibility
+        // constraints). If a definition is found in only one path, it is used as-is.
         for zipped in a.merge_join_by(b, |(a_decl, _), (b_decl, _)| a_decl.cmp(b_decl)) {
             match zipped {
                 EitherOrBoth::Both((_, a_vis_constraint), (_, b_vis_constraint)) => {
@@ -201,6 +217,13 @@ impl SymbolDeclarations {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SymbolBindings {
     /// [`BitSet`]: which bindings (as [`ScopedDefinitionId`]) can reach the current location?
+    ///
+    /// Invariant: Because this is a `BitSet`, it can be viewed as a _sorted_ set of definition
+    /// IDs. The `constraints` and `visibility_constraints` field stores constraints for each
+    /// definition. Therefore those fields must always have the same `len()` as
+    /// `live_bindings`, and the elements must appear in the same order.  Effectively, this means
+    /// that elements must always be added in sorted order, or via a binary search that determines
+    /// the correct place to insert new constraints.
     live_bindings: Bindings,
 
     /// For each live binding, which [`ScopedConstraintId`] apply?
@@ -268,12 +291,21 @@ impl SymbolBindings {
         let a = std::mem::take(self);
         self.live_bindings = a.live_bindings.clone();
         self.live_bindings.union(&b.live_bindings);
+
+        // Invariant: These zips are well-formed since we maintain an invariant that all of our
+        // fields are sets/vecs with the same length.
         let a = (a.live_bindings.iter())
             .zip(a.constraints)
             .zip(a.visibility_constraints);
         let b = (b.live_bindings.iter())
             .zip(b.constraints)
             .zip(b.visibility_constraints);
+
+        // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
+        // the definition IDs and constraints line up correctly in the merged result. If a
+        // definition is found in both `a` and `b`, we compose the constraints from the two paths
+        // in an appropriate way (intersection for narrowing constraints; ternary OR for visibility
+        // constraints). If a definition is found in only one path, it is used as-is.
         for zipped in a.merge_join_by(b, |((a_def, _), _), ((b_def, _), _)| a_def.cmp(b_def)) {
             match zipped {
                 EitherOrBoth::Both(
