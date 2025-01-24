@@ -175,6 +175,8 @@ impl SymbolDeclarations {
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
         let mut a = Self::default();
         std::mem::swap(&mut a, self);
+        self.live_declarations = a.live_declarations.clone();
+        self.live_declarations.union(&b.live_declarations);
         let a = izip!(
             a.live_declarations.iter(),
             a.visibility_constraints.into_iter()
@@ -185,24 +187,23 @@ impl SymbolDeclarations {
         );
         for zipped in a.merge_join_by(b, |(a_decl, _), (b_decl, _)| a_decl.cmp(b_decl)) {
             match zipped {
-                EitherOrBoth::Both((decl, a_vis_constraint), (_, b_vis_constraint)) => {
+                EitherOrBoth::Both((_, a_vis_constraint), (_, b_vis_constraint)) => {
                     let vis_constraint = visibility_constraints
                         .add_or_constraint(a_vis_constraint, b_vis_constraint);
-                    self.add_via_merge(decl, vis_constraint);
+                    self.add_via_merge(vis_constraint);
                 }
 
-                EitherOrBoth::Left((decl, vis_constraint))
-                | EitherOrBoth::Right((decl, vis_constraint)) => {
-                    self.add_via_merge(decl, vis_constraint);
+                EitherOrBoth::Left((_, vis_constraint))
+                | EitherOrBoth::Right((_, vis_constraint)) => {
+                    self.add_via_merge(vis_constraint);
                 }
             }
         }
     }
 
-    fn add_via_merge(&mut self, decl: u32, vis_constraint: ScopedVisibilityConstraintId) {
+    fn add_via_merge(&mut self, vis_constraint: ScopedVisibilityConstraintId) {
         // SAFETY: This can only be called from `merge`, since it assumes that we are adding
         // elements in order, sorted by `decl`.
-        self.live_declarations.insert(decl);
         self.visibility_constraints.push(vis_constraint);
     }
 }
@@ -278,6 +279,8 @@ impl SymbolBindings {
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
         let mut a = Self::default();
         std::mem::swap(&mut a, self);
+        self.live_bindings = a.live_bindings.clone();
+        self.live_bindings.union(&b.live_bindings);
         let a = izip!(
             a.live_bindings.iter(),
             a.constraints.into_iter(),
@@ -291,7 +294,7 @@ impl SymbolBindings {
         for zipped in a.merge_join_by(b, |(a_def, _, _), (b_def, _, _)| a_def.cmp(b_def)) {
             match zipped {
                 EitherOrBoth::Both(
-                    (def, a_constraints, a_vis_constraint),
+                    (_, a_constraints, a_vis_constraint),
                     (_, b_constraints, b_vis_constraint),
                 ) => {
                     // If the same definition is visible through both paths, any constraint
@@ -304,12 +307,12 @@ impl SymbolBindings {
                     let vis_constraint = visibility_constraints
                         .add_or_constraint(a_vis_constraint, b_vis_constraint);
 
-                    self.add_via_merge(def, constraints, vis_constraint);
+                    self.add_via_merge(constraints, vis_constraint);
                 }
 
-                EitherOrBoth::Left((def, constraints, vis_constraint))
-                | EitherOrBoth::Right((def, constraints, vis_constraint)) => {
-                    self.add_via_merge(def, constraints, vis_constraint);
+                EitherOrBoth::Left((_, constraints, vis_constraint))
+                | EitherOrBoth::Right((_, constraints, vis_constraint)) => {
+                    self.add_via_merge(constraints, vis_constraint);
                 }
             }
         }
@@ -317,13 +320,11 @@ impl SymbolBindings {
 
     fn add_via_merge(
         &mut self,
-        def: u32,
         constraints: Constraints,
         vis_constraint: ScopedVisibilityConstraintId,
     ) {
         // SAFETY: This can only be called from `merge`, since it assumes that we are adding
         // elements in order, sorted by `def`.
-        self.live_bindings.insert(def);
         self.constraints.push(constraints);
         self.visibility_constraints.push(vis_constraint);
     }
