@@ -1,4 +1,3 @@
-use std::iter::FusedIterator;
 use std::sync::Arc;
 
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -6,7 +5,7 @@ use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_index::{IndexSlice, IndexVec};
+use ruff_index::IndexVec;
 
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -230,8 +229,17 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
     #[allow(unused)]
-    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
-        AncestorsIter::new(self, scope)
+    pub(crate) fn ancestor_scopes(
+        &self,
+        scope_id: FileScopeId,
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
+        let mut next_id = Some(scope_id);
+        std::iter::from_fn(move || {
+            let current_id = next_id?;
+            let current = &self.scopes[current_id];
+            next_id = current.parent;
+            Some((current_id, current))
+        })
     }
 
     /// Returns the [`Definition`] salsa ingredient for `definition_key`.
@@ -277,34 +285,6 @@ impl<'db> SemanticIndex<'db> {
         self.has_future_annotations
     }
 }
-
-pub struct AncestorsIter<'a> {
-    scopes: &'a IndexSlice<FileScopeId, Scope>,
-    next_id: Option<FileScopeId>,
-}
-
-impl<'a> AncestorsIter<'a> {
-    fn new(module_symbol_table: &'a SemanticIndex, start: FileScopeId) -> Self {
-        Self {
-            scopes: &module_symbol_table.scopes,
-            next_id: Some(start),
-        }
-    }
-}
-
-impl<'a> Iterator for AncestorsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let current_id = self.next_id?;
-        let current = &self.scopes[current_id];
-        self.next_id = current.parent;
-
-        Some((current_id, current))
-    }
-}
-
-impl FusedIterator for AncestorsIter<'_> {}
 
 #[cfg(test)]
 mod tests {
