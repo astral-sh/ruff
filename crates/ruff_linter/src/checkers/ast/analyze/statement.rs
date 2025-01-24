@@ -377,7 +377,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_in_3_function_def(checker, function_def);
+                airflow::rules::removed_function_def_in_3(checker, function_def);
             }
             if checker.enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
