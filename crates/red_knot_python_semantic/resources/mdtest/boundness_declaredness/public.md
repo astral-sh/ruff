@@ -31,7 +31,9 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 If a symbol has a declared type (`int`), we use that even if there is a more precise inferred type
 (`Literal[1]`), or a conflicting inferred type (`Literal[2]`):
 
-```py path=mod.py
+`mod.py`:
+
+```py
 x: int = 1
 
 # error: [invalid-assignment]
@@ -50,7 +52,9 @@ reveal_type(y)  # revealed: str
 If a symbol is declared and *possibly* unbound, we trust that other module and use the declared type
 without raising an error.
 
-```py path=mod.py
+`mod.py`:
+
+```py
 def flag() -> bool: ...
 
 x: int
@@ -73,7 +77,9 @@ reveal_type(y)  # revealed: str
 Similarly, if a symbol is declared but unbound, we do not raise an error. We trust that this symbol
 is available somehow and simply use the declared type.
 
-```py path=mod.py
+`mod.py`:
+
+```py
 x: int
 ```
 
@@ -90,7 +96,9 @@ reveal_type(x)  # revealed: int
 If a symbol is possibly undeclared but definitely bound, we use the union of the declared and
 inferred types:
 
-```py path=mod.py
+`mod.py`:
+
+```py
 from typing import Any
 
 def flag() -> bool: ...
@@ -117,7 +125,9 @@ inferred types. This case is interesting because the "possibly declared" definit
 same as the "possibly bound" definition (symbol `y`). Note that we raise a `possibly-unbound-import`
 error for both `x` and `y`:
 
-```py path=mod.py
+`mod.py`:
+
+```py
 def flag() -> bool: ...
 
 if flag():
@@ -141,7 +151,9 @@ reveal_type(y)  # revealed: Literal[2] | str
 If a symbol is possibly undeclared and definitely unbound, we currently do not raise an error. This
 seems inconsistent when compared to the case just above.
 
-```py path=mod.py
+`mod.py`:
+
+```py
 def flag() -> bool: ...
 
 if flag():
@@ -162,7 +174,9 @@ reveal_type(x)  # revealed: int
 
 We use the inferred type as the public type, if a symbol has no declared type.
 
-```py path=mod.py
+`mod.py`:
+
+```py
 x = 1
 ```
 
@@ -177,7 +191,9 @@ reveal_type(x)  # revealed: Literal[1]
 If a symbol is undeclared and *possibly* unbound, we currently do not raise an error. This seems
 inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" case.
 
-```py path=mod.py
+`mod.py`:
+
+```py
 def flag() -> bool: ...
 
 if flag:
@@ -196,7 +212,9 @@ reveal_type(x)  # revealed: Literal[1]
 
 If a symbol is undeclared *and* unbound, we infer `Unknown` and raise an error.
 
-```py path=mod.py
+`mod.py`:
+
+```py
 if False:
     x: int = 1
 ```

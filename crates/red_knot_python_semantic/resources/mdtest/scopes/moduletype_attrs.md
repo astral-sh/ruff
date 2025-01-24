@@ -29,7 +29,9 @@ def foo():
 However, three attributes on `types.ModuleType` are not present as implicit module globals; these
 are excluded:
 
-```py path=unbound_dunders.py
+`unbound_dunders.py`:
+
+```py
 # error: [unresolved-reference]
 # revealed: Unknown
 reveal_type(__getattr__)
@@ -70,7 +72,9 @@ Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType`
 dynamic imports; but we ignore that for module-literal types where we know exactly which module
 we're dealing with:
 
-```py path=__getattr__.py
+`__getattr__.py`:
+
+```py
 import typing
 
 # error: [unresolved-attribute]
@@ -83,13 +87,17 @@ It's impossible to override the `__dict__` attribute of `types.ModuleType` insta
 module; we should prioritise the attribute in the `types.ModuleType` stub over a variable named
 `__dict__` in the module's global namespace:
 
-```py path=foo.py
+`foo.py`:
+
+```py
 __dict__ = "foo"
 
 reveal_type(__dict__)  # revealed: Literal["foo"]
 ```
 
-```py path=bar.py
+`bar.py`:
+
+```py
 import foo
 from foo import __dict__ as foo_dict
 
