@@ -4,6 +4,7 @@ use std::str::FromStr;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -33,12 +34,12 @@ impl FromStr for LiteralType {
 }
 
 impl LiteralType {
-    fn as_zero_value_expr(self) -> Expr {
+    fn as_zero_value_expr(self, stylist: &Stylist) -> Expr {
         match self {
             LiteralType::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
-                flags: ast::StringLiteralFlags::empty(),
+                flags: ast::StringLiteralFlags::from(stylist).with_dynamic(),
             }
             .into(),
             LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
@@ -191,7 +192,7 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let expr = literal_type.as_zero_value_expr();
+            let expr = literal_type.as_zero_value_expr(checker.stylist());
             let content = checker.generator().expr(&expr);
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,
