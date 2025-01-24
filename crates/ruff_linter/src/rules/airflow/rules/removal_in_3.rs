@@ -122,7 +122,7 @@ pub(crate) fn removed_function_def_in_3(checker: &mut Checker, function_def: &St
         return;
     }
 
-    check_parameters_in_function_def(checker, function_def);
+    check_function_parameters(checker, function_def);
 }
 
 const REMOVED_CONTEXT_KEYS: [&str; 12] = [
@@ -153,7 +153,7 @@ const REMOVED_CONTEXT_KEYS: [&str; 12] = [
 ///     #            'execution_date' is removed in Airflow 3.0
 ///     pass
 /// ```
-fn check_parameters_in_function_def(checker: &mut Checker, function_def: &StmtFunctionDef) {
+fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionDef) {
     if !is_decorated_by_airflow_task(function_def, checker.semantic())
         && !is_execute_method_inherits_from_airflow_operator(function_def, checker.semantic())
     {
