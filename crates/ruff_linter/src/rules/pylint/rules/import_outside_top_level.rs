@@ -1,10 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Alias, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::{
-    checkers::ast::Checker, codes::Rule, rules::flake8_tidy_imports::matchers::NameMatchPolicy,
+    checkers::ast::Checker,
+    codes::Rule,
+    rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, NameMatchPolicy},
 };
 
 /// ## What it does
@@ -58,8 +60,8 @@ impl Violation for ImportOutsideTopLevel {
 pub(crate) fn import_outside_top_level(
     checker: &mut Checker,
     stmt: &Stmt,
-    pkg: Option<NameMatchPolicy>,
-    modules: &Vec<NameMatchPolicy>,
+    pkg: Option<&str>,
+    modules: &[Alias],
 ) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed
@@ -68,37 +70,73 @@ pub(crate) fn import_outside_top_level(
 
     // Check if any of the non-top-level imports are banned by TID253
     // before emitting the diagnostic
-    if checker.enabled(Rule::BannedModuleLevelImports)
-        && (
-            // Either this is a `from pkg` import and the whole package is banned
-            pkg
-            .and_then(|policy| {
-                policy.find(
-                    checker
-                        .settings
-                        .flake8_tidy_imports
-                        .banned_module_level_imports
-                        .iter()
-                        .map(AsRef::as_ref),
-                )
-            })
-            .is_some()
-            // Or all of the import modules are banned
-            || modules.iter().all(|policy| {
-                policy
-                    .find(
+    if checker.enabled(Rule::BannedModuleLevelImports) {
+        match pkg {
+            // import from a package
+            Some(pkg) => {
+                // Either the whole package is banned
+                if NameMatchPolicy::MatchNameOrParent(
+                    MatchNameOrParent {
+                        module: pkg,
+                    }
+                ).find(
                         checker
                             .settings
                             .flake8_tidy_imports
                             .banned_module_level_imports
                             .iter()
                             .map(AsRef::as_ref),
+                    ).is_some()
+                // Or all of the import modules are banned
+                || modules.iter()
+                .map(|alias| {
+                    NameMatchPolicy::MatchName(
+                        MatchName {
+                            module: pkg,
+                            member: &alias.name,
+                        },
                     )
-                    .is_some()
-            })
-        )
-    {
-        return;
+                }).all(|policy| {
+                    policy
+                        .find(
+                            checker
+                                .settings
+                                .flake8_tidy_imports
+                                .banned_module_level_imports
+                                .iter()
+                                .map(AsRef::as_ref),
+                        )
+                        .is_some()
+                }) {
+                    return;
+                }
+            }
+            None => {
+                // plain import
+                if modules
+                    .iter()
+                    .map(|alias| {
+                        NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
+                            module: &alias.name,
+                        })
+                    })
+                    .all(|policy| {
+                        policy
+                            .find(
+                                checker
+                                    .settings
+                                    .flake8_tidy_imports
+                                    .banned_module_level_imports
+                                    .iter()
+                                    .map(AsRef::as_ref),
+                            )
+                            .is_some()
+                    })
+                {
+                    return;
+                }
+            }
+        }
     }
 
     // Emit the diagnostic
