@@ -81,7 +81,7 @@ impl Transformer for Normalizer {
                         string.value = ast::StringLiteralValue::single(ast::StringLiteral {
                             value: string.value.to_str().to_string().into_boxed_str(),
                             range: string.range,
-                            flags: StringLiteralFlags::default(),
+                            flags: StringLiteralFlags::empty(),
                         });
                     }
                 }

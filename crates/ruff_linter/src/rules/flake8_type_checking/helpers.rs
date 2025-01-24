@@ -366,7 +366,7 @@ impl<'a> QuoteAnnotator<'a> {
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
             value: annotation.into_boxed_str(),
-            flags: ast::StringLiteralFlags::default(),
+            flags: ast::StringLiteralFlags::from(self.stylist),
         }))
     }
 
