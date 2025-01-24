@@ -287,18 +287,18 @@ impl SymbolBindings {
         }
     }
 
-    fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
-        let a = std::mem::take(self);
+    fn merge(&mut self, mut b: Self, visibility_constraints: &mut VisibilityConstraints) {
+        let mut a = std::mem::take(self);
         self.live_bindings = a.live_bindings.clone();
         self.live_bindings.union(&b.live_bindings);
 
         // Invariant: These zips are well-formed since we maintain an invariant that all of our
         // fields are sets/vecs with the same length.
         let a = (a.live_bindings.iter())
-            .zip(a.constraints)
+            .zip(a.constraints.iter_mut())
             .zip(a.visibility_constraints);
         let b = (b.live_bindings.iter())
-            .zip(b.constraints)
+            .zip(b.constraints.iter_mut())
             .zip(b.visibility_constraints);
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
@@ -315,9 +315,9 @@ impl SymbolBindings {
                     // If the same definition is visible through both paths, any constraint
                     // that applies on only one path is irrelevant to the resulting type from
                     // unioning the two paths, so we intersect the constraints.
-                    let mut constraints = a_constraints;
+                    let constraints = a_constraints;
                     constraints.intersect(&b_constraints);
-                    self.constraints.push(constraints);
+                    self.constraints.push(std::mem::take(constraints));
 
                     // For visibility constraints, we merge them using a ternary OR operation:
                     let vis_constraint = visibility_constraints
@@ -327,7 +327,7 @@ impl SymbolBindings {
 
                 EitherOrBoth::Left(((_, constraints), vis_constraint))
                 | EitherOrBoth::Right(((_, constraints), vis_constraint)) => {
-                    self.constraints.push(constraints);
+                    self.constraints.push(std::mem::take(constraints));
                     self.visibility_constraints.push(vis_constraint);
                 }
             }
