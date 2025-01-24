@@ -3,7 +3,10 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::{
+    self as ast, Expr, Int, LiteralExpressionRef, StringLiteral, StringLiteralFlags,
+    StringLiteralValue, UnaryOp,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -35,7 +38,15 @@ impl FromStr for LiteralType {
 impl LiteralType {
     fn as_zero_value_expr(self) -> Expr {
         match self {
-            LiteralType::Str => ast::ExprStringLiteral::default().into(),
+            LiteralType::Str => ast::ExprStringLiteral {
+                value: StringLiteralValue::single(StringLiteral {
+                    flags: StringLiteralFlags::default().with_dynamic(),
+                    range: TextRange::default(),
+                    value: "".into(),
+                }),
+                ..ast::ExprStringLiteral::default()
+            }
+            .into(),
             LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
