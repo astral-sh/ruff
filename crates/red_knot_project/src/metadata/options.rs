@@ -149,6 +149,16 @@ impl Options {
                             format!("Unknown lint rule `{rule_name}`"),
                             Severity::Warning,
                         ),
+                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
+                            OptionDiagnostic::new(
+                                DiagnosticId::UnknownRule,
+                                format!(
+                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
+                                ),
+                                Severity::Warning,
+                            )
+                        }
+
                         GetLintError::Removed(_) => OptionDiagnostic::new(
                             DiagnosticId::UnknownRule,
                             format!("Unknown lint rule `{rule_name}`"),
@@ -204,6 +214,16 @@ pub struct SrcOptions {
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
     inner: FxHashMap<RangedValue<String>, RangedValue<Level>>,
+}
+
+impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
+    fn from_iter<T: IntoIterator<Item = (RangedValue<String>, RangedValue<Level>)>>(
+        iter: T,
+    ) -> Self {
+        Self {
+            inner: iter.into_iter().collect(),
+        }
+    }
 }
 
 #[derive(Error, Debug)]

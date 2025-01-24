@@ -52,7 +52,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: "Object of type `NonCallable` is not callable"
+# error: "Object of type `Unknown | Literal[1]` is not callable (due to union element `Literal[1]`)"
 reveal_type(a())  # revealed: Unknown
 ```
 

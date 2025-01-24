@@ -5,6 +5,11 @@ that is, a use of a symbol from another scope. If a symbol has a declared type i
 (e.g. `int`), we use that as the symbol's "public type" (the type of the symbol from the perspective
 of other scopes) even if there is a more precise local inferred type for the symbol (`Literal[1]`).
 
+If a symbol has no declared type, we use the union of `Unknown` with the inferred type as the public
+type. If there is no declaration, then the symbol can be reassigned to any type from another scope;
+the union with `Unknown` reflects that its type must at least be as large as the type of the
+assigned value, but could be arbitrarily larger.
+
 We test the whole matrix of possible boundness and declaredness states. The current behavior is
 summarized in the following table, while the tests below demonstrate each case. Note that some of
 this behavior is questionable and might change in the future. See the TODOs in `symbol_by_id`
@@ -12,11 +17,11 @@ this behavior is questionable and might change in the future. See the TODOs in `
 In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
 "undeclared-and-possibly-unbound" cases (marked with a "?").
 
-| **Public type**  | declared     | possibly-undeclared        | undeclared   |
-| ---------------- | ------------ | -------------------------- | ------------ |
-| bound            | `T_declared` | `T_declared \| T_inferred` | `T_inferred` |
-| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `T_inferred` |
-| unbound          | `T_declared` | `T_declared`               | `Unknown`    |
+| **Public type**  | declared     | possibly-undeclared        | undeclared              |
+| ---------------- | ------------ | -------------------------- | ----------------------- |
+| bound            | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
+| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
+| unbound          | `T_declared` | `T_declared`               | `Unknown`               |
 
 | **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
 | ---------------- | -------- | ------------------------- | ------------------- |
@@ -105,17 +110,24 @@ def flag() -> bool: ...
 
 x = 1
 y = 2
+z = 3
 if flag():
-    x: Any
+    x: int
+    y: Any
     # error: [invalid-declaration]
-    y: str
+    z: str
 ```
 
 ```py
-from mod import x, y
+from mod import x, y, z
 
-reveal_type(x)  # revealed: Literal[1] | Any
-reveal_type(y)  # revealed: Literal[2] | Unknown
+reveal_type(x)  # revealed: int
+reveal_type(y)  # revealed: Literal[2] | Any
+reveal_type(z)  # revealed: Literal[3] | Unknown
+
+# External modifications of `x` that violate the declared type are not allowed:
+# error: [invalid-assignment]
+x = None
 ```
 
 ### Possibly undeclared and possibly unbound
@@ -144,6 +156,10 @@ from mod import x, y
 
 reveal_type(x)  # revealed: Literal[1] | Any
 reveal_type(y)  # revealed: Literal[2] | str
+
+# External modifications of `y` that violate the declared type are not allowed:
+# error: [invalid-assignment]
+y = None
 ```
 
 ### Possibly undeclared and unbound
@@ -166,13 +182,15 @@ if flag():
 from mod import x
 
 reveal_type(x)  # revealed: int
+
+# External modifications to `x` that violate the declared type are not allowed:
+# error: [invalid-assignment]
+x = None
 ```
 
 ## Undeclared
 
 ### Undeclared but bound
-
-We use the inferred type as the public type, if a symbol has no declared type.
 
 `mod.py`:
 
@@ -183,7 +201,10 @@ x = 1
 ```py
 from mod import x
 
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: Unknown | Literal[1]
+
+# All external modifications of `x` are allowed:
+x = None
 ```
 
 ### Undeclared and possibly unbound
@@ -205,7 +226,10 @@ if flag:
 # on top of this document.
 from mod import x
 
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: Unknown | Literal[1]
+
+# All external modifications of `x` are allowed:
+x = None
 ```
 
 ### Undeclared and unbound
@@ -224,4 +248,7 @@ if False:
 from mod import x
 
 reveal_type(x)  # revealed: Unknown
+
+# Modifications allowed in this case:
+x = None
 ```

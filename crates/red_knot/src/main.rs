@@ -1,13 +1,13 @@
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
+use crate::args::{Args, CheckCommand, Command};
+use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use python_version::PythonVersion;
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
+use red_knot_project::metadata::options::Options;
 use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
@@ -16,86 +16,10 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
-use crate::logging::{setup_tracing, Verbosity};
-
+mod args;
 mod logging;
 mod python_version;
 mod verbosity;
-
-#[derive(Debug, Parser)]
-#[command(
-    author,
-    name = "red-knot",
-    about = "An extremely fast Python type checker."
-)]
-#[command(version)]
-struct Args {
-    #[command(subcommand)]
-    pub(crate) command: Option<Command>,
-
-    /// Run the command within the given project directory.
-    ///
-    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
-    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
-    ///
-    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
-    #[arg(long, value_name = "PROJECT")]
-    project: Option<SystemPathBuf>,
-
-    /// Path to the virtual environment the project uses.
-    ///
-    /// If provided, red-knot will use the `site-packages` directory of this virtual environment
-    /// to resolve type information for the project's third-party dependencies.
-    #[arg(long, value_name = "PATH")]
-    venv_path: Option<SystemPathBuf>,
-
-    /// Custom directory to use for stdlib typeshed stubs.
-    #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
-    typeshed: Option<SystemPathBuf>,
-
-    /// Additional path to use as a module-resolution source (can be passed multiple times).
-    #[arg(long, value_name = "PATH")]
-    extra_search_path: Option<Vec<SystemPathBuf>>,
-
-    /// Python version to assume when resolving types.
-    #[arg(long, value_name = "VERSION", alias = "target-version")]
-    python_version: Option<PythonVersion>,
-
-    #[clap(flatten)]
-    verbosity: Verbosity,
-
-    /// Run in watch mode by re-running whenever files change.
-    #[arg(long, short = 'W')]
-    watch: bool,
-}
-
-impl Args {
-    fn to_options(&self) -> Options {
-        Options {
-            environment: Some(EnvironmentOptions {
-                python_version: self
-                    .python_version
-                    .map(|version| RangedValue::cli(version.into())),
-                venv_path: self.venv_path.as_ref().map(RelativePathBuf::cli),
-                typeshed: self.typeshed.as_ref().map(RelativePathBuf::cli),
-                extra_paths: self.extra_search_path.as_ref().map(|extra_search_paths| {
-                    extra_search_paths
-                        .iter()
-                        .map(RelativePathBuf::cli)
-                        .collect()
-                }),
-                ..EnvironmentOptions::default()
-            }),
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, clap::Subcommand)]
-pub enum Command {
-    /// Start the language server
-    Server,
-}
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
@@ -122,10 +46,13 @@ pub fn main() -> ExitStatus {
 fn run() -> anyhow::Result<ExitStatus> {
     let args = Args::parse_from(std::env::args());
 
-    if matches!(args.command, Some(Command::Server)) {
-        return run_server().map(|()| ExitStatus::Success);
+    match args.command {
+        Command::Server => run_server().map(|()| ExitStatus::Success),
+        Command::Check(check_args) => run_check(check_args),
     }
+}
 
+fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
@@ -156,7 +83,8 @@ fn run() -> anyhow::Result<ExitStatus> {
         .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd);
-    let cli_options = args.to_options();
+    let watch = args.watch;
+    let cli_options = args.into_options();
     let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
     workspace_metadata.apply_cli_options(cli_options.clone());
 
@@ -174,7 +102,7 @@ fn run() -> anyhow::Result<ExitStatus> {
         }
     })?;
 
-    let exit_status = if args.watch {
+    let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
         main_loop.run(&mut db)

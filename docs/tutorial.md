@@ -8,13 +8,14 @@ your project. For a more detailed overview, see [_Configuring Ruff_](configurati
 To start, we'll initialize a project using [uv](https://docs.astral.sh/uv/):
 
 ```console
-$ uv init numbers
+$ uv init --lib numbers
 ```
 
 This command creates a Python project with the following structure:
 
 ```text
 numbers
+  ├── README.md
   ├── pyproject.toml
   └── src
       └── numbers

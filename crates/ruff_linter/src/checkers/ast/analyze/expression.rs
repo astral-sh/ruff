@@ -175,7 +175,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::NonPEP646Unpack) {
                 pyupgrade::rules::use_pep646_unpack(checker, subscript);
             }
-
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3(checker, expr);
+            }
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {

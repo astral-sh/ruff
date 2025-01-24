@@ -36,7 +36,7 @@ def f():
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
     # TODO: This should be Color.RED
-    reveal_type(b1)  # revealed: Literal[0]
+    reveal_type(b1)  # revealed: Unknown | Literal[0]
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]

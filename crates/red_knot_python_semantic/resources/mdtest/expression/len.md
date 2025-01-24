@@ -172,10 +172,10 @@ class IntUnion:
     def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]: ...
 
 reveal_type(len(Auto()))  # revealed: int
-reveal_type(len(Int()))  # revealed: Literal[2]
+reveal_type(len(Int()))  # revealed: int
 reveal_type(len(Str()))  # revealed: int
 reveal_type(len(Tuple()))  # revealed: int
-reveal_type(len(IntUnion()))  # revealed: Literal[2, 32]
+reveal_type(len(IntUnion()))  # revealed: int
 ```
 
 ### Negative integers

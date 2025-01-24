@@ -1,16 +1,17 @@
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{
     name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName,
-    StmtClassDef,
+    ExprStringLiteral, ExprSubscript, Stmt, StmtClassDef, StmtFunctionDef,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of deprecated Airflow functions and values.
@@ -71,6 +72,13 @@ impl Violation for Airflow3Removal {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum Replacement {
+    None,
+    Name(&'static str),
+    Message(&'static str),
+}
+
 /// AIR302
 pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
@@ -83,10 +91,11 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 func, arguments, ..
             },
         ) => {
-            if let Some(qualname) = checker.semantic().resolve_qualified_name(func) {
-                check_call_arguments(checker, &qualname, arguments);
+            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
+                check_call_arguments(checker, &qualified_name, arguments);
             };
             check_method(checker, call_expr);
+            check_context_key_usage_in_call(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { attr, .. }) => {
             check_name(checker, expr, attr.range());
@@ -100,15 +109,67 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 }
             }
         }
+        Expr::Subscript(subscript_expr) => {
+            check_context_key_usage_in_subscript(checker, subscript_expr);
+        }
         _ => {}
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-enum Replacement {
-    None,
-    Name(&'static str),
-    Message(&'static str),
+/// AIR302
+pub(crate) fn removed_in_3_function_def(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
+    check_function_parameters(checker, function_def);
+}
+
+const REMOVED_CONTEXT_KEYS: [&str; 12] = [
+    "conf",
+    "execution_date",
+    "next_ds",
+    "next_ds_nodash",
+    "next_execution_date",
+    "prev_ds",
+    "prev_ds_nodash",
+    "prev_execution_date",
+    "prev_execution_date_success",
+    "tomorrow_ds",
+    "yesterday_ds",
+    "yesterday_ds_nodash",
+];
+
+/// Check the function parameters for removed context keys.
+///
+/// For example:
+///
+/// ```python
+/// from airflow.decorators import task
+///
+/// @task
+/// def another_task(execution_date, **kwargs):
+///     #            ^^^^^^^^^^^^^^
+///     #            'execution_date' is removed in Airflow 3.0
+///     pass
+/// ```
+fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    if !is_airflow_task(function_def, checker.semantic()) {
+        return;
+    }
+
+    for param in function_def.parameters.iter_non_variadic_params() {
+        let param_name = param.parameter.name.as_str();
+        if REMOVED_CONTEXT_KEYS.contains(&param_name) {
+            checker.diagnostics.push(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: param_name.to_string(),
+                    replacement: Replacement::None,
+                },
+                param.parameter.name.range(),
+            ));
+        }
+    }
 }
 
 /// Check whether a removed Airflow argument is passed.
@@ -120,8 +181,12 @@ enum Replacement {
 ///
 /// DAG(schedule_interval="@daily")
 /// ```
-fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
-    match qualname.segments() {
+fn check_call_arguments(
+    checker: &mut Checker,
+    qualified_name: &QualifiedName,
+    arguments: &Arguments,
+) {
+    match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             checker.diagnostics.extend(diagnostic_for_argument(
                 arguments,
@@ -145,7 +210,7 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
             ));
         }
         _ => {
-            if is_airflow_auth_manager(qualname.segments()) {
+            if is_airflow_auth_manager(qualified_name.segments()) {
                 if !arguments.is_empty() {
                     checker.diagnostics.push(Diagnostic::new(
                         Airflow3Removal {
@@ -157,13 +222,13 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
                         arguments.range(),
                     ));
                 }
-            } else if is_airflow_task_handler(qualname.segments()) {
+            } else if is_airflow_task_handler(qualified_name.segments()) {
                 checker.diagnostics.extend(diagnostic_for_argument(
                     arguments,
                     "filename_template",
                     None,
                 ));
-            } else if is_airflow_operator(qualname.segments()) {
+            } else if is_airflow_operator(qualified_name.segments()) {
                 checker
                     .diagnostics
                     .extend(diagnostic_for_argument(arguments, "sla", None));
@@ -172,7 +237,7 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 ));
-                match qualname.segments() {
+                match qualified_name.segments() {
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
                         checker.diagnostics.extend(diagnostic_for_argument(
                             arguments,
@@ -250,6 +315,137 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
             attr.range(),
         ));
     }
+}
+
+/// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
+///
+/// Specifically, it flags the following two scenarios:
+///
+/// 1. A removed context key accessed via `context.get("...")` where context is coming from
+///    `get_current_context` function.
+///
+/// ```python
+/// from airflow.decorators import task
+/// from airflow.utils.context import get_current_context
+///
+///
+/// @task
+/// def my_task():
+///     context = get_current_context()
+///     context.get("conf")  # 'conf' is removed in Airflow 3.0
+/// ```
+///
+/// 2. A removed context key accessed via `context.get("...")` where context is a kwarg parameter.
+///
+/// ```python
+/// from airflow.decorators import task
+///
+///
+/// @task
+/// def my_task(**context):
+///     context.get("conf")  # 'conf' is removed in Airflow 3.0
+/// ```
+fn check_context_key_usage_in_call(checker: &mut Checker, call_expr: &ExprCall) {
+    if !in_airflow_task_function(checker.semantic()) {
+        return;
+    }
+
+    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
+        return;
+    };
+
+    if attr.as_str() != "get" {
+        return;
+    }
+
+    let is_kwarg_parameter = value
+        .as_name_expr()
+        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+
+    let is_assigned_from_get_current_context =
+        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        });
+
+    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+        return;
+    }
+
+    for removed_key in REMOVED_CONTEXT_KEYS {
+        let Some(Expr::StringLiteral(ExprStringLiteral { value, range })) =
+            call_expr.arguments.find_positional(0)
+        else {
+            continue;
+        };
+        if value == removed_key {
+            checker.diagnostics.push(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: removed_key.to_string(),
+                    replacement: Replacement::None,
+                },
+                *range,
+            ));
+        }
+    }
+}
+
+/// Check if a subscript expression accesses a removed Airflow context variable.
+/// If a removed key is found, push a corresponding diagnostic.
+fn check_context_key_usage_in_subscript(checker: &mut Checker, subscript: &ExprSubscript) {
+    if !in_airflow_task_function(checker.semantic()) {
+        return;
+    }
+
+    let ExprSubscript { value, slice, .. } = subscript;
+
+    let Some(ExprStringLiteral { value: key, .. }) = slice.as_string_literal_expr() else {
+        return;
+    };
+
+    let is_kwarg_parameter = value
+        .as_name_expr()
+        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+
+    let is_assigned_from_get_current_context =
+        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        });
+
+    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+        return;
+    }
+
+    if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
+        checker.diagnostics.push(Diagnostic::new(
+            Airflow3Removal {
+                deprecated: key.to_string(),
+                replacement: Replacement::None,
+            },
+            slice.range(),
+        ));
+    }
+}
+
+/// Finds the parameter definition for a given name expression in a function.
+fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
+    let Some(binding_id) = semantic.only_binding(name) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+    let Some(Stmt::FunctionDef(StmtFunctionDef { parameters, .. })) = binding.statement(semantic)
+    else {
+        return false;
+    };
+    parameters
+        .kwarg
+        .as_deref()
+        .is_some_and(|kwarg| kwarg.name.as_str() == name.id.as_str())
 }
 
 /// Check whether a removed Airflow class method is called.
@@ -859,4 +1055,24 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
 
         _ => false,
     }
+}
+
+/// Returns `true` if the current statement hierarchy has a function that's decorated with
+/// `@airflow.decorators.task`.
+fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
+    semantic
+        .current_statements()
+        .find_map(|stmt| stmt.as_function_def_stmt())
+        .is_some_and(|function_def| is_airflow_task(function_def, semantic))
+}
+
+/// Returns `true` if the given function is decorated with `@airflow.decorators.task`.
+fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
+            })
+    })
 }
