@@ -1416,6 +1416,10 @@ bitflags! {
 
         /// The string was deemed invalid by the parser.
         const INVALID = 1 << 5;
+
+        /// Whether the flags should be taken from the string literal itself or from the
+        /// [`Generator`] when generating code.
+        const DYNAMIC = 1 << 6;
     }
 }
 
@@ -1487,6 +1491,16 @@ impl StringLiteralFlags {
         } else {
             StringLiteralPrefix::Empty
         }
+    }
+
+    #[must_use]
+    pub fn with_dynamic(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::DYNAMIC;
+        self
+    }
+
+    pub const fn dynamic(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::DYNAMIC)
     }
 }
 
