@@ -109,9 +109,9 @@ reveal_type(x)
 def _(flag: bool):
     class NotIterable:
         if flag:
-            __iter__ = 1
+            __iter__: int = 1
         else:
-            __iter__ = None
+            __iter__: None = None
 
     for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
         pass
@@ -135,7 +135,7 @@ for x in nonsense:  # error: "Object of type `Literal[123]` is not iterable"
 class NotIterable:
     def __getitem__(self, key: int) -> int:
         return 42
-    __iter__ = None
+    __iter__: None = None
 
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass

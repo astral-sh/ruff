@@ -76,11 +76,11 @@ with Manager():
 
 ```py
 class Manager:
-    __enter__ = 42
+    __enter__: int = 42
 
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` of type `Literal[42]` is not callable"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` of type `int` is not callable"
 with Manager():
     ...
 ```
@@ -91,9 +91,9 @@ with Manager():
 class Manager:
     def __enter__(self) -> Self: ...
 
-    __exit__ = 32
+    __exit__: int = 32
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__exit__` of type `Literal[32]` is not callable"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__exit__` of type `int` is not callable"
 with Manager():
     ...
 ```

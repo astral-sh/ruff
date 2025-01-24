@@ -13,7 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::pylint;
+    use crate::rules::{flake8_tidy_imports, pylint};
 
     use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::settings::LinterSettings;
@@ -406,6 +406,30 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn import_outside_top_level_with_banned() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/import_outside_top_level_with_banned.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_module_level_imports: vec![
+                        "foo_banned".to_string(),
+                        "pkg_banned".to_string(),
+                        "pkg.bar_banned".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rules(vec![
+                    Rule::BannedModuleLevelImports,
+                    Rule::ImportOutsideTopLevel,
+                ])
             },
         )?;
         assert_messages!(diagnostics);

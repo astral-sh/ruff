@@ -376,6 +376,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::PytestParameterWithDefaultArgument) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3_function_def(checker, function_def);
+            }
             if checker.enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }
@@ -605,6 +608,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
 
+            if checker.enabled(Rule::BannedModuleLevelImports) {
+                flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
+            }
+
             for alias in names {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
@@ -619,18 +626,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::BannedApi) {
                     flake8_tidy_imports::rules::banned_api(
-                        checker,
-                        &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
-                            flake8_tidy_imports::matchers::MatchNameOrParent {
-                                module: &alias.name,
-                            },
-                        ),
-                        &alias,
-                    );
-                }
-
-                if checker.enabled(Rule::BannedModuleLevelImports) {
-                    flake8_tidy_imports::rules::banned_module_level_imports(
                         checker,
                         &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
                             flake8_tidy_imports::matchers::MatchNameOrParent {
@@ -845,36 +840,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BannedModuleLevelImports) {
-                if let Some(module) = helpers::resolve_imported_module_path(
-                    level,
-                    module,
-                    checker.module.qualified_name(),
-                ) {
-                    flake8_tidy_imports::rules::banned_module_level_imports(
-                        checker,
-                        &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
-                            flake8_tidy_imports::matchers::MatchNameOrParent { module: &module },
-                        ),
-                        &stmt,
-                    );
-
-                    for alias in names {
-                        if &alias.name == "*" {
-                            continue;
-                        }
-                        flake8_tidy_imports::rules::banned_module_level_imports(
-                            checker,
-                            &flake8_tidy_imports::matchers::NameMatchPolicy::MatchName(
-                                flake8_tidy_imports::matchers::MatchName {
-                                    module: &module,
-                                    member: &alias.name,
-                                },
-                            ),
-                            &alias,
-                        );
-                    }
-                }
+                flake8_tidy_imports::rules::banned_module_level_imports(checker, stmt);
             }
+
             if checker.enabled(Rule::PytestIncorrectPytestImport) {
                 if let Some(diagnostic) =
                     flake8_pytest_style::rules::import_from(stmt, module, level)

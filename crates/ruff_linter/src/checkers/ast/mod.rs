@@ -189,7 +189,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
-    module: Module<'a>,
+    pub(crate) module: Module<'a>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.

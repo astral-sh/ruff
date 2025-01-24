@@ -262,7 +262,8 @@ class A:
 class B:
     __add__ = A()
 
-reveal_type(B() + B())  # revealed: int
+# TODO: this could be `int` if we declare `B.__add__` using a `Callable` type
+reveal_type(B() + B())  # revealed: Unknown | int
 ```
 
 ## Integration test: numbers from typeshed

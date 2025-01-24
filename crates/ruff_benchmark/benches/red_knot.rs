@@ -27,9 +27,9 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     // We don't support `*` imports yet:
     "error[lint:unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
     // We don't handle intersections in `is_assignable_to` yet
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:626:46 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`",
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:632:58 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`",
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:639:52 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:626:46 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:632:58 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:639:52 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`",
     "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive",
 ];
 
