@@ -4,7 +4,6 @@ use std::cell::OnceCell;
 use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::StringLiteralFlags;
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_source_file::{find_newline, LineEnding, LineRanges};
 use ruff_text_size::Ranged;
@@ -43,12 +42,6 @@ impl<'a> Stylist<'a> {
             quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
         }
-    }
-}
-
-impl From<&Stylist<'_>> for StringLiteralFlags {
-    fn from(stylist: &Stylist) -> Self {
-        StringLiteralFlags::empty().with_quote_style(stylist.quote())
     }
 }
 

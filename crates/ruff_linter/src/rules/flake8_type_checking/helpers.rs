@@ -4,7 +4,7 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -249,6 +249,7 @@ pub(crate) fn quote_annotation(
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
+    flags: StringLiteralFlags,
 ) -> Edit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -258,7 +259,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -266,7 +267,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -274,7 +275,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -282,14 +283,14 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, semantic, stylist, locator)
+    quote_type_expression(expr, semantic, stylist, locator, flags)
 }
 
 /// Wrap a type expression in quotes.
@@ -305,9 +306,10 @@ pub(crate) fn quote_type_expression(
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
+    flags: StringLiteralFlags,
 ) -> Edit {
     // Quote the entire expression.
-    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator);
+    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
 
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
@@ -336,6 +338,7 @@ pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
+    flags: StringLiteralFlags,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -343,11 +346,13 @@ impl<'a> QuoteAnnotator<'a> {
         semantic: &'a SemanticModel<'a>,
         stylist: &'a Stylist<'a>,
         locator: &'a Locator<'a>,
+        flags: StringLiteralFlags,
     ) -> Self {
         Self {
             semantic,
             stylist,
             locator,
+            flags,
         }
     }
 
@@ -366,7 +371,7 @@ impl<'a> QuoteAnnotator<'a> {
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
             value: annotation.into_boxed_str(),
-            flags: ast::StringLiteralFlags::from(self.stylist),
+            flags: self.flags,
         }))
     }
 

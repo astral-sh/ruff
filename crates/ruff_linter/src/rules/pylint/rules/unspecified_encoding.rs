@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, StringLiteralFlags};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -163,7 +163,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(ast::StringLiteral {
                         value: "utf-8".to_string().into_boxed_str(),
-                        flags: StringLiteralFlags::from(checker.stylist()),
+                        flags: checker.default_string_flags(),
                         range: TextRange::default(),
                     }),
                     range: TextRange::default(),

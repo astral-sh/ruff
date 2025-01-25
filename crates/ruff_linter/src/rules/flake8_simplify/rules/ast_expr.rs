@@ -1,6 +1,4 @@
-use ruff_python_ast::{
-    self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr, StringLiteralFlags,
-};
+use ruff_python_ast::{self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::snippet::SourceCodeSnippet;
@@ -220,7 +218,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     );
     let node = ast::StringLiteral {
         value: capital_env_var.into_boxed_str(),
-        flags: StringLiteralFlags::from(checker.stylist()).with_prefix({
+        flags: checker.default_string_flags().with_prefix({
             if env_var.is_unicode() {
                 StringLiteralPrefix::Unicode
             } else {
