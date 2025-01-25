@@ -64,9 +64,11 @@ pub(crate) fn banned_name(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    match checker.semantic().current_expression_parent() {
-        Some(Expr::Attribute(_)) => return,
-        _ => {}
+    if matches!(
+        checker.semantic().current_expression_parent(),
+        Some(Expr::Attribute(_))
+    ) {
+        return;
     }
 
     banned_reference(checker, expr);
