@@ -4516,21 +4516,33 @@ impl<'db> IntersectionType<'db> {
         }
 
         let self_positive = self.positive(db);
+
         if !all_fully_static(db, self_positive) {
             return false;
         }
 
-        let self_negative = self.negative(db);
-        if !all_fully_static(db, self_negative) {
+        let other_positive = other.positive(db);
+
+        if self_positive.len() != other_positive.len() {
             return false;
         }
 
-        let other_positive = other.positive(db);
         if !all_fully_static(db, other_positive) {
             return false;
         }
 
+        let self_negative = self.negative(db);
+
+        if !all_fully_static(db, self_negative) {
+            return false;
+        }
+
         let other_negative = other.negative(db);
+
+        if self_negative.len() != other_negative.len() {
+            return false;
+        }
+
         if !all_fully_static(db, other_negative) {
             return false;
         }
@@ -4539,7 +4551,13 @@ impl<'db> IntersectionType<'db> {
             return true;
         }
 
-        self_positive.set_eq(other_positive) && self_negative.set_eq(other_negative)
+        let sorted_self = self.to_sorted_intersection(db);
+
+        if sorted_self == other {
+            return true;
+        }
+
+        sorted_self == other.to_sorted_intersection(db)
     }
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as `other`

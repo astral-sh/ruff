@@ -106,4 +106,16 @@ static_assert(
 )
 ```
 
+## Intersections containing tuples containing unions
+
+```py
+from knot_extensions import is_equivalent_to, static_assert, Intersection
+
+class P: ...
+class Q: ...
+class R: ...
+
+static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
