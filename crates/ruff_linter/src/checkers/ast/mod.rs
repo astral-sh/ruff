@@ -296,9 +296,21 @@ impl<'a> Checker<'a> {
     pub(crate) fn generator(&self) -> Generator {
         Generator::new(
             self.stylist.indentation(),
-            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
+            self.preferred_quote(),
             self.stylist.line_ending(),
         )
+    }
+
+    /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
+    /// AST.
+    pub(crate) fn preferred_quote(&self) -> Quote {
+        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+    }
+
+    /// Return the default string flags a generated `StringLiteral` node should use, given where we
+    /// are in the AST.
+    pub(crate) fn default_string_flags(&self) -> ast::StringLiteralFlags {
+        ast::StringLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
