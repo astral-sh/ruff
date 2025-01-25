@@ -35,10 +35,7 @@ impl Visit for CollectOptionsVisitor {
         // Only add the set to completion list if it has it's own documentation.
         self.values.push((
             fully_qualified_name,
-            group
-                .documentation()
-                .unwrap_or("Print a list of available options")
-                .to_owned(),
+            group.documentation().unwrap_or("").to_owned(),
         ));
 
         self.parents.push(name.to_owned());
@@ -71,8 +68,8 @@ impl From<String> for OptionString {
 }
 
 impl From<OptionString> for String {
-    fn from(o: OptionString) -> Self {
-        o.0
+    fn from(value: OptionString) -> Self {
+        value.0
     }
 }
 
@@ -148,7 +145,10 @@ impl TypedValueParser for OptionStringParser {
         Some(Box::new(visitor.into_iter().map(|(name, doc)| {
             let first_paragraph = doc
                 .lines()
-                .take_while(|l| !l.trim_end().is_empty())
+                .take_while(|line| !line.trim_end().is_empty())
+                // Replace double quotes with single quotes,to avoid clap's lack of escaping
+                // when creating zsh completions. This has no security implications, as it only
+                // affects the help string, which is never executed
                 .map(|s| s.replace('"', "'"))
                 .join(" ");
 
