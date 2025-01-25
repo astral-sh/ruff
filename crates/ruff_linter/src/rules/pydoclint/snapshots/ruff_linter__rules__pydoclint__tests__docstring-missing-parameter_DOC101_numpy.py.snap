@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 DOC101_numpy.py:265:5: DOC101 Parameter `b` missing from the docstring
     |
 263 |     Adds two numbers and returns the result.
-264 | 
+264 |
 265 |     Parameters
     |     ^^^^^^^^^^ DOC101
 266 |     ----------
@@ -15,7 +15,7 @@ DOC101_numpy.py:265:5: DOC101 Parameter `b` missing from the docstring
 DOC101_numpy.py:283:5: DOC101 Parameter `multiplier` missing from the docstring
     |
 281 |     Multiplies each element in a list by a given multiplier.
-282 | 
+282 |
 283 |     Parameters
     |     ^^^^^^^^^^ DOC101
 284 |     ----------
@@ -27,10 +27,9 @@ DOC101_numpy.py:298:5: DOC101 Parameter `numbers` missing from the docstring
     |
 296 |   # DOC101
 297 |   def find_max_value(numbers):
-298 |       """
-    |  _____^
+298 | /     """
 299 | |     Finds the maximum value in a list of numbers.
-300 | | 
+300 | |
 301 | |     Returns
 302 | |     -------
 303 | |     int
@@ -44,7 +43,7 @@ DOC101_numpy.py:298:5: DOC101 Parameter `numbers` missing from the docstring
 DOC101_numpy.py:314:5: DOC101 These parameters are missing from the docstring: `name`, `age`
     |
 312 |     Creates a user profile with basic information.
-313 | 
+313 |
 314 |     Parameters
     |     ^^^^^^^^^^ DOC101
 315 |     ----------
@@ -55,7 +54,7 @@ DOC101_numpy.py:314:5: DOC101 These parameters are missing from the docstring: `
 DOC101_numpy.py:339:5: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
     |
 337 |     Calculates the total price after applying tax and a discount.
-338 | 
+338 |
 339 |     Parameters
     |     ^^^^^^^^^^ DOC101
 340 |     ----------
@@ -66,7 +65,7 @@ DOC101_numpy.py:339:5: DOC101 These parameters are missing from the docstring: `
 DOC101_numpy.py:360:5: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
     |
 358 |     Sends an email to the specified recipients.
-359 | 
+359 |
 360 |     Parameters
     |     ^^^^^^^^^^ DOC101
 361 |     ----------
@@ -77,7 +76,7 @@ DOC101_numpy.py:360:5: DOC101 These parameters are missing from the docstring: `
 DOC101_numpy.py:382:5: DOC101 Parameter `args` missing from the docstring
     |
 380 |     Concatenates multiple strings with a specified separator.
-381 | 
+381 |
 382 |     Parameters
     |     ^^^^^^^^^^ DOC101
 383 |     ----------
@@ -88,7 +87,7 @@ DOC101_numpy.py:382:5: DOC101 Parameter `args` missing from the docstring
 DOC101_numpy.py:400:5: DOC101 These parameters are missing from the docstring: `items`, `details`
     |
 398 |     Processes an order with a list of items and optional order details.
-399 | 
+399 |
 400 |     Parameters
     |     ^^^^^^^^^^ DOC101
 401 |     ----------
@@ -100,10 +99,9 @@ DOC101_numpy.py:424:9: DOC101 Parameter `value` missing from the docstring
     |
 422 |       # DOC101
 423 |       def __init__(self, value=0):
-424 |           """
-    |  _________^
+424 | /         """
 425 | |         Initializes the calculator with an initial value.
-426 | | 
+426 | |
 427 | |         """
     | |___________^ DOC101
 428 |           self.value = value
@@ -113,7 +111,7 @@ DOC101_numpy.py:424:9: DOC101 Parameter `value` missing from the docstring
 DOC101_numpy.py:435:9: DOC101 Parameter `number2` missing from the docstring
     |
 433 |         Adds two numbers to the current value.
-434 | 
+434 |
 435 |         Parameters
     |         ^^^^^^^^^^ DOC101
 436 |         ----------
@@ -125,10 +123,9 @@ DOC101_numpy.py:451:9: DOC101 Parameter `value_str` missing from the docstring
     |
 449 |       @classmethod
 450 |       def from_string(cls, value_str):
-451 |           """
-    |  _________^
+451 | /         """
 452 | |         Creates a Calculator instance from a string representation of a number.
-453 | | 
+453 | |
 454 | |         Returns
 455 | |         -------
 456 | |         Calculator
@@ -144,10 +141,9 @@ DOC101_numpy.py:465:9: DOC101 Parameter `number` missing from the docstring
     |
 463 |       @staticmethod
 464 |       def is_valid_number(number):
-465 |           """
-    |  _________^
+465 | /         """
 466 | |         Checks if a given number is valid (int or float).
-467 | | 
+467 | |
 468 | |         Returns
 469 | |         -------
 470 | |         bool

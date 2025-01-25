@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 DOC102_google.py:6:5: DOC102 Documented parameter `a` is not in the function's signature
   |
 4 |     Adds two numbers and returns the result.
-5 | 
+5 |
 6 |     Args:
   |     ^^^^ DOC102
 7 |         a (int): The first number to add.
@@ -15,7 +15,7 @@ DOC102_google.py:6:5: DOC102 Documented parameter `a` is not in the function's s
 DOC102_google.py:21:5: DOC102 Documented parameter `multiplier` is not in the function's signature
    |
 19 |     Multiplies each element in a list by a given multiplier.
-20 | 
+20 |
 21 |     Args:
    |     ^^^^ DOC102
 22 |         lst (list of int): A list of integers.
@@ -26,7 +26,7 @@ DOC102_google.py:21:5: DOC102 Documented parameter `multiplier` is not in the fu
 DOC102_google.py:36:5: DOC102 Documented parameter `numbers` is not in the function's signature
    |
 34 |     Finds the maximum value in a list of numbers.
-35 | 
+35 |
 36 |     Args:
    |     ^^^^ DOC102
 37 |         numbers (list of int): A list of integers to search through.
@@ -36,7 +36,7 @@ DOC102_google.py:36:5: DOC102 Documented parameter `numbers` is not in the funct
 DOC102_google.py:50:5: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
    |
 48 |     Creates a user profile with basic information.
-49 | 
+49 |
 50 |     Args:
    |     ^^^^ DOC102
 51 |         name (str): The name of the user.
@@ -47,7 +47,7 @@ DOC102_google.py:50:5: DOC102 These documented parameters are not in the functio
 DOC102_google.py:72:5: DOC102 Documented parameter `tax_rate` is not in the function's signature
    |
 70 |     Calculates the total price after applying tax and a discount.
-71 | 
+71 |
 72 |     Args:
    |     ^^^^ DOC102
 73 |         item_prices (list of float): A list of prices for each item.
@@ -58,7 +58,7 @@ DOC102_google.py:72:5: DOC102 Documented parameter `tax_rate` is not in the func
 DOC102_google.py:91:5: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
    |
 89 |     Sends an email to the specified recipients.
-90 | 
+90 |
 91 |     Args:
    |     ^^^^ DOC102
 92 |         subject (str): The subject of the email.
@@ -69,7 +69,7 @@ DOC102_google.py:91:5: DOC102 These documented parameters are not in the functio
 DOC102_google.py:109:5: DOC102 Documented parameter `separator` is not in the function's signature
     |
 107 |     Concatenates multiple strings with a specified separator.
-108 | 
+108 |
 109 |     Args:
     |     ^^^^ DOC102
 110 |         separator (str): The separator to use between strings.
@@ -80,7 +80,7 @@ DOC102_google.py:109:5: DOC102 Documented parameter `separator` is not in the fu
 DOC102_google.py:124:5: DOC102 These documented parameters are not in the function's signature: `items`, `details`
     |
 122 |     Processes an order with a list of items and optional order details.
-123 | 
+123 |
 124 |     Args:
     |     ^^^^ DOC102
 125 |         order_id (int): The unique identifier for the order.
@@ -91,7 +91,7 @@ DOC102_google.py:124:5: DOC102 These documented parameters are not in the functi
 DOC102_google.py:149:9: DOC102 Documented parameter `value` is not in the function's signature
     |
 147 |         Initializes the calculator with an initial value.
-148 | 
+148 |
 149 |         Args:
     |         ^^^^ DOC102
 150 |             value (int, optional): The initial value of the calculator. Defaults to 0.
@@ -102,7 +102,7 @@ DOC102_google.py:149:9: DOC102 Documented parameter `value` is not in the functi
 DOC102_google.py:159:9: DOC102 Documented parameter `number` is not in the function's signature
     |
 157 |         Adds a number to the current value.
-158 | 
+158 |
 159 |         Args:
     |         ^^^^ DOC102
 160 |             number (int or float): The number to add to the current value.
@@ -112,7 +112,7 @@ DOC102_google.py:159:9: DOC102 Documented parameter `number` is not in the funct
 DOC102_google.py:174:9: DOC102 Documented parameter `value_str` is not in the function's signature
     |
 172 |         Creates a Calculator instance from a string representation of a number.
-173 | 
+173 |
 174 |         Args:
     |         ^^^^ DOC102
 175 |             value_str (str): The string representing the initial value.
@@ -122,7 +122,7 @@ DOC102_google.py:174:9: DOC102 Documented parameter `value_str` is not in the fu
 DOC102_google.py:189:9: DOC102 Documented parameter `number` is not in the function's signature
     |
 187 |         Checks if a given number is valid (int or float).
-188 | 
+188 |
 189 |         Args:
     |         ^^^^ DOC102
 190 |             number (any): The value to check.

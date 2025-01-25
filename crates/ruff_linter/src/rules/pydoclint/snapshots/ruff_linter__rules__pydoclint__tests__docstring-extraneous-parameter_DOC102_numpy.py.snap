@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 DOC102_numpy.py:6:5: DOC102 Documented parameter `a` is not in the function's signature
   |
 4 |     Adds two numbers and returns the result.
-5 | 
+5 |
 6 |     Parameters
   |     ^^^^^^^^^^ DOC102
 7 |     ----------
@@ -15,7 +15,7 @@ DOC102_numpy.py:6:5: DOC102 Documented parameter `a` is not in the function's si
 DOC102_numpy.py:26:5: DOC102 Documented parameter `multiplier` is not in the function's signature
    |
 24 |     Multiplies each element in a list by a given multiplier.
-25 | 
+25 |
 26 |     Parameters
    |     ^^^^^^^^^^ DOC102
 27 |     ----------
@@ -26,7 +26,7 @@ DOC102_numpy.py:26:5: DOC102 Documented parameter `multiplier` is not in the fun
 DOC102_numpy.py:46:5: DOC102 Documented parameter `numbers` is not in the function's signature
    |
 44 |     Finds the maximum value in a list of numbers.
-45 | 
+45 |
 46 |     Parameters
    |     ^^^^^^^^^^ DOC102
 47 |     ----------
@@ -37,7 +37,7 @@ DOC102_numpy.py:46:5: DOC102 Documented parameter `numbers` is not in the functi
 DOC102_numpy.py:64:5: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
    |
 62 |     Creates a user profile with basic information.
-63 | 
+63 |
 64 |     Parameters
    |     ^^^^^^^^^^ DOC102
 65 |     ----------
@@ -48,7 +48,7 @@ DOC102_numpy.py:64:5: DOC102 These documented parameters are not in the function
 DOC102_numpy.py:93:5: DOC102 Documented parameter `tax_rate` is not in the function's signature
    |
 91 |     Calculates the total price after applying tax and a discount.
-92 | 
+92 |
 93 |     Parameters
    |     ^^^^^^^^^^ DOC102
 94 |     ----------
@@ -59,7 +59,7 @@ DOC102_numpy.py:93:5: DOC102 Documented parameter `tax_rate` is not in the funct
 DOC102_numpy.py:118:5: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
     |
 116 |     Sends an email to the specified recipients.
-117 | 
+117 |
 118 |     Parameters
     |     ^^^^^^^^^^ DOC102
 119 |     ----------
@@ -70,7 +70,7 @@ DOC102_numpy.py:118:5: DOC102 These documented parameters are not in the functio
 DOC102_numpy.py:144:5: DOC102 Documented parameter `separator` is not in the function's signature
     |
 142 |     Concatenates multiple strings with a specified separator.
-143 | 
+143 |
 144 |     Parameters
     |     ^^^^^^^^^^ DOC102
 145 |     ----------
@@ -81,7 +81,7 @@ DOC102_numpy.py:144:5: DOC102 Documented parameter `separator` is not in the fun
 DOC102_numpy.py:164:5: DOC102 These documented parameters are not in the function's signature: `items`, `details`
     |
 162 |     Processes an order with a list of items and optional order details.
-163 | 
+163 |
 164 |     Parameters
     |     ^^^^^^^^^^ DOC102
 165 |     ----------
@@ -92,7 +92,7 @@ DOC102_numpy.py:164:5: DOC102 These documented parameters are not in the functio
 DOC102_numpy.py:195:9: DOC102 Documented parameter `value` is not in the function's signature
     |
 193 |         Initializes the calculator with an initial value.
-194 | 
+194 |
 195 |         Parameters
     |         ^^^^^^^^^^ DOC102
 196 |         ----------
@@ -103,7 +103,7 @@ DOC102_numpy.py:195:9: DOC102 Documented parameter `value` is not in the functio
 DOC102_numpy.py:207:9: DOC102 Documented parameter `number` is not in the function's signature
     |
 205 |         Adds two numbers to the current value.
-206 | 
+206 |
 207 |         Parameters
     |         ^^^^^^^^^^ DOC102
 208 |         ----------
@@ -114,7 +114,7 @@ DOC102_numpy.py:207:9: DOC102 Documented parameter `number` is not in the functi
 DOC102_numpy.py:228:9: DOC102 Documented parameter `value_str` is not in the function's signature
     |
 226 |         Creates a Calculator instance from a string representation of a number.
-227 | 
+227 |
 228 |         Parameters
     |         ^^^^^^^^^^ DOC102
 229 |         ----------
@@ -125,7 +125,7 @@ DOC102_numpy.py:228:9: DOC102 Documented parameter `value_str` is not in the fun
 DOC102_numpy.py:247:9: DOC102 Documented parameter `number` is not in the function's signature
     |
 245 |         Checks if a given number is valid (int or float).
-246 | 
+246 |
 247 |         Parameters
     |         ^^^^^^^^^^ DOC102
 248 |         ----------
