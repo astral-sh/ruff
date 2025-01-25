@@ -118,4 +118,48 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
+## Unions containing tuples containing `bool`
+
+```py
+from knot_extensions import is_equivalent_to, static_assert
+from typing_extensions import Literal
+
+class P: ...
+
+static_assert(is_equivalent_to(tuple[Literal[True, False]] | P, tuple[bool] | P))
+static_assert(is_equivalent_to(P | tuple[bool], P | tuple[Literal[True, False]]))
+```
+
+## Unions and intersections involving `AlwaysTruthy`, `bool` and `AlwaysFalsy`
+
+```py
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_equivalent_to, Not
+from typing_extensions import Literal
+
+static_assert(is_equivalent_to(AlwaysTruthy | bool, Literal[False] | AlwaysTruthy))
+static_assert(is_equivalent_to(AlwaysFalsy | bool, Literal[True] | AlwaysFalsy))
+static_assert(is_equivalent_to(Not[AlwaysTruthy] | bool, Not[AlwaysTruthy] | Literal[True]))
+static_assert(is_equivalent_to(Not[AlwaysFalsy] | bool, Literal[False] | Not[AlwaysFalsy]))
+```
+
+## Unions and intersections involving `AlwaysTruthy`, `LiteralString` and `AlwaysFalsy`
+
+```py
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_equivalent_to, Not, Intersection
+from typing_extensions import Literal, LiteralString
+
+# TODO: these should all pass!
+
+# error: [static-assert-error]
+static_assert(is_equivalent_to(AlwaysTruthy | LiteralString, Literal[""] | AlwaysTruthy))
+# error: [static-assert-error]
+static_assert(is_equivalent_to(AlwaysFalsy | LiteralString, Intersection[LiteralString, Not[Literal[""]]] | AlwaysFalsy))
+# error: [static-assert-error]
+static_assert(is_equivalent_to(Not[AlwaysFalsy] | LiteralString, Literal[""] | Not[AlwaysFalsy]))
+# error: [static-assert-error]
+static_assert(
+    is_equivalent_to(Not[AlwaysTruthy] | LiteralString, Not[AlwaysTruthy] | Intersection[LiteralString, Not[Literal[""]]])
+)
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
