@@ -56,6 +56,23 @@ pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPol
 
 /// TID251
 pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
+    banned_reference(checker, expr);
+}
+
+pub(crate) fn banned_name(checker: &mut Checker, expr: &Expr) {
+    if checker.settings.preview.is_disabled() {
+        return;
+    }
+
+    match checker.semantic().current_expression_parent() {
+        Some(Expr::Attribute(_)) => return,
+        _ => {}
+    }
+
+    banned_reference(checker, expr);
+}
+
+fn banned_reference(checker: &mut Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if banned_api.is_empty() {
         return;

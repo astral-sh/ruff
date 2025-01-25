@@ -9,11 +9,13 @@ mod tests {
 
     use anyhow::Result;
     use rustc_hash::FxHashMap;
+    use test_case::test_case;
 
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::flake8_tidy_imports;
     use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -37,6 +39,30 @@ mod tests {
                             },
                         ),
                     ]),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::BannedApi])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case("list")]
+    #[test_case("builtins.list")]
+    #[test_case("property")]
+    fn banned_api_preview(path: &str) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID251.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_api: FxHashMap::from_iter([(
+                        path.to_string(),
+                        ApiBan {
+                            msg: format!("`{path}` considered harmful."),
+                        },
+                    )]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::BannedApi])
