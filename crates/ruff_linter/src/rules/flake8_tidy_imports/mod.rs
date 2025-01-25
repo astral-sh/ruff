@@ -52,6 +52,7 @@ mod tests {
     #[test_case("builtins.list")]
     #[test_case("property")]
     fn banned_api_preview(path: &str) -> Result<()> {
+        let snapshot = format!("preview__TID251_{}", path.replace('.', "-"));
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID251.py"),
             &LinterSettings {
@@ -68,7 +69,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BannedApi])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
