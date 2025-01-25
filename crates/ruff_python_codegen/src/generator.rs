@@ -1295,12 +1295,7 @@ impl<'a> Generator<'a> {
             if flags.prefix().is_unicode() {
                 self.p("u");
             }
-            let quote = if flags.dynamic() {
-                self.quote
-            } else {
-                flags.quote_style()
-            };
-            self.p_str_repr(value, quote);
+            self.p_str_repr(value, flags.quote_style());
         }
     }
 
