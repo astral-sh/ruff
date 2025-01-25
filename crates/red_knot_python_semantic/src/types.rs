@@ -811,6 +811,31 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Normalize the type `bool` -> `Literal[True, False]`.
+    ///
+    /// Using this method in various type-relational methods
+    /// ensures that the following invariants hold true:
+    ///
+    /// - bool ≡ Literal[True, False]
+    /// - bool | T ≡ Literal[True, False] | T
+    /// - bool <: Literal[True, False]
+    /// - bool | T <: Literal[True, False] | T
+    /// - Literal[True, False] <: bool
+    /// - Literal[True, False] | T <: bool | T
+    #[must_use]
+    pub fn with_normalized_bools(self, db: &'db dyn Db) -> Self {
+        const LITERAL_BOOLS: [Type; 2] = [Type::BooleanLiteral(false), Type::BooleanLiteral(true)];
+
+        match self {
+            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Bool) => {
+                Type::Union(UnionType::new(db, Box::from(LITERAL_BOOLS)))
+            }
+            // TODO: decompose `LiteralString` into `Literal[""] | TruthyLiteralString`?
+            // We'd need to rename this method... --Alex
+            _ => self,
+        }
+    }
+
     /// Return a normalized version of `self` in which all unions and intersections are sorted
     /// according to a canonical order, no matter how "deeply" a union/intersection may be nested.
     #[must_use]
@@ -857,6 +882,12 @@ impl<'db> Type<'db> {
         // and these are exactly the same set of objects at runtime.
         if self.is_equivalent_to(db, target) {
             return true;
+        }
+
+        let normalized_self = self.with_normalized_bools(db);
+        let normalized_target = target.with_normalized_bools(db);
+        if normalized_self != self || normalized_target != target {
+            return normalized_self.is_subtype_of(db, normalized_target);
         }
 
         // Non-fully-static types do not participate in subtyping.
@@ -961,7 +992,7 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).is_subtype_of(db, target)
             }
             (Type::BooleanLiteral(_), _) => {
-                KnownClass::Bool.to_instance(db).is_subtype_of(db, target)
+                KnownClass::Int.to_instance(db).is_subtype_of(db, target)
             }
             (Type::IntLiteral(_), _) => KnownClass::Int.to_instance(db).is_subtype_of(db, target),
             (Type::BytesLiteral(_), _) => {
@@ -1077,6 +1108,11 @@ impl<'db> Type<'db> {
         if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
+        let normalized_self = self.with_normalized_bools(db);
+        let normalized_target = target.with_normalized_bools(db);
+        if normalized_self != self || normalized_target != target {
+            return normalized_self.is_assignable_to(db, normalized_target);
+        }
         match (self, target) {
             // Never can be assigned to any type.
             (Type::Never, _) => true,
@@ -1177,6 +1213,13 @@ impl<'db> Type<'db> {
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical types: TypedDicts, Protocols, type aliases, etc.
 
+        let normalized_self = self.with_normalized_bools(db);
+        let normalized_other = other.with_normalized_bools(db);
+
+        if normalized_self != self || normalized_other != other {
+            return normalized_self.is_equivalent_to(db, normalized_other);
+        }
+
         match (self, other) {
             (Type::Union(left), Type::Union(right)) => left.is_equivalent_to(db, right),
             (Type::Intersection(left), Type::Intersection(right)) => {
@@ -1218,6 +1261,13 @@ impl<'db> Type<'db> {
     ///
     /// [Summary of type relations]: https://typing.readthedocs.io/en/latest/spec/concepts.html#summary-of-type-relations
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        let normalized_self = self.with_normalized_bools(db);
+        let normalized_other = other.with_normalized_bools(db);
+
+        if normalized_self != self || normalized_other != other {
+            return normalized_self.is_gradual_equivalent_to(db, normalized_other);
+        }
+
         if self == other {
             return true;
         }
@@ -1250,6 +1300,12 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        let normalized_self = self.with_normalized_bools(db);
+        let normalized_other = other.with_normalized_bools(db);
+        if normalized_self != self || normalized_other != other {
+            return normalized_self.is_disjoint_from(db, normalized_other);
+        }
+
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
 
@@ -4642,18 +4698,19 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> TupleType<'db> {
-    pub fn from_elements<T: Into<Type<'db>>>(
-        db: &'db dyn Db,
-        types: impl IntoIterator<Item = T>,
-    ) -> Type<'db> {
+    pub fn from_elements<I, T>(db: &'db dyn Db, types: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
         let mut elements = vec![];
 
         for ty in types {
-            let ty = ty.into();
+            let ty: Type<'db> = ty.into();
             if ty.is_never() {
                 return Type::Never;
             }
-            elements.push(ty);
+            elements.push(ty.with_normalized_bools(db));
         }
 
         Type::Tuple(Self::new(db, elements.into_boxed_slice()))

@@ -328,8 +328,9 @@ fn union<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type
 }
 
 mod stable {
-    use super::union;
+    use super::{intersection, union};
     use crate::types::{KnownClass, Type};
+    use itertools::Itertools;
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
@@ -474,6 +475,32 @@ mod stable {
         all_type_pairs_are_assignable_to_their_union, db,
         forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
+
+    // Equal element sets of intersections implies equivalence
+    type_property_test!(
+        intersection_equivalence_not_order_dependent, db,
+        forall types s, t, u.
+            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
+            => [s, t, u]
+                .into_iter()
+                .permutations(3)
+                .map(|trio_of_types| intersection(db, trio_of_types))
+                .permutations(2)
+                .all(|vec_of_intersections| vec_of_intersections[0].is_equivalent_to(db, vec_of_intersections[1]))
+    );
+
+    // Equal element sets of unions implies equivalence
+    type_property_test!(
+        union_equivalence_not_order_dependent, db,
+        forall types s, t, u.
+            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
+            => [s, t, u]
+                .into_iter()
+                .permutations(3)
+                .map(|trio_of_types| union(db, trio_of_types))
+                .permutations(2)
+                .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(db, vec_of_unions[1]))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -484,8 +511,6 @@ mod stable {
 /// tests to the `stable` section. In the meantime, it can still be useful to run these
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
-    use itertools::Itertools;
-
     use super::{intersection, union};
 
     // Negating `T` twice is equivalent to `T`.
@@ -520,34 +545,6 @@ mod flaky {
     type_property_test!(
         all_type_pairs_can_be_assigned_from_their_intersection, db,
         forall types s, t. intersection(db, [s, t]).is_assignable_to(db, s) && intersection(db, [s, t]).is_assignable_to(db, t)
-    );
-
-    // Equal element sets of intersections implies equivalence
-    // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
-    type_property_test!(
-        intersection_equivalence_not_order_dependent, db,
-        forall types s, t, u.
-            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
-            => [s, t, u]
-                .into_iter()
-                .permutations(3)
-                .map(|trio_of_types| intersection(db, trio_of_types))
-                .permutations(2)
-                .all(|vec_of_intersections| vec_of_intersections[0].is_equivalent_to(db, vec_of_intersections[1]))
-    );
-
-    // Equal element sets of unions implies equivalence
-    // flaky at laest in part because of https://github.com/astral-sh/ruff/issues/15513
-    type_property_test!(
-        union_equivalence_not_order_dependent, db,
-        forall types s, t, u.
-            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
-            => [s, t, u]
-                .into_iter()
-                .permutations(3)
-                .map(|trio_of_types| union(db, trio_of_types))
-                .permutations(2)
-                .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(db, vec_of_unions[1]))
     );
 
     // `S | T` is always a supertype of `S`.
