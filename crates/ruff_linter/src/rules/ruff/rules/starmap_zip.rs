@@ -62,7 +62,7 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
     let positionals = &iterable_call.arguments.args;
 
     // `zip(*a)` where `a` is empty is valid, but `map(_, *a)` isn't.
-    if !positionals.is_empty() && positionals.iter().all(|arg| arg.is_starred_expr()) {
+    if !positionals.is_empty() && positionals.iter().all(Expr::is_starred_expr) {
         return;
     }
 
