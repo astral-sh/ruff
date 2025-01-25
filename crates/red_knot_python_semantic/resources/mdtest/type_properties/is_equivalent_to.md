@@ -84,4 +84,20 @@ static_assert(
 )
 ```
 
+## Unions containing tuples containing tuples containing unions (etc.)
+
+```py
+from knot_extensions import is_equivalent_to, static_assert
+
+class P: ...
+class Q: ...
+
+static_assert(
+    is_equivalent_to(
+        tuple[tuple[tuple[P | Q]]] | P,
+        tuple[tuple[tuple[Q | P]]] | P,
+    )
+)
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
