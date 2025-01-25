@@ -6,7 +6,7 @@ import itertools
 
 starmap(func, zip())
 starmap(func, zip([]))
-starmap(func, zip(*args))
+
 
 starmap(func, zip(a, b, c,),)
 
@@ -71,3 +71,7 @@ starmap(func, zip(a, b, c), lorem=ipsum)
 starmap(func, zip(a, b, c, strict=True))
 starmap(func, zip(a, b, c, strict=False))
 starmap(func, zip(a, b, c, strict=strict))
+
+# https://github.com/astral-sh/ruff/issues/15742
+starmap(func, zip(*a))
+starmap(func, zip(*a, *b))
