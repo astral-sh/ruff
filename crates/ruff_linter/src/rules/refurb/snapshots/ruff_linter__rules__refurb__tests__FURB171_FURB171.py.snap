@@ -57,65 +57,85 @@ FURB171.py:9:4: FURB171 [*] Membership test against single-item container
 9     |-if 1 in {1}:
    9  |+if 1 == 1:
 10 10 |     print("Single-element set")
-11 11 | 
-12 12 | if "a" in "a":
+11 11 |     
+12 12 | if 1 in set(1):
 
 FURB171.py:12:4: FURB171 [*] Membership test against single-item container
    |
 10 |     print("Single-element set")
-11 |
-12 | if "a" in "a":
+11 |     
+12 | if 1 in set(1):
+   |    ^^^^^^^^^^^ FURB171
+13 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+9  9  | if 1 in {1}:
+10 10 |     print("Single-element set")
+11 11 |     
+12    |-if 1 in set(1):
+   12 |+if 1 == (1):
+13 13 |     print("Single-element set")
+14 14 | 
+15 15 | if "a" in "a":
+
+FURB171.py:15:4: FURB171 [*] Membership test against single-item container
+   |
+13 |     print("Single-element set")
+14 |
+15 | if "a" in "a":
    |    ^^^^^^^^^^ FURB171
-13 |     print("Single-element string")
+16 |     print("Single-element string")
    |
    = help: Convert to equality test
 
 ℹ Unsafe fix
-9  9  | if 1 in {1}:
-10 10 |     print("Single-element set")
-11 11 | 
-12    |-if "a" in "a":
-   12 |+if "a" == "a":
-13 13 |     print("Single-element string")
+12 12 | if 1 in set(1):
+13 13 |     print("Single-element set")
 14 14 | 
-15 15 | if 1 not in (1,):
+15    |-if "a" in "a":
+   15 |+if "a" == "a":
+16 16 |     print("Single-element string")
+17 17 | 
+18 18 | if 1 not in (1,):
 
-FURB171.py:15:4: FURB171 [*] Membership test against single-item container
+FURB171.py:18:4: FURB171 [*] Membership test against single-item container
    |
-13 |     print("Single-element string")
-14 |
-15 | if 1 not in (1,):
+16 |     print("Single-element string")
+17 |
+18 | if 1 not in (1,):
    |    ^^^^^^^^^^^^^ FURB171
-16 |     print("Check `not in` membership test")
+19 |     print("Check `not in` membership test")
    |
    = help: Convert to inequality test
 
 ℹ Safe fix
-12 12 | if "a" in "a":
-13 13 |     print("Single-element string")
-14 14 | 
-15    |-if 1 not in (1,):
-   15 |+if 1 != 1:
-16 16 |     print("Check `not in` membership test")
+15 15 | if "a" in "a":
+16 16 |     print("Single-element string")
 17 17 | 
-18 18 | if not 1 in (1,):
+18    |-if 1 not in (1,):
+   18 |+if 1 != 1:
+19 19 |     print("Check `not in` membership test")
+20 20 | 
+21 21 | if not 1 in (1,):
 
-FURB171.py:18:8: FURB171 [*] Membership test against single-item container
+FURB171.py:21:8: FURB171 [*] Membership test against single-item container
    |
-16 |     print("Check `not in` membership test")
-17 |
-18 | if not 1 in (1,):
+19 |     print("Check `not in` membership test")
+20 |
+21 | if not 1 in (1,):
    |        ^^^^^^^^^ FURB171
-19 |     print("Check the negated membership test")
+22 |     print("Check the negated membership test")
    |
    = help: Convert to equality test
 
 ℹ Safe fix
-15 15 | if 1 not in (1,):
-16 16 |     print("Check `not in` membership test")
-17 17 | 
-18    |-if not 1 in (1,):
-   18 |+if not 1 == 1:
-19 19 |     print("Check the negated membership test")
+18 18 | if 1 not in (1,):
+19 19 |     print("Check `not in` membership test")
 20 20 | 
-21 21 | # Non-errors.
+21    |-if not 1 in (1,):
+   21 |+if not 1 == 1:
+22 22 |     print("Check the negated membership test")
+23 23 | 
+24 24 | # Non-errors.
