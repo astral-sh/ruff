@@ -1793,6 +1793,46 @@ if True:
     }
 
     #[test]
+    fn set_quote() {
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                Quote::Double,
+                LineEnding::default(),
+                r#""hello""#
+            ),
+            r#""hello""#
+        );
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                Quote::Single,
+                LineEnding::default(),
+                r#""hello""#
+            ),
+            r"'hello'"
+        );
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                Quote::Double,
+                LineEnding::default(),
+                r"'hello'"
+            ),
+            r#""hello""#
+        );
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                Quote::Single,
+                LineEnding::default(),
+                r"'hello'"
+            ),
+            r"'hello'"
+        );
+    }
+
+    #[test]
     fn set_indent() {
         assert_eq!(
             round_trip_with(
