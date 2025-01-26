@@ -58,295 +58,415 @@ FURB171.py:9:4: FURB171 [*] Membership test against single-item container
    9  |+if 1 == 1:
 10 10 |     print("Single-element set")
 11 11 | 
-12 12 | if "a" in "a":
+12 12 | if 1 in set([1]):
 
 FURB171.py:12:4: FURB171 [*] Membership test against single-item container
    |
 10 |     print("Single-element set")
 11 |
-12 | if "a" in "a":
+12 | if 1 in set([1]):
+   |    ^^^^^^^^^^^^^ FURB171
+13 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+9  9  | if 1 in {1}:
+10 10 |     print("Single-element set")
+11 11 | 
+12    |-if 1 in set([1]):
+   12 |+if 1 == 1:
+13 13 |     print("Single-element set")
+14 14 | 
+15 15 | if 1 in set((1,)):
+
+FURB171.py:15:4: FURB171 [*] Membership test against single-item container
+   |
+13 |     print("Single-element set")
+14 |
+15 | if 1 in set((1,)):
+   |    ^^^^^^^^^^^^^^ FURB171
+16 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+12 12 | if 1 in set([1]):
+13 13 |     print("Single-element set")
+14 14 | 
+15    |-if 1 in set((1,)):
+   15 |+if 1 == 1:
+16 16 |     print("Single-element set")
+17 17 | 
+18 18 | if 1 in set({1}):
+
+FURB171.py:18:4: FURB171 [*] Membership test against single-item container
+   |
+16 |     print("Single-element set")
+17 |
+18 | if 1 in set({1}):
+   |    ^^^^^^^^^^^^^ FURB171
+19 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+15 15 | if 1 in set((1,)):
+16 16 |     print("Single-element set")
+17 17 | 
+18    |-if 1 in set({1}):
+   18 |+if 1 == 1:
+19 19 |     print("Single-element set")
+20 20 | 
+21 21 | if 1 in frozenset([1]):
+
+FURB171.py:21:4: FURB171 [*] Membership test against single-item container
+   |
+19 |     print("Single-element set")
+20 |
+21 | if 1 in frozenset([1]):
+   |    ^^^^^^^^^^^^^^^^^^^ FURB171
+22 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+18 18 | if 1 in set({1}):
+19 19 |     print("Single-element set")
+20 20 | 
+21    |-if 1 in frozenset([1]):
+   21 |+if 1 == 1:
+22 22 |     print("Single-element set")
+23 23 | 
+24 24 | if 1 in frozenset((1,)):
+
+FURB171.py:24:4: FURB171 [*] Membership test against single-item container
+   |
+22 |     print("Single-element set")
+23 |
+24 | if 1 in frozenset((1,)):
+   |    ^^^^^^^^^^^^^^^^^^^^ FURB171
+25 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+21 21 | if 1 in frozenset([1]):
+22 22 |     print("Single-element set")
+23 23 | 
+24    |-if 1 in frozenset((1,)):
+   24 |+if 1 == 1:
+25 25 |     print("Single-element set")
+26 26 | 
+27 27 | if 1 in frozenset({1}):
+
+FURB171.py:27:4: FURB171 [*] Membership test against single-item container
+   |
+25 |     print("Single-element set")
+26 |
+27 | if 1 in frozenset({1}):
+   |    ^^^^^^^^^^^^^^^^^^^ FURB171
+28 |     print("Single-element set")
+   |
+   = help: Convert to equality test
+
+ℹ Safe fix
+24 24 | if 1 in frozenset((1,)):
+25 25 |     print("Single-element set")
+26 26 | 
+27    |-if 1 in frozenset({1}):
+   27 |+if 1 == 1:
+28 28 |     print("Single-element set")
+29 29 | 
+30 30 | if "a" in "a":
+
+FURB171.py:30:4: FURB171 [*] Membership test against single-item container
+   |
+28 |     print("Single-element set")
+29 |
+30 | if "a" in "a":
    |    ^^^^^^^^^^ FURB171
-13 |     print("Single-element string")
+31 |     print("Single-element string")
    |
    = help: Convert to equality test
 
 ℹ Unsafe fix
-9  9  | if 1 in {1}:
-10 10 |     print("Single-element set")
-11 11 | 
-12    |-if "a" in "a":
-   12 |+if "a" == "a":
-13 13 |     print("Single-element string")
-14 14 | 
-15 15 | if 1 not in (1,):
+27 27 | if 1 in frozenset({1}):
+28 28 |     print("Single-element set")
+29 29 | 
+30    |-if "a" in "a":
+   30 |+if "a" == "a":
+31 31 |     print("Single-element string")
+32 32 | 
+33 33 | if 1 not in (1,):
 
-FURB171.py:15:4: FURB171 [*] Membership test against single-item container
+FURB171.py:33:4: FURB171 [*] Membership test against single-item container
    |
-13 |     print("Single-element string")
-14 |
-15 | if 1 not in (1,):
+31 |     print("Single-element string")
+32 |
+33 | if 1 not in (1,):
    |    ^^^^^^^^^^^^^ FURB171
-16 |     print("Check `not in` membership test")
+34 |     print("Check `not in` membership test")
    |
    = help: Convert to inequality test
 
 ℹ Safe fix
-12 12 | if "a" in "a":
-13 13 |     print("Single-element string")
-14 14 | 
-15    |-if 1 not in (1,):
-   15 |+if 1 != 1:
-16 16 |     print("Check `not in` membership test")
-17 17 | 
-18 18 | if not 1 in (1,):
+30 30 | if "a" in "a":
+31 31 |     print("Single-element string")
+32 32 | 
+33    |-if 1 not in (1,):
+   33 |+if 1 != 1:
+34 34 |     print("Check `not in` membership test")
+35 35 | 
+36 36 | if not 1 in (1,):
 
-FURB171.py:18:8: FURB171 [*] Membership test against single-item container
+FURB171.py:36:8: FURB171 [*] Membership test against single-item container
    |
-16 |     print("Check `not in` membership test")
-17 |
-18 | if not 1 in (1,):
+34 |     print("Check `not in` membership test")
+35 |
+36 | if not 1 in (1,):
    |        ^^^^^^^^^ FURB171
-19 |     print("Check the negated membership test")
+37 |     print("Check the negated membership test")
    |
    = help: Convert to equality test
 
 ℹ Safe fix
-15 15 | if 1 not in (1,):
-16 16 |     print("Check `not in` membership test")
-17 17 | 
-18    |-if not 1 in (1,):
-   18 |+if not 1 == 1:
-19 19 |     print("Check the negated membership test")
-20 20 | 
-21 21 | # Non-errors.
+33 33 | if 1 not in (1,):
+34 34 |     print("Check `not in` membership test")
+35 35 | 
+36    |-if not 1 in (1,):
+   36 |+if not 1 == 1:
+37 37 |     print("Check the negated membership test")
+38 38 | 
+39 39 | # Non-errors.
 
-FURB171.py:52:5: FURB171 [*] Membership test against single-item container
+FURB171.py:88:5: FURB171 [*] Membership test against single-item container
    |
-51 |   # https://github.com/astral-sh/ruff/issues/10063
-52 |   _ = a in (
+87 |   # https://github.com/astral-sh/ruff/issues/10063
+88 |   _ = a in (
    |  _____^
-53 | |     # Foo
-54 | |     b,
-55 | | )
+89 | |     # Foo
+90 | |     b,
+91 | | )
    | |_^ FURB171
-56 |
-57 |   _ = a in (  # Foo1
+92 |
+93 |   _ = a in (  # Foo1
    |
    = help: Convert to equality test
 
 ℹ Unsafe fix
-49 49 | 
-50 50 | 
-51 51 | # https://github.com/astral-sh/ruff/issues/10063
-52    |-_ = a in (
-53    |-    # Foo
-54    |-    b,
-55    |-)
-   52 |+_ = a == b
-56 53 | 
-57 54 | _ = a in (  # Foo1
-58 55 |     (  # Foo2
+85 85 | 
+86 86 | 
+87 87 | # https://github.com/astral-sh/ruff/issues/10063
+88    |-_ = a in (
+89    |-    # Foo
+90    |-    b,
+91    |-)
+   88 |+_ = a == b
+92 89 | 
+93 90 | _ = a in (  # Foo1
+94 91 |     (  # Foo2
 
-FURB171.py:57:5: FURB171 [*] Membership test against single-item container
-   |
-55 |   )
-56 |
-57 |   _ = a in (  # Foo1
-   |  _____^
-58 | |     (  # Foo2
-59 | |     # Foo3
-60 | |         (  # Tuple
-61 | |             (  # Bar
-62 | |        (b
-63 | |         # Bar
-64 | |         )
-65 | |   )
-66 | |        # Foo4
-67 | |             # Foo5
-68 | |      ,
-69 | |        )
-70 | |         # Foo6
-71 | |     )
-72 | | )
-   | |_^ FURB171
-73 |
-74 |   foo = (
-   |
-   = help: Convert to equality test
-
-ℹ Unsafe fix
-54 54 |     b,
-55 55 | )
-56 56 | 
-57    |-_ = a in (  # Foo1
-58    |-    (  # Foo2
-59    |-    # Foo3
-60    |-        (  # Tuple
-61    |-            (  # Bar
-   57 |+_ = a == (  # Bar
-62 58 |        (b
-63 59 |         # Bar
-64 60 |         )
-65 61 |   )
-66    |-       # Foo4
-67    |-            # Foo5
-68    |-     ,
-69    |-       )
-70    |-        # Foo6
-71    |-    )
-72    |-)
-73 62 | 
-74 63 | foo = (
-75 64 |     lorem()
-
-FURB171.py:77:28: FURB171 [*] Membership test against single-item container
-   |
-75 |       lorem()
-76 |           .ipsum()
-77 |           .dolor(lambda sit: sit in (
-   |  ____________________________^
-78 | |             # Foo1
-79 | |             # Foo2
-80 | |             amet,
-81 | |         ))
-   | |_________^ FURB171
-82 |   )
-   |
-   = help: Convert to equality test
-
-ℹ Unsafe fix
-74 74 | foo = (
-75 75 |     lorem()
-76 76 |         .ipsum()
-77    |-        .dolor(lambda sit: sit in (
-78    |-            # Foo1
-79    |-            # Foo2
-80    |-            amet,
-81    |-        ))
-   77 |+        .dolor(lambda sit: sit == amet)
-82 78 | )
-83 79 | 
-84 80 | foo = (
-
-FURB171.py:87:28: FURB171 [*] Membership test against single-item container
-   |
-85 |       lorem()
-86 |           .ipsum()
-87 |           .dolor(lambda sit: sit in (
-   |  ____________________________^
-88 | |             (
-89 | |                 # Foo1
-90 | |                 # Foo2
-91 | |                 amet
-92 | |             ),
-93 | |         ))
-   | |_________^ FURB171
-94 |   )
-   |
-   = help: Convert to equality test
-
-ℹ Unsafe fix
-84 84 | foo = (
-85 85 |     lorem()
-86 86 |         .ipsum()
-87    |-        .dolor(lambda sit: sit in (
-88    |-            (
-   87 |+        .dolor(lambda sit: sit == (
-89 88 |                 # Foo1
-90 89 |                 # Foo2
-91 90 |                 amet
-92    |-            ),
-93    |-        ))
-   91 |+            ))
-94 92 | )
-95 93 | 
-96 94 | foo = lorem() \
-
-FURB171.py:98:24: FURB171 [*] Membership test against single-item container
+FURB171.py:93:5: FURB171 [*] Membership test against single-item container
     |
- 96 |   foo = lorem() \
- 97 |       .ipsum() \
- 98 |       .dolor(lambda sit: sit in (
-    |  ________________________^
- 99 | |         # Foo1
-100 | |         # Foo2
-101 | |         amet,
-102 | |     ))
-    | |_____^ FURB171
-103 |
-104 |   def _():
+ 91 |   )
+ 92 |
+ 93 |   _ = a in (  # Foo1
+    |  _____^
+ 94 | |     (  # Foo2
+ 95 | |     # Foo3
+ 96 | |         (  # Tuple
+ 97 | |             (  # Bar
+ 98 | |        (b
+ 99 | |         # Bar
+100 | |         )
+101 | |   )
+102 | |        # Foo4
+103 | |             # Foo5
+104 | |      ,
+105 | |        )
+106 | |         # Foo6
+107 | |     )
+108 | | )
+    | |_^ FURB171
+109 |
+110 |   foo = (
     |
     = help: Convert to equality test
 
 ℹ Unsafe fix
-95  95  | 
-96  96  | foo = lorem() \
-97  97  |     .ipsum() \
-98      |-    .dolor(lambda sit: sit in (
-99      |-        # Foo1
-100     |-        # Foo2
-101     |-        amet,
-102     |-    ))
-    98  |+    .dolor(lambda sit: sit == amet)
-103 99  | 
-104 100 | def _():
-105 101 |     if foo not \
+90  90  |     b,
+91  91  | )
+92  92  | 
+93      |-_ = a in (  # Foo1
+94      |-    (  # Foo2
+95      |-    # Foo3
+96      |-        (  # Tuple
+97      |-            (  # Bar
+    93  |+_ = a == (  # Bar
+98  94  |        (b
+99  95  |         # Bar
+100 96  |         )
+101 97  |   )
+102     |-       # Foo4
+103     |-            # Foo5
+104     |-     ,
+105     |-       )
+106     |-        # Foo6
+107     |-    )
+108     |-)
+109 98  | 
+110 99  | foo = (
+111 100 |     lorem()
 
-FURB171.py:105:8: FURB171 [*] Membership test against single-item container
+FURB171.py:113:28: FURB171 [*] Membership test against single-item container
     |
-104 |   def _():
-105 |       if foo not \
-    |  ________^
-106 | |         in [
-107 | |         # Before
-108 | |         bar
-109 | |         # After
-110 | |     ]: ...
+111 |       lorem()
+112 |           .ipsum()
+113 |           .dolor(lambda sit: sit in (
+    |  ____________________________^
+114 | |             # Foo1
+115 | |             # Foo2
+116 | |             amet,
+117 | |         ))
+    | |_________^ FURB171
+118 |   )
+    |
+    = help: Convert to equality test
+
+ℹ Unsafe fix
+110 110 | foo = (
+111 111 |     lorem()
+112 112 |         .ipsum()
+113     |-        .dolor(lambda sit: sit in (
+114     |-            # Foo1
+115     |-            # Foo2
+116     |-            amet,
+117     |-        ))
+    113 |+        .dolor(lambda sit: sit == amet)
+118 114 | )
+119 115 | 
+120 116 | foo = (
+
+FURB171.py:123:28: FURB171 [*] Membership test against single-item container
+    |
+121 |       lorem()
+122 |           .ipsum()
+123 |           .dolor(lambda sit: sit in (
+    |  ____________________________^
+124 | |             (
+125 | |                 # Foo1
+126 | |                 # Foo2
+127 | |                 amet
+128 | |             ),
+129 | |         ))
+    | |_________^ FURB171
+130 |   )
+    |
+    = help: Convert to equality test
+
+ℹ Unsafe fix
+120 120 | foo = (
+121 121 |     lorem()
+122 122 |         .ipsum()
+123     |-        .dolor(lambda sit: sit in (
+124     |-            (
+    123 |+        .dolor(lambda sit: sit == (
+125 124 |                 # Foo1
+126 125 |                 # Foo2
+127 126 |                 amet
+128     |-            ),
+129     |-        ))
+    127 |+            ))
+130 128 | )
+131 129 | 
+132 130 | foo = lorem() \
+
+FURB171.py:134:24: FURB171 [*] Membership test against single-item container
+    |
+132 |   foo = lorem() \
+133 |       .ipsum() \
+134 |       .dolor(lambda sit: sit in (
+    |  ________________________^
+135 | |         # Foo1
+136 | |         # Foo2
+137 | |         amet,
+138 | |     ))
     | |_____^ FURB171
-111 |
-112 |   def _():
+139 |
+140 |   def _():
+    |
+    = help: Convert to equality test
+
+ℹ Unsafe fix
+131 131 | 
+132 132 | foo = lorem() \
+133 133 |     .ipsum() \
+134     |-    .dolor(lambda sit: sit in (
+135     |-        # Foo1
+136     |-        # Foo2
+137     |-        amet,
+138     |-    ))
+    134 |+    .dolor(lambda sit: sit == amet)
+139 135 | 
+140 136 | def _():
+141 137 |     if foo not \
+
+FURB171.py:141:8: FURB171 [*] Membership test against single-item container
+    |
+140 |   def _():
+141 |       if foo not \
+    |  ________^
+142 | |         in [
+143 | |         # Before
+144 | |         bar
+145 | |         # After
+146 | |     ]: ...
+    | |_____^ FURB171
+147 |
+148 |   def _():
     |
     = help: Convert to inequality test
 
 ℹ Unsafe fix
-102 102 |     ))
-103 103 | 
-104 104 | def _():
-105     |-    if foo not \
-106     |-        in [
-107     |-        # Before
-108     |-        bar
-109     |-        # After
-110     |-    ]: ...
-    105 |+    if foo != bar: ...
-111 106 | 
-112 107 | def _():
-113 108 |     if foo not \
+138 138 |     ))
+139 139 | 
+140 140 | def _():
+141     |-    if foo not \
+142     |-        in [
+143     |-        # Before
+144     |-        bar
+145     |-        # After
+146     |-    ]: ...
+    141 |+    if foo != bar: ...
+147 142 | 
+148 143 | def _():
+149 144 |     if foo not \
 
-FURB171.py:113:8: FURB171 [*] Membership test against single-item container
+FURB171.py:149:8: FURB171 [*] Membership test against single-item container
     |
-112 |   def _():
-113 |       if foo not \
+148 |   def _():
+149 |       if foo not \
     |  ________^
-114 | |         in [
-115 | |         # Before
-116 | |         bar
-117 | |         # After
-118 | |     ] and \
+150 | |         in [
+151 | |         # Before
+152 | |         bar
+153 | |         # After
+154 | |     ] and \
     | |_____^ FURB171
-119 |           0 < 1: ...
+155 |           0 < 1: ...
     |
     = help: Convert to inequality test
 
 ℹ Unsafe fix
-110 110 |     ]: ...
-111 111 | 
-112 112 | def _():
-113     |-    if foo not \
-114     |-        in [
-115     |-        # Before
-116     |-        bar
-117     |-        # After
-118     |-    ] and \
-    113 |+    if foo != bar and \
-119 114 |         0 < 1: ...
+146 146 |     ]: ...
+147 147 | 
+148 148 | def _():
+149     |-    if foo not \
+150     |-        in [
+151     |-        # Before
+152     |-        bar
+153     |-        # After
+154     |-    ] and \
+    149 |+    if foo != bar and \
+155 150 |         0 < 1: ...
