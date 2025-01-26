@@ -63,6 +63,14 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
+    /// Use exit code 1 if there are any warning-level diagnostics.
+    #[arg(long, conflicts_with = "exit_zero")]
+    pub(crate) error_on_warning: bool,
+
+    /// Always use exit code 0, even when there are error-level diagnostics.
+    #[arg(long)]
+    pub(crate) exit_zero: bool,
+
     /// Run in watch mode by re-running whenever files change.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
@@ -97,6 +105,7 @@ impl CheckCommand {
                 ..EnvironmentOptions::default()
             }),
             rules,
+            error_on_warning: Some(self.error_on_warning),
             ..Default::default()
         }
     }

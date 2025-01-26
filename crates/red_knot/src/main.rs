@@ -12,7 +12,7 @@ use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
@@ -84,6 +84,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let system = OsSystem::new(cwd);
     let watch = args.watch;
+    let exit_zero = args.exit_zero;
     let cli_options = args.into_options();
     let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
     workspace_metadata.apply_cli_options(cli_options.clone());
@@ -112,7 +113,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     std::mem::forget(db);
 
-    Ok(exit_status)
+    if exit_zero {
+        Ok(ExitStatus::Success)
+    } else {
+        Ok(exit_status)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -213,7 +218,18 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
-                    let has_diagnostics = !result.is_empty();
+                    let (has_warnings, has_errors) = result.iter().fold(
+                        (false, false),
+                        |(has_warnings, has_errors), diagnostic| {
+                            let severity = diagnostic.severity();
+
+                            (
+                                has_warnings || severity == Severity::Warning,
+                                has_errors || severity >= Severity::Error,
+                            )
+                        },
+                    );
+
                     if check_revision == revision {
                         #[allow(clippy::print_stdout)]
                         for diagnostic in result {
@@ -226,10 +242,21 @@ impl MainLoop {
                     }
 
                     if self.watcher.is_none() {
-                        return if has_diagnostics {
-                            ExitStatus::Failure
-                        } else {
-                            ExitStatus::Success
+                        let error_on_warning =
+                            self.cli_options.error_on_warning.unwrap_or_default();
+
+                        return match (has_warnings, has_errors) {
+                            (false, false) => ExitStatus::Success,
+
+                            (true, false) => {
+                                if error_on_warning {
+                                    ExitStatus::Failure
+                                } else {
+                                    ExitStatus::Success
+                                }
+                            }
+
+                            (_, true) => ExitStatus::Failure,
                         };
                     }
 
