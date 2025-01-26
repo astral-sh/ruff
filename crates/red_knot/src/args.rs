@@ -63,7 +63,7 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
-    /// Use [exit code 1](ExitStatus::Failure) if there are any warning-level diagnostics.
+    /// Use exit code 1 if there are any warning-level diagnostics.
     #[arg(long, conflicts_with = "exit_zero")]
     pub(crate) error_on_warning: bool,
 
