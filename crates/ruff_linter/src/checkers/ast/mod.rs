@@ -303,7 +303,7 @@ impl<'a> Checker<'a> {
 
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
     /// AST.
-    pub(crate) fn preferred_quote(&self) -> Quote {
+    fn preferred_quote(&self) -> Quote {
         self.f_string_quote_style().unwrap_or(self.stylist.quote())
     }
 
