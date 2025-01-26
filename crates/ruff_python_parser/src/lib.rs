@@ -200,12 +200,12 @@ pub fn parse_parenthesized_expression_range(
 ///
 /// ```
 /// use ruff_python_parser::parse_string_annotation;
-/// use ruff_python_ast::{StringLiteral, StringLiteralFlags};
+/// use ruff_python_ast::{str::Quote, StringLiteral, StringLiteralFlags};
 /// use ruff_text_size::{TextRange, TextSize};
 ///
 /// let string = StringLiteral {
 ///     value: "'''\n int | str'''".to_string().into_boxed_str(),
-///     flags: StringLiteralFlags::empty(),
+///     flags: StringLiteralFlags::new(Quote::Double),
 ///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
 /// };
 /// let parsed = parse_string_annotation("'''\n int | str'''", &string);
