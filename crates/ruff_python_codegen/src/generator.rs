@@ -1799,36 +1799,36 @@ if True:
                 &Indentation::default(),
                 Quote::Double,
                 LineEnding::default(),
-                r#""hello""#
+                r#"b"hello""#
             ),
-            r#""hello""#
+            r#"b"hello""#
         );
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 Quote::Single,
                 LineEnding::default(),
-                r#""hello""#
+                r#"b"hello""#
             ),
-            r"'hello'"
+            r"b'hello'"
         );
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 Quote::Double,
                 LineEnding::default(),
-                r"'hello'"
+                r"b'hello'"
             ),
-            r#""hello""#
+            r#"b"hello""#
         );
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 Quote::Single,
                 LineEnding::default(),
-                r"'hello'"
+                r"b'hello'"
             ),
-            r"'hello'"
+            r"b'hello'"
         );
     }
 
