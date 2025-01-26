@@ -1,0 +1,108 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF055_2.py:7:1: RUF055 [*] Plain string pattern passed to `re` function
+  |
+6 | # this should be replaced with `"abc" not in s`
+7 | re.search("abc", s) is None
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+  |
+  = help: Replace with `"abc" not in s`
+
+ℹ Safe fix
+4 4 | s = "str"
+5 5 | 
+6 6 | # this should be replaced with `"abc" not in s`
+7   |-re.search("abc", s) is None
+  7 |+"abc" not in s
+8 8 | 
+9 9 | 
+10 10 | # this shuold be replaced with `"abc" in s`
+
+RUF055_2.py:11:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+10 | # this shuold be replaced with `"abc" in s`
+11 | re.search("abc", s) is not None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `"abc" in s`
+
+ℹ Safe fix
+8  8  | 
+9  9  | 
+10 10 | # this shuold be replaced with `"abc" in s`
+11    |-re.search("abc", s) is not None
+   11 |+"abc" in s
+12 12 | 
+13 13 | 
+14 14 | # this should be replaced with `not s.startswith("abc")`
+
+RUF055_2.py:15:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+14 | # this should be replaced with `not s.startswith("abc")`
+15 | re.match("abc", s) is None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `not s.startswith("abc")`
+
+ℹ Safe fix
+12 12 | 
+13 13 | 
+14 14 | # this should be replaced with `not s.startswith("abc")`
+15    |-re.match("abc", s) is None
+   15 |+not s.startswith("abc")
+16 16 | 
+17 17 | 
+18 18 | # this should be replaced with `s.startswith("abc")`
+
+RUF055_2.py:19:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+18 | # this should be replaced with `s.startswith("abc")`
+19 | re.match("abc", s) is not None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `s.startswith("abc")`
+
+ℹ Safe fix
+16 16 | 
+17 17 | 
+18 18 | # this should be replaced with `s.startswith("abc")`
+19    |-re.match("abc", s) is not None
+   19 |+s.startswith("abc")
+20 20 | 
+21 21 | 
+22 22 | # this should be replaced with `s != "abc"`
+
+RUF055_2.py:23:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+22 | # this should be replaced with `s != "abc"`
+23 | re.fullmatch("abc", s) is None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `s != "abc"`
+
+ℹ Safe fix
+20 20 | 
+21 21 | 
+22 22 | # this should be replaced with `s != "abc"`
+23    |-re.fullmatch("abc", s) is None
+   23 |+s != "abc"
+24 24 | 
+25 25 | 
+26 26 | # this should be replaced with `s == "abc"`
+
+RUF055_2.py:27:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+26 | # this should be replaced with `s == "abc"`
+27 | re.fullmatch("abc", s) is not None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `s == "abc"`
+
+ℹ Safe fix
+24 24 | 
+25 25 | 
+26 26 | # this should be replaced with `s == "abc"`
+27    |-re.fullmatch("abc", s) is not None
+   27 |+s == "abc"
