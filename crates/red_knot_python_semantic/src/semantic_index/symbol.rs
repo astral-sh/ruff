@@ -101,10 +101,8 @@ pub struct ScopedSymbolId;
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
 pub struct ScopeId<'db> {
-    #[id]
     pub file: File,
 
-    #[id]
     pub file_scope_id: FileScopeId,
 
     #[no_eq]

@@ -33,11 +33,9 @@ pub(crate) enum ExpressionKind {
 #[salsa::tracked]
 pub(crate) struct Expression<'db> {
     /// The file in which the expression occurs.
-    #[id]
     pub(crate) file: File,
 
     /// The scope in which the expression occurs.
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The expression node.

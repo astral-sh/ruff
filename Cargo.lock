@@ -30,6 +30,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "allocator-api2"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1096,6 +1102,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash",
+ "allocator-api2",
 ]
 
 [[package]]
@@ -3304,12 +3311,13 @@ checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=88a1d7774d78f048fbd77d40abca9ebd729fd1f0#88a1d7774d78f048fbd77d40abca9ebd729fd1f0"
+source = "git+https://github.com/ibraheemdev/salsa.git?rev=22f742a53d9eafca80fe5a0a6b188b56243c741c#22f742a53d9eafca80fe5a0a6b188b56243c741c"
 dependencies = [
  "append-only-vec",
  "arc-swap",
  "crossbeam",
  "dashmap 6.1.0",
+ "hashbrown 0.14.5",
  "hashlink",
  "indexmap",
  "parking_lot",
@@ -3324,12 +3332,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=88a1d7774d78f048fbd77d40abca9ebd729fd1f0#88a1d7774d78f048fbd77d40abca9ebd729fd1f0"
+source = "git+https://github.com/ibraheemdev/salsa.git?rev=22f742a53d9eafca80fe5a0a6b188b56243c741c#22f742a53d9eafca80fe5a0a6b188b56243c741c"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=88a1d7774d78f048fbd77d40abca9ebd729fd1f0#88a1d7774d78f048fbd77d40abca9ebd729fd1f0"
+source = "git+https://github.com/ibraheemdev/salsa.git?rev=22f742a53d9eafca80fe5a0a6b188b56243c741c#22f742a53d9eafca80fe5a0a6b188b56243c741c"
 dependencies = [
  "heck",
  "proc-macro2",

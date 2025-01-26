@@ -28,10 +28,8 @@ use crate::Db;
 /// * an argument of a cross-module query
 #[salsa::tracked]
 pub(crate) struct Unpack<'db> {
-    #[id]
     pub(crate) file: File,
 
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
@@ -62,7 +60,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub(crate) enum UnpackValue<'db> {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable(Expression<'db>),
