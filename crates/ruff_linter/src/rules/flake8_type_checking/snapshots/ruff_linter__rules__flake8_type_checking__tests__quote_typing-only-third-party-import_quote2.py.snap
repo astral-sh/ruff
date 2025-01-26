@@ -111,7 +111,7 @@ quote2.py:25:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 25    |-    from django.contrib.auth.models import AbstractBaseUser
 26 29 | 
 27    |-    def test_literal_annotation_args_contain_quotes(self, type1: AbstractBaseUser[Literal["user", "admin"], Annotated["int", "1", 2]]):
-   30 |+    def test_literal_annotation_args_contain_quotes(self, type1: 'AbstractBaseUser[Literal["user", "admin"], Annotated[int, "1", 2]]'):
+   30 |+    def test_literal_annotation_args_contain_quotes(self, type1: "AbstractBaseUser[Literal['user', 'admin'], Annotated[int, '1', 2]]"):
 28 31 |         pass
 29 32 | 
 30 33 | 
@@ -142,7 +142,7 @@ quote2.py:34:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 34    |-    from django.contrib.auth.models import AbstractBaseUser
 35 38 | 
 36    |-    def test_union_contain_inner_quotes(self, type1: AbstractBaseUser["int" | Literal["int"]]):
-   39 |+    def test_union_contain_inner_quotes(self, type1: 'AbstractBaseUser[int | Literal["int"]]'):
+   39 |+    def test_union_contain_inner_quotes(self, type1: "AbstractBaseUser[int | Literal['int']]"):
 37 40 |         pass
 38 41 | 
 39 42 | 
@@ -173,7 +173,7 @@ quote2.py:43:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 43    |-    from django.contrib.auth.models import AbstractBaseUser
 44 47 | 
 45    |-    def test_inner_literal_mixed_quotes(user: AbstractBaseUser[Literal['user', "admin"]]):
-   48 |+    def test_inner_literal_mixed_quotes(user: "AbstractBaseUser[Literal['user', \"admin\"]]"):
+   48 |+    def test_inner_literal_mixed_quotes(user: "AbstractBaseUser[Literal['user', 'admin']]"):
 46 49 |         pass
 47 50 | 
 48 51 | 
@@ -266,7 +266,7 @@ quote2.py:70:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 70    |-    from django.contrib.auth.models import AbstractBaseUser
 71 74 | 
 72    |-    def test_annotated_literal_mixed_quotes(user: AbstractBaseUser[Annotated[str, "max_length=20", Literal['user', "admin"]]]):
-   75 |+    def test_annotated_literal_mixed_quotes(user: "AbstractBaseUser[Annotated[str, \"max_length=20\", Literal['user', \"admin\"]]]"):
+   75 |+    def test_annotated_literal_mixed_quotes(user: "AbstractBaseUser[Annotated[str, 'max_length=20', Literal['user', 'admin']]]"):
 73 76 |         pass
 74 77 | 
 75 78 |

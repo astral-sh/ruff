@@ -23,7 +23,7 @@ quote3.py:4:44: TC002 [*] Move third-party import `django.contrib.auth.models.Ab
 4     |-    from django.contrib.auth.models import AbstractBaseUser
 5  8  | 
 6     |-    def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
-   9  |+    def test_union_literal_mixed_quotes(user: 'AbstractBaseUser[Union[Literal[\'active\', "inactive"], str]]'):
+   9  |+    def test_union_literal_mixed_quotes(user: 'AbstractBaseUser[Union[Literal["active", "inactive"], str]]'):
 7  10 |         pass
 8  11 | 
 9  12 | 
@@ -54,7 +54,7 @@ quote3.py:13:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 13    |-    from django.contrib.auth.models import AbstractBaseUser
 14 17 | 
 15    |-    def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
-   18 |+    def test_callable_literal_mixed_quotes(callable_fn: 'AbstractBaseUser[Callable[[int, Literal[\'admin\', "user"]], bool]]'):
+   18 |+    def test_callable_literal_mixed_quotes(callable_fn: 'AbstractBaseUser[Callable[[int, Literal["admin", "user"]], bool]]'):
 16 19 |         pass
 17 20 | 
 18 21 | 
@@ -85,7 +85,7 @@ quote3.py:22:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 22    |-    from django.contrib.auth.models import AbstractBaseUser
 23 26 | 
 24    |-    def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
-   27 |+    def test_callable_annotated_literal(callable_fn: 'AbstractBaseUser[Callable[[int, Annotated[str, Literal[\'active\', "inactive"]]], bool]]'):
+   27 |+    def test_callable_annotated_literal(callable_fn: 'AbstractBaseUser[Callable[[int, Annotated[str, Literal["active", "inactive"]]], bool]]'):
 25 28 |         pass
 26 29 | 
 27 30 | 
