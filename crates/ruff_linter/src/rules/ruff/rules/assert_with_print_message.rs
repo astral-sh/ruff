@@ -66,7 +66,7 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
                     test: stmt.test.clone(),
-                    msg: print_arguments::to_expr(&call.arguments, checker.stylist().quote())
+                    msg: print_arguments::to_expr(&call.arguments, checker.preferred_quote())
                         .map(Box::new),
                     range: TextRange::default(),
                 })),
