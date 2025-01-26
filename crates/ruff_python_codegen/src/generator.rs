@@ -1794,42 +1794,37 @@ if True:
 
     #[test]
     fn set_quote() {
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Double,
-                LineEnding::default(),
-                r#"b"hello""#
-            ),
-            r#"b"hello""#
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Single,
-                LineEnding::default(),
-                r#"b"hello""#
-            ),
-            r"b'hello'"
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Double,
-                LineEnding::default(),
-                r"b'hello'"
-            ),
-            r#"b"hello""#
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Single,
-                LineEnding::default(),
-                r"b'hello'"
-            ),
-            r"b'hello'"
-        );
+        macro_rules! round_trip_with {
+            ($quote:expr, $start:expr, $end:expr) => {
+                assert_eq!(
+                    round_trip_with(
+                        &Indentation::default(),
+                        $quote,
+                        LineEnding::default(),
+                        $start
+                    ),
+                    $end,
+                );
+            };
+        }
+
+        // setting Generator::quote works for bytestrings
+        round_trip_with!(Quote::Double, r#"b"hello""#, r#"b"hello""#);
+        round_trip_with!(Quote::Single, r#"b"hello""#, r"b'hello'");
+        round_trip_with!(Quote::Double, r"b'hello'", r#"b"hello""#);
+        round_trip_with!(Quote::Single, r"b'hello'", r"b'hello'");
+
+        // and for f-strings
+        round_trip_with!(Quote::Double, r#"f"hello""#, r#"f"hello""#);
+        round_trip_with!(Quote::Single, r#"f"hello""#, r"f'hello'");
+        round_trip_with!(Quote::Double, r"f'hello'", r#"f"hello""#);
+        round_trip_with!(Quote::Single, r"f'hello'", r"f'hello'");
+
+        // but not for string literals, where the `Quote` is taken directly from their flags
+        round_trip_with!(Quote::Double, r#""hello""#, r#""hello""#);
+        round_trip_with!(Quote::Single, r#""hello""#, r#""hello""#); // no effect
+        round_trip_with!(Quote::Double, r"'hello'", r#"'hello'"#); // no effect
+        round_trip_with!(Quote::Single, r"'hello'", r"'hello'");
     }
 
     #[test]
