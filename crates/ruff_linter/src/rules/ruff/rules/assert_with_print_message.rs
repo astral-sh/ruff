@@ -147,7 +147,7 @@ mod print_arguments {
             if let FStringElement::Literal(literal) = element {
                 acc.push(StringLiteral {
                     value: literal.value.clone(),
-                    flags: StringLiteralFlags::empty().with_quote_style(quote),
+                    flags: StringLiteralFlags::new(quote),
                     range: TextRange::default(),
                 });
                 Some(acc)
@@ -206,7 +206,7 @@ mod print_arguments {
             range: TextRange::default(),
             value: StringLiteralValue::single(StringLiteral {
                 value: combined_string.into(),
-                flags: StringLiteralFlags::empty().with_quote_style(quote),
+                flags: StringLiteralFlags::new(quote),
                 range: TextRange::default(),
             }),
         }))

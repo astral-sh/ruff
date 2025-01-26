@@ -1424,7 +1424,11 @@ bitflags! {
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
-    pub fn empty() -> Self {
+    pub fn new(quote_style: Quote) -> Self {
+        Self::empty().with_quote_style(quote_style)
+    }
+
+    pub(crate) fn empty() -> Self {
         Self(StringLiteralFlagsInner::empty())
     }
 
