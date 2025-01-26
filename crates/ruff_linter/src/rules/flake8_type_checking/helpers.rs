@@ -3,6 +3,7 @@ use std::cmp::Reverse;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
 use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
@@ -381,6 +382,12 @@ impl<'a> QuoteAnnotator<'a> {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice {
             if !elts.is_empty() {
                 self.visit_expr(&mut elts[0]);
+                // The outer annotation will use the preferred quote.
+                // As such, any quotes found in metadata elements inside an `Annotated` slice
+                // should use the opposite quote to the preferred quote.
+                for elt in elts.iter_mut().skip(1) {
+                    QuoteRewriter::new(self.stylist).visit_expr(elt);
+                }
             }
         }
     }
@@ -395,8 +402,10 @@ impl Transformer for QuoteAnnotator<'_> {
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Literal")
                     {
-                        // we don't want to modify anything inside `Literal`
-                        // so skip visiting this subscripts' slice
+                        // The outer annotation will use the preferred quote.
+                        // As such, any quotes found inside a `Literal` slice
+                        // should use the opposite quote to the preferred quote.
+                        QuoteRewriter::new(self.stylist).visit_expr(slice);
                     } else if self
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Annotated")
@@ -423,5 +432,24 @@ impl Transformer for QuoteAnnotator<'_> {
                 walk_expr(self, expr);
             }
         }
+    }
+}
+
+#[derive(Debug)]
+struct QuoteRewriter {
+    preferred_inner_quote: Quote,
+}
+
+impl QuoteRewriter {
+    fn new(stylist: &Stylist) -> Self {
+        Self {
+            preferred_inner_quote: stylist.quote().opposite(),
+        }
+    }
+}
+
+impl Transformer for QuoteRewriter {
+    fn visit_string_literal(&self, literal: &mut ast::StringLiteral) {
+        literal.flags = literal.flags.with_quote_style(self.preferred_inner_quote);
     }
 }
