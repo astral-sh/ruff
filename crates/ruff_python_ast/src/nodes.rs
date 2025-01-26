@@ -1424,6 +1424,17 @@ bitflags! {
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
+    /// Construct a new [`StringLiteralFlags`] with `quote_style`.
+    ///
+    /// If you're using a [`Generator`](../ruff_python_codegen/struct.Generator.html) to generate a
+    /// fix from an existing string literal, consider passing along the [`StringLiteral::flags`]
+    /// field or the result of the [`StringLiteralValue::flags`] method. If you don't have an
+    /// existing string but have a [`Checker`](../ruff_linter/checkers/ast/struct.Checker.html)
+    /// available, consider using [`Checker::default_string_flags`], which will properly handle
+    /// surrounding f-strings.
+    ///
+    /// [`Checker::default_string_flags`]:
+    /// ../ruff_linter/checkers/ast/struct.Checker.html#method.default_string_flags
     pub fn new(quote_style: Quote) -> Self {
         Self::empty().with_quote_style(quote_style)
     }
