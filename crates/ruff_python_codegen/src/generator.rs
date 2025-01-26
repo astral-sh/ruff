@@ -65,7 +65,10 @@ mod precedence {
 pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
-    /// The quote style to use for string literals.
+    /// The quote style to use for bytestring and f-string literals. For a plain
+    /// [`StringLiteral`](ast::StringLiteral), modify its `flags` field using
+    /// [`StringLiteralFlags::with_quote_style`](ast::StringLiteralFlags::with_quote_style) before
+    /// passing it to the [`Generator`].
     quote: Quote,
     /// The line ending to use.
     line_ending: LineEnding,
