@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+TID251.py:49:6: TID251 `property` is banned: `property` considered harmful.
+   |
+48 | class C:
+49 |     @property
+   |      ^^^^^^^^ TID251
+50 |     def foo(self): ...
+   |

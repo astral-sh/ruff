@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+TID251.py:42:22: TID251 `builtins.list` is banned: `builtins.list` considered harmful.
+   |
+40 | list()
+41 |
+42 | from builtins import list as l
+   |                      ^^^^^^^^^ TID251
+43 | l()
+   |
+
+TID251.py:43:1: TID251 `builtins.list` is banned: `builtins.list` considered harmful.
+   |
+42 | from builtins import list as l
+43 | l()
+   | ^ TID251
+44 |
+45 | import builtins
+   |
+
+TID251.py:46:1: TID251 `builtins.list` is banned: `builtins.list` considered harmful.
+   |
+45 | import builtins
+46 | builtins.list
+   | ^^^^^^^^^^^^^ TID251
+47 |
+48 | class C:
+   |

@@ -293,6 +293,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             }
                         }
                     }
+                    if checker.enabled(Rule::BannedApi) {
+                        flake8_tidy_imports::rules::banned_name(checker, expr);
+                    }
                 }
                 ExprContext::Store => {
                     if checker.enabled(Rule::NonLowercaseVariableInFunction) {
