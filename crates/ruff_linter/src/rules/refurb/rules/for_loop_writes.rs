@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprName, Stmt, StmtFor};
+use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{
     Binding, BindingKind, ScopeId, SemanticModel, TypingOnlyBindingsStatus,
@@ -60,9 +60,7 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> O
 
     let semantic = checker.semantic();
 
-    let Stmt::For(for_stmt) = binding.statement(semantic)? else {
-        return None;
-    };
+    let for_stmt = binding.statement(semantic)?.as_for_stmt()?;
 
     if for_stmt.is_async {
         return None;
@@ -105,13 +103,7 @@ fn binding_names(parent: &Expr) -> Vec<&ExprName> {
 
             Expr::Starred(starred) => collect_names(starred.value.as_ref(), names),
 
-            Expr::List(list) => list
-                .elts
-                .iter()
-                .for_each(|element| collect_names(element, names)),
-
-            Expr::Tuple(tuple) => tuple
-                .elts
+            Expr::List(ExprList { elts, .. }) | Expr::Tuple(ExprTuple { elts, .. }) => elts
                 .iter()
                 .for_each(|element| collect_names(element, names)),
 
@@ -136,15 +128,14 @@ fn for_loop_writes(
     let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {
         return None;
     };
-    let Expr::Call(call_expr) = stmt_expr.value.as_ref() else {
-        return None;
-    };
-    let Expr::Attribute(expr_attr) = call_expr.func.as_ref() else {
-        return None;
-    };
+
+    let call_expr = stmt_expr.value.as_ref().as_call_expr()?;
+    let expr_attr = call_expr.func.as_ref().as_attribute_expr()?;
+
     if expr_attr.attr.as_str() != "write" {
         return None;
     }
+
     if !call_expr.arguments.keywords.is_empty() {
         return None;
     }
@@ -152,18 +143,13 @@ fn for_loop_writes(
         return None;
     };
 
-    let Expr::Name(io_object_name) = expr_attr.value.as_ref() else {
-        return None;
-    };
+    let io_object_name = expr_attr.value.as_ref().as_name_expr()?;
 
     let semantic = checker.semantic();
 
     // Determine whether `f` in `f.write()` was bound to a file object.
-    if !semantic
-        .resolve_name(io_object_name)
-        .map(|id| semantic.binding(id))
-        .is_some_and(|binding| typing::is_io_base(binding, semantic))
-    {
+    let binding = semantic.binding(semantic.resolve_name(io_object_name)?);
+    if !typing::is_io_base(binding, semantic) {
         return None;
     }
 
