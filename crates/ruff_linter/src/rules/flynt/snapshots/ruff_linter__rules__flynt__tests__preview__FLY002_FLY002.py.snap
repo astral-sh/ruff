@@ -144,7 +144,7 @@ FLY002.py:23:11: FLY002 [*] Consider `f"{url}{filename}"` instead of string join
 25 25 | 
 26 26 | # Regression test for: https://github.com/astral-sh/ruff/issues/5150
 
-FLY002.py:27:12: FLY002 [*] Consider f-string instead of string join
+FLY002.py:27:12: FLY002 Consider f-string instead of string join
    |
 26 |   # Regression test for: https://github.com/astral-sh/ruff/issues/5150
 27 |   expected = "\n".join(
@@ -157,15 +157,3 @@ FLY002.py:27:12: FLY002 [*] Consider f-string instead of string join
    | |_^ FLY002
    |
    = help: Replace with f-string
-
-ℹ Unsafe fix
-24 24 | 
-25 25 | 
-26 26 | # Regression test for: https://github.com/astral-sh/ruff/issues/5150
-27    |-expected = "\n".join(
-28    |-    [
-29    |-        "=== long text ======================================================================",
-30    |-        "=== long text ======================================================================",
-31    |-    ],
-32    |-)
-   27 |+expected = "=== long text ======================================================================\n=== long text ======================================================================"

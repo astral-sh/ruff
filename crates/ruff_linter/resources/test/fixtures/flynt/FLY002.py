@@ -21,3 +21,12 @@ nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
 # Regression test for: https://github.com/astral-sh/ruff/issues/7197
 def create_file_public_url(url, filename):
     return''.join([url, filename])
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/5150
+expected = "\n".join(
+    [
+        "=== long text ======================================================================",
+        "=== long text ======================================================================",
+    ],
+)
