@@ -27,6 +27,9 @@ pub struct Options {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Rules>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_on_warning: Option<bool>,
 }
 
 impl Options {

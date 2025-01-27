@@ -200,8 +200,8 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
         warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
 
@@ -251,8 +251,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("--warn")
             .arg("unresolved-import"),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
     warning[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
@@ -303,8 +303,8 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("--ignore")
             .arg("possibly-unresolved-reference"),
         @r"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
         warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
 
@@ -330,8 +330,8 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
         warning[unknown-rule] <temp_dir>/pyproject.toml:3:1 Unknown lint rule `division-by-zer`
 
@@ -347,10 +347,155 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", "print(10)")?;
 
     assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        warning[unknown-rule] Unknown lint rule `division-by-zer`
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_only_warnings() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        warning[lint:unresolved-reference] <temp_dir>/test.py:1:7 Name `x` used when not defined
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_only_info() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        from typing_extensions import reveal_type
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type] <temp_dir>/test.py:3:1 Revealed type is `Literal[1]`
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        from typing_extensions import reveal_type
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type] <temp_dir>/test.py:3:1 Revealed type is `Literal[1]`
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
         success: false
         exit_code: 1
         ----- stdout -----
-        warning[unknown-rule] Unknown lint rule `division-by-zer`
+        warning[lint:unresolved-reference] <temp_dir>/test.py:1:7 Name `x` used when not defined
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[lint:unresolved-reference] <temp_dir>/test.py:2:7 Name `x` used when not defined
+        error[lint:non-subscriptable] <temp_dir>/test.py:3:7 Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        warning[lint:unresolved-reference] <temp_dir>/test.py:2:7 Name `x` used when not defined
+        error[lint:non-subscriptable] <temp_dir>/test.py:3:7 Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+
+        ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        warning[lint:unresolved-reference] <temp_dir>/test.py:2:7 Name `x` used when not defined
+        error[lint:non-subscriptable] <temp_dir>/test.py:3:7 Cannot subscript object of type `Literal[4]` with no `__getitem__` method
 
         ----- stderr -----
     ");
