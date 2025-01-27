@@ -55,6 +55,10 @@ def g(cond: bool):
 
 ## `continue` is terminal within its loop scope
 
+TODO: We are not currently modeling the cyclic control flow for loops, pending fixpoint support in
+Salsa. The false positives in this section are because of that, and not our terminal statement
+support. See [ruff#14160](https://github.com/astral-sh/ruff/issues/14160) for more details.
+
 ```py
 def f(cond: bool) -> str:
     while True:
@@ -75,6 +79,7 @@ def g(cond: bool, i: int):
             reveal_type(x)  # revealed: Literal["continue"]
             continue
         reveal_type(x)  # revealed: Literal["loop"]
+    # TODO: Should be Literal["before", "loop", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop"]
 ```
 
@@ -168,7 +173,6 @@ def top_level_return(cond1: bool, cond2: bool):
 
     def g():
         reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
-
     if cond1:
         if cond2:
             x = 2
@@ -182,7 +186,6 @@ def return_from_if(cond1: bool, cond2: bool):
     def g():
         # TODO: Unknown | Literal[1, 2, 3]
         reveal_type(x)  # revealed: Unknown | Literal[1]
-
     if cond1:
         if cond2:
             x = 2
@@ -196,7 +199,6 @@ def return_from_nested_if(cond1: bool, cond2: bool):
     def g():
         # TODO: Unknown | Literal[1, 2, 3]
         reveal_type(x)  # revealed: Unknown | Literal[1, 3]
-
     if cond1:
         if cond2:
             x = 2
