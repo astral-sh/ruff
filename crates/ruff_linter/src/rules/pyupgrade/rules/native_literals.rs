@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, StringLiteralFlags, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -33,15 +33,20 @@ impl FromStr for LiteralType {
 }
 
 impl LiteralType {
-    fn as_zero_value_expr(self, flags: StringLiteralFlags) -> Expr {
+    fn as_zero_value_expr(self, checker: &Checker) -> Expr {
         match self {
             LiteralType::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
-                flags,
+                flags: checker.default_string_flags(),
             }
             .into(),
-            LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
+            LiteralType::Bytes => ast::BytesLiteral {
+                value: Box::default(),
+                range: TextRange::default(),
+                flags: checker.default_bytes_flags(),
+            }
+            .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
@@ -191,7 +196,7 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let expr = literal_type.as_zero_value_expr(checker.default_string_flags());
+            let expr = literal_type.as_zero_value_expr(checker);
             let content = checker.generator().expr(&expr);
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,
