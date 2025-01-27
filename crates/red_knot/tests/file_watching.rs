@@ -47,7 +47,7 @@ impl TestCase {
         #[track_caller]
         fn panic_with_formatted_events(events: Vec<ChangeEvent>) -> Vec<ChangeEvent> {
             panic!(
-                "Didn't observe expected change:\n{}",
+                "Didn't observe the expected event. The following events occurred:\n{}",
                 events
                     .into_iter()
                     .map(|event| format!("  - {event:?}"))
