@@ -698,11 +698,11 @@ impl<'db> UseDefMapBuilder<'db> {
         // Unreachable snapshots should not be merged: If the current snapshot is unreachable, it
         // should be completely overwritten by the snapshot we're merging in. If the other snapshot
         // is unreachable, we should return without merging.
-        if !self.reachable {
-            self.restore(snapshot);
+        if !snapshot.reachable {
             return;
         }
-        if !snapshot.reachable {
+        if !self.reachable {
+            self.restore(snapshot);
             return;
         }
 
