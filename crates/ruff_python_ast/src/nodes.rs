@@ -1813,9 +1813,9 @@ bitflags! {
 /// ## Notes on usage
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
-/// from an existing string literal, consider passing along the [`BytesLiteral::flags`] field or the
-/// result of the [`BytesLiteralValue::flags`] method. If you don't have an existing string but have
-/// a `Checker` from the `ruff_linter` crate available, consider using
+/// from an existing bytes literal, consider passing along the [`BytesLiteral::flags`] field or the
+/// result of the [`BytesLiteralValue::flags`] method. If you don't have an existing literal but
+/// have a `Checker` from the `ruff_linter` crate available, consider using
 /// `Checker::default_bytes_flags` to create instances of this struct; this method will properly
 /// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
 /// public constructor [`BytesLiteralFlags::empty`] can be used.
