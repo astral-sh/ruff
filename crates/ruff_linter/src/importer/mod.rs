@@ -135,71 +135,76 @@ impl<'a> Importer<'a> {
             self.stylist,
         )?;
 
-        // Import the `TYPE_CHECKING` symbol from the typing module.
-        let (type_checking_edit, type_checking) =
-            if let Some(type_checking) = Self::find_type_checking(at, semantic)? {
-                // Special-case: if the `TYPE_CHECKING` symbol is imported as part of the same
-                // statement that we're modifying, avoid adding a no-op edit. For example, here,
-                // the `TYPE_CHECKING` no-op edit would overlap with the edit to remove `Final`
-                // from the import:
-                // ```python
-                // from __future__ import annotations
-                //
-                // from typing import Final, TYPE_CHECKING
-                //
-                // Const: Final[dict] = {}
-                // ```
-                let edit = if type_checking.statement(semantic) == import.statement {
-                    None
-                } else {
-                    Some(Edit::range_replacement(
-                        self.locator.slice(type_checking.range()).to_string(),
-                        type_checking.range(),
-                    ))
-                };
-                (edit, type_checking.into_name())
-            } else {
-                // Special-case: if the `TYPE_CHECKING` symbol would be added to the same import
-                // we're modifying, import it as a separate import statement. For example, here,
-                // we're concurrently removing `Final` and adding `TYPE_CHECKING`, so it's easier to
-                // use a separate import statement:
-                // ```python
-                // from __future__ import annotations
-                //
-                // from typing import Final
-                //
-                // Const: Final[dict] = {}
-                // ```
-                let (edit, name) = self.import_symbol(
-                    &ImportRequest::import_from("typing", "TYPE_CHECKING"),
-                    at,
-                    Some(import.statement),
-                    semantic,
-                )?;
-                (Some(edit), name)
-            };
-
         // Add the import to a `TYPE_CHECKING` block.
-        let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
-            // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start())
+        if let Some(block) = self.preceding_type_checking_block(at) {
+            // Add the import to the existing `TYPE_CHECKING` block.
+            Ok(TypingImportEdit {
+                type_checking_edit: None,
+                add_import_edit: self.add_to_type_checking_block(&content, block.start()),
+            })
         } else {
-            // Add the import to a new `TYPE_CHECKING` block.
-            self.add_type_checking_block(
-                &format!(
-                    "{}if {type_checking}:{}{}",
-                    self.stylist.line_ending().as_str(),
-                    self.stylist.line_ending().as_str(),
-                    indent(&content, self.stylist.indentation())
-                ),
-                at,
-            )?
-        };
+            // Import the `TYPE_CHECKING` symbol from the typing module.
+            // TODO: Should we provide an option to avoid this import?
+            //       E.g. either through an explicit setting, or implicitly
+            //       when `typing` isn't part of the exempt modules and there
+            //       are no other existing runtime imports of `typing`.
+            let (type_checking_edit, type_checking) =
+                if let Some(type_checking) = Self::find_type_checking(at, semantic)? {
+                    // Special-case: if the `TYPE_CHECKING` symbol is imported as part of the same
+                    // statement that we're modifying, avoid adding a no-op edit. For example, here,
+                    // the `TYPE_CHECKING` no-op edit would overlap with the edit to remove `Final`
+                    // from the import:
+                    // ```python
+                    // from __future__ import annotations
+                    //
+                    // from typing import Final, TYPE_CHECKING
+                    //
+                    // Const: Final[dict] = {}
+                    // ```
+                    let edit = if type_checking.statement(semantic) == import.statement {
+                        None
+                    } else {
+                        Some(Edit::range_replacement(
+                            self.locator.slice(type_checking.range()).to_string(),
+                            type_checking.range(),
+                        ))
+                    };
+                    (edit, type_checking.into_name())
+                } else {
+                    // Special-case: if the `TYPE_CHECKING` symbol would be added to the same import
+                    // we're modifying, import it as a separate import statement. For example, here,
+                    // we're concurrently removing `Final` and adding `TYPE_CHECKING`, so it's easier to
+                    // use a separate import statement:
+                    // ```python
+                    // from __future__ import annotations
+                    //
+                    // from typing import Final
+                    //
+                    // Const: Final[dict] = {}
+                    // ```
+                    let (edit, name) = self.import_symbol(
+                        &ImportRequest::import_from("typing", "TYPE_CHECKING"),
+                        at,
+                        Some(import.statement),
+                        semantic,
+                    )?;
+                    (Some(edit), name)
+                };
 
-        Ok(TypingImportEdit {
-            type_checking_edit,
-            add_import_edit,
-        })
+            // Add the import to a new `TYPE_CHECKING` block.
+            Ok(TypingImportEdit {
+                type_checking_edit,
+                add_import_edit: self.add_type_checking_block(
+                    &format!(
+                        "{}if {type_checking}:{}{}",
+                        self.stylist.line_ending().as_str(),
+                        self.stylist.line_ending().as_str(),
+                        indent(&content, self.stylist.indentation())
+                    ),
+                    at,
+                )?,
+            })
+        }
     }
 
     /// Find a reference to `typing.TYPE_CHECKING`.
