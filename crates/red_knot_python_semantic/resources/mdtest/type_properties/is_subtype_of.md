@@ -449,5 +449,31 @@ static_assert(not is_subtype_of(Intersection[Unknown, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Unknown]))
 ```
 
+## `bool` is a subtype of `AlwaysTruthy | AlwaysFalsy`
+
+`bool` is equivalent to `Literal[True] | Literal[False]`. `Literal[True]` is a subtype of
+`AlwaysTruthy` and `Literal[False]` is a subtype of `AlwaysFalsy`; it therefore stands to reason
+that `bool` is a subtype of `AlwaysTruthy | AlwaysFalsy`.
+
+```py
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert, Not, is_disjoint_from
+from typing_extensions import Literal
+
+static_assert(is_subtype_of(bool, AlwaysTruthy | AlwaysFalsy))
+
+# the inverse also applies -- TODO: this should pass!
+# See the TODO comments in the `Type::Intersection` branch of `Type::is_disjoint_from()`.
+static_assert(is_disjoint_from(bool, Not[AlwaysTruthy | AlwaysFalsy]))  # error: [static-assert-error]
+
+# `Type::is_subtype_of` delegates many questions of `bool` subtyping to `int`,
+# but set-theoretic types like intersections and unions are still handled differently to `int`
+static_assert(is_subtype_of(Literal[True], Not[Literal[2]]))
+static_assert(is_subtype_of(bool, Not[Literal[2]]))
+static_assert(is_subtype_of(Literal[True], bool | None))
+static_assert(is_subtype_of(bool, bool | None))
+
+static_assert(not is_subtype_of(int, Not[Literal[2]]))
+```
+
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
