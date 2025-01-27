@@ -18,7 +18,7 @@ pub(crate) enum ConstraintNode<'db> {
 }
 
 /// Pattern kinds for which we support type narrowing and/or static visibility analysis.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub(crate) enum PatternConstraintKind<'db> {
     Singleton(Singleton, Option<Expression<'db>>),
     Value(Expression<'db>, Option<Expression<'db>>),
@@ -28,10 +28,8 @@ pub(crate) enum PatternConstraintKind<'db> {
 
 #[salsa::tracked]
 pub(crate) struct PatternConstraint<'db> {
-    #[id]
     pub(crate) file: File,
 
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     #[no_eq]

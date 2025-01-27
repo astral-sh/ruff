@@ -18,7 +18,7 @@ use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
-    let interned_name = ModuleNameIngredient::new(db, module_name);
+    let interned_name = ModuleNameIngredient::new(db, module_name.clone());
 
     resolve_module_query(db, interned_name)
 }

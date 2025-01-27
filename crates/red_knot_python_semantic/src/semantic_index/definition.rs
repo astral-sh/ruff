@@ -25,15 +25,12 @@ use crate::Db;
 #[salsa::tracked]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
-    #[id]
     pub(crate) file: File,
 
     /// The scope in which the definition occurs.
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The symbol defined.
-    #[id]
     pub(crate) symbol: ScopedSymbolId,
 
     #[no_eq]
@@ -435,7 +432,7 @@ impl DefinitionCategory {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
     ImportFrom(ImportFromDefinitionKind),
@@ -540,7 +537,7 @@ impl DefinitionKind<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
     Sequence(Unpack<'db>),
     Name,
@@ -555,7 +552,7 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 #[allow(dead_code)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
@@ -573,7 +570,7 @@ impl MatchPatternDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ComprehensionDefinitionKind {
     iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::ExprName>,
@@ -599,7 +596,7 @@ impl ComprehensionDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
@@ -615,7 +612,7 @@ impl ImportFromDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct AssignmentDefinitionKind<'db> {
     target: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
@@ -641,7 +638,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct WithItemDefinitionKind {
     node: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::ExprName>,
@@ -662,7 +659,7 @@ impl WithItemDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ForStmtDefinitionKind<'db> {
     target: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -693,7 +690,7 @@ impl<'db> ForStmtDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ExceptHandlerDefinitionKind {
     handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
     is_star: bool,

@@ -1134,7 +1134,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
-            &name.id,
+            name.id.clone(),
             function_kind,
             body_scope,
             decorator_tys.into_boxed_slice(),
@@ -1362,7 +1362,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class = Class::new(self.db(), &name.id, body_scope, maybe_known_class);
+        let class = Class::new(self.db(), name.id.clone(), body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);
 
         self.add_declaration_with_binding(
@@ -1419,7 +1419,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::new(
                 self.db(),
-                &type_alias.name.as_name_expr().unwrap().id,
+                type_alias.name.as_name_expr().unwrap().id.clone(),
                 rhs_scope,
             )));
 
