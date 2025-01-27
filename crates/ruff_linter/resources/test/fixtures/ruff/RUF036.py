@@ -25,6 +25,30 @@ def func6(arg: U[None, None, int]):
     ...
 
 
+def func7() -> U[
+    None,
+    # comment
+    int
+]: 
+    ...
+
+
+def func8(x: None | U[None ,int]):
+    ...
+
+
+def func9(x: int | (str | None) | list):
+    ...
+
+
+def func10(x: U[int, U[None, list | set]]):
+    ...
+
+
+def func11(x: None | int) -> None | int:
+    ...
+
+
 # Ok
 def good_func1(arg: int | None): 
     ...
