@@ -435,6 +435,8 @@ impl Transformer for QuoteAnnotator<'_> {
     }
 }
 
+/// A [`Transformer`] class that rewrites all strings in an expression
+/// to use a specified quotation style
 #[derive(Debug)]
 struct QuoteRewriter {
     preferred_inner_quote: Quote,
