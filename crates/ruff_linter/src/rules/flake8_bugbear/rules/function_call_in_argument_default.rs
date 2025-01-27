@@ -106,7 +106,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
             Expr::Call(ast::ExprCall { func, .. }) => {
                 if !is_mutable_func(func, self.semantic)
                     && !is_immutable_func(func, self.semantic, self.extend_immutable_calls)
-                    && !is_immutable_newtype_call(func, self.semantic, &self.extend_immutable_calls)
+                    && !is_immutable_newtype_call(func, self.semantic, self.extend_immutable_calls)
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
