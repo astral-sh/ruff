@@ -80,7 +80,7 @@ enum Replacement {
 }
 
 /// AIR302
-pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn airflow_3_removal_expr(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -117,7 +117,10 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
 }
 
 /// AIR302
-pub(crate) fn removed_in_3_function_def(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn airflow_3_removal_function_def(
+    checker: &mut Checker,
+    function_def: &StmtFunctionDef,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -154,7 +157,9 @@ const REMOVED_CONTEXT_KEYS: [&str; 12] = [
 ///     pass
 /// ```
 fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionDef) {
-    if !is_airflow_task(function_def, checker.semantic()) {
+    if !is_airflow_task_function_def(function_def, checker.semantic())
+        && !is_execute_method_inherits_from_airflow_operator(function_def, checker.semantic())
+    {
         return;
     }
 
@@ -346,7 +351,7 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
 ///     context.get("conf")  # 'conf' is removed in Airflow 3.0
 /// ```
 fn check_context_key_usage_in_call(checker: &mut Checker, call_expr: &ExprCall) {
-    if !in_airflow_task_function(checker.semantic()) {
+    if !in_airflow_task_function_def(checker.semantic()) {
         return;
     }
 
@@ -395,7 +400,7 @@ fn check_context_key_usage_in_call(checker: &mut Checker, call_expr: &ExprCall) 
 /// Check if a subscript expression accesses a removed Airflow context variable.
 /// If a removed key is found, push a corresponding diagnostic.
 fn check_context_key_usage_in_subscript(checker: &mut Checker, subscript: &ExprSubscript) {
-    if !in_airflow_task_function(checker.semantic()) {
+    if !in_airflow_task_function_def(checker.semantic()) {
         return;
     }
 
@@ -1059,20 +1064,52 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
 
 /// Returns `true` if the current statement hierarchy has a function that's decorated with
 /// `@airflow.decorators.task`.
-fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
+fn in_airflow_task_function_def(semantic: &SemanticModel) -> bool {
     semantic
         .current_statements()
         .find_map(|stmt| stmt.as_function_def_stmt())
-        .is_some_and(|function_def| is_airflow_task(function_def, semantic))
+        .is_some_and(|function_def| is_airflow_task_function_def(function_def, semantic))
 }
 
 /// Returns `true` if the given function is decorated with `@airflow.decorators.task`.
-fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+fn is_airflow_task_function_def(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
+            })
+    })
+}
+
+/// Check it's "execute" method inherits from Airflow base operator
+///
+/// For example:
+///
+/// ```python
+/// from airflow.models.baseoperator import BaseOperator
+///
+/// class CustomOperator(BaseOperator):
+///     def execute(self):
+///         pass
+/// ```
+fn is_execute_method_inherits_from_airflow_operator(
+    function_def: &StmtFunctionDef,
+    semantic: &SemanticModel,
+) -> bool {
+    if function_def.name.as_str() != "execute" {
+        return false;
+    }
+
+    let ScopeKind::Class(class_def) = semantic.current_scope().kind else {
+        return false;
+    };
+
+    class_def.bases().iter().any(|class_base| {
+        semantic
+            .resolve_qualified_name(class_base)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
             })
     })
 }
