@@ -1420,25 +1420,33 @@ bitflags! {
 
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for a string literal.
+///
+/// ## Notes on usage
+///
+/// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
+/// from an existing string literal, consider passing along the [`StringLiteral::flags`] field or
+/// the result of the [`StringLiteralValue::flags`] method. If you don't have an existing string but
+/// have a `Checker` from the `ruff_linter` crate available, consider using
+/// `Checker::default_string_flags` to create instances of this struct; this method will properly
+/// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
+/// public constructor [`StringLiteralFlags::new`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
     /// Construct a new [`StringLiteralFlags`] with `quote_style`.
     ///
-    /// If you're using a [`Generator`](../ruff_python_codegen/struct.Generator.html) to generate a
-    /// fix from an existing string literal, consider passing along the [`StringLiteral::flags`]
-    /// field or the result of the [`StringLiteralValue::flags`] method. If you don't have an
-    /// existing string but have a [`Checker`](../ruff_linter/checkers/ast/struct.Checker.html)
-    /// available, consider using [`Checker::default_string_flags`], which will properly handle
-    /// surrounding f-strings.
+    /// Note that the returned flags will not have the triple-quoting or prefix flags set. See
+    /// [`StringLiteralFlags::with_triple_quotes`] and [`StringLiteralFlags::with_prefix`] for
+    /// respective ways of setting these flags.
     ///
-    /// [`Checker::default_string_flags`]:
-    /// ../ruff_linter/checkers/ast/struct.Checker.html#method.default_string_flags
+    /// See the documentation for [`StringLiteralFlags`] for caveats on this constructor,
+    /// and situations in which alternative ways to construct this struct should be used.
     pub fn new(quote_style: Quote) -> Self {
         Self::empty().with_quote_style(quote_style)
     }
 
+    /// Private-to-the-crate method for creating a new [`StringLiteralFlags`].
     pub(crate) fn empty() -> Self {
         Self(StringLiteralFlagsInner::empty())
     }
