@@ -90,9 +90,9 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
 mod print_arguments {
     use itertools::Itertools;
     use ruff_python_ast::{
-        Arguments, ConversionFlag, Expr, ExprFString, ExprStringLiteral, FString, FStringElement,
-        FStringElements, FStringExpressionElement, FStringFlags, FStringLiteralElement,
-        FStringValue, StringLiteral, StringLiteralFlags, StringLiteralValue,
+        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement, FStringElements,
+        FStringExpressionElement, FStringFlags, FStringLiteralElement, FStringValue, StringLiteral,
+        StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
 
@@ -202,13 +202,10 @@ mod print_arguments {
             })
             .join(&sep_string);
 
-        Some(Expr::StringLiteral(ExprStringLiteral {
+        Some(Expr::from(StringLiteral {
+            value: combined_string.into(),
+            flags,
             range: TextRange::default(),
-            value: StringLiteralValue::single(StringLiteral {
-                value: combined_string.into(),
-                flags,
-                range: TextRange::default(),
-            }),
         }))
     }
 

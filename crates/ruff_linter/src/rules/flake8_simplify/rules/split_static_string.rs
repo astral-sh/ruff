@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringLiteral,
-    StringLiteralFlags, StringLiteralValue, UnaryOp,
+    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
+    StringLiteralValue, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -120,13 +120,10 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
         elts: elts
             .iter()
             .map(|elt| {
-                Expr::StringLiteral(ExprStringLiteral {
-                    value: StringLiteralValue::single(StringLiteral {
-                        value: Box::from(*elt),
-                        range: TextRange::default(),
-                        flags,
-                    }),
+                Expr::from(StringLiteral {
+                    value: Box::from(*elt),
                     range: TextRange::default(),
+                    flags,
                 })
             })
             .collect(),
