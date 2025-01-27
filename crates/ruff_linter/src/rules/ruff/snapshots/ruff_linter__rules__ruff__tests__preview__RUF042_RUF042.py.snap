@@ -1,0 +1,770 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF042.py:9:22: RUF042 [*] Unnecessary intermediate representation
+   |
+ 7 | ### Lists
+ 8 |
+ 9 | def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^^^ RUF042
+10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+6  6  | 
+7  7  | ### Lists
+8  8  | 
+9     |-def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+   9  |+def f(l: list[Any]): l.append("append")                 # `l.append("append")` (safe)
+10 10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+11 11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+12 12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+
+RUF042.py:10:22: RUF042 [*] Unnecessary intermediate representation
+   |
+ 9 | def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^^ RUF042
+11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+7  7  | ### Lists
+8  8  | 
+9  9  | def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+10    |-def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+   10 |+def f(l: list[Any]): l.append("append")                  # `l.append("append")` (safe)
+11 11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+12 12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+13 13 | 
+
+RUF042.py:11:22: RUF042 [*] Unnecessary intermediate representation
+   |
+ 9 | def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^^ RUF042
+12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+8  8  | 
+9  9  | def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+10 10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+11    |-def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   11 |+def f(l: list[Any]): l.append("append")                  # `l.append("append")` (safe)
+12 12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+13 13 | 
+14 14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+
+RUF042.py:12:22: RUF042 [*] Unnecessary intermediate representation
+   |
+10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^^ RUF042
+13 |
+14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+9  9  | def f(l: list[Any]): l.extend(("append",))                 # `l.append("append")` (safe)
+10 10 | def f(l: list[Any]): l.extend(["append"])                  # `l.append("append")` (safe)
+11 11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+12    |-def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+   12 |+def f(l: list[Any]): l.append("append")                  # `l.append("append")` (safe)
+13 13 | 
+14 14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+15 15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+
+RUF042.py:14:22: RUF042 [*] Unnecessary intermediate representation
+   |
+12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+13 |
+14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^^ RUF042
+15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+11 11 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+12 12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+13 13 | 
+14    |-def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+   14 |+def f(l: list[Any]): l.append("append")                      # `l.append("append")` (safe)
+15 15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+16 16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+17 17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+
+RUF042.py:15:22: RUF042 [*] Unnecessary intermediate representation
+   |
+14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^ RUF042
+16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+12 12 | def f(l: list[Any]): l.extend({"append"})                  # `l.append("append")` (safe)
+13 13 | 
+14 14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+15    |-def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+   15 |+def f(l: list[Any]): l.append("append")                       # `l.append("append")` (safe)
+16 16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+17 17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+18 18 | 
+
+RUF042.py:16:22: RUF042 [*] Unnecessary intermediate representation
+   |
+14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^ RUF042
+17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+13 13 | 
+14 14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+15 15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+16    |-def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+   16 |+def f(l: list[Any]): l.append("append")                       # `l.append("append")` (safe)
+17 17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+18 18 | 
+19 19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+
+RUF042.py:17:22: RUF042 [*] Unnecessary intermediate representation
+   |
+15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^ RUF042
+18 |
+19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+   |
+   = help: Replace with `.append()`
+
+ℹ Safe fix
+14 14 | def f(l: list[Any]): l += ("append",)                      # `l.append("append")` (safe)
+15 15 | def f(l: list[Any]): l += ["append"]                       # `l.append("append")` (safe)
+16 16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+17    |-def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+   17 |+def f(l: list[Any]): l.append("append")                    # `l.append("append")` (safe)
+18 18 | 
+19 19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+20 20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+
+RUF042.py:19:22: RUF042 [*] Unnecessary intermediate representation
+   |
+17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+18 |
+19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^ RUF042
+20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+   |
+   = help: Replace with `.extend()`
+
+ℹ Safe fix
+16 16 | def f(l: list[Any]): l += {"append"}                       # `l.append("append")` (safe)
+17 17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+18 18 | 
+19    |-def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+   19 |+def f(l: list[Any]): l.extend(("ext", "end"))                   # `l.extend(("ext", "end"))` (safe)
+20 20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+21 21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+
+RUF042.py:20:22: RUF042 [*] Unnecessary intermediate representation
+   |
+19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^ RUF042
+21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+   |
+   = help: Replace with `.extend()`
+
+ℹ Safe fix
+17 17 | def f(l: list[Any]): l += {"append": 0}                    # `l.append("append")` (safe)
+18 18 | 
+19 19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+20    |-def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+   20 |+def f(l: list[Any]): l.extend(("ext", "end"))                   # `l.extend(("ext", "end"))` (safe)
+21 21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+23 23 | 
+
+RUF042.py:21:22: RUF042 [*] Unnecessary intermediate representation
+   |
+19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^ RUF042
+22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+   |
+   = help: Replace with `.extend()`
+
+ℹ Safe fix
+18 18 | 
+19 19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+20 20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+21    |-def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+   21 |+def f(l: list[Any]): l.extend(("ext", "end"))                   # `l.extend(("ext", "end"))` (safe)
+22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+23 23 | 
+24 24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+
+RUF042.py:22:22: RUF042 [*] Unnecessary intermediate representation
+   |
+20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF042
+23 |
+24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+   |
+   = help: Replace with `.extend()`
+
+ℹ Safe fix
+19 19 | def f(l: list[Any]): l += ("ext", "end")                   # `l.extend(("ext", "end"))` (safe)
+20 20 | def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "end"))` (safe)
+21 21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+22    |-def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+   22 |+def f(l: list[Any]): l.extend(("ext", "end"))             # `l.extend(("ext", "end"))` (safe)
+23 23 | 
+24 24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+25 25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
+
+RUF042.py:24:22: RUF042 [*] Unnecessary intermediate representation
+   |
+22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+23 |
+24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+   |                      ^^^^^^^^^^^^^^^ RUF042
+25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
+   |
+   = help: Replace with `.extend()`
+
+ℹ Safe fix
+21 21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
+22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+23 23 | 
+24    |-def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+   24 |+def f(l: list[Any]): l.extend(extend)                       # `l.extend(extend)` (safe)
+25 25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
+26 26 | 
+27 27 | 
+
+RUF042.py:25:22: RUF042 [*] Unnecessary intermediate representation
+   |
+24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
+   |                      ^^^^^^^^^^^^^^ RUF042
+   |
+   = help: Replace with `.extend()`
+
+ℹ Safe fix
+22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
+23 23 | 
+24 24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+25    |-def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
+   25 |+def f(l: list[Any]): l.extend(extend)                        # `l.extend(extend)` (safe)
+26 26 | 
+27 27 | 
+28 28 | ### Sets
+
+RUF042.py:29:21: RUF042 [*] Unnecessary intermediate representation
+   |
+28 | ### Sets
+29 | def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^ RUF042
+30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+   |
+   = help: Replace with `.add()`
+
+ℹ Safe fix
+26 26 | 
+27 27 | 
+28 28 | ### Sets
+29    |-def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+   29 |+def f(s: set[Any]): s.add("add")                     # `s.add("add")` (safe)
+30 30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+31 31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+32 32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+
+RUF042.py:30:21: RUF042 [*] Unnecessary intermediate representation
+   |
+28 | ### Sets
+29 | def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^ RUF042
+31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+   |
+   = help: Replace with `.add()`
+
+ℹ Safe fix
+27 27 | 
+28 28 | ### Sets
+29 29 | def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+30    |-def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+   30 |+def f(s: set[Any]): s.add("add")                      # `s.add("add")` (safe)
+31 31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+32 32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+33 33 | 
+
+RUF042.py:31:21: RUF042 [*] Unnecessary intermediate representation
+   |
+29 | def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^ RUF042
+32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+   |
+   = help: Replace with `.add()`
+
+ℹ Safe fix
+28 28 | ### Sets
+29 29 | def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+30 30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+31    |-def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+   31 |+def f(s: set[Any]): s.add("add")                      # `s.add("add")` (safe)
+32 32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+33 33 | 
+34 34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+
+RUF042.py:32:21: RUF042 [*] Unnecessary intermediate representation
+   |
+30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^^ RUF042
+33 |
+34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+   |
+   = help: Replace with `.add()`
+
+ℹ Safe fix
+29 29 | def f(s: set[Any]): s.update(("add",))                     # `s.add("add")` (safe)
+30 30 | def f(s: set[Any]): s.update(["add"])                      # `s.add("add")` (safe)
+31 31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+32    |-def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+   32 |+def f(s: set[Any]): s.add("add")                   # `s.add("add")` (safe)
+33 33 | 
+34 34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+35 35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+
+RUF042.py:34:21: RUF042 [*] Unnecessary intermediate representation
+   |
+32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+33 |
+34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF042
+35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+   |
+   = help: Replace with `.discard()`
+
+ℹ Safe fix
+31 31 | def f(s: set[Any]): s.update({"add"})                      # `s.add("add")` (safe)
+32 32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+33 33 | 
+34    |-def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+   34 |+def f(s: set[Any]): s.discard("discard")      # `s.discard("discard")` (safe)
+35 35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+36 36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+37 37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+
+RUF042.py:35:21: RUF042 [*] Unnecessary intermediate representation
+   |
+34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF042
+36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+   |
+   = help: Replace with `.discard()`
+
+ℹ Safe fix
+32 32 | def f(s: set[Any]): s.update({"add": 0})                   # `s.add("add")` (safe)
+33 33 | 
+34 34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+35    |-def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+   35 |+def f(s: set[Any]): s.discard("discard")       # `s.discard("discard")` (safe)
+36 36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+37 37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+38 38 | 
+
+RUF042.py:36:21: RUF042 [*] Unnecessary intermediate representation
+   |
+34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF042
+37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+   |
+   = help: Replace with `.discard()`
+
+ℹ Safe fix
+33 33 | 
+34 34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+35 35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+36    |-def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+   36 |+def f(s: set[Any]): s.discard("discard")       # `s.discard("discard")` (safe)
+37 37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+38 38 | 
+39 39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+
+RUF042.py:37:21: RUF042 [*] Unnecessary intermediate representation
+   |
+35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF042
+38 |
+39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+   |
+   = help: Replace with `.discard()`
+
+ℹ Safe fix
+34 34 | def f(s: set[Any]): s.difference_update(("discard",))      # `s.discard("discard")` (safe)
+35 35 | def f(s: set[Any]): s.difference_update(["discard"])       # `s.discard("discard")` (safe)
+36 36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+37    |-def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+   37 |+def f(s: set[Any]): s.discard("discard")    # `s.discard("discard")` (safe)
+38 38 | 
+39 39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+40 40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+
+RUF042.py:39:21: RUF042 [*] Unnecessary intermediate representation
+   |
+37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+38 |
+39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+   |                     ^^^^^^^^^^^^ RUF042
+40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+   |
+   = help: Replace with `.add()`
+
+ℹ Safe fix
+36 36 | def f(s: set[Any]): s.difference_update({"discard"})       # `s.discard("discard")` (safe)
+37 37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+38 38 | 
+39    |-def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+   39 |+def f(s: set[Any]): s.add("add")                           # `s.add("add")`          (safe)
+40 40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+41 41 | 
+42 42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+
+RUF042.py:40:21: RUF042 [*] Unnecessary intermediate representation
+   |
+39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+   |                     ^^^^^^^^^^^^^^^^ RUF042
+41 |
+42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+   |
+   = help: Replace with `.discard()`
+
+ℹ Safe fix
+37 37 | def f(s: set[Any]): s.difference_update({"discard": 0})    # `s.discard("discard")` (safe)
+38 38 | 
+39 39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+40    |-def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+   40 |+def f(s: set[Any]): s.discard("discard")                       # `s.discard("discard"))` (safe)
+41 41 | 
+42 42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+43 43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+
+RUF042.py:42:21: RUF042 [*] Unnecessary intermediate representation
+   |
+40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+41 |
+42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF042
+43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+39 39 | def f(s: set[Any]): s |= {"add"}                           # `s.add("add")`          (safe)
+40 40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+41 41 | 
+42    |-def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+   42 |+def f(s: set[Any]): s.update(("upd", "ate"))                    # `s.update(("upd", "ate"))`            (safe)
+43 43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+44 44 | 
+45 45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+
+RUF042.py:43:21: RUF042 [*] Unnecessary intermediate representation
+   |
+42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF042
+44 |
+45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+   |
+   = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+40 40 | def f(s: set[Any]): s -= {"discard"}                       # `s.discard("discard"))` (safe)
+41 41 | 
+42 42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+43    |-def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+   43 |+def f(s: set[Any]): s.difference_update(("upd", "ate"))                    # `s.difference_update(("upd", "ate"))` (safe)
+44 44 | 
+45 45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+46 46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+
+RUF042.py:45:21: RUF042 [*] Unnecessary intermediate representation
+   |
+43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+44 |
+45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF042
+46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+42 42 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate"))`            (safe)
+43 43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+44 44 | 
+45    |-def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+   45 |+def f(s: set[Any]): s.update(("upd", "ate"))                    # `s.update(("upd", "ate")`                       (safe)
+46 46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47 47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+48 48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+
+RUF042.py:46:21: RUF042 [*] Unnecessary intermediate representation
+   |
+45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF042
+47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+   |
+   = help: Replace with `.intersection_update()`
+
+ℹ Safe fix
+43 43 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))` (safe)
+44 44 | 
+45 45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+46    |-def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+   46 |+def f(s: set[Any]): s.intersection_update(("upd", "ate"))                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47 47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+48 48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+49 49 | 
+
+RUF042.py:47:21: RUF042 [*] Unnecessary intermediate representation
+   |
+45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF042
+48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+   |
+   = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+44 44 | 
+45 45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+46 46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47    |-def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+   47 |+def f(s: set[Any]): s.difference_update(("upd", "ate"))                    # `s.difference_update(("upd", "ate"))`           (safe)
+48 48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+49 49 | 
+50 50 | def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+
+RUF042.py:48:21: RUF042 [*] Unnecessary intermediate representation
+   |
+46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF042
+49 |
+50 | def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+   |
+   = help: Replace with `.symmetric_difference_update()`
+
+ℹ Safe fix
+45 45 | def f(s: set[Any]): s |= {"upd", "ate"}                    # `s.update(("upd", "ate")`                       (safe)
+46 46 | def f(s: set[Any]): s &= {"upd", "ate"}                    # `s.intersection_update(("upd", "ate"))`         (safe)
+47 47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+48    |-def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+   48 |+def f(s: set[Any]): s.symmetric_difference_update(("upd", "ate"))                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+49 49 | 
+50 50 | def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+51 51 | def f(s: set[Any]): s -= {*update}                         # `s.difference_update(update)` (safe)
+
+RUF042.py:50:21: RUF042 [*] Unnecessary intermediate representation
+   |
+48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+49 |
+50 | def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+   |                     ^^^^^^^^^^^^^^ RUF042
+51 | def f(s: set[Any]): s -= {*update}                         # `s.difference_update(update)` (safe)
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+47 47 | def f(s: set[Any]): s -= {"upd", "ate"}                    # `s.difference_update(("upd", "ate"))`           (safe)
+48 48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+49 49 | 
+50    |-def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+   50 |+def f(s: set[Any]): s.update(update)                         # `s.update(update)`            (safe)
+51 51 | def f(s: set[Any]): s -= {*update}                         # `s.difference_update(update)` (safe)
+52 52 | 
+53 53 | 
+
+RUF042.py:51:21: RUF042 [*] Unnecessary intermediate representation
+   |
+50 | def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+51 | def f(s: set[Any]): s -= {*update}                         # `s.difference_update(update)` (safe)
+   |                     ^^^^^^^^^^^^^^ RUF042
+   |
+   = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+48 48 | def f(s: set[Any]): s ^= {"upd", "ate"}                    # `s.symmetric_difference_update(("upd", "ate"))` (safe)
+49 49 | 
+50 50 | def f(s: set[Any]): s |= {*update}                         # `s.update(update)`            (safe)
+51    |-def f(s: set[Any]): s -= {*update}                         # `s.difference_update(update)` (safe)
+   51 |+def f(s: set[Any]): s.difference_update(update)                         # `s.difference_update(update)` (safe)
+52 52 | 
+53 53 | 
+54 54 | ### Dictionaries
+
+RUF042.py:56:27: RUF042 [*] Unnecessary intermediate representation
+   |
+54 | ### Dictionaries
+55 |
+56 | def f(d: dict[Any, Any]): d.update(**update)               # `d.update(update)` (safe)
+   |                           ^^^^^^^^^^^^^^^^^^ RUF042
+57 | def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+53 53 | 
+54 54 | ### Dictionaries
+55 55 | 
+56    |-def f(d: dict[Any, Any]): d.update(**update)               # `d.update(update)` (safe)
+   56 |+def f(d: dict[Any, Any]): d.update(update)               # `d.update(update)` (safe)
+57 57 | def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+58 58 | 
+59 59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+
+RUF042.py:57:27: RUF042 [*] Unnecessary intermediate representation
+   |
+56 | def f(d: dict[Any, Any]): d.update(**update)               # `d.update(update)` (safe)
+57 | def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+   |                           ^^^^^^^^^^^^^^^^^^^^ RUF042
+58 |
+59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+54 54 | ### Dictionaries
+55 55 | 
+56 56 | def f(d: dict[Any, Any]): d.update(**update)               # `d.update(update)` (safe)
+57    |-def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+   57 |+def f(d: dict[Any, Any]): d.update(update)             # `d.update(update)` (safe)
+58 58 | 
+59 59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+60 60 | def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+
+RUF042.py:59:27: RUF042 [*] Unnecessary intermediate representation
+   |
+57 | def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+58 |
+59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+   |                           ^^^^^^^^^^^^^^^^^^^^^ RUF042
+60 | def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+   |
+   = help: Replace with item assignment
+
+ℹ Safe fix
+56 56 | def f(d: dict[Any, Any]): d.update(**update)               # `d.update(update)` (safe)
+57 57 | def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+58 58 | 
+59    |-def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+   59 |+def f(d: dict[Any, Any]): d["et"] = "s"            # `d["s"] = "et"` (safe)
+60 60 | def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+61 61 | 
+62 62 | def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+
+RUF042.py:60:27: RUF042 [*] Unnecessary intermediate representation
+   |
+59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+60 | def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+   |                           ^^^^^^^^^^^^^^^^ RUF042
+61 |
+62 | def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+   |
+   = help: Replace with item assignment
+
+ℹ Safe fix
+57 57 | def f(d: dict[Any, Any]): d.update({**update})             # `d.update(update)` (safe)
+58 58 | 
+59 59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+60    |-def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+   60 |+def f(d: dict[Any, Any]): d["s"] = "et"                 # `d["s"] = "et"` (safe)
+61 61 | 
+62 62 | def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+63 63 | 
+
+RUF042.py:62:27: RUF042 [*] Unnecessary intermediate representation
+   |
+60 | def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+61 |
+62 | def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+   |                           ^^^^^^^^^^^^^^^^ RUF042
+63 |
+64 | def f(d: dict[Any, Any]): d |= {**update}                  # `d.update(update)` (safe)
+   |
+   = help: Replace with item assignment
+
+ℹ Safe fix
+59 59 | def f(d: dict[Any, Any]): d.update({"s": "et"})            # `d["s"] = "et"` (safe)
+60 60 | def f(d: dict[Any, Any]): d.update(s="et")                 # `d["s"] = "et"` (safe)
+61 61 | 
+62    |-def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+   62 |+def f(d: dict[Any, Any]): d["et"] = "s"                 # `d["s"] = "et"` (safe)
+63 63 | 
+64 64 | def f(d: dict[Any, Any]): d |= {**update}                  # `d.update(update)` (safe)
+65 65 | 
+
+RUF042.py:64:27: RUF042 [*] Unnecessary intermediate representation
+   |
+62 | def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+63 |
+64 | def f(d: dict[Any, Any]): d |= {**update}                  # `d.update(update)` (safe)
+   |                           ^^^^^^^^^^^^^^^ RUF042
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+61 61 | 
+62 62 | def f(d: dict[Any, Any]): d |= {"s": "et"}                 # `d["s"] = "et"` (safe)
+63 63 | 
+64    |-def f(d: dict[Any, Any]): d |= {**update}                  # `d.update(update)` (safe)
+   64 |+def f(d: dict[Any, Any]): d.update(update)                  # `d.update(update)` (safe)
+65 65 | 
+66 66 | 
+67 67 | ##### No errors
