@@ -1714,6 +1714,16 @@ impl BytesLiteralValue {
     pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
+
+    /// Returns the [`BytesLiteralFlags`] associated with this literal.
+    ///
+    /// For an implicitly concatenated literal, it returns the flags for the first literal.
+    pub fn flags(&self) -> BytesLiteralFlags {
+        self.iter()
+            .next()
+            .expect("There should always be at least one literal in an `ExprBytesLiteral` node")
+            .flags
+    }
 }
 
 impl<'a> IntoIterator for &'a BytesLiteralValue {
