@@ -1634,14 +1634,14 @@ impl Debug for ConcatenatedStringLiteral {
 
 /// An AST node that represents either a single bytes literal or an implicitly
 /// concatenated bytes literals.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ExprBytesLiteral {
     pub range: TextRange,
     pub value: BytesLiteralValue,
 }
 
 /// The value representing a [`ExprBytesLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BytesLiteralValue {
     inner: BytesLiteralValueInner,
 }
@@ -1781,12 +1781,6 @@ enum BytesLiteralValueInner {
     Concatenated(Vec<BytesLiteral>),
 }
 
-impl Default for BytesLiteralValueInner {
-    fn default() -> Self {
-        Self::Single(BytesLiteral::default())
-    }
-}
-
 bitflags! {
     #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct BytesLiteralFlagsInner: u8 {
@@ -1815,10 +1809,33 @@ bitflags! {
 
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for a bytes literal.
-#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+///
+/// ## Notes on usage
+///
+/// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
+/// from an existing string literal, consider passing along the [`BytesLiteral::flags`] field or the
+/// result of the [`BytesLiteralValue::flags`] method. If you don't have an existing string but have
+/// a `Checker` from the `ruff_linter` crate available, consider using
+/// `Checker::default_bytes_flags` to create instances of this struct; this method will properly
+/// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
+/// public constructor [`BytesLiteralFlags::empty`] can be used.
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 
 impl BytesLiteralFlags {
+    /// Construct a new [`BytesLiteralFlags`] with **no flags set**.
+    ///
+    /// See [`BytesLiteralFlags::with_quote_style`], [`BytesLiteralFlags::with_triple_quotes`], and
+    /// [`BytesLiteralFlags::with_prefix`] for ways of setting the quote style (single or double),
+    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
+    ///
+    /// See the documentation for [`BytesLiteralFlags`] for additional caveats on this constructor,
+    /// and situations in which alternative ways to construct this struct should be used, especially
+    /// when writing lint rules.
+    pub fn empty() -> Self {
+        Self(BytesLiteralFlagsInner::empty())
+    }
+
     #[must_use]
     pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
         self.0
@@ -1904,7 +1921,7 @@ impl fmt::Debug for BytesLiteralFlags {
 
 /// An AST node that represents a single bytes literal which is part of an
 /// [`ExprBytesLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
     pub value: Box<[u8]>,
@@ -1930,7 +1947,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            flags: BytesLiteralFlags::default().with_invalid(),
+            flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
 }
@@ -2183,7 +2200,7 @@ impl From<AnyStringFlags> for BytesLiteralFlags {
                 value.prefix()
             )
         };
-        let new = BytesLiteralFlags::default()
+        let new = BytesLiteralFlags::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(bytestring_prefix);
         if value.is_triple_quoted() {

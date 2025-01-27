@@ -316,7 +316,7 @@ impl<'a> Checker<'a> {
     /// Return the default bytestring flags a generated `ByteStringLiteral` node should use, given
     /// where we are in the AST.
     pub(crate) fn default_bytes_flags(&self) -> ast::BytesLiteralFlags {
-        ast::BytesLiteralFlags::default().with_quote_style(self.preferred_quote())
+        ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
