@@ -430,7 +430,7 @@ jobs:
           name: ruff
           path: target/debug
 
-      - uses: dawidd6/action-download-artifact@v7
+      - uses: dawidd6/action-download-artifact@v8
         name: Download baseline Ruff binary
         with:
           name: ruff
