@@ -310,7 +310,7 @@ impl<'a> Checker<'a> {
     /// Return the default string flags a generated `StringLiteral` node should use, given where we
     /// are in the AST.
     pub(crate) fn default_string_flags(&self) -> ast::StringLiteralFlags {
-        ast::StringLiteralFlags::new(self.preferred_quote())
+        ast::StringLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of

@@ -1434,20 +1434,16 @@ bitflags! {
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
-    /// Construct a new [`StringLiteralFlags`] with `quote_style`.
+    /// Construct a new [`StringLiteralFlags`] with **no flags set**.
     ///
-    /// Note that the returned flags will not have the triple-quoting or prefix flags set. See
-    /// [`StringLiteralFlags::with_triple_quotes`] and [`StringLiteralFlags::with_prefix`] for
-    /// respective ways of setting these flags.
+    /// See [`StringLiteralFlags::with_quote_style`], [`StringLiteralFlags::with_triple_quotes`],
+    /// and [`StringLiteralFlags::with_prefix`] for ways of setting the quote style (single or
+    /// double), enabling triple quotes, and adding prefixes (such as `r` or `u`), respectively.
     ///
-    /// See the documentation for [`StringLiteralFlags`] for caveats on this constructor,
-    /// and situations in which alternative ways to construct this struct should be used.
-    pub fn new(quote_style: Quote) -> Self {
-        Self::empty().with_quote_style(quote_style)
-    }
-
-    /// Private-to-the-crate method for creating a new [`StringLiteralFlags`].
-    pub(crate) fn empty() -> Self {
+    /// See the documentation for [`StringLiteralFlags`] for additional caveats on this constructor,
+    /// and situations in which alternative ways to construct this struct should be used, especially
+    /// when writing lint rules.
+    pub fn empty() -> Self {
         Self(StringLiteralFlagsInner::empty())
     }
 
