@@ -24,7 +24,7 @@ use crate::fix::edits::add_argument;
 /// encoding. [PEP 597] recommends the use of `encoding="utf-8"` as a default,
 /// and suggests that it may become the default in future versions of Python.
 ///
-/// If a local-specific encoding is intended, use `encoding="local"`  on
+/// If a locale-specific encoding is intended, use `encoding="locale"`  on
 /// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
 /// to make the encoding explicit.
 ///
