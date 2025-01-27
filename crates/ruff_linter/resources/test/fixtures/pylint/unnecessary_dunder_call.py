@@ -48,6 +48,21 @@ x = -(-a).__add__(3)  # PLC2801
 # Calls
 print(a.__call__())  # PLC2801 (no fix, intentional)
 
+class Foo:
+    def __init__(self, v):
+        self.v = v
+
+    def __add__(self, other):
+        self.v += other
+        return self
+
+    def get_v(self):
+        return self.v
+
+foo = Foo(1)
+foo.__add__(2).get_v()  # PLC2801
+
+
 # Lambda expressions
 blah = lambda: a.__add__(1)  # PLC2801
 
@@ -72,13 +87,22 @@ print(next(gen))
 
 # Subscripts
 print({"a": a.__add__(1)}["a"])  # PLC2801
+# https://github.com/astral-sh/ruff/issues/15745
+print("x".__add__("y")[0])  # PLC2801
 
 # Starred
 print(*[a.__add__(1)])  # PLC2801
 
+list1 = [1, 2, 3]
+list2 = [4, 5, 6]
+print([*list1.__add__(list2)])  # PLC2801
+
 # Slices
 print([a.__add__(1), a.__sub__(1)][0:1])  # PLC2801
 
+# Attribute access
+# https://github.com/astral-sh/ruff/issues/15745
+print(1j.__add__(1.0).real) # PLC2801
 
 class Thing:
     def __init__(self, stuff: Any) -> None:
