@@ -1,10 +1,9 @@
-use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt, StmtAssign};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_immutable_func};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::{is_immutable_func, is_immutable_newtype_call};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -24,6 +23,9 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// If a field needs to be initialized with a mutable object, use the
 /// `field(default_factory=...)` pattern.
+///
+/// Attributes whose default arguments are `NewType` calls
+/// where the original type is immutable are ignored.
 ///
 /// ## Examples
 /// ```python
@@ -157,47 +159,4 @@ fn any_annotated(class_body: &[Stmt]) -> bool {
     class_body
         .iter()
         .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
-}
-
-pub(crate) fn is_immutable_newtype_call(
-    func: &Expr,
-    semantic: &SemanticModel,
-    extend_immutable_calls: &[QualifiedName],
-) -> bool {
-    let Expr::Name(name) = func else {
-        return false;
-    };
-
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    if !binding.kind.is_assignment() {
-        return false;
-    }
-
-    let Some(Stmt::Assign(StmtAssign { value, .. })) = binding.statement(semantic) else {
-        return false;
-    };
-
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
-        return false;
-    };
-
-    if !semantic.match_typing_expr(func, "NewType") {
-        return false;
-    }
-
-    if arguments.len() != 2 {
-        return false;
-    }
-
-    let Some(original_type) = arguments.find_argument_value("tp", 1) else {
-        return false;
-    };
-
-    is_immutable_annotation(original_type, semantic, extend_immutable_calls)
 }

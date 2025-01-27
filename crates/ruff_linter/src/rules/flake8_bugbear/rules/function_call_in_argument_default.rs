@@ -8,12 +8,11 @@ use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::{
-    is_immutable_annotation, is_immutable_func, is_mutable_func,
+    is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::is_immutable_newtype_call;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -23,12 +22,12 @@ use crate::rules::ruff::rules::is_immutable_newtype_call;
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
 ///
-/// Calls can be marked as an exception to this rule with the
-/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
+/// Parameters with immutable type annotations will be ignored by this rule.
+/// Those whose default arguments are `NewType` calls where the original type
+/// is immutable are also ignored.
 ///
-/// Arguments with immutable type annotations will be ignored by this rule.
-/// Types outside of the standard library can be marked as immutable with the
-/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option as well.
+/// Calls and types outside of the standard library can be marked as an exception
+/// to this rule with the [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Example
 ///
