@@ -79,7 +79,7 @@ impl Transformer for Normalizer {
 
                     if can_join {
                         string.value = ast::StringLiteralValue::single(ast::StringLiteral {
-                            value: string.value.to_str().to_string().into_boxed_str(),
+                            value: Box::from(string.value.to_str()),
                             range: string.range,
                             flags: StringLiteralFlags::empty(),
                         });
