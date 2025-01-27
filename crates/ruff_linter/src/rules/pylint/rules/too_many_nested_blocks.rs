@@ -1,8 +1,10 @@
-use ast::ExceptHandler;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_semantic::SemanticModel;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange};
+use std::{iter, ptr};
 
 use crate::checkers::ast::Checker;
 
@@ -37,8 +39,10 @@ impl Violation for TooManyNestedBlocks {
 
 /// PLR1702
 pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
+    let semantic = checker.semantic();
+
     // Only enforce nesting within functions or methods.
-    if !checker.semantic().current_scope().kind.is_function() {
+    if !semantic.current_scope().kind.is_function() {
         return;
     }
 
@@ -48,38 +52,49 @@ pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
+    if !current_stmt_is_first_nested_within_block(semantic) {
+        return;
+    }
+
     let max_nested_blocks = checker.settings.pylint.max_nested_blocks;
+
+    let Some(current_id) = semantic.current_statement_id() else {
+        return;
+    };
 
     // Traverse up the hierarchy, identifying the root node and counting the number of nested
     // blocks between the root and this leaf.
-    let (count, root_id) =
-        checker
-            .semantic()
+    let (count, encountered_root) =
+        semantic
             .current_statement_ids()
-            .fold((0, None), |(count, ancestor_id), id| {
-                let stmt = checker.semantic().statement(id);
+            .fold((0, false), |(count, encountered_root), id| {
+                let stmt = semantic.statement(id);
                 if is_nested_block(stmt) {
-                    (count + 1, Some(id))
+                    (count + 1, true)
                 } else {
-                    (count, ancestor_id)
+                    (count, encountered_root)
                 }
             });
 
-    let Some(root_id) = root_id else {
+    if !encountered_root {
         return;
-    };
+    }
 
     // If the number of nested blocks is less than the maximum, we don't want to emit a diagnostic.
     if count <= max_nested_blocks {
         return;
     }
 
+    let current_stmt_start = semantic.statement(current_id).start();
+    let current_stmt_line_start = checker.locator().line_start(current_stmt_start);
+    let indentation_range = TextRange::new(current_stmt_line_start, current_stmt_start);
+
     checker.diagnostics.push(Diagnostic::new(
         TooManyNestedBlocks {
             nested_blocks: count,
             max_nested_blocks,
         },
-        checker.semantic().statement(root_id).range(),
+        indentation_range,
     ));
 }
 
@@ -91,7 +106,7 @@ fn is_nested_block(stmt: &Stmt) -> bool {
     )
 }
 
-/// Returns `true` if the given statement is a leaf node.
+/// Returns `true` if the given statement is not a leaf node.
 fn has_nested_block(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
@@ -127,6 +142,54 @@ fn has_nested_block(stmt: &Stmt) -> bool {
                 || finalbody.iter().any(is_nested_block)
         }
         Stmt::With(ast::StmtWith { body, .. }) => body.iter().any(is_nested_block),
+        _ => false,
+    }
+}
+
+fn current_stmt_is_first_nested_within_block(semantic: &SemanticModel) -> bool {
+    let Some(parent) = semantic.current_statement_parent() else {
+        return false;
+    };
+    let current = semantic.current_statement();
+
+    let current_is_first_nested = |block: &Vec<Stmt>| {
+        let Some(first_nested) = block.iter().find(|stmt| is_nested_block(stmt)) else {
+            return false;
+        };
+
+        ptr::eq(first_nested, current)
+    };
+
+    match parent {
+        Stmt::With(ast::StmtWith { body, .. }) => current_is_first_nested(body),
+
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => iter::once(body)
+            .chain(elif_else_clauses.iter().map(|clause| &clause.body))
+            .any(current_is_first_nested),
+
+        Stmt::While(ast::StmtWhile { body, orelse, .. })
+        | Stmt::For(ast::StmtFor { body, orelse, .. }) => iter::once(body)
+            .chain(iter::once(orelse))
+            .any(current_is_first_nested),
+
+        Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => handlers
+            .iter()
+            .map(|ExceptHandler::ExceptHandler(handler)| &handler.body)
+            .chain(iter::once(body))
+            .chain(iter::once(orelse))
+            .chain(iter::once(finalbody))
+            .any(current_is_first_nested),
+
         _ => false,
     }
 }
