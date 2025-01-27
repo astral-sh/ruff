@@ -1,11 +1,12 @@
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, Stmt, StmtFor};
+use ruff_python_ast::{Expr, ExprName, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::TypingOnlyBindingsStatus;
-use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
+use ruff_python_semantic::{
+    Binding, BindingKind, ScopeId, SemanticModel, TypingOnlyBindingsStatus,
+};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// ## What it does
 /// Checks for the use of `IOBase.write` in a for loop.
@@ -52,31 +53,107 @@ impl AlwaysFixableViolation for ForLoopWrites {
     }
 }
 
-pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
-    if !for_stmt.orelse.is_empty() {
+pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+    if !matches!(binding.kind, BindingKind::LoopVar) {
+        return None;
+    }
+
+    let semantic = checker.semantic();
+
+    let Stmt::For(for_stmt) = binding.statement(semantic)? else {
+        return None;
+    };
+
+    if for_stmt.is_async {
+        return None;
+    }
+
+    let binding_names = binding_names(&for_stmt.target);
+
+    if !binding_names.first()?.range().contains_range(binding.range) {
+        return None;
+    }
+
+    for_loop_writes(checker, for_stmt, binding.scope, binding_names)
+}
+
+pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
+    // Loops with bindings are handled later.
+    if binding_names(&for_stmt.target).first().is_some() {
         return;
+    }
+
+    let scope_id = checker.semantic().scope_id;
+
+    if let Some(diagnostic) = for_loop_writes(checker, for_stmt, scope_id, vec![]) {
+        checker.diagnostics.push(diagnostic);
+    }
+}
+
+/// Find the subexpressions of a `for` loop target
+/// that are assigned to during iteration.
+///
+/// ```python
+/// for ((), [(a,), [[b]]], c.d, e[f], *[*g]) in h:
+///     #      ^      ^                   ^
+///     ...
+/// ```
+fn binding_names(parent: &Expr) -> Vec<&ExprName> {
+    fn collect_names<'a>(expr: &'a Expr, names: &mut Vec<&'a ExprName>) {
+        match expr {
+            Expr::Name(name) => names.push(name),
+
+            Expr::Starred(starred) => collect_names(starred.value.as_ref(), names),
+
+            Expr::List(list) => list
+                .elts
+                .iter()
+                .for_each(|element| collect_names(element, names)),
+
+            Expr::Tuple(tuple) => tuple
+                .elts
+                .iter()
+                .for_each(|element| collect_names(element, names)),
+
+            _ => {}
+        }
+    }
+
+    let mut names = vec![];
+    collect_names(parent, &mut names);
+    names
+}
+
+fn for_loop_writes(
+    checker: &Checker,
+    for_stmt: &StmtFor,
+    scope_id: ScopeId,
+    binding_names: Vec<&ExprName>,
+) -> Option<Diagnostic> {
+    if !for_stmt.orelse.is_empty() {
+        return None;
     }
     let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {
-        return;
+        return None;
     };
     let Expr::Call(call_expr) = stmt_expr.value.as_ref() else {
-        return;
+        return None;
     };
     let Expr::Attribute(expr_attr) = call_expr.func.as_ref() else {
-        return;
+        return None;
     };
     if expr_attr.attr.as_str() != "write" {
-        return;
+        return None;
     }
     if !call_expr.arguments.keywords.is_empty() {
-        return;
+        return None;
     }
     let [write_arg] = call_expr.arguments.args.as_ref() else {
-        return;
+        return None;
     };
 
     let Expr::Name(io_object_name) = expr_attr.value.as_ref() else {
-        return;
+        return None;
     };
 
     let semantic = checker.semantic();
@@ -87,22 +164,15 @@ pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
         .map(|id| semantic.binding(id))
         .is_some_and(|binding| typing::is_io_base(binding, semantic))
     {
-        return;
+        return None;
+    }
+
+    if loop_variables_are_used_outside_loop(binding_names, for_stmt.range, semantic, scope_id) {
+        return None;
     }
 
     let content = match (for_stmt.target.as_ref(), write_arg) {
         (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
-            let overwritten = semantic.simulate_runtime_load_at_location_in_scope(
-                for_target.id.as_str(),
-                TextRange::at(for_stmt.start(), 0.into()),
-                semantic.scope_id,
-                TypingOnlyBindingsStatus::Disallowed,
-            );
-
-            if overwritten.is_some() {
-                return;
-            }
-
             format!(
                 "{}.writelines({})",
                 checker.locator().slice(io_object_name),
@@ -126,16 +196,55 @@ pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
         Applicability::Safe
     };
 
-    checker.diagnostics.push(
-        Diagnostic::new(
-            ForLoopWrites {
-                name: io_object_name.id.to_string(),
-            },
-            for_stmt.range,
-        )
-        .with_fix(Fix::applicable_edit(
-            Edit::range_replacement(content, for_stmt.range),
-            applicability,
-        )),
+    let diagnostic = Diagnostic::new(
+        ForLoopWrites {
+            name: io_object_name.id.to_string(),
+        },
+        for_stmt.range,
     );
+    let fix = Fix::applicable_edit(
+        Edit::range_replacement(content, for_stmt.range),
+        applicability,
+    );
+
+    Some(diagnostic.with_fix(fix))
+}
+
+fn loop_variables_are_used_outside_loop(
+    binding_names: Vec<&ExprName>,
+    loop_range: TextRange,
+    semantic: &SemanticModel,
+    scope_id: ScopeId,
+) -> bool {
+    let find_binding_id = |name: &ExprName, offset: TextSize| {
+        semantic.simulate_runtime_load_at_location_in_scope(
+            name.id.as_str(),
+            TextRange::at(offset, 0.into()),
+            scope_id,
+            TypingOnlyBindingsStatus::Disallowed,
+        )
+    };
+
+    let name_overwrites_outer =
+        |name: &ExprName| find_binding_id(name, loop_range.start()).is_some();
+
+    let name_is_used_later = |name: &ExprName| {
+        let Some(binding_id) = find_binding_id(name, loop_range.end()) else {
+            return false;
+        };
+
+        for reference_id in semantic.binding(binding_id).references() {
+            let reference = semantic.reference(reference_id);
+
+            if !loop_range.contains_range(reference.range()) {
+                return true;
+            }
+        }
+
+        false
+    };
+
+    binding_names
+        .iter()
+        .any(|name| name_overwrites_outer(name) || name_is_used_later(name))
 }

@@ -132,3 +132,24 @@ def _():
         line = ''
         for line in lines:
             f.write(line)
+
+
+def _():
+    with open("file", "w") as f:
+        for a, b, c in d:
+            f.write((a, b))
+        print(a)
+
+
+def _():
+    with open("file", "w") as f:
+        for [*[*a]], b, [[c]] in d:
+            f.write((a, b))
+        print(c)
+
+
+def _():
+    with open("file", "w") as f:
+        global global_foo
+        for [a, b, (global_foo, c)] in d:
+            f.write((a, b))
