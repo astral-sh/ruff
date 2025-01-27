@@ -88,7 +88,7 @@ pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
     }
 }
 
-/// Find the subexpressions of a `for` loop target
+/// Find the names in a `for` loop target
 /// that are assigned to during iteration.
 ///
 /// ```python
@@ -96,7 +96,7 @@ pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
 ///     #      ^      ^                   ^
 ///     ...
 /// ```
-fn binding_names(parent: &Expr) -> Vec<&ExprName> {
+fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
     fn collect_names<'a>(expr: &'a Expr, names: &mut Vec<&'a ExprName>) {
         match expr {
             Expr::Name(name) => names.push(name),
@@ -112,7 +112,7 @@ fn binding_names(parent: &Expr) -> Vec<&ExprName> {
     }
 
     let mut names = vec![];
-    collect_names(parent, &mut names);
+    collect_names(for_target, &mut names);
     names
 }
 
