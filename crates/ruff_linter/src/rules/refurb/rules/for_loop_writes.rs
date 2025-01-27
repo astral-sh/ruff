@@ -2,7 +2,8 @@ use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
-use ruff_text_size::Ranged;
+use ruff_python_semantic::TypingOnlyBindingsStatus;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -78,18 +79,30 @@ pub(crate) fn for_loop_writes(checker: &mut Checker, for_stmt: &StmtFor) {
         return;
     };
 
+    let semantic = checker.semantic();
+
     // Determine whether `f` in `f.write()` was bound to a file object.
-    if !checker
-        .semantic()
+    if !semantic
         .resolve_name(io_object_name)
-        .map(|id| checker.semantic().binding(id))
-        .is_some_and(|binding| typing::is_io_base(binding, checker.semantic()))
+        .map(|id| semantic.binding(id))
+        .is_some_and(|binding| typing::is_io_base(binding, semantic))
     {
         return;
     }
 
     let content = match (for_stmt.target.as_ref(), write_arg) {
         (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
+            let overwritten = semantic.simulate_runtime_load_at_location_in_scope(
+                for_target.id.as_str(),
+                TextRange::at(for_stmt.start(), 0.into()),
+                semantic.scope_id,
+                TypingOnlyBindingsStatus::Disallowed,
+            );
+
+            if overwritten.is_some() {
+                return;
+            }
+
             format!(
                 "{}.writelines({})",
                 checker.locator().slice(io_object_name),
