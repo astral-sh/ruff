@@ -26,7 +26,7 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 
-use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
@@ -45,6 +45,7 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
+        let ty = ty.with_normalized_bools(self.db);
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
@@ -55,27 +56,10 @@ impl<'db> UnionBuilder<'db> {
             }
             Type::Never => {}
             _ => {
-                let bool_pair = if let Type::BooleanLiteral(b) = ty {
-                    Some(Type::BooleanLiteral(!b))
-                } else {
-                    None
-                };
-
-                let mut to_add = ty;
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = ty.negate(self.db);
 
                 for (index, element) in self.elements.iter().enumerate() {
-                    if Some(*element) == bool_pair {
-                        to_add = KnownClass::Bool.to_instance(self.db);
-                        to_remove.push(index);
-                        // The type we are adding is a BooleanLiteral, which doesn't have any
-                        // subtypes. And we just found that the union already contained our
-                        // mirror-image BooleanLiteral, so it can't also contain bool or any
-                        // supertype of bool. Therefore, we are done.
-                        break;
-                    }
-
                     if ty.is_same_gradual_form(*element) || ty.is_subtype_of(self.db, *element) {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
@@ -94,8 +78,8 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
                 match to_remove[..] {
-                    [] => self.elements.push(to_add),
-                    [index] => self.elements[index] = to_add,
+                    [] => self.elements.push(ty),
+                    [index] => self.elements[index] = ty,
                     _ => {
                         let mut current_index = 0;
                         let mut to_remove = to_remove.into_iter();
@@ -110,7 +94,7 @@ impl<'db> UnionBuilder<'db> {
                             current_index += 1;
                             retain
                         });
-                        self.elements.push(to_add);
+                        self.elements.push(ty);
                     }
                 }
             }
@@ -154,6 +138,7 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
+        let ty = ty.with_normalized_bools(self.db);
         if let Type::Union(union) = ty {
             // Distribute ourself over this union: for each union element, clone ourself and
             // intersect with that union element, then create a new union-of-intersections with all
@@ -183,6 +168,9 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
+
+        let ty = ty.with_normalized_bools(self.db);
+
         if let Type::Union(union) = ty {
             for elem in union.elements(self.db) {
                 self = self.add_negative(*elem);
@@ -246,7 +234,7 @@ struct InnerIntersectionBuilder<'db> {
 
 impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
-    fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
+    fn add_positive(&mut self, db: &'db dyn Db, new_positive: Type<'db>) {
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::LiteralString) => {
@@ -291,62 +279,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
                     return;
-                }
-
-                let addition_is_bool_instance = known_instance == Some(KnownClass::Bool);
-
-                for (index, existing_positive) in self.positive.iter().enumerate() {
-                    match existing_positive {
-                        // `AlwaysTruthy & bool` -> `Literal[True]`
-                        Type::AlwaysTruthy if addition_is_bool_instance => {
-                            new_positive = Type::BooleanLiteral(true);
-                        }
-                        // `AlwaysFalsy & bool` -> `Literal[False]`
-                        Type::AlwaysFalsy if addition_is_bool_instance => {
-                            new_positive = Type::BooleanLiteral(false);
-                        }
-                        Type::Instance(InstanceType { class })
-                            if class.is_known(db, KnownClass::Bool) =>
-                        {
-                            match new_positive {
-                                // `bool & AlwaysTruthy` -> `Literal[True]`
-                                Type::AlwaysTruthy => {
-                                    new_positive = Type::BooleanLiteral(true);
-                                }
-                                // `bool & AlwaysFalsy` -> `Literal[False]`
-                                Type::AlwaysFalsy => {
-                                    new_positive = Type::BooleanLiteral(false);
-                                }
-                                _ => continue,
-                            }
-                        }
-                        _ => continue,
-                    }
-                    self.positive.swap_remove_index(index);
-                    break;
-                }
-
-                if addition_is_bool_instance {
-                    for (index, existing_negative) in self.negative.iter().enumerate() {
-                        match existing_negative {
-                            // `bool & ~Literal[False]` -> `Literal[True]`
-                            // `bool & ~Literal[True]` -> `Literal[False]`
-                            Type::BooleanLiteral(bool_value) => {
-                                new_positive = Type::BooleanLiteral(!bool_value);
-                            }
-                            // `bool & ~AlwaysTruthy` -> `Literal[False]`
-                            Type::AlwaysTruthy => {
-                                new_positive = Type::BooleanLiteral(false);
-                            }
-                            // `bool & ~AlwaysFalsy` -> `Literal[True]`
-                            Type::AlwaysFalsy => {
-                                new_positive = Type::BooleanLiteral(true);
-                            }
-                            _ => continue,
-                        }
-                        self.negative.swap_remove_index(index);
-                        break;
-                    }
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
@@ -396,14 +328,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
-        let contains_bool = || {
-            self.positive
-                .iter()
-                .filter_map(|ty| ty.into_instance())
-                .filter_map(|instance| instance.class.known(db))
-                .any(KnownClass::is_bool)
-        };
-
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
@@ -427,19 +351,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // simplify the representation.
                 self.add_positive(db, ty);
             }
-            // `bool & ~AlwaysTruthy` -> `bool & Literal[False]`
-            // `bool & ~Literal[True]` -> `bool & Literal[False]`
-            Type::AlwaysTruthy | Type::BooleanLiteral(true) if contains_bool() => {
-                self.add_positive(db, Type::BooleanLiteral(false));
-            }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::LiteralString) => {
                 self.add_positive(db, Type::string_literal(db, ""));
-            }
-            // `bool & ~AlwaysFalsy` -> `bool & Literal[True]`
-            // `bool & ~Literal[False]` -> `bool & Literal[True]`
-            Type::AlwaysFalsy | Type::BooleanLiteral(false) if contains_bool() => {
-                self.add_positive(db, Type::BooleanLiteral(true));
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysFalsy if self.positive.contains(&Type::LiteralString) => {

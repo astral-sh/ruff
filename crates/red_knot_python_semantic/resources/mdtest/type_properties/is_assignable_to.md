@@ -346,4 +346,16 @@ static_assert(is_assignable_to(Never, type[str]))
 static_assert(is_assignable_to(Never, type[Any]))
 ```
 
+### `bool` is assignable to unions that include `bool`
+
+Since we decompose `bool` to `Literal[True, False]` in unions, it would be surprisingly easy to get
+this wrong if we forgot to normalize `bool` to `Literal[True, False]` when it appeared on the
+left-hand side in `Type::is_assignable_to()`.
+
+```py
+from knot_extensions import is_assignable_to, static_assert
+
+static_assert(is_assignable_to(bool, str | bool))
+```
+
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
