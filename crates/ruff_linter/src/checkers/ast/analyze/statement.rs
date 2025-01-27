@@ -1415,7 +1415,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
                 if checker.enabled(Rule::ForLoopWrites) {
-                    refurb::rules::for_loop_writes(checker, for_stmt);
+                    refurb::rules::for_loop_writes_stmt(checker, for_stmt);
                 }
             }
             if checker.enabled(Rule::NeedlessElse) {
