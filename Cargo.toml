@@ -159,7 +159,7 @@ unicode-ident = { version = "1.0.12" }
 unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
-ureq = { version = "2.9.6" }
+ureq = { version = "3.0.0" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = [
     "v4",
