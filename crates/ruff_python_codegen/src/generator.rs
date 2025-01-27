@@ -1819,8 +1819,8 @@ if True:
 
         // but not for bytestrings
         round_trip_with!(Quote::Double, r#"b"hello""#);
-        round_trip_with!(Quote::Single, r#"b"hello""#);
-        round_trip_with!(Quote::Double, r"b'hello'");
+        round_trip_with!(Quote::Single, r#"b"hello""#); // no effect
+        round_trip_with!(Quote::Double, r"b'hello'"); // no effect
         round_trip_with!(Quote::Single, r"b'hello'");
 
         // or for string literals, where the `Quote` is taken directly from their flags
