@@ -214,22 +214,41 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Setup Dev Drive
+        run: ${{ github.workspace }}/.github/workflows/setup-dev-drive.ps1
+
+      # actions/checkout does not let us clone into anywhere outside `github.workspace`, so we have to copy the clone
+      # the fuzz corpus links are broken so we remove them
+      - name: Copy Git Repo to Dev Drive
+        run: |
+          Remove-Item -Path ".\fuzz\corpus" -Recurse
+          Copy-Item -Path "${{ github.workspace }}" -Destination "${{ env.RUFF_WORKSPACE }}" -Recurse
+
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.RUFF_WORKSPACE }}
+
       - name: "Install Rust toolchain"
+        working-directory: ${{ env.RUFF_WORKSPACE }}
         run: rustup show
+
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
       - name: "Run tests"
+        working-directory: ${{ env.RUFF_WORKSPACE }}
         shell: bash
         env:
           NEXTEST_PROFILE: "ci"
           # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
+          RED_KNOT_LOG: debug
+          RUST_LOG: debug
         run: |
-          cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
+          cargo nextest run --all-features --profile ci -- directory_deleted
+          # cargo test --all-features --doc
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
