@@ -13,6 +13,7 @@ use ruff_python_semantic::analyze::typing::{
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::rules::ruff::rules::is_immutable_newtype_call;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -105,6 +106,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
             Expr::Call(ast::ExprCall { func, .. }) => {
                 if !is_mutable_func(func, self.semantic)
                     && !is_immutable_func(func, self.semantic, self.extend_immutable_calls)
+                    && !is_immutable_newtype_call(func, self.semantic, &self.extend_immutable_calls)
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {

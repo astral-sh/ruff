@@ -159,7 +159,7 @@ fn any_annotated(class_body: &[Stmt]) -> bool {
         .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
 }
 
-fn is_immutable_newtype_call(
+pub(crate) fn is_immutable_newtype_call(
     func: &Expr,
     semantic: &SemanticModel,
     extend_immutable_calls: &[QualifiedName],
