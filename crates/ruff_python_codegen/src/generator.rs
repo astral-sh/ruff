@@ -1806,25 +1806,28 @@ if True:
                     $end,
                 );
             };
+            ($quote:expr, $start:expr) => {
+                round_trip_with!($quote, $start, $start);
+            };
         }
 
-        // setting Generator::quote works for bytestrings
-        round_trip_with!(Quote::Double, r#"b"hello""#, r#"b"hello""#);
-        round_trip_with!(Quote::Single, r#"b"hello""#, r"b'hello'");
-        round_trip_with!(Quote::Double, r"b'hello'", r#"b"hello""#);
-        round_trip_with!(Quote::Single, r"b'hello'", r"b'hello'");
-
-        // and for f-strings
+        // setting Generator::quote works for f-strings
         round_trip_with!(Quote::Double, r#"f"hello""#, r#"f"hello""#);
         round_trip_with!(Quote::Single, r#"f"hello""#, r"f'hello'");
         round_trip_with!(Quote::Double, r"f'hello'", r#"f"hello""#);
         round_trip_with!(Quote::Single, r"f'hello'", r"f'hello'");
 
-        // but not for string literals, where the `Quote` is taken directly from their flags
-        round_trip_with!(Quote::Double, r#""hello""#, r#""hello""#);
-        round_trip_with!(Quote::Single, r#""hello""#, r#""hello""#); // no effect
-        round_trip_with!(Quote::Double, r"'hello'", r#"'hello'"#); // no effect
-        round_trip_with!(Quote::Single, r"'hello'", r"'hello'");
+        // but not for bytestrings
+        round_trip_with!(Quote::Double, r#"b"hello""#);
+        round_trip_with!(Quote::Single, r#"b"hello""#);
+        round_trip_with!(Quote::Double, r"b'hello'");
+        round_trip_with!(Quote::Single, r"b'hello'");
+
+        // or for string literals, where the `Quote` is taken directly from their flags
+        round_trip_with!(Quote::Double, r#""hello""#);
+        round_trip_with!(Quote::Single, r#""hello""#); // no effect
+        round_trip_with!(Quote::Double, r"'hello'"); // no effect
+        round_trip_with!(Quote::Single, r"'hello'");
     }
 
     #[test]
