@@ -506,7 +506,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     checker,
                                     attr,
                                     call,
-                                    string_value.to_str(),
+                                    string_value,
                                 );
                             }
                         } else if attr == "format" {
