@@ -518,6 +518,22 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
+                        if visibility::is_new(name) {
+                            method(
+                                Argumentable::StaticMethod,
+                                parameters,
+                                scope,
+                                checker.semantic(),
+                                &checker.settings.dummy_variable_rgx,
+                                checker
+                                    .settings
+                                    .flake8_unused_arguments
+                                    .ignore_variadic_names,
+                                diagnostics,
+                            );
+                            return;
+                        }
+
                         function(
                             Argumentable::StaticMethod,
                             parameters,
