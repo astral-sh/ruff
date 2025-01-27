@@ -1429,7 +1429,7 @@ bitflags! {
 /// have a `Checker` from the `ruff_linter` crate available, consider using
 /// `Checker::default_string_flags` to create instances of this struct; this method will properly
 /// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
-/// public constructor [`StringLiteralFlags::new`] can be used.
+/// public constructor [`StringLiteralFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
