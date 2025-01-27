@@ -5,6 +5,8 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
 use ruff_linter::{line_width::LineLength, RuleSelector};
+use ruff_workspace::configuration::Configuration;
+use ruff_workspace::resolver::{resolve_configuration, ConfigurationTransformer, Relativity};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
@@ -13,7 +15,7 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 /// used directly by the server, and are *not* a 1:1 representation with how the client
 /// sends them.
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq))]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
@@ -29,9 +31,7 @@ pub(crate) struct ResolvedClientSettings {
 /// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
-    pub(super) configuration: Option<PathBuf>,
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
     pub(super) select: Option<Vec<RuleSelector>>,
@@ -40,6 +40,58 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
     pub(super) configuration_preference: ConfigurationPreference,
+
+    /// The resolved configuration from the editor settings, cached on first access.
+    resolved_configuration: Option<ResolvedConfiguration>,
+}
+
+impl ResolvedEditorSettings {
+    /// Returns the resolved configuration from the editor settings, if it exists.
+    pub(super) fn configuration(&self) -> Option<Configuration> {
+        self.resolved_configuration
+            .as_ref()?
+            .configuration
+            .clone()
+            .map(|config| *config)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ResolvedConfiguration {
+    /// The path to the configuration file as specified in the editor settings.
+    #[allow(dead_code)]
+    path: PathBuf,
+    /// The resolved configuration from the editor settings. It will be `None` if the configuration
+    /// failed to load e.g., due to a file not existing or invalid configuration.
+    configuration: Option<Box<Configuration>>,
+}
+
+impl ResolvedConfiguration {
+    fn new(path: PathBuf) -> ResolvedConfiguration {
+        tracing::info!(
+            "Loading configuration from editor-specified file: {}",
+            path.display()
+        );
+        let configuration = match resolve_configuration(
+            &path,
+            Relativity::Cwd,
+            &IdentityTransformer,
+        ) {
+            Ok(config) => Some(Box::new(config)),
+            Err(err) => {
+                tracing::error!("{:?}", err);
+                show_err_msg!(
+                    "Failed to load editor-specified configuration file at {}. Refer to the logs for more details.",
+                    path.display()
+                );
+                None
+            }
+        };
+        ResolvedConfiguration {
+            path,
+            configuration,
+        }
+    }
 }
 
 /// Determines how multiple conflicting configurations should be resolved - in this
@@ -305,13 +357,14 @@ impl ResolvedClientSettings {
                 true,
             ),
             editor_settings: ResolvedEditorSettings {
-                configuration: Self::resolve_optional(all_settings, |settings| {
+                resolved_configuration: Self::resolve_optional(all_settings, |settings| {
                     settings
                         .configuration
                         .as_ref()
                         .and_then(|config_path| shellexpand::full(config_path).ok())
                         .map(|config_path| PathBuf::from(config_path.as_ref()))
-                }),
+                })
+                .map(ResolvedConfiguration::new),
                 lint_preview: Self::resolve_optional(all_settings, |settings| {
                     settings.lint.as_ref()?.preview
                 }),
@@ -422,6 +475,14 @@ impl Default for InitializationOptions {
     }
 }
 
+struct IdentityTransformer;
+
+impl ConfigurationTransformer for IdentityTransformer {
+    fn transform(&self, config: Configuration) -> Configuration {
+        config
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
@@ -447,6 +508,26 @@ mod tests {
 
     fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
+    }
+
+    impl PartialEq for ResolvedConfiguration {
+        fn eq(&self, other: &Self) -> bool {
+            self.path == other.path
+        }
+    }
+
+    impl PartialEq for ResolvedEditorSettings {
+        fn eq(&self, other: &Self) -> bool {
+            self.resolved_configuration == other.resolved_configuration
+                && self.lint_preview == other.lint_preview
+                && self.format_preview == other.format_preview
+                && self.select == other.select
+                && self.extend_select == other.extend_select
+                && self.ignore == other.ignore
+                && self.exclude == other.exclude
+                && self.line_length == other.line_length
+                && self.configuration_preference == other.configuration_preference
+        }
     }
 
     #[cfg(not(windows))]
@@ -682,7 +763,7 @@ mod tests {
                 fix_violation_enable: false,
                 show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
-                    configuration: None,
+                    resolved_configuration: None,
                     lint_preview: Some(true),
                     format_preview: None,
                     select: Some(vec![
@@ -714,7 +795,7 @@ mod tests {
                 fix_violation_enable: false,
                 show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
-                    configuration: None,
+                    resolved_configuration: None,
                     lint_preview: Some(false),
                     format_preview: None,
                     select: Some(vec![
@@ -809,7 +890,7 @@ mod tests {
                 fix_violation_enable: true,
                 show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
-                    configuration: None,
+                    resolved_configuration: None,
                     lint_preview: None,
                     format_preview: None,
                     select: None,
