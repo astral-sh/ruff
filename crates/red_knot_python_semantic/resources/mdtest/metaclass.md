@@ -205,7 +205,7 @@ reveal_type(D.__class__)  # revealed: Literal[SignatureMismatch]
 
 Retrieving the metaclass of a cyclically defined class should not cause an infinite loop.
 
-```py path=a.pyi
+```pyi
 class A(B): ...  # error: [cyclic-class-definition]
 class B(C): ...  # error: [cyclic-class-definition]
 class C(A): ...  # error: [cyclic-class-definition]

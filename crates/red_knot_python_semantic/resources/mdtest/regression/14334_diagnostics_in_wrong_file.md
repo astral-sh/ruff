@@ -2,12 +2,16 @@
 
 Regression test for [this issue](https://github.com/astral-sh/ruff/issues/14334).
 
-```py path=base.py
+`base.py`:
+
+```py
 # error: [invalid-base]
 class Base(2): ...
 ```
 
-```py path=a.py
+`a.py`:
+
+```py
 # No error here
 from base import Base
 ```

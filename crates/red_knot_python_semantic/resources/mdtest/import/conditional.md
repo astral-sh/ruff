@@ -2,7 +2,9 @@
 
 ## Maybe unbound
 
-```py path=maybe_unbound.py
+`maybe_unbound.py`:
+
+```py
 def coinflip() -> bool:
     return True
 
@@ -29,7 +31,9 @@ reveal_type(y)  # revealed: Unknown | Literal[3]
 
 ## Maybe unbound annotated
 
-```py path=maybe_unbound_annotated.py
+`maybe_unbound_annotated.py`:
+
+```py
 def coinflip() -> bool:
     return True
 
@@ -60,7 +64,9 @@ reveal_type(y)  # revealed: int
 
 Importing a possibly undeclared name still gives us its declared type:
 
-```py path=maybe_undeclared.py
+`maybe_undeclared.py`:
+
+```py
 def coinflip() -> bool:
     return True
 
@@ -76,11 +82,15 @@ reveal_type(x)  # revealed: int
 
 ## Reimport
 
-```py path=c.py
+`c.py`:
+
+```py
 def f(): ...
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 def coinflip() -> bool:
     return True
 
@@ -102,11 +112,15 @@ reveal_type(f)  # revealed: Literal[f, f]
 When we have a declared type in one path and only an inferred-from-definition type in the other, we
 should still be able to unify those:
 
-```py path=c.pyi
+`c.pyi`:
+
+```pyi
 x: int
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 def coinflip() -> bool:
     return True
 

@@ -8,11 +8,15 @@ import a.b
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 ## Via from/import
@@ -23,11 +27,15 @@ from a import b
 reveal_type(b)  # revealed: int
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 ## Via both
@@ -40,11 +48,15 @@ reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 ## Via both (backwards)
@@ -65,11 +77,15 @@ reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 [from-import]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement

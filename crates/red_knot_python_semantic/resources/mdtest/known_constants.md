@@ -31,7 +31,9 @@ reveal_type(TC)  # revealed: Literal[True]
 Make sure we only use our special handling for `typing.TYPE_CHECKING` and not for other constants
 with the same name:
 
-```py path=constants.py
+`constants.py`:
+
+```py
 TYPE_CHECKING: bool = False
 ```
 

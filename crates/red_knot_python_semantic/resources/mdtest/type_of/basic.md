@@ -39,7 +39,9 @@ def f(c: type[A]):
     reveal_type(c)  # revealed: type[A]
 ```
 
-```py path=a.py
+`a.py`:
+
+```py
 class A: ...
 ```
 
@@ -52,23 +54,31 @@ def f(c: type[a.B]):
     reveal_type(c)  # revealed: type[B]
 ```
 
-```py path=a.py
+`a.py`:
+
+```py
 class B: ...
 ```
 
 ## Deeply qualified class literal from another module
 
-```py path=a/test.py
+`a/test.py`:
+
+```py
 import a.b
 
 def f(c: type[a.b.C]):
     reveal_type(c)  # revealed: type[C]
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 class C: ...
 ```
 

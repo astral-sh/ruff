@@ -33,7 +33,9 @@ reveal_type(a >= b)  # revealed: Literal[False]
 
 Even when tuples have different lengths, comparisons should be handled appropriately.
 
-```py path=different_length.py
+`different_length.py`:
+
+```py
 a = (1, 2, 3)
 b = (1, 2, 3, 4)
 
@@ -102,7 +104,9 @@ reveal_type(a >= b)  # revealed: bool
 However, if the lexicographic comparison completes without reaching a point where str and int are
 compared, Python will still produce a result based on the prior elements.
 
-```py path=short_circuit.py
+`short_circuit.py`:
+
+```py
 a = (1, 2)
 b = (999999, "hello")
 

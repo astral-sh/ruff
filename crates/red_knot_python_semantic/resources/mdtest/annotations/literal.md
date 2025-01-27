@@ -116,7 +116,9 @@ def union_example(
 Only Literal that is defined in typing and typing_extension modules is detected as the special
 Literal.
 
-```pyi path=other.pyi
+`other.pyi`:
+
+```pyi
 from typing import _SpecialForm
 
 Literal: _SpecialForm
