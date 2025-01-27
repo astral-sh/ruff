@@ -153,8 +153,8 @@ impl<'a> Generator<'a> {
         self.p(s.as_str());
     }
 
-    fn p_bytes_repr(&mut self, s: &[u8]) {
-        let escape = AsciiEscape::with_preferred_quote(s, self.quote);
+    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote) {
+        let escape = AsciiEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1100,7 +1100,7 @@ impl<'a> Generator<'a> {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(&bytes_literal.value);
+                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags.quote_style());
                 }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
