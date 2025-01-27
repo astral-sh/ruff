@@ -74,7 +74,7 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> O
         return None;
     }
 
-    for_loop_writes(checker, for_stmt, binding.scope, binding_names)
+    for_loop_writes(checker, for_stmt, binding.scope, &binding_names)
 }
 
 pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
@@ -85,7 +85,7 @@ pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
 
     let scope_id = checker.semantic().scope_id;
 
-    if let Some(diagnostic) = for_loop_writes(checker, for_stmt, scope_id, vec![]) {
+    if let Some(diagnostic) = for_loop_writes(checker, for_stmt, scope_id, &[]) {
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -128,7 +128,7 @@ fn for_loop_writes(
     checker: &Checker,
     for_stmt: &StmtFor,
     scope_id: ScopeId,
-    binding_names: Vec<&ExprName>,
+    binding_names: &[&ExprName],
 ) -> Option<Diagnostic> {
     if !for_stmt.orelse.is_empty() {
         return None;
@@ -211,7 +211,7 @@ fn for_loop_writes(
 }
 
 fn loop_variables_are_used_outside_loop(
-    binding_names: Vec<&ExprName>,
+    binding_names: &[&ExprName],
     loop_range: TextRange,
     semantic: &SemanticModel,
     scope_id: ScopeId,
