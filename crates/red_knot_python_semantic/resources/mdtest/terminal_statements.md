@@ -149,7 +149,58 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-## Terminal statement after a list comprehension
+## Early returns and nested functions
+
+Free references inside of a function body refer to variables defined in the containing scope.
+Function bodies are _lazy scopes_: at runtime, these references are not resolved immediately at the
+point of the function definition. Instead, they are resolved _at the time of the call_, which means
+that their values (and types) can be different for different invocations. For simplicity, we instead
+resolve free references _at the end of the containing scope_. That means that in the examples below,
+all of the `x` bindings should be visible to the `reveal_type`, regardless of where we place the
+`return` statements.
+
+```py
+def top_level_return(cond1: bool, cond2: bool):
+    x = 1
+
+    def g():
+        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
+
+    if cond1:
+        if cond2:
+            x = 2
+        else:
+            x = 3
+    return
+
+def return_from_if(cond1: bool, cond2: bool):
+    x = 1
+
+    def g():
+        reveal_type(x)  # revealed: Unknown | Literal[1]
+
+    if cond1:
+        if cond2:
+            x = 2
+        else:
+            x = 3
+        return
+
+def return_from_nested_if(cond1: bool, cond2: bool):
+    x = 1
+
+    def g():
+        reveal_type(x)  # revealed: Unknown | Literal[1, 3]
+
+    if cond1:
+        if cond2:
+            x = 2
+            return
+        else:
+            x = 3
+```
+
+## Early returns and list comprehensions
 
 ```py
 def f(x: str) -> int:
