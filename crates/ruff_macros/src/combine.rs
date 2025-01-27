@@ -1,25 +1,18 @@
 use quote::{quote, quote_spanned};
-use syn::{Data, DataStruct, DeriveInput, Fields};
+use syn::spanned::Spanned;
+use syn::{Data, DataStruct, DeriveInput};
 
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 
     match data {
-        Data::Struct(DataStruct {
-            fields: Fields::Named(fields),
-            ..
-        }) => {
+        Data::Struct(DataStruct { fields, .. }) => {
             let output: Vec<_> = fields
-                .named
-                .iter()
-                .map(|field| {
-                    let ident = field
-                        .ident
-                        .as_ref()
-                        .expect("Expected to handle named fields");
+                .members()
+                .map(|member| {
 
                     quote_spanned!(
-                        ident.span() => crate::combine::Combine::combine_with(&mut self.#ident, other.#ident)
+                        member.span() => crate::combine::Combine::combine_with(&mut self.#member, other.#member)
                     )
                 })
                 .collect();
@@ -37,7 +30,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
         }
         _ => Err(syn::Error::new(
             ident.span(),
-            "Can only derive Combine from structs with named fields.",
+            "Can only derive Combine from structs.",
         )),
     }
 }

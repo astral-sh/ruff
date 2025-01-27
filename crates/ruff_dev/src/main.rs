@@ -13,6 +13,7 @@ mod generate_all;
 mod generate_cli_help;
 mod generate_docs;
 mod generate_json_schema;
+mod generate_knot_schema;
 mod generate_options;
 mod generate_rules_table;
 mod print_ast;
@@ -39,6 +40,8 @@ enum Command {
     GenerateAll(generate_all::Args),
     /// Generate JSON schema for the TOML configuration file.
     GenerateJSONSchema(generate_json_schema::Args),
+    /// Generate JSON schema for the Red Knot TOML configuration file.
+    GenerateKnotSchema(generate_knot_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
     GenerateRulesTable,
     /// Generate a Markdown-compatible listing of configuration options.
@@ -83,6 +86,7 @@ fn main() -> Result<ExitCode> {
     match command {
         Command::GenerateAll(args) => generate_all::main(&args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
+        Command::GenerateKnotSchema(args) => generate_knot_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
         Command::GenerateOptions => println!("{}", generate_options::generate()),
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
