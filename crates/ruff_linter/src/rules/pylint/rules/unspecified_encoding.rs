@@ -158,16 +158,11 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
     Fix::unsafe_edit(add_argument(
         &format!(
             "encoding={}",
-            checker
-                .generator()
-                .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: "utf-8".to_string().into_boxed_str(),
-                        flags: checker.default_string_flags(),
-                        range: TextRange::default(),
-                    }),
-                    range: TextRange::default(),
-                }))
+            checker.generator().expr(&Expr::from(ast::StringLiteral {
+                value: Box::from("utf-8"),
+                flags: checker.default_string_flags(),
+                range: TextRange::default(),
+            }))
         ),
         &call.arguments,
         checker.comment_ranges(),
