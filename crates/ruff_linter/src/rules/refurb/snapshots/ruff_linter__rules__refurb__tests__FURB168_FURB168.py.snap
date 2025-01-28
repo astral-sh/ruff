@@ -59,14 +59,14 @@ FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    11 |+if foo is None:
 12 12 |     pass
 13 13 | 
-14 14 | if isinstance(foo, None | None):
+14 14 | if isinstance(foo, type(None)) is True:
 
 FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
 12 |     pass
 13 |
-14 | if isinstance(foo, None | None):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+14 | if isinstance(foo, type(None)) is True:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
 15 |     pass
    |
    = help: Replace with `is` operator
@@ -75,28 +75,28 @@ FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 11 11 | if isinstance(foo, (type(None), type(None), type(None))):
 12 12 |     pass
 13 13 | 
-14    |-if isinstance(foo, None | None):
-   14 |+if foo is None:
+14    |-if isinstance(foo, type(None)) is True:
+   14 |+if (foo is None) is True:
 15 15 |     pass
 16 16 | 
-17 17 | if isinstance(foo, (None | None)):
+17 17 | if -isinstance(foo, type(None)):
 
-FURB168.py:17:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:17:5: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
 15 |     pass
 16 |
-17 | if isinstance(foo, (None | None)):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+17 | if -isinstance(foo, type(None)):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
 18 |     pass
    |
    = help: Replace with `is` operator
 
 ℹ Safe fix
-14 14 | if isinstance(foo, None | None):
+14 14 | if isinstance(foo, type(None)) is True:
 15 15 |     pass
 16 16 | 
-17    |-if isinstance(foo, (None | None)):
-   17 |+if foo is None:
+17    |-if -isinstance(foo, type(None)):
+   17 |+if -(foo is None):
 18 18 |     pass
 19 19 | 
 20 20 | if isinstance(foo, None | type(None)):
@@ -112,7 +112,7 @@ FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    = help: Replace with `is` operator
 
 ℹ Safe fix
-17 17 | if isinstance(foo, (None | None)):
+17 17 | if -isinstance(foo, type(None)):
 18 18 |     pass
 19 19 | 
 20    |-if isinstance(foo, None | type(None)):
@@ -158,4 +158,4 @@ FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    27 |+if foo is None:
 28 28 |     pass
 29 29 | 
-30 30 |
+30 30 | if isinstance(

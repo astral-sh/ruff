@@ -11,10 +11,10 @@ if isinstance(foo, (type(None))):
 if isinstance(foo, (type(None), type(None), type(None))):
     pass
 
-if isinstance(foo, None | None):
+if isinstance(foo, type(None)) is True:
     pass
 
-if isinstance(foo, (None | None)):
+if -isinstance(foo, type(None)):
     pass
 
 if isinstance(foo, None | type(None)):
@@ -26,6 +26,12 @@ if isinstance(foo, (None | type(None))):
 # A bit contrived, but is both technically valid and equivalent to the above.
 if isinstance(foo, (type(None) | ((((type(None))))) | ((None | type(None))))):
     pass
+
+if isinstance(
+    foo,  # Comment
+    None
+):
+    ...
 
 
 # Okay.
@@ -49,3 +55,16 @@ if isinstance(foo, None):
 # This is also a TypeError, which the rule ignores.
 if isinstance(foo, (None,)):
     pass
+
+if isinstance(foo, None | None):
+    pass
+
+if isinstance(foo, (type(None) | ((((type(None))))) | ((None | None | type(None))))):
+    pass
+
+# https://github.com/astral-sh/ruff/issues/15776
+def _():
+    def type(*args): ...
+
+    if isinstance(foo, type(None)):
+        ...

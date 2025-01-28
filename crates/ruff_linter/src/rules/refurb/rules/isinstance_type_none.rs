@@ -1,12 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Operator};
 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_text_size::Ranged;
+use ruff_python_semantic::SemanticModel;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::pad;
-use crate::rules::refurb::helpers::generate_none_identity_comparison;
 
 /// ## What it does
 /// Checks for uses of `isinstance` that check if an object is of type `None`.
@@ -48,37 +47,35 @@ impl Violation for IsinstanceTypeNone {
 
 /// FURB168
 pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) {
-    let Some(types) = call.arguments.find_positional(1) else {
+    let semantic = checker.semantic();
+    let (func, arguments) = (&call.func, &call.arguments);
+
+    if !arguments.keywords.is_empty() {
+        return;
+    }
+
+    let [expr, types] = arguments.args.as_ref() else {
         return;
     };
-    if !checker
-        .semantic()
-        .match_builtin_expr(&call.func, "isinstance")
-    {
+
+    if !semantic.match_builtin_expr(func, "isinstance") {
         return;
     }
-    if is_none(types) {
-        let Some(Expr::Name(ast::ExprName {
-            id: object_name, ..
-        })) = call.arguments.find_positional(0)
-        else {
-            return;
-        };
-        let mut diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range());
-        let replacement =
-            generate_none_identity_comparison(object_name.clone(), false, checker.generator());
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(replacement, call.range(), checker.locator()),
-            call.range(),
-        )));
-        checker.diagnostics.push(diagnostic);
+
+    if !is_none(types, semantic) {
+        return;
     }
+
+    let fix = replace_with_identity_check(expr, call.range, checker);
+    let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
+
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// Returns `true` if the given expression is equivalent to checking if the
 /// object type is `None` when used with the `isinstance` builtin.
-fn is_none(expr: &Expr) -> bool {
-    fn inner(expr: &Expr, in_union_context: bool) -> bool {
+fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
+    fn inner(expr: &Expr, in_union_context: bool, semantic: &SemanticModel) -> bool {
         match expr {
             // Ex) `None`
             // Note: `isinstance` only accepts `None` as a type when used with
@@ -88,17 +85,16 @@ fn is_none(expr: &Expr) -> bool {
             // Ex) `type(None)`
             Expr::Call(ast::ExprCall {
                 func, arguments, ..
-            }) if arguments.len() == 1 => {
-                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id.as_str() == "type" {
-                        return matches!(arguments.args.first(), Some(Expr::NoneLiteral(_)));
-                    }
+            }) => {
+                if !semantic.match_builtin_expr(func, "type") {
+                    return false;
                 }
-                false
+
+                matches!(arguments.args.as_ref(), [Expr::NoneLiteral(_)])
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false)),
+            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false, semantic)),
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {
@@ -106,11 +102,46 @@ fn is_none(expr: &Expr) -> bool {
                 op: Operator::BitOr,
                 right,
                 ..
-            }) => inner(left, true) && inner(right, true),
+            }) => {
+                // `None | None` is a `TypeError` at runtime
+                if left.is_none_literal_expr() && right.is_none_literal_expr() {
+                    return false;
+                }
+
+                inner(left, true, semantic) && inner(right, true, semantic)
+            }
 
             // Otherwise, return false.
             _ => false,
         }
     }
-    inner(expr, false)
+    inner(expr, false, semantic)
+}
+
+fn replace_with_identity_check(expr: &Expr, range: TextRange, checker: &mut Checker) -> Fix {
+    let (semantic, generator) = (checker.semantic(), checker.generator());
+
+    let new_expr = Expr::Compare(ast::ExprCompare {
+        left: expr.clone().into(),
+        ops: [CmpOp::Is].into(),
+        comparators: [ast::ExprNoneLiteral::default().into()].into(),
+        range: TextRange::default(),
+    });
+
+    let new_content = generator.expr(&new_expr);
+    let new_content = if semantic.current_expression_parent().is_some() {
+        format!("({new_content})")
+    } else {
+        new_content
+    };
+
+    let applicability = if checker.comment_ranges().intersects(range) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    let edit = Edit::range_replacement(new_content, range);
+
+    Fix::applicable_edit(edit, applicability)
 }
