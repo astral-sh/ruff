@@ -283,7 +283,7 @@ cargo test -p red_knot_python_semantic -- mdtest__
 Alternatively, you can use the `mdtest.py` runner which has a watch mode that will re-run corresponding tests when Markdown files change, and recompile automatically when Rust code changes:
 
 ```bash
-uv -q run crates/red_knot_python_semantic/mdtest.py
+uv run crates/red_knot_python_semantic/mdtest.py
 ```
 
 ## Planned features
