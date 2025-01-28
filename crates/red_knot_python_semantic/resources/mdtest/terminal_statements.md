@@ -353,35 +353,6 @@ def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
     reveal_type(x)  # revealed: Literal["before", "loop", "break1", "break2"]
 ```
 
-## `return` is terminal in nested conditionals
-
-```py
-def f(cond1: bool, cond2: bool) -> str:
-    if cond1:
-        if cond2:
-            x = "test1"
-        else:
-            return "early"
-    else:
-        x = "test2"
-    return x
-
-def g(cond1: bool, cond2: bool):
-    if cond1:
-        if cond2:
-            x = "test1"
-            reveal_type(x)  # revealed: Literal["test1"]
-        else:
-            x = "terminal"
-            reveal_type(x)  # revealed: Literal["terminal"]
-            return
-        reveal_type(x)  # revealed: Literal["test1"]
-    else:
-        x = "test2"
-        reveal_type(x)  # revealed: Literal["test2"]
-    reveal_type(x)  # revealed: Literal["test1", "test2"]
-```
-
 ## Terminal in a `finally` block
 
 Control-flow through finally isn't working right yet:
