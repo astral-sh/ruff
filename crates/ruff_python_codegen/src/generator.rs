@@ -1813,19 +1813,18 @@ if True:
             };
         }
 
-        // setting Generator::quote works for f-strings
-        round_trip_with!(Quote::Double, r#"f"hello""#, r#"f"hello""#);
-        round_trip_with!(Quote::Single, r#"f"hello""#, r"f'hello'");
-        round_trip_with!(Quote::Double, r"f'hello'", r#"f"hello""#);
-        round_trip_with!(Quote::Single, r"f'hello'", r"f'hello'");
+        // setting Generator::quote no longer works because the quote values are taken from the
+        // string literals themselves
+        round_trip_with!(Quote::Double, r#"f"hello""#);
+        round_trip_with!(Quote::Single, r#"f"hello""#); // no effect
+        round_trip_with!(Quote::Double, r"f'hello'"); // no effect
+        round_trip_with!(Quote::Single, r"f'hello'");
 
-        // but not for bytestrings
         round_trip_with!(Quote::Double, r#"b"hello""#);
         round_trip_with!(Quote::Single, r#"b"hello""#); // no effect
         round_trip_with!(Quote::Double, r"b'hello'"); // no effect
         round_trip_with!(Quote::Single, r"b'hello'");
 
-        // or for string literals, where the `Quote` is taken directly from their flags
         round_trip_with!(Quote::Double, r#""hello""#);
         round_trip_with!(Quote::Single, r#""hello""#); // no effect
         round_trip_with!(Quote::Double, r"'hello'"); // no effect
