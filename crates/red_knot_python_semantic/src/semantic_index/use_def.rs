@@ -728,7 +728,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .visibility_constraints
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
 
-        // At least one of the two snapshots was reachable, so the merged result is too.
+        // Both of the snapshots are reachable, so the merged result is too.
         self.reachable = true;
     }
 
