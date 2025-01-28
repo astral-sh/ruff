@@ -811,29 +811,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Normalize the type `bool` -> `Literal[True, False]`.
-    ///
-    /// Using this method in various type-relational methods
-    /// ensures that the following invariants hold true:
-    ///
-    /// - bool ≡ Literal[True, False]
-    /// - bool | T ≡ Literal[True, False] | T
-    /// - bool <: Literal[True, False]
-    /// - bool | T <: Literal[True, False] | T
-    /// - Literal[True, False] <: bool
-    /// - Literal[True, False] | T <: bool | T
-    #[must_use]
-    pub fn with_normalized_bools(self, db: &'db dyn Db) -> Self {
-        match self {
-            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Bool) => {
-                Type::normalized_bool(db)
-            }
-            // TODO: decompose `LiteralString` into `Literal[""] | TruthyLiteralString`?
-            // We'd need to rename this method... --Alex
-            _ => self,
-        }
-    }
-
     /// Return a normalized version of `self` in which all unions and intersections are sorted
     /// according to a canonical order, no matter how "deeply" a union/intersection may be nested.
     #[must_use]
@@ -905,10 +882,12 @@ impl<'db> Type<'db> {
             (_, Type::Never) => false,
 
             (Type::Instance(InstanceType { class }), _) if class.is_known(db, KnownClass::Bool) => {
-                Type::normalized_bool(db).is_subtype_of(db, target)
+                Type::BooleanLiteral(true).is_subtype_of(db, target)
+                    && Type::BooleanLiteral(false).is_subtype_of(db, target)
             }
             (_, Type::Instance(InstanceType { class })) if class.is_known(db, KnownClass::Bool) => {
-                self.is_boolean_literal()
+                self.is_subtype_of(db, Type::BooleanLiteral(true))
+                    || self.is_subtype_of(db, Type::BooleanLiteral(false))
             }
 
             (Type::Union(union), _) => union
@@ -1125,10 +1104,12 @@ impl<'db> Type<'db> {
             }
 
             (Type::Instance(InstanceType { class }), _) if class.is_known(db, KnownClass::Bool) => {
-                Type::normalized_bool(db).is_assignable_to(db, target)
+                Type::BooleanLiteral(true).is_assignable_to(db, target)
+                    && Type::BooleanLiteral(false).is_assignable_to(db, target)
             }
             (_, Type::Instance(InstanceType { class })) if class.is_known(db, KnownClass::Bool) => {
-                self.is_assignable_to(db, Type::normalized_bool(db))
+                self.is_assignable_to(db, Type::BooleanLiteral(false))
+                    || self.is_assignable_to(db, Type::BooleanLiteral(true))
             }
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
@@ -2407,13 +2388,6 @@ impl<'db> Type<'db> {
     /// The type `NoneType` / `None`
     pub fn none(db: &'db dyn Db) -> Type<'db> {
         KnownClass::NoneType.to_instance(db)
-    }
-
-    /// The type `Literal[True, False]`, which is exactly equivalent to `bool`
-    /// (and which `bool` is eagerly normalized to in several situations)
-    pub fn normalized_bool(db: &'db dyn Db) -> Type<'db> {
-        const LITERAL_BOOLS: [Type; 2] = [Type::BooleanLiteral(false), Type::BooleanLiteral(true)];
-        Type::Union(UnionType::new(db, Box::from(LITERAL_BOOLS)))
     }
 
     /// Return the type of `tuple(sys.version_info)`.
