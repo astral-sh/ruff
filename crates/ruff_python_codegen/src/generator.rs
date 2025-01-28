@@ -1091,7 +1091,7 @@ impl<'a> Generator<'a> {
                 self.p(")");
             }
             Expr::FString(ast::ExprFString { value, .. }) => {
-                self.unparse_f_string_value(value, false);
+                self.unparse_f_string_value(value);
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 self.unparse_string_literal_value(value);
@@ -1310,7 +1310,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_f_string_value(&mut self, value: &ast::FStringValue, is_spec: bool) {
+    fn unparse_f_string_value(&mut self, value: &ast::FStringValue) {
         let mut first = true;
         for f_string_part in value {
             self.p_delim(&mut first, " ");
@@ -1319,7 +1319,7 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(&f_string.elements, is_spec);
+                    self.unparse_f_string(&f_string.elements, false);
                 }
             }
         }
@@ -1397,6 +1397,8 @@ impl<'a> Generator<'a> {
         self.p(&s);
     }
 
+    /// `is_spec` indicates whether we are inside of a format specifier (i.e. after the `:` in
+    /// `{var:...}`)
     fn unparse_f_string(&mut self, values: &[ast::FStringElement], is_spec: bool) {
         if is_spec {
             self.unparse_f_string_body(values);
