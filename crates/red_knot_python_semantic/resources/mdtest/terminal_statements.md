@@ -19,8 +19,8 @@ def g(cond: bool):
         x = "test"
         reveal_type(x)  # revealed: Literal["test"]
     else:
-        x = "unreachable"
-        reveal_type(x)  # revealed: Literal["unreachable"]
+        x = "terminal"
+        reveal_type(x)  # revealed: Literal["terminal"]
         raise ValueError
     reveal_type(x)  # revealed: Literal["test"]
 ```
@@ -29,38 +29,61 @@ In `f`, we should be able to determine that the `else` branch ends in a terminal
 the `return` statement can only be executed when the condition is true. We should therefore consider
 the reference always bound, even though `x` is only bound in the true branch.
 
-Similarly, in `g`, we should see that the assignment of the value `"unreachable"` can never be seen
-by the final `reveal_type`.
+Similarly, in `g`, we should see that the assignment of the value `"terminal"` can never be seen by
+the final `reveal_type`.
 
-## `return` is terminal
+## `return`
+
+A `return` statement is terminal; bindings that occur before it are not visible after it.
 
 ```py
-def f(cond: bool) -> str:
+def resolved_reference(cond: bool) -> str:
     if cond:
         x = "test"
     else:
         return "early"
     return x  # no possibly-unresolved-reference diagnostic!
 
-def g(cond: bool):
+def return_in_if(cond: bool):
     if cond:
         x = "test"
         reveal_type(x)  # revealed: Literal["test"]
     else:
-        x = "unreachable"
-        reveal_type(x)  # revealed: Literal["unreachable"]
+        x = "terminal"
+        reveal_type(x)  # revealed: Literal["terminal"]
         return
     reveal_type(x)  # revealed: Literal["test"]
+
+def return_in_nested_if(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test1"
+        reveal_type(x)  # revealed: Literal["test1"]
+    else:
+        if cond2:
+            x = "test2"
+            reveal_type(x)  # revealed: Literal["test2"]
+        else:
+            x = "terminal"
+            reveal_type(x)  # revealed: Literal["terminal"]
+            return
+        reveal_type(x)  # revealed: Literal["test2"]
+    reveal_type(x)  # revealed: Literal["test1", "test2"]
 ```
 
-## `continue` is terminal within its loop scope
+## `continue`
+
+A `continue` statement jumps back to the top of the innermost loop. This makes it terminal within
+the loop body: definitions before it are not visible after it within the rest of the loop body. They
+are likely to visible after the loop body, since loops do not introduce new scopes. (Statically
+known infinite loops are one exception — if control never leaves the loop body, bindings inside of
+the loop are not visible outside of it.)
 
 TODO: We are not currently modeling the cyclic control flow for loops, pending fixpoint support in
 Salsa. The false positives in this section are because of that, and not our terminal statement
 support. See [ruff#14160](https://github.com/astral-sh/ruff/issues/14160) for more details.
 
 ```py
-def f(cond: bool) -> str:
+def resolved_reference(cond: bool) -> str:
     while True:
         if cond:
             x = "test"
@@ -68,7 +91,7 @@ def f(cond: bool) -> str:
             continue
         return x
 
-def g(cond: bool, i: int):
+def continue_in_if(cond: bool, i: int):
     x = "before"
     for _ in range(i):
         if cond:
@@ -81,12 +104,37 @@ def g(cond: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop"]
     # TODO: Should be Literal["before", "loop", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop"]
+
+def continue_in_nested_if(cond1: bool, cond2: bool, i: int):
+    x = "before"
+    for _ in range(i):
+        if cond1:
+            x = "loop1"
+            reveal_type(x)  # revealed: Literal["loop1"]
+        else:
+            if cond2:
+                x = "loop2"
+                reveal_type(x)  # revealed: Literal["loop2"]
+            else:
+                x = "continue"
+                reveal_type(x)  # revealed: Literal["continue"]
+                continue
+            reveal_type(x)  # revealed: Literal["loop2"]
+        reveal_type(x)  # revealed: Literal["loop1", "loop2"]
+    # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
+    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
 ```
 
-## `break` is terminal within its loop scope
+## `break`
+
+A `break` statement jumps to the end of the innermost loop. This makes it terminal within the loop
+body: definitions before it are not visible after it within the rest of the loop body. They are
+likely to visible after the loop body, since loops do not introduce new scopes. (Statically known
+infinite loops are one exception — if control never leaves the loop body, bindings inside of the
+loop are not visible outside of it.)
 
 ```py
-def f(cond: bool) -> str:
+def resolved_reference(cond: bool) -> str:
     while True:
         if cond:
             x = "test"
@@ -95,7 +143,7 @@ def f(cond: bool) -> str:
         return x
     return x  # error: [unresolved-reference]
 
-def g(cond: bool, i: int):
+def break_in_if(cond: bool, i: int):
     x = "before"
     for _ in range(i):
         if cond:
@@ -107,6 +155,24 @@ def g(cond: bool, i: int):
             break
         reveal_type(x)  # revealed: Literal["loop"]
     reveal_type(x)  # revealed: Literal["before", "loop", "break"]
+
+def break_in_nested_if(cond1: bool, cond2: bool, i: int):
+    x = "before"
+    for _ in range(i):
+        if cond1:
+            x = "loop1"
+            reveal_type(x)  # revealed: Literal["loop1"]
+        else:
+            if cond2:
+                x = "loop2"
+                reveal_type(x)  # revealed: Literal["loop2"]
+            else:
+                x = "break"
+                reveal_type(x)  # revealed: Literal["break"]
+                break
+            reveal_type(x)  # revealed: Literal["loop2"]
+        reveal_type(x)  # revealed: Literal["loop1", "loop2"]
+    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2", "break"]
 ```
 
 ## `return` is terminal in nested conditionals
@@ -128,8 +194,8 @@ def g(cond1: bool, cond2: bool):
             x = "test1"
             reveal_type(x)  # revealed: Literal["test1"]
         else:
-            x = "unreachable"
-            reveal_type(x)  # revealed: Literal["unreachable"]
+            x = "terminal"
+            reveal_type(x)  # revealed: Literal["terminal"]
             return
         reveal_type(x)  # revealed: Literal["test1"]
     else:
