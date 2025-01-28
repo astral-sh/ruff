@@ -294,11 +294,7 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        Generator::new(
-            self.stylist.indentation(),
-            self.preferred_quote(),
-            self.stylist.line_ending(),
-        )
+        Generator::new(self.stylist.indentation(), self.stylist.line_ending())
     }
 
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the

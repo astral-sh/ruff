@@ -363,11 +363,7 @@ impl<'a> QuoteAnnotator<'a> {
         let generator = Generator::from(self.stylist);
         // we first generate the annotation with the inverse quote, so we can
         // generate the string literal with the preferred quote
-        let subgenerator = Generator::new(
-            self.stylist.indentation(),
-            self.stylist.quote().opposite(),
-            self.stylist.line_ending(),
-        );
+        let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
