@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF058_1.py:7:10: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_1.py:7:10: RUF058 `itertools.starmap` called on `zip` iterable
   |
 6 | map = {}
 7 | for _ in starmap(print, zip("A", "12")):
@@ -9,11 +9,3 @@ RUF058_1.py:7:10: RUF058 [*] `itertools.starmap` called on `zip` iterable
 8 |     pass
   |
   = help: Use `map` instead
-
-ℹ Safe fix
-4 4 | from itertools import starmap
-5 5 | 
-6 6 | map = {}
-7   |-for _ in starmap(print, zip("A", "12")):
-  7 |+for _ in map(print, "A", "12"):
-8 8 |     pass
