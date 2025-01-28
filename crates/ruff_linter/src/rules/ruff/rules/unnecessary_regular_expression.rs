@@ -124,12 +124,20 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     );
 
     if let Some(repl) = repl {
+        let has_comments = match (
+            re_func.comparison_to_none,
+            semantic.current_expression_parent(),
+        ) {
+            (Some(_), Some(parent_expr)) => checker
+                .comment_ranges()
+                .has_comments(parent_expr, checker.source()),
+            _ => checker
+                .comment_ranges()
+                .has_comments(call, checker.source()),
+        };
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(repl, re_func.range),
-            if checker
-                .comment_ranges()
-                .has_comments(call, checker.source())
-            {
+            if has_comments {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -167,7 +175,7 @@ impl<'a> ReFunc<'a> {
         func_name: &str,
     ) -> Option<Self> {
         // the proposed fixes for match, search, and fullmatch rely on the
-        // return value only being used for its truth value
+        // return value only being used for its truth value or being compared to None
         let comparison_to_none = get_comparison_to_none(semantic);
         let in_truthy_context = semantic.in_boolean_test() || comparison_to_none.is_some();
 
