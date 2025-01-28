@@ -7,7 +7,7 @@ s = "str"
 re.search("abc", s) is None
 
 
-# this shuold be replaced with `"abc" in s`
+# this should be replaced with `"abc" in s`
 re.search("abc", s) is not None
 
 

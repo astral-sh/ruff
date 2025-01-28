@@ -18,11 +18,11 @@ RUF055_2.py:7:1: RUF055 [*] Plain string pattern passed to `re` function
   7 |+"abc" not in s
 8 8 | 
 9 9 | 
-10 10 | # this shuold be replaced with `"abc" in s`
+10 10 | # this should be replaced with `"abc" in s`
 
 RUF055_2.py:11:1: RUF055 [*] Plain string pattern passed to `re` function
    |
-10 | # this shuold be replaced with `"abc" in s`
+10 | # this should be replaced with `"abc" in s`
 11 | re.search("abc", s) is not None
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
    |
@@ -31,7 +31,7 @@ RUF055_2.py:11:1: RUF055 [*] Plain string pattern passed to `re` function
 ℹ Safe fix
 8  8  | 
 9  9  | 
-10 10 | # this shuold be replaced with `"abc" in s`
+10 10 | # this should be replaced with `"abc" in s`
 11    |-re.search("abc", s) is not None
    11 |+"abc" in s
 12 12 | 
