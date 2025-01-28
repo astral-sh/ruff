@@ -90,9 +90,9 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
 mod print_arguments {
     use itertools::Itertools;
     use ruff_python_ast::{
-        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement, FStringElements,
-        FStringExpressionElement, FStringFlags, FStringLiteralElement, FStringValue, StringLiteral,
-        StringLiteralFlags,
+        str::Quote, Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement,
+        FStringElements, FStringExpressionElement, FStringFlags, FStringLiteralElement,
+        FStringValue, StringFlags, StringLiteral, StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
 
@@ -222,6 +222,7 @@ mod print_arguments {
     fn args_to_fstring_expr(
         mut args: impl ExactSizeIterator<Item = Vec<FStringElement>>,
         sep: impl ExactSizeIterator<Item = FStringElement>,
+        quote: Quote,
     ) -> Option<Expr> {
         // If there are no arguments, short-circuit and return `None`
         let first_arg = args.next()?;
@@ -236,7 +237,7 @@ mod print_arguments {
         Some(Expr::FString(ExprFString {
             value: FStringValue::single(FString {
                 elements: FStringElements::from(fstring_elements),
-                flags: FStringFlags::default(),
+                flags: FStringFlags::default().with_quote_style(quote),
                 range: TextRange::default(),
             }),
             range: TextRange::default(),
@@ -286,7 +287,8 @@ mod print_arguments {
 
         // Attempt to convert the `sep` and `args` arguments to a string literal,
         // falling back to an f-string if the arguments are not all string literals.
-        args_to_string_literal_expr(args.iter(), sep.iter(), flags)
-            .or_else(|| args_to_fstring_expr(args.into_iter(), sep.into_iter()))
+        args_to_string_literal_expr(args.iter(), sep.iter(), flags).or_else(|| {
+            args_to_fstring_expr(args.into_iter(), sep.into_iter(), flags.quote_style())
+        })
     }
 }
