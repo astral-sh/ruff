@@ -1312,8 +1312,7 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    let quote = f_string.flags.quote_style();
-                    self.unparse_f_string(&f_string.elements, quote);
+                    self.unparse_f_string(&f_string.elements, f_string.flags.quote_style());
                 }
             }
         }
