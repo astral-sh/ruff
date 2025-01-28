@@ -273,11 +273,3 @@ def return_from_nested_if(cond1: bool, cond2: bool):
         else:
             x = 3
 ```
-
-## Early returns and list comprehensions
-
-```py
-def f(x: str) -> int:
-    y = [x for i in range(len(x))]
-    return 4
-```
