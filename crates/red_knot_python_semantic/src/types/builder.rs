@@ -33,6 +33,7 @@ use smallvec::SmallVec;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
     db: &'db dyn Db,
+    contains_bool_literals: bool,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -40,6 +41,7 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
+            contains_bool_literals: false,
         }
     }
 
@@ -77,6 +79,7 @@ impl<'db> UnionBuilder<'db> {
                         return self;
                     }
                 }
+                self.contains_bool_literals |= ty.is_boolean_literal();
                 match to_remove[..] {
                     [] => self.elements.push(ty),
                     [index] => self.elements[index] = ty,
@@ -103,34 +106,30 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
-        let UnionBuilder { elements, db } = self;
+        let UnionBuilder {
+            mut elements,
+            db,
+            contains_bool_literals,
+        } = self;
 
         match elements.len() {
             0 => Type::Never,
             1 => elements[0],
             _ => {
-                let mut normalized_elements = Vec::with_capacity(elements.len());
-                let mut first_bool_literal_pos = None;
-                let mut seen_two_bool_literals = false;
-                for (i, element) in elements.into_iter().enumerate() {
-                    if element.is_boolean_literal() {
-                        if first_bool_literal_pos.is_none() {
-                            first_bool_literal_pos = Some(i);
-                        } else {
-                            seen_two_bool_literals = true;
-                            continue;
+                if contains_bool_literals {
+                    let mut element_iter = elements.iter();
+                    if let Some(first_pos) = element_iter.position(Type::is_boolean_literal) {
+                        if let Some(second_pos) = element_iter.position(Type::is_boolean_literal) {
+                            let bool_instance = KnownClass::Bool.to_instance(db);
+                            if elements.len() == 2 {
+                                return bool_instance;
+                            }
+                            elements.swap_remove(first_pos + second_pos + 1);
+                            elements[first_pos] = bool_instance;
                         }
                     }
-                    normalized_elements.push(element);
                 }
-                if let (Some(pos), true) = (first_bool_literal_pos, seen_two_bool_literals) {
-                    // If we have two boolean literals, we can merge them to `bool`.
-                    if normalized_elements.len() == 1 {
-                        return KnownClass::Bool.to_instance(db);
-                    }
-                    normalized_elements[pos] = KnownClass::Bool.to_instance(db);
-                }
-                Type::Union(UnionType::new(db, normalized_elements.into_boxed_slice()))
+                Type::Union(UnionType::new(db, elements.into_boxed_slice()))
             }
         }
     }
