@@ -403,7 +403,7 @@ def raise_in_then_branch(cond: bool):
         reveal_type(x)  # revealed: Literal["else"]
     finally:
         # This includes "before" because we assume that an exception might have occurred before the
-        # "raise" assignment.
+        # `if` statement.
         reveal_type(x)  # revealed: Literal["before", "raise", "else"]
     reveal_type(x)  # revealed: Literal["before", "raise", "else"]
 
@@ -428,7 +428,7 @@ def raise_in_else_branch(cond: bool):
         reveal_type(x)  # revealed: Literal["else"]
     finally:
         # This includes "before" because we assume that an exception might have occurred before the
-        # "raise" assignment.
+        # `if` statement.
         reveal_type(x)  # revealed: Literal["before", "else", "raise"]
     reveal_type(x)  # revealed: Literal["before", "else", "raise"]
 
@@ -454,7 +454,7 @@ def raise_in_both_branches(cond: bool):
         pass
     finally:
         # This includes "before" because we assume that an exception might have occurred before the
-        # "raise" assignment.
+        # `if` statement.
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
 
@@ -484,7 +484,7 @@ def raise_in_nested_then_branch(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["else1", "else2"]
     finally:
         # This includes "before" because we assume that an exception might have occurred before the
-        # "raise" assignment.
+        # `if` statement.
         reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
     reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
 
@@ -514,7 +514,7 @@ def raise_in_nested_else_branch(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["else1", "else2"]
     finally:
         # This includes "before" because we assume that an exception might have occurred before the
-        # "raise" assignment.
+        # `if` statement.
         reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
     reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
 
@@ -544,7 +544,7 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["else"]
     finally:
         # This includes "before" because we assume that an exception might have occurred before the
-        # "raise" assignment.
+        # `if` statement.
         reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
     reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
 ```
