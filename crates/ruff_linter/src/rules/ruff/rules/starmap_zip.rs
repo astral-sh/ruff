@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{parenthesize::parenthesized_range, Expr, ExprCall};
 use ruff_python_parser::TokenKind;
@@ -28,17 +28,29 @@ use ruff_text_size::{Ranged, TextRange};
 /// map(func, a, b)
 /// map(func, a, b, strict=True)  # 3.14+
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe if the `starmap` or `zip` expressions contain comments that
+/// would be deleted by applying the fix. Otherwise, the fix can be applied safely.
+///
+/// ## Fix availability
+///
+/// This rule will emit a diagnostic but not suggest a fix if `map` has been shadowed from its
+/// builtin binding.
 #[derive(ViolationMetadata)]
 pub(crate) struct StarmapZip;
 
-impl AlwaysFixableViolation for StarmapZip {
+impl Violation for StarmapZip {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`itertools.starmap` called on `zip` iterable".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Use `map` instead".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `map` instead".to_string())
     }
 }
 
@@ -77,13 +89,21 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let fix = replace_with_map(call, iterable_call, checker);
-    let diagnostic = Diagnostic::new(StarmapZip, call.range);
+    let mut diagnostic = Diagnostic::new(StarmapZip, call.range);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    if let Some(fix) = replace_with_map(call, iterable_call, checker) {
+        diagnostic.set_fix(fix);
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
 
-fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Fix {
+/// Replace the `starmap` call with a call to the `map` builtin, if `map` has not been shadowed.
+fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Option<Fix> {
+    if !checker.semantic().has_builtin_binding("map") {
+        return None;
+    }
+
     let change_func_to_map = Edit::range_replacement("map".to_string(), starmap.func.range());
 
     let mut remove_zip = vec![];
@@ -149,5 +169,9 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Fi
         Applicability::Safe
     };
 
-    Fix::applicable_edits(change_func_to_map, remove_zip, applicability)
+    Some(Fix::applicable_edits(
+        change_func_to_map,
+        remove_zip,
+        applicability,
+    ))
 }
