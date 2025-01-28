@@ -202,17 +202,16 @@ a = None
 
 ### Undeclared but bound
 
-If a symbols is undeclared, we use the union of `Unknown` with the inferred type. Note that we treat
-symbols that are undeclared differently from symbols that are explicitly declared as `Unknown`:
+If a symbol is *undeclared*, we use the union of `Unknown` with the inferred type. Note that we
+treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
+possibly due to the usage of an unknown name in the annotation:
 
 ```py path=mod.py
-from knot_extensions import Unknown
-
 # Undeclared:
 a = 1
 
-# Declared with `Unknown`:
-b: Unknown = 1
+# Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
+b: SomeUnknownName = 1  # error: [unresolved-reference]
 ```
 
 ```py
@@ -231,13 +230,11 @@ If a symbol is undeclared and *possibly* unbound, we currently do not raise an e
 inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" case.
 
 ```py path=mod.py
-from knot_extensions import Unknown
-
 def flag() -> bool: ...
 
 if flag:
     a = 1
-    b: Unknown = 1
+    b: SomeUnknownName = 1  # error: [unresolved-reference]
 ```
 
 ```py
