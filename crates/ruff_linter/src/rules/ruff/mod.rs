@@ -426,7 +426,7 @@ mod tests {
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
-    #[test_case(Rule::StarmapZip, Path::new("RUF058.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
