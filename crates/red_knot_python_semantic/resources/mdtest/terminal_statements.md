@@ -54,6 +54,16 @@ def return_in_if(cond: bool):
         return
     reveal_type(x)  # revealed: Literal["test"]
 
+def return_in_both_branches(cond: bool):
+    if cond:
+        x = "terminal1"
+        reveal_type(x)  # revealed: Literal["terminal1"]
+        return
+    else:
+        x = "terminal2"
+        reveal_type(x)  # revealed: Literal["terminal2"]
+        return
+
 def return_in_nested_if(cond1: bool, cond2: bool):
     if cond1:
         x = "test1"
@@ -68,6 +78,21 @@ def return_in_nested_if(cond1: bool, cond2: bool):
             return
         reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
+
+def return_in_both_nested_branches(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    else:
+        if cond2:
+            x = "terminal1"
+            reveal_type(x)  # revealed: Literal["terminal1"]
+            return
+        else:
+            x = "terminal2"
+            reveal_type(x)  # revealed: Literal["terminal2"]
+            return
+    reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ## `continue`
@@ -105,6 +130,20 @@ def continue_in_if(cond: bool, i: int):
     # TODO: Should be Literal["before", "loop", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop"]
 
+def continue_in_both_branches(cond: bool, i: int):
+    x = "before"
+    for _ in range(i):
+        if cond:
+            x = "continue1"
+            reveal_type(x)  # revealed: Literal["continue1"]
+            continue
+        else:
+            x = "continue2"
+            reveal_type(x)  # revealed: Literal["continue2"]
+            continue
+    # TODO: Should be Literal["before", "continue1", "continue2"]
+    reveal_type(x)  # revealed: Literal["before"]
+
 def continue_in_nested_if(cond1: bool, cond2: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -123,6 +162,25 @@ def continue_in_nested_if(cond1: bool, cond2: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
     # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
+
+def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
+    x = "before"
+    for _ in range(i):
+        if cond1:
+            x = "loop"
+            reveal_type(x)  # revealed: Literal["loop"]
+        else:
+            if cond2:
+                x = "continue1"
+                reveal_type(x)  # revealed: Literal["continue1"]
+                continue
+            else:
+                x = "continue2"
+                reveal_type(x)  # revealed: Literal["continue2"]
+                continue
+        reveal_type(x)  # revealed: Literal["loop"]
+    # TODO: Should be Literal["before", "loop", "continue1", "continue2"]
+    reveal_type(x)  # revealed: Literal["before", "loop"]
 ```
 
 ## `break`
@@ -156,6 +214,19 @@ def break_in_if(cond: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop"]
     reveal_type(x)  # revealed: Literal["before", "loop", "break"]
 
+def break_in_both_branches(cond: bool, i: int):
+    x = "before"
+    for _ in range(i):
+        if cond:
+            x = "break1"
+            reveal_type(x)  # revealed: Literal["break1"]
+            break
+        else:
+            x = "break2"
+            reveal_type(x)  # revealed: Literal["break2"]
+            break
+    reveal_type(x)  # revealed: Literal["before", "break1", "break2"]
+
 def break_in_nested_if(cond1: bool, cond2: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -173,6 +244,24 @@ def break_in_nested_if(cond1: bool, cond2: bool, i: int):
             reveal_type(x)  # revealed: Literal["loop2"]
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
     reveal_type(x)  # revealed: Literal["before", "loop1", "loop2", "break"]
+
+def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
+    x = "before"
+    for _ in range(i):
+        if cond1:
+            x = "loop"
+            reveal_type(x)  # revealed: Literal["loop"]
+        else:
+            if cond2:
+                x = "break1"
+                reveal_type(x)  # revealed: Literal["break1"]
+                break
+            else:
+                x = "break2"
+                reveal_type(x)  # revealed: Literal["break2"]
+                break
+        reveal_type(x)  # revealed: Literal["loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop", "break1", "break2"]
 ```
 
 ## `return` is terminal in nested conditionals
