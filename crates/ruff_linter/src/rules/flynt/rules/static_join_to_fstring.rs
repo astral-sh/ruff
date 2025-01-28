@@ -1,11 +1,10 @@
 use ast::FStringFlags;
 use itertools::Itertools;
-use ruff_python_ast::str::Quote;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags};
+use ruff_python_ast::{self as ast, Arguments, Expr, };
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -61,8 +60,8 @@ fn is_static_length(elts: &[Expr]) -> bool {
     elts.iter().all(|e| !e.is_starred_expr())
 }
 
-/// Build an f-string consisting of `joinees` joined by `joiner` and surrounded by `quote`.
-fn build_fstring(joiner: &str, joinees: &[Expr], quote: Quote) -> Option<Expr> {
+/// Build an f-string consisting of `joinees` joined by `joiner` with `flags`.
+fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let mut flags = None;
@@ -106,7 +105,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], quote: Quote) -> Option<Expr> {
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
-        flags: FStringFlags::default().with_quote_style(quote),
+        flags,
     };
     Some(node.into())
 }
@@ -139,8 +138,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string elements).
-    let quote = checker.default_string_flags().quote_style();
-    let Some(new_expr) = build_fstring(joiner, joinees, quote) else {
+    let Some(new_expr) = build_fstring(joiner, joinees, checker.default_fstring_flags()) else {
         return;
     };
 

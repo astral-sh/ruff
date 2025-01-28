@@ -181,7 +181,7 @@ impl Transformer for Normalizer {
                         fstring.value = ast::FStringValue::single(ast::FString {
                             elements: collector.elements.into(),
                             range: fstring.range,
-                            flags: FStringFlags::default(),
+                            flags: FStringFlags::empty(),
                         });
                     }
                 }

@@ -315,6 +315,12 @@ impl<'a> Checker<'a> {
         ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
+    /// Return the default f-string flags a generated `FString` node should use, given where we are
+    /// in the AST.
+    pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
+        ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
     /// the f-string.
     ///
