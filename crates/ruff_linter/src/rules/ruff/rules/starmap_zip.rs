@@ -28,6 +28,11 @@ use ruff_text_size::{Ranged, TextRange};
 /// map(func, a, b)
 /// map(func, a, b, strict=True)  # 3.14+
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe if the `starmap` or `zip` expressions contain comments that
+/// would be deleted by applying the fix. Otherwise, the fix can be applied safely.
 #[derive(ViolationMetadata)]
 pub(crate) struct StarmapZip;
 
