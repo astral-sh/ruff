@@ -369,7 +369,7 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-## Early returns and nested functions
+## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.
 Function bodies are _lazy scopes_: at runtime, these references are not resolved immediately at the
