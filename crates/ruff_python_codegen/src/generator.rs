@@ -1771,14 +1771,11 @@ if True:
     #[test]
     fn set_quote() {
         macro_rules! round_trip_with {
-            ($start:expr, $end:expr) => {
+            ($start:expr) => {
                 assert_eq!(
                     round_trip_with(&Indentation::default(), LineEnding::default(), $start),
-                    $end,
+                    $start,
                 );
-            };
-            ($start:expr) => {
-                round_trip_with!($start, $start);
             };
         }
 
