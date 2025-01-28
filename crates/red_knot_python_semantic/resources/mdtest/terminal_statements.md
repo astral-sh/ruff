@@ -74,6 +74,21 @@ def return_in_both_branches(cond: bool):
         reveal_type(x)  # revealed: Literal["terminal2"]
         return
 
+def return_in_try(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "test"
+            return
+    except:
+        # TODO: Literal["before"]
+        reveal_type(x)  # revealed: Literal["before", "test"]
+    else:
+        reveal_type(x)  # revealed: Literal["before"]
+    finally:
+        reveal_type(x)  # revealed: Literal["before", "test"]
+    reveal_type(x)  # revealed: Literal["before", "test"]
+
 def return_in_nested_then_branch(cond1: bool, cond2: bool):
     if cond1:
         x = "test1"
