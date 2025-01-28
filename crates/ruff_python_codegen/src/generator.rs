@@ -1319,7 +1319,8 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(&f_string.elements, false);
+                    let quote = f_string.flags.quote_style();
+                    self.unparse_f_string(&f_string.elements, quote);
                 }
             }
         }
@@ -1366,7 +1367,7 @@ impl<'a> Generator<'a> {
 
         if let Some(spec) = spec {
             self.p(":");
-            self.unparse_f_string(&spec.elements, true);
+            self.unparse_f_string_specifier(&spec.elements);
         }
 
         self.p("}");
@@ -1397,19 +1398,18 @@ impl<'a> Generator<'a> {
         self.p(&s);
     }
 
-    /// `is_spec` indicates whether we are inside of a format specifier (i.e. after the `:` in
-    /// `{var:...}`)
-    fn unparse_f_string(&mut self, values: &[ast::FStringElement], is_spec: bool) {
-        if is_spec {
-            self.unparse_f_string_body(values);
-        } else {
-            self.p("f");
-            let mut generator =
-                Generator::new(self.indent, self.quote.opposite(), self.line_ending);
-            generator.unparse_f_string_body(values);
-            let body = &generator.buffer;
-            self.p_str_repr(body, self.quote);
-        }
+    fn unparse_f_string_specifier(&mut self, values: &[ast::FStringElement]) {
+        self.unparse_f_string_body(values);
+    }
+
+    /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
+    /// surrounding quote style.
+    fn unparse_f_string(&mut self, values: &[ast::FStringElement], quote: Quote) {
+        self.p("f");
+        let mut generator = Generator::new(self.indent, self.quote.opposite(), self.line_ending);
+        generator.unparse_f_string_body(values);
+        let body = &generator.buffer;
+        self.p_str_repr(body, quote);
     }
 
     fn unparse_alias(&mut self, alias: &Alias) {
