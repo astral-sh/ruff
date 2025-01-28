@@ -33,6 +33,11 @@ use ruff_text_size::{Ranged, TextRange};
 ///
 /// This rule's fix is marked as unsafe if the `starmap` or `zip` expressions contain comments that
 /// would be deleted by applying the fix. Otherwise, the fix can be applied safely.
+///
+/// ## Fix availability
+///
+/// This rule will emit a diagnostic but not suggest a fix if `map` has been shadowed from its
+/// builtin binding.
 #[derive(ViolationMetadata)]
 pub(crate) struct StarmapZip;
 
