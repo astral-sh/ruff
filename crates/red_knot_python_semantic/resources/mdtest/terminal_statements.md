@@ -172,6 +172,7 @@ def top_level_return(cond1: bool, cond2: bool):
     x = 1
 
     def g():
+        # TODO eliminate Unknown
         reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
@@ -184,7 +185,7 @@ def return_from_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO: Unknown | Literal[1, 2, 3]
+        # TODO: Literal[1, 2, 3]
         reveal_type(x)  # revealed: Unknown | Literal[1]
     if cond1:
         if cond2:
@@ -197,7 +198,7 @@ def return_from_nested_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO: Unknown | Literal[1, 2, 3]
+        # TODO: Literal[1, 2, 3]
         reveal_type(x)  # revealed: Unknown | Literal[1, 3]
     if cond1:
         if cond2:
