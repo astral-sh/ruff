@@ -353,6 +353,187 @@ def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
     reveal_type(x)  # revealed: Literal["before", "loop", "break1", "break2"]
 ```
 
+## `raise`
+
+A `raise` statement is terminal. If it occurs in a lexically containing `try` statement, it will
+jump to one of the `except` clauses (if it matches the value being raised), or to the `finally`
+clause (if none match). Currently, we assume definitions from before the `raise` are visible in all
+`except` and `finally` clauses. (In the future, we might analyze the `except` clauses to see which
+ones match the value being raised, and limit visibility to those clauses.) Definitions from before
+the `raise` are not visible in any `else` clause, but are visible after the containing `try`
+statement, since `try` does not introduce a new scope.
+
+TODO: We are not currently implementing the "jump" behavior correctly for `raise` statements. The
+false positives in this section are because of that, and not our terminal statement support.
+
+```py
+def raise_in_then_branch(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "raise"
+            reveal_type(x)  # revealed: Literal["raise"]
+            raise ValueError
+        else:
+            x = "else"
+            reveal_type(x)  # revealed: Literal["else"]
+        reveal_type(x)  # revealed: Literal["else"]
+    except ValueError:
+        # TODO: Literal["raise"]
+        reveal_type(x)  # revealed: Literal["before", "raise", "else"]
+    except:
+        # TODO: Literal["raise"] or Never
+        reveal_type(x)  # revealed: Literal["before", "raise", "else"]
+    else:
+        reveal_type(x)  # revealed: Literal["else"]
+    finally:
+        # This includes "before" because we assume that an exception might have occurred before the
+        # "raise" assignment.
+        reveal_type(x)  # revealed: Literal["before", "raise", "else"]
+    reveal_type(x)  # revealed: Literal["before", "raise", "else"]
+
+def raise_in_else_branch(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "else"
+            reveal_type(x)  # revealed: Literal["else"]
+        else:
+            x = "raise"
+            reveal_type(x)  # revealed: Literal["raise"]
+            raise ValueError
+        reveal_type(x)  # revealed: Literal["else"]
+    except ValueError:
+        # TODO: Literal["raise"]
+        reveal_type(x)  # revealed: Literal["before", "else", "raise"]
+    except:
+        # TODO: Literal["raise"] or Never
+        reveal_type(x)  # revealed: Literal["before", "else", "raise"]
+    else:
+        reveal_type(x)  # revealed: Literal["else"]
+    finally:
+        # This includes "before" because we assume that an exception might have occurred before the
+        # "raise" assignment.
+        reveal_type(x)  # revealed: Literal["before", "else", "raise"]
+    reveal_type(x)  # revealed: Literal["before", "else", "raise"]
+
+def raise_in_both_branches(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "raise1"
+            reveal_type(x)  # revealed: Literal["raise1"]
+            raise ValueError
+        else:
+            x = "raise2"
+            reveal_type(x)  # revealed: Literal["raise2"]
+            raise ValueError
+    except ValueError:
+        # TODO: Literal["raise1", "raise2"]
+        reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
+    except:
+        # TODO: Literal["raise1", "raise2"] or Never
+        reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
+    else:
+        # This is unreachable
+        pass
+    finally:
+        # This includes "before" because we assume that an exception might have occurred before the
+        # "raise" assignment.
+        reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
+    reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
+
+def raise_in_nested_then_branch(cond1: bool, cond2: bool):
+    x = "before"
+    try:
+        if cond1:
+            x = "else1"
+            reveal_type(x)  # revealed: Literal["else1"]
+        else:
+            if cond2:
+                x = "raise"
+                reveal_type(x)  # revealed: Literal["raise"]
+                raise ValueError
+            else:
+                x = "else2"
+                reveal_type(x)  # revealed: Literal["else2"]
+            reveal_type(x)  # revealed: Literal["else2"]
+        reveal_type(x)  # revealed: Literal["else1", "else2"]
+    except ValueError:
+        # TODO: Literal["raise"]
+        reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
+    except:
+        # TODO: Literal["raise"] or Never
+        reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
+    else:
+        reveal_type(x)  # revealed: Literal["else1", "else2"]
+    finally:
+        # This includes "before" because we assume that an exception might have occurred before the
+        # "raise" assignment.
+        reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
+    reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
+
+def raise_in_nested_else_branch(cond1: bool, cond2: bool):
+    x = "before"
+    try:
+        if cond1:
+            x = "else1"
+            reveal_type(x)  # revealed: Literal["else1"]
+        else:
+            if cond2:
+                x = "else2"
+                reveal_type(x)  # revealed: Literal["else2"]
+            else:
+                x = "raise"
+                reveal_type(x)  # revealed: Literal["raise"]
+                raise ValueError
+            reveal_type(x)  # revealed: Literal["else2"]
+        reveal_type(x)  # revealed: Literal["else1", "else2"]
+    except ValueError:
+        # TODO: Literal["raise"]
+        reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
+    except:
+        # TODO: Literal["raise"] or Never
+        reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
+    else:
+        reveal_type(x)  # revealed: Literal["else1", "else2"]
+    finally:
+        # This includes "before" because we assume that an exception might have occurred before the
+        # "raise" assignment.
+        reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
+    reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
+
+def raise_in_both_nested_branches(cond1: bool, cond2: bool):
+    x = "before"
+    try:
+        if cond1:
+            x = "else"
+            reveal_type(x)  # revealed: Literal["else"]
+        else:
+            if cond2:
+                x = "raise1"
+                reveal_type(x)  # revealed: Literal["raise1"]
+                raise ValueError
+            else:
+                x = "raise2"
+                reveal_type(x)  # revealed: Literal["raise2"]
+                raise ValueError
+        reveal_type(x)  # revealed: Literal["else"]
+    except ValueError:
+        # TODO: Literal["raise1", "raise2"]
+        reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
+    except:
+        # TODO: Literal["raise1", "raise2"] or Never
+        reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
+    else:
+        reveal_type(x)  # revealed: Literal["else"]
+    finally:
+        # This includes "before" because we assume that an exception might have occurred before the
+        # "raise" assignment.
+        reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
+    reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
+```
+
 ## Terminal in a `finally` block
 
 Control-flow through finally isn't working right yet:
