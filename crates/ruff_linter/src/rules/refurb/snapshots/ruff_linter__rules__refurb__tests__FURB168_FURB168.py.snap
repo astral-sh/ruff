@@ -119,14 +119,14 @@ FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    20 |+if foo is None:
 21 21 |     pass
 22 22 | 
-23 23 | if isinstance(foo, (None | type(None))):
+23 23 | if isinstance(foo, type(None) | type(None)):
 
 FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
 21 |     pass
 22 |
-23 | if isinstance(foo, (None | type(None))):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+23 | if isinstance(foo, type(None) | type(None)):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
 24 |     pass
    |
    = help: Replace with `is` operator
@@ -135,7 +135,7 @@ FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 20 20 | if isinstance(foo, None | type(None)):
 21 21 |     pass
 22 22 | 
-23    |-if isinstance(foo, (None | type(None))):
+23    |-if isinstance(foo, type(None) | type(None)):
    23 |+if foo is None:
 24 24 |     pass
 25 25 | 
@@ -159,3 +159,63 @@ FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 28 28 |     pass
 29 29 | 
 30 30 | if isinstance(
+
+FURB168.py:38:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+36 | from typing import Union
+37 |
+38 | if isinstance(foo, Union[None]):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+39 |     ...
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+35 35 | 
+36 36 | from typing import Union
+37 37 | 
+38    |-if isinstance(foo, Union[None]):
+   38 |+if foo is None:
+39 39 |     ...
+40 40 | 
+41 41 | if isinstance(foo, Union[None, None]):
+
+FURB168.py:41:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+39 |     ...
+40 |
+41 | if isinstance(foo, Union[None, None]):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+42 |     ...
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+38 38 | if isinstance(foo, Union[None]):
+39 39 |     ...
+40 40 | 
+41    |-if isinstance(foo, Union[None, None]):
+   41 |+if foo is None:
+42 42 |     ...
+43 43 | 
+44 44 | if isinstance(foo, Union[None, type(None)]):
+
+FURB168.py:44:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+42 |     ...
+43 |
+44 | if isinstance(foo, Union[None, type(None)]):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+45 |     ...
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+41 41 | if isinstance(foo, Union[None, None]):
+42 42 |     ...
+43 43 | 
+44    |-if isinstance(foo, Union[None, type(None)]):
+   44 |+if foo is None:
+45 45 |     ...
+46 46 | 
+47 47 |

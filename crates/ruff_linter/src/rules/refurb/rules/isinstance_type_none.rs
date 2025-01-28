@@ -90,6 +90,10 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
                     return false;
                 }
 
+                if !arguments.keywords.is_empty() {
+                    return false;
+                }
+
                 matches!(arguments.args.as_ref(), [Expr::NoneLiteral(_)])
             }
 
@@ -111,6 +115,20 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
                 inner(left, true, semantic) && inner(right, true, semantic)
             }
 
+            // Ex) `Union[None, ...]`
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                if !semantic.match_typing_expr(value, "Union") {
+                    return false;
+                }
+
+                match slice.as_ref() {
+                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        elts.iter().all(|element| inner(element, true, semantic))
+                    }
+                    slice => inner(slice, true, semantic),
+                }
+            }
+
             // Otherwise, return false.
             _ => false,
         }
@@ -118,7 +136,7 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
     inner(expr, false, semantic)
 }
 
-fn replace_with_identity_check(expr: &Expr, range: TextRange, checker: &mut Checker) -> Fix {
+fn replace_with_identity_check(expr: &Expr, range: TextRange, checker: &Checker) -> Fix {
     let (semantic, generator) = (checker.semantic(), checker.generator());
 
     let new_expr = Expr::Compare(ast::ExprCompare {

@@ -20,7 +20,7 @@ if -isinstance(foo, type(None)):
 if isinstance(foo, None | type(None)):
     pass
 
-if isinstance(foo, (None | type(None))):
+if isinstance(foo, type(None) | type(None)):
     pass
 
 # A bit contrived, but is both technically valid and equivalent to the above.
@@ -31,6 +31,17 @@ if isinstance(
     foo,  # Comment
     None
 ):
+    ...
+
+from typing import Union
+
+if isinstance(foo, Union[None]):
+    ...
+
+if isinstance(foo, Union[None, None]):
+    ...
+
+if isinstance(foo, Union[None, type(None)]):
     ...
 
 
@@ -47,6 +58,13 @@ if isinstance(foo, (int, str)):
 
 if isinstance(foo, (int, type(None), str)):
     pass
+    pass
+
+if isinstance(foo, str | None):
+    pass
+
+if isinstance(foo, Union[None, str]):
+    ...
 
 # This is a TypeError, which the rule ignores.
 if isinstance(foo, None):
