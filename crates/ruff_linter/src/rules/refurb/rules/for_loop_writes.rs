@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for ForLoopWrites {
 }
 
 pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !matches!(binding.kind, BindingKind::LoopVar) {
+    if !binding.kind.is_loop_var() {
         return None;
     }
 
@@ -101,7 +101,7 @@ fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
         match expr {
             Expr::Name(name) => names.push(name),
 
-            Expr::Starred(starred) => collect_names(starred.value.as_ref(), names),
+            Expr::Starred(starred) => collect_names(&starred.value, names),
 
             Expr::List(ExprList { elts, .. }) | Expr::Tuple(ExprTuple { elts, .. }) => elts
                 .iter()
@@ -129,10 +129,10 @@ fn for_loop_writes(
         return None;
     };
 
-    let call_expr = stmt_expr.value.as_ref().as_call_expr()?;
-    let expr_attr = call_expr.func.as_ref().as_attribute_expr()?;
+    let call_expr = stmt_expr.value.as_call_expr()?;
+    let expr_attr = call_expr.func.as_attribute_expr()?;
 
-    if expr_attr.attr.as_str() != "write" {
+    if &expr_attr.attr != "write" {
         return None;
     }
 
@@ -143,7 +143,7 @@ fn for_loop_writes(
         return None;
     };
 
-    let io_object_name = expr_attr.value.as_ref().as_name_expr()?;
+    let io_object_name = expr_attr.value.as_name_expr()?;
 
     let semantic = checker.semantic();
 
@@ -211,6 +211,13 @@ fn loop_variables_are_used_outside_loop(
         )
     };
 
+    // If the load simulation succeeds at the position right before the loop,
+    // that binding is shadowed.
+    // ```python
+    //   a = 1
+    //   for a in b: ...
+    // # ^ Load here
+    // ```
     let name_overwrites_outer =
         |name: &ExprName| find_binding_id(name, loop_range.start()).is_some();
 
