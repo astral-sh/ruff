@@ -153,8 +153,8 @@ impl<'a> Generator<'a> {
         self.p(s.as_str());
     }
 
-    fn p_bytes_repr(&mut self, s: &[u8]) {
-        let escape = AsciiEscape::with_preferred_quote(s, self.quote);
+    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote) {
+        let escape = AsciiEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1100,7 +1100,7 @@ impl<'a> Generator<'a> {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(&bytes_literal.value);
+                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags.quote_style());
                 }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
@@ -1739,11 +1739,11 @@ class Foo:
 
     #[test]
     fn quote() {
-        assert_eq!(round_trip(r#""hello""#), r#""hello""#);
+        assert_round_trip!(r#""hello""#);
         assert_round_trip!(r"'hello'");
         assert_round_trip!(r"u'hello'");
         assert_round_trip!(r"r'hello'");
-        assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
+        assert_round_trip!(r"b'hello'");
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
@@ -1806,25 +1806,28 @@ if True:
                     $end,
                 );
             };
+            ($quote:expr, $start:expr) => {
+                round_trip_with!($quote, $start, $start);
+            };
         }
 
-        // setting Generator::quote works for bytestrings
-        round_trip_with!(Quote::Double, r#"b"hello""#, r#"b"hello""#);
-        round_trip_with!(Quote::Single, r#"b"hello""#, r"b'hello'");
-        round_trip_with!(Quote::Double, r"b'hello'", r#"b"hello""#);
-        round_trip_with!(Quote::Single, r"b'hello'", r"b'hello'");
-
-        // and for f-strings
+        // setting Generator::quote works for f-strings
         round_trip_with!(Quote::Double, r#"f"hello""#, r#"f"hello""#);
         round_trip_with!(Quote::Single, r#"f"hello""#, r"f'hello'");
         round_trip_with!(Quote::Double, r"f'hello'", r#"f"hello""#);
         round_trip_with!(Quote::Single, r"f'hello'", r"f'hello'");
 
-        // but not for string literals, where the `Quote` is taken directly from their flags
-        round_trip_with!(Quote::Double, r#""hello""#, r#""hello""#);
-        round_trip_with!(Quote::Single, r#""hello""#, r#""hello""#); // no effect
-        round_trip_with!(Quote::Double, r"'hello'", r#"'hello'"#); // no effect
-        round_trip_with!(Quote::Single, r"'hello'", r"'hello'");
+        // but not for bytestrings
+        round_trip_with!(Quote::Double, r#"b"hello""#);
+        round_trip_with!(Quote::Single, r#"b"hello""#); // no effect
+        round_trip_with!(Quote::Double, r"b'hello'"); // no effect
+        round_trip_with!(Quote::Single, r"b'hello'");
+
+        // or for string literals, where the `Quote` is taken directly from their flags
+        round_trip_with!(Quote::Double, r#""hello""#);
+        round_trip_with!(Quote::Single, r#""hello""#); // no effect
+        round_trip_with!(Quote::Double, r"'hello'"); // no effect
+        round_trip_with!(Quote::Single, r"'hello'");
     }
 
     #[test]
