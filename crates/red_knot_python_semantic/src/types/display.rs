@@ -1,6 +1,5 @@
 //! Display implementations for types.
 
-use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter, Write};
 
 use ruff_db::display::FormatterJoinExtension;
@@ -152,31 +151,12 @@ struct DisplayUnionType<'db> {
 
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut elements = Cow::Borrowed(self.ty.elements(self.db));
-
-        if let Some(literal_false_pos) = elements
-            .iter()
-            .position(|ty| matches!(ty, Type::BooleanLiteral(false)))
-        {
-            if let Some(literal_true_pos) = elements
-                .iter()
-                .position(|ty| matches!(ty, Type::BooleanLiteral(true)))
-            {
-                let (min, max) = if literal_false_pos < literal_true_pos {
-                    (literal_false_pos, literal_true_pos)
-                } else {
-                    (literal_true_pos, literal_false_pos)
-                };
-                let mutable_elements = elements.to_mut();
-                mutable_elements.swap_remove(max);
-                mutable_elements[min] = KnownClass::Bool.to_instance(self.db);
-            }
-        }
+        let elements = self.ty.elements(self.db);
 
         // Group condensed-display types by kind.
         let mut grouped_condensed_kinds = FxHashMap::default();
 
-        for element in &*elements {
+        for element in elements {
             if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
                 grouped_condensed_kinds
                     .entry(kind)
@@ -187,7 +167,7 @@ impl Display for DisplayUnionType<'_> {
 
         let mut join = f.join(" | ");
 
-        for element in &*elements {
+        for element in elements {
             if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
                 let Some(condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
                     continue;

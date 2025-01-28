@@ -103,10 +103,35 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
-        match self.elements.len() {
+        let UnionBuilder { elements, db } = self;
+
+        match elements.len() {
             0 => Type::Never,
-            1 => self.elements[0],
-            _ => Type::Union(UnionType::new(self.db, self.elements.into_boxed_slice())),
+            1 => elements[0],
+            _ => {
+                let mut normalized_elements = Vec::with_capacity(elements.len());
+                let mut first_bool_literal_pos = None;
+                let mut seen_two_bool_literals = false;
+                for (i, element) in elements.into_iter().enumerate() {
+                    if element.is_boolean_literal() {
+                        if first_bool_literal_pos.is_none() {
+                            first_bool_literal_pos = Some(i);
+                        } else {
+                            seen_two_bool_literals = true;
+                            continue;
+                        }
+                    }
+                    normalized_elements.push(element);
+                }
+                if let (Some(pos), true) = (first_bool_literal_pos, seen_two_bool_literals) {
+                    // If we have two boolean literals, we can merge them to `bool`.
+                    if normalized_elements.len() == 1 {
+                        return KnownClass::Bool.to_instance(db);
+                    }
+                    normalized_elements[pos] = KnownClass::Bool.to_instance(db);
+                }
+                Type::Union(UnionType::new(db, normalized_elements.into_boxed_slice()))
+            }
         }
     }
 }

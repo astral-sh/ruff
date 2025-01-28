@@ -358,4 +358,12 @@ from knot_extensions import is_assignable_to, static_assert
 static_assert(is_assignable_to(bool, str | bool))
 ```
 
+### `bool` is assignable to `AlwaysTruthy | AlwaysFalsy`
+
+```py
+from knot_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
+
+static_assert(is_assignable_to(bool, AlwaysTruthy | AlwaysFalsy))
+```
+
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

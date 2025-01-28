@@ -455,9 +455,9 @@ else:
     reveal_type(x)  # revealed: slice
 finally:
     # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float | range | slice`
-    reveal_type(x)  # revealed: bool | slice | float
+    reveal_type(x)  # revealed: bool | float | slice
 
-reveal_type(x)  # revealed: bool | slice | float
+reveal_type(x)  # revealed: bool | float | slice
 ```
 
 ## Nested `try`/`except` blocks
@@ -534,7 +534,7 @@ try:
         reveal_type(x)  # revealed: slice
     finally:
         # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float | range | slice`
-        reveal_type(x)  # revealed: bool | slice | float
+        reveal_type(x)  # revealed: bool | float | slice
         x = 2
         reveal_type(x)  # revealed: Literal[2]
     reveal_type(x)  # revealed: Literal[2]
