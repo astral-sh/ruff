@@ -124,6 +124,7 @@ def return_in_both_nested_branches(cond1: bool, cond2: bool):
         x = "test"
         reveal_type(x)  # revealed: Literal["test"]
     else:
+        x = "terminal0"
         if cond2:
             x = "terminal1"
             reveal_type(x)  # revealed: Literal["terminal1"]
@@ -139,7 +140,7 @@ def return_in_both_nested_branches(cond1: bool, cond2: bool):
 
 A `continue` statement jumps back to the top of the innermost loop. This makes it terminal within
 the loop body: definitions before it are not visible after it within the rest of the loop body. They
-are likely to visible after the loop body, since loops do not introduce new scopes. (Statically
+are likely visible after the loop body, since loops do not introduce new scopes. (Statically
 known infinite loops are one exception — if control never leaves the loop body, bindings inside of
 the loop are not visible outside of it.)
 
@@ -260,7 +261,7 @@ def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
 
 A `break` statement jumps to the end of the innermost loop. This makes it terminal within the loop
 body: definitions before it are not visible after it within the rest of the loop body. They are
-likely to visible after the loop body, since loops do not introduce new scopes. (Statically known
+likely visible after the loop body, since loops do not introduce new scopes. (Statically known
 infinite loops are one exception — if control never leaves the loop body, bindings inside of the
 loop are not visible outside of it.)
 
@@ -371,15 +372,16 @@ def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
 ## `raise`
 
 A `raise` statement is terminal. If it occurs in a lexically containing `try` statement, it will
-jump to one of the `except` clauses (if it matches the value being raised), or to the `finally`
+jump to one of the `except` clauses (if it matches the value being raised), or to the `else`
 clause (if none match). Currently, we assume definitions from before the `raise` are visible in all
-`except` and `finally` clauses. (In the future, we might analyze the `except` clauses to see which
+`except` and `else` clauses. (In the future, we might analyze the `except` clauses to see which
 ones match the value being raised, and limit visibility to those clauses.) Definitions from before
-the `raise` are not visible in any `else` clause, but are visible after the containing `try`
-statement, since `try` does not introduce a new scope.
+the `raise` are not visible in any `else` clause, but are visible in `except` clauses or after the
+containing `try` statement (since control flow may have passed through an `except`).
 
-TODO: We are not currently implementing the "jump" behavior correctly for `raise` statements. The
-false positives in this section are because of that, and not our terminal statement support.
+Currently we assume that an exception could be raised anywhere within a `try` block; the TODOs below reflect
+cases where we could implement a more precise understanding of where exceptions (barring `KeyboardInterrupt`
+and `MemoryError`) can and cannot actually be raised.
 
 ```py
 def raise_in_then_branch(cond: bool):
@@ -447,7 +449,7 @@ def raise_in_both_branches(cond: bool):
         # TODO: Literal["raise1", "raise2"]
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     except:
-        # TODO: Literal["raise1", "raise2"] or Never
+        # TODO: Literal["raise1", "raise2"]
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     else:
         # This is unreachable
@@ -549,9 +551,10 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
     reveal_type(x)  # revealed: Literal["before", "else", "raise1", "raise2"]
 ```
 
-## Terminal in a `finally` block
+## Terminal in `try` with `finally` clause
 
-Control-flow through finally isn't working right yet:
+TODO: we don't yet model that a `break` or `continue` in a `try` block will jump to a `finally` clause before it
+jumps to end/start of the loop.
 
 ```py
 def f():
