@@ -19,14 +19,14 @@ FURB168.py:5:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if a
   5 |+if foo is None:
 6 6 |     pass
 7 7 | 
-8 8 | if isinstance(foo, (type(None))):
+8 8 | if isinstance(foo and bar, type(None)):
 
 FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
   |
 6 |     pass
 7 |
-8 | if isinstance(foo, (type(None))):
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+8 | if isinstance(foo and bar, type(None)):
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
 9 |     pass
   |
   = help: Replace with `is` operator
@@ -35,8 +35,8 @@ FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if a
 5 5 | if isinstance(foo, type(None)):
 6 6 |     pass
 7 7 | 
-8   |-if isinstance(foo, (type(None))):
-  8 |+if foo is None:
+8   |-if isinstance(foo and bar, type(None)):
+  8 |+if (foo and bar) is None:
 9 9 |     pass
 10 10 | 
 11 11 | if isinstance(foo, (type(None), type(None), type(None))):
@@ -52,7 +52,7 @@ FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    = help: Replace with `is` operator
 
 ℹ Safe fix
-8  8  | if isinstance(foo, (type(None))):
+8  8  | if isinstance(foo and bar, type(None)):
 9  9  |     pass
 10 10 | 
 11    |-if isinstance(foo, (type(None), type(None), type(None))):

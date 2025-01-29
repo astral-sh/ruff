@@ -5,7 +5,7 @@ foo: object
 if isinstance(foo, type(None)):
     pass
 
-if isinstance(foo, (type(None))):
+if isinstance(foo and bar, type(None)):
     pass
 
 if isinstance(foo, (type(None), type(None), type(None))):
@@ -57,7 +57,6 @@ if isinstance(foo, (int, str)):
     pass
 
 if isinstance(foo, (int, type(None), str)):
-    pass
     pass
 
 if isinstance(foo, str | None):
