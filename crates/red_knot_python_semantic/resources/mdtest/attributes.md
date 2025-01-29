@@ -13,123 +13,94 @@ accessed on the class itself.
 
 ```py
 class C:
-    def __init__(self, value2: int, flag: bool = False) -> None:
-        # bound but not declared
-        self.pure_instance_variable1 = "value set in __init__"
-
-        # bound but not declared - with type inferred from parameter
-        self.pure_instance_variable2 = value2
-
-        # declared but not bound
-        self.pure_instance_variable3: bytes
-
-        # declared and bound
-        self.pure_instance_variable4: bool = True
-
-        # possibly undeclared/unbound
+    def __init__(self, param: int | None, flag: bool = False) -> None:
+        value = 1 if flag else "a"
+        self.inferred_from_value = value
+        self.inferred_from_other_attribute = self.inferred_from_value
+        self.inferred_from_param = param
+        self.declared_only: bytes
+        self.declared_and_bound: bool = True
         if flag:
-            self.pure_instance_variable5: str = "possibly set in __init__"
+            self.possibly_undeclared_unbound: str = "possibly set in __init__"
 
 c_instance = C(1)
 
-# TODO: should be `Literal["value set in __init__"]`, or `Unknown | Literal[…]` to allow
-# assignments to this unannotated attribute from other scopes.
-reveal_type(c_instance.pure_instance_variable1)  # revealed: @Todo(implicit instance attribute)
+# TODO: Mypy/pyright infer `int | str` here. We want this to be `Unknown | Literal[1, "a"]`
+reveal_type(c_instance.inferred_from_value)  # revealed: @Todo(implicit instance attribute)
 
-# TODO: should be `int`
-reveal_type(c_instance.pure_instance_variable2)  # revealed: @Todo(implicit instance attribute)
+# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: @Todo(implicit instance attribute)
+
+# TODO: should be `int | None`
+reveal_type(c_instance.inferred_from_param)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `bytes`
-reveal_type(c_instance.pure_instance_variable3)  # revealed: @Todo(implicit instance attribute)
+reveal_type(c_instance.declared_only)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `bool`
-reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(implicit instance attribute)
+reveal_type(c_instance.declared_and_bound)  # revealed: @Todo(implicit instance attribute)
 
 # TODO: should be `str`
 # We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
 # mypy and pyright do not show an error here.
-reveal_type(c_instance.pure_instance_variable5)  # revealed: @Todo(implicit instance attribute)
+reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: @Todo(implicit instance attribute)
 
-# TODO: If we choose to infer a precise `Literal[…]` type for the instance attribute (see
-# above), this should be an error: incompatible types in assignment. If we choose to infer
-# a gradual `Unknown | Literal[…]` type, this assignment is fine.
-c_instance.pure_instance_variable1 = "value set on instance"
+# This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
+c_instance.inferred_from_value = "value set on instance"
+
+# This assignment is also fine:
+c_instance.inferred_from_param = None
 
 # TODO: this should be an error (incompatible types in assignment)
-c_instance.pure_instance_variable2 = "incompatible"
+c_instance.inferred_from_param = "incompatible"
 
 # TODO: we already show an error here but the message might be improved?
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `pure_instance_variable1`"
-reveal_type(C.pure_instance_variable1)  # revealed: Unknown
+# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `inferred_from_value`"
+reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # TODO: this should be an error (pure instance variables cannot be accessed on the class)
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-C.pure_instance_variable1 = "overwritten on class"
+C.inferred_from_value = "overwritten on class"
 
-c_instance.pure_instance_variable4 = False
+# This assignment is fine:
+c_instance.declared_and_bound = False
 
 # TODO: After this assignment to the attribute within this scope, we may eventually want to narrow
 # the `bool` type (see above) for this instance variable to `Literal[False]` here. This is unsound
 # in general (we don't know what else happened to `c_instance` between the assignment and the use
 # here), but mypy and pyright support this. In conclusion, this could be `bool` but should probably
 # be `Literal[False]`.
-reveal_type(c_instance.pure_instance_variable4)  # revealed: @Todo(implicit instance attribute)
+reveal_type(c_instance.declared_and_bound)  # revealed: @Todo(implicit instance attribute)
 ```
 
-#### Variable declared in class body and declared/bound in `__init__`
+#### Variable declared in class body and possibly bound in `__init__`
 
 The same rule applies even if the variable is *declared* (not bound!) in the class body: it is still
 a pure instance variable.
 
 ```py
 class C:
-    pure_instance_variable: str
+    declared_and_bound: str | None
 
     def __init__(self) -> None:
-        self.pure_instance_variable = "value set in __init__"
+        self.declared_and_bound = "value set in __init__"
 
 c_instance = C()
 
-reveal_type(c_instance.pure_instance_variable)  # revealed: str
+reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
 # TODO: we currently plan to emit a diagnostic here. Note that both mypy
 # and pyright show no error in this case! So we may reconsider this in
 # the future, if it turns out to produce too many false positives.
-reveal_type(C.pure_instance_variable)  # revealed: str
+reveal_type(C.declared_and_bound)  # revealed: str | None
 
 # TODO: same as above. We plan to emit a diagnostic here, even if both mypy
 # and pyright allow this.
-C.pure_instance_variable = "overwritten on class"
+C.declared_and_bound = "overwritten on class"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `pure_instance_variable` of type `str`"
-c_instance.pure_instance_variable = 1
-```
-
-#### Variable only defined in unrelated method
-
-We also recognize pure instance variables if they are defined in a method that is not `__init__`.
-
-```py
-class C:
-    def set_instance_variable(self) -> None:
-        self.pure_instance_variable = "value set in method"
-
-c_instance = C()
-
-# Not that we would use this in static analysis, but for a more realistic example, let's actually
-# call the method, so that the attribute is bound if this example is actually run.
-c_instance.set_instance_variable()
-
-# TODO: should be `Literal["value set in method"]` or `Unknown | Literal[…]` (see above).
-reveal_type(c_instance.pure_instance_variable)  # revealed: @Todo(implicit instance attribute)
-
-# TODO: We already show an error here, but the message might be improved?
-# error: [unresolved-attribute]
-reveal_type(C.pure_instance_variable)  # revealed: Unknown
-
-# TODO: this should be an error
-C.pure_instance_variable = "overwritten on class"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` of type `str | None`"
+c_instance.declared_and_bound = 1
 ```
 
 #### Variable declared in class body and not bound anywhere
@@ -139,18 +110,86 @@ instance variable and allow access to it via instances.
 
 ```py
 class C:
-    pure_instance_variable: str
+    only_declared: str
 
 c_instance = C()
 
-reveal_type(c_instance.pure_instance_variable)  # revealed: str
+reveal_type(c_instance.only_declared)  # revealed: str
 
 # TODO: mypy and pyright do not show an error here, but we plan to emit a diagnostic.
 # The type could be changed to 'Unknown' if we decide to emit an error?
-reveal_type(C.pure_instance_variable)  # revealed: str
+reveal_type(C.only_declared)  # revealed: str
 
 # TODO: mypy and pyright do not show an error here, but we plan to emit one.
-C.pure_instance_variable = "overwritten on class"
+C.only_declared = "overwritten on class"
+```
+
+#### Variable only defined in unrelated method
+
+We also recognize pure instance variables if they are defined in a method that is not `__init__`.
+
+```py
+class C:
+    def __init__(self, param: int | None, flag: bool = False) -> None:
+        self.initialize(param, flag)
+
+    def initialize(self, param: int | None, flag: bool) -> None:
+        value = 1 if flag else "a"
+        self.inferred_from_value = value
+        self.inferred_from_other_attribute = self.inferred_from_value
+        self.inferred_from_param = param
+        self.declared_only: bytes
+        self.declared_and_bound: bool = True
+
+c_instance = C(1)
+
+# TODO: Should be `Unknown | Literal[1, "a"]`
+reveal_type(c_instance.inferred_from_value)  # revealed: @Todo(implicit instance attribute)
+
+# TODO: Should be `Unknown | Literal[1, "a"]`
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: @Todo(implicit instance attribute)
+
+# TODO: Should be `int | None`
+reveal_type(c_instance.inferred_from_param)  # revealed: @Todo(implicit instance attribute)
+
+# TODO: Should be `bytes`
+reveal_type(c_instance.declared_only)  # revealed: @Todo(implicit instance attribute)
+
+# TODO: Should be `bool`
+reveal_type(c_instance.declared_and_bound)  # revealed: @Todo(implicit instance attribute)
+
+# TODO: We already show an error here, but the message might be improved?
+# error: [unresolved-attribute]
+reveal_type(C.inferred_from_value)  # revealed: Unknown
+
+# TODO: this should be an error
+C.inferred_from_value = "overwritten on class"
+```
+
+#### Methods that does not use `self` as a first parameter
+
+```py
+class C:
+    # This might trigger a stylistic lint like `invalid-first-argument-name-for-method`, but
+    # it should be supported in general:
+    def __init__(this) -> None:
+        this.declared_and_bound: str | None = "a"
+
+# TODO: should be `str | None`
+reveal_type(C().declared_and_bound)  # revealed: @Todo(implicit instance attribute)
+```
+
+#### Aliased `self` parameter
+
+```py
+class C:
+    def __init__(self) -> None:
+        this = self
+        this.declared_and_bound: str | None = "a"
+
+# TODO: This would ideally be `str | None`, but mypy/pyright don't support this either,
+# so `Unknown` + a diagnostic is also fine.
+reveal_type(C().declared_and_bound)  # revealed: @Todo(implicit instance attribute)
 ```
 
 ### Pure class variables (`ClassVar`)
@@ -275,6 +314,36 @@ reveal_type(C.variable_with_class_default1)  # revealed: str
 
 # TODO: should still be `Literal["value set on instance"]`, or `str`.
 reveal_type(c_instance.variable_with_class_default1)  # revealed: str
+```
+
+### Inheritance of class/instance attributes
+
+#### Instance variable defined in a base class
+
+```py
+class Base:
+    declared_in_body: int | None = 1
+
+    can_not_be_redeclared: str | None = None
+
+    def __init__(self) -> None:
+        self.defined_in_init: str | None = "value in base"
+
+class Intermediate(Base):
+    # TODO: This should be an error
+    can_not_be_redeclared: str = "a"
+
+    def __init__(self) -> None:
+        super().__init__()
+
+class Derived(Intermediate): ...
+
+reveal_type(Derived.declared_in_body)  # revealed: int | None
+
+reveal_type(Derived().declared_in_body)  # revealed: int | None
+
+# TODO: Should be `str | None`
+reveal_type(Derived().defined_in_init)  # revealed: @Todo(implicit instance attribute)
 ```
 
 ## Union of attributes
