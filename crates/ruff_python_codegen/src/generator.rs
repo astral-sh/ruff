@@ -1761,6 +1761,49 @@ class Foo:
         assert_round_trip!(r#"b'''hello'''"#);
         assert_round_trip!(r#"f'''hello'''"#);
         assert_round_trip!(r#"f'''{hello}'''"#);
+
+        // all of the valid string literal prefix and quote combinations from
+        // https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+        let string_prefixes = [
+            ("r", "r"),
+            ("u", "u"),
+            ("R", "R"),
+            ("U", "u"), // case not tracked
+            ("f", "f"),
+            ("F", "f"),   // f case not tracked
+            ("fr", "rf"), // r before f
+            ("Fr", "rf"), // f case not tracked, r before f
+            ("fR", "Rf"), // r before f
+            ("FR", "Rf"), // f case not tracked, r before f
+            ("rf", "rf"),
+            ("rF", "rf"), // f case not tracked
+            ("Rf", "Rf"),
+            ("RF", "Rf"), // f case not tracked
+            // bytestrings
+            ("b", "b"),
+            ("B", "b"),   // b case
+            ("br", "rb"), // r before b
+            ("Br", "rb"), // b case, r before b
+            ("bR", "Rb"), // r before b
+            ("BR", "Rb"), // b case, r before b
+            ("rb", "rb"),
+            ("rB", "rb"), // b case
+            ("Rb", "Rb"),
+            ("RB", "Rb"), // b case
+        ];
+        let quotes = ["\"", "'", "\"\"\"", "'''"];
+        for (inp, out) in string_prefixes {
+            for q in quotes {
+                let input = format!("{inp}{q}hello{q}");
+                let output = format!("{out}{q}hello{q}");
+                assert_eq!(round_trip(&input), output);
+
+                // variants with f-string patterns
+                let input = format!("{inp}{q}{{hello}} {{world}}{q}");
+                let output = format!("{out}{q}{{hello}} {{world}}{q}");
+                assert_eq!(round_trip(&input), output);
+            }
+        }
     }
 
     #[test]
