@@ -28,6 +28,8 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::ExceptionCallOutsideHandlers, Path::new("LOG004.py"))]
+    #[test_case(Rule::ExcInfoOutsideHandlers, Path::new("LOG014.py"))]
     #[test_case(Rule::RootLoggerCall, Path::new("LOG015.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
