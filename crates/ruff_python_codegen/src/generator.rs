@@ -158,7 +158,7 @@ impl<'a> Generator<'a> {
         escape
             .bytes_repr(flags.is_triple_quoted())
             .write(&mut self.buffer)
-            .unwrap(); // write to string doesn't fail
+            .expect("Writing to a String buffer should never fail");
     }
 
     /// Returns a [`std::str::Utf8Error`] if `s` is not valid UTF-8, otherwise converts `s` to a
@@ -187,7 +187,7 @@ impl<'a> Generator<'a> {
         escape
             .str_repr(flags.is_triple_quoted())
             .write(&mut self.buffer)
-            .unwrap(); // write to string doesn't fail
+            .expect("Writing to a String buffer should never fail");
     }
 
     fn p_if(&mut self, cond: bool, s: &str) {
