@@ -123,7 +123,17 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
-                    flags,
+                    // intentionally omit the triple quote flag, if set, to avoid strange
+                    // replacements like
+                    //
+                    // ```python
+                    // """
+                    // itemA
+                    // itemB
+                    // itemC
+                    // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
+                    // ```
+                    flags: flags.without_triple_quotes(),
                 })
             })
             .collect(),

@@ -1483,6 +1483,12 @@ impl StringLiteralFlags {
     }
 
     #[must_use]
+    pub fn without_triple_quotes(mut self) -> Self {
+        self.0.remove(StringLiteralFlagsInner::TRIPLE_QUOTED);
+        self
+    }
+
+    #[must_use]
     pub fn with_prefix(self, prefix: StringLiteralPrefix) -> Self {
         let StringLiteralFlags(flags) = self;
         match prefix {
