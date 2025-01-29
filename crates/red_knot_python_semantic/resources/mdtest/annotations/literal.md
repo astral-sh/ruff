@@ -106,7 +106,7 @@ def union_example(
         Literal["B"],
         Literal[True],
         None,
-    ]
+    ],
 ):
     reveal_type(x)  # revealed: Unknown | Literal[-1, "A", b"A", b"\x00", b"\x07", 0, 1, "B", "foo", "bar", True] | None
 ```
