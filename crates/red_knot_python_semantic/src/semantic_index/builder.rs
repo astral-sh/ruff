@@ -65,6 +65,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
 
+    return_states: Vec<FlowSnapshot>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
@@ -95,6 +96,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
+            return_states: vec![],
             loop_break_states: vec![],
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
@@ -703,10 +705,20 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
+                        let saved_return_states = std::mem::take(&mut builder.return_states);
 
                         builder.declare_parameters(parameters);
 
                         builder.visit_body(body);
+
+                        // Merge the flow state just before any `return` statements with the flow
+                        // state at the end of the function body.
+                        let return_states =
+                            std::mem::replace(&mut builder.return_states, saved_return_states);
+                        for return_state in return_states {
+                            builder.flow_merge(return_state);
+                        }
+
                         builder.pop_scope()
                     },
                 );
@@ -1272,8 +1284,17 @@ where
                 self.visit_body(finalbody);
             }
 
-            ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
+            ast::Stmt::Raise(_) | ast::Stmt::Continue(_) => {
                 walk_stmt(self, stmt);
+                // Everything in the current block after a terminal statement is unreachable.
+                self.mark_unreachable();
+            }
+
+            ast::Stmt::Return(_) => {
+                // Mark the flow state just before the `return` as one of the return states of the
+                // current function.
+                self.return_states.push(self.flow_snapshot());
+
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
