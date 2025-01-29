@@ -330,7 +330,10 @@ class Base:
         self.defined_in_init: str | None = "value in base"
 
 class Intermediate(Base):
-    # TODO: This should be an error
+    # TODO: Mypy does not report an error here, but pyright does:
+    # "… overrides symbol of same name in class "Base". Variable is mutable so its type is invariant"
+    # We should introduce a diagnostic for this. Whether or not that should be enabled by default can
+    # still be discussed.
     can_not_be_redeclared: str = "a"
 
     def __init__(self) -> None:
