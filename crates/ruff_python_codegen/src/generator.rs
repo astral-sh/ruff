@@ -146,6 +146,11 @@ impl<'a> Generator<'a> {
     }
 
     fn p_bytes_repr(&mut self, s: &[u8], flags: BytesLiteralFlags) {
+        // raw bytes are interpreted without escapes and should all be ascii, but double check
+        // before writing to self
+        if flags.prefix().is_raw() && self.p_raw_bytes(s, flags).is_ok() {
+            return;
+        }
         let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -154,6 +159,21 @@ impl<'a> Generator<'a> {
             .bytes_repr(flags.is_triple_quoted())
             .write(&mut self.buffer)
             .unwrap(); // write to string doesn't fail
+    }
+
+    /// Returns a [`std::str::Utf8Error`] if `s` is not valid UTF-8, otherwise converts `s` to a
+    /// `str` and adds it to `self`.
+    fn p_raw_bytes(
+        &mut self,
+        s: &[u8],
+        flags: BytesLiteralFlags,
+    ) -> Result<(), std::str::Utf8Error> {
+        let body = std::str::from_utf8(s)?;
+        self.p(flags.prefix().as_str());
+        self.p(flags.quote_str());
+        self.p(body);
+        self.p(flags.quote_str());
+        Ok(())
     }
 
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
