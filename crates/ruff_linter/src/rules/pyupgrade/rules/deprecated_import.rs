@@ -308,7 +308,9 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "TypeGuard",
     "get_args",
     "get_origin",
-    "is_typeddict",
+    // Introduced in Python 3.10, but `typing_extensions` equivalent
+    // also checks for `typing_extensions.TypedDict` in addition to `typing.TypedDict`.
+    // "is_typeddict",
 ];
 
 // Python 3.11+
