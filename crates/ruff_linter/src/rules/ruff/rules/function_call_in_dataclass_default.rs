@@ -140,7 +140,9 @@ pub(crate) fn function_call_in_dataclass_default(
             || is_class_var_annotation(annotation, checker.semantic())
             || is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
             || is_descriptor_class(func, checker.semantic())
-            || is_immutable_newtype_call(func, checker.semantic(), &extend_immutable_calls)
+            || func.as_name_expr().is_some_and(|name| {
+                is_immutable_newtype_call(name, checker.semantic(), &extend_immutable_calls)
+            })
         {
             continue;
         }

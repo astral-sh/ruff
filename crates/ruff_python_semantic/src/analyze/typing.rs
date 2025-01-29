@@ -303,15 +303,22 @@ pub fn is_immutable_func(
         })
 }
 
+/// Return `true` if `name` is bound to the `typing.NewType` call where the original type is
+/// immutable.
+///
+/// For example:
+/// ```python
+/// from typing import NewType
+///
+/// UserId = NewType("UserId", int)
+/// ```
+///
+/// Here, `name` would be `UserId`.
 pub fn is_immutable_newtype_call(
-    func: &Expr,
+    name: &ast::ExprName,
     semantic: &SemanticModel,
     extend_immutable_calls: &[QualifiedName],
 ) -> bool {
-    let Expr::Name(name) = func else {
-        return false;
-    };
-
     let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
         return false;
     };
