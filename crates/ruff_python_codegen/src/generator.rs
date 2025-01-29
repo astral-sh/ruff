@@ -158,6 +158,14 @@ impl<'a> Generator<'a> {
 
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
         let flags = flags.into();
+        if flags.prefix().is_raw() {
+            self.p(flags.prefix().as_str());
+            self.p(flags.quote_str());
+            self.p(s);
+            self.p(flags.quote_str());
+            return;
+        }
+        self.p(flags.prefix().as_str());
         let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -1286,19 +1294,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         let ast::StringLiteral { value, flags, .. } = string_literal;
-        // for raw strings, we don't want to perform the UnicodeEscape in `p_str_repr`, so build the
-        // replacement here
-        if flags.prefix().is_raw() {
-            self.p(flags.prefix().as_str());
-            self.p(flags.quote_str());
-            self.p(value);
-            self.p(flags.quote_str());
-        } else {
-            if flags.prefix().is_unicode() {
-                self.p("u");
-            }
-            self.p_str_repr(value, *flags);
-        }
+        self.p_str_repr(value, *flags);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -1403,7 +1399,6 @@ impl<'a> Generator<'a> {
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
     /// surrounding quote style.
     fn unparse_f_string(&mut self, values: &[ast::FStringElement], flags: FStringFlags) {
-        self.p("f");
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_f_string_body(values);
         let body = &generator.buffer;
