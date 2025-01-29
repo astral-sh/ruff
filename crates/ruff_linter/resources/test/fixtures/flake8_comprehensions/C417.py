@@ -19,7 +19,7 @@ _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 
 # False negatives.
 map(lambda x=2, y=1: x + y, nums, nums)
-
+set(map(lambda x, y: x, nums, nums))
 
 
 def func(arg1: int, arg2: int = 4):
@@ -62,7 +62,7 @@ map(lambda x:x, [c:=a])
 # https://github.com/astral-sh/ruff/issues/15796
 map(lambda: "const", nums)
 list(map(lambda x, y: x * y, nums))
-set(map(lambda x, y: x, nums, nums))
+
 
 map(lambda: 1, "xyz")
 map(lambda x, y: x, [(1, 2), (3, 4)])

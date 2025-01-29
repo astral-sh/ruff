@@ -111,7 +111,7 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if !lambda_has_expected_arity(parameters.as_ref(), body) {
+            if !lambda_has_expected_arity(parameters.as_deref(), body) {
                 return;
             }
         }
@@ -146,7 +146,7 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if !lambda_has_expected_arity(parameters.as_ref(), body) {
+            if !lambda_has_expected_arity(parameters.as_deref(), body) {
                 return;
             }
         }
@@ -191,7 +191,7 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if !lambda_has_expected_arity(parameters.as_ref(), body) {
+            if !lambda_has_expected_arity(parameters.as_deref(), body) {
                 return;
             }
         }
@@ -216,11 +216,10 @@ pub(crate) fn unnecessary_map(
 /// * It has exactly one parameter
 /// * That parameter is not variadic
 /// * That parameter does not have a default value
-fn lambda_has_expected_arity(parameters: Option<&Box<Parameters>>, body: &Expr) -> bool {
+fn lambda_has_expected_arity(parameters: Option<&Parameters>, body: &Expr) -> bool {
     let Some(parameters) = parameters else {
         return false;
     };
-    let parameters = parameters.as_ref();
 
     let [parameter] = &parameters.args[..] else {
         return false;
