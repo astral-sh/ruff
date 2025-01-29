@@ -56,7 +56,7 @@ repos:
             .*?invalid(_.+)*_syntax\.md
           )$
         additional_dependencies:
-          - black==24.10.0
+          - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
     rev: v1.29.4
