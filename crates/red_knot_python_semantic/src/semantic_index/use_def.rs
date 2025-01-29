@@ -476,6 +476,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
+    reachable: bool,
 }
 
 #[derive(Debug)]
@@ -503,6 +504,8 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Currently live bindings and declarations for each symbol.
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
+
+    reachable: bool,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -515,11 +518,16 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
+            reachable: true,
         }
     }
 }
 
 impl<'db> UseDefMapBuilder<'db> {
+    pub(super) fn mark_unreachable(&mut self) {
+        self.reachable = false;
+    }
+
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
         let new_symbol = self
             .symbol_states
@@ -656,6 +664,7 @@ impl<'db> UseDefMapBuilder<'db> {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
             scope_start_visibility: self.scope_start_visibility,
+            reachable: self.reachable,
         }
     }
 
@@ -678,12 +687,25 @@ impl<'db> UseDefMapBuilder<'db> {
             num_symbols,
             SymbolState::undefined(self.scope_start_visibility),
         );
+
+        self.reachable = snapshot.reachable;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
     pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+        // Unreachable snapshots should not be merged: If the current snapshot is unreachable, it
+        // should be completely overwritten by the snapshot we're merging in. If the other snapshot
+        // is unreachable, we should return without merging.
+        if !snapshot.reachable {
+            return;
+        }
+        if !self.reachable {
+            self.restore(snapshot);
+            return;
+        }
+
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
@@ -705,6 +727,9 @@ impl<'db> UseDefMapBuilder<'db> {
         self.scope_start_visibility = self
             .visibility_constraints
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
+
+        // Both of the snapshots are reachable, so the merged result is too.
+        self.reachable = true;
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
