@@ -146,20 +146,26 @@ impl<'a> Generator<'a> {
         self.p(s.as_str());
     }
 
-    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote) {
+    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote, triple_quote: bool) {
         let escape = AsciiEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
-        escape.bytes_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
+        escape
+            .bytes_repr(triple_quote)
+            .write(&mut self.buffer)
+            .unwrap(); // write to string doesn't fail
     }
 
-    fn p_str_repr(&mut self, s: &str, quote: Quote) {
+    fn p_str_repr(&mut self, s: &str, quote: Quote, triple_quote: bool) {
         let escape = UnicodeEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
-        escape.str_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
+        escape
+            .str_repr(triple_quote)
+            .write(&mut self.buffer)
+            .unwrap(); // write to string doesn't fail
     }
 
     fn p_if(&mut self, cond: bool, s: &str) {
@@ -1093,7 +1099,11 @@ impl<'a> Generator<'a> {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags.quote_style());
+                    self.p_bytes_repr(
+                        &bytes_literal.value,
+                        bytes_literal.flags.quote_style(),
+                        bytes_literal.flags.is_triple_quoted(),
+                    );
                 }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
@@ -1291,7 +1301,7 @@ impl<'a> Generator<'a> {
             if flags.prefix().is_unicode() {
                 self.p("u");
             }
-            self.p_str_repr(value, flags.quote_style());
+            self.p_str_repr(value, flags.quote_style(), flags.is_triple_quoted());
         }
     }
 
@@ -1312,7 +1322,11 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(&f_string.elements, f_string.flags.quote_style());
+                    self.unparse_f_string(
+                        &f_string.elements,
+                        f_string.flags.quote_style(),
+                        f_string.flags.is_triple_quoted(),
+                    );
                 }
             }
         }
@@ -1396,12 +1410,17 @@ impl<'a> Generator<'a> {
 
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
     /// surrounding quote style.
-    fn unparse_f_string(&mut self, values: &[ast::FStringElement], quote: Quote) {
+    fn unparse_f_string(
+        &mut self,
+        values: &[ast::FStringElement],
+        quote: Quote,
+        triple_quote: bool,
+    ) {
         self.p("f");
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_f_string_body(values);
         let body = &generator.buffer;
-        self.p_str_repr(body, quote);
+        self.p_str_repr(body, quote, triple_quote);
     }
 
     fn unparse_alias(&mut self, alias: &Alias) {
@@ -1726,6 +1745,20 @@ class Foo:
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_round_trip!(r#"f'abc{"def"}{1}'"#);
+        // triple double quotes should be preserved for all string types
+        assert_round_trip!(r#""""hello""""#);
+        assert_round_trip!(r#"u"""hello""""#);
+        assert_round_trip!(r#"r"""hello""""#);
+        assert_round_trip!(r#"b"""hello""""#);
+        assert_round_trip!(r#"f"""hello""""#);
+        assert_round_trip!(r#"f"""{hello}""""#);
+        // same for triple single quotes
+        assert_round_trip!(r#"'''hello'''"#);
+        assert_round_trip!(r#"u'''hello'''"#);
+        assert_round_trip!(r#"r'''hello'''"#);
+        assert_round_trip!(r#"b'''hello'''"#);
+        assert_round_trip!(r#"f'''hello'''"#);
+        assert_round_trip!(r#"f'''{hello}'''"#);
     }
 
     #[test]

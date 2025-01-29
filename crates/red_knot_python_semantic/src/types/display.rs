@@ -98,7 +98,7 @@ impl Display for DisplayRepresentation<'_> {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
-                escape.bytes_repr().write(f)
+                escape.bytes_repr(false).write(f)
             }
             Type::SliceLiteral(slice) => {
                 f.write_str("slice[")?;
