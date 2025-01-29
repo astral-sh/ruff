@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B008_extended.py:24:51: B008 Do not perform function call `Depends` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
    |
@@ -14,4 +13,11 @@ B008_extended.py:36:15: B008 Do not perform function call `OtherClass` in argume
 36 | def error(obj=OtherClass()):
    |               ^^^^^^^^^^^^ B008
 37 |     ...
+   |
+
+B008_extended.py:48:17: B008 Do not perform function call `L` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+   |
+47 | def okay(obj = N()): ...
+48 | def error(obj = L()): ...
+   |                 ^^^ B008
    |
