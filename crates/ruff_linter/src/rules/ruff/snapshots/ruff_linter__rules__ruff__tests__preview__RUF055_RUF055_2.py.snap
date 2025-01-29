@@ -1,0 +1,170 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF055_2.py:7:1: RUF055 [*] Plain string pattern passed to `re` function
+  |
+6 | # this should be replaced with `"abc" not in s`
+7 | re.search("abc", s) is None
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+  |
+  = help: Replace with `"abc" not in s`
+
+ℹ Safe fix
+4 4 | s = "str"
+5 5 | 
+6 6 | # this should be replaced with `"abc" not in s`
+7   |-re.search("abc", s) is None
+  7 |+"abc" not in s
+8 8 | 
+9 9 | 
+10 10 | # this should be replaced with `"abc" in s`
+
+RUF055_2.py:11:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+10 | # this should be replaced with `"abc" in s`
+11 | re.search("abc", s) is not None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `"abc" in s`
+
+ℹ Safe fix
+8  8  | 
+9  9  | 
+10 10 | # this should be replaced with `"abc" in s`
+11    |-re.search("abc", s) is not None
+   11 |+"abc" in s
+12 12 | 
+13 13 | 
+14 14 | # this should be replaced with `not s.startswith("abc")`
+
+RUF055_2.py:15:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+14 | # this should be replaced with `not s.startswith("abc")`
+15 | re.match("abc", s) is None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `not s.startswith("abc")`
+
+ℹ Safe fix
+12 12 | 
+13 13 | 
+14 14 | # this should be replaced with `not s.startswith("abc")`
+15    |-re.match("abc", s) is None
+   15 |+not s.startswith("abc")
+16 16 | 
+17 17 | 
+18 18 | # this should be replaced with `s.startswith("abc")`
+
+RUF055_2.py:19:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+18 | # this should be replaced with `s.startswith("abc")`
+19 | re.match("abc", s) is not None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `s.startswith("abc")`
+
+ℹ Safe fix
+16 16 | 
+17 17 | 
+18 18 | # this should be replaced with `s.startswith("abc")`
+19    |-re.match("abc", s) is not None
+   19 |+s.startswith("abc")
+20 20 | 
+21 21 | 
+22 22 | # this should be replaced with `s != "abc"`
+
+RUF055_2.py:23:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+22 | # this should be replaced with `s != "abc"`
+23 | re.fullmatch("abc", s) is None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `s != "abc"`
+
+ℹ Safe fix
+20 20 | 
+21 21 | 
+22 22 | # this should be replaced with `s != "abc"`
+23    |-re.fullmatch("abc", s) is None
+   23 |+s != "abc"
+24 24 | 
+25 25 | 
+26 26 | # this should be replaced with `s == "abc"`
+
+RUF055_2.py:27:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+26 | # this should be replaced with `s == "abc"`
+27 | re.fullmatch("abc", s) is not None
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `s == "abc"`
+
+ℹ Safe fix
+24 24 | 
+25 25 | 
+26 26 | # this should be replaced with `s == "abc"`
+27    |-re.fullmatch("abc", s) is not None
+   27 |+s == "abc"
+28 28 | 
+29 29 | 
+30 30 | # this should trigger an unsafe fix because of the presence of a comment within the
+
+RUF055_2.py:33:5: RUF055 [*] Plain string pattern passed to `re` function
+   |
+31 |   # expression being replaced (which we'd lose)
+32 |   if (
+33 | /     re.fullmatch(
+34 | |         "a really really really really long string",
+35 | |         s,
+36 | |     )
+37 | |     # with a comment here
+38 | |     is None
+   | |___________^ RUF055
+39 |   ):
+40 |       pass
+   |
+   = help: Replace with `s != "a really really really really long string"`
+
+ℹ Unsafe fix
+30 30 | # this should trigger an unsafe fix because of the presence of a comment within the
+31 31 | # expression being replaced (which we'd lose)
+32 32 | if (
+33    |-    re.fullmatch(
+34    |-        "a really really really really long string",
+35    |-        s,
+36    |-    )
+37    |-    # with a comment here
+38    |-    is None
+   33 |+    s != "a really really really really long string"
+39 34 | ):
+40 35 |     pass
+41 36 | 
+
+RUF055_2.py:46:5: RUF055 [*] Plain string pattern passed to `re` function
+   |
+44 |   # expression)
+45 |   if (  # leading
+46 | /     re.fullmatch(
+47 | |         "a really really really really long string",
+48 | |         s,
+49 | |     )
+50 | |     is None  # trailing
+   | |___________^ RUF055
+51 |   ):
+52 |       pass
+   |
+   = help: Replace with `s != "a really really really really long string"`
+
+ℹ Safe fix
+43 43 | # this should trigger a safe fix (comments are preserved given they're outside the
+44 44 | # expression)
+45 45 | if (  # leading
+46    |-    re.fullmatch(
+47    |-        "a really really really really long string",
+48    |-        s,
+49    |-    )
+50    |-    is None  # trailing
+   46 |+    s != "a really really really really long string"  # trailing
+51 47 | ):
+52 48 |     pass
