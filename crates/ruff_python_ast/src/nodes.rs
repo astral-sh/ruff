@@ -1103,6 +1103,12 @@ impl FStringFlags {
     }
 
     #[must_use]
+    pub fn without_triple_quotes(mut self) -> Self {
+        self.0.remove(FStringFlagsInner::TRIPLE_QUOTED);
+        self
+    }
+
+    #[must_use]
     pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
         match prefix {
             FStringPrefix::Regular => {
@@ -1878,6 +1884,12 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
+    pub fn without_triple_quotes(mut self) -> Self {
+        self.0.remove(BytesLiteralFlagsInner::TRIPLE_QUOTED);
+        self
+    }
+
+    #[must_use]
     pub fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
         match prefix {
             ByteStringPrefix::Regular => {
@@ -2122,6 +2134,12 @@ impl AnyStringFlags {
     #[must_use]
     pub fn with_triple_quotes(mut self) -> Self {
         self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn without_triple_quotes(mut self) -> Self {
+        self.0.remove(AnyStringFlagsInner::TRIPLE_QUOTED);
         self
     }
 }
