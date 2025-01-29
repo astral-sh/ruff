@@ -1063,10 +1063,32 @@ bitflags! {
 
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for an f-string.
-#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+///
+/// ## Notes on usage
+///
+/// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
+/// from an existing f-string literal, consider passing along the [`FString::flags`] field. If you
+/// don't have an existing literal but have a `Checker` from the `ruff_linter` crate available,
+/// consider using `Checker::default_fstring_flags` to create instances of this struct; this method
+/// will properly handle nested f-strings. For usage that doesn't fit into one of these categories,
+/// the public constructor [`FStringFlags::empty`] can be used.
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct FStringFlags(FStringFlagsInner);
 
 impl FStringFlags {
+    /// Construct a new [`FStringFlags`] with **no flags set**.
+    ///
+    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes`], and
+    /// [`FStringFlags::with_prefix`] for ways of setting the quote style (single or double),
+    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
+    ///
+    /// See the documentation for [`FStringFlags`] for additional caveats on this constructor, and
+    /// situations in which alternative ways to construct this struct should be used, especially
+    /// when writing lint rules.
+    pub fn empty() -> Self {
+        Self(FStringFlagsInner::empty())
+    }
+
     #[must_use]
     pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
         self.0
@@ -2229,7 +2251,7 @@ impl From<AnyStringFlags> for FStringFlags {
                 value.prefix()
             )
         };
-        let new = FStringFlags::default()
+        let new = FStringFlags::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(fstring_prefix);
         if value.is_triple_quoted() {
