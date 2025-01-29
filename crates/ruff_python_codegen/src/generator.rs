@@ -2,12 +2,11 @@
 
 use std::ops::Deref;
 
-use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
-    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Singleton, Stmt, StringFlags, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
-    TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
+    Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, FStringFlags, Identifier,
+    MatchCase, Operator, Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -146,24 +145,25 @@ impl<'a> Generator<'a> {
         self.p(s.as_str());
     }
 
-    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote, triple_quote: bool) {
-        let escape = AsciiEscape::with_preferred_quote(s, quote);
+    fn p_bytes_repr(&mut self, s: &[u8], flags: BytesLiteralFlags) {
+        let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
         escape
-            .bytes_repr(triple_quote)
+            .bytes_repr(flags.is_triple_quoted())
             .write(&mut self.buffer)
             .unwrap(); // write to string doesn't fail
     }
 
-    fn p_str_repr(&mut self, s: &str, quote: Quote, triple_quote: bool) {
-        let escape = UnicodeEscape::with_preferred_quote(s, quote);
+    fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
+        let flags = flags.into();
+        let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
         escape
-            .str_repr(triple_quote)
+            .str_repr(flags.is_triple_quoted())
             .write(&mut self.buffer)
             .unwrap(); // write to string doesn't fail
     }
@@ -1099,11 +1099,7 @@ impl<'a> Generator<'a> {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(
-                        &bytes_literal.value,
-                        bytes_literal.flags.quote_style(),
-                        bytes_literal.flags.is_triple_quoted(),
-                    );
+                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags);
                 }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
@@ -1301,7 +1297,7 @@ impl<'a> Generator<'a> {
             if flags.prefix().is_unicode() {
                 self.p("u");
             }
-            self.p_str_repr(value, flags.quote_style(), flags.is_triple_quoted());
+            self.p_str_repr(value, *flags);
         }
     }
 
@@ -1322,11 +1318,7 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(
-                        &f_string.elements,
-                        f_string.flags.quote_style(),
-                        f_string.flags.is_triple_quoted(),
-                    );
+                    self.unparse_f_string(&f_string.elements, f_string.flags);
                 }
             }
         }
@@ -1410,17 +1402,12 @@ impl<'a> Generator<'a> {
 
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
     /// surrounding quote style.
-    fn unparse_f_string(
-        &mut self,
-        values: &[ast::FStringElement],
-        quote: Quote,
-        triple_quote: bool,
-    ) {
+    fn unparse_f_string(&mut self, values: &[ast::FStringElement], flags: FStringFlags) {
         self.p("f");
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_f_string_body(values);
         let body = &generator.buffer;
-        self.p_str_repr(body, quote, triple_quote);
+        self.p_str_repr(body, flags);
     }
 
     fn unparse_alias(&mut self, alias: &Alias) {
