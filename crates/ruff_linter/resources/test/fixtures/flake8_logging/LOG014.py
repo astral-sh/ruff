@@ -35,6 +35,9 @@ except ...:
 logging.info("", exc_info=a)
 logger.info("", exc_info=a)
 
+logging.info("", exc_info=False)
+logger.info("", exc_info=False)
+
 
 try:
     ...
