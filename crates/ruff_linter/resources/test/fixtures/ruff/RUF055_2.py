@@ -27,7 +27,8 @@ re.fullmatch("abc", s) is None
 re.fullmatch("abc", s) is not None
 
 
-# this should trigger an unsafe fix because of the presence of a comment (which we'd lose)
+# this should trigger an unsafe fix because of the presence of a comment within the
+# expression being replaced (which we'd lose)
 if (
     re.fullmatch(
         "a really really really really long string",
@@ -38,3 +39,14 @@ if (
 ):
     pass
 
+
+# this should trigger a safe fix (comments are preserved given they're outside the
+# expression)
+if (  # leading
+    re.fullmatch(
+        "a really really really really long string",
+        s,
+    )
+    is None  # trailing
+):
+    pass

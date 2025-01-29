@@ -7,7 +7,7 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -124,20 +124,9 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     );
 
     if let Some(repl) = repl {
-        let has_comments = match (
-            re_func.comparison_to_none,
-            semantic.current_expression_parent(),
-        ) {
-            (Some(_), Some(parent_expr)) => checker
-                .comment_ranges()
-                .has_comments(parent_expr, checker.source()),
-            _ => checker
-                .comment_ranges()
-                .has_comments(call, checker.source()),
-        };
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(repl, re_func.range),
-            if has_comments {
+            if checker.comment_ranges().intersects(re_func.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -181,7 +170,7 @@ impl<'a> ReFunc<'a> {
 
         let (comparison_to_none, range) = match comparison_to_none {
             Some((cmp, range)) => (Some(cmp), range),
-            None => (None, call.range()),
+            None => (None, call.range),
         };
 
         match (func_name, call.arguments.len()) {
@@ -270,7 +259,7 @@ impl<'a> ReFunc<'a> {
             // string.split(pattern)
             (ReFuncKind::Split, _) => Some(self.method_expr("split", vec![self.pattern.clone()])),
             // pattern in string
-            (ReFuncKind::Search, None) => {
+            (ReFuncKind::Search, None | Some(ComparisonToNone::IsNot)) => {
                 Some(ReFunc::compare_expr(self.pattern, CmpOp::In, self.string))
             }
             // pattern not in string
@@ -279,12 +268,8 @@ impl<'a> ReFunc<'a> {
                 CmpOp::NotIn,
                 self.string,
             )),
-            // pattern in string
-            (ReFuncKind::Search, Some(ComparisonToNone::IsNot)) => {
-                Some(ReFunc::compare_expr(self.pattern, CmpOp::In, self.string))
-            }
             // string.startswith(pattern)
-            (ReFuncKind::Match, None) => {
+            (ReFuncKind::Match, None | Some(ComparisonToNone::IsNot)) => {
                 Some(self.method_expr("startswith", vec![self.pattern.clone()]))
             }
             // not string.startswith(pattern)
@@ -297,12 +282,8 @@ impl<'a> ReFunc<'a> {
                 });
                 Some(negated_expr)
             }
-            // string.startswith(pattern)
-            (ReFuncKind::Match, Some(ComparisonToNone::IsNot)) => {
-                Some(self.method_expr("startswith", vec![self.pattern.clone()]))
-            }
             // string == pattern
-            (ReFuncKind::Fullmatch, None) => {
+            (ReFuncKind::Fullmatch, None | Some(ComparisonToNone::IsNot)) => {
                 Some(ReFunc::compare_expr(self.string, CmpOp::Eq, self.pattern))
             }
             // string != pattern
@@ -311,10 +292,6 @@ impl<'a> ReFunc<'a> {
                 CmpOp::NotEq,
                 self.pattern,
             )),
-            // string == pattern
-            (ReFuncKind::Fullmatch, Some(ComparisonToNone::IsNot)) => {
-                Some(ReFunc::compare_expr(self.string, CmpOp::Eq, self.pattern))
-            }
         }
     }
 
