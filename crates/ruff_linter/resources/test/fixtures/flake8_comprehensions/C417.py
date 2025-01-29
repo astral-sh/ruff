@@ -6,12 +6,12 @@ list(map(lambda x: x * 2, nums))
 set(map(lambda x: x % 2 == 0, nums))
 dict(map(lambda v: (v, v**2), nums))
 dict(map(lambda v: [v, v**2], nums))
-map(lambda: "const", nums)
+
 map(lambda _: 3.0, nums)
 _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 all(map(lambda v: isinstance(v, dict), nums))
 filter(func, map(lambda v: v, nums))
-list(map(lambda x, y: x * y, nums))
+
 
 # When inside f-string, then the fix should be surrounded by whitespace
 _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
@@ -19,7 +19,7 @@ _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 
 # False negatives.
 map(lambda x=2, y=1: x + y, nums, nums)
-set(map(lambda x, y: x, nums, nums))
+
 
 
 def func(arg1: int, arg2: int = 4):
@@ -49,7 +49,7 @@ map(lambda x: x, (y if y else z))
 map(lambda x: x, (x, y, z))
 
 # See https://github.com/astral-sh/ruff/issues/14808
-# The following should be Ok since 
+# The following should be Ok since
 # named expressions are a syntax error inside comprehensions
 a = [1, 2, 3]
 b = map(lambda x: x, c := a)
@@ -57,3 +57,16 @@ print(c)
 
 # Check nested as well
 map(lambda x:x, [c:=a])
+
+
+# https://github.com/astral-sh/ruff/issues/15796
+map(lambda: "const", nums)
+list(map(lambda x, y: x * y, nums))
+set(map(lambda x, y: x, nums, nums))
+
+map(lambda: 1, "xyz")
+map(lambda x, y: x, [(1, 2), (3, 4)])
+list(map(lambda: 1, "xyz"))
+list(map(lambda x, y: x, [(1, 2), (3, 4)]))
+list(map(lambda: 1, "xyz"))
+list(map(lambda x, y: x, [(1, 2), (3, 4)]))
