@@ -525,7 +525,8 @@ impl Default for UseDefMapBuilder<'_> {
 
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
-        self.reachable = false;
+        //self.reachable = false;
+        self.record_visibility_constraint_id(ScopedVisibilityConstraintId::ALWAYS_FALSE);
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
