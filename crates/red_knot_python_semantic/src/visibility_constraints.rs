@@ -186,7 +186,10 @@ pub(crate) struct VisibilityConstraints<'db> {
 impl Default for VisibilityConstraints<'_> {
     fn default() -> Self {
         Self {
-            constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
+            constraints: IndexVec::from_iter([
+                VisibilityConstraint::AlwaysTrue,
+                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
+            ]),
         }
     }
 }
@@ -204,6 +207,15 @@ impl<'db> VisibilityConstraints<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
+        if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            return b;
+        } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            return a;
+        } else if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
+            return ScopedVisibilityConstraintId::ALWAYS_TRUE;
+        } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
+            return ScopedVisibilityConstraintId::ALWAYS_TRUE;
+        }
         match (&self.constraints[a], &self.constraints[b]) {
             (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
                 ScopedVisibilityConstraintId::ALWAYS_TRUE
@@ -221,11 +233,22 @@ impl<'db> VisibilityConstraints<'db> {
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            b
+            return b;
         } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            a
-        } else {
-            self.add(VisibilityConstraint::KleeneAnd(a, b))
+            return a;
+        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            return ScopedVisibilityConstraintId::ALWAYS_FALSE;
+        } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            return ScopedVisibilityConstraintId::ALWAYS_FALSE;
+        }
+        match (&self.constraints[a], &self.constraints[b]) {
+            (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
+                ScopedVisibilityConstraintId::ALWAYS_FALSE
+            }
+            (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
+                ScopedVisibilityConstraintId::ALWAYS_FALSE
+            }
+            _ => self.add(VisibilityConstraint::KleeneAnd(a, b)),
         }
     }
 
