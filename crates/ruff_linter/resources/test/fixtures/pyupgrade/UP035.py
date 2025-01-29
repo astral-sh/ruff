@@ -113,3 +113,5 @@ from typing_extensions import deprecated
 
 # https://github.com/astral-sh/ruff/issues/15780
 from typing_extensions import is_typeddict
+# https://github.com/astral-sh/ruff/pull/15800#pullrequestreview-2580704217
+from typing_extensions import TypedDict
