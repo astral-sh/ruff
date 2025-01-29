@@ -20,6 +20,8 @@ ruff_python_parser = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
+[dev-dependencies]
+test-case = { workspace = true }
 
 [lints]
 workspace = true

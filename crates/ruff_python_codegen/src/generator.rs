@@ -1755,49 +1755,48 @@ class Foo:
         assert_round_trip!(r#"b'''hello'''"#);
         assert_round_trip!(r#"f'''hello'''"#);
         assert_round_trip!(r#"f'''{hello}'''"#);
+    }
 
-        // all of the valid string literal prefix and quote combinations from
-        // https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-        let string_prefixes = [
-            ("r", "r"),
-            ("u", "u"),
-            ("R", "R"),
-            ("U", "u"), // case not tracked
-            ("f", "f"),
-            ("F", "f"),   // f case not tracked
-            ("fr", "rf"), // r before f
-            ("Fr", "rf"), // f case not tracked, r before f
-            ("fR", "Rf"), // r before f
-            ("FR", "Rf"), // f case not tracked, r before f
-            ("rf", "rf"),
-            ("rF", "rf"), // f case not tracked
-            ("Rf", "Rf"),
-            ("RF", "Rf"), // f case not tracked
+    /// test all of the valid string literal prefix and quote combinations from
+    /// https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+    ///
+    /// Note that the numeric ids on the input/output and quote fields prevent name conflicts from
+    /// the test_matrix but are otherwise unnecessary
+    #[test_case::test_matrix(
+        [
+            ("r", "r", 0),
+            ("u", "u", 1),
+            ("R", "R", 2),
+            ("U", "u", 3), // case not tracked
+            ("f", "f", 4),
+            ("F", "f", 5),   // f case not tracked
+            ("fr", "rf", 6), // r before f
+            ("Fr", "rf", 7), // f case not tracked, r before f
+            ("fR", "Rf", 8), // r before f
+            ("FR", "Rf", 9), // f case not tracked, r before f
+            ("rf", "rf", 10),
+            ("rF", "rf", 11), // f case not tracked
+            ("Rf", "Rf", 12),
+            ("RF", "Rf", 13), // f case not tracked
             // bytestrings
-            ("b", "b"),
-            ("B", "b"),   // b case
-            ("br", "rb"), // r before b
-            ("Br", "rb"), // b case, r before b
-            ("bR", "Rb"), // r before b
-            ("BR", "Rb"), // b case, r before b
-            ("rb", "rb"),
-            ("rB", "rb"), // b case
-            ("Rb", "Rb"),
-            ("RB", "Rb"), // b case
-        ];
-        let quotes = ["\"", "'", "\"\"\"", "'''"];
-        for (inp, out) in string_prefixes {
-            for q in quotes {
-                let input = format!("{inp}{q}hello{q}");
-                let output = format!("{out}{q}hello{q}");
-                assert_eq!(round_trip(&input), output);
-
-                // variants with f-string patterns
-                let input = format!("{inp}{q}{{hello}} {{world}}{q}");
-                let output = format!("{out}{q}{{hello}} {{world}}{q}");
-                assert_eq!(round_trip(&input), output);
-            }
-        }
+            ("b", "b", 14),
+            ("B", "b", 15),   // b case
+            ("br", "rb", 16), // r before b
+            ("Br", "rb", 17), // b case, r before b
+            ("bR", "Rb", 18), // r before b
+            ("BR", "Rb", 19), // b case, r before b
+            ("rb", "rb", 20),
+            ("rB", "rb", 21), // b case
+            ("Rb", "Rb", 22),
+            ("RB", "Rb", 23), // b case
+        ],
+        [("\"", 0), ("'",1), ("\"\"\"", 2), ("'''", 3)],
+        ["hello", "{hello} {world}"]
+    )]
+    fn prefix_quotes((inp, out, _id): (&str, &str, u8), (quote, _id2): (&str, u8), base: &str) {
+        let input = format!("{inp}{quote}{base}{quote}");
+        let output = format!("{out}{quote}{base}{quote}");
+        assert_eq!(round_trip(&input), output);
     }
 
     #[test]
