@@ -24,6 +24,9 @@ use crate::checkers::ast::Checker;
 /// obj is None
 /// ```
 ///
+/// ## Fix safety
+/// The fix will be marked as unsafe if there are any comments within the call.
+///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
