@@ -379,9 +379,9 @@ match the value being raised, and limit visibility to those clauses.) Definition
 `raise` are not visible in any `else` clause, but are visible in `except` clauses or after the
 containing `try` statement (since control flow may have passed through an `except`).
 
-Currently we assume that an exception could be raised anywhere within a `try` block; the TODOs below
-reflect cases where we could implement a more precise understanding of where exceptions (barring
-`KeyboardInterrupt` and `MemoryError`) can and cannot actually be raised.
+Currently we assume that an exception could be raised anywhere within a `try` block. We may want to
+implement a more precise understanding of where exceptions (barring `KeyboardInterrupt` and
+`MemoryError`) can and cannot actually be raised.
 
 ```py
 def raise_in_then_branch(cond: bool):
