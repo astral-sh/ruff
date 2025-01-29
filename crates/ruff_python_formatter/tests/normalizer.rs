@@ -4,12 +4,12 @@ use {
     regex::Regex,
 };
 
-use ruff_python_ast::visitor::transformer;
 use ruff_python_ast::visitor::transformer::Transformer;
 use ruff_python_ast::{
     self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringLiteralElement,
-    FStringPart, Stmt, StringFlags, StringLiteralFlags,
+    FStringPart, Stmt, StringFlags,
 };
+use ruff_python_ast::{visitor::transformer, StringLiteralFlags};
 use ruff_text_size::{Ranged, TextRange};
 
 /// A struct to normalize AST nodes for the purpose of comparing formatted representations for
@@ -79,9 +79,9 @@ impl Transformer for Normalizer {
 
                     if can_join {
                         string.value = ast::StringLiteralValue::single(ast::StringLiteral {
-                            value: string.value.to_str().to_string().into_boxed_str(),
+                            value: Box::from(string.value.to_str()),
                             range: string.range,
-                            flags: StringLiteralFlags::default(),
+                            flags: StringLiteralFlags::empty(),
                         });
                     }
                 }
@@ -97,7 +97,7 @@ impl Transformer for Normalizer {
                         bytes.value = ast::BytesLiteralValue::single(ast::BytesLiteral {
                             value: bytes.value.bytes().collect(),
                             range: bytes.range,
-                            flags: BytesLiteralFlags::default(),
+                            flags: BytesLiteralFlags::empty(),
                         });
                     }
                 }

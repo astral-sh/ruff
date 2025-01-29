@@ -6,8 +6,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    WithItem,
+    Singleton, Stmt, StringFlags, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -65,7 +65,10 @@ mod precedence {
 pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
-    /// The quote style to use for string literals.
+    /// The quote style to use for bytestring and f-string literals. For a plain
+    /// [`StringLiteral`](ast::StringLiteral), modify its `flags` field using
+    /// [`StringLiteralFlags::with_quote_style`](ast::StringLiteralFlags::with_quote_style) before
+    /// passing it to the [`Generator`].
     quote: Quote,
     /// The line ending to use.
     line_ending: LineEnding,
@@ -150,16 +153,16 @@ impl<'a> Generator<'a> {
         self.p(s.as_str());
     }
 
-    fn p_bytes_repr(&mut self, s: &[u8]) {
-        let escape = AsciiEscape::with_preferred_quote(s, self.quote);
+    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote) {
+        let escape = AsciiEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
         escape.bytes_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
     }
 
-    fn p_str_repr(&mut self, s: &str) {
-        let escape = UnicodeEscape::with_preferred_quote(s, self.quote);
+    fn p_str_repr(&mut self, s: &str, quote: Quote) {
+        let escape = UnicodeEscape::with_preferred_quote(s, quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1097,7 +1100,7 @@ impl<'a> Generator<'a> {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(&bytes_literal.value);
+                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags.quote_style());
                 }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
@@ -1288,14 +1291,14 @@ impl<'a> Generator<'a> {
         // replacement here
         if flags.prefix().is_raw() {
             self.p(flags.prefix().as_str());
-            self.p(self.quote.as_str());
+            self.p(flags.quote_str());
             self.p(value);
-            self.p(self.quote.as_str());
+            self.p(flags.quote_str());
         } else {
             if flags.prefix().is_unicode() {
                 self.p("u");
             }
-            self.p_str_repr(value);
+            self.p_str_repr(value, flags.quote_style());
         }
     }
 
@@ -1403,7 +1406,7 @@ impl<'a> Generator<'a> {
                 Generator::new(self.indent, self.quote.opposite(), self.line_ending);
             generator.unparse_f_string_body(values);
             let body = &generator.buffer;
-            self.p_str_repr(body);
+            self.p_str_repr(body, self.quote);
         }
     }
 
@@ -1444,6 +1447,24 @@ mod tests {
         generator.generate()
     }
 
+    /// Like [`round_trip`] but configure the [`Generator`] with the requested `indentation`,
+    /// `quote`, and `line_ending` settings.
+    ///
+    /// Note that quoting styles for string literals are taken from their [`StringLiteralFlags`],
+    /// not from the [`Generator`] itself, so using this function on a plain string literal can give
+    /// surprising results.
+    ///
+    /// ```rust
+    /// assert_eq!(
+    ///     round_trip_with(
+    ///         &Indentation::default(),
+    ///         Quote::Double,
+    ///         LineEnding::default(),
+    ///         r#"'hello'"#
+    ///     ),
+    ///     r#"'hello'"#
+    /// );
+    /// ```
     fn round_trip_with(
         indentation: &Indentation,
         quote: Quote,
@@ -1718,15 +1739,15 @@ class Foo:
 
     #[test]
     fn quote() {
-        assert_eq!(round_trip(r#""hello""#), r#""hello""#);
-        assert_eq!(round_trip(r"'hello'"), r#""hello""#);
-        assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
-        assert_eq!(round_trip(r"r'hello'"), r#"r"hello""#);
-        assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
+        assert_round_trip!(r#""hello""#);
+        assert_round_trip!(r"'hello'");
+        assert_round_trip!(r"u'hello'");
+        assert_round_trip!(r"r'hello'");
+        assert_round_trip!(r"b'hello'");
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
-        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
+        assert_round_trip!(r#"f'abc{"def"}{1}'"#);
     }
 
     #[test]
@@ -1773,42 +1794,40 @@ if True:
 
     #[test]
     fn set_quote() {
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Double,
-                LineEnding::default(),
-                r#""hello""#
-            ),
-            r#""hello""#
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Single,
-                LineEnding::default(),
-                r#""hello""#
-            ),
-            r"'hello'"
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Double,
-                LineEnding::default(),
-                r"'hello'"
-            ),
-            r#""hello""#
-        );
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                Quote::Single,
-                LineEnding::default(),
-                r"'hello'"
-            ),
-            r"'hello'"
-        );
+        macro_rules! round_trip_with {
+            ($quote:expr, $start:expr, $end:expr) => {
+                assert_eq!(
+                    round_trip_with(
+                        &Indentation::default(),
+                        $quote,
+                        LineEnding::default(),
+                        $start
+                    ),
+                    $end,
+                );
+            };
+            ($quote:expr, $start:expr) => {
+                round_trip_with!($quote, $start, $start);
+            };
+        }
+
+        // setting Generator::quote works for f-strings
+        round_trip_with!(Quote::Double, r#"f"hello""#, r#"f"hello""#);
+        round_trip_with!(Quote::Single, r#"f"hello""#, r"f'hello'");
+        round_trip_with!(Quote::Double, r"f'hello'", r#"f"hello""#);
+        round_trip_with!(Quote::Single, r"f'hello'", r"f'hello'");
+
+        // but not for bytestrings
+        round_trip_with!(Quote::Double, r#"b"hello""#);
+        round_trip_with!(Quote::Single, r#"b"hello""#); // no effect
+        round_trip_with!(Quote::Double, r"b'hello'"); // no effect
+        round_trip_with!(Quote::Single, r"b'hello'");
+
+        // or for string literals, where the `Quote` is taken directly from their flags
+        round_trip_with!(Quote::Double, r#""hello""#);
+        round_trip_with!(Quote::Single, r#""hello""#); // no effect
+        round_trip_with!(Quote::Double, r"'hello'"); // no effect
+        round_trip_with!(Quote::Single, r"'hello'");
     }
 
     #[test]

@@ -377,7 +377,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_in_3_function_def(checker, function_def);
+                airflow::rules::airflow_3_removal_function_def(checker, function_def);
             }
             if checker.enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
@@ -1415,7 +1415,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
                 if checker.enabled(Rule::ForLoopWrites) {
-                    refurb::rules::for_loop_writes(checker, for_stmt);
+                    refurb::rules::for_loop_writes_stmt(checker, for_stmt);
                 }
             }
             if checker.enabled(Rule::NeedlessElse) {

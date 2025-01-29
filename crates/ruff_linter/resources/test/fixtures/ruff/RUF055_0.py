@@ -93,3 +93,8 @@ re.sub(r"a", r"\a", "a")
 
 re.sub(r"a", "\?", "a")
 re.sub(r"a", r"\?", "a")
+
+# these double as tests for preserving raw string quoting style
+re.sub(r'abc', "", s)
+re.sub(r"""abc""", "", s)
+re.sub(r'''abc''', "", s)

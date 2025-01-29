@@ -2,7 +2,9 @@
 
 use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt};
+use ruff_python_ast::{
+    self as ast, Expr, ExprCall, Int, Operator, ParameterWithDefault, Parameters, Stmt, StmtAssign,
+};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
@@ -299,6 +301,56 @@ pub fn is_immutable_func(
                     .iter()
                     .any(|target| qualified_name == *target)
         })
+}
+
+/// Return `true` if `name` is bound to the `typing.NewType` call where the original type is
+/// immutable.
+///
+/// For example:
+/// ```python
+/// from typing import NewType
+///
+/// UserId = NewType("UserId", int)
+/// ```
+///
+/// Here, `name` would be `UserId`.
+pub fn is_immutable_newtype_call(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+) -> bool {
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    if !binding.kind.is_assignment() {
+        return false;
+    }
+
+    let Some(Stmt::Assign(StmtAssign { value, .. })) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return false;
+    };
+
+    if !semantic.match_typing_expr(func, "NewType") {
+        return false;
+    }
+
+    if arguments.len() != 2 {
+        return false;
+    }
+
+    let Some(original_type) = arguments.find_argument_value("tp", 1) else {
+        return false;
+    };
+
+    is_immutable_annotation(original_type, semantic, extend_immutable_calls)
 }
 
 /// Return `true` if `func` is a function that returns a mutable value.

@@ -66,7 +66,8 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
                     test: stmt.test.clone(),
-                    msg: print_arguments::to_expr(&call.arguments).map(Box::new),
+                    msg: print_arguments::to_expr(&call.arguments, checker.default_string_flags())
+                        .map(Box::new),
                     range: TextRange::default(),
                 })),
                 // We have to replace the entire statement,
@@ -89,9 +90,9 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
 mod print_arguments {
     use itertools::Itertools;
     use ruff_python_ast::{
-        Arguments, ConversionFlag, Expr, ExprFString, ExprStringLiteral, FString, FStringElement,
-        FStringElements, FStringExpressionElement, FStringFlags, FStringLiteralElement,
-        FStringValue, StringLiteral, StringLiteralFlags, StringLiteralValue,
+        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement, FStringElements,
+        FStringExpressionElement, FStringFlags, FStringLiteralElement, FStringValue, StringLiteral,
+        StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
 
@@ -140,12 +141,13 @@ mod print_arguments {
     /// literals.
     fn fstring_elements_to_string_literals<'a>(
         mut elements: impl ExactSizeIterator<Item = &'a FStringElement>,
+        flags: StringLiteralFlags,
     ) -> Option<Vec<StringLiteral>> {
         elements.try_fold(Vec::with_capacity(elements.len()), |mut acc, element| {
             if let FStringElement::Literal(literal) = element {
                 acc.push(StringLiteral {
                     value: literal.value.clone(),
-                    flags: StringLiteralFlags::default(),
+                    flags,
                     range: TextRange::default(),
                 });
                 Some(acc)
@@ -162,6 +164,7 @@ mod print_arguments {
     fn args_to_string_literal_expr<'a>(
         args: impl ExactSizeIterator<Item = &'a Vec<FStringElement>>,
         sep: impl ExactSizeIterator<Item = &'a FStringElement>,
+        flags: StringLiteralFlags,
     ) -> Option<Expr> {
         // If there are no arguments, short-circuit and return `None`
         if args.len() == 0 {
@@ -174,8 +177,8 @@ mod print_arguments {
         // of a concatenated string literal. (e.g. "text", "text" "text") The `sep` will
         // be inserted only between the outer Vecs.
         let (Some(sep), Some(args)) = (
-            fstring_elements_to_string_literals(sep),
-            args.map(|arg| fstring_elements_to_string_literals(arg.iter()))
+            fstring_elements_to_string_literals(sep, flags),
+            args.map(|arg| fstring_elements_to_string_literals(arg.iter(), flags))
                 .collect::<Option<Vec<_>>>(),
         ) else {
             // If any of the arguments are not string literals, return None
@@ -199,13 +202,10 @@ mod print_arguments {
             })
             .join(&sep_string);
 
-        Some(Expr::StringLiteral(ExprStringLiteral {
+        Some(Expr::from(StringLiteral {
+            value: combined_string.into(),
+            flags,
             range: TextRange::default(),
-            value: StringLiteralValue::single(StringLiteral {
-                value: combined_string.into(),
-                flags: StringLiteralFlags::default(),
-                range: TextRange::default(),
-            }),
         }))
     }
 
@@ -256,7 +256,7 @@ mod print_arguments {
     /// - [`Some`]<[`Expr::StringLiteral`]> if all arguments including `sep` are string literals.
     /// - [`Some`]<[`Expr::FString`]> if any of the arguments are not string literals.
     /// - [`None`] if the `print` contains no positional arguments at all.
-    pub(super) fn to_expr(arguments: &Arguments) -> Option<Expr> {
+    pub(super) fn to_expr(arguments: &Arguments, flags: StringLiteralFlags) -> Option<Expr> {
         // Convert the `sep` argument into `FStringElement`s
         let sep = arguments
             .find_keyword("sep")
@@ -286,7 +286,7 @@ mod print_arguments {
 
         // Attempt to convert the `sep` and `args` arguments to a string literal,
         // falling back to an f-string if the arguments are not all string literals.
-        args_to_string_literal_expr(args.iter(), sep.iter())
+        args_to_string_literal_expr(args.iter(), sep.iter(), flags)
             .or_else(|| args_to_fstring_expr(args.into_iter(), sep.into_iter()))
     }
 }

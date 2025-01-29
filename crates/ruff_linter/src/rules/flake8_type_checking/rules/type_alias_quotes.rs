@@ -175,6 +175,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
+        checker.default_string_flags(),
     );
     let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
