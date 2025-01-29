@@ -4,7 +4,7 @@ use std::fmt::{self, Display, Formatter, Write};
 
 use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
-use ruff_python_literal::escape::AsciiEscape;
+use ruff_python_literal::escape::{AsciiEscape, TripleQuoted};
 
 use crate::types::class_base::ClassBase;
 use crate::types::{
@@ -98,7 +98,7 @@ impl Display for DisplayRepresentation<'_> {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
-                escape.bytes_repr(false).write(f)
+                escape.bytes_repr(TripleQuoted::No).write(f)
             }
             Type::SliceLiteral(slice) => {
                 f.write_str("slice[")?;
