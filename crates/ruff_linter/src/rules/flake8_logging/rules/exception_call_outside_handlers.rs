@@ -76,7 +76,7 @@ pub(crate) fn exception_call_outside_handlers(checker: &mut Checker, call: &Expr
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
             let logger_objects = &checker.settings.logger_objects;
 
-            if !logging::is_logger_candidate(func, semantic, &logger_objects) {
+            if !logging::is_logger_candidate(func, semantic, logger_objects) {
                 return;
             }
 

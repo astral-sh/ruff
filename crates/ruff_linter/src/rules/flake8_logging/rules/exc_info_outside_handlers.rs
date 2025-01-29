@@ -15,18 +15,31 @@ use crate::rules::flake8_logging::rules::helpers::outside_handlers;
 /// Checks for logging calls with `exc_info=` outside exception handlers.
 ///
 /// ## Why is this bad?
+/// Using `exc_info=True` outside of an exception handler
+/// attaches ``None`` as the exception information, leading to confusing messages:
 ///
+/// ```pycon
+/// >>> logging.warning("Uh oh", exc_info=True)
+/// WARNING:root:Uh oh
+/// NoneType: None
+/// ```
 ///
 /// ## Example
 ///
 /// ```python
+/// import logging
 ///
+///
+/// logging.warning("Foobar", exc_info=True)
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// import logging
 ///
+///
+/// logging.warning("Foobar")
 /// ```
 ///
 /// ## Fix safety
