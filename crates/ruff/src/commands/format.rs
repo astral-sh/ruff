@@ -787,7 +787,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // First, collect all rules that are incompatible regardless of the linter-specific settings.
     let mut incompatible_rules = FxHashSet::default();
     for setting in resolver.settings() {
-        for rule in [
+        for (rule, is_conflicting) in [
             // Flags missing trailing commas when all arguments are on its own line:
             // ```python
             // def args(
@@ -795,11 +795,14 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             // ):
             //     pass
             // ```
-            Rule::MissingTrailingComma,
+            (
+                Rule::MissingTrailingComma,                         // adds trailing commas
+                setting.formatter.magic_trailing_comma.is_ignore(), // ignores trailing commas
+            ),
             // The formatter always removes blank lines before the docstring.
-            Rule::IncorrectBlankLineBeforeClass,
+            (Rule::IncorrectBlankLineBeforeClass, true),
         ] {
-            if setting.linter.rules.enabled(rule) {
+            if is_conflicting && setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);
             }
         }
