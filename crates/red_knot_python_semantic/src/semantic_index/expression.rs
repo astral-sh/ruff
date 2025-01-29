@@ -35,6 +35,13 @@ pub(crate) struct Expression<'db> {
     #[return_ref]
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
+    /// Whether or not this expression should be inferred as a type expression or
+    /// a normal expression. For example, in `self.x: <annotation> = <value>`, the
+    /// `<annotation>` is inferred as a type expression, while `<value>` is inferred
+    /// as a normal expression.
+    #[id]
+    pub(crate) infer_as_type_expression: bool,
+
     #[no_eq]
     count: countme::Count<Expression<'static>>,
 }

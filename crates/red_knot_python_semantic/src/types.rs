@@ -23,6 +23,7 @@ pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -4136,7 +4137,66 @@ impl<'db> Class<'db> {
 
         // TODO: The symbol is not present in any class body, but it could be implicitly
         // defined in `__init__` or other methods anywhere in the MRO.
-        todo_type!("implicit instance attribute").into()
+        SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+    }
+
+    /// Tries to find declarations/bindings of an instance attribute named `name` that are only
+    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`.
+    fn implicit_instance_attribute(
+        db: &'db dyn Db,
+        class_body_scope: ScopeId<'db>,
+        name: &str,
+        inferred_type_from_class_body: Option<Type<'db>>,
+    ) -> Symbol<'db> {
+        let index = semantic_index(db, class_body_scope.file(db));
+        let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
+
+        if let Some(ty) = inferred_type_from_class_body {
+            union_of_inferred_types = union_of_inferred_types.add(ty);
+        }
+
+        let Some(attribute_assignments) = index.attribute_assignments(db, class_body_scope, name)
+        else {
+            if inferred_type_from_class_body.is_some() {
+                return union_of_inferred_types.build().into();
+            }
+            return Symbol::Unbound;
+        };
+
+        for attribute_assignment in attribute_assignments {
+            match attribute_assignment {
+                AttributeAssignment::Annotated { annotation } => {
+                    // We found an annotated assignment of one of the following forms (using 'self' in these
+                    // examples, but we support arbitrary names for the first parameters of methods):
+                    //
+                    //     self.name: <annotation>
+                    //     self.name: <annotation> = …
+
+                    let inference = infer_expression_types(db, *annotation);
+                    let expr_scope = annotation.scope(db);
+                    let annotation_ty = inference.expression_type(
+                        annotation.node_ref(db).scoped_expression_id(db, expr_scope),
+                    );
+
+                    // TODO: check if there are conflicting declarations
+                    return annotation_ty.into();
+                }
+                AttributeAssignment::Unannotated { value } => {
+                    // We found an un-annotated attribute assignment of the form:
+                    //
+                    //     self.name = <value>
+
+                    let inference = infer_expression_types(db, *value);
+                    let expr_scope = value.scope(db);
+                    let inferred_ty = inference
+                        .expression_type(value.node_ref(db).scoped_expression_id(db, expr_scope));
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+            }
+        }
+
+        union_of_inferred_types.build().into()
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -4158,6 +4218,8 @@ impl<'db> Class<'db> {
 
             match symbol_from_declarations(db, declarations) {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
+                    // The attribute is declared in the class body.
+
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
                         // just a temporary heuristic to provide a broad categorization into properties
@@ -4171,22 +4233,26 @@ impl<'db> Class<'db> {
                         SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
                     }
                 }
-                Ok(symbol @ SymbolAndQualifiers(Symbol::Unbound, qualifiers)) => {
+                Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+                    // The attribute is not *declared* in the class body. It could still be declared
+                    // in a method, and it could also be *bound* in the class body (and/or in a method).
+
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
+                    let inferred_ty = inferred.ignore_possibly_unbound();
 
-                    SymbolAndQualifiers(
-                        widen_type_for_undeclared_public_symbol(db, inferred, symbol.is_final()),
-                        qualifiers,
-                    )
+                    Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
-                    // Ignore conflicting declarations
+                    // There are conflicting declarations for this attribute in the class body.
                     SymbolAndQualifiers(declared_ty.inner_type().into(), declared_ty.qualifiers())
                 }
             }
         } else {
-            Symbol::Unbound.into()
+            // This attribute is neither declared nor bound in the class body.
+            // It could still be implicitly defined in a method.
+
+            Self::implicit_instance_attribute(db, body_scope, name, None).into()
         }
     }
 

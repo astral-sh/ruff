@@ -832,7 +832,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression_impl(expression.node_ref(self.db()));
+        if expression.infer_as_type_expression(self.db()) {
+            self.infer_type_expression(expression.node_ref(self.db()));
+        } else {
+            self.infer_expression_impl(expression.node_ref(self.db()));
+        }
     }
 
     /// Raise a diagnostic if the given type cannot be divided by zero.

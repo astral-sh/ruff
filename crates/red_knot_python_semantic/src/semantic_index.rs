@@ -11,6 +11,7 @@ use ruff_index::{IndexSlice, IndexVec};
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
+use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
@@ -21,6 +22,7 @@ use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
+pub mod attribute_assignment;
 mod builder;
 pub(crate) mod constraint;
 pub mod definition;
@@ -139,6 +141,10 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
+
+    /// Maps from class body scopes to attribute assignments that were found
+    /// in methods of that class.
+    attribute_assignments: FxHashMap<FileScopeId, FxHashMap<String, Vec<AttributeAssignment<'db>>>>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -263,6 +269,17 @@ impl<'db> SemanticIndex<'db> {
     /// the logic for type inference.
     pub(super) fn has_future_annotations(&self) -> bool {
         self.has_future_annotations
+    }
+
+    pub(super) fn attribute_assignments(
+        &self,
+        db: &dyn Db,
+        class_body_scope_id: ScopeId,
+        attribute: &str,
+    ) -> Option<&[AttributeAssignment<'db>]> {
+        self.attribute_assignments
+            .get(&class_body_scope_id.file_scope_id(db))
+            .and_then(|assignments| assignments.get(attribute).map(Vec::as_slice))
     }
 }
 

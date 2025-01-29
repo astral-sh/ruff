@@ -14,6 +14,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
+use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::constraint::PatternConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
@@ -53,17 +54,34 @@ impl LoopState {
     }
 }
 
+/// Used in the scope-stack of the [`SemanticIndexBuilder`] to keep track of whether
+/// or not the current scope belongs to a method in a class, which is the case if
+/// the current scope is a `BuilderScopeKind::FunctionBody` and the parent scope is
+/// a `BuilderScopeKind::ClassBody`.
+///
+/// This is called `BuilderScopeKind` to distinguish it from the `ScopeKind` enum,
+/// which is not fine-grained enough for this use case (functions and lambdas are
+/// both `ScopeKind::Function`)
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum BuilderScopeKind {
+    ClassBody,
+    FunctionBody,
+    Other,
+}
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     module: &'db ParsedModule,
-    scope_stack: Vec<(FileScopeId, LoopState)>,
+    scope_stack: Vec<(FileScopeId, LoopState, BuilderScopeKind)>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
+    /// The name of the first function parameter of the innermost function that we're currently visiting.
+    current_first_parameter_name: Option<Name>,
 
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
@@ -84,6 +102,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
+    attribute_assignments: FxHashMap<FileScopeId, FxHashMap<String, Vec<AttributeAssignment<'db>>>>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -95,6 +114,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
+            current_first_parameter_name: None,
             loop_break_states: vec![],
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
@@ -112,6 +132,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             expressions_by_node: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
+
+            attribute_assignments: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -123,7 +145,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         *self
             .scope_stack
             .last()
-            .map(|(scope, _)| scope)
+            .map(|(scope, _, _)| scope)
             .expect("Always to have a root scope")
     }
 
@@ -132,6 +154,21 @@ impl<'db> SemanticIndexBuilder<'db> {
             .last()
             .expect("Always to have a root scope")
             .1
+    }
+
+    /// Returns the scope ID of the surrounding class body scope if the current scope
+    /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
+    /// scope is a function body outside of a class, or if the current scope is not a
+    /// function body.
+    fn is_method_of_class(&self) -> Option<FileScopeId> {
+        let mut scopes_rev = self.scope_stack.iter().rev();
+        let (_, _, current_scope_kind) = scopes_rev.next()?;
+        let (parent_scope, _, parent_scope_kind) = scopes_rev.next()?;
+
+        match (current_scope_kind, parent_scope_kind) {
+            (BuilderScopeKind::FunctionBody, BuilderScopeKind::ClassBody) => Some(*parent_scope),
+            _ => None,
+        }
     }
 
     fn set_inside_loop(&mut self, state: LoopState) {
@@ -171,11 +208,18 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
-        self.scope_stack.push((file_scope_id, LoopState::NotInLoop));
+        let scope_kind = match node {
+            NodeWithScopeRef::Class(_) => BuilderScopeKind::ClassBody,
+            NodeWithScopeRef::Function(_) => BuilderScopeKind::FunctionBody,
+            _ => BuilderScopeKind::Other,
+        };
+
+        self.scope_stack
+            .push((file_scope_id, LoopState::NotInLoop, scope_kind));
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        let (id, _) = self.scope_stack.pop().expect("Root scope to be present");
+        let (id, _, _) = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
@@ -404,6 +448,32 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_assignments.last_mut()
     }
 
+    /// Records the fact that we saw an attribute assignment of the form
+    /// `object.attr: <annotation>( = …)` or `object.attr = <value>`.
+    fn register_attribute_assignment(
+        &mut self,
+        object: &ast::Expr,
+        attr: &ast::Identifier,
+        attribute_assignment: AttributeAssignment<'db>,
+    ) {
+        if let Some(class_body_scope) = self.is_method_of_class() {
+            // We only care about attribute assignments to the first parameter of a method,
+            // i.e. typically `self` or `cls`.
+            let accessed_object_refers_to_first_parameter =
+                object.as_name_expr().map(|name| &name.id)
+                    == self.current_first_parameter_name.as_ref();
+
+            if accessed_object_refers_to_first_parameter {
+                self.attribute_assignments
+                    .entry(class_body_scope)
+                    .or_default()
+                    .entry(attr.id().as_str().to_owned())
+                    .or_default()
+                    .push(attribute_assignment);
+            }
+        }
+    }
+
     fn add_pattern_constraint(
         &mut self,
         subject: Expression<'db>,
@@ -457,6 +527,20 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
+        self.add_standalone_expression_impl(expression_node, false)
+    }
+
+    /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
+    /// *type* expression, which makes sure that it will later be inferred as such.
+    fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
+        self.add_standalone_expression_impl(expression_node, true)
+    }
+
+    fn add_standalone_expression_impl(
+        &mut self,
+        expression_node: &ast::Expr,
+        infer_as_type_expression: bool,
+    ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
@@ -465,6 +549,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             unsafe {
                 AstNodeRef::new(self.module.clone(), expression_node)
             },
+            infer_as_type_expression,
             countme::Count::default(),
         );
         self.expressions_by_node
@@ -668,6 +753,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
+            attribute_assignments: self.attribute_assignments,
         }
     }
 }
@@ -706,7 +792,17 @@ where
 
                         builder.declare_parameters(parameters);
 
+                        let mut first_parameter_name = parameters
+                            .iter_non_variadic_params()
+                            .next()
+                            .map(|first_param| first_param.parameter.name.id().clone());
+                        std::mem::swap(
+                            &mut builder.current_first_parameter_name,
+                            &mut first_parameter_name,
+                        );
                         builder.visit_body(body);
+                        builder.current_first_parameter_name = first_parameter_name;
+
                         builder.pop_scope()
                     },
                 );
@@ -840,6 +936,19 @@ where
                             unpack: None,
                             first: false,
                         }),
+                        ast::Expr::Attribute(ast::ExprAttribute {
+                            value: object,
+                            attr,
+                            ..
+                        }) => {
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                AttributeAssignment::Unannotated { value },
+                            );
+
+                            None
+                        }
                         _ => None,
                     };
 
@@ -858,6 +967,7 @@ where
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.annotation);
+                let annotation = self.add_standalone_type_expression(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                 }
@@ -869,6 +979,20 @@ where
                 ) {
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
+
+                    if let ast::Expr::Attribute(ast::ExprAttribute {
+                        value: object,
+                        attr,
+                        ..
+                    }) = &*node.target
+                    {
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            AttributeAssignment::Annotated { annotation },
+                        );
+                    }
+
                     self.pop_assignment();
                 } else {
                     self.visit_expr(&node.target);
