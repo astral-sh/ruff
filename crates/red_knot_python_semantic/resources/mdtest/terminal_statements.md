@@ -140,9 +140,9 @@ def return_in_both_nested_branches(cond1: bool, cond2: bool):
 
 A `continue` statement jumps back to the top of the innermost loop. This makes it terminal within
 the loop body: definitions before it are not visible after it within the rest of the loop body. They
-are likely visible after the loop body, since loops do not introduce new scopes. (Statically
-known infinite loops are one exception — if control never leaves the loop body, bindings inside of
-the loop are not visible outside of it.)
+are likely visible after the loop body, since loops do not introduce new scopes. (Statically known
+infinite loops are one exception — if control never leaves the loop body, bindings inside of the
+loop are not visible outside of it.)
 
 TODO: We are not currently modeling the cyclic control flow for loops, pending fixpoint support in
 Salsa. The false positives in this section are because of that, and not our terminal statement
@@ -372,16 +372,16 @@ def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
 ## `raise`
 
 A `raise` statement is terminal. If it occurs in a lexically containing `try` statement, it will
-jump to one of the `except` clauses (if it matches the value being raised), or to the `else`
-clause (if none match). Currently, we assume definitions from before the `raise` are visible in all
-`except` and `else` clauses. (In the future, we might analyze the `except` clauses to see which
-ones match the value being raised, and limit visibility to those clauses.) Definitions from before
-the `raise` are not visible in any `else` clause, but are visible in `except` clauses or after the
+jump to one of the `except` clauses (if it matches the value being raised), or to the `else` clause
+(if none match). Currently, we assume definitions from before the `raise` are visible in all
+`except` and `else` clauses. (In the future, we might analyze the `except` clauses to see which ones
+match the value being raised, and limit visibility to those clauses.) Definitions from before the
+`raise` are not visible in any `else` clause, but are visible in `except` clauses or after the
 containing `try` statement (since control flow may have passed through an `except`).
 
-Currently we assume that an exception could be raised anywhere within a `try` block; the TODOs below reflect
-cases where we could implement a more precise understanding of where exceptions (barring `KeyboardInterrupt`
-and `MemoryError`) can and cannot actually be raised.
+Currently we assume that an exception could be raised anywhere within a `try` block; the TODOs below
+reflect cases where we could implement a more precise understanding of where exceptions (barring
+`KeyboardInterrupt` and `MemoryError`) can and cannot actually be raised.
 
 ```py
 def raise_in_then_branch(cond: bool):
@@ -552,8 +552,8 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 ## Terminal in `try` with `finally` clause
 
-TODO: we don't yet model that a `break` or `continue` in a `try` block will jump to a `finally` clause before it
-jumps to end/start of the loop.
+TODO: we don't yet model that a `break` or `continue` in a `try` block will jump to a `finally`
+clause before it jumps to end/start of the loop.
 
 ```py
 def f():
