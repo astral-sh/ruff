@@ -1719,6 +1719,9 @@ class Foo:
         assert_round_trip!(r"u'hello'");
         assert_round_trip!(r"r'hello'");
         assert_round_trip!(r"b'hello'");
+        assert_round_trip!(r#"b"hello""#);
+        assert_round_trip!(r"f'hello'");
+        assert_round_trip!(r#"f"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
@@ -1765,35 +1768,6 @@ if True:
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
-    }
-
-    #[test]
-    fn set_quote() {
-        macro_rules! round_trip_with {
-            ($start:expr) => {
-                assert_eq!(
-                    round_trip_with(&Indentation::default(), LineEnding::default(), $start),
-                    $start,
-                );
-            };
-        }
-
-        // setting Generator::quote no longer works because the quote values are taken from the
-        // string literals themselves
-        round_trip_with!(r#"f"hello""#);
-        round_trip_with!(r#"f"hello""#); // no effect
-        round_trip_with!(r"f'hello'"); // no effect
-        round_trip_with!(r"f'hello'");
-
-        round_trip_with!(r#"b"hello""#);
-        round_trip_with!(r#"b"hello""#); // no effect
-        round_trip_with!(r"b'hello'"); // no effect
-        round_trip_with!(r"b'hello'");
-
-        round_trip_with!(r#""hello""#);
-        round_trip_with!(r#""hello""#); // no effect
-        round_trip_with!(r"'hello'"); // no effect
-        round_trip_with!(r"'hello'");
     }
 
     #[test]
