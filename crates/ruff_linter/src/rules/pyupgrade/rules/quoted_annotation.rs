@@ -88,12 +88,10 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
     let last_token_is_comment = checker
-        // Inside an annotation, the `checker.tokens()`
-        // returns the tokens for the parsed annotation.
         .tokens()
         // The actual last token will always be a logical newline,
         // so we check the second to last
-        .get((checker.tokens().len()) - 2)
+        .get(checker.tokens().len().saturating_sub(2))
         .is_some_and(|tok| tok.kind() == TokenKind::Comment);
 
     let new_content = match (spans_multiple_lines, last_token_is_comment) {
