@@ -221,11 +221,18 @@ impl<'db> VisibilityConstraints<'db> {
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            b
+            return b;
         } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            a
-        } else {
-            self.add(VisibilityConstraint::KleeneAnd(a, b))
+            return a;
+        }
+        match (&self.constraints[a], &self.constraints[b]) {
+            (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => self.add(
+                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
+            ),
+            (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => self.add(
+                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
+            ),
+            _ => self.add(VisibilityConstraint::KleeneAnd(a, b)),
         }
     }
 
