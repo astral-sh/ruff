@@ -416,9 +416,17 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
         }
     };
 
+    let inner_needs_parens = matches!(
+        inner_call.whitespace_after_func,
+        ParenthesizableWhitespace::ParenthesizedWhitespace(_)
+    );
+
     if let Expression::Name(outer_name) = &*outer_call.func {
         if outer_name.value == "list" {
             tree = Expression::Call(Box::new((*inner_call).clone()));
+            if inner_needs_parens {
+                tree = tree.with_parens(LeftParen::default(), RightParen::default());
+            };
         } else {
             // If the `reverse` argument is used...
             let args = if inner_call.args.iter().any(|arg| {
@@ -503,6 +511,9 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
                 whitespace_after_func: inner_call.whitespace_after_func.clone(),
                 whitespace_before_args: inner_call.whitespace_before_args.clone(),
             }));
+            if inner_needs_parens {
+                tree = tree.with_parens(LeftParen::default(), RightParen::default());
+            }
         }
     }
 
