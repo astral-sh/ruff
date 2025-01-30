@@ -99,6 +99,10 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
         let binding = checker.semantic().binding(id);
 
+        if binding.kind.is_builtin() {
+            return false;
+        }
+
         dict_comp.range().contains_range(binding.range())
     });
     if self_referential {
