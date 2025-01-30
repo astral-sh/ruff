@@ -1033,6 +1033,14 @@ pub trait StringFlags: Copy {
         let quote_str = self.quote_str();
         format!("{prefix}{quote_str}{contents}{quote_str}")
     }
+
+    fn write_string_contents(self, buffer: &mut String, contents: &str) {
+        let quote_str = self.quote_str();
+        buffer.push_str(self.prefix().as_str());
+        buffer.push_str(quote_str);
+        buffer.push_str(contents);
+        buffer.push_str(quote_str);
+    }
 }
 
 bitflags! {

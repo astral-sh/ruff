@@ -168,15 +168,14 @@ impl<'a> Generator<'a> {
         s: &[u8],
         flags: BytesLiteralFlags,
     ) -> Result<(), std::str::Utf8Error> {
-        let body = std::str::from_utf8(s)?;
-        self.p(&flags.format_string_contents(body));
+        flags.write_string_contents(&mut self.buffer, std::str::from_utf8(s)?);
         Ok(())
     }
 
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
         let flags = flags.into();
         if flags.prefix().is_raw() {
-            self.p(&flags.format_string_contents(s));
+            flags.write_string_contents(&mut self.buffer, s);
             return;
         }
         self.p(flags.prefix().as_str());
