@@ -50,6 +50,13 @@ use super::{
 /// type PositiveInt = Annotated[int, Gt(0)]
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked unsafe for `TypeAlias` assignments outside of stub files because of the
+/// runtime behavior around `isinstance()` calls noted above. The fix is also unsafe for
+/// `TypeAliasType` assignments if there are any comments in the replacement range that would be
+/// deleted.
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695TypeAlias {
