@@ -120,6 +120,23 @@ fn single_item(expr: &Expr) -> Option<&Expr> {
             [item] => Some(item),
             _ => None,
         },
+        Expr::Call(ast::ExprCall {
+            func,
+            arguments,
+            range: _,
+        }) => {
+            if let Expr::Name(ast::ExprName {
+                id,
+                ctx: _,
+                range: _,
+            }) = func.as_ref()
+            {
+                if id == "set" && arguments.args.len() == 1 {
+                    return Some(&arguments.args[0]);
+                }
+            }
+            None
+        }
         string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
             if string.chars().count() == 1 =>
         {
