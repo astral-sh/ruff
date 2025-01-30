@@ -1741,20 +1741,6 @@ class Foo:
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_round_trip!(r#"f'abc{"def"}{1}'"#);
-        // triple double quotes should be preserved for all string types
-        assert_round_trip!(r#""""hello""""#);
-        assert_round_trip!(r#"u"""hello""""#);
-        assert_round_trip!(r#"r"""hello""""#);
-        assert_round_trip!(r#"b"""hello""""#);
-        assert_round_trip!(r#"f"""hello""""#);
-        assert_round_trip!(r#"f"""{hello}""""#);
-        // same for triple single quotes
-        assert_round_trip!(r#"'''hello'''"#);
-        assert_round_trip!(r#"u'''hello'''"#);
-        assert_round_trip!(r#"r'''hello'''"#);
-        assert_round_trip!(r#"b'''hello'''"#);
-        assert_round_trip!(r#"f'''hello'''"#);
-        assert_round_trip!(r#"f'''{hello}'''"#);
     }
 
     /// test all of the valid string literal prefix and quote combinations from
