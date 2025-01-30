@@ -53,6 +53,7 @@ mod mro;
 mod narrow;
 mod signatures;
 mod slots;
+mod statistics;
 mod string_annotation;
 mod subclass_of;
 mod type_ordering;
