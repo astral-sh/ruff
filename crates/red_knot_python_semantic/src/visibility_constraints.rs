@@ -252,12 +252,22 @@ impl<'db> VisibilityConstraints<'db> {
         }
     }
 
-    /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
-        self.evaluate_impl(db, id, MAX_RECURSION_DEPTH)
+    /// Analyze the statically known visibility for a given visibility constraint, without
+    /// performing any type inference.
+    pub(crate) fn evaluate_without_inference(
+        &self,
+        db: &'db dyn Db,
+        id: ScopedVisibilityConstraintId,
+    ) -> Truthiness {
+        self.evaluate_impl::<false>(db, id, MAX_RECURSION_DEPTH)
     }
 
-    fn evaluate_impl(
+    /// Analyze the statically known visibility for a given visibility constraint.
+    pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
+        self.evaluate_impl::<true>(db, id, MAX_RECURSION_DEPTH)
+    }
+
+    fn evaluate_impl<const INFERENCE_ALLOWED: bool>(
         &self,
         db: &'db dyn Db,
         id: ScopedVisibilityConstraintId,
@@ -271,18 +281,24 @@ impl<'db> VisibilityConstraints<'db> {
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
             VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
-            VisibilityConstraint::VisibleIf(constraint) => Self::analyze_single(db, constraint),
-            VisibilityConstraint::VisibleIfNot(negated) => {
-                self.evaluate_impl(db, *negated, max_depth - 1).negate()
+            VisibilityConstraint::VisibleIf(constraint) => {
+                if INFERENCE_ALLOWED {
+                    Self::analyze_single(db, constraint)
+                } else {
+                    Truthiness::Ambiguous
+                }
             }
+            VisibilityConstraint::VisibleIfNot(negated) => self
+                .evaluate_impl::<INFERENCE_ALLOWED>(db, *negated, max_depth - 1)
+                .negate(),
             VisibilityConstraint::KleeneAnd(lhs, rhs) => {
-                let lhs = self.evaluate_impl(db, *lhs, max_depth - 1);
+                let lhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *lhs, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysFalse {
                     return Truthiness::AlwaysFalse;
                 }
 
-                let rhs = self.evaluate_impl(db, *rhs, max_depth - 1);
+                let rhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *rhs, max_depth - 1);
 
                 if rhs == Truthiness::AlwaysFalse {
                     Truthiness::AlwaysFalse
@@ -293,13 +309,13 @@ impl<'db> VisibilityConstraints<'db> {
                 }
             }
             VisibilityConstraint::KleeneOr(lhs_id, rhs_id) => {
-                let lhs = self.evaluate_impl(db, *lhs_id, max_depth - 1);
+                let lhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *lhs_id, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysTrue {
                     return Truthiness::AlwaysTrue;
                 }
 
-                let rhs = self.evaluate_impl(db, *rhs_id, max_depth - 1);
+                let rhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *rhs_id, max_depth - 1);
 
                 if rhs == Truthiness::AlwaysTrue {
                     Truthiness::AlwaysTrue

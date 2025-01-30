@@ -160,7 +160,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::default());
-        self.use_def_maps.push(UseDefMapBuilder::default());
+        self.use_def_maps.push(UseDefMapBuilder::new(self.db));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());

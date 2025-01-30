@@ -265,6 +265,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraints};
+use crate::Db;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -476,11 +477,12 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
-    reachable: bool,
+    reachability: ScopedVisibilityConstraintId,
 }
 
-#[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
+    db: &'db dyn Db,
+
     /// Append-only array of [`Definition`].
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
@@ -505,12 +507,13 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Currently live bindings and declarations for each symbol.
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 
-    reachable: bool,
+    reachability: ScopedVisibilityConstraintId,
 }
 
-impl Default for UseDefMapBuilder<'_> {
-    fn default() -> Self {
+impl<'db> UseDefMapBuilder<'db> {
+    pub(super) fn new(db: &'db dyn Db) -> Self {
         Self {
+            db,
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
             visibility_constraints: VisibilityConstraints::default(),
@@ -518,14 +521,12 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
-            reachable: true,
+            reachability: ScopedVisibilityConstraintId::ALWAYS_TRUE,
         }
     }
-}
 
-impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
-        //self.reachable = false;
+        self.reachability = ScopedVisibilityConstraintId::ALWAYS_FALSE;
         self.record_visibility_constraint_id(ScopedVisibilityConstraintId::ALWAYS_FALSE);
     }
 
@@ -543,7 +544,7 @@ impl<'db> UseDefMapBuilder<'db> {
             binding,
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
-        symbol_state.record_binding(def_id, ScopedVisibilityConstraintId::ALWAYS_TRUE);
+        symbol_state.record_binding(def_id, self.reachability);
     }
 
     pub(super) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
@@ -648,7 +649,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
         symbol_state.record_declaration(def_id);
-        symbol_state.record_binding(def_id, ScopedVisibilityConstraintId::ALWAYS_TRUE);
+        symbol_state.record_binding(def_id, self.reachability);
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -665,7 +666,7 @@ impl<'db> UseDefMapBuilder<'db> {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
             scope_start_visibility: self.scope_start_visibility,
-            reachable: self.reachable,
+            reachability: self.reachability,
         }
     }
 
@@ -689,20 +690,32 @@ impl<'db> UseDefMapBuilder<'db> {
             SymbolState::undefined(self.scope_start_visibility),
         );
 
-        self.reachable = snapshot.reachable;
+        self.reachability = snapshot.reachability;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
     pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
-        // Unreachable snapshots should not be merged: If the current snapshot is unreachable, it
-        // should be completely overwritten by the snapshot we're merging in. If the other snapshot
-        // is unreachable, we should return without merging.
-        if !snapshot.reachable {
+        // As an optimization, if we know statically that either of the snapshots is always
+        // unreachable, we can leave it out of the merged result entirely. Note that we cannot
+        // perform any type inference at this point, so this is largely limited to unreachability
+        // via terminal statements. If a flow's reachability depends on an expression in the code,
+        // we will include the flow in the merged result; the visibility constraints of its
+        // bindings will include this reachability condition, so that later during type inference,
+        // we can determine whether any particular binding is non-visible due to unreachability.
+        if self
+            .visibility_constraints
+            .evaluate_without_inference(self.db, snapshot.reachability)
+            .is_always_false()
+        {
             return;
         }
-        if !self.reachable {
+        if self
+            .visibility_constraints
+            .evaluate_without_inference(self.db, self.reachability)
+            .is_always_false()
+        {
             self.restore(snapshot);
             return;
         }
@@ -729,8 +742,10 @@ impl<'db> UseDefMapBuilder<'db> {
             .visibility_constraints
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
 
-        // Both of the snapshots are reachable, so the merged result is too.
-        self.reachable = true;
+        // The merged result is reachability when either of the merged flows is.
+        self.reachability = self
+            .visibility_constraints
+            .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
