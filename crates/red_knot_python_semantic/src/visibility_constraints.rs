@@ -273,40 +273,6 @@ impl<'db> VisibilityConstraints<'db> {
         self.evaluate_impl::<false>(db, id, MAX_RECURSION_DEPTH)
     }
 
-    pub(crate) fn contains_always_false(&self, id: ScopedVisibilityConstraintId) -> bool {
-        let visibility_constraint = &self.constraints[id];
-        match visibility_constraint {
-            VisibilityConstraint::AlwaysTrue => false,
-            VisibilityConstraint::AlwaysFalse => true,
-            VisibilityConstraint::Ambiguous => false,
-            VisibilityConstraint::VisibleIf(_) => false,
-            VisibilityConstraint::VisibleIfNot(negated) => self.contains_always_true(*negated),
-            VisibilityConstraint::KleeneAnd(lhs, rhs) => {
-                self.contains_always_false(*lhs) || self.contains_always_false(*rhs)
-            }
-            VisibilityConstraint::KleeneOr(lhs, rhs) => {
-                self.contains_always_false(*lhs) || self.contains_always_false(*rhs)
-            }
-        }
-    }
-
-    pub(crate) fn contains_always_true(&self, id: ScopedVisibilityConstraintId) -> bool {
-        let visibility_constraint = &self.constraints[id];
-        match visibility_constraint {
-            VisibilityConstraint::AlwaysTrue => true,
-            VisibilityConstraint::AlwaysFalse => false,
-            VisibilityConstraint::Ambiguous => false,
-            VisibilityConstraint::VisibleIf(_) => false,
-            VisibilityConstraint::VisibleIfNot(negated) => self.contains_always_false(*negated),
-            VisibilityConstraint::KleeneAnd(lhs, rhs) => {
-                self.contains_always_true(*lhs) || self.contains_always_true(*rhs)
-            }
-            VisibilityConstraint::KleeneOr(lhs, rhs) => {
-                self.contains_always_true(*lhs) || self.contains_always_true(*rhs)
-            }
-        }
-    }
-
     /// Analyze the statically known visibility for a given visibility constraint.
     pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
         self.evaluate_impl::<true>(db, id, MAX_RECURSION_DEPTH)
