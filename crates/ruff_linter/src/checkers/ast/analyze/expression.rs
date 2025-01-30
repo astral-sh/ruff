@@ -826,7 +826,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_comprehensions::rules::unnecessary_literal_within_dict_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListCall) {
-                flake8_comprehensions::rules::unnecessary_list_call(checker, expr, func, args);
+                flake8_comprehensions::rules::unnecessary_list_call(checker, expr, call);
             }
             if checker.enabled(Rule::UnnecessaryCallAroundSorted) {
                 flake8_comprehensions::rules::unnecessary_call_around_sorted(
