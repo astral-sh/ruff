@@ -31,7 +31,7 @@ pub enum TripleQuoted {
 
 impl TripleQuoted {
     #[must_use]
-    pub fn is_yes(&self) -> bool {
+    pub const fn is_yes(&self) -> bool {
         matches!(self, Self::Yes)
     }
 }
