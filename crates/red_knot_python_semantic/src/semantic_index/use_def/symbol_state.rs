@@ -254,7 +254,11 @@ impl SymbolBindings {
     }
 
     /// Record a newly-encountered binding for this symbol.
-    pub(super) fn record_binding(&mut self, binding_id: ScopedDefinitionId) {
+    pub(super) fn record_binding(
+        &mut self,
+        binding_id: ScopedDefinitionId,
+        visibility: ScopedVisibilityConstraintId,
+    ) {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
         self.live_bindings = Bindings::with(binding_id.into());
@@ -262,8 +266,7 @@ impl SymbolBindings {
         self.constraints.push(Constraints::default());
 
         self.visibility_constraints = VisibilityConstraintPerBinding::with_capacity(1);
-        self.visibility_constraints
-            .push(ScopedVisibilityConstraintId::ALWAYS_TRUE);
+        self.visibility_constraints.push(visibility);
     }
 
     /// Add given constraint to all live bindings.
@@ -366,9 +369,13 @@ impl SymbolState {
     }
 
     /// Record a newly-encountered binding for this symbol.
-    pub(super) fn record_binding(&mut self, binding_id: ScopedDefinitionId) {
+    pub(super) fn record_binding(
+        &mut self,
+        binding_id: ScopedDefinitionId,
+        visibility: ScopedVisibilityConstraintId,
+    ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
-        self.bindings.record_binding(binding_id);
+        self.bindings.record_binding(binding_id, visibility);
     }
 
     /// Add given constraint to all live bindings.
@@ -574,7 +581,10 @@ mod tests {
     #[test]
     fn with() {
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym.record_binding(ScopedDefinitionId::from_u32(1));
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
 
         assert_bindings(&sym, &["1<>"]);
     }
@@ -582,7 +592,10 @@ mod tests {
     #[test]
     fn record_constraint() {
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym.record_binding(ScopedDefinitionId::from_u32(1));
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
         sym.record_constraint(ScopedConstraintId::from_u32(0));
 
         assert_bindings(&sym, &["1<0>"]);
@@ -594,11 +607,17 @@ mod tests {
 
         // merging the same definition with the same constraint keeps the constraint
         let mut sym1a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym1a.record_binding(ScopedDefinitionId::from_u32(1));
+        sym1a.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
         sym1a.record_constraint(ScopedConstraintId::from_u32(0));
 
         let mut sym1b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym1b.record_binding(ScopedDefinitionId::from_u32(1));
+        sym1b.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
         sym1b.record_constraint(ScopedConstraintId::from_u32(0));
 
         sym1a.merge(sym1b, &mut visibility_constraints);
@@ -607,11 +626,17 @@ mod tests {
 
         // merging the same definition with differing constraints drops all constraints
         let mut sym2a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym2a.record_binding(ScopedDefinitionId::from_u32(2));
+        sym2a.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
         sym2a.record_constraint(ScopedConstraintId::from_u32(1));
 
         let mut sym1b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym1b.record_binding(ScopedDefinitionId::from_u32(2));
+        sym1b.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
         sym1b.record_constraint(ScopedConstraintId::from_u32(2));
 
         sym2a.merge(sym1b, &mut visibility_constraints);
@@ -620,7 +645,10 @@ mod tests {
 
         // merging a constrained definition with unbound keeps both
         let mut sym3a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym3a.record_binding(ScopedDefinitionId::from_u32(3));
+        sym3a.record_binding(
+            ScopedDefinitionId::from_u32(3),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
         sym3a.record_constraint(ScopedConstraintId::from_u32(3));
 
         let sym2b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
