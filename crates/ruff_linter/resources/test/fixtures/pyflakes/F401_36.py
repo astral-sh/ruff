@@ -5,6 +5,6 @@ from typing import Union
 from typing_extensions import TypeAliasType
 
 Json = TypeAliasType(
-    "Json",
-    "Union[dict[str, Json], list[Json], str, int, float, bool, None]",
+    value="Union[dict[str, Json], list[Json], str, int, float, bool, None]",
+    name="Json",
 )
