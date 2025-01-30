@@ -1028,13 +1028,14 @@ pub trait StringFlags: Copy {
     }
 
     fn format_string_contents(self, contents: &str) -> String {
-        let buf_size = self.opener_len().to_usize() + contents.len() + self.closer_len().to_usize();
-        let mut buffer = String::with_capacity(buf_size);
+        let mut buffer = String::new();
         self.write_string_contents(&mut buffer, contents);
         buffer
     }
 
     fn write_string_contents(self, buffer: &mut String, contents: &str) {
+        buffer
+            .reserve(self.opener_len().to_usize() + contents.len() + self.closer_len().to_usize());
         let quote_str = self.quote_str();
         buffer.push_str(self.prefix().as_str());
         buffer.push_str(quote_str);
