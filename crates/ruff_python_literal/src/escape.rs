@@ -63,24 +63,24 @@ impl<'a> UnicodeEscape<'a> {
         Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
-    pub fn str_repr<'r>(&'a self, triple_quote: TripleQuotes) -> StrRepr<'r, 'a> {
+    pub fn str_repr<'r>(&'a self, triple_quotes: TripleQuotes) -> StrRepr<'r, 'a> {
         StrRepr {
             escape: self,
-            triple_quote,
+            triple_quotes,
         }
     }
 }
 
 pub struct StrRepr<'r, 'a> {
     escape: &'r UnicodeEscape<'a>,
-    triple_quote: TripleQuotes,
+    triple_quotes: TripleQuotes,
 }
 
 impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
         let flags = StringLiteralFlags::empty()
             .with_quote_style(self.escape.layout().quote)
-            .with_triple_quotes_set_to(self.triple_quote);
+            .with_triple_quotes_set_to(self.triple_quotes);
         formatter.write_str(flags.quote_str())?;
         self.escape.write_body(formatter)?;
         formatter.write_str(flags.quote_str())?;
