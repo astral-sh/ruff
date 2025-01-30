@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
-    StringLiteralValue, UnaryOp,
+    str::TripleQuotes, Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral,
+    StringLiteralFlags, StringLiteralValue, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -133,7 +133,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
                     // itemC
                     // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
                     // ```
-                    flags: flags.without_triple_quotes(),
+                    flags: flags.with_triple_quotes_set_to(TripleQuotes::No),
                 })
             })
             .collect(),
