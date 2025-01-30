@@ -9,7 +9,7 @@ use ruff_python_ast::{
     TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
-use ruff_python_literal::escape::{AsciiEscape, Escape, TripleQuoted, UnicodeEscape};
+use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use ruff_source_file::LineEnding;
 
 use super::stylist::{Indentation, Stylist};
@@ -156,7 +156,7 @@ impl<'a> Generator<'a> {
             self.buffer.reserve(len);
         }
         escape
-            .bytes_repr(TripleQuoted::from(flags))
+            .bytes_repr(flags.triple_quotes())
             .write(&mut self.buffer)
             .expect("Writing to a String buffer should never fail");
     }
@@ -185,7 +185,7 @@ impl<'a> Generator<'a> {
             self.buffer.reserve(len);
         }
         escape
-            .str_repr(TripleQuoted::from(flags))
+            .str_repr(flags.triple_quotes())
             .write(&mut self.buffer)
             .expect("Writing to a String buffer should never fail");
     }

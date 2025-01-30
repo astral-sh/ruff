@@ -10,7 +10,7 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
@@ -718,8 +718,12 @@ impl StringFlags for TokenFlags {
         }
     }
 
-    fn is_triple_quoted(self) -> bool {
-        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING)
+    fn triple_quotes(self) -> TripleQuotes {
+        if self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) {
+            TripleQuotes::Yes
+        } else {
+            TripleQuotes::No
+        }
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -769,7 +773,7 @@ impl TokenFlags {
 
     /// Converts this type to [`AnyStringFlags`], setting the equivalent flags.
     pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {
-        AnyStringFlags::new(self.prefix(), self.quote_style(), self.is_triple_quoted())
+        AnyStringFlags::new(self.prefix(), self.quote_style(), self.triple_quotes())
     }
 }
 

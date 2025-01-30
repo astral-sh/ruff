@@ -1,4 +1,7 @@
-use ruff_python_ast::{str::Quote, StringFlags};
+use ruff_python_ast::{
+    str::{Quote, TripleQuotes},
+    BytesLiteralFlags, StringFlags, StringLiteralFlags,
+};
 
 pub struct EscapeLayout {
     pub quote: Quote,
@@ -19,32 +22,6 @@ pub trait Escape {
             self.write_body_slow(formatter)
         } else {
             self.write_source(formatter)
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum TripleQuoted {
-    Yes,
-    No,
-}
-
-impl TripleQuoted {
-    #[must_use]
-    pub const fn is_yes(&self) -> bool {
-        matches!(self, Self::Yes)
-    }
-}
-
-impl<F> From<F> for TripleQuoted
-where
-    F: StringFlags,
-{
-    fn from(value: F) -> Self {
-        if value.is_triple_quoted() {
-            Self::Yes
-        } else {
-            Self::No
         }
     }
 }
@@ -86,7 +63,7 @@ impl<'a> UnicodeEscape<'a> {
         Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
-    pub fn str_repr<'r>(&'a self, triple_quote: TripleQuoted) -> StrRepr<'r, 'a> {
+    pub fn str_repr<'r>(&'a self, triple_quote: TripleQuotes) -> StrRepr<'r, 'a> {
         StrRepr {
             escape: self,
             triple_quote,
@@ -96,23 +73,17 @@ impl<'a> UnicodeEscape<'a> {
 
 pub struct StrRepr<'r, 'a> {
     escape: &'r UnicodeEscape<'a>,
-    triple_quote: TripleQuoted,
+    triple_quote: TripleQuotes,
 }
 
 impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.escape.layout().quote.as_char();
-        formatter.write_char(quote)?;
-        if self.triple_quote.is_yes() {
-            formatter.write_char(quote)?;
-            formatter.write_char(quote)?;
-        }
+        let flags = StringLiteralFlags::empty()
+            .with_quote_style(self.escape.layout().quote)
+            .with_triple_quotes_set_to(self.triple_quote);
+        formatter.write_str(flags.quote_str())?;
         self.escape.write_body(formatter)?;
-        formatter.write_char(quote)?;
-        if self.triple_quote.is_yes() {
-            formatter.write_char(quote)?;
-            formatter.write_char(quote)?;
-        }
+        formatter.write_str(flags.quote_str())?;
         Ok(())
     }
 
@@ -285,10 +256,10 @@ impl<'a> AsciiEscape<'a> {
         Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
-    pub fn bytes_repr<'r>(&'a self, triple_quote: TripleQuoted) -> BytesRepr<'r, 'a> {
+    pub fn bytes_repr<'r>(&'a self, triple_quotes: TripleQuotes) -> BytesRepr<'r, 'a> {
         BytesRepr {
             escape: self,
-            triple_quote,
+            triple_quotes,
         }
     }
 }
@@ -406,24 +377,19 @@ impl Escape for AsciiEscape<'_> {
 
 pub struct BytesRepr<'r, 'a> {
     escape: &'r AsciiEscape<'a>,
-    triple_quote: TripleQuoted,
+    triple_quotes: TripleQuotes,
 }
 
 impl BytesRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.escape.layout().quote.as_char();
+        let flags = BytesLiteralFlags::empty()
+            .with_quote_style(self.escape.layout().quote)
+            .with_triple_quotes_set_to(self.triple_quotes);
+
         formatter.write_char('b')?;
-        formatter.write_char(quote)?;
-        if self.triple_quote.is_yes() {
-            formatter.write_char(quote)?;
-            formatter.write_char(quote)?;
-        }
+        formatter.write_str(flags.quote_str())?;
         self.escape.write_body(formatter)?;
-        formatter.write_char(quote)?;
-        if self.triple_quote.is_yes() {
-            formatter.write_char(quote)?;
-            formatter.write_char(quote)?;
-        }
+        formatter.write_str(flags.quote_str())?;
         Ok(())
     }
 
