@@ -158,9 +158,8 @@ except KeyboardInterrupt as e:  # fine
 try:
     raise
 except int as e:  # error: [invalid-exception-caught]
-    # error: [unresolved-reference]
     reveal_type(e)  # revealed: Unknown
-    raise KeyError from e  # error: [unresolved-reference]
+    raise KeyError from e
 
 def _(e: Exception | type[Exception]):
     raise ModuleNotFoundError from e  # fine
