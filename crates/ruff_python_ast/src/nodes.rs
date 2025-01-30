@@ -13,11 +13,10 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::name::Name;
-use crate::str::TripleQuotes;
 use crate::{
     int,
-    str::Quote,
+    name::Name,
+    str::{Quote, TripleQuotes},
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
     ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam,
 };
