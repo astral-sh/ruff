@@ -171,6 +171,7 @@ const MAX_RECURSION_DEPTH: usize = 24;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VisibilityConstraint<'db> {
     AlwaysTrue,
+    AlwaysFalse,
     Ambiguous,
     VisibleIf(Constraint<'db>),
     VisibleIfNot(ScopedVisibilityConstraintId),
@@ -188,7 +189,7 @@ impl Default for VisibilityConstraints<'_> {
         Self {
             constraints: IndexVec::from_iter([
                 VisibilityConstraint::AlwaysTrue,
-                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
+                VisibilityConstraint::AlwaysFalse,
             ]),
         }
     }
@@ -199,7 +200,11 @@ impl<'db> VisibilityConstraints<'db> {
         &mut self,
         constraint: VisibilityConstraint<'db>,
     ) -> ScopedVisibilityConstraintId {
-        self.constraints.push(constraint)
+        match constraint {
+            VisibilityConstraint::AlwaysTrue => ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            VisibilityConstraint::AlwaysFalse => ScopedVisibilityConstraintId::ALWAYS_FALSE,
+            _ => self.constraints.push(constraint),
+        }
     }
 
     pub(crate) fn add_not_constraint(
@@ -286,6 +291,7 @@ impl<'db> VisibilityConstraints<'db> {
         let visibility_constraint = &self.constraints[id];
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
+            VisibilityConstraint::AlwaysFalse => Truthiness::AlwaysFalse,
             VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
             VisibilityConstraint::VisibleIf(constraint) => {
                 if INFERENCE_ALLOWED {
