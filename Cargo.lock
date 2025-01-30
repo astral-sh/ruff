@@ -2717,6 +2717,7 @@ name = "ruff_db"
 version = "0.0.0"
 dependencies = [
  "camino",
+ "colored 3.0.0",
  "countme",
  "dashmap 6.1.0",
  "dunce",
@@ -2726,6 +2727,7 @@ dependencies = [
  "insta",
  "matchit",
  "path-slash",
+ "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_notebook",
  "ruff_python_ast",
