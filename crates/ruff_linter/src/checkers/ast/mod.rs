@@ -1271,6 +1271,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::TypeVar)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                            {
+                                Some(typing::Callable::TypeAliasType)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
                                 Some(typing::Callable::NamedTuple)
@@ -1347,6 +1352,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             } = keyword;
                             if let Some(id) = arg {
                                 if matches!(&**id, "bound" | "default") {
+                                    self.visit_type_definition(value);
+                                } else {
+                                    self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    Some(typing::Callable::TypeAliasType) => {
+                        // Ex) TypeAliasType("Json", "Union[dict[str, Json]]")
+                        let mut args = arguments.args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        if let Some(arg) = args.next() {
+                            self.visit_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for Keyword { arg, value, .. } in &*arguments.keywords {
+                            if let Some(id) = arg {
+                                if matches!(&**id, "type_params") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);

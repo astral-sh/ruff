@@ -28,6 +28,7 @@ pub enum Callable {
     NamedTuple,
     TypedDict,
     MypyExtension,
+    TypeAliasType,
 }
 
 #[derive(Debug, Copy, Clone)]
