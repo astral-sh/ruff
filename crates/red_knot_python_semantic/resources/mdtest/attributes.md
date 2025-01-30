@@ -324,20 +324,35 @@ reveal_type(c_instance.variable_with_class_default1)  # revealed: str
 class Base:
     declared_in_body: int | None = 1
 
-    can_not_be_redeclared: str | None = None
+    base_class_attribute_1: str | None
+    base_class_attribute_2: str | None
+    base_class_attribute_3: str | None
 
     def __init__(self) -> None:
         self.defined_in_init: str | None = "value in base"
 
 class Intermediate(Base):
-    # TODO: Mypy does not report an error here, but pyright does:
-    # "… overrides symbol of same name in class "Base". Variable is mutable so its type is invariant"
-    # We should introduce a diagnostic for this. Whether or not that should be enabled by default can
-    # still be discussed.
-    can_not_be_redeclared: str = "a"
+    # Re-declaring base class attributes with the *same *type is fine:
+    base_class_attribute_1: str | None = None
 
-    def __init__(self) -> None:
-        super().__init__()
+    # Re-declaring them with a *narrower type* is unsound, because modifications
+    # through a `Base` reference could violate that constraint.
+    #
+    # Mypy does not report an error here, but pyright does: "… overrides symbol
+    # of same name in class "Base". Variable is mutable so its type is invariant"
+    #
+    # We should introduce a diagnostic for this. Whether or not that should be
+    # enabled by default can still be discussed.
+    #
+    # TODO: This should be an error
+    base_class_attribute_2: str
+
+    # Re-declaring attributes with a *wider type* directly violates LSP.
+    #
+    # In this case, both mypy and pyright report an error.
+    #
+    # TODO: This should be an error
+    base_class_attribute_3: str | int | None
 
 class Derived(Intermediate): ...
 
