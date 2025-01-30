@@ -583,6 +583,15 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
+    pub(super) fn record_negated_visibility_constraint_id(
+        &mut self,
+        constraint: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        let new_constraint_id = self.visibility_constraints.add_not_constraint(constraint);
+        self.record_visibility_constraint_id(new_constraint_id);
+        new_constraint_id
+    }
+
     pub(super) fn record_visibility_constraint(
         &mut self,
         constraint: VisibilityConstraint<'db>,

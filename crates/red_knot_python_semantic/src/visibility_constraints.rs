@@ -202,6 +202,19 @@ impl<'db> VisibilityConstraints<'db> {
         self.constraints.push(constraint)
     }
 
+    pub(crate) fn add_not_constraint(
+        &mut self,
+        a: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
+            ScopedVisibilityConstraintId::ALWAYS_FALSE
+        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            ScopedVisibilityConstraintId::ALWAYS_TRUE
+        } else {
+            self.add(VisibilityConstraint::VisibleIfNot(a))
+        }
+    }
+
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,

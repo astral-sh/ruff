@@ -356,7 +356,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
+            .record_negated_visibility_constraint_id(constraint)
     }
 
     /// Records a visibility constraint by applying it to all live bindings and declarations.
