@@ -617,6 +617,14 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
 
+        if !self
+            .visibility_constraints
+            .evaluate_without_inference(self.db, self.scope_start_visibility)
+            .is_always_true()
+        {
+            return;
+        }
+
         self.scope_start_visibility = snapshot.scope_start_visibility;
 
         // Note that this loop terminates when we reach a symbol not present in the snapshot.
