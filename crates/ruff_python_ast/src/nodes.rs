@@ -2064,7 +2064,7 @@ bitflags! {
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AnyStringFlags(AnyStringFlagsInner);
 
 impl AnyStringFlags {
@@ -2103,7 +2103,7 @@ impl AnyStringFlags {
     }
 
     pub fn new(prefix: AnyStringPrefix, quotes: Quote, triple_quotes: TripleQuotes) -> Self {
-        Self::default()
+        Self(AnyStringFlagsInner::empty())
             .with_prefix(prefix)
             .with_quote_style(quotes)
             .with_triple_quotes_set_to(triple_quotes)
