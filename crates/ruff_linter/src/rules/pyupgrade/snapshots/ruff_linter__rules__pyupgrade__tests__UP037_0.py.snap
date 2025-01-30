@@ -554,4 +554,72 @@ UP037_0.py:67:45: UP037 [*] Remove quotes from type annotation
    67 |+x: NamedTuple(typename="X", fields=[("foo", int)])
 68 68 | 
 69 69 | X: MyCallable("X")
-70 70 |
+70 70 | 
+
+UP037_0.py:112:12: UP037 [*] Remove quotes from type annotation
+    |
+110 | # Handle end of line comment in string annotation
+111 | # See https://github.com/astral-sh/ruff/issues/15816
+112 | def f() -> "Literal[0]#":
+    |            ^^^^^^^^^^^^^ UP037
+113 |     return 0
+    |
+    = help: Remove quotes
+
+ℹ Safe fix
+109 109 | 
+110 110 | # Handle end of line comment in string annotation
+111 111 | # See https://github.com/astral-sh/ruff/issues/15816
+112     |-def f() -> "Literal[0]#":
+    112 |+def f() -> (Literal[0]#
+    113 |+):
+113 114 |     return 0
+114 115 | 
+115 116 | def g(x: "Literal['abc']#") -> None:
+
+UP037_0.py:115:10: UP037 [*] Remove quotes from type annotation
+    |
+113 |     return 0
+114 |
+115 | def g(x: "Literal['abc']#") -> None:
+    |          ^^^^^^^^^^^^^^^^^ UP037
+116 |     return
+    |
+    = help: Remove quotes
+
+ℹ Safe fix
+112 112 | def f() -> "Literal[0]#":
+113 113 |     return 0
+114 114 | 
+115     |-def g(x: "Literal['abc']#") -> None:
+    115 |+def g(x: (Literal['abc']#
+    116 |+)) -> None:
+116 117 |     return
+117 118 | 
+118 119 | def f() -> """Literal[0]
+
+UP037_0.py:118:12: UP037 [*] Remove quotes from type annotation
+    |
+116 |       return
+117 |
+118 |   def f() -> """Literal[0]
+    |  ____________^
+119 | |     #
+120 | |     
+121 | |     """:
+    | |_______^ UP037
+122 |       return 0
+    |
+    = help: Remove quotes
+
+ℹ Safe fix
+115 115 | def g(x: "Literal['abc']#") -> None:
+116 116 |     return
+117 117 | 
+118     |-def f() -> """Literal[0]
+    118 |+def f() -> (Literal[0]
+119 119 |     #
+120 120 |     
+121     |-    """:
+    121 |+    ):
+122 122 |     return 0
