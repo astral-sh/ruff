@@ -4,16 +4,16 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, visitor::Visitor, Expr, ExprCall, ExprName, Keyword, Stmt, StmtAnnAssign,
-    StmtAssign, StmtTypeAlias, TypeParam,
+    visitor::Visitor, Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign,
 };
-use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
-use super::{expr_name_to_type_var, TypeParamKind, TypeVar, TypeVarReferenceVisitor};
+use super::{
+    expr_name_to_type_var, DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor,
+};
 
 /// ## What it does
 /// Checks for use of `TypeAlias` annotations and `TypeAliasType` assignments
@@ -146,9 +146,9 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
     };
 
     checker.diagnostics.push(create_diagnostic(
-        checker.generator(),
+        checker.source(),
         stmt.range(),
-        target_name.id.clone(),
+        &target_name.id,
         value,
         &vars,
         Applicability::Safe,
@@ -208,9 +208,9 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     }
 
     checker.diagnostics.push(create_diagnostic(
-        checker.generator(),
+        checker.source(),
         stmt.range(),
-        name.clone(),
+        name,
         value,
         &vars,
         // The fix is only safe in a type stub because new-style aliases have different runtime behavior
@@ -226,14 +226,20 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
 
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
 fn create_diagnostic(
-    generator: Generator,
+    source: &str,
     stmt_range: TextRange,
-    name: Name,
+    name: &Name,
     value: &Expr,
-    vars: &[TypeVar],
+    type_vars: &[TypeVar],
     applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
+    let content = format!(
+        "type {name}{type_params} = {value}",
+        type_params = DisplayTypeVars { type_vars, source },
+        value = &source[value.range()]
+    );
+    let edit = Edit::range_replacement(content, stmt_range);
     Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
@@ -241,31 +247,5 @@ fn create_diagnostic(
         },
         stmt_range,
     )
-    .with_fix(Fix::applicable_edit(
-        Edit::range_replacement(
-            generator.stmt(&Stmt::from(StmtTypeAlias {
-                range: TextRange::default(),
-                name: Box::new(Expr::Name(ExprName {
-                    range: TextRange::default(),
-                    id: name,
-                    ctx: ast::ExprContext::Load,
-                })),
-                type_params: create_type_params(vars),
-                value: Box::new(value.clone()),
-            })),
-            stmt_range,
-        ),
-        applicability,
-    ))
-}
-
-fn create_type_params(vars: &[TypeVar]) -> Option<ruff_python_ast::TypeParams> {
-    if vars.is_empty() {
-        return None;
-    }
-
-    Some(ast::TypeParams {
-        range: TextRange::default(),
-        type_params: vars.iter().map(TypeParam::from).collect(),
-    })
+    .with_fix(Fix::applicable_edit(edit, applicability))
 }
