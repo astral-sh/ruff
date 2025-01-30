@@ -146,8 +146,10 @@ impl<'a> Generator<'a> {
     }
 
     fn p_bytes_repr(&mut self, s: &[u8], flags: BytesLiteralFlags) {
-        // raw bytes are interpreted without escapes and should all be ascii, but double check
-        // before writing to self
+        // raw bytes are interpreted without escapes and should all be ascii (it's a python syntax
+        // error otherwise), but if this assumption is violated, a `Utf8Error` will be returned from
+        // `p_raw_bytes`, and we should fall back on the normal escaping behavior instead of
+        // panicking
         if flags.prefix().is_raw() && self.p_raw_bytes(s, flags).is_ok() {
             return;
         }
