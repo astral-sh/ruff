@@ -99,6 +99,10 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
         let binding = checker.semantic().binding(id);
 
+        // Builtin bindings have a range of 0..0, and are never
+        // defined within the comprehension, so we abort before
+        // checking the range overlap below. Note this only matters
+        // if the comprehension appears at the top of the file!
         if binding.kind.is_builtin() {
             return false;
         }
