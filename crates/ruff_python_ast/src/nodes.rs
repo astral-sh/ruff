@@ -1078,7 +1078,7 @@ pub struct FStringFlags(FStringFlagsInner);
 impl FStringFlags {
     /// Construct a new [`FStringFlags`] with **no flags set**.
     ///
-    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes`], and
+    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes_set_to`], and
     /// [`FStringFlags::with_prefix`] for ways of setting the quote style (single or double),
     /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
     ///
@@ -1463,9 +1463,10 @@ pub struct StringLiteralFlags(StringLiteralFlagsInner);
 impl StringLiteralFlags {
     /// Construct a new [`StringLiteralFlags`] with **no flags set**.
     ///
-    /// See [`StringLiteralFlags::with_quote_style`], [`StringLiteralFlags::with_triple_quotes`],
-    /// and [`StringLiteralFlags::with_prefix`] for ways of setting the quote style (single or
-    /// double), enabling triple quotes, and adding prefixes (such as `r` or `u`), respectively.
+    /// See [`StringLiteralFlags::with_quote_style`],
+    /// [`StringLiteralFlags::with_triple_quotes_set_to`], and [`StringLiteralFlags::with_prefix`]
+    /// for ways of setting the quote style (single or double), enabling triple quotes, and adding
+    /// prefixes (such as `r` or `u`), respectively.
     ///
     /// See the documentation for [`StringLiteralFlags`] for additional caveats on this constructor,
     /// and situations in which alternative ways to construct this struct should be used, especially
@@ -1859,9 +1860,10 @@ pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 impl BytesLiteralFlags {
     /// Construct a new [`BytesLiteralFlags`] with **no flags set**.
     ///
-    /// See [`BytesLiteralFlags::with_quote_style`], [`BytesLiteralFlags::with_triple_quotes`], and
-    /// [`BytesLiteralFlags::with_prefix`] for ways of setting the quote style (single or double),
-    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
+    /// See [`BytesLiteralFlags::with_quote_style`],
+    /// [`BytesLiteralFlags::with_triple_quotes_set_to`], and [`BytesLiteralFlags::with_prefix`] for
+    /// ways of setting the quote style (single or double), enabling triple quotes, and adding
+    /// prefixes (such as `r`), respectively.
     ///
     /// See the documentation for [`BytesLiteralFlags`] for additional caveats on this constructor,
     /// and situations in which alternative ways to construct this struct should be used, especially
