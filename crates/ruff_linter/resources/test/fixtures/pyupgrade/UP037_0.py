@@ -106,3 +106,17 @@ x = TypeVar("x", "str", "int")
 x = cast("str", x)
 
 X = List["MyClass"]
+
+# Handle end of line comment in string annotation
+# See https://github.com/astral-sh/ruff/issues/15816
+def f() -> "Literal[0]#":
+    return 0
+
+def g(x: "Literal['abc']#") -> None:
+    return
+
+def f() -> """Literal[0]
+    #
+    
+    """:
+    return 0

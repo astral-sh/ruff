@@ -1,3 +1,4 @@
+use ruff_python_parser::TokenKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -5,7 +6,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 
 /// ## What it does
@@ -87,14 +87,12 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     let placeholder_range = TextRange::up_to(annotation.text_len());
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
-    let tokenizer = SimpleTokenizer::new(annotation, placeholder_range);
-    let last_token_is_comment = matches!(
-        tokenizer.last(),
-        Some(SimpleToken {
-            kind: SimpleTokenKind::Comment,
-            ..
-        })
-    );
+    let last_token_is_comment = checker
+        .tokens()
+        // The actual last token will always be a logical newline,
+        // so we check the second to last
+        .get(checker.tokens().len().saturating_sub(2))
+        .is_some_and(|tok| tok.kind() == TokenKind::Comment);
 
     let new_content = match (spans_multiple_lines, last_token_is_comment) {
         (_, false) if in_parameter_annotation(range.start(), checker.semantic()) => {
