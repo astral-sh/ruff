@@ -46,3 +46,74 @@ if "a" == "a":
 
 if 1 in {*[1]}:
     pass
+
+
+# https://github.com/astral-sh/ruff/issues/10063
+_ = a in (
+    # Foo
+    b,
+)
+
+_ = a in (  # Foo1
+    (  # Foo2
+    # Foo3
+        (  # Tuple
+            (  # Bar
+       (b
+        # Bar
+        )
+  )
+       # Foo4
+            # Foo5
+     ,
+       )
+        # Foo6
+    )
+)
+
+foo = (
+    lorem()
+        .ipsum()
+        .dolor(lambda sit: sit in (
+            # Foo1
+            # Foo2
+            amet,
+        ))
+)
+
+foo = (
+    lorem()
+        .ipsum()
+        .dolor(lambda sit: sit in (
+            (
+                # Foo1
+                # Foo2
+                amet
+            ),
+        ))
+)
+
+foo = lorem() \
+    .ipsum() \
+    .dolor(lambda sit: sit in (
+        # Foo1
+        # Foo2
+        amet,
+    ))
+
+def _():
+    if foo not \
+        in [
+        # Before
+        bar
+        # After
+    ]: ...
+
+def _():
+    if foo not \
+        in [
+        # Before
+        bar
+        # After
+    ] and \
+        0 < 1: ...
