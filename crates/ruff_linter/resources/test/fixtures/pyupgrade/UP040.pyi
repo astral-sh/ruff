@@ -5,3 +5,10 @@ from typing import TypeAlias
 # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
 x: typing.TypeAlias = int
 x: TypeAlias = int
+
+
+# comments in the value are preserved
+x: TypeAlias = tuple[
+    int,  # preserved
+    float,
+]

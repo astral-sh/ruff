@@ -152,7 +152,13 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         return;
     };
 
-    let safety = if checker.comment_ranges().intersects(stmt.range) {
+    // it would be easier to check for comments in the whole `stmt.range`, but because
+    // `create_diagnostic` uses the full source text of `value`, comments within `value` are
+    // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
+    let pre_value = TextRange::new(stmt.start(), value.start());
+    let post_value = TextRange::new(value.end(), stmt.end());
+    let comment_ranges = checker.comment_ranges();
+    let safety = if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
         Applicability::Unsafe
     } else {
         Applicability::Safe

@@ -403,3 +403,31 @@ UP040.py:104:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignm
 105     |-    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 106     |-) # this comment should be okay
     104 |+type PositiveList[T] = list[Annotated[T, Gt(0)]] # this comment should be okay
+107 105 | 
+108 106 | 
+109 107 | # this comment will actually be preserved because it's inside the "value" part
+
+UP040.py:111:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+    |
+109 |   # this comment will actually be preserved because it's inside the "value" part
+110 |   T = TypeVar("T")
+111 | / PositiveList = TypeAliasType(
+112 | |     "PositiveList", list[
+113 | |         Annotated[T, Gt(0)],  # preserved comment
+114 | |     ], type_params=(T,)
+115 | | )
+    | |_^ UP040
+    |
+    = help: Use the `type` keyword
+
+ℹ Safe fix
+108 108 | 
+109 109 | # this comment will actually be preserved because it's inside the "value" part
+110 110 | T = TypeVar("T")
+111     |-PositiveList = TypeAliasType(
+112     |-    "PositiveList", list[
+    111 |+type PositiveList[T] = list[
+113 112 |         Annotated[T, Gt(0)],  # preserved comment
+114     |-    ], type_params=(T,)
+115     |-)
+    113 |+    ]

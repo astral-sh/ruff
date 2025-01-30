@@ -104,3 +104,12 @@ T = TypeVar("T")
 PositiveList = TypeAliasType(
     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 ) # this comment should be okay
+
+
+# this comment will actually be preserved because it's inside the "value" part
+T = TypeVar("T")
+PositiveList = TypeAliasType(
+    "PositiveList", list[
+        Annotated[T, Gt(0)],  # preserved comment
+    ], type_params=(T,)
+)
