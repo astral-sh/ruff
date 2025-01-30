@@ -1739,6 +1739,7 @@ class Foo:
         assert_round_trip!(r#"f"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
+        assert_eq!(round_trip(r#"b"he\"llo""#), r#"b'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_round_trip!(r#"f'abc{"def"}{1}'"#);
     }
