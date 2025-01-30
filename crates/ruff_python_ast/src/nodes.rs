@@ -1029,9 +1029,10 @@ pub trait StringFlags: Copy {
     }
 
     fn format_string_contents(self, contents: &str) -> String {
-        let prefix = self.prefix();
-        let quote_str = self.quote_str();
-        format!("{prefix}{quote_str}{contents}{quote_str}")
+        let buf_size = self.opener_len().to_usize() + contents.len() + self.closer_len().to_usize();
+        let mut buffer = String::with_capacity(buf_size);
+        self.write_string_contents(&mut buffer, contents);
+        buffer
     }
 
     fn write_string_contents(self, buffer: &mut String, contents: &str) {
