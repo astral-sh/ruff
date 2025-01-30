@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
@@ -360,3 +359,47 @@ UP040.py:85:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignmen
 86 86 | 
 87 87 | # OK: Other name
 88 88 | T = TypeVar("T", bound=SupportGt)
+
+UP040.py:99:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+    |
+ 97 |   # unsafe fix if comments within the fix
+ 98 |   T = TypeVar("T")
+ 99 | / PositiveList = TypeAliasType(  # eaten comment
+100 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+101 | | )
+    | |_^ UP040
+102 |
+103 |   T = TypeVar("T")
+    |
+    = help: Use the `type` keyword
+
+ℹ Unsafe fix
+96  96  | 
+97  97  | # unsafe fix if comments within the fix
+98  98  | T = TypeVar("T")
+99      |-PositiveList = TypeAliasType(  # eaten comment
+100     |-    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+101     |-)
+    99  |+type PositiveList[T] = list[Annotated[T, Gt(0)]]
+102 100 | 
+103 101 | T = TypeVar("T")
+104 102 | PositiveList = TypeAliasType(
+
+UP040.py:104:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+    |
+103 |   T = TypeVar("T")
+104 | / PositiveList = TypeAliasType(
+105 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+106 | | ) # this comment should be okay
+    | |_^ UP040
+    |
+    = help: Use the `type` keyword
+
+ℹ Safe fix
+101 101 | )
+102 102 | 
+103 103 | T = TypeVar("T")
+104     |-PositiveList = TypeAliasType(
+105     |-    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+106     |-) # this comment should be okay
+    104 |+type PositiveList[T] = list[Annotated[T, Gt(0)]] # this comment should be okay

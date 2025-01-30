@@ -145,13 +145,19 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         return;
     };
 
+    let safety = if checker.comment_ranges().intersects(stmt.range) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     checker.diagnostics.push(create_diagnostic(
         checker.source(),
-        stmt.range(),
+        stmt.range,
         &target_name.id,
         value,
         &vars,
-        Applicability::Safe,
+        safety,
         TypeAliasKind::TypeAliasType,
     ));
 }
