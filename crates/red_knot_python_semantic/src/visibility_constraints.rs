@@ -211,9 +211,9 @@ impl<'db> VisibilityConstraints<'db> {
             return b;
         } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
             return a;
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            return ScopedVisibilityConstraintId::ALWAYS_TRUE;
-        } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
+        } else if a == ScopedVisibilityConstraintId::ALWAYS_TRUE
+            || b == ScopedVisibilityConstraintId::ALWAYS_TRUE
+        {
             return ScopedVisibilityConstraintId::ALWAYS_TRUE;
         }
         match (&self.constraints[a], &self.constraints[b]) {
@@ -236,9 +236,9 @@ impl<'db> VisibilityConstraints<'db> {
             b
         } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
             a
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            ScopedVisibilityConstraintId::ALWAYS_FALSE
-        } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE
+            || b == ScopedVisibilityConstraintId::ALWAYS_FALSE
+        {
             ScopedVisibilityConstraintId::ALWAYS_FALSE
         } else {
             self.add(VisibilityConstraint::KleeneAnd(a, b))
