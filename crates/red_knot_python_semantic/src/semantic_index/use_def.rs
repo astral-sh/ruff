@@ -709,7 +709,6 @@ impl<'db> UseDefMapBuilder<'db> {
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
     pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
-        /*
         // As an optimization, if we know statically that either of the snapshots is always
         // unreachable, we can leave it out of the merged result entirely. Note that we cannot
         // perform any type inference at this point, so this is largely limited to unreachability
@@ -722,6 +721,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .evaluate_without_inference(self.db, snapshot.scope_start_visibility)
             .is_always_false()
         {
+            self.always_reachable = false;
             return;
         }
         if self
@@ -730,9 +730,9 @@ impl<'db> UseDefMapBuilder<'db> {
             .is_always_false()
         {
             self.restore(snapshot);
+            self.always_reachable = false;
             return;
         }
-        */
 
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
