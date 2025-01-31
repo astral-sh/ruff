@@ -21,6 +21,7 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// class GenericClass[_T]:
 ///     var: _T
 ///
+///
 /// def generic_function[_T](var: _T) -> list[_T]:
 ///     return var[0]
 /// ```
@@ -30,6 +31,7 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// ```python
 /// class GenericClass[T]:
 ///     var: T
+///
 ///
 /// def generic_function[T](var: T) -> list[T]:
 ///     return var[0]
