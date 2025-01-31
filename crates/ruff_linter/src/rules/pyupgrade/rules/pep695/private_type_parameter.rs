@@ -90,7 +90,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         _ => return None,
     };
 
-    let old_name = binding.name(&checker.source());
+    let old_name = binding.name(checker.source());
     if !old_name.starts_with('_') {
         return None;
     }
@@ -101,7 +101,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
-            &old_name,
+            old_name,
             new_name,
             &semantic.scopes[binding.scope],
             checker.semantic(),
