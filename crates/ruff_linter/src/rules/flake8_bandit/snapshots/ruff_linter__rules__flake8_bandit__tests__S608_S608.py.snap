@@ -576,3 +576,29 @@ S608.py:144:11: S608 Possible SQL injection vector through string-based query co
 148 |
 149 |   query57 = f"""
     |
+
+S608.py:160:11: S608 Possible SQL injection vector through string-based query construction
+    |
+159 |   # https://github.com/astral-sh/ruff/issues/15653
+160 |   query59 = f"""
+    |  ___________^
+161 | |     SELECT *, foo
+162 | |     FROM ({user_input}) raw
+163 | | """
+    | |___^ S608
+164 |   query60 = f"""
+165 |       SELECT *,
+    |
+
+S608.py:164:11: S608 Possible SQL injection vector through string-based query construction
+    |
+162 |       FROM ({user_input}) raw
+163 |   """
+164 |   query60 = f"""
+    |  ___________^
+165 | |     SELECT *,
+166 | |         foo
+167 | |     FROM ({user_input}) raw
+168 | | """
+    | |___^ S608
+    |

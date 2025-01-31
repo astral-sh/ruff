@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
+---
+UP046_1.py:11:14: UP046 Generic class `BadStr` uses `Generic` subclass instead of type parameters
+   |
+11 | class BadStr(Generic[AnyStr]):
+   |              ^^^^^^^^^^^^^^^ UP046
+12 |     var: AnyStr
+   |
+   = help: Use type parameters

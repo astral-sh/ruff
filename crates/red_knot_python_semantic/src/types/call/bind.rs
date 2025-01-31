@@ -73,7 +73,7 @@ pub(crate) fn bind_call<'db>(
                 continue;
             }
         };
-        if let Some(expected_ty) = parameter.annotated_ty() {
+        if let Some(expected_ty) = parameter.annotated_type() {
             if !argument_ty.is_assignable_to(db, expected_ty) {
                 errors.push(CallBindingError::InvalidArgumentType {
                     parameter: ParameterContext::new(parameter, index, positional),
@@ -109,7 +109,8 @@ pub(crate) fn bind_call<'db>(
     for (index, bound_ty) in parameter_tys.iter().enumerate() {
         if bound_ty.is_none() {
             let param = &parameters[index];
-            if param.is_variadic() || param.is_keyword_variadic() || param.default_ty().is_some() {
+            if param.is_variadic() || param.is_keyword_variadic() || param.default_type().is_some()
+            {
                 // variadic/keywords and defaulted arguments are not required
                 continue;
             }
@@ -151,7 +152,7 @@ pub(crate) struct CallBinding<'db> {
 
 impl<'db> CallBinding<'db> {
     // TODO remove this constructor and construct always from `bind_call`
-    pub(crate) fn from_return_ty(return_ty: Type<'db>) -> Self {
+    pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
         Self {
             callable_ty: None,
             return_ty,
@@ -160,27 +161,27 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    pub(crate) fn set_return_ty(&mut self, return_ty: Type<'db>) {
+    pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }
 
-    pub(crate) fn return_ty(&self) -> Type<'db> {
+    pub(crate) fn return_type(&self) -> Type<'db> {
         self.return_ty
     }
 
-    pub(crate) fn parameter_tys(&self) -> &[Type<'db>] {
+    pub(crate) fn parameter_types(&self) -> &[Type<'db>] {
         &self.parameter_tys
     }
 
-    pub(crate) fn one_parameter_ty(&self) -> Option<Type<'db>> {
-        match self.parameter_tys() {
+    pub(crate) fn one_parameter_type(&self) -> Option<Type<'db>> {
+        match self.parameter_types() {
             [ty] => Some(*ty),
             _ => None,
         }
     }
 
-    pub(crate) fn two_parameter_tys(&self) -> Option<(Type<'db>, Type<'db>)> {
-        match self.parameter_tys() {
+    pub(crate) fn two_parameter_types(&self) -> Option<(Type<'db>, Type<'db>)> {
+        match self.parameter_types() {
             [first, second] => Some((*first, *second)),
             _ => None,
         }

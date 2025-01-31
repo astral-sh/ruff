@@ -85,6 +85,14 @@ impl<'db> Symbol<'db> {
             Symbol::Unbound => self,
         }
     }
+
+    #[must_use]
+    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Symbol<'db> {
+        match self {
+            Symbol::Type(ty, boundness) => Symbol::Type(f(ty), boundness),
+            Symbol::Unbound => Symbol::Unbound,
+        }
+    }
 }
 
 #[cfg(test)]

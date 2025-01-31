@@ -89,13 +89,13 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call, or `None` if not callable.
-    pub(super) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::Callable { binding } => Some(binding.return_ty()),
+            Self::Callable { binding } => Some(binding.return_type()),
             Self::RevealType {
                 binding,
                 revealed_ty: _,
-            } => Some(binding.return_ty()),
+            } => Some(binding.return_type()),
             Self::NotCallable { not_callable_ty: _ } => None,
             Self::Union {
                 outcomes,
@@ -105,7 +105,7 @@ impl<'db> CallOutcome<'db> {
                 // If all outcomes are NotCallable, we return None; if some outcomes are callable
                 // and some are not, we return a union including Unknown.
                 .fold(None, |acc, outcome| {
-                    let ty = outcome.return_ty(db);
+                    let ty = outcome.return_type(db);
                     match (acc, ty) {
                         (None, None) => None,
                         (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
@@ -113,12 +113,12 @@ impl<'db> CallOutcome<'db> {
                     }
                 })
                 .map(UnionBuilder::build),
-            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
+            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_type(db),
             Self::StaticAssertionError { .. } => Some(Type::none(db)),
             Self::AssertType {
                 binding,
                 asserted_ty: _,
-            } => Some(binding.return_ty()),
+            } => Some(binding.return_type()),
         }
     }
 
@@ -128,7 +128,7 @@ impl<'db> CallOutcome<'db> {
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
     ) -> Type<'db> {
-        match self.return_ty_result(context, node) {
+        match self.return_type_result(context, node) {
             Ok(return_ty) => return_ty,
             Err(NotCallableError::Type {
                 not_callable_ty,
@@ -194,7 +194,7 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call as a result.
-    pub(super) fn return_ty_result(
+    pub(super) fn return_type_result(
         &self,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
@@ -205,7 +205,7 @@ impl<'db> CallOutcome<'db> {
         match self {
             Self::Callable { binding } => {
                 binding.report_diagnostics(context, node);
-                Ok(binding.return_ty())
+                Ok(binding.return_type())
             }
             Self::RevealType {
                 binding,
@@ -218,7 +218,7 @@ impl<'db> CallOutcome<'db> {
                     Severity::Info,
                     format_args!("Revealed type is `{}`", revealed_ty.display(context.db())),
                 );
-                Ok(binding.return_ty())
+                Ok(binding.return_type())
             }
             Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
                 not_callable_ty: *not_callable_ty,
@@ -230,7 +230,7 @@ impl<'db> CallOutcome<'db> {
             } => Err(NotCallableError::PossiblyUnboundDunderCall {
                 callable_ty: *called_ty,
                 return_ty: call_outcome
-                    .return_ty(context.db())
+                    .return_type(context.db())
                     .unwrap_or(Type::unknown()),
             }),
             Self::Union {
@@ -251,7 +251,7 @@ impl<'db> CallOutcome<'db> {
                             revealed_ty: _,
                         } => {
                             if revealed {
-                                binding.return_ty()
+                                binding.return_type()
                             } else {
                                 revealed = true;
                                 outcome.unwrap_with_diagnostic(context, node)
@@ -329,8 +329,8 @@ impl<'db> CallOutcome<'db> {
                 binding,
                 asserted_ty,
             } => {
-                let [actual_ty, _asserted] = binding.parameter_tys() else {
-                    return Ok(binding.return_ty());
+                let [actual_ty, _asserted] = binding.parameter_types() else {
+                    return Ok(binding.return_type());
                 };
 
                 if !actual_ty.is_gradual_equivalent_to(context.db(), *asserted_ty) {
@@ -345,7 +345,7 @@ impl<'db> CallOutcome<'db> {
                     );
                 }
 
-                Ok(binding.return_ty())
+                Ok(binding.return_type())
             }
         }
     }
@@ -358,9 +358,9 @@ pub(super) enum CallDunderResult<'db> {
 }
 
 impl<'db> CallDunderResult<'db> {
-    pub(super) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::CallOutcome(outcome) => outcome.return_ty(db),
+            Self::CallOutcome(outcome) => outcome.return_type(db),
             Self::PossiblyUnbound { .. } => None,
             Self::MethodNotAvailable => None,
         }
@@ -394,7 +394,7 @@ pub(super) enum NotCallableError<'db> {
 
 impl<'db> NotCallableError<'db> {
     /// The return type that should be used when a call is not callable.
-    pub(super) fn return_ty(&self) -> Type<'db> {
+    pub(super) fn return_type(&self) -> Type<'db> {
         match self {
             Self::Type { return_ty, .. } => *return_ty,
             Self::UnionElement { return_ty, .. } => *return_ty,
@@ -407,7 +407,7 @@ impl<'db> NotCallableError<'db> {
     ///
     /// For unions, returns the union type itself, which may contain a mix of callable and
     /// non-callable types.
-    pub(super) fn called_ty(&self) -> Type<'db> {
+    pub(super) fn called_type(&self) -> Type<'db> {
         match self {
             Self::Type {
                 not_callable_ty, ..

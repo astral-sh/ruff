@@ -175,7 +175,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::NonPEP646Unpack) {
                 pyupgrade::rules::use_pep646_unpack(checker, subscript);
             }
-
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
@@ -225,7 +227,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         refurb::rules::regex_flag_alias(checker, expr);
                     }
                     if checker.enabled(Rule::Airflow3Removal) {
-                        airflow::rules::removed_in_3(checker, expr);
+                        airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
                     if checker.enabled(Rule::Airflow3MovedToProvider) {
                         airflow::rules::moved_to_provider_in_3(checker, expr);
@@ -309,7 +311,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::Airflow3Removal) {
-                        airflow::rules::removed_in_3(checker, expr);
+                        airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
                     if checker.enabled(Rule::MixedCaseVariableInGlobalScope) {
                         if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
@@ -447,7 +449,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_in_3(checker, expr);
+                airflow::rules::airflow_3_removal_expr(checker, expr);
             }
         }
         Expr::Call(
@@ -504,7 +506,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     checker,
                                     attr,
                                     call,
-                                    string_value.to_str(),
+                                    string_value,
                                 );
                             }
                         } else if attr == "format" {
@@ -824,7 +826,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_comprehensions::rules::unnecessary_literal_within_dict_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListCall) {
-                flake8_comprehensions::rules::unnecessary_list_call(checker, expr, func, args);
+                flake8_comprehensions::rules::unnecessary_list_call(checker, expr, call);
             }
             if checker.enabled(Rule::UnnecessaryCallAroundSorted) {
                 flake8_comprehensions::rules::unnecessary_call_around_sorted(
@@ -940,18 +942,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pytest_style::rules::parametrize(checker, call);
             }
             if checker.enabled(Rule::PytestUnittestAssertion) {
-                if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
-                    checker, expr, func, args, keywords,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_pytest_style::rules::unittest_assertion(checker, expr, func, args, keywords);
             }
             if checker.enabled(Rule::PytestUnittestRaisesAssertion) {
-                if let Some(diagnostic) =
-                    flake8_pytest_style::rules::unittest_raises_assertion(checker, call)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_pytest_style::rules::unittest_raises_assertion_call(checker, call);
             }
             if checker.enabled(Rule::SubprocessPopenPreexecFn) {
                 pylint::rules::subprocess_popen_preexec_fn(checker, call);
@@ -1156,7 +1150,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_in_3(checker, expr);
+                airflow::rules::airflow_3_removal_expr(checker, expr);
             }
             if checker.enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);

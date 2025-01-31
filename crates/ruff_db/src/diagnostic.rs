@@ -73,6 +73,9 @@ pub enum DiagnosticId {
 
     /// A revealed type: Created by `reveal_type(expression)`.
     RevealedType,
+
+    /// No rule with the given name exists.
+    UnknownRule,
 }
 
 impl DiagnosticId {
@@ -89,6 +92,10 @@ impl DiagnosticId {
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
     pub fn is_lint_named(&self, name: &str) -> bool {
         matches!(self, DiagnosticId::Lint(self_name) if self_name == name)
+    }
+
+    pub fn strip_category(code: &str) -> Option<&str> {
+        code.split_once(':').map(|(_, rest)| rest)
     }
 
     /// Returns `true` if this `DiagnosticId` matches the given name.
@@ -112,15 +119,18 @@ impl DiagnosticId {
     }
 
     pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
-        match self {
-            DiagnosticId::Io => Ok("io"),
-            DiagnosticId::InvalidSyntax => Ok("invalid-syntax"),
-            DiagnosticId::Lint(name) => Err(DiagnosticAsStrError::Category {
-                category: "lint",
-                name: name.as_str(),
-            }),
-            DiagnosticId::RevealedType => Ok("revealed-type"),
-        }
+        Ok(match self {
+            DiagnosticId::Io => "io",
+            DiagnosticId::InvalidSyntax => "invalid-syntax",
+            DiagnosticId::Lint(name) => {
+                return Err(DiagnosticAsStrError::Category {
+                    category: "lint",
+                    name: name.as_str(),
+                })
+            }
+            DiagnosticId::RevealedType => "revealed-type",
+            DiagnosticId::UnknownRule => "unknown-rule",
+        })
     }
 }
 
@@ -152,8 +162,18 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     fn message(&self) -> Cow<str>;
 
-    fn file(&self) -> File;
+    /// The file this diagnostic is associated with.
+    ///
+    /// File can be `None` for diagnostics that don't originate from a file.
+    /// For example:
+    /// * A diagnostic indicating that a directory couldn't be read.
+    /// * A diagnostic related to a CLI argument
+    fn file(&self) -> Option<File>;
 
+    /// The primary range of the diagnostic in `file`.
+    ///
+    /// The range can be `None` if the diagnostic doesn't have a file
+    /// or it applies to the entire file (e.g. the file should be executable but isn't).
     fn range(&self) -> Option<TextRange>;
 
     fn severity(&self) -> Severity;
@@ -197,16 +217,15 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             Severity::Fatal => f.write_str("fatal")?,
         }
 
-        write!(
-            f,
-            "[{rule}] {path}",
-            rule = self.diagnostic.id(),
-            path = self.diagnostic.file().path(self.db)
-        )?;
+        write!(f, "[{rule}]", rule = self.diagnostic.id())?;
 
-        if let Some(range) = self.diagnostic.range() {
-            let index = line_index(self.db, self.diagnostic.file());
-            let source = source_text(self.db, self.diagnostic.file());
+        if let Some(file) = self.diagnostic.file() {
+            write!(f, " {path}", path = file.path(self.db))?;
+        }
+
+        if let (Some(file), Some(range)) = (self.diagnostic.file(), self.diagnostic.range()) {
+            let index = line_index(self.db, file);
+            let source = source_text(self.db, file);
 
             let start = index.source_location(range.start(), &source);
 
@@ -229,7 +248,7 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> File {
+    fn file(&self) -> Option<File> {
         (**self).file()
     }
 
@@ -254,7 +273,7 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> File {
+    fn file(&self) -> Option<File> {
         (**self).file()
     }
 
@@ -276,7 +295,7 @@ impl Diagnostic for Box<dyn Diagnostic> {
         (**self).message()
     }
 
-    fn file(&self) -> File {
+    fn file(&self) -> Option<File> {
         (**self).file()
     }
 
@@ -310,8 +329,8 @@ impl Diagnostic for ParseDiagnostic {
         self.error.error.to_string().into()
     }
 
-    fn file(&self) -> File {
-        self.file
+    fn file(&self) -> Option<File> {
+        Some(self.file)
     }
 
     fn range(&self) -> Option<TextRange> {

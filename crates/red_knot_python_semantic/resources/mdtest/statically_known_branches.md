@@ -11,7 +11,7 @@ version:
 import sys
 
 if sys.version_info >= (3, 9):
-    SomeFeature = "available"
+    SomeFeature: str = "available"
 ```
 
 If we can statically determine that the condition is always true, then we can also understand that
@@ -21,7 +21,7 @@ If we can statically determine that the condition is always true, then we can al
 from module1 import SomeFeature
 
 # SomeFeature is unconditionally available here, because we are on Python 3.9 or newer:
-reveal_type(SomeFeature)  # revealed: Literal["available"]
+reveal_type(SomeFeature)  # revealed: str
 ```
 
 Another scenario where this is useful is for `typing.TYPE_CHECKING` branches, which are often used

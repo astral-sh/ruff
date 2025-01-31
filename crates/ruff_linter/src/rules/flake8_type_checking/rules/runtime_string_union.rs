@@ -189,6 +189,7 @@ pub(crate) fn runtime_string_union_preview(
                 checker.semantic(),
                 checker.stylist(),
                 checker.locator(),
+                checker.default_string_flags(),
             );
             let fix = if checker.comment_ranges().intersects(extended_expr.range()) {
                 Fix::unsafe_edit(edit)

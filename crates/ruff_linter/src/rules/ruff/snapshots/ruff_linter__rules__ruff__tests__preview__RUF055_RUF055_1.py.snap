@@ -29,11 +29,11 @@ RUF055_1.py:17:1: RUF055 [*] Plain string pattern passed to `re` function
 17 | re.sub(r"abc", repl, haystack)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
    |
-   = help: Replace with `haystack.replace("abc", repl)`
+   = help: Replace with `haystack.replace(r"abc", repl)`
 
 ℹ Safe fix
 14 14 | 
 15 15 | # also works for the `repl` argument in sub
 16 16 | repl = "new"
 17    |-re.sub(r"abc", repl, haystack)
-   17 |+haystack.replace("abc", repl)
+   17 |+haystack.replace(r"abc", repl)

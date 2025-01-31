@@ -169,7 +169,7 @@ impl SearchPaths {
         let SearchPathSettings {
             extra_paths,
             src_roots,
-            typeshed,
+            custom_typeshed: typeshed,
             site_packages: site_packages_paths,
         } = settings;
 
@@ -222,8 +222,14 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match site_packages_paths {
-            SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
-                .and_then(|venv| venv.site_packages_directories(system))?,
+            SitePackages::Derived { venv_path } => {
+                // TODO: We may want to warn here if the venv's python version is older
+                //  than the one resolved in the program settings because it indicates
+                //  that the `target-version` is incorrectly configured or that the
+                //  venv is out of date.
+                VirtualEnvironment::new(venv_path, system)
+                    .and_then(|venv| venv.site_packages_directories(system))?
+            }
             SitePackages::Known(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
@@ -1302,7 +1308,7 @@ mod tests {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
-                    typeshed: Some(custom_typeshed),
+                    custom_typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
             },
@@ -1808,7 +1814,7 @@ not_a_directory
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![SystemPathBuf::from("/src")],
-                    typeshed: None,
+                    custom_typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,
                         system_site_packages,

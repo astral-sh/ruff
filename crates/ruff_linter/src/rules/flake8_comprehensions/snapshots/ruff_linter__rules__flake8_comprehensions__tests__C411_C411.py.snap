@@ -6,6 +6,8 @@ C411.py:2:1: C411 [*] Unnecessary `list()` call (remove the outer call to `list(
 1 | x = [1, 2, 3]
 2 | list([i for i in x])
   | ^^^^^^^^^^^^^^^^^^^^ C411
+3 |
+4 | # Skip when too many positional arguments
   |
   = help: Remove outer `list()` call
 
@@ -13,3 +15,6 @@ C411.py:2:1: C411 [*] Unnecessary `list()` call (remove the outer call to `list(
 1 1 | x = [1, 2, 3]
 2   |-list([i for i in x])
   2 |+[i for i in x]
+3 3 | 
+4 4 | # Skip when too many positional arguments
+5 5 | # or keyword argument present.

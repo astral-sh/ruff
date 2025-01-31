@@ -3,13 +3,13 @@ use std::iter::FusedIterator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
-    self as ast, AnyNodeRef, AnyStringFlags, Expr, ExprBytesLiteral, ExprFString,
-    ExprStringLiteral, ExpressionRef, StringFlags,
+    self as ast, AnyNodeRef, AnyStringFlags, Expr, ExprBytesLiteral, ExprFString, ExprRef,
+    ExprStringLiteral, StringFlags,
 };
 
-impl<'a> From<&'a Box<Expr>> for ExpressionRef<'a> {
+impl<'a> From<&'a Box<Expr>> for ExprRef<'a> {
     fn from(value: &'a Box<Expr>) -> Self {
-        ExpressionRef::from(value.as_ref())
+        ExprRef::from(value.as_ref())
     }
 }
 
@@ -111,11 +111,11 @@ impl<'a> StringLike<'a> {
         }
     }
 
-    pub const fn as_expression_ref(self) -> ExpressionRef<'a> {
+    pub const fn as_expression_ref(self) -> ExprRef<'a> {
         match self {
-            StringLike::String(expr) => ExpressionRef::StringLiteral(expr),
-            StringLike::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
-            StringLike::FString(expr) => ExpressionRef::FString(expr),
+            StringLike::String(expr) => ExprRef::StringLiteral(expr),
+            StringLike::Bytes(expr) => ExprRef::BytesLiteral(expr),
+            StringLike::FString(expr) => ExprRef::FString(expr),
         }
     }
 }
@@ -138,12 +138,12 @@ impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
     }
 }
 
-impl<'a> From<&StringLike<'a>> for ExpressionRef<'a> {
+impl<'a> From<&StringLike<'a>> for ExprRef<'a> {
     fn from(value: &StringLike<'a>) -> Self {
         match value {
-            StringLike::String(expr) => ExpressionRef::StringLiteral(expr),
-            StringLike::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
-            StringLike::FString(expr) => ExpressionRef::FString(expr),
+            StringLike::String(expr) => ExprRef::StringLiteral(expr),
+            StringLike::Bytes(expr) => ExprRef::BytesLiteral(expr),
+            StringLike::FString(expr) => ExprRef::FString(expr),
         }
     }
 }

@@ -139,7 +139,9 @@ reveal_type(not AlwaysFalse())
 
 # We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
 class BoolIsBool:
-    __bool__ = bool
+    # TODO: The `type[bool]` declaration here is a workaround to avoid running into
+    # https://github.com/astral-sh/ruff/issues/15672
+    __bool__: type[bool] = bool
 
 # revealed: bool
 reveal_type(not BoolIsBool())

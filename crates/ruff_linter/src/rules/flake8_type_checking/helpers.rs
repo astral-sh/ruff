@@ -3,8 +3,9 @@ use std::cmp::Reverse;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprContext, Operator};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprContext, Operator, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -251,6 +252,7 @@ pub(crate) fn quote_annotation(
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
+    flags: StringLiteralFlags,
 ) -> Edit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -260,7 +262,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -268,7 +270,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -276,7 +278,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -284,14 +286,14 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, semantic, stylist, locator)
+    quote_type_expression(expr, semantic, stylist, locator, flags)
 }
 
 /// Wrap a type expression in quotes.
@@ -307,9 +309,10 @@ pub(crate) fn quote_type_expression(
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
+    flags: StringLiteralFlags,
 ) -> Edit {
     // Quote the entire expression.
-    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator);
+    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
 
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
@@ -338,6 +341,7 @@ pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
+    flags: StringLiteralFlags,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -345,11 +349,13 @@ impl<'a> QuoteAnnotator<'a> {
         semantic: &'a SemanticModel<'a>,
         stylist: &'a Stylist<'a>,
         locator: &'a Locator<'a>,
+        flags: StringLiteralFlags,
     ) -> Self {
         Self {
             semantic,
             stylist,
             locator,
+            flags,
         }
     }
 
@@ -359,16 +365,12 @@ impl<'a> QuoteAnnotator<'a> {
         let generator = Generator::from(self.stylist);
         // we first generate the annotation with the inverse quote, so we can
         // generate the string literal with the preferred quote
-        let subgenerator = Generator::new(
-            self.stylist.indentation(),
-            self.stylist.quote().opposite(),
-            self.stylist.line_ending(),
-        );
+        let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
             value: annotation.into_boxed_str(),
-            flags: ast::StringLiteralFlags::default(),
+            flags: self.flags,
         }))
     }
 
@@ -378,6 +380,12 @@ impl<'a> QuoteAnnotator<'a> {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice {
             if !elts.is_empty() {
                 self.visit_expr(&mut elts[0]);
+                // The outer annotation will use the preferred quote.
+                // As such, any quotes found in metadata elements inside an `Annotated` slice
+                // should use the opposite quote to the preferred quote.
+                for elt in elts.iter_mut().skip(1) {
+                    QuoteRewriter::new(self.stylist).visit_expr(elt);
+                }
             }
         }
     }
@@ -392,8 +400,10 @@ impl Transformer for QuoteAnnotator<'_> {
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Literal")
                     {
-                        // we don't want to modify anything inside `Literal`
-                        // so skip visiting this subscripts' slice
+                        // The outer annotation will use the preferred quote.
+                        // As such, any quotes found inside a `Literal` slice
+                        // should use the opposite quote to the preferred quote.
+                        QuoteRewriter::new(self.stylist).visit_expr(slice);
                     } else if self
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Annotated")
@@ -420,6 +430,27 @@ impl Transformer for QuoteAnnotator<'_> {
                 walk_expr(self, expr);
             }
         }
+    }
+}
+
+/// A [`Transformer`] struct that rewrites all strings in an expression
+/// to use a specified quotation style
+#[derive(Debug)]
+struct QuoteRewriter {
+    preferred_inner_quote: Quote,
+}
+
+impl QuoteRewriter {
+    fn new(stylist: &Stylist) -> Self {
+        Self {
+            preferred_inner_quote: stylist.quote().opposite(),
+        }
+    }
+}
+
+impl Transformer for QuoteRewriter {
+    fn visit_string_literal(&self, literal: &mut ast::StringLiteral) {
+        literal.flags = literal.flags.with_quote_style(self.preferred_inner_quote);
     }
 }
 

@@ -156,11 +156,6 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn with_custom_typeshed(mut self, path: &str) -> Self {
-            self.custom_typeshed = Some(SystemPathBuf::from(path));
-            self
-        }
-
         pub(crate) fn with_file(mut self, path: &'a str, content: &'a str) -> Self {
             self.files.push((path, content));
             self
@@ -176,7 +171,7 @@ pub(crate) mod tests {
                 .context("Failed to write test files")?;
 
             let mut search_paths = SearchPathSettings::new(vec![src_root]);
-            search_paths.typeshed = self.custom_typeshed;
+            search_paths.custom_typeshed = self.custom_typeshed;
 
             Program::from_settings(
                 &db,

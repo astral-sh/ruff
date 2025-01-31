@@ -8,29 +8,4 @@ requires-python = ">=3.11"
 line-length = 88
 
 [tool.ruff]
-line-length = 88
-
-[tool.ruff.lint]
-select = [
-  "E",   # pycodestyle (error)
-  "F",   # pyflakes
-  "B",   # bugbear
-  "B9",
-  "C4",  # flake8-comprehensions
-  "SIM", # flake8-simplify
-  "I",   # isort
-  "UP",  # pyupgrade
-  "PIE", # flake8-pie
-  "PGH", # pygrep-hooks
-  "PYI", # flake8-pyi
-  "RUF",
-]
-
-ignore = [
-  # only relevant if you run a script with `python -0`,
-  # which seems unlikely for any of the scripts in this directory
-  "B011"
-]
-
-[tool.ruff.lint.isort]
-required-imports = ["from __future__ import annotations"]
+extend = "../pyproject.toml"

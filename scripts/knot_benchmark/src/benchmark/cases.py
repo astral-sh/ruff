@@ -68,7 +68,7 @@ class Knot(Tool):
         )
 
     def cold_command(self, project: Project, venv: Venv) -> Command:
-        command = [str(self.path), "-v"]
+        command = [str(self.path), "check", "-v"]
 
         assert len(project.include) < 2, "Knot doesn't support multiple source folders"
 

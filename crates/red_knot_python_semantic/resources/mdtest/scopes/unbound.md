@@ -17,8 +17,8 @@ class C:
         x = 2
 
 # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C]` is possibly unbound"
-reveal_type(C.x)  # revealed: Literal[2]
-reveal_type(C.y)  # revealed: Literal[1]
+reveal_type(C.x)  # revealed: Unknown | Literal[2]
+reveal_type(C.y)  # revealed: Unknown | Literal[1]
 ```
 
 ## Possibly unbound in class and global scope
@@ -37,7 +37,7 @@ class C:
     # error: [possibly-unresolved-reference]
     y = x
 
-reveal_type(C.y)  # revealed: Literal[1, "abc"]
+reveal_type(C.y)  # revealed: Unknown | Literal[1, "abc"]
 ```
 
 ## Unbound function local

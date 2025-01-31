@@ -30,6 +30,8 @@ use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
 
+use crate::commands::completions::config::{OptionString, OptionStringParser};
+
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
 #[derive(Debug, Default, Clone, clap::Args)]
@@ -114,7 +116,11 @@ pub enum Command {
     /// List or describe the available configuration options.
     Config {
         /// Config key to show
-        option: Option<String>,
+        #[arg(
+            value_parser = OptionStringParser,
+            hide_possible_values = true
+        )]
+        option: Option<OptionString>,
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,

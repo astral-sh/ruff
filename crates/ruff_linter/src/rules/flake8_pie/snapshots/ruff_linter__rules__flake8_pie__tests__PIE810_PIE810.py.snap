@@ -142,3 +142,21 @@ PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
 26 26 |         print("yes") 
 27 27 | 
 28 28 | # ok
+
+PIE810.py:83:8: PIE810 [*] Call `startswith` once with a `tuple`
+   |
+81 | def func():
+82 |     "Regression test for https://github.com/astral-sh/ruff/issues/9663"
+83 |     if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+84 |         print("yes")
+   |
+   = help: Merge into a single `startswith` call
+
+ℹ Unsafe fix
+80 80 | 
+81 81 | def func():
+82 82 |     "Regression test for https://github.com/astral-sh/ruff/issues/9663"
+83    |-    if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
+   83 |+    if x.startswith(("a", "b")) or re.match(r"a\.b", x):
+84 84 |         print("yes")

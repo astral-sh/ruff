@@ -66,4 +66,56 @@ static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], 
 static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
 ```
 
+## Tuples containing equivalent but differently ordered unions/intersections are equivalent
+
+```py
+from knot_extensions import is_equivalent_to, TypeOf, static_assert, Intersection, Not
+from typing import Literal
+
+class P: ...
+class Q: ...
+class R: ...
+class S: ...
+
+static_assert(is_equivalent_to(tuple[P | Q], tuple[Q | P]))
+static_assert(is_equivalent_to(tuple[P | None], tuple[None | P]))
+static_assert(
+    is_equivalent_to(tuple[Intersection[P, Q] | Intersection[R, Not[S]]], tuple[Intersection[Not[S], R] | Intersection[Q, P]])
+)
+```
+
+## Unions containing tuples containing tuples containing unions (etc.)
+
+```py
+from knot_extensions import is_equivalent_to, static_assert, Intersection
+
+class P: ...
+class Q: ...
+
+static_assert(
+    is_equivalent_to(
+        tuple[tuple[tuple[P | Q]]] | P,
+        tuple[tuple[tuple[Q | P]]] | P,
+    )
+)
+static_assert(
+    is_equivalent_to(
+        tuple[tuple[tuple[tuple[tuple[Intersection[P, Q]]]]]],
+        tuple[tuple[tuple[tuple[tuple[Intersection[Q, P]]]]]],
+    )
+)
+```
+
+## Intersections containing tuples containing unions
+
+```py
+from knot_extensions import is_equivalent_to, static_assert, Intersection
+
+class P: ...
+class Q: ...
+class R: ...
+
+static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent

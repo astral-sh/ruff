@@ -6,11 +6,10 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::pyproject::{PyProject, Tool};
+use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{
-    resolve_module, ModuleName, PythonPlatform, PythonVersion, SitePackages,
-};
+use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform, PythonVersion};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -48,7 +47,7 @@ impl TestCase {
         #[track_caller]
         fn panic_with_formatted_events(events: Vec<ChangeEvent>) -> Vec<ChangeEvent> {
             panic!(
-                "Didn't observe expected change:\n{}",
+                "Didn't observe the expected event. The following events occurred:\n{}",
                 events
                     .into_iter()
                     .map(|event| format!("  - {event:?}"))
@@ -323,8 +322,7 @@ where
         .search_paths
         .extra_paths
         .iter()
-        .chain(program_settings.search_paths.typeshed.as_ref())
-        .chain(program_settings.search_paths.site_packages.paths())
+        .chain(program_settings.search_paths.custom_typeshed.as_ref())
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path `{path}`"))?;
@@ -794,7 +792,7 @@ fn search_path() -> anyhow::Result<()> {
     let mut case = setup_with_options([("bar.py", "import sub.a")], |root_path, _project_path| {
         Some(Options {
             environment: Some(EnvironmentOptions {
-                venv_path: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
+                extra_paths: Some(vec![RelativePathBuf::cli(root_path.join("site_packages"))]),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -835,7 +833,7 @@ fn add_search_path() -> anyhow::Result<()> {
     // Register site-packages as a search path.
     case.update_options(Options {
         environment: Some(EnvironmentOptions {
-            venv_path: Some(SitePackages::Known(vec![site_packages.clone()])),
+            extra_paths: Some(vec![RelativePathBuf::cli("site_packages")]),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -858,7 +856,7 @@ fn remove_search_path() -> anyhow::Result<()> {
     let mut case = setup_with_options([("bar.py", "import sub.a")], |root_path, _project_path| {
         Some(Options {
             environment: Some(EnvironmentOptions {
-                venv_path: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
+                extra_paths: Some(vec![RelativePathBuf::cli(root_path.join("site_packages"))]),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -899,8 +897,10 @@ print(sys.last_exc, os.getegid())
         |_root_path, _project_path| {
             Some(Options {
                 environment: Some(EnvironmentOptions {
-                    python_version: Some(PythonVersion::PY311),
-                    python_platform: Some(PythonPlatform::Identifier("win32".to_string())),
+                    python_version: Some(RangedValue::cli(PythonVersion::PY311)),
+                    python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
+                        "win32".to_string(),
+                    ))),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -923,8 +923,10 @@ print(sys.last_exc, os.getegid())
     // Change the python version
     case.update_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(PythonVersion::PY312),
-            python_platform: Some(PythonPlatform::Identifier("linux".to_string())),
+            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
+                "linux".to_string(),
+            ))),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -954,7 +956,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
         |root_path, _project_path| {
             Some(Options {
                 environment: Some(EnvironmentOptions {
-                    typeshed: Some(root_path.join("typeshed")),
+                    typeshed: Some(RelativePathBuf::cli(root_path.join("typeshed"))),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -1378,12 +1380,13 @@ mod unix {
 
                 Ok(())
             },
-            |_root, project| {
+            |_root, _project| {
                 Some(Options {
                     environment: Some(EnvironmentOptions {
-                        venv_path: Some(SitePackages::Known(vec![
-                            project.join(".venv/lib/python3.12/site-packages")
-                        ])),
+                        extra_paths: Some(vec![RelativePathBuf::cli(
+                            ".venv/lib/python3.12/site-packages",
+                        )]),
+                        python_version: Some(RangedValue::cli(PythonVersion::PY312)),
                         ..EnvironmentOptions::default()
                     }),
                     ..Options::default()
