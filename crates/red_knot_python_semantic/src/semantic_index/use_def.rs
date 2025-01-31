@@ -265,8 +265,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{
-    ScopedVisibilityConstraintId, VisibilityConstraint, VisibilityConstraints,
-    VisibilityConstraintsBuilder,
+    ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
@@ -491,7 +490,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_constraints: AllConstraints<'db>,
 
     /// Append-only array of [`VisibilityConstraint`].
-    visibility_constraints: VisibilityConstraintsBuilder<'db>,
+    pub(super) visibility_constraints: VisibilityConstraintsBuilder<'db>,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
     /// whether or not the start of the scope is visible. This is important for cases like
@@ -564,33 +563,16 @@ impl<'db> UseDefMapBuilder<'db> {
         new_constraint_id
     }
 
-    pub(super) fn add_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        self.visibility_constraints.add(constraint)
-    }
-
-    pub(super) fn record_visibility_constraint_id(
+    pub(super) fn record_visibility_constraint(
         &mut self,
         constraint: ScopedVisibilityConstraintId,
     ) {
         for state in &mut self.symbol_states {
             state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
         }
-
         self.scope_start_visibility = self
             .visibility_constraints
             .add_and_constraint(self.scope_start_visibility, constraint);
-    }
-
-    pub(super) fn record_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        let new_constraint_id = self.add_visibility_constraint(constraint);
-        self.record_visibility_constraint_id(new_constraint_id);
-        new_constraint_id
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state

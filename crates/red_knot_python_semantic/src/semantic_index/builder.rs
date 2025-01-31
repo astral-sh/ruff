@@ -28,7 +28,9 @@ use crate::semantic_index::symbol::{
 use crate::semantic_index::use_def::{FlowSnapshot, ScopedConstraintId, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::visibility_constraints::{ScopedVisibilityConstraintId, VisibilityConstraint};
+use crate::visibility_constraints::{
+    ScopedVisibilityConstraintId, VisibilityConstraint, VisibilityConstraintsBuilder,
+};
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -230,6 +232,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &self.use_def_maps[scope_id]
     }
 
+    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder<'db> {
+        let scope_id = self.current_scope();
+        &mut self.use_def_maps[scope_id].visibility_constraints
+    }
+
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
@@ -371,15 +378,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         constraint: VisibilityConstraint<'db>,
     ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .add_visibility_constraint(constraint)
+        self.current_visibility_constraints_mut().add(constraint)
     }
 
     /// Records a previously added visibility constraint by applying it to all live bindings
     /// and declarations.
     fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint_id(constraint);
+            .record_visibility_constraint(constraint);
     }
 
     /// Negates the given visibility constraint and then adds it to all live bindings and declarations.
@@ -387,8 +393,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         constraint: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
+        let id = self
+            .current_visibility_constraints_mut()
+            .add(VisibilityConstraint::VisibleIfNot(constraint));
+        self.record_visibility_constraint_id(id);
+        id
     }
 
     /// Records a visibility constraint by applying it to all live bindings and declarations.
@@ -396,8 +405,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         constraint: Constraint<'db>,
     ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 0))
+        let id = self
+            .current_visibility_constraints_mut()
+            .add(VisibilityConstraint::VisibleIf(constraint, 0));
+        self.record_visibility_constraint_id(id);
+        id
     }
 
     /// Records that all remaining statements in the current block are unreachable, and therefore
@@ -409,7 +421,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
     fn record_ambiguous_visibility(&mut self) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint_id(ScopedVisibilityConstraintId::AMBIGUOUS);
+            .record_visibility_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);
     }
 
     /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
