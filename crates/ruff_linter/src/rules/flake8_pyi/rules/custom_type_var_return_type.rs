@@ -121,18 +121,25 @@ pub(crate) fn custom_type_var_return_type(
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     ) {
-        FunctionType::Function => return,
-        FunctionType::StaticMethod => return,
-        FunctionType::ClassMethod => Method::Class(ClassMethod {
-            cls_annotation: self_or_cls_annotation,
-            returns,
-            type_params: function_def.type_params.as_deref(),
-        }),
         FunctionType::Method => Method::Instance(InstanceMethod {
             self_annotation: self_or_cls_annotation,
             returns,
             type_params: function_def.type_params.as_deref(),
         }),
+        FunctionType::ClassMethod => Method::Class(ClassMethod {
+            cls_annotation: self_or_cls_annotation,
+            returns,
+            type_params: function_def.type_params.as_deref(),
+        }),
+        FunctionType::StaticMethod if matches!(function_def.name.as_str(), "__new__") => {
+            Method::DunderNew(DunderNewMethod {
+                cls_annotation: self_or_cls_annotation,
+                returns,
+                type_params: function_def.type_params.as_deref(),
+            })
+        }
+        FunctionType::StaticMethod => return,
+        FunctionType::Function => return,
     };
 
     if method.uses_custom_var() {
@@ -142,6 +149,7 @@ pub(crate) fn custom_type_var_return_type(
 
 #[derive(Debug)]
 enum Method<'a> {
+    DunderNew(DunderNewMethod<'a>),
     Class(ClassMethod<'a>),
     Instance(InstanceMethod<'a>),
 }
@@ -149,6 +157,7 @@ enum Method<'a> {
 impl Method<'_> {
     fn uses_custom_var(&self) -> bool {
         match self {
+            Self::DunderNew(dunder_new_method) => dunder_new_method.uses_custom_var(),
             Self::Class(class_method) => class_method.uses_custom_var(),
             Self::Instance(instance_method) => instance_method.uses_custom_var(),
         }
@@ -195,6 +204,10 @@ impl ClassMethod<'_> {
         is_likely_private_typevar(&slice.id, self.type_params)
     }
 }
+
+// Dunder new methods (`__new__`) are technically static methods with `cls` as their first argument.
+// For simplicity of implementation, we treat them as class methods.
+use ClassMethod as DunderNewMethod;
 
 #[derive(Debug)]
 struct InstanceMethod<'a> {
