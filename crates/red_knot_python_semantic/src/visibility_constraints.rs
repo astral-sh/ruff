@@ -150,9 +150,8 @@
 //!
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 
-use ruff_index::IndexVec;
+use ruff_index::{newtype_index, IndexVec};
 
-use crate::semantic_index::ScopedVisibilityConstraintId;
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
     constraint::{Constraint, ConstraintNode, PatternConstraintKind},
@@ -191,6 +190,18 @@ pub(crate) enum VisibilityConstraint<'db> {
     VisibleIfNot(ScopedVisibilityConstraintId),
     KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
     KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+}
+
+/// A newtype-index for a visibility constraint in a particular scope.
+#[newtype_index]
+pub(crate) struct ScopedVisibilityConstraintId;
+
+impl ScopedVisibilityConstraintId {
+    /// A special ID that is used for an "always true" / "always visible" constraint.
+    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
+    /// present at index 0.
+    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId::from_u32(0);
 }
 
 #[derive(Debug, PartialEq, Eq)]

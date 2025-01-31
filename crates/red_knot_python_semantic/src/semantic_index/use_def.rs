@@ -255,17 +255,18 @@
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
+pub(crate) use self::symbol_state::ScopedConstraintId;
 use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstraintId};
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{
-    VisibilityConstraint, VisibilityConstraints, VisibilityConstraintsBuilder,
+    ScopedVisibilityConstraintId, VisibilityConstraint, VisibilityConstraints,
+    VisibilityConstraintsBuilder,
 };
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;

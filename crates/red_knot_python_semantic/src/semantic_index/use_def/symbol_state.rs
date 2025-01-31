@@ -50,6 +50,7 @@ use smallvec::SmallVec;
 
 use crate::semantic_index::use_def::bitset::{BitSet, BitSetIterator};
 use crate::semantic_index::use_def::VisibilityConstraintsBuilder;
+use crate::visibility_constraints::ScopedVisibilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
@@ -98,18 +99,6 @@ type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
 
 /// Iterate over all constraints for a single binding.
 type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
-
-/// A newtype-index for a visibility constraint in a particular scope.
-#[newtype_index]
-pub(crate) struct ScopedVisibilityConstraintId;
-
-impl ScopedVisibilityConstraintId {
-    /// A special ID that is used for an "always true" / "always visible" constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 0.
-    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(0);
-}
 
 const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
 type InlineVisibilityConstraintsArray =

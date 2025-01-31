@@ -32,7 +32,7 @@ mod use_def;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator, ScopedVisibilityConstraintId,
+    DeclarationsIterator,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;

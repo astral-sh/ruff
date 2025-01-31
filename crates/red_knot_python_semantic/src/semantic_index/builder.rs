@@ -25,12 +25,10 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{
-    FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
-};
+use crate::semantic_index::use_def::{FlowSnapshot, ScopedConstraintId, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::visibility_constraints::VisibilityConstraint;
+use crate::visibility_constraints::{ScopedVisibilityConstraintId, VisibilityConstraint};
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
