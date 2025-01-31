@@ -1,5 +1,6 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
+use crate::importer::{ImportRequest, ResolutionError};
+use crate::settings::types::PythonVersion;
 use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -9,7 +10,7 @@ use ruff_python_ast::{
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// ## What it does
 /// Checks for methods that define a custom `TypeVar` for their return type
@@ -270,12 +271,8 @@ fn add_diagnostic(checker: &mut Checker, function_def: &ast::StmtFunctionDef, re
         returns.range(),
     );
 
-    // See `replace_custom_typevar_with_self`'s doc comment
-    if in_stub {
-        if let Some(fix) = replace_custom_typevar_with_self(checker, function_def, returns) {
-            diagnostic.set_fix(fix);
-        }
-    }
+    diagnostic
+        .try_set_optional_fix(|| replace_custom_typevar_with_self(checker, function_def, returns));
 
     checker.diagnostics.push(diagnostic);
 }
@@ -288,10 +285,6 @@ fn add_diagnostic(checker: &mut Checker, function_def: &ast::StmtFunctionDef, re
 /// * Replace other uses of the original type variable elsewhere in the signature with `Self`
 /// * Remove that type variable from the PEP 695 type parameter list
 ///
-/// This fix cannot be suggested for non-stubs,
-/// as a non-stub fix would have to deal with references in body/at runtime as well,
-/// which is substantially harder and requires a type-aware backend.
-///
 /// The fourth step above has the same problem.
 /// This function thus only does replacements for the simplest of cases
 /// and will mark the fix as unsafe if an annotation cannot be handled.
@@ -299,55 +292,58 @@ fn replace_custom_typevar_with_self(
     checker: &Checker,
     function_def: &ast::StmtFunctionDef,
     returns: &Expr,
-) -> Option<Fix> {
+) -> anyhow::Result<Option<Fix>> {
     if checker.settings.preview.is_disabled() {
-        return None;
+        return Ok(None);
+    }
+
+    // This fix cannot be suggested for non-stubs,
+    // as a non-stub fix would have to deal with references in body/at runtime as well,
+    // which is substantially harder and requires a type-aware backend.
+    if !checker.source_type.is_stub() {
+        return Ok(None);
     }
 
     // Non-`Name` return annotations are not currently autofixed
-    let typevar_name = &returns.as_name_expr()?.id;
+    let Expr::Name(typevar_name) = &returns else {
+        return Ok(None);
+    };
+
+    let typevar_name = &typevar_name.id;
+
+    let (import_edit, self_symbol_binding) = import_self(checker, returns.start())?;
 
     let mut all_edits = vec![
-        replace_return_annotation_with_self(returns),
+        import_edit,
+        replace_return_annotation_with_self(self_symbol_binding, returns),
         remove_first_parameter_annotation(&function_def.parameters),
     ];
 
-    let edit = import_self(checker, returns.range())?;
-    all_edits.push(edit);
+    all_edits.extend(remove_typevar_declaration(
+        function_def.type_params.as_deref(),
+        typevar_name,
+    ));
 
-    if let Some(edit) =
-        remove_typevar_declaration(function_def.type_params.as_deref(), typevar_name)
-    {
-        all_edits.push(edit);
-    }
-
-    let (mut edits, fix_applicability) =
+    let (edits, fix_applicability) =
         replace_typevar_usages_with_self(&function_def.parameters, typevar_name);
-    all_edits.append(&mut edits);
+
+    all_edits.extend(edits);
 
     let (first, rest) = (all_edits.swap_remove(0), all_edits);
 
-    Some(Fix::applicable_edits(first, rest, fix_applicability))
+    Ok(Some(Fix::applicable_edits(first, rest, fix_applicability)))
 }
 
-fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {
-    // From PYI034's fix
-    let target_version = checker.settings.target_version.as_tuple();
-    let source_module = if target_version >= (3, 11) {
+fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
+    // See also PYI034's fix
+    let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
         "typing"
     } else {
         "typing_extensions"
     };
-
     let (importer, semantic) = (checker.importer(), checker.semantic());
     let request = ImportRequest::import_from(source_module, "Self");
-
-    let position = return_range.start();
-    let (edit, ..) = importer
-        .get_or_import_symbol(&request, position, semantic)
-        .ok()?;
-
-    Some(edit)
+    importer.get_or_import_symbol(&request, position, semantic)
 }
 
 fn remove_first_parameter_annotation(parameters: &Parameters) -> Edit {
@@ -362,8 +358,8 @@ fn remove_first_parameter_annotation(parameters: &Parameters) -> Edit {
     Edit::deletion(name_end, annotation_end)
 }
 
-fn replace_return_annotation_with_self(returns: &Expr) -> Edit {
-    Edit::range_replacement("Self".to_string(), returns.range())
+fn replace_return_annotation_with_self(self_symbol_binding: String, returns: &Expr) -> Edit {
+    Edit::range_replacement(self_symbol_binding, returns.range())
 }
 
 fn replace_typevar_usages_with_self(
