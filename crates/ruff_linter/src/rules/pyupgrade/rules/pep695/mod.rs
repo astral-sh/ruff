@@ -24,6 +24,7 @@ use crate::checkers::ast::Checker;
 mod non_pep695_generic_class;
 mod non_pep695_generic_function;
 mod non_pep695_type_alias;
+mod private_type_parameter;
 
 #[derive(Debug)]
 enum TypeVarRestriction<'a> {
