@@ -10,3 +10,11 @@ class Generic[_T]:
 def second[_T](var: tuple[_T]) -> _T:
     y: _T = var[1]
     return y
+
+
+# one diagnostic for each variable, comments are preserved
+def many_generics[
+    _T,  # first generic
+    _U,  # second generic
+](args):
+    return args

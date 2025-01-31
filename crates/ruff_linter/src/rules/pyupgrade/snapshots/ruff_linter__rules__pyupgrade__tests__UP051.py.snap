@@ -42,3 +42,50 @@ UP051.py:10:11: UP051 [*] Generic function uses private type parameters
    10 |+def second[T](var: tuple[T]) -> T:
    11 |+    y: T = var[1]
 12 12 |     return y
+13 13 | 
+14 14 | 
+
+UP051.py:16:18: UP051 [*] Generic function uses private type parameters
+   |
+15 |   # one diagnostic for each variable, comments are preserved
+16 |   def many_generics[
+   |  __________________^
+17 | |     _T,  # first generic
+18 | |     _U,  # second generic
+19 | | ](args):
+   | |_^ UP051
+20 |       return args
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+14 14 | 
+15 15 | # one diagnostic for each variable, comments are preserved
+16 16 | def many_generics[
+17    |-    _T,  # first generic
+   17 |+    T,  # first generic
+18 18 |     _U,  # second generic
+19 19 | ](args):
+20 20 |     return args
+
+UP051.py:16:18: UP051 [*] Generic function uses private type parameters
+   |
+15 |   # one diagnostic for each variable, comments are preserved
+16 |   def many_generics[
+   |  __________________^
+17 | |     _T,  # first generic
+18 | |     _U,  # second generic
+19 | | ](args):
+   | |_^ UP051
+20 |       return args
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+15 15 | # one diagnostic for each variable, comments are preserved
+16 16 | def many_generics[
+17 17 |     _T,  # first generic
+18    |-    _U,  # second generic
+   18 |+    U,  # second generic
+19 19 | ](args):
+20 20 |     return args
