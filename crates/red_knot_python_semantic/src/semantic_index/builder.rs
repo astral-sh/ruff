@@ -365,7 +365,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: Constraint<'db>,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
+            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint.into()))
     }
 
     /// Records that all remaining statements in the current block are unreachable, and therefore
@@ -1523,8 +1523,9 @@ where
                             ast::BoolOp::And => (constraint, self.add_constraint(constraint)),
                             ast::BoolOp::Or => self.add_negated_constraint(constraint),
                         };
-                        let visibility_constraint = self
-                            .add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint));
+                        let visibility_constraint = self.add_visibility_constraint(
+                            VisibilityConstraint::VisibleIf(constraint.into()),
+                        );
 
                         let after_expr = self.flow_snapshot();
 

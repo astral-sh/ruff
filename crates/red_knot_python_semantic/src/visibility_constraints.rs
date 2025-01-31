@@ -168,14 +168,49 @@ use crate::Db;
 /// resulting from a few files with a lot of boolean expressions and `if`-statements.
 const MAX_RECURSION_DEPTH: usize = 24;
 
+/// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
+/// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
+/// module documentation for more details.)
+///
+/// The primitive atoms of the formula are [`Constraint`]s, which express some property of the
+/// runtime state of the code that we are analyzing.
+///
+/// We assume that each atom has a stable value each time that the formula is evaluated. An atom
+/// that resolves to `Ambiguous` might be true or false, and we can't tell which — but within that
+/// evaluation, we assume that the atom has the _same_ unknown value each time it appears. That
+/// allows us to perform simplifications like `A ∨ !A → true` and `A ∧ !A → false`.
+///
+/// That means that when you are constructing a formula, you might need to create distinct atoms
+/// for a particular [`Constraint`], if your formula needs to consider how a particular runtime
+/// property might be different at different points in the execution of the program.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VisibilityConstraint<'db> {
     AlwaysTrue,
     Ambiguous,
-    VisibleIf(Constraint<'db>),
+    VisibleIf(VisibilityConstraintAtom<'db>),
     VisibleIfNot(ScopedVisibilityConstraintId),
     KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
     KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct VisibilityConstraintAtom<'db> {
+    /// The [`Constraint`] that is evaluated
+    constraint: Constraint<'db>,
+    /// Disambiguates different atoms that evaluate the same constraint
+    copy: u8,
+}
+
+impl<'db> From<Constraint<'db>> for VisibilityConstraintAtom<'db> {
+    fn from(constraint: Constraint<'db>) -> VisibilityConstraintAtom<'db> {
+        VisibilityConstraintAtom::new_copy(constraint, 0)
+    }
+}
+
+impl<'db> VisibilityConstraintAtom<'db> {
+    pub(crate) fn new_copy(constraint: Constraint<'db>, copy: u8) -> VisibilityConstraintAtom<'db> {
+        VisibilityConstraintAtom { constraint, copy }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -255,7 +290,7 @@ impl<'db> VisibilityConstraints<'db> {
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
             VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
-            VisibilityConstraint::VisibleIf(constraint) => Self::analyze_single(db, constraint),
+            VisibilityConstraint::VisibleIf(atom) => Self::analyze_single(db, &atom.constraint),
             VisibilityConstraint::VisibleIfNot(negated) => {
                 self.evaluate_impl(db, *negated, max_depth - 1).negate()
             }
