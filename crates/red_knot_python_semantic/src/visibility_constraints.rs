@@ -150,7 +150,9 @@
 //!
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 
-use ruff_index::{newtype_index, IndexVec};
+use std::cmp::Ordering;
+
+use rustc_hash::FxHashMap;
 
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
@@ -158,14 +160,6 @@ use crate::semantic_index::{
 };
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
-
-/// The maximum depth of recursion when evaluating visibility constraints.
-///
-/// This is a performance optimization that prevents us from descending deeply in case of
-/// pathological cases. The actual limit here has been derived from performance testing on
-/// the `black` codebase. When increasing the limit beyond 32, we see a 5x runtime increase
-/// resulting from a few files with a lot of boolean expressions and `if`-statements.
-const MAX_RECURSION_DEPTH: usize = 24;
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -182,75 +176,167 @@ const MAX_RECURSION_DEPTH: usize = 24;
 /// That means that when you are constructing a formula, you might need to create distinct atoms
 /// for a particular [`Constraint`], if your formula needs to consider how a particular runtime
 /// property might be different at different points in the execution of the program.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraint<'db>(VisibilityConstraintInner<'db>);
+///
+/// Visibility constraints are normalized, so equivalent constraints are guaranteed to have equal
+/// IDs.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) struct ScopedVisibilityConstraintId(u32);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum VisibilityConstraintInner<'db> {
-    AlwaysTrue,
-    AlwaysFalse,
-    Ambiguous,
-    VisibleIf(Constraint<'db>, u8),
-    VisibleIfNot(ScopedVisibilityConstraintId),
-    KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-    KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+impl std::fmt::Debug for ScopedVisibilityConstraintId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ScopedVisibilityConstraintId")
+            .field(&self.into_node_kind())
+            .finish()
+    }
 }
 
-/// A newtype-index for a visibility constraint in a particular scope.
-#[newtype_index]
-pub(crate) struct ScopedVisibilityConstraintId;
+// Internal details:
+//
+// There are 3 terminals, with hard-coded constraint IDs: true, ambiguous, and false.
+//
+// _Atoms_ are the underlying Constraints, which are the variables that are evaluated by the
+// ternary function.
+//
+// _Interior nodes_ provide the TDD structure for the formula. Interior nodes are stored in an
+// arena Vec, with the constraint ID providing an index into the arena.
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NodeKind {
+    AlwaysTrue,
+    Ambiguous,
+    AlwaysFalse,
+    Interior(u32),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct InteriorNode {
+    atom: Atom,
+    if_true: ScopedVisibilityConstraintId,
+    if_ambiguous: ScopedVisibilityConstraintId,
+    if_false: ScopedVisibilityConstraintId,
+}
+
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct Atom(u32);
+
+impl Atom {
+    fn into_index_and_copy(self) -> (u32, u8) {
+        let copy = self.0 >> 24;
+        let index = self.0 & 0x00ff_ffff;
+        (index, copy as u8)
+    }
+
+    fn from_index_and_copy(index: u32, copy: u8) -> Self {
+        debug_assert!(index <= 0x00ff_ffff);
+        Self((u32::from(copy) << 24) | index)
+    }
+}
+
+impl std::fmt::Debug for Atom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (index, copy) = self.into_index_and_copy();
+        f.debug_tuple("Atom").field(&index).field(&copy).finish()
+    }
+}
 
 impl ScopedVisibilityConstraintId {
     /// A special ID that is used for an "always true" / "always visible" constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 0.
     pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(0);
-
-    /// A special ID that is used for an "always false" / "never visible" constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 1.
-    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(1);
+        ScopedVisibilityConstraintId(0xffff_ffff);
 
     /// A special ID that is used for an ambiguous constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 2.
     pub(crate) const AMBIGUOUS: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(2);
+        ScopedVisibilityConstraintId(0xffff_fffe);
+
+    /// A special ID that is used for an "always false" / "never visible" constraint.
+    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId(0xffff_fffd);
+
+    fn into_node_kind(self) -> NodeKind {
+        if self == Self::ALWAYS_TRUE {
+            NodeKind::AlwaysTrue
+        } else if self == Self::AMBIGUOUS {
+            NodeKind::Ambiguous
+        } else if self == Self::ALWAYS_FALSE {
+            NodeKind::AlwaysFalse
+        } else {
+            NodeKind::Interior(self.0)
+        }
+    }
+}
+
+impl From<NodeKind> for ScopedVisibilityConstraintId {
+    fn from(kind: NodeKind) -> ScopedVisibilityConstraintId {
+        match kind {
+            NodeKind::AlwaysTrue => Self::ALWAYS_TRUE,
+            NodeKind::Ambiguous => Self::AMBIGUOUS,
+            NodeKind::AlwaysFalse => Self::ALWAYS_FALSE,
+            NodeKind::Interior(index) => {
+                // We have verified elsewhere that index is within the expected range
+                Self(index)
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
-    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
+    constraints: Vec<Constraint<'db>>,
+    interiors: Vec<InteriorNode>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraintsBuilder<'db> {
-    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
-}
-
-impl Default for VisibilityConstraintsBuilder<'_> {
-    fn default() -> Self {
-        Self {
-            constraints: IndexVec::from_iter([
-                VisibilityConstraint(VisibilityConstraintInner::AlwaysTrue),
-                VisibilityConstraint(VisibilityConstraintInner::AlwaysFalse),
-                VisibilityConstraint(VisibilityConstraintInner::Ambiguous),
-            ]),
-        }
-    }
+    constraints: Vec<Constraint<'db>>,
+    interiors: Vec<InteriorNode>,
+    constraint_cache: FxHashMap<Constraint<'db>, u32>,
+    interior_cache: FxHashMap<InteriorNode, u32>,
+    not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
+    and_cache: FxHashMap<
+        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+        ScopedVisibilityConstraintId,
+    >,
+    or_cache: FxHashMap<
+        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+        ScopedVisibilityConstraintId,
+    >,
 }
 
 impl<'db> VisibilityConstraintsBuilder<'db> {
     pub(crate) fn build(self) -> VisibilityConstraints<'db> {
         VisibilityConstraints {
             constraints: self.constraints,
+            interiors: self.interiors,
         }
     }
 
-    fn add(&mut self, constraint: VisibilityConstraintInner<'db>) -> ScopedVisibilityConstraintId {
-        self.constraints.push(VisibilityConstraint(constraint))
+    /// Adds a constraint, ensuring that we only store any particular constraint once.
+    #[allow(clippy::cast_possible_truncation)]
+    fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
+        let index = *self.constraint_cache.entry(constraint).or_insert_with(|| {
+            let index = self.constraints.len() as u32;
+            self.constraints.push(constraint);
+            index
+        });
+        Atom::from_index_and_copy(index, copy)
+    }
+
+    /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
+    /// equal nodes.
+    #[allow(clippy::cast_possible_truncation)]
+    fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
+        // Reduce!
+        if node.if_true == node.if_ambiguous && node.if_true == node.if_false {
+            return node.if_true;
+        }
+
+        let index = *self.interior_cache.entry(node).or_insert_with(|| {
+            let index = self.interiors.len() as u32;
+            self.interiors.push(node);
+            index
+        });
+        debug_assert!(index < 0x8000_0000);
+        NodeKind::Interior(index).into()
     }
 
     pub(crate) fn add_atom(
@@ -258,22 +344,39 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         constraint: Constraint<'db>,
         copy: u8,
     ) -> ScopedVisibilityConstraintId {
-        self.add(VisibilityConstraintInner::VisibleIf(constraint, copy))
+        let atom = self.add_constraint(constraint, copy);
+        self.add_interior(InteriorNode {
+            atom,
+            if_true: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            if_ambiguous: ScopedVisibilityConstraintId::AMBIGUOUS,
+            if_false: ScopedVisibilityConstraintId::ALWAYS_FALSE,
+        })
     }
 
     pub(crate) fn add_not_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            ScopedVisibilityConstraintId::ALWAYS_TRUE
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            ScopedVisibilityConstraintId::ALWAYS_FALSE
-        } else if a == ScopedVisibilityConstraintId::AMBIGUOUS {
-            ScopedVisibilityConstraintId::AMBIGUOUS
-        } else {
-            self.add(VisibilityConstraintInner::VisibleIfNot(a))
+        if let Some(cached) = self.not_cache.get(&a) {
+            return *cached;
         }
+        let a_node = match a.into_node_kind() {
+            NodeKind::AlwaysTrue => return ScopedVisibilityConstraintId::ALWAYS_FALSE,
+            NodeKind::Ambiguous => return ScopedVisibilityConstraintId::AMBIGUOUS,
+            NodeKind::AlwaysFalse => return ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            NodeKind::Interior(index) => self.interiors[index as usize],
+        };
+        let if_true = self.add_not_constraint(a_node.if_true);
+        let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
+        let if_false = self.add_not_constraint(a_node.if_false);
+        let result = self.add_interior(InteriorNode {
+            atom: a_node.atom,
+            if_true,
+            if_ambiguous,
+            if_false,
+        });
+        self.not_cache.insert(a, result);
+        result
     }
 
     pub(crate) fn add_or_constraint(
@@ -281,24 +384,74 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_TRUE
-            || b == ScopedVisibilityConstraintId::ALWAYS_TRUE
+        if let Some(cached) = self.or_cache.get(&(a, b)) {
+            return *cached;
+        }
+
+        let (atom, if_true, if_ambiguous, if_false) = match (a.into_node_kind(), b.into_node_kind())
         {
-            return ScopedVisibilityConstraintId::ALWAYS_TRUE;
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            return b;
-        } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            return a;
-        }
-        match (&self.constraints[a], &self.constraints[b]) {
-            (_, VisibilityConstraint(VisibilityConstraintInner::VisibleIfNot(id))) if a == *id => {
-                ScopedVisibilityConstraintId::ALWAYS_TRUE
+            (NodeKind::AlwaysTrue, _) | (_, NodeKind::AlwaysTrue) => {
+                return ScopedVisibilityConstraintId::ALWAYS_TRUE
             }
-            (VisibilityConstraint(VisibilityConstraintInner::VisibleIfNot(id)), _) if *id == b => {
-                ScopedVisibilityConstraintId::ALWAYS_TRUE
+            (NodeKind::AlwaysFalse, _) => return b,
+            (_, NodeKind::AlwaysFalse) => return a,
+            (NodeKind::Ambiguous, NodeKind::Ambiguous) => {
+                return ScopedVisibilityConstraintId::AMBIGUOUS
             }
-            _ => self.add(VisibilityConstraintInner::KleeneOr(a, b)),
-        }
+
+            (NodeKind::Ambiguous, NodeKind::Interior(b_index)) => {
+                let b_node = self.interiors[b_index as usize];
+                (
+                    b_node.atom,
+                    self.add_or_constraint(a, b_node.if_true),
+                    self.add_or_constraint(a, b_node.if_ambiguous),
+                    self.add_or_constraint(a, b_node.if_false),
+                )
+            }
+            (NodeKind::Interior(a_index), NodeKind::Ambiguous) => {
+                let a_node = self.interiors[a_index as usize];
+                (
+                    a_node.atom,
+                    self.add_or_constraint(a_node.if_true, b),
+                    self.add_or_constraint(a_node.if_ambiguous, b),
+                    self.add_or_constraint(a_node.if_false, b),
+                )
+            }
+
+            (NodeKind::Interior(a_index), NodeKind::Interior(b_index)) => {
+                let a_node = self.interiors[a_index as usize];
+                let b_node = self.interiors[b_index as usize];
+                match a_node.atom.cmp(&b_node.atom) {
+                    Ordering::Equal => (
+                        a_node.atom,
+                        self.add_or_constraint(a_node.if_true, b_node.if_true),
+                        self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
+                        self.add_or_constraint(a_node.if_false, b_node.if_false),
+                    ),
+                    Ordering::Less => (
+                        a_node.atom,
+                        self.add_or_constraint(a_node.if_true, b),
+                        self.add_or_constraint(a_node.if_ambiguous, b),
+                        self.add_or_constraint(a_node.if_false, b),
+                    ),
+                    Ordering::Greater => (
+                        b_node.atom,
+                        self.add_or_constraint(a, b_node.if_true),
+                        self.add_or_constraint(a, b_node.if_ambiguous),
+                        self.add_or_constraint(a, b_node.if_false),
+                    ),
+                }
+            }
+        };
+
+        let result = self.add_interior(InteriorNode {
+            atom,
+            if_true,
+            if_ambiguous,
+            if_false,
+        });
+        self.or_cache.insert((a, b), result);
+        result
     }
 
     pub(crate) fn add_and_constraint(
@@ -306,88 +459,92 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_FALSE
-            || b == ScopedVisibilityConstraintId::ALWAYS_FALSE
+        if let Some(cached) = self.and_cache.get(&(a, b)) {
+            return *cached;
+        }
+
+        let (atom, if_true, if_ambiguous, if_false) = match (a.into_node_kind(), b.into_node_kind())
         {
-            return ScopedVisibilityConstraintId::ALWAYS_FALSE;
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            return b;
-        } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            return a;
-        }
-        match (&self.constraints[a], &self.constraints[b]) {
-            (_, VisibilityConstraint(VisibilityConstraintInner::VisibleIfNot(id))) if a == *id => {
-                ScopedVisibilityConstraintId::ALWAYS_FALSE
+            (NodeKind::AlwaysFalse, _) | (_, NodeKind::AlwaysFalse) => {
+                return ScopedVisibilityConstraintId::ALWAYS_FALSE
             }
-            (VisibilityConstraint(VisibilityConstraintInner::VisibleIfNot(id)), _) if *id == b => {
-                ScopedVisibilityConstraintId::ALWAYS_FALSE
+            (NodeKind::AlwaysTrue, _) => return b,
+            (_, NodeKind::AlwaysTrue) => return a,
+            (NodeKind::Ambiguous, NodeKind::Ambiguous) => {
+                return ScopedVisibilityConstraintId::AMBIGUOUS
             }
-            _ => self.add(VisibilityConstraintInner::KleeneAnd(a, b)),
-        }
+
+            (NodeKind::Ambiguous, NodeKind::Interior(b_index)) => {
+                let b_node = self.interiors[b_index as usize];
+                (
+                    b_node.atom,
+                    self.add_and_constraint(a, b_node.if_true),
+                    self.add_and_constraint(a, b_node.if_ambiguous),
+                    self.add_and_constraint(a, b_node.if_false),
+                )
+            }
+            (NodeKind::Interior(a_index), NodeKind::Ambiguous) => {
+                let a_node = self.interiors[a_index as usize];
+                (
+                    a_node.atom,
+                    self.add_and_constraint(a_node.if_true, b),
+                    self.add_and_constraint(a_node.if_ambiguous, b),
+                    self.add_and_constraint(a_node.if_false, b),
+                )
+            }
+
+            (NodeKind::Interior(a_index), NodeKind::Interior(b_index)) => {
+                let a_node = self.interiors[a_index as usize];
+                let b_node = self.interiors[b_index as usize];
+                match a_node.atom.cmp(&b_node.atom) {
+                    Ordering::Equal => (
+                        a_node.atom,
+                        self.add_and_constraint(a_node.if_true, b_node.if_true),
+                        self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
+                        self.add_and_constraint(a_node.if_false, b_node.if_false),
+                    ),
+                    Ordering::Less => (
+                        a_node.atom,
+                        self.add_and_constraint(a_node.if_true, b),
+                        self.add_and_constraint(a_node.if_ambiguous, b),
+                        self.add_and_constraint(a_node.if_false, b),
+                    ),
+                    Ordering::Greater => (
+                        b_node.atom,
+                        self.add_and_constraint(a, b_node.if_true),
+                        self.add_and_constraint(a, b_node.if_ambiguous),
+                        self.add_and_constraint(a, b_node.if_false),
+                    ),
+                }
+            }
+        };
+
+        let result = self.add_interior(InteriorNode {
+            atom,
+            if_true,
+            if_ambiguous,
+            if_false,
+        });
+        self.and_cache.insert((a, b), result);
+        result
     }
 }
 
 impl<'db> VisibilityConstraints<'db> {
     /// Analyze the statically known visibility for a given visibility constraint.
     pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
-        self.evaluate_impl(db, id, MAX_RECURSION_DEPTH)
-    }
-
-    fn evaluate_impl(
-        &self,
-        db: &'db dyn Db,
-        id: ScopedVisibilityConstraintId,
-        max_depth: usize,
-    ) -> Truthiness {
-        if max_depth == 0 {
-            return Truthiness::Ambiguous;
-        }
-
-        let VisibilityConstraint(visibility_constraint) = &self.constraints[id];
-        match visibility_constraint {
-            VisibilityConstraintInner::AlwaysTrue => Truthiness::AlwaysTrue,
-            VisibilityConstraintInner::AlwaysFalse => Truthiness::AlwaysFalse,
-            VisibilityConstraintInner::Ambiguous => Truthiness::Ambiguous,
-            VisibilityConstraintInner::VisibleIf(constraint, _) => {
-                Self::analyze_single(db, constraint)
-            }
-            VisibilityConstraintInner::VisibleIfNot(negated) => {
-                self.evaluate_impl(db, *negated, max_depth - 1).negate()
-            }
-            VisibilityConstraintInner::KleeneAnd(lhs, rhs) => {
-                let lhs = self.evaluate_impl(db, *lhs, max_depth - 1);
-
-                if lhs == Truthiness::AlwaysFalse {
-                    return Truthiness::AlwaysFalse;
-                }
-
-                let rhs = self.evaluate_impl(db, *rhs, max_depth - 1);
-
-                if rhs == Truthiness::AlwaysFalse {
-                    Truthiness::AlwaysFalse
-                } else if lhs == Truthiness::AlwaysTrue && rhs == Truthiness::AlwaysTrue {
-                    Truthiness::AlwaysTrue
-                } else {
-                    Truthiness::Ambiguous
-                }
-            }
-            VisibilityConstraintInner::KleeneOr(lhs_id, rhs_id) => {
-                let lhs = self.evaluate_impl(db, *lhs_id, max_depth - 1);
-
-                if lhs == Truthiness::AlwaysTrue {
-                    return Truthiness::AlwaysTrue;
-                }
-
-                let rhs = self.evaluate_impl(db, *rhs_id, max_depth - 1);
-
-                if rhs == Truthiness::AlwaysTrue {
-                    Truthiness::AlwaysTrue
-                } else if lhs == Truthiness::AlwaysFalse && rhs == Truthiness::AlwaysFalse {
-                    Truthiness::AlwaysFalse
-                } else {
-                    Truthiness::Ambiguous
-                }
-            }
+        let node = match id.into_node_kind() {
+            NodeKind::AlwaysTrue => return Truthiness::AlwaysTrue,
+            NodeKind::Ambiguous => return Truthiness::Ambiguous,
+            NodeKind::AlwaysFalse => return Truthiness::AlwaysFalse,
+            NodeKind::Interior(index) => self.interiors[index as usize],
+        };
+        let (index, _) = node.atom.into_index_and_copy();
+        let constraint = &self.constraints[index as usize];
+        match Self::analyze_single(db, constraint) {
+            Truthiness::AlwaysTrue => self.evaluate(db, node.if_true),
+            Truthiness::Ambiguous => self.evaluate(db, node.if_ambiguous),
+            Truthiness::AlwaysFalse => self.evaluate(db, node.if_false),
         }
     }
 

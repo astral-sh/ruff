@@ -27,7 +27,6 @@ pub(crate) mod site_packages;
 mod stdlib;
 mod suppression;
 pub(crate) mod symbol;
-mod tdd;
 pub mod types;
 mod unpack;
 mod util;

@@ -1494,6 +1494,8 @@ from module import symbol
 We currently have a limitation in the complexity (depth) of the visibility constraints that are
 supported. This is to avoid pathological cases that would require us to recurse deeply.
 
+TODO: We don't! Remove this!
+
 ```py
 x = 1
 
@@ -1516,8 +1518,7 @@ False or False or False or False or \
     False or False or False or False or \
     False or False or False or (y := 2)  # fmt: skip
 
-# TODO: This should ideally be `Literal[2]` as well:
-reveal_type(y)  # revealed: Literal[1, 2]
+reveal_type(y)  # revealed: Literal[2]
 ```
 
 ## Unsupported features
