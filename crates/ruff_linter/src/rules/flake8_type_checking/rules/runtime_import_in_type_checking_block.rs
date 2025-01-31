@@ -292,6 +292,7 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
                             checker.semantic(),
                             checker.stylist(),
                             checker.locator(),
+                            checker.default_string_flags(),
                         ))
                     } else {
                         None

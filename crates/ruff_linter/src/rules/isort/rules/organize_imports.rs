@@ -133,16 +133,15 @@ pub(crate) fn organize_imports(
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
-    let actual = locator.slice(range);
+    let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
+    let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
         return None;
     }
-
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
-        range,
+        fix_range,
     )));
     Some(diagnostic)
 }

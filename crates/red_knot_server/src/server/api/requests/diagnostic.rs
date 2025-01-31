@@ -11,7 +11,7 @@ use crate::edit::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use red_knot_workspace::db::{Db, ProjectDatabase};
+use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};
 
@@ -75,9 +75,9 @@ fn to_lsp_diagnostic(
     diagnostic: &dyn ruff_db::diagnostic::Diagnostic,
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
-    let range = if let Some(range) = diagnostic.range() {
-        let index = line_index(db.upcast(), diagnostic.file());
-        let source = source_text(db.upcast(), diagnostic.file());
+    let range = if let (Some(file), Some(range)) = (diagnostic.file(), diagnostic.range()) {
+        let index = line_index(db.upcast(), file);
+        let source = source_text(db.upcast(), file);
 
         range.to_range(&source, &index, encoding)
     } else {

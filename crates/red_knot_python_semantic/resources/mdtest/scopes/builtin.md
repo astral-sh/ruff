@@ -10,10 +10,10 @@ def returns_bool() -> bool:
     return True
 
 if returns_bool():
-    chr = 1
+    chr: int = 1
 
 def f():
-    reveal_type(chr)  # revealed: Literal[chr] | Literal[1]
+    reveal_type(chr)  # revealed: Literal[chr] | int
 ```
 
 ## Conditionally global or builtin, with annotation

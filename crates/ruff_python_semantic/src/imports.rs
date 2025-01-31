@@ -57,7 +57,7 @@ impl NameImport {
     }
 
     /// Returns the [`QualifiedName`] of the imported name (e.g., given `from foo import bar as baz`, returns `["foo", "bar"]`).
-    fn qualified_name(&self) -> QualifiedName {
+    pub fn qualified_name(&self) -> QualifiedName {
         match self {
             NameImport::Import(import) => QualifiedName::user_defined(&import.name.name),
             NameImport::ImportFrom(import_from) => collect_import_from_member(

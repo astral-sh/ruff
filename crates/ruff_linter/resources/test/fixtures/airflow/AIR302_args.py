@@ -26,6 +26,8 @@ def sla_callback(*arg, **kwargs):
 
 DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
 
+DAG(dag_id="class_sla_callback", fail_stop=True)
+
 
 @dag(schedule="0 * * * *")
 def decorator_schedule():

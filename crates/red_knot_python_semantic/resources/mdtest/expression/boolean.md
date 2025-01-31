@@ -55,7 +55,7 @@ reveal_type("x" or "y" and "")  # revealed: Literal["x"]
 ## Evaluates to builtin
 
 ```py path=a.py
-redefined_builtin_bool = bool
+redefined_builtin_bool: type[bool] = bool
 
 def my_bool(x) -> bool:
     return True

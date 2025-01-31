@@ -175,6 +175,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
+        checker.default_string_flags(),
     );
     let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
@@ -289,10 +290,7 @@ pub(crate) fn quoted_type_alias(
     let range = annotation_expr.range();
     let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
     let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
-    if checker
-        .comment_ranges()
-        .has_comments(expr, checker.source())
-    {
+    if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));

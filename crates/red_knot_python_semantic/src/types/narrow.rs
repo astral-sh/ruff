@@ -322,9 +322,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
-                inference.expression_ty(left.scoped_expression_id(self.db, scope))
+                inference.expression_type(left.scoped_expression_id(self.db, scope))
             });
-            let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
+            let rhs_ty = inference.expression_type(right.scoped_expression_id(self.db, scope));
             last_rhs_ty = Some(rhs_ty);
 
             match left {
@@ -393,7 +393,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
 
                     let callable_ty =
-                        inference.expression_ty(callable.scoped_expression_id(self.db, scope));
+                        inference.expression_type(callable.scoped_expression_id(self.db, scope));
 
                     if callable_ty
                         .into_class_literal()
@@ -422,7 +422,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let inference = infer_expression_types(self.db, expression);
 
         let callable_ty =
-            inference.expression_ty(expr_call.func.scoped_expression_id(self.db, scope));
+            inference.expression_type(expr_call.func.scoped_expression_id(self.db, scope));
 
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
@@ -441,7 +441,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
                 let class_info_ty =
-                    inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
+                    inference.expression_type(class_info.scoped_expression_id(self.db, scope));
 
                 function
                     .generate_constraint(self.db, class_info_ty)
@@ -500,7 +500,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let scope = self.scope();
             let inference = infer_expression_types(self.db, cls);
             let ty = inference
-                .expression_ty(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
+                .expression_type(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
                 .to_instance(self.db);
             let mut constraints = NarrowingConstraints::default();
             constraints.insert(symbol, ty);
@@ -524,7 +524,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // filter our arms with statically known truthiness
             .filter(|expr| {
                 inference
-                    .expression_ty(expr.scoped_expression_id(self.db, scope))
+                    .expression_type(expr.scoped_expression_id(self.db, scope))
                     .bool(self.db)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,

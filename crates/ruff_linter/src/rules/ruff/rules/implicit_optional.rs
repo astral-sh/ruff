@@ -179,7 +179,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
         if let Expr::StringLiteral(string_expr) = annotation.as_ref() {
             // Quoted annotation.
-            if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
+            if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     parsed_annotation.expression(),
                     checker,

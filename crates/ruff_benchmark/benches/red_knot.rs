@@ -1,11 +1,11 @@
 #![allow(clippy::disallowed_names)]
 
 use rayon::ThreadPoolBuilder;
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::value::RangedValue;
+use red_knot_project::watch::{ChangeEvent, ChangedKind};
+use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::PythonVersion;
-use red_knot_workspace::db::{Db, ProjectDatabase};
-use red_knot_workspace::project::settings::Configuration;
-use red_knot_workspace::project::ProjectMetadata;
-use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::Diagnostic;
@@ -26,27 +26,10 @@ const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     // We don't support `*` imports yet:
     "error[lint:unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
-    // We don't support terminal statements in control flow yet:
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:455:9 Name `nest` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:482:16 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:566:12 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
     // We don't handle intersections in `is_assignable_to` yet
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:626:46 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`",
-    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:632:58 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`",
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:639:52 Object of type `@Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:626:46 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:632:58 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`",
+    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:639:52 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`",
     "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive",
 ];
 
@@ -74,15 +57,14 @@ fn setup_case() -> Case {
     .unwrap();
 
     let src_root = SystemPath::new("/src");
-    let metadata = ProjectMetadata::discover(
-        src_root,
-        &system,
-        Some(&Configuration {
-            python_version: Some(PythonVersion::PY312),
-            ..Configuration::default()
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+    metadata.apply_cli_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            ..EnvironmentOptions::default()
         }),
-    )
-    .unwrap();
+        ..Options::default()
+    });
 
     let mut db = ProjectDatabase::new(metadata, system).unwrap();
 

@@ -4,8 +4,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::AstNode;
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext, StringLiteralFlags};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -281,7 +280,7 @@ impl Violation for PytestDuplicateParametrizeTestCases {
     }
 }
 
-fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
+fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -> Option<String> {
     if !elts.iter().all(Expr::is_string_literal_expr) {
         return None;
     }
@@ -299,7 +298,8 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
                 acc
             })
             .into_boxed_str(),
-        ..ast::StringLiteral::default()
+        range: TextRange::default(),
+        flags,
     });
     Some(generator.expr(&node))
 }
@@ -324,7 +324,7 @@ fn get_parametrize_name_range(
 ) -> Option<TextRange> {
     parenthesized_range(
         expr.into(),
-        call.arguments.as_any_node_ref(),
+        (&call.arguments).into(),
         comment_ranges,
         source,
     )
@@ -359,8 +359,9 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string().into_boxed_str(),
-                                        ..ast::StringLiteral::default()
+                                        value: Box::from(*name),
+                                        range: TextRange::default(),
+                                        flags: checker.default_string_flags(),
                                     })
                                 })
                                 .collect(),
@@ -394,8 +395,9 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string().into_boxed_str(),
-                                        ..ast::StringLiteral::default()
+                                        value: Box::from(*name),
+                                        range: TextRange::default(),
+                                        flags: checker.default_string_flags(),
                                     })
                                 })
                                 .collect(),
@@ -445,7 +447,9 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                             },
                             expr.range(),
                         );
-                        if let Some(content) = elts_to_csv(elts, checker.generator()) {
+                        if let Some(content) =
+                            elts_to_csv(elts, checker.generator(), checker.default_string_flags())
+                        {
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 content,
                                 expr.range(),
@@ -490,7 +494,9 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                             },
                             expr.range(),
                         );
-                        if let Some(content) = elts_to_csv(elts, checker.generator()) {
+                        if let Some(content) =
+                            elts_to_csv(elts, checker.generator(), checker.default_string_flags())
+                        {
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 content,
                                 expr.range(),

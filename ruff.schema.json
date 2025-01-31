@@ -900,6 +900,7 @@
       "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
+      "description": "Options for the `flake8-annotations` plugin.",
       "type": "object",
       "properties": {
         "allow-star-arg-any": {
@@ -941,6 +942,7 @@
       "additionalProperties": false
     },
     "Flake8BanditOptions": {
+      "description": "Options for the `flake8-bandit` plugin.",
       "type": "object",
       "properties": {
         "check-typed-exception": {
@@ -974,6 +976,7 @@
       "additionalProperties": false
     },
     "Flake8BooleanTrapOptions": {
+      "description": "Options for the `flake8-boolean-trap` plugin",
       "type": "object",
       "properties": {
         "extend-allowed-calls": {
@@ -990,6 +993,7 @@
       "additionalProperties": false
     },
     "Flake8BugbearOptions": {
+      "description": "Options for the `flake8-bugbear` plugin.",
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
@@ -1006,6 +1010,7 @@
       "additionalProperties": false
     },
     "Flake8BuiltinsOptions": {
+      "description": "Options for the `flake8-builtins` plugin.",
       "type": "object",
       "properties": {
         "builtins-allowed-modules": {
@@ -1032,6 +1037,7 @@
       "additionalProperties": false
     },
     "Flake8ComprehensionsOptions": {
+      "description": "Options for the `flake8-comprehensions` plugin.",
       "type": "object",
       "properties": {
         "allow-dict-calls-with-keyword-arguments": {
@@ -1045,6 +1051,7 @@
       "additionalProperties": false
     },
     "Flake8CopyrightOptions": {
+      "description": "Options for the `flake8-copyright` plugin.",
       "type": "object",
       "properties": {
         "author": {
@@ -1074,6 +1081,7 @@
       "additionalProperties": false
     },
     "Flake8ErrMsgOptions": {
+      "description": "Options for the `flake8-errmsg` plugin.",
       "type": "object",
       "properties": {
         "max-string-length": {
@@ -1089,6 +1097,7 @@
       "additionalProperties": false
     },
     "Flake8GetTextOptions": {
+      "description": "Options for the `flake8-gettext` plugin.",
       "type": "object",
       "properties": {
         "extend-function-names": {
@@ -1115,6 +1124,7 @@
       "additionalProperties": false
     },
     "Flake8ImplicitStrConcatOptions": {
+      "description": "Options for the `flake8-implicit-str-concat` plugin",
       "type": "object",
       "properties": {
         "allow-multiline": {
@@ -1128,6 +1138,7 @@
       "additionalProperties": false
     },
     "Flake8ImportConventionsOptions": {
+      "description": "Options for the `flake8-import-conventions` plugin",
       "type": "object",
       "properties": {
         "aliases": {
@@ -1175,6 +1186,7 @@
       "additionalProperties": false
     },
     "Flake8PytestStyleOptions": {
+      "description": "Options for the `flake8-pytest-style` plugin",
       "type": "object",
       "properties": {
         "fixture-parentheses": {
@@ -1268,6 +1280,7 @@
       "additionalProperties": false
     },
     "Flake8QuotesOptions": {
+      "description": "Options for the `flake8-quotes` plugin.",
       "type": "object",
       "properties": {
         "avoid-escape": {
@@ -1314,6 +1327,7 @@
       "additionalProperties": false
     },
     "Flake8SelfOptions": {
+      "description": "Options for the `flake8_self` plugin.",
       "type": "object",
       "properties": {
         "extend-ignore-names": {
@@ -1340,6 +1354,7 @@
       "additionalProperties": false
     },
     "Flake8TidyImportsOptions": {
+      "description": "Options for the `flake8-tidy-imports` plugin",
       "type": "object",
       "properties": {
         "ban-relative-imports": {
@@ -1377,6 +1392,7 @@
       "additionalProperties": false
     },
     "Flake8TypeCheckingOptions": {
+      "description": "Options for the `flake8-type-checking` plugin",
       "type": "object",
       "properties": {
         "exempt-modules": {
@@ -1439,6 +1455,7 @@
       "additionalProperties": false
     },
     "Flake8UnusedArgumentsOptions": {
+      "description": "Options for the `flake8-unused-arguments` plugin",
       "type": "object",
       "properties": {
         "ignore-variadic-names": {
@@ -1578,6 +1595,7 @@
       "minimum": 1.0
     },
     "IsortOptions": {
+      "description": "Options for the `isort` plugin.",
       "type": "object",
       "properties": {
         "case-sensitive": {
@@ -2308,6 +2326,17 @@
             }
           ]
         },
+        "pydoclint": {
+          "description": "Options for the `pydoclint` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PydoclintOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "pydocstyle": {
           "description": "Options for the `pydocstyle` plugin.",
           "anyOf": [
@@ -2407,6 +2436,7 @@
       "additionalProperties": false
     },
     "McCabeOptions": {
+      "description": "Options for the `mccabe` plugin.",
       "type": "object",
       "properties": {
         "max-complexity": {
@@ -2464,6 +2494,7 @@
       ]
     },
     "Pep8NamingOptions": {
+      "description": "Options for the `pep8-naming` plugin.",
       "type": "object",
       "properties": {
         "classmethod-decorators": {
@@ -2510,6 +2541,7 @@
       "additionalProperties": false
     },
     "PyUpgradeOptions": {
+      "description": "Options for the `pyupgrade` plugin.",
       "type": "object",
       "properties": {
         "keep-runtime-typing": {
@@ -2523,6 +2555,7 @@
       "additionalProperties": false
     },
     "PycodestyleOptions": {
+      "description": "Options for the `pycodestyle` plugin.",
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
@@ -2557,7 +2590,22 @@
       },
       "additionalProperties": false
     },
+    "PydoclintOptions": {
+      "description": "Options for the `pydoclint` plugin.",
+      "type": "object",
+      "properties": {
+        "ignore-one-line-docstrings": {
+          "description": "Skip docstrings which fit on a single line.\n\nNote: The corresponding setting in `pydoclint` is named `skip-checking-short-docstrings`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "PydocstyleOptions": {
+      "description": "Options for the `pydocstyle` plugin.",
       "type": "object",
       "properties": {
         "convention": {
@@ -2602,6 +2650,7 @@
       "additionalProperties": false
     },
     "PyflakesOptions": {
+      "description": "Options for the `pyflakes` plugin.",
       "type": "object",
       "properties": {
         "allowed-unused-imports": {
@@ -2628,6 +2677,7 @@
       "additionalProperties": false
     },
     "PylintOptions": {
+      "description": "Options for the `pylint` plugin.",
       "type": "object",
       "properties": {
         "allow-dunder-method-names": {
@@ -2827,6 +2877,7 @@
       "type": "string"
     },
     "RuffOptions": {
+      "description": "Options for the `ruff` plugin",
       "type": "object",
       "properties": {
         "allowed-markup-calls": {
@@ -3321,6 +3372,7 @@
         "FURB116",
         "FURB118",
         "FURB12",
+        "FURB122",
         "FURB129",
         "FURB13",
         "FURB131",
@@ -3672,7 +3724,6 @@
         "PLW0",
         "PLW01",
         "PLW010",
-        "PLW0101",
         "PLW0108",
         "PLW012",
         "PLW0120",
@@ -3688,6 +3739,7 @@
         "PLW021",
         "PLW0211",
         "PLW024",
+        "PLW0244",
         "PLW0245",
         "PLW04",
         "PLW040",
@@ -3939,6 +3991,7 @@
         "RUF041",
         "RUF043",
         "RUF046",
+        "RUF047",
         "RUF048",
         "RUF049",
         "RUF05",
@@ -3947,6 +4000,7 @@
         "RUF055",
         "RUF056",
         "RUF057",
+        "RUF058",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4204,6 +4258,8 @@
         "UP043",
         "UP044",
         "UP045",
+        "UP046",
+        "UP047",
         "W",
         "W1",
         "W19",

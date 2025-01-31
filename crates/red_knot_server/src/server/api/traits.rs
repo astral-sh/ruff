@@ -5,7 +5,7 @@ use crate::session::{DocumentSnapshot, Session};
 
 use lsp_types::notification::Notification as LSPNotification;
 use lsp_types::request::Request;
-use red_knot_workspace::db::ProjectDatabase;
+use red_knot_project::ProjectDatabase;
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {

@@ -308,7 +308,9 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "TypeGuard",
     "get_args",
     "get_origin",
-    "is_typeddict",
+    // Introduced in Python 3.10, but `typing_extensions` equivalent
+    // also checks for `typing_extensions.TypedDict` in addition to `typing.TypedDict`.
+    // "is_typeddict",
 ];
 
 // Python 3.11+
@@ -382,13 +384,14 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
     // Introduced in Python 3.8, but typing_extensions
     // backports features and bugfixes from py313:
     "Protocol",
-    "TypedDict",
     "runtime_checkable",
     // Introduced in earlier Python versions,
     // but typing_extensions backports PEP-696:
     "ParamSpec",
     "TypeVar",
     "TypeVarTuple",
+    // `typing_extensions` backports PEP 728 (TypedDict with Typed Extra Items)
+    // "TypedDict",
 ];
 
 // Members of `typing_extensions` that were moved to `types`.

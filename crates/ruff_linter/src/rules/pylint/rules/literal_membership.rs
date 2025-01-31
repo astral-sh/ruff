@@ -65,6 +65,11 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         _ => return,
     };
 
+    // Skip empty collections (#15729).
+    if elts.is_empty() {
+        return;
+    }
+
     // If `left`, or any of the elements in `right`, are known to _not_ be hashable, return.
     if std::iter::once(compare.left.as_ref())
         .chain(elts)

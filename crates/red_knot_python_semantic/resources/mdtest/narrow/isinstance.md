@@ -199,24 +199,20 @@ def f(
     if isinstance(a, bool):
         reveal_type(a)  # revealed: Never
     else:
-        # TODO: `bool` is final, so `& ~bool` is redundant here
-        reveal_type(a)  # revealed: P & AlwaysTruthy & ~bool
+        reveal_type(a)  # revealed: P & AlwaysTruthy
 
     if isinstance(b, bool):
         reveal_type(b)  # revealed: Never
     else:
-        # TODO: `bool` is final, so `& ~bool` is redundant here
-        reveal_type(b)  # revealed: P & AlwaysFalsy & ~bool
+        reveal_type(b)  # revealed: P & AlwaysFalsy
 
     if isinstance(c, bool):
         reveal_type(c)  # revealed: Never
     else:
-        # TODO: `bool` is final, so `& ~bool` is redundant here
-        reveal_type(c)  # revealed: P & ~AlwaysTruthy & ~bool
+        reveal_type(c)  # revealed: P & ~AlwaysTruthy
 
     if isinstance(d, bool):
         reveal_type(d)  # revealed: Never
     else:
-        # TODO: `bool` is final, so `& ~bool` is redundant here
-        reveal_type(d)  # revealed: P & ~AlwaysFalsy & ~bool
+        reveal_type(d)  # revealed: P & ~AlwaysFalsy
 ```

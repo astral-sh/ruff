@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF047_try.py:7:1: RUF047 [*] Empty `else` clause
+  |
+5 |   except:
+6 |       pass
+7 | / else:
+8 | |     pass
+  | |________^ RUF047
+  |
+  = help: Remove the `else` clause
+
+ℹ Safe fix
+4 4 |     raise try_body_is_not_checked()
+5 5 | except:
+6 6 |     pass
+7   |-else:
+8   |-    pass
+9 7 | 
+10 8 | 
+11 9 | try:
+
+RUF047_try.py:17:1: RUF047 [*] Empty `else` clause
+   |
+15 |   except:
+16 |       to()  # `except`
+17 | / else:
+18 | |     ...
+   | |_______^ RUF047
+   |
+   = help: Remove the `else` clause
+
+ℹ Safe fix
+14 14 |     belongs()
+15 15 | except:
+16 16 |     to()  # `except`
+17    |-else:
+18    |-    ...
+19 17 | 
+20 18 | 
+21 19 | try:

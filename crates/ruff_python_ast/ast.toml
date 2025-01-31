@@ -1,0 +1,167 @@
+# This file is used by generate.py to autogenerate our Python AST data model.
+#
+# We have defined a Rust struct for each syntax node in `src/nodes.rs`.  Many of
+# these nodes belong to groups. For instance, there is a `Stmt` group
+# consisting of all of the syntax nodes that represent valid Python statements.
+#
+# There is a special group named `ungrouped` that contains syntax nodes that do
+# not belong to any group.
+#
+# Each group is defined by two sections below. The `[GROUP]` section defines
+# options that control the auto-generation for that group. The `[GROUP.nodes]`
+# section defines which syntax nodes belong to that group. The name of each
+# entry in the nodes section must match the name of the corresponding Rust
+# struct. The value of each entry defines options that control the
+# auto-generation for that syntax node.
+#
+# The following group options are available:
+#
+# add_suffix_to_is_methods: [true/false]
+#   Controls the name of the is_foo methods of the group's enums.  If false (the
+#   default), these methods will use the variant name in snake_case.  If true,
+#   then the group prefix will be moved to the end before snake_casing.  (That
+#   is, `StmtIf` will become `if_stmt`.)
+#
+# anynode_is_label: foo_bar
+#   Controls the name of the AnyNodeRef::is_foo_bar method.  The default is the
+#   group name in snake_case.
+#
+# rustdoc:
+#   A rustdoc comment that is added to the group's enums.
+#
+# The following syntax node options are available:
+#
+# variant:
+#   The name of the enum variant for this syntax node.  Defaults to the node
+#   name with the group prefix removed.  (That is, `StmtIf` becomes `If`.)
+
+[Mod]
+anynode_is_label = "module"
+rustdoc = "/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
+
+[Mod.nodes]
+ModModule = {}
+ModExpression = {}
+
+[Stmt]
+add_suffix_to_is_methods = true
+anynode_is_label = "statement"
+rustdoc = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+
+[Stmt.nodes]
+StmtFunctionDef = {}
+StmtClassDef = {}
+StmtReturn = {}
+StmtDelete = {}
+StmtTypeAlias = {}
+StmtAssign = {}
+StmtAugAssign = {}
+StmtAnnAssign = {}
+StmtFor = {}
+StmtWhile = {}
+StmtIf = {}
+StmtWith = {}
+StmtMatch = {}
+StmtRaise = {}
+StmtTry = {}
+StmtAssert = {}
+StmtImport = {}
+StmtImportFrom = {}
+StmtGlobal = {}
+StmtNonlocal = {}
+StmtExpr = {}
+StmtPass = {}
+StmtBreak = {}
+StmtContinue = {}
+StmtIpyEscapeCommand = {}
+
+[Expr]
+add_suffix_to_is_methods = true
+anynode_is_label = "expression"
+rustdoc = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
+
+[Expr.nodes]
+ExprBoolOp = {}
+ExprNamed = {}
+ExprBinOp = {}
+ExprUnaryOp = {}
+ExprLambda = {}
+ExprIf = {}
+ExprDict = {}
+ExprSet = {}
+ExprListComp = {}
+ExprSetComp = {}
+ExprDictComp = {}
+ExprGenerator = {}
+ExprAwait = {}
+ExprYield = {}
+ExprYieldFrom = {}
+ExprCompare = {}
+ExprCall = {}
+ExprFString = {}
+ExprStringLiteral = {}
+ExprBytesLiteral = {}
+ExprNumberLiteral = {}
+ExprBooleanLiteral = {}
+ExprNoneLiteral = {}
+ExprEllipsisLiteral = {}
+ExprAttribute = {}
+ExprSubscript = {}
+ExprStarred = {}
+ExprName = {}
+ExprList = {}
+ExprTuple = {}
+ExprSlice = {}
+ExprIpyEscapeCommand = {}
+
+[ExceptHandler]
+rustdoc = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
+
+[ExceptHandler.nodes]
+ExceptHandlerExceptHandler = {}
+
+[FStringElement.nodes]
+FStringExpressionElement = {variant = "Expression"}
+FStringLiteralElement = {variant = "Literal"}
+
+[Pattern]
+rustdoc = "/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
+
+[Pattern.nodes]
+PatternMatchValue = {}
+PatternMatchSingleton = {}
+PatternMatchSequence = {}
+PatternMatchMapping = {}
+PatternMatchClass = {}
+PatternMatchStar = {}
+PatternMatchAs = {}
+PatternMatchOr = {}
+
+[TypeParam]
+rustdoc = "/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
+
+[TypeParam.nodes]
+TypeParamTypeVar = {}
+TypeParamTypeVarTuple = {}
+TypeParamParamSpec = {}
+
+[ungrouped.nodes]
+FStringFormatSpec = {}
+PatternArguments = {}
+PatternKeyword = {}
+Comprehension = {}
+Arguments = {}
+Parameters = {}
+Parameter = {}
+ParameterWithDefault = {}
+Keyword = {}
+Alias = {}
+WithItem = {}
+MatchCase = {}
+Decorator = {}
+ElifElseClause = {}
+TypeParams = {}
+FString = {}
+StringLiteral = {}
+BytesLiteral = {}
+Identifier = {}

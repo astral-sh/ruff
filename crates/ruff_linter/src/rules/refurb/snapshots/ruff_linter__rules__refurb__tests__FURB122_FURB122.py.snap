@@ -1,0 +1,235 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB122.py:10:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+ 8 |   def _():
+ 9 |       with open("file", "w") as f:
+10 | /         for line in lines:
+11 | |             f.write(line)
+   | |_________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+7  7  | 
+8  8  | def _():
+9  9  |     with open("file", "w") as f:
+10    |-        for line in lines:
+11    |-            f.write(line)
+   10 |+        f.writelines(lines)
+12 11 | 
+13 12 | 
+14 13 | def _():
+
+FURB122.py:17:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+15 |       other_line = "other line"
+16 |       with Path("file").open("w") as f:
+17 | /         for line in lines:
+18 | |             f.write(other_line)
+   | |_______________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+14 14 | def _():
+15 15 |     other_line = "other line"
+16 16 |     with Path("file").open("w") as f:
+17    |-        for line in lines:
+18    |-            f.write(other_line)
+   17 |+        f.writelines(other_line for line in lines)
+19 18 | 
+20 19 | 
+21 20 | def _():
+
+FURB122.py:23:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+21 |   def _():
+22 |       with Path("file").open("w") as f:
+23 | /         for line in lines:
+24 | |             f.write(line)
+   | |_________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+20 20 | 
+21 21 | def _():
+22 22 |     with Path("file").open("w") as f:
+23    |-        for line in lines:
+24    |-            f.write(line)
+   23 |+        f.writelines(lines)
+25 24 | 
+26 25 | 
+27 26 | def _():
+
+FURB122.py:29:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+27 |   def _():
+28 |       with Path("file").open("wb") as f:
+29 | /         for line in lines:
+30 | |             f.write(line.encode())
+   | |__________________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+26 26 | 
+27 27 | def _():
+28 28 |     with Path("file").open("wb") as f:
+29    |-        for line in lines:
+30    |-            f.write(line.encode())
+   29 |+        f.writelines(line.encode() for line in lines)
+31 30 | 
+32 31 | 
+33 32 | def _():
+
+FURB122.py:35:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+33 |   def _():
+34 |       with Path("file").open("w") as f:
+35 | /         for line in lines:
+36 | |             f.write(line.upper())
+   | |_________________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+32 32 | 
+33 33 | def _():
+34 34 |     with Path("file").open("w") as f:
+35    |-        for line in lines:
+36    |-            f.write(line.upper())
+   35 |+        f.writelines(line.upper() for line in lines)
+37 36 | 
+38 37 | 
+39 38 | def _():
+
+FURB122.py:43:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+41 |           pass
+42 |
+43 | /         for line in lines:
+44 | |             f.write(line)
+   | |_________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+40 40 |     with Path("file").open("w") as f:
+41 41 |         pass
+42 42 | 
+43    |-        for line in lines:
+44    |-            f.write(line)
+   43 |+        f.writelines(lines)
+45 44 | 
+46 45 | 
+47 46 | def _():
+
+FURB122.py:50:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+48 |       # Offer unsafe fix if it would delete comments
+49 |       with open("file","w") as f:
+50 | /         for line in lines:
+51 | |             # a really important comment
+52 | |             f.write(line)
+   | |_________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Unsafe fix
+47 47 | def _():
+48 48 |     # Offer unsafe fix if it would delete comments
+49 49 |     with open("file","w") as f:
+50    |-        for line in lines:
+51    |-            # a really important comment
+52    |-            f.write(line)
+   50 |+        f.writelines(lines)
+53 51 | 
+54 52 | 
+55 53 | def _():
+
+FURB122.py:57:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+55 |   def _():
+56 |       with open("file", "w") as f:
+57 | /         for () in a:
+58 | |             f.write(())
+   | |_______________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+54 54 | 
+55 55 | def _():
+56 56 |     with open("file", "w") as f:
+57    |-        for () in a:
+58    |-            f.write(())
+   57 |+        f.writelines(() for () in a)
+59 58 | 
+60 59 | 
+61 60 | def _():
+
+FURB122.py:63:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+61 |   def _():
+62 |       with open("file", "w") as f:
+63 | /         for a, b, c in d:
+64 | |             f.write((a, b))
+   | |___________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+60 60 | 
+61 61 | def _():
+62 62 |     with open("file", "w") as f:
+63    |-        for a, b, c in d:
+64    |-            f.write((a, b))
+   63 |+        f.writelines((a, b) for a, b, c in d)
+65 64 | 
+66 65 | 
+67 66 | def _():
+
+FURB122.py:69:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+67 |   def _():
+68 |       with open("file", "w") as f:
+69 | /         for [(), [a.b], (c,)] in d:
+70 | |             f.write(())
+   | |_______________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+66 66 | 
+67 67 | def _():
+68 68 |     with open("file", "w") as f:
+69    |-        for [(), [a.b], (c,)] in d:
+70    |-            f.write(())
+   69 |+        f.writelines(() for [(), [a.b], (c,)] in d)
+71 70 | 
+72 71 | 
+73 72 | def _():
+
+FURB122.py:75:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+73 |   def _():
+74 |       with open("file", "w") as f:
+75 | /         for [([([a[b]],)],), [], (c[d],)] in e:
+76 | |             f.write(())
+   | |_______________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+72 72 | 
+73 73 | def _():
+74 74 |     with open("file", "w") as f:
+75    |-        for [([([a[b]],)],), [], (c[d],)] in e:
+76    |-            f.write(())
+   75 |+        f.writelines(() for [([([a[b]],)],), [], (c[d],)] in e)
+77 76 | 
+78 77 | 
+79 78 | # OK

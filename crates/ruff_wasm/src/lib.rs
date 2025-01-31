@@ -53,7 +53,7 @@ export interface Diagnostic {
             };
         }[];
     } | null;
-};
+}
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]

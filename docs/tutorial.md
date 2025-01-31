@@ -8,13 +8,14 @@ your project. For a more detailed overview, see [_Configuring Ruff_](configurati
 To start, we'll initialize a project using [uv](https://docs.astral.sh/uv/):
 
 ```console
-$ uv init numbers
+$ uv init --lib numbers
 ```
 
 This command creates a Python project with the following structure:
 
 ```text
 numbers
+  ├── README.md
   ├── pyproject.toml
   └── src
       └── numbers
@@ -364,7 +365,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.9.1
+  rev: v0.9.4
   hooks:
     # Run the linter.
     - id: ruff

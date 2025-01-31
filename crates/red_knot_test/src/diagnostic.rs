@@ -198,8 +198,8 @@ mod tests {
             "dummy".into()
         }
 
-        fn file(&self) -> File {
-            self.file
+        fn file(&self) -> Option<File> {
+            Some(self.file)
         }
 
         fn range(&self) -> Option<TextRange> {

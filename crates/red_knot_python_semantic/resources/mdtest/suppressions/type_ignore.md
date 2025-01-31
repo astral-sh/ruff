@@ -151,7 +151,7 @@ b = a / 0
 ```py
 """
 File level suppressions must come before any non-trivia token,
-including module docstrings. 
+including module docstrings.
 """
 
 # error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"

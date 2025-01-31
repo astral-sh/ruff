@@ -51,7 +51,7 @@ jobs:
         env:
           TAG: ${{ inputs.plan != '' && fromJson(inputs.plan).announcement_tag || 'dry-run' }}
         run: |
-          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
+          version=$(grep -m 1 "^version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
           if [ "${TAG}" != "${version}" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
             echo "${TAG}" >&2

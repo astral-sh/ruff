@@ -42,7 +42,7 @@ impl<'db> Mro<'db> {
     fn of_class_impl(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
 
-        if !class_bases.is_empty() && class.is_cyclically_defined(db) {
+        if !class_bases.is_empty() && class.inheritance_cycle(db).is_some() {
             // We emit errors for cyclically defined classes elsewhere.
             // It's important that we don't even try to infer the MRO for a cyclically defined class,
             // or we'll end up in an infinite loop.
@@ -76,7 +76,7 @@ impl<'db> Mro<'db> {
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base] => ClassBase::try_from_ty(db, *single_base).map_or_else(
+            [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
                 || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                 |single_base| {
                     Ok(std::iter::once(ClassBase::Class(class))
@@ -95,7 +95,7 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(db, *base) {
+                    match ClassBase::try_from_type(db, *base) {
                         Some(valid_base) => valid_bases.push(valid_base),
                         None => invalid_bases.push((i, *base)),
                     }

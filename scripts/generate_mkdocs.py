@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 from collections.abc import Sequence
+from itertools import chain
 from pathlib import Path
 from typing import NamedTuple
 
@@ -257,10 +258,18 @@ def main() -> None:
     config["plugins"].append(
         {
             "redirects": {
-                "redirect_maps": {
-                    f"rules/{rule['code']}.md": f"rules/{rule['name']}.md"
-                    for rule in rules
-                },
+                "redirect_maps": dict(
+                    chain.from_iterable(
+                        [
+                            (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
+                            (
+                                f"rules/{rule['code'].lower()}.md",
+                                f"rules/{rule['name']}.md",
+                            ),
+                        ]
+                        for rule in rules
+                    )
+                ),
             },
         },
     )

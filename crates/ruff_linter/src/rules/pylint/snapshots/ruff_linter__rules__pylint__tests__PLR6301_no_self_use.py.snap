@@ -35,3 +35,43 @@ no_self_use.py:103:9: PLR6301 Method `validate_y` could be a function, class met
 104 |         if value <= 0:
 105 |             raise ValueError("y must be a positive integer")
     |
+
+no_self_use.py:128:9: PLR6301 Method `non_simple_assignment` could be a function, class method, or static method
+    |
+126 |     # Errors
+127 |
+128 |     def non_simple_assignment(self):
+    |         ^^^^^^^^^^^^^^^^^^^^^ PLR6301
+129 |         msg = foo = ""
+130 |         raise NotImplementedError(msg)
+    |
+
+no_self_use.py:132:9: PLR6301 Method `non_simple_assignment_2` could be a function, class method, or static method
+    |
+130 |         raise NotImplementedError(msg)
+131 |
+132 |     def non_simple_assignment_2(self):
+    |         ^^^^^^^^^^^^^^^^^^^^^^^ PLR6301
+133 |         msg[0] = ""
+134 |         raise NotImplementedError(msg)
+    |
+
+no_self_use.py:136:9: PLR6301 Method `unused_message` could be a function, class method, or static method
+    |
+134 |         raise NotImplementedError(msg)
+135 |
+136 |     def unused_message(self):
+    |         ^^^^^^^^^^^^^^ PLR6301
+137 |         msg = ""
+138 |         raise NotImplementedError("")
+    |
+
+no_self_use.py:140:9: PLR6301 Method `unused_message_2` could be a function, class method, or static method
+    |
+138 |         raise NotImplementedError("")
+139 |
+140 |     def unused_message_2(self, x):
+    |         ^^^^^^^^^^^^^^^^ PLR6301
+141 |         msg = ""
+142 |         raise NotImplementedError(x)
+    |

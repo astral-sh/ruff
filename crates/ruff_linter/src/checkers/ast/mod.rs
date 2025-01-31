@@ -41,15 +41,15 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
-    UnaryOp,
+    self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
+    Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
-use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_parser::{ParseError, Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -189,7 +189,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
-    module: Module<'a>,
+    pub(crate) module: Module<'a>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
@@ -234,7 +234,7 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
-        parsed_annotations_arena: &'a typed_arena::Arena<ParsedAnnotation>,
+        parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -294,11 +294,31 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        Generator::new(
-            self.stylist.indentation(),
-            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
-            self.stylist.line_ending(),
-        )
+        Generator::new(self.stylist.indentation(), self.stylist.line_ending())
+    }
+
+    /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
+    /// AST.
+    fn preferred_quote(&self) -> Quote {
+        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+    }
+
+    /// Return the default string flags a generated `StringLiteral` node should use, given where we
+    /// are in the AST.
+    pub(crate) fn default_string_flags(&self) -> ast::StringLiteralFlags {
+        ast::StringLiteralFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
+    /// Return the default bytestring flags a generated `ByteStringLiteral` node should use, given
+    /// where we are in the AST.
+    pub(crate) fn default_bytes_flags(&self) -> ast::BytesLiteralFlags {
+        ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
+    /// Return the default f-string flags a generated `FString` node should use, given where we are
+    /// in the AST.
+    pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
+        ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
@@ -425,7 +445,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn parse_type_annotation(
         &self,
         annotation: &ast::ExprStringLiteral,
-    ) -> Option<&'a ParsedAnnotation> {
+    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
     }
@@ -441,7 +461,7 @@ impl<'a> Checker<'a> {
         match_fn: impl FnOnce(&ast::Expr) -> bool,
     ) -> bool {
         if let ast::Expr::StringLiteral(string_annotation) = expr {
-            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation) else {
+            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation).ok() else {
                 return false;
             };
             match_fn(parsed_annotation.expression())
@@ -1251,6 +1271,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::TypeVar)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                            {
+                                Some(typing::Callable::TypeAliasType)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
                                 Some(typing::Callable::NamedTuple)
@@ -1326,10 +1351,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 range: _,
                             } = keyword;
                             if let Some(id) = arg {
-                                if id.as_str() == "bound" {
+                                if matches!(&**id, "bound" | "default") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    Some(typing::Callable::TypeAliasType) => {
+                        // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if matches!(&**id, "value" | "type_params") {
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2327,58 +2370,66 @@ impl<'a> Checker<'a> {
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
-                let annotation_parse_result = self.parse_type_annotation(string_expr);
-                if let Some(parsed_annotation) = annotation_parse_result {
-                    self.parsed_type_annotation = Some(parsed_annotation);
+                match self.parse_type_annotation(string_expr) {
+                    Ok(parsed_annotation) => {
+                        self.parsed_type_annotation = Some(parsed_annotation);
 
-                    let annotation = string_expr.value.to_str();
-                    let range = string_expr.range();
+                        let annotation = string_expr.value.to_str();
+                        let range = string_expr.range();
 
-                    self.semantic.restore(snapshot);
+                        self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.in_typing_only_annotation() {
-                        if self.enabled(Rule::QuotedAnnotation) {
-                            pyupgrade::rules::quoted_annotation(self, annotation, range);
+                        if self.semantic.in_annotation()
+                            && self.semantic.in_typing_only_annotation()
+                        {
+                            if self.enabled(Rule::QuotedAnnotation) {
+                                pyupgrade::rules::quoted_annotation(self, annotation, range);
+                            }
                         }
+                        if self.source_type.is_stub() {
+                            if self.enabled(Rule::QuotedAnnotationInStub) {
+                                flake8_pyi::rules::quoted_annotation_in_stub(
+                                    self, annotation, range,
+                                );
+                            }
+                        }
+
+                        let type_definition_flag = match parsed_annotation.kind() {
+                            AnnotationKind::Simple => {
+                                SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION
+                            }
+                            AnnotationKind::Complex => {
+                                SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                            }
+                        };
+
+                        self.semantic.flags |=
+                            SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
+                        let parsed_expr = parsed_annotation.expression();
+                        self.visit_expr(parsed_expr);
+                        if self.semantic.in_type_alias_value() {
+                            // stub files are covered by PYI020
+                            if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
+                                flake8_type_checking::rules::quoted_type_alias(
+                                    self,
+                                    parsed_expr,
+                                    string_expr,
+                                );
+                            }
+                        }
+                        self.parsed_type_annotation = None;
                     }
-                    if self.source_type.is_stub() {
-                        if self.enabled(Rule::QuotedAnnotationInStub) {
-                            flake8_pyi::rules::quoted_annotation_in_stub(self, annotation, range);
-                        }
-                    }
+                    Err(parse_error) => {
+                        self.semantic.restore(snapshot);
 
-                    let type_definition_flag = match parsed_annotation.kind() {
-                        AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => {
-                            SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                            self.push_type_diagnostic(Diagnostic::new(
+                                pyflakes::rules::ForwardAnnotationSyntaxError {
+                                    parse_error: parse_error.error.to_string(),
+                                },
+                                string_expr.range(),
+                            ));
                         }
-                    };
-
-                    self.semantic.flags |=
-                        SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    let parsed_expr = parsed_annotation.expression();
-                    self.visit_expr(parsed_expr);
-                    if self.semantic.in_type_alias_value() {
-                        // stub files are covered by PYI020
-                        if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
-                            flake8_type_checking::rules::quoted_type_alias(
-                                self,
-                                parsed_expr,
-                                string_expr,
-                            );
-                        }
-                    }
-                    self.parsed_type_annotation = None;
-                } else {
-                    self.semantic.restore(snapshot);
-
-                    if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                        self.push_type_diagnostic(Diagnostic::new(
-                            pyflakes::rules::ForwardAnnotationSyntaxError {
-                                body: string_expr.value.to_string(),
-                            },
-                            string_expr.range(),
-                        ));
                     }
                 }
             }
@@ -2550,12 +2601,12 @@ impl<'a> Checker<'a> {
 }
 
 struct ParsedAnnotationsCache<'a> {
-    arena: &'a typed_arena::Arena<ParsedAnnotation>,
-    by_offset: RefCell<FxHashMap<TextSize, Option<&'a ParsedAnnotation>>>,
+    arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
+    by_offset: RefCell<FxHashMap<TextSize, Result<&'a ParsedAnnotation, &'a ParseError>>>,
 }
 
 impl<'a> ParsedAnnotationsCache<'a> {
-    fn new(arena: &'a typed_arena::Arena<ParsedAnnotation>) -> Self {
+    fn new(arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>) -> Self {
         Self {
             arena,
             by_offset: RefCell::default(),
@@ -2566,17 +2617,15 @@ impl<'a> ParsedAnnotationsCache<'a> {
         &self,
         annotation: &ast::ExprStringLiteral,
         source: &str,
-    ) -> Option<&'a ParsedAnnotation> {
+    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         *self
             .by_offset
             .borrow_mut()
             .entry(annotation.start())
             .or_insert_with(|| {
-                if let Ok(annotation) = parse_type_annotation(annotation, source) {
-                    Some(self.arena.alloc(annotation))
-                } else {
-                    None
-                }
+                self.arena
+                    .alloc(parse_type_annotation(annotation, source))
+                    .as_ref()
             })
     }
 

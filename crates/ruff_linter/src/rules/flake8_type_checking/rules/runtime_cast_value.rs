@@ -68,11 +68,9 @@ pub(crate) fn runtime_cast_value(checker: &mut Checker, type_expr: &Expr) {
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
+        checker.default_string_flags(),
     );
-    if checker
-        .comment_ranges()
-        .has_comments(type_expr, checker.source())
-    {
+    if checker.comment_ranges().intersects(type_expr.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));

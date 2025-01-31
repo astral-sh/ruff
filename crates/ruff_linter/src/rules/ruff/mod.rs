@@ -79,6 +79,10 @@ mod tests {
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
@@ -418,10 +422,13 @@ mod tests {
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
+    #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

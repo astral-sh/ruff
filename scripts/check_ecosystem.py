@@ -449,7 +449,7 @@ async def main(
 
                     if matches is None:
                         # Handle case where there are no regex matches e.g.
-                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501
+                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE"
                         # Which was found in local testing
                         continue
 

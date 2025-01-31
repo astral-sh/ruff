@@ -1,7 +1,7 @@
 use lsp_server::ErrorCode;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::DidCloseTextDocumentParams;
-use red_knot_workspace::watch::ChangeEvent;
+use red_knot_project::watch::ChangeEvent;
 
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};

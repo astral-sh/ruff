@@ -359,7 +359,7 @@ fn call<'a>(
 ///
 /// [`is_stub`]: function_type::is_stub
 /// [`EM101`]: https://docs.astral.sh/ruff/rules/raw-string-in-exception/
-fn is_not_implemented_stub_with_variable(
+pub(crate) fn is_not_implemented_stub_with_variable(
     function_def: &StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {

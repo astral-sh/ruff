@@ -17,7 +17,8 @@ use crate::registry::AsRule;
 /// call to complete, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking call, use an equivalent asynchronous library
-/// or function.
+/// or function, like [`trio.run_process()`](https://trio.readthedocs.io/en/stable/reference-io.html#trio.run_process)
+/// or [`anyio.run_process()`](https://anyio.readthedocs.io/en/latest/api.html#anyio.run_process).
 ///
 /// ## Example
 /// ```python
@@ -49,7 +50,8 @@ impl Violation for CreateSubprocessInAsyncFunction {
 /// call to complete, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking call, use an equivalent asynchronous library
-/// or function.
+/// or function, like [`trio.run_process()`](https://trio.readthedocs.io/en/stable/reference-io.html#trio.run_process)
+/// or [`anyio.run_process()`](https://anyio.readthedocs.io/en/latest/api.html#anyio.run_process).
 ///
 /// ## Example
 /// ```python
@@ -81,7 +83,8 @@ impl Violation for RunProcessInAsyncFunction {
 /// call to complete, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking call, use an equivalent asynchronous library
-/// or function.
+/// or function, like [`trio.to_thread.run_sync()`](https://trio.readthedocs.io/en/latest/reference-core.html#trio.to_thread.run_sync)
+/// or [`anyio.to_thread.run_sync()`](https://anyio.readthedocs.io/en/latest/api.html#anyio.to_thread.run_sync).
 ///
 /// ## Example
 /// ```python

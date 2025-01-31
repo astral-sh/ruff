@@ -168,8 +168,8 @@ impl SearchPaths {
 
         let SearchPathSettings {
             extra_paths,
-            src_root,
-            typeshed,
+            src_roots,
+            custom_typeshed: typeshed,
             site_packages: site_packages_paths,
         } = settings;
 
@@ -186,8 +186,10 @@ impl SearchPaths {
             static_paths.push(SearchPath::extra(system, path)?);
         }
 
-        tracing::debug!("Adding first-party search path '{src_root}'");
-        static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        for src_root in src_roots {
+            tracing::debug!("Adding first-party search path '{src_root}'");
+            static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
             let typeshed = canonicalize(typeshed, system);
@@ -220,8 +222,14 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match site_packages_paths {
-            SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
-                .and_then(|venv| venv.site_packages_directories(system))?,
+            SitePackages::Derived { venv_path } => {
+                // TODO: We may want to warn here if the venv's python version is older
+                //  than the one resolved in the program settings because it indicates
+                //  that the `target-version` is incorrectly configured or that the
+                //  venv is out of date.
+                VirtualEnvironment::new(venv_path, system)
+                    .and_then(|venv| venv.site_packages_directories(system))?
+            }
             SitePackages::Known(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
@@ -1299,8 +1307,8 @@ mod tests {
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: src.clone(),
-                    typeshed: Some(custom_typeshed),
+                    src_roots: vec![src.clone()],
+                    custom_typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
             },
@@ -1805,8 +1813,8 @@ not_a_directory
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
-                    typeshed: None,
+                    src_roots: vec![SystemPathBuf::from("/src")],
+                    custom_typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,
                         system_site_packages,
