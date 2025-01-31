@@ -87,3 +87,28 @@ class PEP695Fix:
     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 
     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
+
+
+class InvalidButWeDoNotPanic:
+    @classmethod
+    def m[S](cls: type[S], /) -> S[int]: ...
+    def n(self: S) -> S[int]: ...
+
+
+import builtins
+
+class UsesFullyQualifiedType:
+    @classmethod
+    def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
+
+
+def shadowed_type():
+    type = 1
+    class A:
+        @classmethod
+        def m[S](cls: type[S]) -> S: ...  # no error here
+
+
+class SubscriptReturnType:
+    @classmethod
+    def m[S](cls: type[S]) -> type[S]: ...  # PYI019, but no autofix (yet)
