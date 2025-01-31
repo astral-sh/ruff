@@ -29,9 +29,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::visibility_constraints::{
-    VisibilityConstraint, VisibilityConstraintAtom, VisibilityConstraints,
-};
+use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraintAtom};
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -198,11 +196,6 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn current_use_def_map(&self) -> &UseDefMapBuilder<'db> {
         let scope_id = self.current_scope();
         &self.use_def_maps[scope_id]
-    }
-
-    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraints<'db> {
-        let scope_id = self.current_scope();
-        &mut self.use_def_maps[scope_id].visibility_constraints
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -999,16 +992,11 @@ where
                 self.visit_body(body);
                 self.set_inside_loop(outer_loop_state);
 
-                // The first time the body is executed, we will have only checked the first
-                // evaluation of the condition, which must be True. For the second and later times,
-                // the first evaluation must still have been True, and a later evaluation was also
-                // True. So the full visibility constraint is (first ∨ (first ∧ later)).
-                let first_and_later = self
-                    .current_visibility_constraints_mut()
-                    .add_and_constraint(first_vis_constraint_id, later_vis_constraint_id);
-                let body_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
-                    .add_or_constraint(first_vis_constraint_id, first_and_later);
+                // If the body is executed, we know that we've evaluated the condition at least
+                // once, and that the first evaluation was True. We might not have evaluated the
+                // condition more than once, so we can't assume that later evaluations were True.
+                // So the body's full visibility constraint is `first`.
+                let body_vis_constraint_id = first_vis_constraint_id;
                 self.record_visibility_constraint_id(body_vis_constraint_id);
 
                 // Get the break states from the body of this loop, and restore the saved outer
