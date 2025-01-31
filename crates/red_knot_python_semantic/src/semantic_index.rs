@@ -144,7 +144,8 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Maps from class body scopes to attribute assignments that were found
     /// in methods of that class.
-    attribute_assignments: FxHashMap<FileScopeId, FxHashMap<String, Vec<AttributeAssignment<'db>>>>,
+    attribute_assignments:
+        FxHashMap<FileScopeId, FxHashMap<&'db str, Vec<AttributeAssignment<'db>>>>,
 }
 
 impl<'db> SemanticIndex<'db> {

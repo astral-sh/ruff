@@ -81,7 +81,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
-    current_first_parameter_name: Option<Name>,
+    current_first_parameter_name: Option<&'db str>,
 
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
@@ -102,7 +102,8 @@ pub(super) struct SemanticIndexBuilder<'db> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    attribute_assignments: FxHashMap<FileScopeId, FxHashMap<String, Vec<AttributeAssignment<'db>>>>,
+    attribute_assignments:
+        FxHashMap<FileScopeId, FxHashMap<&'db str, Vec<AttributeAssignment<'db>>>>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -453,21 +454,21 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn register_attribute_assignment(
         &mut self,
         object: &ast::Expr,
-        attr: &ast::Identifier,
+        attr: &'db ast::Identifier,
         attribute_assignment: AttributeAssignment<'db>,
     ) {
         if let Some(class_body_scope) = self.is_method_of_class() {
             // We only care about attribute assignments to the first parameter of a method,
             // i.e. typically `self` or `cls`.
             let accessed_object_refers_to_first_parameter =
-                object.as_name_expr().map(|name| &name.id)
-                    == self.current_first_parameter_name.as_ref();
+                object.as_name_expr().map(|name| name.id.as_str())
+                    == self.current_first_parameter_name;
 
             if accessed_object_refers_to_first_parameter {
                 self.attribute_assignments
                     .entry(class_body_scope)
                     .or_default()
-                    .entry(attr.id().as_str().to_owned())
+                    .entry(attr.id().as_str())
                     .or_default()
                     .push(attribute_assignment);
             }
@@ -795,7 +796,7 @@ where
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
                             .next()
-                            .map(|first_param| first_param.parameter.name.id().clone());
+                            .map(|first_param| first_param.parameter.name.id().as_str());
                         std::mem::swap(
                             &mut builder.current_first_parameter_name,
                             &mut first_parameter_name,
