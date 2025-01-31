@@ -264,7 +264,9 @@ use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
-use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraints};
+use crate::visibility_constraints::{
+    VisibilityConstraint, VisibilityConstraints, VisibilityConstraintsBuilder,
+};
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -488,7 +490,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_constraints: AllConstraints<'db>,
 
     /// Append-only array of [`VisibilityConstraint`].
-    visibility_constraints: VisibilityConstraints<'db>,
+    visibility_constraints: VisibilityConstraintsBuilder<'db>,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
     /// whether or not the start of the scope is visible. This is important for cases like
@@ -513,7 +515,7 @@ impl Default for UseDefMapBuilder<'_> {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
-            visibility_constraints: VisibilityConstraints::default(),
+            visibility_constraints: VisibilityConstraintsBuilder::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
@@ -742,7 +744,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             all_constraints: self.all_constraints,
-            visibility_constraints: self.visibility_constraints,
+            visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
             definitions_by_definition: self.definitions_by_definition,

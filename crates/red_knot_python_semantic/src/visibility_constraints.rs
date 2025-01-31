@@ -198,7 +198,12 @@ pub(crate) struct VisibilityConstraints<'db> {
     constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
 }
 
-impl Default for VisibilityConstraints<'_> {
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct VisibilityConstraintsBuilder<'db> {
+    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
+}
+
+impl Default for VisibilityConstraintsBuilder<'_> {
     fn default() -> Self {
         Self {
             constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
@@ -206,7 +211,13 @@ impl Default for VisibilityConstraints<'_> {
     }
 }
 
-impl<'db> VisibilityConstraints<'db> {
+impl<'db> VisibilityConstraintsBuilder<'db> {
+    pub(crate) fn build(self) -> VisibilityConstraints<'db> {
+        VisibilityConstraints {
+            constraints: self.constraints,
+        }
+    }
+
     pub(crate) fn add(
         &mut self,
         constraint: VisibilityConstraint<'db>,
@@ -250,7 +261,9 @@ impl<'db> VisibilityConstraints<'db> {
             _ => self.add(VisibilityConstraint::KleeneAnd(a, b)),
         }
     }
+}
 
+impl<'db> VisibilityConstraints<'db> {
     /// Analyze the statically known visibility for a given visibility constraint.
     pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
         self.evaluate_impl(db, id, MAX_RECURSION_DEPTH)
