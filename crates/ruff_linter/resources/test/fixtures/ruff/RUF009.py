@@ -41,11 +41,9 @@ DEFAULT_A_FOR_ALL_DATACLASSES = A([1, 2, 3])
 
 @dataclass
 class B:
-    # Errors
     hidden_mutable_default: list[int] = default_function()
     another_dataclass: A = A()
 
-    # No errors
     not_optimal: ImmutableType = ImmutableType(20)
     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES

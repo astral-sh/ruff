@@ -12,6 +12,8 @@ from attrs import Factory, define, field, frozen
 
 def default_function() -> list[int]:
     return []
+def default_int() -> int:
+    return 1337
 
 
 class ImmutableType(NamedTuple):
@@ -49,6 +51,7 @@ class B:
     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
 
+    fine_immutable_function_result: int = default_int()
     fine_dataclass_function: list[int] = field(default_factory=list)
     attrs_factory: dict[str, str] = Factory(OrderedDict)
 
