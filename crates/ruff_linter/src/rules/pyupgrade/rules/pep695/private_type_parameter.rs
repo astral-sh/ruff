@@ -19,11 +19,6 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 ///
 /// TODO, none yet
 ///
-/// ## Fix safety
-///
-/// TODO none yet, likely the usual caveats around comments since line breaks are allowed in the
-/// type parameters
-///
 /// ## Example
 ///
 /// ```python
@@ -119,11 +114,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
             checker.stylist(),
         )?;
 
-        Ok(Fix::applicable_edits(
-            first,
-            rest,
-            Applicability::Safe, // TODO unsafe when comments present (at least)
-        ))
+        Ok(Fix::safe_edits(first, rest))
     });
 
     Some(diagnostic)
