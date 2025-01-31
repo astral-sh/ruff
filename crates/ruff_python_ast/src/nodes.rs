@@ -1087,7 +1087,7 @@ pub struct FStringFlags(FStringFlagsInner);
 impl FStringFlags {
     /// Construct a new [`FStringFlags`] with **no flags set**.
     ///
-    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes_set_to`], and
+    /// See [`FStringFlags::with_quote_style`], [`FStringFlags::with_triple_quotes`], and
     /// [`FStringFlags::with_prefix`] for ways of setting the quote style (single or double),
     /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
     ///
@@ -1106,7 +1106,7 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes_set_to(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0
             .set(FStringFlagsInner::TRIPLE_QUOTED, triple_quotes.is_yes());
         self
@@ -1472,10 +1472,9 @@ pub struct StringLiteralFlags(StringLiteralFlagsInner);
 impl StringLiteralFlags {
     /// Construct a new [`StringLiteralFlags`] with **no flags set**.
     ///
-    /// See [`StringLiteralFlags::with_quote_style`],
-    /// [`StringLiteralFlags::with_triple_quotes_set_to`], and [`StringLiteralFlags::with_prefix`]
-    /// for ways of setting the quote style (single or double), enabling triple quotes, and adding
-    /// prefixes (such as `r` or `u`), respectively.
+    /// See [`StringLiteralFlags::with_quote_style`], [`StringLiteralFlags::with_triple_quotes`],
+    /// and [`StringLiteralFlags::with_prefix`] for ways of setting the quote style (single or
+    /// double), enabling triple quotes, and adding prefixes (such as `r` or `u`), respectively.
     ///
     /// See the documentation for [`StringLiteralFlags`] for additional caveats on this constructor,
     /// and situations in which alternative ways to construct this struct should be used, especially
@@ -1492,7 +1491,7 @@ impl StringLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes_set_to(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0.set(
             StringLiteralFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
@@ -1869,10 +1868,9 @@ pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 impl BytesLiteralFlags {
     /// Construct a new [`BytesLiteralFlags`] with **no flags set**.
     ///
-    /// See [`BytesLiteralFlags::with_quote_style`],
-    /// [`BytesLiteralFlags::with_triple_quotes_set_to`], and [`BytesLiteralFlags::with_prefix`] for
-    /// ways of setting the quote style (single or double), enabling triple quotes, and adding
-    /// prefixes (such as `r`), respectively.
+    /// See [`BytesLiteralFlags::with_quote_style`], [`BytesLiteralFlags::with_triple_quotes`], and
+    /// [`BytesLiteralFlags::with_prefix`] for ways of setting the quote style (single or double),
+    /// enabling triple quotes, and adding prefixes (such as `r`), respectively.
     ///
     /// See the documentation for [`BytesLiteralFlags`] for additional caveats on this constructor,
     /// and situations in which alternative ways to construct this struct should be used, especially
@@ -1889,7 +1887,7 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes_set_to(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0.set(
             BytesLiteralFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
@@ -2107,7 +2105,7 @@ impl AnyStringFlags {
         Self(AnyStringFlagsInner::empty())
             .with_prefix(prefix)
             .with_quote_style(quotes)
-            .with_triple_quotes_set_to(triple_quotes)
+            .with_triple_quotes(triple_quotes)
     }
 
     /// Does the string have a `u` or `U` prefix?
@@ -2142,7 +2140,7 @@ impl AnyStringFlags {
     }
 
     #[must_use]
-    pub fn with_triple_quotes_set_to(mut self, triple_quotes: TripleQuotes) -> Self {
+    pub fn with_triple_quotes(mut self, triple_quotes: TripleQuotes) -> Self {
         self.0
             .set(AnyStringFlagsInner::TRIPLE_QUOTED, triple_quotes.is_yes());
         self
@@ -2227,7 +2225,7 @@ impl From<AnyStringFlags> for StringLiteralFlags {
         StringLiteralFlags::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
-            .with_triple_quotes_set_to(value.triple_quotes())
+            .with_triple_quotes(value.triple_quotes())
     }
 }
 
@@ -2252,7 +2250,7 @@ impl From<AnyStringFlags> for BytesLiteralFlags {
         BytesLiteralFlags::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(bytestring_prefix)
-            .with_triple_quotes_set_to(value.triple_quotes())
+            .with_triple_quotes(value.triple_quotes())
     }
 }
 
@@ -2277,7 +2275,7 @@ impl From<AnyStringFlags> for FStringFlags {
         FStringFlags::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(fstring_prefix)
-            .with_triple_quotes_set_to(value.triple_quotes())
+            .with_triple_quotes(value.triple_quotes())
     }
 }
 

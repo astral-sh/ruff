@@ -133,7 +133,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
                     // itemC
                     // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
                     // ```
-                    flags: flags.with_triple_quotes_set_to(TripleQuotes::No),
+                    flags: flags.with_triple_quotes(TripleQuotes::No),
                 })
             })
             .collect(),

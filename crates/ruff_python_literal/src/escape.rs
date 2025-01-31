@@ -80,7 +80,7 @@ impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
         let flags = StringLiteralFlags::empty()
             .with_quote_style(self.escape.layout().quote)
-            .with_triple_quotes_set_to(self.triple_quotes);
+            .with_triple_quotes(self.triple_quotes);
         formatter.write_str(flags.quote_str())?;
         self.escape.write_body(formatter)?;
         formatter.write_str(flags.quote_str())?;
@@ -384,7 +384,7 @@ impl BytesRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
         let flags = BytesLiteralFlags::empty()
             .with_quote_style(self.escape.layout().quote)
-            .with_triple_quotes_set_to(self.triple_quotes);
+            .with_triple_quotes(self.triple_quotes);
 
         formatter.write_char('b')?;
         formatter.write_str(flags.quote_str())?;
