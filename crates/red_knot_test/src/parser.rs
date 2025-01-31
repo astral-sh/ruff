@@ -133,12 +133,17 @@ struct EmbeddedFileId;
 
 /// A single file embedded in a [`Section`] as a fenced code block.
 ///
-/// Currently must be a Python file (`py` language) or type stub (`pyi`). In the future we plan
-/// support other kinds of files as well (TOML configuration, typeshed VERSIONS, `pth` files...).
+/// Currently must be a Python file (`py` language), a type stub (`pyi`) or a [typeshed `VERSIONS`]
+/// file.
+///
+/// TOML configuration blocks are also supported, but are not stored as `EmbeddedFile`s. In the
+/// future we plan to support `pth` files as well.
 ///
 /// A Python embedded file makes its containing [`Section`] into a [`MarkdownTest`], and will be
 /// type-checked and searched for inline-comment assertions to match against the diagnostics from
 /// type checking.
+///
+/// [typeshed `VERSIONS`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18
 #[derive(Debug)]
 pub(crate) struct EmbeddedFile<'s> {
     section: SectionId,

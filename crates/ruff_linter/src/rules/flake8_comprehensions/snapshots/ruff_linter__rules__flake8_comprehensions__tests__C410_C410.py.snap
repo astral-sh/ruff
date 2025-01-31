@@ -104,6 +104,8 @@ C410.py:11:1: C410 [*] Unnecessary list literal passed to `list()` (remove the o
 12 | |     1, 2
 13 | | ])
    | |__^ C410
+14 |
+15 |   # Skip when too many positional arguments
    |
    = help: Remove outer `list()` call
 
@@ -116,3 +118,6 @@ C410.py:11:1: C410 [*] Unnecessary list literal passed to `list()` (remove the o
 12 12 |     1, 2
 13    |-])
    13 |+]
+14 14 | 
+15 15 | # Skip when too many positional arguments
+16 16 | # See https://github.com/astral-sh/ruff/issues/15810

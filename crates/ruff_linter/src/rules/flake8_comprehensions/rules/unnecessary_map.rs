@@ -111,14 +111,7 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if parameters.as_ref().is_some_and(|parameters| {
-                late_binding(parameters, body)
-                    || parameters
-                        .iter_non_variadic_params()
-                        .any(|param| param.default.is_some())
-                    || parameters.vararg.is_some()
-                    || parameters.kwarg.is_some()
-            }) {
+            if !lambda_has_expected_arity(parameters.as_deref(), body) {
                 return;
             }
         }
@@ -153,14 +146,7 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if parameters.as_ref().is_some_and(|parameters| {
-                late_binding(parameters, body)
-                    || parameters
-                        .iter_non_variadic_params()
-                        .any(|param| param.default.is_some())
-                    || parameters.vararg.is_some()
-                    || parameters.kwarg.is_some()
-            }) {
+            if !lambda_has_expected_arity(parameters.as_deref(), body) {
                 return;
             }
         }
@@ -205,14 +191,7 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if parameters.as_ref().is_some_and(|parameters| {
-                late_binding(parameters, body)
-                    || parameters
-                        .iter_non_variadic_params()
-                        .any(|param| param.default.is_some())
-                    || parameters.vararg.is_some()
-                    || parameters.kwarg.is_some()
-            }) {
+            if !lambda_has_expected_arity(parameters.as_deref(), body) {
                 return;
             }
         }
@@ -230,6 +209,35 @@ pub(crate) fn unnecessary_map(
         .map(Fix::unsafe_edit)
     });
     checker.diagnostics.push(diagnostic);
+}
+
+/// A lambda as the first argument to `map()` has the "expected" arity when:
+///
+/// * It has exactly one parameter
+/// * That parameter is not variadic
+/// * That parameter does not have a default value
+fn lambda_has_expected_arity(parameters: Option<&Parameters>, body: &Expr) -> bool {
+    let Some(parameters) = parameters else {
+        return false;
+    };
+
+    let [parameter] = &parameters.args[..] else {
+        return false;
+    };
+
+    if parameter.default.is_some() {
+        return false;
+    }
+
+    if parameters.vararg.is_some() || parameters.kwarg.is_some() {
+        return false;
+    }
+
+    if late_binding(parameters, body) {
+        return false;
+    }
+
+    true
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -17,13 +17,13 @@ reveal_type(X)  # revealed: Unknown
 ```
 
 ```py path=package/foo.py
-X = 42
+X: int = 42
 ```
 
 ```py path=package/bar.py
 from .foo import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Dotted
@@ -32,25 +32,25 @@ reveal_type(X)  # revealed: Literal[42]
 ```
 
 ```py path=package/foo/bar/baz.py
-X = 42
+X: int = 42
 ```
 
 ```py path=package/bar.py
 from .foo.bar.baz import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Bare to package
 
 ```py path=package/__init__.py
-X = 42
+X: int = 42
 ```
 
 ```py path=package/bar.py
 from . import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Non-existent + bare to package
@@ -66,11 +66,11 @@ reveal_type(X)  # revealed: Unknown
 ```py path=package/__init__.py
 from .foo import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ```py path=package/foo.py
-X = 42
+X: int = 42
 ```
 
 ## Non-existent + dunder init
@@ -87,13 +87,13 @@ reveal_type(X)  # revealed: Unknown
 ```
 
 ```py path=package/foo.py
-X = 42
+X: int = 42
 ```
 
 ```py path=package/subpackage/subsubpackage/bar.py
 from ...foo import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Unbound symbol
@@ -117,13 +117,13 @@ reveal_type(x)  # revealed: Unknown
 ```
 
 ```py path=package/foo.py
-X = 42
+X: int = 42
 ```
 
 ```py path=package/bar.py
 from . import foo
 
-reveal_type(foo.X)  # revealed: Literal[42]
+reveal_type(foo.X)  # revealed: int
 ```
 
 ## Non-existent + bare to module
@@ -152,7 +152,7 @@ submodule via the attribute on its parent package.
 ```
 
 ```py path=package/foo.py
-X = 42
+X: int = 42
 ```
 
 ```py path=package/bar.py

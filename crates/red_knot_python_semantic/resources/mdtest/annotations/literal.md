@@ -36,7 +36,7 @@ def f():
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
     # TODO: This should be Color.RED
-    reveal_type(b1)  # revealed: Literal[0]
+    reveal_type(b1)  # revealed: Unknown | Literal[0]
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -106,7 +106,7 @@ def union_example(
         Literal["B"],
         Literal[True],
         None,
-    ]
+    ],
 ):
     reveal_type(x)  # revealed: Unknown | Literal[-1, "A", b"A", b"\x00", b"\x07", 0, 1, "B", "foo", "bar", True] | None
 ```

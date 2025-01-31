@@ -6,7 +6,6 @@ ProjectMetadata(
   name: Name("nested-project"),
   root: "/app/packages/a",
   options: Options(
-    environment: None,
     src: Some(SrcOptions(
       root: Some("src"),
     )),

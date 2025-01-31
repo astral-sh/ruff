@@ -190,3 +190,25 @@ TC006.py:82:10: TC006 [*] Add quotes to type expression in `typing.cast()`
 81 81 | 
 82    |-    cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
    82 |+    cast("list[Annotated[list[Literal['A']], 'Foo']]", ['A'])
+83 83 | 
+84 84 | 
+85 85 | def f():
+
+TC006.py:89:9: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+88 |     cast(
+89 |         int  # TC006
+   |         ^^^ TC006
+90 |         , 6.0
+91 |     )
+   |
+   = help: Add quotes
+
+ℹ Safe fix
+86 86 |     from typing import cast
+87 87 | 
+88 88 |     cast(
+89    |-        int  # TC006
+   89 |+        "int"  # TC006
+90 90 |         , 6.0
+91 91 |     )

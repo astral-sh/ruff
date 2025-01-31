@@ -82,3 +82,11 @@ class Collection(Protocol[*_B0]):
 # Regression test for: https://github.com/astral-sh/ruff/issues/8609
 def f(x: Union[int, str, bytes]) -> None:
     ...
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14132
+class AClass:
+    ...
+
+def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
+    print(param)

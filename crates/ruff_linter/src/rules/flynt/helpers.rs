@@ -15,7 +15,7 @@ fn to_f_string_expression_element(inner: &Expr) -> ast::FStringElement {
 /// Convert a string to a [`ast::FStringElement::Literal`].
 pub(super) fn to_f_string_literal_element(s: &str) -> ast::FStringElement {
     ast::FStringElement::Literal(ast::FStringLiteralElement {
-        value: s.to_string().into_boxed_str(),
+        value: Box::from(s),
         range: TextRange::default(),
     })
 }

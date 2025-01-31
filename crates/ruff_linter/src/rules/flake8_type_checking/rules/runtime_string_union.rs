@@ -120,6 +120,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
             checker.semantic(),
             checker.stylist(),
             checker.locator(),
+            checker.default_string_flags(),
         );
         let parent = expr.range().start();
         let fix = if checker.comment_ranges().intersects(expr.range()) {

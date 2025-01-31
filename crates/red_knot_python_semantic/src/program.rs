@@ -108,7 +108,7 @@ pub struct SearchPathSettings {
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
-    pub typeshed: Option<SystemPathBuf>,
+    pub custom_typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
     pub site_packages: SitePackages,
@@ -119,7 +119,7 @@ impl SearchPathSettings {
         Self {
             src_roots,
             extra_paths: vec![],
-            typeshed: None,
+            custom_typeshed: None,
             site_packages: SitePackages::Known(vec![]),
         }
     }
@@ -133,13 +133,4 @@ pub enum SitePackages {
     },
     /// Resolved site packages paths
     Known(Vec<SystemPathBuf>),
-}
-
-impl SitePackages {
-    pub fn paths(&self) -> &[SystemPathBuf] {
-        match self {
-            SitePackages::Derived { venv_path } => std::slice::from_ref(venv_path),
-            SitePackages::Known(paths) => paths,
-        }
-    }
 }

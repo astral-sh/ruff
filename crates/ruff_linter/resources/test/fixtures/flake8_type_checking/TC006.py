@@ -80,3 +80,12 @@ def f():
     from typing import cast, Annotated, Literal
 
     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
+
+
+def f():
+    from typing import cast
+
+    cast(
+        int  # TC006
+        , 6.0
+    )

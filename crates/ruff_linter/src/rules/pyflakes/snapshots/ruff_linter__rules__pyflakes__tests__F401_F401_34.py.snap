@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401_34.py:45:24: F401 [*] `typing.Union` imported but unused
+   |
+43 | # expressions either!)
+44 | def f():
+45 |     from typing import Union
+   |                        ^^^^^ F401
+46 |
+47 |     from typing_extensions import TypeAliasType
+   |
+   = help: Remove unused import: `typing.Union`
+
+ℹ Safe fix
+42 42 | # expressions (and type checkers probably wouldn't understand them as type
+43 43 | # expressions either!)
+44 44 | def f():
+45    |-    from typing import Union
+46 45 | 
+47 46 |     from typing_extensions import TypeAliasType
+48 47 | 
+
+F401_34.py:58:24: F401 [*] `typing.Union` imported but unused
+   |
+57 | def f():
+58 |     from typing import Union
+   |                        ^^^^^ F401
+59 |
+60 |     from typing_extensions import TypeAliasType
+   |
+   = help: Remove unused import: `typing.Union`
+
+ℹ Safe fix
+55 55 | 
+56 56 | 
+57 57 | def f():
+58    |-    from typing import Union
+59 58 | 
+60 59 |     from typing_extensions import TypeAliasType
+61 60 |

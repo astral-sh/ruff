@@ -7,7 +7,7 @@ use ruff_formatter::{
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
 use ruff_python_ast::{self as ast};
-use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
+use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
@@ -881,14 +881,14 @@ pub enum CallChainLayout {
 
 impl CallChainLayout {
     pub(crate) fn from_expression(
-        mut expr: ExpressionRef,
+        mut expr: ExprRef,
         comment_ranges: &CommentRanges,
         source: &str,
     ) -> Self {
         let mut attributes_after_parentheses = 0;
         loop {
             match expr {
-                ExpressionRef::Attribute(ast::ExprAttribute { value, .. }) => {
+                ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
                     // ```
                     // f().g
                     // ^^^ value
@@ -903,7 +903,7 @@ impl CallChainLayout {
                         attributes_after_parentheses += 1;
                     }
 
-                    expr = ExpressionRef::from(value.as_ref());
+                    expr = ExprRef::from(value.as_ref());
                 }
                 // ```
                 // f()
@@ -913,9 +913,9 @@ impl CallChainLayout {
                 // ^^^^^^^^^^ expr
                 // ^^^^ value
                 // ```
-                ExpressionRef::Call(ast::ExprCall { func: inner, .. })
-                | ExpressionRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
-                    expr = ExpressionRef::from(inner.as_ref());
+                ExprRef::Call(ast::ExprCall { func: inner, .. })
+                | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
                     // We to format the following in fluent style:
@@ -947,7 +947,7 @@ impl CallChainLayout {
     /// formatting
     pub(crate) fn apply_in_node<'a>(
         self,
-        item: impl Into<ExpressionRef<'a>>,
+        item: impl Into<ExprRef<'a>>,
         f: &mut PyFormatter,
     ) -> CallChainLayout {
         match self {

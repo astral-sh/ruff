@@ -4,6 +4,7 @@ use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Diagnostic;
@@ -48,7 +49,7 @@ impl Workspace {
 
         workspace.apply_cli_options(Options {
             environment: Some(EnvironmentOptions {
-                python_version: Some(settings.python_version.into()),
+                python_version: Some(RangedValue::cli(settings.python_version.into())),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
