@@ -407,9 +407,9 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
-    fn record_ambiguous_visibility(&mut self) -> ScopedVisibilityConstraintId {
+    fn record_ambiguous_visibility(&mut self) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::Ambiguous)
+            .record_visibility_constraint_id(ScopedVisibilityConstraintId::AMBIGUOUS);
     }
 
     /// Simplifies (resets) visibility constraints on all live bindings and declarations that did

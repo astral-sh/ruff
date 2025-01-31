@@ -185,6 +185,7 @@ const MAX_RECURSION_DEPTH: usize = 24;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VisibilityConstraint<'db> {
     AlwaysTrue,
+    AlwaysFalse,
     Ambiguous,
     VisibleIf(Constraint<'db>, u8),
     VisibleIfNot(ScopedVisibilityConstraintId),
@@ -202,6 +203,18 @@ impl ScopedVisibilityConstraintId {
     /// present at index 0.
     pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
         ScopedVisibilityConstraintId::from_u32(0);
+
+    /// A special ID that is used for an "always false" / "never visible" constraint.
+    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
+    /// present at index 1.
+    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId::from_u32(1);
+
+    /// A special ID that is used for an ambiguous constraint.
+    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
+    /// present at index 2.
+    pub(crate) const AMBIGUOUS: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId::from_u32(2);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -217,7 +230,11 @@ pub(crate) struct VisibilityConstraintsBuilder<'db> {
 impl Default for VisibilityConstraintsBuilder<'_> {
     fn default() -> Self {
         Self {
-            constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
+            constraints: IndexVec::from_iter([
+                VisibilityConstraint::AlwaysTrue,
+                VisibilityConstraint::AlwaysFalse,
+                VisibilityConstraint::Ambiguous,
+            ]),
         }
     }
 }
@@ -241,6 +258,11 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
+        if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            return b;
+        } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+            return a;
+        }
         match (&self.constraints[a], &self.constraints[b]) {
             (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
                 ScopedVisibilityConstraintId::ALWAYS_TRUE
@@ -263,12 +285,12 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             return a;
         }
         match (&self.constraints[a], &self.constraints[b]) {
-            (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => self.add(
-                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
-            ),
-            (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => self.add(
-                VisibilityConstraint::VisibleIfNot(ScopedVisibilityConstraintId::ALWAYS_TRUE),
-            ),
+            (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
+                ScopedVisibilityConstraintId::ALWAYS_FALSE
+            }
+            (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
+                ScopedVisibilityConstraintId::ALWAYS_FALSE
+            }
             _ => self.add(VisibilityConstraint::KleeneAnd(a, b)),
         }
     }
@@ -293,6 +315,7 @@ impl<'db> VisibilityConstraints<'db> {
         let visibility_constraint = &self.constraints[id];
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
+            VisibilityConstraint::AlwaysFalse => Truthiness::AlwaysFalse,
             VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
             VisibilityConstraint::VisibleIf(constraint, _) => Self::analyze_single(db, constraint),
             VisibilityConstraint::VisibleIfNot(negated) => {
