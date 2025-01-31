@@ -396,6 +396,7 @@ PYI019.pyi:87:94: PYI019 Methods like `multiple_type_vars` should return `Self` 
    87 |+    def multiple_type_vars[*Ts, T](self, other: Self, /, *args: *Ts, a: T, b: list[T]) -> Self: ...
 88 88 | 
 89 89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
+90 90 | 
 
 PYI019.pyi:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` should return `Self` instead of a custom `TypeVar`
    |
@@ -412,3 +413,15 @@ PYI019.pyi:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` shoul
 88 88 | 
 89    |-    def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
    89 |+    def mixing_old_and_new_style_type_vars[T](self, a: T, b: T) -> Self: ...
+90 90 | 
+91 91 | 
+92 92 | class InvalidButWeDoNotPanic:
+
+PYI019.pyi:94:34: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
+   |
+92 | class InvalidButWeDoNotPanic:
+93 |     @classmethod
+94 |     def m[S](cls: type[S], /) -> S[int]: ...
+   |                                  ^^^^^^ PYI019
+   |
+   = help: Replace with `Self`

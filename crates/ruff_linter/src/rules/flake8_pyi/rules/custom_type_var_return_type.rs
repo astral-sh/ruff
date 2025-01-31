@@ -292,9 +292,8 @@ fn replace_custom_typevar_with_self(
         return None;
     }
 
-    // The return annotation is guaranteed to be a name,
-    // as verified by `uses_custom_var()`.
-    let typevar_name = returns.as_name_expr().unwrap().id();
+    // Non-`Name` return annotations are not currently autofixed
+    let typevar_name = &returns.as_name_expr()?.id;
 
     let mut all_edits = vec![
         replace_return_annotation_with_self(returns),
