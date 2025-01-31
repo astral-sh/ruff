@@ -69,12 +69,18 @@ enum BuilderScopeKind {
     Other,
 }
 
+struct ScopeInfo {
+    file_scope_id: FileScopeId,
+    loop_state: LoopState,
+    scope_kind: BuilderScopeKind,
+}
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     module: &'db ParsedModule,
-    scope_stack: Vec<(FileScopeId, LoopState, BuilderScopeKind)>,
+    scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'db>>,
@@ -146,7 +152,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         *self
             .scope_stack
             .last()
-            .map(|(scope, _, _)| scope)
+            .map(|ScopeInfo { file_scope_id, .. }| file_scope_id)
             .expect("Always to have a root scope")
     }
 
@@ -154,7 +160,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.scope_stack
             .last()
             .expect("Always to have a root scope")
-            .1
+            .loop_state
     }
 
     /// Returns the scope ID of the surrounding class body scope if the current scope
@@ -163,11 +169,13 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// function body.
     fn is_method_of_class(&self) -> Option<FileScopeId> {
         let mut scopes_rev = self.scope_stack.iter().rev();
-        let (_, _, current_scope_kind) = scopes_rev.next()?;
-        let (parent_scope, _, parent_scope_kind) = scopes_rev.next()?;
+        let current = scopes_rev.next()?;
+        let parent = scopes_rev.next()?;
 
-        match (current_scope_kind, parent_scope_kind) {
-            (BuilderScopeKind::FunctionBody, BuilderScopeKind::ClassBody) => Some(*parent_scope),
+        match (current.scope_kind, parent.scope_kind) {
+            (BuilderScopeKind::FunctionBody, BuilderScopeKind::ClassBody) => {
+                Some(parent.file_scope_id)
+            }
             _ => None,
         }
     }
@@ -176,7 +184,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.scope_stack
             .last_mut()
             .expect("Always to have a root scope")
-            .1 = state;
+            .loop_state = state;
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -215,17 +223,21 @@ impl<'db> SemanticIndexBuilder<'db> {
             _ => BuilderScopeKind::Other,
         };
 
-        self.scope_stack
-            .push((file_scope_id, LoopState::NotInLoop, scope_kind));
+        self.scope_stack.push(ScopeInfo {
+            file_scope_id,
+            loop_state: LoopState::NotInLoop,
+            scope_kind,
+        });
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        let (id, _, _) = self.scope_stack.pop().expect("Root scope to be present");
+        let ScopeInfo { file_scope_id, .. } =
+            self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
-        let scope = &mut self.scopes[id];
+        let scope = &mut self.scopes[file_scope_id];
         scope.descendents = scope.descendents.start..children_end;
         self.try_node_context_stack_manager.exit_scope();
-        id
+        file_scope_id
     }
 
     fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {
