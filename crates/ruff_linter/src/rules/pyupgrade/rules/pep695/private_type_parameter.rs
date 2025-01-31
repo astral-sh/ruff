@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_python_semantic::Binding;
@@ -59,9 +59,7 @@ enum ParamKind {
     Function,
 }
 
-impl Violation for PrivateTypeParameter {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for PrivateTypeParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let kind = match self.kind {
@@ -71,8 +69,8 @@ impl Violation for PrivateTypeParameter {
         format!("Generic {kind} uses private type parameters")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Remove the leading underscores".to_string())
+    fn fix_title(&self) -> String {
+        "Remove the leading underscores".to_string()
     }
 }
 
