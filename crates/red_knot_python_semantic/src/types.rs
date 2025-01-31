@@ -4135,8 +4135,6 @@ impl<'db> Class<'db> {
             }
         }
 
-        // TODO: The symbol is not present in any class body, but it could be implicitly
-        // defined in `__init__` or other methods anywhere in the MRO.
         SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
     }
 
