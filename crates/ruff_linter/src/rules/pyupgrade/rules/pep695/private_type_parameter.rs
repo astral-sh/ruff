@@ -15,10 +15,6 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// [PEP 695] type parameters are already restricted in scope to the class or function in which they
 /// appear, so leading underscores just hurt readability without the usual privacy benefits.
 ///
-/// ## Known problems
-///
-/// TODO, none yet
-///
 /// ## Example
 ///
 /// ```python
