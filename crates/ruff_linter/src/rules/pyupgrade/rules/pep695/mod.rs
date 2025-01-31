@@ -60,8 +60,11 @@ struct DisplayTypeVars<'a> {
 
 impl Display for DisplayTypeVars<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[")?;
         let nvars = self.type_vars.len();
+        if nvars == 0 {
+            return Ok(());
+        }
+        f.write_str("[")?;
         for (i, tv) in self.type_vars.iter().enumerate() {
             write!(f, "{}", tv.display(self.source))?;
             if i < nvars - 1 {

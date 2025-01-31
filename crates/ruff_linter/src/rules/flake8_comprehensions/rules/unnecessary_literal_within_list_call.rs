@@ -67,6 +67,9 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
     if !call.arguments.keywords.is_empty() {
         return;
     }
+    if call.arguments.args.len() > 1 {
+        return;
+    }
     let Some(argument) =
         helpers::first_argument_with_matching_function("list", &call.func, &call.arguments.args)
     else {
