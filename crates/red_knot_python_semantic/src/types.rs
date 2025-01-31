@@ -4147,6 +4147,11 @@ impl<'db> Class<'db> {
         inferred_type_from_class_body: Option<Type<'db>>,
     ) -> Symbol<'db> {
         let index = semantic_index(db, class_body_scope.file(db));
+
+        // If we do not see any declarations of an attribute, neither in the class body nor in
+        // any method, we build a union of `Unknown` with the inferred types of all bindings of
+        // that attribute. We include `Unknown` in that union to account for the fact that the
+        // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
 
         if let Some(ty) = inferred_type_from_class_body {
