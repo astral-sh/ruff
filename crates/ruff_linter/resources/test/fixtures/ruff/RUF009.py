@@ -15,7 +15,6 @@ def default_int() -> int:
 class ImmutableType(NamedTuple):
     something: int = 8
 
-
 @dataclass()
 class A:
     hidden_mutable_default: list[int] = default_function()
@@ -100,3 +99,10 @@ class DataclassWithNewTypeFields:
     # No errors
     e: SpecialString = SpecialString("Lorem ipsum")
     f: NegativeInteger = NegativeInteger(-110)
+
+# Test expected behavior for:
+# https://github.com/astral-sh/ruff/issues/15772
+@dataclass
+class _:
+    this_is_not_fine: list[int] = f()  
+    this_should_be: int = f()        
