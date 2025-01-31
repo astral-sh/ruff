@@ -359,7 +359,11 @@ reveal_type(C().declared_and_bound)  # revealed: Unknown
 ```py
 class C:
     def __init__(self) -> None:
-        if 2 + 3 < 4:
+        # We use a "significantly complex" condition here (instead of just `False`)
+        # for a proper comparison with mypy and pyright, which distinguish between
+        # conditions that can be resolved from a simple pattern matching and those
+        # that need proper type inference.
+        if (2 + 3) < 4:
             self.x: str = "a"
 
 # TODO: Ideally, this would result in a `unresolved-attribute` error. But mypy and pyright
