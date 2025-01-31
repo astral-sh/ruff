@@ -29,7 +29,9 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::visibility_constraints::VisibilityConstraint;
+use crate::visibility_constraints::{
+    VisibilityConstraint, VisibilityConstraintAtom, VisibilityConstraints,
+};
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -196,6 +198,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn current_use_def_map(&self) -> &UseDefMapBuilder<'db> {
         let scope_id = self.current_scope();
         &self.use_def_maps[scope_id]
+    }
+
+    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraints<'db> {
+        let scope_id = self.current_scope();
+        &mut self.use_def_maps[scope_id].visibility_constraints
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -970,6 +977,18 @@ where
                 let pre_loop = self.flow_snapshot();
                 let constraint = self.record_expression_constraint(test);
 
+                // We need multiple copies of the visibility constraint for the while condition,
+                // since we need to model situations where the first evaluation of the condition
+                // returns True, but a later evaluation returns False.
+                let first_vis_constraint_id =
+                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(
+                        VisibilityConstraintAtom::new_copy(constraint, 0),
+                    ));
+                let later_vis_constraint_id =
+                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(
+                        VisibilityConstraintAtom::new_copy(constraint, 1),
+                    ));
+
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
@@ -980,26 +999,47 @@ where
                 self.visit_body(body);
                 self.set_inside_loop(outer_loop_state);
 
-                let vis_constraint_id = self.record_visibility_constraint(constraint);
+                // The first time the body is executed, we will have only checked the first
+                // evaluation of the condition, which must be True. For the second and later times,
+                // the first evaluation must still have been True, and a later evaluation was also
+                // True. So the full visibility constraint is (first ∨ (first ∧ later)).
+                let first_and_later = self
+                    .current_visibility_constraints_mut()
+                    .add_and_constraint(first_vis_constraint_id, later_vis_constraint_id);
+                let body_vis_constraint_id = self
+                    .current_visibility_constraints_mut()
+                    .add_or_constraint(first_vis_constraint_id, first_and_later);
+                self.record_visibility_constraint_id(body_vis_constraint_id);
 
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);
 
-                // We may execute the `else` clause without ever executing the body, so merge in
-                // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop.clone());
+                // We execute the `else` once the condition evaluates to false. This could happen
+                // without ever executing the body, if the condition is false the first time it's
+                // tested. So the starting flow state of the `else` clause is the union of:
+                //   - the pre-loop state with a visibility constraint that the first evaluation of
+                //     the while condition was false,
+                //   - the post-body state (which already has a visibility constraint that the
+                //     first evaluation was true) with a visibility constraint that a _later_
+                //     evaluation of the while condition was false.
+                // To model this correctly, we need two copies of the while condition constraint,
+                // since the first and later evaluations might produce different results.
+                let post_body = self.flow_snapshot();
+                self.flow_restore(pre_loop.clone());
+                self.record_negated_visibility_constraint(first_vis_constraint_id);
+                self.flow_merge(post_body);
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
-                self.record_negated_visibility_constraint(vis_constraint_id);
+                self.record_negated_visibility_constraint(later_vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
                     let snapshot = self.flow_snapshot();
                     self.flow_restore(break_state);
-                    self.record_visibility_constraint(constraint);
+                    self.record_visibility_constraint_id(body_vis_constraint_id);
                     self.flow_merge(snapshot);
                 }
 

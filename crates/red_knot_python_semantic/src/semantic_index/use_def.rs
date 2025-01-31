@@ -488,7 +488,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_constraints: AllConstraints<'db>,
 
     /// Append-only array of [`VisibilityConstraint`].
-    visibility_constraints: VisibilityConstraints<'db>,
+    pub(super) visibility_constraints: VisibilityConstraints<'db>,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
     /// whether or not the start of the scope is visible. This is important for cases like
