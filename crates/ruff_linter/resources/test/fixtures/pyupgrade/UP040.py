@@ -93,3 +93,23 @@ PositiveList = TypeAliasType(
 # `default` should be skipped for now, added in Python 3.13
 T = typing.TypeVar("T", default=Any)
 AnyList = TypeAliasType("AnyList", list[T], typep_params=(T,))
+
+# unsafe fix if comments within the fix
+T = TypeVar("T")
+PositiveList = TypeAliasType(  # eaten comment
+    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+)
+
+T = TypeVar("T")
+PositiveList = TypeAliasType(
+    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+) # this comment should be okay
+
+
+# this comment will actually be preserved because it's inside the "value" part
+T = TypeVar("T")
+PositiveList = TypeAliasType(
+    "PositiveList", list[
+        Annotated[T, Gt(0)],  # preserved comment
+    ], type_params=(T,)
+)
