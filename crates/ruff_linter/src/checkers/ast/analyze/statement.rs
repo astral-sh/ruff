@@ -554,6 +554,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NonPEP695GenericClass) {
                 pyupgrade::rules::non_pep695_generic_class(checker, class_def);
             }
+            if checker.enabled(Rule::ClassWithMixedTypeVars) {
+                ruff::rules::class_with_mixed_type_vars(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
