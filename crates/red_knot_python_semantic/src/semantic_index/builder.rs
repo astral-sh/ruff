@@ -29,7 +29,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraintAtom};
+use crate::visibility_constraints::VisibilityConstraint;
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -365,7 +365,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: Constraint<'db>,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint.into()))
+            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 0))
     }
 
     /// Records that all remaining statements in the current block are unreachable, and therefore
@@ -974,13 +974,9 @@ where
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
                 let first_vis_constraint_id =
-                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(
-                        VisibilityConstraintAtom::new_copy(constraint, 0),
-                    ));
+                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 0));
                 let later_vis_constraint_id =
-                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(
-                        VisibilityConstraintAtom::new_copy(constraint, 1),
-                    ));
+                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 1));
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -1552,7 +1548,7 @@ where
                             ast::BoolOp::Or => self.add_negated_constraint(constraint),
                         };
                         let visibility_constraint = self.add_visibility_constraint(
-                            VisibilityConstraint::VisibleIf(constraint.into()),
+                            VisibilityConstraint::VisibleIf(constraint, 0),
                         );
 
                         let after_expr = self.flow_snapshot();

@@ -187,30 +187,10 @@ const MAX_RECURSION_DEPTH: usize = 24;
 pub(crate) enum VisibilityConstraint<'db> {
     AlwaysTrue,
     Ambiguous,
-    VisibleIf(VisibilityConstraintAtom<'db>),
+    VisibleIf(Constraint<'db>, u8),
     VisibleIfNot(ScopedVisibilityConstraintId),
     KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
     KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraintAtom<'db> {
-    /// The [`Constraint`] that is evaluated
-    constraint: Constraint<'db>,
-    /// Disambiguates different atoms that evaluate the same constraint
-    copy: u8,
-}
-
-impl<'db> From<Constraint<'db>> for VisibilityConstraintAtom<'db> {
-    fn from(constraint: Constraint<'db>) -> VisibilityConstraintAtom<'db> {
-        VisibilityConstraintAtom::new_copy(constraint, 0)
-    }
-}
-
-impl<'db> VisibilityConstraintAtom<'db> {
-    pub(crate) fn new_copy(constraint: Constraint<'db>, copy: u8) -> VisibilityConstraintAtom<'db> {
-        VisibilityConstraintAtom { constraint, copy }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -290,7 +270,7 @@ impl<'db> VisibilityConstraints<'db> {
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
             VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
-            VisibilityConstraint::VisibleIf(atom) => Self::analyze_single(db, &atom.constraint),
+            VisibilityConstraint::VisibleIf(constraint, _) => Self::analyze_single(db, constraint),
             VisibilityConstraint::VisibleIfNot(negated) => {
                 self.evaluate_impl(db, *negated, max_depth - 1).negate()
             }
