@@ -7,12 +7,14 @@ PYI019_0.py:7:62: PYI019 Methods like `__new__` should return `Self` instead of 
 7 |     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
   |                                                              ^^ PYI019
   |
+  = help: Replace with `Self`
 
 PYI019_0.py:10:54: PYI019 Methods like `bad_instance_method` should return `Self` instead of a custom `TypeVar`
    |
 10 |     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
    |                                                      ^^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:14:54: PYI019 Methods like `bad_class_method` should return `Self` instead of a custom `TypeVar`
    |
@@ -20,6 +22,7 @@ PYI019_0.py:14:54: PYI019 Methods like `bad_class_method` should return `Self` i
 14 |     def bad_class_method(cls: type[_S], arg: int) -> _S: ...  # PYI019
    |                                                      ^^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:18:55: PYI019 Methods like `bad_posonly_class_method` should return `Self` instead of a custom `TypeVar`
    |
@@ -27,6 +30,7 @@ PYI019_0.py:18:55: PYI019 Methods like `bad_posonly_class_method` should return 
 18 |     def bad_posonly_class_method(cls: type[_S], /) -> _S: ...  # PYI019
    |                                                       ^^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:39:63: PYI019 Methods like `__new__` should return `Self` instead of a custom `TypeVar`
    |
@@ -35,12 +39,14 @@ PYI019_0.py:39:63: PYI019 Methods like `__new__` should return `Self` instead of
 39 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
    |                                                               ^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:42:46: PYI019 Methods like `generic_instance_method` should return `Self` instead of a custom `TypeVar`
    |
 42 |   def generic_instance_method[S](self: S) -> S: ...  # PYI019
    |                                              ^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:54:32: PYI019 Methods like `foo` should return `Self` instead of a custom `TypeVar`
    |
@@ -49,6 +55,7 @@ PYI019_0.py:54:32: PYI019 Methods like `foo` should return `Self` instead of a c
 54 |    def foo[S](cls: type[S]) -> S: ...  # PYI019
    |                                ^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:61:48: PYI019 Methods like `__new__` should return `Self` instead of a custom `TypeVar`
    |
@@ -59,6 +66,7 @@ PYI019_0.py:61:48: PYI019 Methods like `__new__` should return `Self` instead of
 62 |
 63 |     def __init_subclass__[S](cls: type[S]) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:63:47: PYI019 Methods like `__init_subclass__` should return `Self` instead of a custom `TypeVar`
    |
@@ -69,6 +77,7 @@ PYI019_0.py:63:47: PYI019 Methods like `__init_subclass__` should return `Self` 
 64 |
 65 |     def __neg__[S: PEP695Fix](self: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:65:43: PYI019 Methods like `__neg__` should return `Self` instead of a custom `TypeVar`
    |
@@ -79,6 +88,7 @@ PYI019_0.py:65:43: PYI019 Methods like `__neg__` should return `Self` instead of
 66 |
 67 |     def __pos__[S](self: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:67:32: PYI019 Methods like `__pos__` should return `Self` instead of a custom `TypeVar`
    |
@@ -89,6 +99,7 @@ PYI019_0.py:67:32: PYI019 Methods like `__pos__` should return `Self` instead of
 68 |
 69 |     def __add__[S: PEP695Fix](self: S, other: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:69:53: PYI019 Methods like `__add__` should return `Self` instead of a custom `TypeVar`
    |
@@ -99,6 +110,7 @@ PYI019_0.py:69:53: PYI019 Methods like `__add__` should return `Self` instead of
 70 |
 71 |     def __sub__[S](self: S, other: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:71:42: PYI019 Methods like `__sub__` should return `Self` instead of a custom `TypeVar`
    |
@@ -109,6 +121,7 @@ PYI019_0.py:71:42: PYI019 Methods like `__sub__` should return `Self` instead of
 72 |
 73 |     @classmethod
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:74:59: PYI019 Methods like `class_method_bound` should return `Self` instead of a custom `TypeVar`
    |
@@ -118,6 +131,7 @@ PYI019_0.py:74:59: PYI019 Methods like `class_method_bound` should return `Self`
 75 |
 76 |     @classmethod
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:77:50: PYI019 Methods like `class_method_unbound` should return `Self` instead of a custom `TypeVar`
    |
@@ -127,6 +141,7 @@ PYI019_0.py:77:50: PYI019 Methods like `class_method_unbound` should return `Sel
 78 |
 79 |     def instance_method_bound[S: PEP695Fix](self: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:79:57: PYI019 Methods like `instance_method_bound` should return `Self` instead of a custom `TypeVar`
    |
@@ -137,6 +152,7 @@ PYI019_0.py:79:57: PYI019 Methods like `instance_method_bound` should return `Se
 80 |
 81 |     def instance_method_unbound[S](self: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:81:48: PYI019 Methods like `instance_method_unbound` should return `Self` instead of a custom `TypeVar`
    |
@@ -147,6 +163,7 @@ PYI019_0.py:81:48: PYI019 Methods like `instance_method_unbound` should return `
 82 |
 83 |     def instance_method_bound_with_another_parameter[S: PEP695Fix](self: S, other: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:83:90: PYI019 Methods like `instance_method_bound_with_another_parameter` should return `Self` instead of a custom `TypeVar`
    |
@@ -157,6 +174,7 @@ PYI019_0.py:83:90: PYI019 Methods like `instance_method_bound_with_another_param
 84 |
 85 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:85:81: PYI019 Methods like `instance_method_unbound_with_another_parameter` should return `Self` instead of a custom `TypeVar`
    |
@@ -167,6 +185,7 @@ PYI019_0.py:85:81: PYI019 Methods like `instance_method_unbound_with_another_par
 86 |
 87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:87:94: PYI019 Methods like `multiple_type_vars` should return `Self` instead of a custom `TypeVar`
    |
@@ -177,6 +196,7 @@ PYI019_0.py:87:94: PYI019 Methods like `multiple_type_vars` should return `Self`
 88 |
 89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` should return `Self` instead of a custom `TypeVar`
    |
@@ -185,6 +205,7 @@ PYI019_0.py:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` shou
 89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
    |                                                                           ^^^^^ PYI019
    |
+   = help: Replace with `Self`
 
 PYI019_0.py:102:40: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
     |
@@ -193,6 +214,7 @@ PYI019_0.py:102:40: PYI019 Methods like `m` should return `Self` instead of a cu
 102 |     def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
     |                                        ^ PYI019
     |
+    = help: Replace with `Self`
 
 PYI019_0.py:114:31: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
     |
@@ -201,3 +223,4 @@ PYI019_0.py:114:31: PYI019 Methods like `m` should return `Self` instead of a cu
 114 |     def m[S](cls: type[S]) -> type[S]: ...  # PYI019, but no autofix (yet)
     |                               ^^^^^^^ PYI019
     |
+    = help: Replace with `Self`

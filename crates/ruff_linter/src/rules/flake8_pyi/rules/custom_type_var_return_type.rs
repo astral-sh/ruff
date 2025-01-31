@@ -61,7 +61,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 #[derive(ViolationMetadata)]
 pub(crate) struct CustomTypeVarReturnType {
     method_name: String,
-    in_stub: bool,
 }
 
 impl Violation for CustomTypeVarReturnType {
@@ -74,12 +73,7 @@ impl Violation for CustomTypeVarReturnType {
     }
 
     fn fix_title(&self) -> Option<String> {
-        // See `replace_custom_typevar_with_self`'s doc comment
-        if self.in_stub {
-            Some("Replace with `Self`".to_string())
-        } else {
-            None
-        }
+        Some("Replace with `Self`".to_string())
     }
 }
 
@@ -261,12 +255,9 @@ fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&TypeParam
 }
 
 fn add_diagnostic(checker: &mut Checker, function_def: &ast::StmtFunctionDef, returns: &Expr) {
-    let in_stub = checker.source_type.is_stub();
-
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarReturnType {
             method_name: function_def.name.to_string(),
-            in_stub,
         },
         returns.range(),
     );
