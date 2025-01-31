@@ -1,5 +1,7 @@
 # Truthiness
 
+## Literals
+
 ```py
 from typing_extensions import Literal, LiteralString
 from knot_extensions import AlwaysFalsy, AlwaysTruthy
@@ -44,4 +46,28 @@ def _(
     reveal_type(bool(b))  # revealed: bool
     reveal_type(bool(c))  # revealed: bool
     reveal_type(bool(d))  # revealed: bool
+```
+
+## Instances
+
+```py
+# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
+class BoolIsBool:
+    __bool__ = bool
+
+# TODO: when bool is used as a method, it is called without arguments and always returns False, but this is not yet implemented
+# see https://github.com/astral-sh/ruff/issues/15672
+
+reveal_type(bool(BoolIsBool()))  # revealed: bool
+
+def flag() -> bool:
+    return True
+
+class Boom:
+    if flag():
+        __bool__ = bool
+    else:
+        __bool__ = int
+
+reveal_type(bool(Boom()))  # revealed: bool
 ```

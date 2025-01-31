@@ -667,6 +667,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    pub const fn is_instance(&self) -> bool {
+        matches!(self, Type::Instance(..))
+    }
+
     pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
     }
@@ -1840,19 +1844,8 @@ impl<'db> Type<'db> {
                         return Truthiness::Ambiguous;
                     };
 
-                    // Check if the class has `__bool__ = bool` and avoid infinite recursion, since
-                    // `Type::call` on `bool` will call `Type::bool` on the argument.
-                    if bool_method
-                        .into_class_literal()
-                        .is_some_and(|ClassLiteralType { class }| {
-                            class.is_known(db, KnownClass::Bool)
-                        })
-                    {
-                        return Truthiness::Ambiguous;
-                    }
-
                     if let Some(Type::BooleanLiteral(bool_val)) = bool_method
-                        .call(db, &CallArguments::positional([*instance_ty]))
+                        .call_bound(db, instance_ty, &CallArguments::positional([]))
                         .return_type(db)
                     {
                         bool_val.into()
@@ -2139,6 +2132,83 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call()"),
+            )),
+
+            _ => CallOutcome::not_callable(self),
+        }
+    }
+
+    /// Return the outcome of calling an class/instance attribute of this type
+    /// using descriptor protocol.
+    ///
+    /// `receiver_ty` must be `Type::Instance(_)` or `Type::ClassLiteral`.
+    ///
+    /// TODO: handle `super()` objects properly
+    #[must_use]
+    fn call_bound(
+        self,
+        db: &'db dyn Db,
+        receiver_ty: &Type<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> CallOutcome<'db> {
+        debug_assert!(receiver_ty.is_instance() || receiver_ty.is_class_literal());
+
+        match self {
+            Type::FunctionLiteral(..) => {
+                // Functions are always descriptors, so this would effectively call
+                // the function with the instance as the first argument
+                self.call(db, &arguments.with_self(*receiver_ty))
+            }
+
+            object_ty @ (Type::Instance(_) | Type::ClassLiteral(_)) => {
+                match object_ty.member(db, "__get__") {
+                    Symbol::Type(get_method, _) => {
+                        let descr_result = match receiver_ty {
+                            Type::Instance(_) => {
+                                let receiver_class = receiver_ty.to_meta_type(db);
+
+                                get_method.call(
+                                    db,
+                                    &CallArguments::positional([*receiver_ty, receiver_class]),
+                                )
+                            }
+                            Type::ClassLiteral(_) => get_method.call(
+                                db,
+                                &CallArguments::positional([
+                                    KnownClass::NoneType.to_instance(db),
+                                    object_ty,
+                                ]),
+                            ),
+                            _ => unreachable!(),
+                        };
+
+                        match descr_result {
+                            CallOutcome::Callable { binding } => {
+                                binding.return_type().call(db, arguments)
+                            }
+                            _ => descr_result,
+                        }
+                    }
+                    Symbol::Unbound => {
+                        // Not a descriptor, so call without passing the instance
+                        self.call(db, arguments)
+                    }
+                }
+            }
+
+            // Dynamic types are callable, and the return type is the same dynamic type
+            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_type(self)),
+
+            Type::Union(union) => CallOutcome::union(
+                self,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|elem| elem.call_bound(db, receiver_ty, arguments)),
+            ),
+
+            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_type(
+                todo_type!("Type::Intersection.call_bound()"),
             )),
 
             _ => CallOutcome::not_callable(self),
