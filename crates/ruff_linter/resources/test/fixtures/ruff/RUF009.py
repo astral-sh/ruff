@@ -9,7 +9,8 @@ from typing import ClassVar, NamedTuple
 
 def default_function() -> list[int]:
     return []
-
+def default_int() -> int:
+    return 1337
 
 class ImmutableType(NamedTuple):
     something: int = 8
@@ -40,12 +41,16 @@ DEFAULT_A_FOR_ALL_DATACLASSES = A([1, 2, 3])
 
 @dataclass
 class B:
+    # Errors
     hidden_mutable_default: list[int] = default_function()
     another_dataclass: A = A()
+
+    # No errors
     not_optimal: ImmutableType = ImmutableType(20)
     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
 
+    fine_immutable_function_result: int = default_int()
     fine_dataclass_function: list[int] = field(default_factory=list)
 
 

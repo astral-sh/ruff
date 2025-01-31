@@ -3,7 +3,9 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_semantic::analyze::typing::{is_immutable_func, is_immutable_newtype_call};
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
+};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -115,6 +117,8 @@ pub(crate) fn function_call_in_dataclass_default(
         .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
+    extend_immutable_calls.iter().for_each(|f| println!("{f}"));
+
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
@@ -127,7 +131,6 @@ pub(crate) fn function_call_in_dataclass_default(
         let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() else {
             continue;
         };
-
         let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
 
         // Non-explicit fields in an `attrs` dataclass
@@ -138,6 +141,7 @@ pub(crate) fn function_call_in_dataclass_default(
 
         if is_field
             || is_class_var_annotation(annotation, checker.semantic())
+            || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
             || is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
             || is_descriptor_class(func, checker.semantic())
             || func.as_name_expr().is_some_and(|name| {
