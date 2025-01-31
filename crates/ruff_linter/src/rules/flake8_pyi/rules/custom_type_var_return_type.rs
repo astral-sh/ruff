@@ -3,8 +3,9 @@ use crate::importer::ImportRequest;
 use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, ExprName};
-use ruff_python_ast::{Expr, ExprSubscript, Parameters, TypeParam, TypeParams};
+use ruff_python_ast::{
+    self as ast, Expr, ExprName, ExprSubscript, Parameters, TypeParam, TypeParams,
+};
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::SemanticModel;
