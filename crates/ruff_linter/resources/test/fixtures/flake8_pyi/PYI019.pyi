@@ -92,3 +92,23 @@ class PEP695Fix:
 class InvalidButWeDoNotPanic:
     @classmethod
     def m[S](cls: type[S], /) -> S[int]: ...
+    def n(self: S) -> S[int]: ...
+
+
+import builtins
+
+class UsesFullyQualifiedType:
+    @classmethod
+    def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
+
+
+def shadowed_type():
+    type = 1
+    class A:
+        @classmethod
+        def m[S](cls: type[S]) -> S: ...  # no error here
+
+
+class SubscriptReturnType:
+    @classmethod
+    def m[S](cls: type[S]) -> type[S]: ...  # PYI019, but no autofix (yet)

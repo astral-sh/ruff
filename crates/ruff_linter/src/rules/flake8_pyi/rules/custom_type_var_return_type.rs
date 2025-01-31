@@ -3,11 +3,11 @@ use crate::importer::ImportRequest;
 use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast as ast;
-use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Expr, Parameters, TypeParam, TypeParams};
+use ruff_python_ast::{self as ast, ExprName};
+use ruff_python_ast::{Expr, ExprSubscript, Parameters, TypeParam, TypeParams};
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
@@ -135,7 +135,7 @@ pub(crate) fn custom_type_var_return_type(
         }),
     };
 
-    if method.uses_custom_var() {
+    if method.uses_custom_var(semantic) {
         add_diagnostic(checker, function_def, returns);
     }
 }
@@ -147,9 +147,9 @@ enum Method<'a> {
 }
 
 impl Method<'_> {
-    fn uses_custom_var(&self) -> bool {
+    fn uses_custom_var(&self, semantic: &SemanticModel) -> bool {
         match self {
-            Self::Class(class_method) => class_method.uses_custom_var(),
+            Self::Class(class_method) => class_method.uses_custom_var(semantic),
             Self::Instance(instance_method) => instance_method.uses_custom_var(),
         }
     }
@@ -165,34 +165,45 @@ struct ClassMethod<'a> {
 impl ClassMethod<'_> {
     /// Returns `true` if the class method is annotated with
     /// a custom `TypeVar` that is likely private.
-    fn uses_custom_var(&self) -> bool {
-        let Expr::Subscript(ast::ExprSubscript { slice, value, .. }) = self.cls_annotation else {
+    fn uses_custom_var(&self, semantic: &SemanticModel) -> bool {
+        let Expr::Subscript(ast::ExprSubscript {
+            value: cls_annotation_value,
+            slice: cls_annotation_typevar,
+            ..
+        }) = self.cls_annotation
+        else {
             return false;
         };
 
-        let Expr::Name(value) = value.as_ref() else {
+        let Expr::Name(cls_annotation_typevar) = &**cls_annotation_typevar else {
             return false;
         };
 
-        // Don't error if the first argument is annotated with typing.Type[T].
-        // These are edge cases, and it's hard to give good error messages for them.
-        if value.id != "type" {
-            return false;
-        };
+        let cls_annotation_typevar = &cls_annotation_typevar.id;
 
-        let Expr::Name(slice) = slice.as_ref() else {
-            return false;
-        };
-
-        let Expr::Name(return_annotation) = map_subscript(self.returns) else {
-            return false;
-        };
-
-        if slice.id != return_annotation.id {
+        if !semantic.match_builtin_expr(cls_annotation_value, "type") {
             return false;
         }
 
-        is_likely_private_typevar(&slice.id, self.type_params)
+        let return_annotation_typevar = match self.returns {
+            Expr::Name(ExprName { id, .. }) => id,
+            Expr::Subscript(ExprSubscript { value, slice, .. }) => {
+                let Expr::Name(return_annotation_typevar) = &**slice else {
+                    return false;
+                };
+                if !semantic.match_builtin_expr(value, "type") {
+                    return false;
+                }
+                &return_annotation_typevar.id
+            }
+            _ => return false,
+        };
+
+        if cls_annotation_typevar != return_annotation_typevar {
+            return false;
+        }
+
+        is_likely_private_typevar(cls_annotation_typevar, self.type_params)
     }
 }
 
@@ -216,7 +227,7 @@ impl InstanceMethod<'_> {
 
         let Expr::Name(ast::ExprName {
             id: return_type, ..
-        }) = map_subscript(self.returns)
+        }) = self.returns
         else {
             return false;
         };
