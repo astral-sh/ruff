@@ -235,25 +235,33 @@ def returns_tuple() -> tuple[int, str]:
     return (1, "a")
 
 class C:
+    a1, b1 = (1, "a")
+    c1, d1 = returns_tuple()
+
     def __init__(self) -> None:
-        self.a, self.b = (1, "a")
-        self.x, self.y = returns_tuple()
+        self.a2, self.b2 = (1, "a")
+        self.c2, self.d2 = returns_tuple()
 
 c_instance = C()
 
+reveal_type(c_instance.a1)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.b1)  # revealed: Unknown | Literal["a"]
+reveal_type(c_instance.c1)  # revealed: Unknown | int
+reveal_type(c_instance.d1)  # revealed: Unknown | str
+
 # TODO: This should be supported (no error; type should be: `Unknown | Literal[1]`)
 # error: [unresolved-attribute]
-reveal_type(c_instance.a)  # revealed: Unknown
+reveal_type(c_instance.a2)  # revealed: Unknown
 
 # TODO: This should be supported (no error; type should be: `Unknown | Literal["a"]`)
 # error: [unresolved-attribute]
-reveal_type(c_instance.b)  # revealed: Unknown
+reveal_type(c_instance.b2)  # revealed: Unknown
 
-# TODO: Similar for these two (should be `int` and `str`, respectively)
+# TODO: Similar for these two (should be `Unknown | int` and `Unknown | str`, respectively)
 # error: [unresolved-attribute]
-reveal_type(c_instance.x)  # revealed: Unknown
+reveal_type(c_instance.c2)  # revealed: Unknown
 # error: [unresolved-attribute]
-reveal_type(c_instance.y)  # revealed: Unknown
+reveal_type(c_instance.d2)  # revealed: Unknown
 ```
 
 #### Attributes defined in for-loop (unpacking)
