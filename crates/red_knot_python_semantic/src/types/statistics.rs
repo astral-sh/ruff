@@ -30,7 +30,12 @@ pub(super) struct TypeStatistics<'db>(FxHashMap<Type<'db>, u32>);
 
 impl<'db> TypeStatistics<'db> {
     fn extend(&mut self, other: &TypeStatistics<'db>) {
-        self.0.extend(&other.0);
+        for (ty, count) in &other.0 {
+            self.0
+                .entry(*ty)
+                .and_modify(|my_count| *my_count += count)
+                .or_insert(*count);
+        }
     }
 
     pub(super) fn increment(&mut self, ty: Type<'db>) {
@@ -95,5 +100,22 @@ mod tests {
 
         assert_eq!(stats.todo_count(), 4);
         assert_eq!(stats.expression_count(), 6);
+    }
+
+    #[test]
+    fn sum() {
+        let mut db = setup_db();
+
+        let stats = get_stats(
+            &mut db,
+            "src/foo.py",
+            r#"
+                1
+                def f():
+                    1
+            "#,
+        );
+
+        assert_eq!(stats.0[&Type::IntLiteral(1)], 2);
     }
 }
