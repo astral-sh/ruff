@@ -206,3 +206,12 @@ PYI019.pyi:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` shoul
    |                                                                           ^^^^^ PYI019
    |
    = help: Replace with `Self`
+
+PYI019.pyi:94:34: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
+   |
+92 | class InvalidButWeDoNotPanic:
+93 |     @classmethod
+94 |     def m[S](cls: type[S], /) -> S[int]: ...
+   |                                  ^^^^^^ PYI019
+   |
+   = help: Replace with `Self`
