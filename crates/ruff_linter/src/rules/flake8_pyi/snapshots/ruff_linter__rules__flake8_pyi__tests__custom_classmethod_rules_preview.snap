@@ -444,3 +444,18 @@ PYI019.pyi:114:31: PYI019 Methods like `m` should return `Self` instead of a cus
     |                               ^^^^^^^ PYI019
     |
     = help: Replace with `Self`
+
+PYI019.pyi:118:29: PYI019 [*] Methods like `f` should return `Self` instead of a custom `TypeVar`
+    |
+117 | class PEP695TypeParameterAtTheVeryEndOfTheList:
+118 |     def f[T, S](self: S) -> S: ...
+    |                             ^ PYI019
+    |
+    = help: Replace with `Self`
+
+ℹ Safe fix
+115 115 | 
+116 116 | 
+117 117 | class PEP695TypeParameterAtTheVeryEndOfTheList:
+118     |-    def f[T, S](self: S) -> S: ...
+    118 |+    def f[T](self) -> Self: ...

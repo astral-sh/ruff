@@ -112,3 +112,7 @@ def shadowed_type():
 class SubscriptReturnType:
     @classmethod
     def m[S](cls: type[S]) -> type[S]: ...  # PYI019, but no autofix (yet)
+
+
+class PEP695TypeParameterAtTheVeryEndOfTheList:
+    def f[T, S](self: S) -> S: ...

@@ -430,7 +430,7 @@ fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> O
         // [A, B, C]
         //      ^^^ Remove this
         let previous_range = parameters[index - 1].range();
-        TextRange::new(previous_range.end(), typevar_range.start())
+        TextRange::new(previous_range.end(), typevar_range.end())
     };
 
     Some(Edit::range_deletion(range))
