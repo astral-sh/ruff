@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP051.py:2:14: UP051 [*] Generic class uses private type parameters
+  |
+1 | # simple case, replace _T in signature and body
+2 | class Generic[_T]:
+  |              ^^^^ UP051
+3 |     buf: list[_T]
+  |
+  = help: Remove the leading underscores
+
+ℹ Safe fix
+1 1 | # simple case, replace _T in signature and body
+2   |-class Generic[_T]:
+3   |-    buf: list[_T]
+  2 |+class Generic[T]:
+  3 |+    buf: list[T]
+4 4 | 
+5   |-    def append(self, t: _T):
+  5 |+    def append(self, t: T):
+6 6 |         self.buf.append(t)
+7 7 | 
+8 8 | 
+
+UP051.py:10:11: UP051 [*] Generic function uses private type parameters
+   |
+ 9 | # simple case, replace _T in signature and body
+10 | def second[_T](var: tuple[_T]) -> _T:
+   |           ^^^^ UP051
+11 |     y: _T = var[1]
+12 |     return y
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+7  7  | 
+8  8  | 
+9  9  | # simple case, replace _T in signature and body
+10    |-def second[_T](var: tuple[_T]) -> _T:
+11    |-    y: _T = var[1]
+   10 |+def second[T](var: tuple[T]) -> T:
+   11 |+    y: T = var[1]
+12 12 |     return y

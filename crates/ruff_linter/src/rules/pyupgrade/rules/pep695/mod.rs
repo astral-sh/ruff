@@ -18,6 +18,7 @@ use ruff_text_size::{Ranged, TextRange};
 pub(crate) use non_pep695_generic_class::*;
 pub(crate) use non_pep695_generic_function::*;
 pub(crate) use non_pep695_type_alias::*;
+pub(crate) use private_type_parameter::*;
 
 use crate::checkers::ast::Checker;
 
