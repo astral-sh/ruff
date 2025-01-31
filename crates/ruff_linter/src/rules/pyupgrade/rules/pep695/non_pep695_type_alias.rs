@@ -203,8 +203,6 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         return;
     };
 
-    // TODO(zanie): We should check for generic type variables used in the value and define them
-    //              as type params instead
     let vars = {
         let mut visitor = TypeVarReferenceVisitor {
             vars: vec![],
