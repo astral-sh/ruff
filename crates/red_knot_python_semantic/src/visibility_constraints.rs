@@ -359,15 +359,16 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         &mut self,
         a: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if let Some(cached) = self.not_cache.get(&a) {
-            return *cached;
-        }
         if a == ALWAYS_TRUE {
             return ALWAYS_FALSE;
         } else if a == AMBIGUOUS {
             return AMBIGUOUS;
         } else if a == ALWAYS_FALSE {
             return ALWAYS_TRUE;
+        }
+
+        if let Some(cached) = self.not_cache.get(&a) {
+            return *cached;
         }
         let a_node = self.interiors[a.0 as usize];
         let if_true = self.add_not_constraint(a_node.if_true);
@@ -388,15 +389,15 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if let Some(cached) = self.or_cache.get(&(a, b)) {
-            return *cached;
-        }
-
         match (a, b) {
             (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
             (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
             (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
             _ => {}
+        }
+
+        if let Some(cached) = self.or_cache.get(&(a, b)) {
+            return *cached;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -445,15 +446,15 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if let Some(cached) = self.and_cache.get(&(a, b)) {
-            return *cached;
-        }
-
         match (a, b) {
             (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
             (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
             (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
             _ => {}
+        }
+
+        if let Some(cached) = self.and_cache.get(&(a, b)) {
+            return *cached;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -505,19 +506,25 @@ impl<'db> VisibilityConstraints<'db> {
     }
 
     /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
-        let node = match id {
-            ALWAYS_TRUE => return Truthiness::AlwaysTrue,
-            AMBIGUOUS => return Truthiness::Ambiguous,
-            ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-            _ => self.interior_node(id),
-        };
-        let (index, _) = node.atom.into_index_and_copy();
-        let constraint = &self.constraints[index as usize];
-        match Self::analyze_single(db, constraint) {
-            Truthiness::AlwaysTrue => self.evaluate(db, node.if_true),
-            Truthiness::Ambiguous => self.evaluate(db, node.if_ambiguous),
-            Truthiness::AlwaysFalse => self.evaluate(db, node.if_false),
+    pub(crate) fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        mut id: ScopedVisibilityConstraintId,
+    ) -> Truthiness {
+        loop {
+            let node = match id {
+                ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+                AMBIGUOUS => return Truthiness::Ambiguous,
+                ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+                _ => self.interior_node(id),
+            };
+            let (index, _) = node.atom.into_index_and_copy();
+            let constraint = &self.constraints[index as usize];
+            match Self::analyze_single(db, constraint) {
+                Truthiness::AlwaysTrue => id = node.if_true,
+                Truthiness::Ambiguous => id = node.if_ambiguous,
+                Truthiness::AlwaysFalse => id = node.if_false,
+            }
         }
     }
 
