@@ -148,6 +148,7 @@ static_assert(is_subtype_of(tuple[int], tuple))
 
 ```py
 from knot_extensions import is_subtype_of, static_assert
+from typing import Literal
 
 class A: ...
 class B1(A): ...
@@ -271,6 +272,7 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 
 ```py
 from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
+from typing import Literal
 
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[0], AlwaysFalsy))
@@ -309,7 +311,7 @@ static_assert(is_subtype_of(TypeOf[1:2:3], slice))
 ### Special forms
 
 ```py
-from typing import _SpecialForm
+from typing import _SpecialForm, Literal
 from knot_extensions import TypeOf, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(TypeOf[Literal], _SpecialForm))

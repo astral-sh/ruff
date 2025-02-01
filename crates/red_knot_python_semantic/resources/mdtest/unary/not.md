@@ -123,6 +123,8 @@ classes without a `__bool__` method, with or without `__len__`, must be inferred
 truthiness.
 
 ```py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True

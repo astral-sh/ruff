@@ -78,6 +78,7 @@ def _(a: type[Unknown], b: type[Any]):
 Tuple types with the same elements are the same.
 
 ```py
+from typing import Any
 from typing_extensions import assert_type
 
 from knot_extensions import Unknown
