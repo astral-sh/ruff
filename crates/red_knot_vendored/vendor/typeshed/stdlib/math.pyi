@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Iterable
-from typing import Protocol, SupportsFloat, SupportsIndex, TypeVar, overload
+from typing import Final, Protocol, SupportsFloat, SupportsIndex, TypeVar, overload
 from typing_extensions import TypeAlias
 
 _T = TypeVar("_T")
@@ -8,11 +8,11 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 _SupportsFloatOrIndex: TypeAlias = SupportsFloat | SupportsIndex
 
-e: float
-pi: float
-inf: float
-nan: float
-tau: float
+e: Final[float]
+pi: Final[float]
+inf: Final[float]
+nan: Final[float]
+tau: Final[float]
 
 def acos(x: _SupportsFloatOrIndex, /) -> float: ...
 def acosh(x: _SupportsFloatOrIndex, /) -> float: ...
