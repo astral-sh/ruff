@@ -179,14 +179,18 @@ use crate::Db;
 ///
 /// Visibility constraints are normalized, so equivalent constraints are guaranteed to have equal
 /// IDs.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub(crate) struct ScopedVisibilityConstraintId(u32);
 
 impl std::fmt::Debug for ScopedVisibilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ScopedVisibilityConstraintId")
-            .field(&self.into_node_kind())
-            .finish()
+        let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
+        match *self {
+            ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")).finish(),
+            AMBIGUOUS => f.field(&format_args!("Ambiguous")).finish(),
+            ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")).finish(),
+            _ => f.field(&self.0).finish(),
+        }
     }
 }
 
@@ -199,14 +203,6 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 //
 // _Interior nodes_ provide the TDD structure for the formula. Interior nodes are stored in an
 // arena Vec, with the constraint ID providing an index into the arena.
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum NodeKind {
-    AlwaysTrue,
-    Ambiguous,
-    AlwaysFalse,
-    Interior(u32),
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InteriorNode {
@@ -252,32 +248,15 @@ impl ScopedVisibilityConstraintId {
     pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
         ScopedVisibilityConstraintId(0xffff_fffd);
 
-    fn into_node_kind(self) -> NodeKind {
-        if self == Self::ALWAYS_TRUE {
-            NodeKind::AlwaysTrue
-        } else if self == Self::AMBIGUOUS {
-            NodeKind::Ambiguous
-        } else if self == Self::ALWAYS_FALSE {
-            NodeKind::AlwaysFalse
-        } else {
-            NodeKind::Interior(self.0)
-        }
+    fn is_terminal(self) -> bool {
+        self.0 >= SMALLEST_TERMINAL
     }
 }
 
-impl From<NodeKind> for ScopedVisibilityConstraintId {
-    fn from(kind: NodeKind) -> ScopedVisibilityConstraintId {
-        match kind {
-            NodeKind::AlwaysTrue => Self::ALWAYS_TRUE,
-            NodeKind::Ambiguous => Self::AMBIGUOUS,
-            NodeKind::AlwaysFalse => Self::ALWAYS_FALSE,
-            NodeKind::Interior(index) => {
-                // We have verified elsewhere that index is within the expected range
-                Self(index)
-            }
-        }
-    }
-}
+const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
+const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
+const ALWAYS_FALSE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_FALSE;
+const SMALLEST_TERMINAL: u32 = ALWAYS_FALSE.0;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
@@ -310,6 +289,29 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         }
     }
 
+    fn interior_node(&self, a: ScopedVisibilityConstraintId) -> InteriorNode {
+        debug_assert!(!a.is_terminal());
+        self.interiors[a.0 as usize]
+    }
+
+    /// Returns whether `a` or `b` has a "larger" atom. Terminals are considered to have a larger
+    /// atom than any internal node.
+    fn cmp_atoms(
+        &self,
+        a: ScopedVisibilityConstraintId,
+        b: ScopedVisibilityConstraintId,
+    ) -> Ordering {
+        if a == b {
+            Ordering::Equal
+        } else if a.is_terminal() {
+            Ordering::Greater
+        } else if b.is_terminal() {
+            Ordering::Less
+        } else {
+            self.interior_node(a).atom.cmp(&self.interior_node(b).atom)
+        }
+    }
+
     /// Adds a constraint, ensuring that we only store any particular constraint once.
     #[allow(clippy::cast_possible_truncation)]
     fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
@@ -335,8 +337,8 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             self.interiors.push(node);
             index
         });
-        debug_assert!(index < 0x8000_0000);
-        NodeKind::Interior(index).into()
+        debug_assert!(index < SMALLEST_TERMINAL);
+        ScopedVisibilityConstraintId(index)
     }
 
     pub(crate) fn add_atom(
@@ -347,9 +349,9 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         let atom = self.add_constraint(constraint, copy);
         self.add_interior(InteriorNode {
             atom,
-            if_true: ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            if_ambiguous: ScopedVisibilityConstraintId::AMBIGUOUS,
-            if_false: ScopedVisibilityConstraintId::ALWAYS_FALSE,
+            if_true: ALWAYS_TRUE,
+            if_ambiguous: AMBIGUOUS,
+            if_false: ALWAYS_FALSE,
         })
     }
 
@@ -360,12 +362,14 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         if let Some(cached) = self.not_cache.get(&a) {
             return *cached;
         }
-        let a_node = match a.into_node_kind() {
-            NodeKind::AlwaysTrue => return ScopedVisibilityConstraintId::ALWAYS_FALSE,
-            NodeKind::Ambiguous => return ScopedVisibilityConstraintId::AMBIGUOUS,
-            NodeKind::AlwaysFalse => return ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            NodeKind::Interior(index) => self.interiors[index as usize],
-        };
+        if a == ALWAYS_TRUE {
+            return ALWAYS_FALSE;
+        } else if a == AMBIGUOUS {
+            return AMBIGUOUS;
+        } else if a == ALWAYS_FALSE {
+            return ALWAYS_TRUE;
+        }
+        let a_node = self.interiors[a.0 as usize];
         let if_true = self.add_not_constraint(a_node.if_true);
         let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
         let if_false = self.add_not_constraint(a_node.if_false);
@@ -388,28 +392,26 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             return *cached;
         }
 
-        let (atom, if_true, if_ambiguous, if_false) = match (a.into_node_kind(), b.into_node_kind())
-        {
-            (NodeKind::AlwaysTrue, _) | (_, NodeKind::AlwaysTrue) => {
-                return ScopedVisibilityConstraintId::ALWAYS_TRUE
-            }
-            (NodeKind::AlwaysFalse, _) => return b,
-            (_, NodeKind::AlwaysFalse) => return a,
-            (NodeKind::Ambiguous, NodeKind::Ambiguous) => {
-                return ScopedVisibilityConstraintId::AMBIGUOUS
-            }
+        match (a, b) {
+            (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
+            (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
+            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ => {}
+        }
 
-            (NodeKind::Ambiguous, NodeKind::Interior(b_index)) => {
-                let b_node = self.interiors[b_index as usize];
+        let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
+            Ordering::Equal => {
+                let a_node = self.interior_node(a);
+                let b_node = self.interior_node(b);
                 (
-                    b_node.atom,
-                    self.add_or_constraint(a, b_node.if_true),
-                    self.add_or_constraint(a, b_node.if_ambiguous),
-                    self.add_or_constraint(a, b_node.if_false),
+                    a_node.atom,
+                    self.add_or_constraint(a_node.if_true, b_node.if_true),
+                    self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
+                    self.add_or_constraint(a_node.if_false, b_node.if_false),
                 )
             }
-            (NodeKind::Interior(a_index), NodeKind::Ambiguous) => {
-                let a_node = self.interiors[a_index as usize];
+            Ordering::Less => {
+                let a_node = self.interior_node(a);
                 (
                     a_node.atom,
                     self.add_or_constraint(a_node.if_true, b),
@@ -417,30 +419,14 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
                     self.add_or_constraint(a_node.if_false, b),
                 )
             }
-
-            (NodeKind::Interior(a_index), NodeKind::Interior(b_index)) => {
-                let a_node = self.interiors[a_index as usize];
-                let b_node = self.interiors[b_index as usize];
-                match a_node.atom.cmp(&b_node.atom) {
-                    Ordering::Equal => (
-                        a_node.atom,
-                        self.add_or_constraint(a_node.if_true, b_node.if_true),
-                        self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
-                        self.add_or_constraint(a_node.if_false, b_node.if_false),
-                    ),
-                    Ordering::Less => (
-                        a_node.atom,
-                        self.add_or_constraint(a_node.if_true, b),
-                        self.add_or_constraint(a_node.if_ambiguous, b),
-                        self.add_or_constraint(a_node.if_false, b),
-                    ),
-                    Ordering::Greater => (
-                        b_node.atom,
-                        self.add_or_constraint(a, b_node.if_true),
-                        self.add_or_constraint(a, b_node.if_ambiguous),
-                        self.add_or_constraint(a, b_node.if_false),
-                    ),
-                }
+            Ordering::Greater => {
+                let b_node = self.interior_node(b);
+                (
+                    b_node.atom,
+                    self.add_or_constraint(a, b_node.if_true),
+                    self.add_or_constraint(a, b_node.if_ambiguous),
+                    self.add_or_constraint(a, b_node.if_false),
+                )
             }
         };
 
@@ -463,28 +449,26 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             return *cached;
         }
 
-        let (atom, if_true, if_ambiguous, if_false) = match (a.into_node_kind(), b.into_node_kind())
-        {
-            (NodeKind::AlwaysFalse, _) | (_, NodeKind::AlwaysFalse) => {
-                return ScopedVisibilityConstraintId::ALWAYS_FALSE
-            }
-            (NodeKind::AlwaysTrue, _) => return b,
-            (_, NodeKind::AlwaysTrue) => return a,
-            (NodeKind::Ambiguous, NodeKind::Ambiguous) => {
-                return ScopedVisibilityConstraintId::AMBIGUOUS
-            }
+        match (a, b) {
+            (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
+            (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
+            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ => {}
+        }
 
-            (NodeKind::Ambiguous, NodeKind::Interior(b_index)) => {
-                let b_node = self.interiors[b_index as usize];
+        let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
+            Ordering::Equal => {
+                let a_node = self.interior_node(a);
+                let b_node = self.interior_node(b);
                 (
-                    b_node.atom,
-                    self.add_and_constraint(a, b_node.if_true),
-                    self.add_and_constraint(a, b_node.if_ambiguous),
-                    self.add_and_constraint(a, b_node.if_false),
+                    a_node.atom,
+                    self.add_and_constraint(a_node.if_true, b_node.if_true),
+                    self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
+                    self.add_and_constraint(a_node.if_false, b_node.if_false),
                 )
             }
-            (NodeKind::Interior(a_index), NodeKind::Ambiguous) => {
-                let a_node = self.interiors[a_index as usize];
+            Ordering::Less => {
+                let a_node = self.interior_node(a);
                 (
                     a_node.atom,
                     self.add_and_constraint(a_node.if_true, b),
@@ -492,30 +476,14 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
                     self.add_and_constraint(a_node.if_false, b),
                 )
             }
-
-            (NodeKind::Interior(a_index), NodeKind::Interior(b_index)) => {
-                let a_node = self.interiors[a_index as usize];
-                let b_node = self.interiors[b_index as usize];
-                match a_node.atom.cmp(&b_node.atom) {
-                    Ordering::Equal => (
-                        a_node.atom,
-                        self.add_and_constraint(a_node.if_true, b_node.if_true),
-                        self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
-                        self.add_and_constraint(a_node.if_false, b_node.if_false),
-                    ),
-                    Ordering::Less => (
-                        a_node.atom,
-                        self.add_and_constraint(a_node.if_true, b),
-                        self.add_and_constraint(a_node.if_ambiguous, b),
-                        self.add_and_constraint(a_node.if_false, b),
-                    ),
-                    Ordering::Greater => (
-                        b_node.atom,
-                        self.add_and_constraint(a, b_node.if_true),
-                        self.add_and_constraint(a, b_node.if_ambiguous),
-                        self.add_and_constraint(a, b_node.if_false),
-                    ),
-                }
+            Ordering::Greater => {
+                let b_node = self.interior_node(b);
+                (
+                    b_node.atom,
+                    self.add_and_constraint(a, b_node.if_true),
+                    self.add_and_constraint(a, b_node.if_ambiguous),
+                    self.add_and_constraint(a, b_node.if_false),
+                )
             }
         };
 
@@ -531,13 +499,18 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 }
 
 impl<'db> VisibilityConstraints<'db> {
+    fn interior_node(&self, a: ScopedVisibilityConstraintId) -> InteriorNode {
+        debug_assert!(!a.is_terminal());
+        self.interiors[a.0 as usize]
+    }
+
     /// Analyze the statically known visibility for a given visibility constraint.
     pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
-        let node = match id.into_node_kind() {
-            NodeKind::AlwaysTrue => return Truthiness::AlwaysTrue,
-            NodeKind::Ambiguous => return Truthiness::Ambiguous,
-            NodeKind::AlwaysFalse => return Truthiness::AlwaysFalse,
-            NodeKind::Interior(index) => self.interiors[index as usize],
+        let node = match id {
+            ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            AMBIGUOUS => return Truthiness::Ambiguous,
+            ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            _ => self.interior_node(id),
         };
         let (index, _) = node.atom.into_index_and_copy();
         let constraint = &self.constraints[index as usize];
