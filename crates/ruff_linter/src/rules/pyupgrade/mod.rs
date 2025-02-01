@@ -116,6 +116,25 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn up007_preview() -> Result<()> {
         let diagnostics = test_path(
