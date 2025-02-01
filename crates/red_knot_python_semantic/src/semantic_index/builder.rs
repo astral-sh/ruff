@@ -605,7 +605,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.parameter.name.id().clone());
+        let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 

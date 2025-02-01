@@ -95,7 +95,7 @@ pub(crate) fn custom_type_var_return_type(
         .iter()
         .chain(&parameters.args)
         .next()
-        .and_then(|parameter_with_default| parameter_with_default.parameter.annotation.as_ref())
+        .and_then(|parameter_with_default| parameter_with_default.annotation())
     else {
         return;
     };
@@ -341,12 +341,8 @@ fn remove_first_parameter_annotation(parameters: &Parameters) -> Edit {
     // The first parameter is guaranteed to be `self`/`cls`,
     // as verified by `uses_custom_var()`.
     let mut non_variadic_positional = parameters.posonlyargs.iter().chain(&parameters.args);
-    let first = &non_variadic_positional.next().unwrap().parameter;
-
-    let name_end = first.name.range.end();
-    let annotation_end = first.range.end();
-
-    Edit::deletion(name_end, annotation_end)
+    let first = &non_variadic_positional.next().unwrap();
+    Edit::deletion(first.name().end(), first.end())
 }
 
 fn replace_return_annotation_with_self(self_symbol_binding: String, returns: &Expr) -> Edit {
