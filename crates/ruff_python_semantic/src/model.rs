@@ -271,7 +271,16 @@ impl<'a> SemanticModel<'a> {
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding(&self, member: &str) -> bool {
-        self.lookup_symbol(member)
+        self.has_builtin_binding_in_scope(member, self.scope_id)
+    }
+
+    /// Return `true` if `member` is bound as a builtin *in the scope we are currently visiting*.
+    ///
+    /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
+    /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
+    /// that are pre-populated in Python's global scope before any imports have taken place.
+    pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
+        self.lookup_symbol_in_scope(member, scope, false)
             .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
     }
