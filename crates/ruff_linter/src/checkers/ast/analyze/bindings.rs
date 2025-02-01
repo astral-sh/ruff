@@ -24,6 +24,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::PytestUnittestRaisesAssertion,
         Rule::ForLoopWrites,
         Rule::CustomTypeVarForSelf,
+        Rule::OperationOnClosedIO,
     ]) {
         return;
     }
@@ -121,6 +122,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 flake8_pyi::rules::custom_type_var_instead_of_self(checker, binding)
             {
                 checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::OperationOnClosedIO) {
+            if let Some(mut diagnostics) = ruff::rules::operation_on_closed_io(checker, binding) {
+                checker.diagnostics.append(&mut diagnostics);
             }
         }
     }
