@@ -89,3 +89,25 @@ UP051.py:16:18: UP051 [*] Generic function uses private type parameters
    18 |+    U,  # second generic
 19 19 | ](args):
 20 20 |     return args
+21 21 | 
+
+UP051.py:27:6: UP051 [*] Generic function uses private type parameters
+   |
+27 | def f[_T](v):
+   |      ^^^^ UP051
+28 |     cast("_T", v)
+29 |     cast("Literal['_T']")
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+24 24 | from typing import Literal, cast
+25 25 | 
+26 26 | 
+27    |-def f[_T](v):
+28    |-    cast("_T", v)
+   27 |+def f[T](v):
+   28 |+    cast("T", v)
+29 29 |     cast("Literal['_T']")
+30    |-    cast("list[_T]", v)
+   30 |+    cast("list[T]", v)

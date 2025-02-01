@@ -18,3 +18,13 @@ def many_generics[
     _U,  # second generic
 ](args):
     return args
+
+
+# neither of these are currently renamed
+from typing import Literal, cast
+
+
+def f[_T](v):
+    cast("_T", v)
+    cast("Literal['_T']")
+    cast("list[_T]", v)
