@@ -370,7 +370,7 @@ if sys.version_info >= (3, 12):
     AGEN_CLOSED: Final = "AGEN_CLOSED"
 
     def getasyncgenstate(
-        agen: AsyncGenerator[Any, Any]
+        agen: AsyncGenerator[Any, Any],
     ) -> Literal["AGEN_CREATED", "AGEN_RUNNING", "AGEN_SUSPENDED", "AGEN_CLOSED"]: ...
     def getasyncgenlocals(agen: AsyncGeneratorType[Any, Any]) -> dict[str, Any]: ...
 
@@ -590,7 +590,7 @@ GEN_SUSPENDED: Final = "GEN_SUSPENDED"
 GEN_CLOSED: Final = "GEN_CLOSED"
 
 def getgeneratorstate(
-    generator: Generator[Any, Any, Any]
+    generator: Generator[Any, Any, Any],
 ) -> Literal["GEN_CREATED", "GEN_RUNNING", "GEN_SUSPENDED", "GEN_CLOSED"]: ...
 
 CORO_CREATED: Final = "CORO_CREATED"
@@ -599,7 +599,7 @@ CORO_SUSPENDED: Final = "CORO_SUSPENDED"
 CORO_CLOSED: Final = "CORO_CLOSED"
 
 def getcoroutinestate(
-    coroutine: Coroutine[Any, Any, Any]
+    coroutine: Coroutine[Any, Any, Any],
 ) -> Literal["CORO_CREATED", "CORO_RUNNING", "CORO_SUSPENDED", "CORO_CLOSED"]: ...
 def getgeneratorlocals(generator: Generator[Any, Any, Any]) -> dict[str, Any]: ...
 def getcoroutinelocals(coroutine: Coroutine[Any, Any, Any]) -> dict[str, Any]: ...
