@@ -2654,6 +2654,16 @@ pub struct Parameter {
     pub annotation: Option<Box<Expr>>,
 }
 
+impl Parameter {
+    pub const fn name(&self) -> &Identifier {
+        &self.name
+    }
+
+    pub fn annotation(&self) -> Option<&Expr> {
+        self.annotation.as_deref()
+    }
+}
+
 /// See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyword {
@@ -3145,6 +3155,20 @@ pub struct ParameterWithDefault {
     pub range: TextRange,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
+}
+
+impl ParameterWithDefault {
+    pub fn default(&self) -> Option<&Expr> {
+        self.default.as_deref()
+    }
+
+    pub const fn name(&self) -> &Identifier {
+        self.parameter.name()
+    }
+
+    pub fn annotation(&self) -> Option<&Expr> {
+        self.parameter.annotation()
+    }
 }
 
 /// An AST node used to represent the arguments passed to a function call or class definition.

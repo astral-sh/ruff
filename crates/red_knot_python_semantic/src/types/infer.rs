@@ -1294,7 +1294,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        if let Some(annotation) = parameter.annotation.as_ref() {
+        if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
             // TODO `tuple[annotated_ty, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db());
@@ -1323,7 +1323,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        if let Some(annotation) = parameter.annotation.as_ref() {
+        if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
             // TODO `dict[str, annotated_ty]`
             let ty = KnownClass::Dict.to_instance(self.db());

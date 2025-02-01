@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
+use ruff_python_ast::{Decorator, Expr, Parameters};
 use ruff_python_semantic::analyze::visibility;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
@@ -115,16 +115,8 @@ pub(crate) fn boolean_default_value_positional_argument(
         return;
     }
 
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in parameters.posonlyargs.iter().chain(&parameters.args)
-    {
-        if default
-            .as_ref()
-            .is_some_and(|default| default.is_boolean_literal_expr())
-        {
+    for param in parameters.posonlyargs.iter().chain(&parameters.args) {
+        if param.default().is_some_and(Expr::is_boolean_literal_expr) {
             // Allow Boolean defaults in setters.
             if decorator_list.iter().any(|decorator| {
                 UnqualifiedName::from_expr(&decorator.expression)
@@ -141,7 +133,7 @@ pub(crate) fn boolean_default_value_positional_argument(
 
             checker.diagnostics.push(Diagnostic::new(
                 BooleanDefaultValuePositionalArgument,
-                parameter.name.range(),
+                param.identifier(),
             ));
         }
     }

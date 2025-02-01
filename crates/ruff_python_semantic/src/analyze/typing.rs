@@ -1,6 +1,7 @@
 //! Analysis rules for the `typing` module.
 
 use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     self as ast, Expr, ExprCall, Int, Operator, ParameterWithDefault, Parameters, Stmt, StmtAssign,
@@ -617,7 +618,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
                 let Some(parameter) = find_parameter(parameters, binding) else {
                     return false;
                 };
-                let Some(ref annotation) = parameter.parameter.annotation else {
+                let Some(annotation) = parameter.annotation() else {
                     return false;
                 };
                 T::match_annotation(annotation, semantic)
@@ -1026,7 +1027,7 @@ fn find_parameter<'a>(
 ) -> Option<&'a ParameterWithDefault> {
     parameters
         .iter_non_variadic_params()
-        .find(|arg| arg.parameter.name.range() == binding.range())
+        .find(|param| param.identifier() == binding.range())
 }
 
 /// Return the [`QualifiedName`] of the value to which the given [`Expr`] is assigned, if any.

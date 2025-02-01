@@ -65,7 +65,7 @@ impl Violation for BuiltinArgumentShadowing {
 /// A002
 pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
     if shadows_builtin(
-        parameter.name.as_str(),
+        parameter.name(),
         checker.source_type,
         &checker.settings.flake8_builtins.builtins_ignorelist,
         checker.settings.target_version,

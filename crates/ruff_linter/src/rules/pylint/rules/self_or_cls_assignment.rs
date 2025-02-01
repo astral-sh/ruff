@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -82,10 +82,7 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
         return;
     };
 
-    let Some(ParameterWithDefault {
-        parameter: self_or_cls,
-        ..
-    }) = parameters
+    let Some(self_or_cls) = parameters
         .posonlyargs
         .first()
         .or_else(|| parameters.args.first())
@@ -102,7 +99,7 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
 
-    let method_type = match (function_type, self_or_cls.name.as_str()) {
+    let method_type = match (function_type, self_or_cls.name().as_str()) {
         (FunctionType::Method { .. }, "self") => MethodType::Instance,
         (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
         _ => return,
