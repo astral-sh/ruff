@@ -25,7 +25,9 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not
 
 ## Tuple annotations are understood
 
-```py path=module.py
+`module.py`:
+
+```py
 from typing_extensions import Unpack
 
 a: tuple[()] = ()
@@ -40,7 +42,9 @@ i: tuple[str | int, str | int] = (42, 42)
 j: tuple[str | int] = (42,)
 ```
 
-```py path=script.py
+`script.py`:
+
+```py
 from module import a, b, c, d, e, f, g, h, i, j
 
 reveal_type(a)  # revealed: tuple[()]

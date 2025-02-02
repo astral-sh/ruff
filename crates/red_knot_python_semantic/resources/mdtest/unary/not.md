@@ -28,7 +28,9 @@ reveal_type(not b)  # revealed: Literal[False]
 reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 y = 1
 ```
 

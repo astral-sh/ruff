@@ -37,7 +37,9 @@ child expression now suppresses errors in the outer expression.
 For example, the `type: ignore` comment in this example suppresses the error of adding `2` to
 `"test"` and adding `"other"` to the result of the cast.
 
-```py path=nested.py
+`nested.py`:
+
+```py
 # fmt: off
 from typing import cast
 

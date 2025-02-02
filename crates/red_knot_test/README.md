@@ -138,7 +138,9 @@ from b import C
 reveal_type(C)  # revealed: Literal[C]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 class C: pass
 ```
 ````
@@ -171,7 +173,9 @@ from b import y
 x: int = y  # error: [invalid-assignment]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 y = "foo"
 ```
 ````
@@ -392,7 +396,9 @@ from b import x
 reveal_type(x)
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 x = 1
 ```
 
@@ -404,7 +410,9 @@ Initial expected output for `test.py`:
 
 Now in our first incremental stage, modify the contents of `b.py`:
 
-```py path=b.py stage=1
+`b.py`:
+
+```py stage=1
 # b.py
 x = 2
 ```
