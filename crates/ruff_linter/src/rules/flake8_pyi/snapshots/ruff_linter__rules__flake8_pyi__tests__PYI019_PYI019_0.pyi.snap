@@ -211,7 +211,7 @@ PYI019_0.pyi:114:31: PYI019 Use `Self` instead of custom TypeVar `S`
     |
 112 | class SubscriptReturnType:
 113 |     @classmethod
-114 |     def m[S](cls: type[S]) -> type[S]: ...  # PYI019, but no autofix (yet)
+114 |     def m[S](cls: type[S]) -> type[S]: ...  # PYI019
     |                               ^^^^^^^ PYI019
     |
     = help: Replace TypeVar `S` with `Self`
@@ -252,3 +252,25 @@ PYI019_0.pyi:141:10: PYI019 Use `Self` instead of custom TypeVar `S`
     |          ^ PYI019
     |
     = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.pyi:156:34: PYI019 Use `Self` instead of custom TypeVar `_NotATypeVar`
+    |
+154 | # but our preview-mode logic is smarter about this.
+155 | class Foo:
+156 |     def x(self: _NotATypeVar) -> _NotATypeVar: ...
+    |                                  ^^^^^^^^^^^^ PYI019
+157 |     @classmethod
+158 |     def y(self: type[_NotATypeVar]) -> _NotATypeVar: ...
+    |
+    = help: Replace TypeVar `_NotATypeVar` with `Self`
+
+PYI019_0.pyi:158:40: PYI019 Use `Self` instead of custom TypeVar `_NotATypeVar`
+    |
+156 |     def x(self: _NotATypeVar) -> _NotATypeVar: ...
+157 |     @classmethod
+158 |     def y(self: type[_NotATypeVar]) -> _NotATypeVar: ...
+    |                                        ^^^^^^^^^^^^ PYI019
+159 |
+160 | class NoReturnAnnotations:
+    |
+    = help: Replace TypeVar `_NotATypeVar` with `Self`
