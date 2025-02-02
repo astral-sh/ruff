@@ -114,7 +114,7 @@ reveal_type(x)  # revealed: Foo
 
 ## Annotations in stub files are deferred
 
-```pyi path=main.pyi
+```pyi
 x: Foo
 
 class Foo: ...
@@ -125,7 +125,7 @@ reveal_type(x)  # revealed: Foo
 
 ## Annotated assignments in stub files are inferred correctly
 
-```pyi path=main.pyi
+```pyi
 x: int = 1
 reveal_type(x) # revealed: Literal[1]
 ```

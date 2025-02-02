@@ -9,7 +9,7 @@ y = x
 reveal_type(y)  # revealed: int
 ```
 
-```py path=b.pyi
+```pyi path=b.pyi
 x: int
 ```
 
