@@ -23,3 +23,12 @@ s = set([  # comment
 ])
 
 s = set(([x for x in range(3)]))
+
+s = set(((([x for x in range(3)]))))
+
+s = set( # outer set comment
+( # inner paren comment - not preserved
+((
+[ # comprehension comment
+ x for x in range(3)]
+ ))))
