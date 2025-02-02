@@ -29,7 +29,7 @@ pub struct Options {
     pub rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_on_warning: Option<bool>,
+    pub terminal: Option<TerminalOptions>,
 }
 
 impl Options {
@@ -227,6 +227,12 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
             inner: iter.into_iter().collect(),
         }
     }
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct TerminalOptions {
+    pub error_on_warning: Option<bool>,
 }
 
 #[derive(Error, Debug)]

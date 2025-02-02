@@ -8,8 +8,8 @@ use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use red_knot_project::metadata::options::Options;
-use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
+use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -218,17 +218,24 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
-                    let (has_warnings, has_errors) = result.iter().fold(
-                        (false, false),
-                        |(has_warnings, has_errors), diagnostic| {
-                            let severity = diagnostic.severity();
+                    let error_on_warnings = db
+                        .project()
+                        .metadata(db)
+                        .options()
+                        .terminal
+                        .as_ref()
+                        .and_then(|it| it.error_on_warning)
+                        .unwrap_or_default();
 
-                            (
-                                has_warnings || severity == Severity::Warning,
-                                has_errors || severity >= Severity::Error,
-                            )
-                        },
-                    );
+                    let failure_threshold = if error_on_warnings {
+                        Severity::Warning
+                    } else {
+                        Severity::Error
+                    };
+
+                    let failed = result
+                        .iter()
+                        .any(|diagnostic| diagnostic.severity() >= failure_threshold);
 
                     if check_revision == revision {
                         #[allow(clippy::print_stdout)]
@@ -242,21 +249,10 @@ impl MainLoop {
                     }
 
                     if self.watcher.is_none() {
-                        let error_on_warning =
-                            self.cli_options.error_on_warning.unwrap_or_default();
-
-                        return match (has_warnings, has_errors) {
-                            (false, false) => ExitStatus::Success,
-
-                            (true, false) => {
-                                if error_on_warning {
-                                    ExitStatus::Failure
-                                } else {
-                                    ExitStatus::Success
-                                }
-                            }
-
-                            (_, true) => ExitStatus::Failure,
+                        return if failed {
+                            ExitStatus::Failure
+                        } else {
+                            ExitStatus::Success
                         };
                     }
 
