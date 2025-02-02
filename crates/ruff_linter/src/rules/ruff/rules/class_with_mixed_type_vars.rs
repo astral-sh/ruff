@@ -82,14 +82,13 @@ pub(crate) fn class_with_mixed_type_vars(checker: &mut Checker, class_def: &Stmt
         return;
     }
 
-    let semantic = checker.semantic();
     let StmtClassDef {
         type_params,
         arguments,
         ..
     } = class_def;
 
-    let Some(type_params) = type_params.as_deref() else {
+    let Some(type_params) = type_params else {
         return;
     };
 
@@ -98,7 +97,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &mut Checker, class_def: &Stmt
     };
 
     let Some((generic_base, old_style_type_vars)) =
-        typing_generic_base_and_arguments(arguments, semantic)
+        typing_generic_base_and_arguments(arguments, checker.semantic())
     else {
         return;
     };
