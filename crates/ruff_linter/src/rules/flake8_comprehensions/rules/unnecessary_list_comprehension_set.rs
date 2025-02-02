@@ -60,37 +60,35 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
         return;
     }
     let diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, call.range());
-    let fix = {
-        let one = TextSize::from(1);
+    let one = TextSize::from(1);
 
-        // Replace `set(` with `{`.
-        let call_start = Edit::replacement(
-            pad_start("{", call.range(), checker.locator(), checker.semantic()),
-            call.start(),
-            call.arguments.start() + one,
-        );
+    // Replace `set(` with `{`.
+    let call_start = Edit::replacement(
+        pad_start("{", call.range(), checker.locator(), checker.semantic()),
+        call.start(),
+        call.arguments.start() + one,
+    );
 
-        // Replace `)` with `}`.
-        let call_end = Edit::replacement(
-            pad_end("}", call.range(), checker.locator(), checker.semantic()),
-            call.arguments.end() - one,
-            call.end(),
-        );
+    // Replace `)` with `}`.
+    let call_end = Edit::replacement(
+        pad_end("}", call.range(), checker.locator(), checker.semantic()),
+        call.arguments.end() - one,
+        call.end(),
+    );
 
-        // If the list comprehension is parenthesized, remove the parentheses in addition to
-        // removing the brackets.
-        let replacement_range = parenthesized_range(
-            argument.into(),
-            (&call.arguments).into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
-        )
-        .unwrap_or_else(|| argument.range());
+    // If the list comprehension is parenthesized, remove the parentheses in addition to
+    // removing the brackets.
+    let replacement_range = parenthesized_range(
+        argument.into(),
+        (&call.arguments).into(),
+        checker.comment_ranges(),
+        checker.locator().contents(),
+    )
+    .unwrap_or_else(|| argument.range());
 
-        let span = argument.range().add_start(one).sub_end(one);
-        let replacement =
-            Edit::range_replacement(checker.source()[span].to_string(), replacement_range);
-        Fix::unsafe_edits(call_start, [call_end, replacement])
-    };
+    let span = argument.range().add_start(one).sub_end(one);
+    let replacement =
+        Edit::range_replacement(checker.source()[span].to_string(), replacement_range);
+    let fix = Fix::unsafe_edits(call_start, [call_end, replacement]);
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
