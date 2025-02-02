@@ -2364,7 +2364,6 @@ dependencies = [
  "ruff_db",
  "ruff_python_trivia",
  "salsa",
- "serde",
  "tempfile",
  "toml",
  "tracing",

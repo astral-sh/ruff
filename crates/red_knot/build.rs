@@ -58,7 +58,7 @@ fn commit_info(workspace_root: &Path) {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let mut parts = stdout.split_whitespace();
     let mut next = || parts.next().unwrap();
-    println!("cargo::rustc-env=RED_KNOT_COMMIT_HASH={}", next());
+    let _commit_hash = next();
     println!("cargo::rustc-env=RED_KNOT_COMMIT_SHORT_HASH={}", next());
     println!("cargo::rustc-env=RED_KNOT_COMMIT_DATE={}", next());
 
@@ -66,10 +66,8 @@ fn commit_info(workspace_root: &Path) {
     // https://git-scm.com/docs/pretty-formats#Documentation/pretty-formats.txt-emdescribeoptionsem
     if let Some(describe) = parts.next() {
         let mut describe_parts = describe.split('-');
-        println!(
-            "cargo::rustc-env=RED_KNOT_LAST_TAG={}",
-            describe_parts.next().unwrap()
-        );
+        let _last_tag = describe_parts.next().unwrap();
+
         // If this is the tagged commit, this component will be missing
         println!(
             "cargo::rustc-env=RED_KNOT_LAST_TAG_DISTANCE={}",

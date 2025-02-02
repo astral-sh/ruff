@@ -30,7 +30,6 @@ tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 tracing-flame = { workspace = true }
 tracing-tree = { workspace = true }
-serde = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
