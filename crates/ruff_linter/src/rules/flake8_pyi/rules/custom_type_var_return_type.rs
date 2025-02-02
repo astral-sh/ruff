@@ -3,7 +3,7 @@ use std::cmp;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ExprName, ExprSubscript, TypeParam, TypeParams};
+use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel};
@@ -86,10 +86,16 @@ pub(crate) fn custom_type_var_return_type(
     let current_scope = &semantic.scopes[binding.scope];
     let function_def = binding.statement(semantic)?.as_function_def_stmt()?;
 
-    // Given, e.g., `def foo(self: _S, arg: bytes) -> _T`, extract `_T`.
-    let returns = function_def.returns.as_ref()?;
+    let ast::StmtFunctionDef {
+        name: function_name,
+        parameters,
+        returns,
+        decorator_list,
+        type_params,
+        ..
+    } = function_def;
 
-    let parameters = &*function_def.parameters;
+    let returns = returns.as_deref()?;
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
     let self_or_cls_parameter = parameters
@@ -99,7 +105,6 @@ pub(crate) fn custom_type_var_return_type(
         .next()?;
 
     let self_or_cls_annotation = self_or_cls_parameter.annotation()?;
-    let decorator_list = &*function_def.decorator_list;
 
     // Skip any abstract, static, and overloaded methods.
     if is_abstract(decorator_list, semantic) || is_overload(decorator_list, semantic) {
@@ -107,7 +112,7 @@ pub(crate) fn custom_type_var_return_type(
     }
 
     let method = match function_type::classify(
-        &function_def.name,
+        function_name,
         decorator_list,
         current_scope,
         semantic,
@@ -119,12 +124,12 @@ pub(crate) fn custom_type_var_return_type(
         FunctionType::ClassMethod => Method::Class(ClassMethod {
             cls_annotation: self_or_cls_annotation,
             returns,
-            type_params: function_def.type_params.as_deref(),
+            type_params: type_params.as_deref(),
         }),
         FunctionType::Method => Method::Instance(InstanceMethod {
             self_annotation: self_or_cls_annotation,
             returns,
-            type_params: function_def.type_params.as_deref(),
+            type_params: type_params.as_deref(),
         }),
     };
 
@@ -134,7 +139,7 @@ pub(crate) fn custom_type_var_return_type(
 
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarReturnType {
-            method_name: function_def.name.to_string(),
+            method_name: function_name.to_string(),
         },
         returns.range(),
     );
@@ -169,16 +174,16 @@ impl Method<'_> {
 
 #[derive(Debug)]
 struct ClassMethod<'a> {
-    cls_annotation: &'a Expr,
-    returns: &'a Expr,
-    type_params: Option<&'a TypeParams>,
+    cls_annotation: &'a ast::Expr,
+    returns: &'a ast::Expr,
+    type_params: Option<&'a ast::TypeParams>,
 }
 
 impl ClassMethod<'_> {
     /// Returns `true` if the class method is annotated with
     /// a custom `TypeVar` that is likely private.
     fn uses_custom_var(&self, semantic: &SemanticModel, scope: ScopeId) -> bool {
-        let Expr::Subscript(ast::ExprSubscript {
+        let ast::Expr::Subscript(ast::ExprSubscript {
             value: cls_annotation_value,
             slice: cls_annotation_typevar,
             ..
@@ -187,13 +192,13 @@ impl ClassMethod<'_> {
             return false;
         };
 
-        let Expr::Name(cls_annotation_typevar) = &**cls_annotation_typevar else {
+        let ast::Expr::Name(cls_annotation_typevar) = &**cls_annotation_typevar else {
             return false;
         };
 
         let cls_annotation_typevar = &cls_annotation_typevar.id;
 
-        let Expr::Name(ExprName { id, .. }) = &**cls_annotation_value else {
+        let ast::Expr::Name(ast::ExprName { id, .. }) = &**cls_annotation_value else {
             return false;
         };
 
@@ -206,12 +211,12 @@ impl ClassMethod<'_> {
         }
 
         let return_annotation_typevar = match self.returns {
-            Expr::Name(ExprName { id, .. }) => id,
-            Expr::Subscript(ExprSubscript { value, slice, .. }) => {
-                let Expr::Name(return_annotation_typevar) = &**slice else {
+            ast::Expr::Name(ast::ExprName { id, .. }) => id,
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let ast::Expr::Name(return_annotation_typevar) = &**slice else {
                     return false;
                 };
-                let Expr::Name(ExprName { id, .. }) = &**value else {
+                let ast::Expr::Name(ast::ExprName { id, .. }) = &**value else {
                     return false;
                 };
                 if id != "type" {
@@ -232,23 +237,23 @@ impl ClassMethod<'_> {
 
 #[derive(Debug)]
 struct InstanceMethod<'a> {
-    self_annotation: &'a Expr,
-    returns: &'a Expr,
-    type_params: Option<&'a TypeParams>,
+    self_annotation: &'a ast::Expr,
+    returns: &'a ast::Expr,
+    type_params: Option<&'a ast::TypeParams>,
 }
 
 impl InstanceMethod<'_> {
     /// Returns `true` if the instance method is annotated with
     /// a custom `TypeVar` that is likely private.
     fn uses_custom_var(&self) -> bool {
-        let Expr::Name(ast::ExprName {
+        let ast::Expr::Name(ast::ExprName {
             id: first_arg_type, ..
         }) = self.self_annotation
         else {
             return false;
         };
 
-        let Expr::Name(ast::ExprName {
+        let ast::Expr::Name(ast::ExprName {
             id: return_type, ..
         }) = self.returns
         else {
@@ -264,7 +269,7 @@ impl InstanceMethod<'_> {
 }
 
 /// Returns `true` if the type variable is likely private.
-fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&TypeParams>) -> bool {
+fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&ast::TypeParams>) -> bool {
     // Ex) `_T`
     if type_var_name.starts_with('_') {
         return true;
@@ -272,7 +277,7 @@ fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&TypeParam
     // Ex) `class Foo[T]: ...`
     type_params.is_some_and(|type_params| {
         type_params.iter().any(|type_param| {
-            if let TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) = type_param {
+            if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) = type_param {
                 name == type_var_name
             } else {
                 false
@@ -293,7 +298,7 @@ fn replace_custom_typevar_with_self(
     function_def: &ast::StmtFunctionDef,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
-    returns: &Expr,
+    returns: &ast::Expr,
 ) -> anyhow::Result<Option<Fix>> {
     if checker.settings.preview.is_disabled() {
         return Ok(None);
@@ -307,7 +312,7 @@ fn replace_custom_typevar_with_self(
     }
 
     // Non-`Name` return annotations are not currently autofixed
-    let Expr::Name(typevar) = &returns else {
+    let ast::Expr::Name(typevar) = &returns else {
         return Ok(None);
     };
 
@@ -363,9 +368,10 @@ fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), 
     } else {
         "typing_extensions"
     };
-    let (importer, semantic) = (checker.importer(), checker.semantic());
     let request = ImportRequest::import_from(source_module, "Self");
-    importer.get_or_import_symbol(&request, position, semantic)
+    checker
+        .importer()
+        .get_or_import_symbol(&request, position, checker.semantic())
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`,
@@ -398,9 +404,9 @@ fn replace_typevar_usages_with_self(
     Some(edits)
 }
 
-fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> Option<Edit> {
-    let is_declaration_in_question = |type_param: &&TypeParam| -> bool {
-        if let TypeParam::TypeVar(typevar) = type_param {
+fn remove_typevar_declaration(type_params: Option<&ast::TypeParams>, name: &str) -> Option<Edit> {
+    let is_declaration_in_question = |type_param: &&ast::TypeParam| -> bool {
+        if let ast::TypeParam::TypeVar(typevar) = type_param {
             return typevar.name.as_str() == name;
         };
 
@@ -419,19 +425,16 @@ fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> O
         .iter()
         .find_position(is_declaration_in_question)?;
 
-    let typevar_range = declaration.range();
     let last_index = parameters.len() - 1;
 
     let range = if index < last_index {
         // [A, B, C]
         //     ^^^ Remove this
-        let next_range = parameters[index + 1].range();
-        TextRange::new(typevar_range.start(), next_range.start())
+        TextRange::new(declaration.start(), parameters[index + 1].start())
     } else {
         // [A, B, C]
         //      ^^^ Remove this
-        let previous_range = parameters[index - 1].range();
-        TextRange::new(previous_range.end(), typevar_range.end())
+        TextRange::new(parameters[index - 1].end(), declaration.end())
     };
 
     Some(Edit::range_deletion(range))
