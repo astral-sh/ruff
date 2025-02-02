@@ -378,7 +378,7 @@ fn replace_return_annotation_with_self(self_symbol_binding: &str, returns: &Expr
     Edit::range_replacement(self_symbol_binding.to_string(), returns.range())
 }
 
-/// Returns a series of [`Edit`]s that modify all references to the given `typevar`,.
+/// Returns a series of [`Edit`]s that modify all references to the given `typevar`,
 /// or `None` when it is not possible to resolve the binding.
 ///
 /// Only references within `editable_range` will be modified.
