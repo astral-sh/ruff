@@ -397,4 +397,24 @@ RUF060.py:79:12: RUF060 [*] Class with type parameter list inherits from `Generi
    79 |+class C[T, *_As, _A]: ...
 80 80 | 
 81 81 | 
-82 82 | ### No errors
+82 82 | from somewhere import APublicTypeVar
+
+RUF060.py:83:12: RUF060 Class with type parameter list inherits from `Generic`
+   |
+82 | from somewhere import APublicTypeVar
+83 | class C[T](Generic[APublicTypeVar]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^ RUF060
+84 | class C[T](Generic[APublicTypeVar, _A]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF060.py:84:12: RUF060 Class with type parameter list inherits from `Generic`
+   |
+82 | from somewhere import APublicTypeVar
+83 | class C[T](Generic[APublicTypeVar]): ...
+84 | class C[T](Generic[APublicTypeVar, _A]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF060
+85 |
+86 | ### No errors
+   |
+   = help: Remove `Generic` base class
