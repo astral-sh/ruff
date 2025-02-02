@@ -265,7 +265,7 @@ impl<'a> SemanticModel<'a> {
         self.shadowed_bindings.get(&binding_id).copied()
     }
 
-    /// Return `true` if `member` is bound as a builtin.
+    /// Return `true` if `member` is bound as a builtin *in the scope we are currently visiting*.
     ///
     /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
@@ -274,7 +274,7 @@ impl<'a> SemanticModel<'a> {
         self.has_builtin_binding_in_scope(member, self.scope_id)
     }
 
-    /// Return `true` if `member` is bound as a builtin *in the scope we are currently visiting*.
+    /// Return `true` if `member` is bound as a builtin *in a given scope*.
     ///
     /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
