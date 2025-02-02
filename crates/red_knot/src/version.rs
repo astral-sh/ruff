@@ -74,7 +74,7 @@ mod tests {
             version: "0.0.0".to_string(),
             commit_info: None,
         };
-        assert_snapshot!(version, @"");
+        assert_snapshot!(version, @"0.0.0");
     }
 
     #[test]
@@ -87,7 +87,7 @@ mod tests {
                 commits_since_last_tag: 0,
             }),
         };
-        assert_snapshot!(version, @"");
+        assert_snapshot!(version, @"0.0.0 (53b0f5d92 2023-10-19)");
     }
 
     #[test]
@@ -100,6 +100,6 @@ mod tests {
                 commits_since_last_tag: 24,
             }),
         };
-        assert_snapshot!(version, @"");
+        assert_snapshot!(version, @"0.0.0+24 (53b0f5d92 2023-10-19)");
     }
 }
