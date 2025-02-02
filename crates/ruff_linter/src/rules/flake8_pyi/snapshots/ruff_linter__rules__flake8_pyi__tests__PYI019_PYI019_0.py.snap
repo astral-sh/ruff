@@ -59,7 +59,6 @@ PYI019_0.py:54:32: PYI019 Use `Self` instead of custom TypeVar `S`
 
 PYI019_0.py:61:48: PYI019 Use `Self` instead of custom TypeVar `S`
    |
-59 | # Only .pyi gets fixes, no fixes for .py
 60 | class PEP695Fix:
 61 |     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
    |                                                ^ PYI019
@@ -251,5 +250,37 @@ PYI019_0.py:141:63: PYI019 Use `Self` instead of custom TypeVar `S`
 140 |     def m[S: int, T: int](self: S, other: T) -> S: ...
 141 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
     |                                                               ^ PYI019
+142 |
+143 | class MethodsWithBody:
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:144:36: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+143 | class MethodsWithBody:
+144 |     def m[S](self: S, other: S) -> S:
+    |                                    ^ PYI019
+145 |         x: S = other
+146 |         return x
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:149:41: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+148 |     @classmethod
+149 |     def n[S](cls: type[S], other: S) -> S:
+    |                                         ^ PYI019
+150 |         x: type[S] = type(other)
+151 |         return x()
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:154:26: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+153 | class StringizedReferencesAreTooComplicated:
+154 |     def m[S](self: S) -> S:
+    |                          ^ PYI019
+155 |         x = cast("S", self)
+156 |         return x
     |
     = help: Replace TypeVar `S` with `Self`

@@ -56,7 +56,7 @@ class CustomClassMethod:
 
 _S695 = TypeVar("_S695", bound="PEP695Fix")
 
-# Only .pyi gets fixes, no fixes for .py
+
 class PEP695Fix:
     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
 

@@ -1,4 +1,4 @@
-from typing import TypeVar, Self, Type
+from typing import TypeVar, Self, Type, cast
 
 _S = TypeVar("_S", bound=BadClass)
 _S2 = TypeVar("_S2", BadClass, GoodClass)
@@ -56,7 +56,7 @@ class CustomClassMethod:
 
 _S695 = TypeVar("_S695", bound="PEP695Fix")
 
-# Only .pyi gets fixes, no fixes for .py
+
 class PEP695Fix:
     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
 
@@ -139,3 +139,18 @@ class NoReturnAnnotations:
 class MultipleBoundParameters:
     def m[S: int, T: int](self: S, other: T) -> S: ...
     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+
+class MethodsWithBody:
+    def m[S](self: S, other: S) -> S:
+        x: S = other
+        return x
+
+    @classmethod
+    def n[S](cls: type[S], other: S) -> S:
+        x: type[S] = type(other)
+        return x()
+
+class StringizedReferencesAreTooComplicated:
+    def m[S](self: S) -> S:
+        x = cast("S", self)
+        return x
