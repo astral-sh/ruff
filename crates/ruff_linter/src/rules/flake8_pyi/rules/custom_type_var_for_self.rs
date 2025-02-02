@@ -14,8 +14,8 @@ use crate::importer::{ImportRequest, ResolutionError};
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for methods that define a custom `TypeVar` for their return type
-/// annotation instead of using `Self`.
+/// Checks for methods that use custom `TypeVar`s in their annotations
+/// when they could use `Self` instead.
 ///
 /// ## Why is this bad?
 /// While the semantics are often identical, using `Self` is more intuitive
@@ -24,7 +24,8 @@ use crate::settings::types::PythonVersion;
 /// on the `self` and `cls` arguments.
 ///
 /// This check currently applies to instance methods that return `self`,
-/// class methods that return an instance of `cls`, and `__new__` methods.
+/// class methods that return an instance of `cls`, class methods that return
+/// `cls`, and `__new__` methods.
 ///
 /// ## Example
 ///
@@ -59,26 +60,31 @@ use crate::settings::types::PythonVersion;
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 /// [PEP 695]: https://peps.python.org/pep-0695/
 #[derive(ViolationMetadata)]
-pub(crate) struct CustomTypeVarReturnType {
-    method_name: String,
+pub(crate) struct CustomTypeVarForSelf {
+    typevar_name: String,
 }
 
-impl Violation for CustomTypeVarReturnType {
+impl Violation for CustomTypeVarForSelf {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let method_name = &self.method_name;
-        format!("Methods like `{method_name}` should return `Self` instead of a custom `TypeVar`")
+        format!(
+            "Use `Self` instead of custom TypeVar `{}`",
+            &self.typevar_name
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `Self`".to_string())
+        Some(format!(
+            "Replace TypeVar `{}` with `Self`",
+            &self.typevar_name
+        ))
     }
 }
 
 /// PYI019
-pub(crate) fn custom_type_var_return_type(
+pub(crate) fn custom_type_var_instead_of_self(
     checker: &Checker,
     binding: &Binding,
 ) -> Option<Diagnostic> {
@@ -133,13 +139,11 @@ pub(crate) fn custom_type_var_return_type(
         }),
     };
 
-    if !method.uses_custom_var(semantic, binding.scope) {
-        return None;
-    }
+    let custom_typevar_name = method.custom_typevar(semantic, binding.scope)?;
 
     let mut diagnostic = Diagnostic::new(
-        CustomTypeVarReturnType {
-            method_name: function_name.to_string(),
+        CustomTypeVarForSelf {
+            typevar_name: custom_typevar_name.to_string(),
         },
         returns.range(),
     );
@@ -164,10 +168,10 @@ enum Method<'a> {
 }
 
 impl Method<'_> {
-    fn uses_custom_var(&self, semantic: &SemanticModel, scope: ScopeId) -> bool {
+    fn custom_typevar(&self, semantic: &SemanticModel, scope: ScopeId) -> Option<&str> {
         match self {
-            Self::Class(class_method) => class_method.uses_custom_var(semantic, scope),
-            Self::Instance(instance_method) => instance_method.uses_custom_var(),
+            Self::Class(class_method) => class_method.custom_typevar(semantic, scope),
+            Self::Instance(instance_method) => instance_method.custom_typevar(),
         }
     }
 }
@@ -180,58 +184,45 @@ struct ClassMethod<'a> {
 }
 
 impl ClassMethod<'_> {
-    /// Returns `true` if the class method is annotated with
+    /// Returns `Some(typevar_name)` if the class method is annotated with
     /// a custom `TypeVar` that is likely private.
-    fn uses_custom_var(&self, semantic: &SemanticModel, scope: ScopeId) -> bool {
-        let ast::Expr::Subscript(ast::ExprSubscript {
+    fn custom_typevar(&self, semantic: &SemanticModel, scope: ScopeId) -> Option<&str> {
+        let ast::ExprSubscript {
             value: cls_annotation_value,
             slice: cls_annotation_typevar,
             ..
-        }) = self.cls_annotation
-        else {
-            return false;
-        };
+        } = self.cls_annotation.as_subscript_expr()?;
 
-        let ast::Expr::Name(cls_annotation_typevar) = &**cls_annotation_typevar else {
-            return false;
-        };
-
-        let cls_annotation_typevar = &cls_annotation_typevar.id;
-
-        let ast::Expr::Name(ast::ExprName { id, .. }) = &**cls_annotation_value else {
-            return false;
-        };
+        let cls_annotation_typevar = &cls_annotation_typevar.as_name_expr()?.id;
+        let ast::ExprName { id, .. } = cls_annotation_value.as_name_expr()?;
 
         if id != "type" {
-            return false;
+            return None;
         }
 
         if !semantic.has_builtin_binding_in_scope("type", scope) {
-            return false;
+            return None;
         }
 
         let return_annotation_typevar = match self.returns {
             ast::Expr::Name(ast::ExprName { id, .. }) => id,
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let ast::Expr::Name(return_annotation_typevar) = &**slice else {
-                    return false;
-                };
-                let ast::Expr::Name(ast::ExprName { id, .. }) = &**value else {
-                    return false;
-                };
+                let return_annotation_typevar = slice.as_name_expr()?;
+                let ast::ExprName { id, .. } = value.as_name_expr()?;
                 if id != "type" {
-                    return false;
+                    return None;
                 }
                 &return_annotation_typevar.id
             }
-            _ => return false,
+            _ => return None,
         };
 
         if cls_annotation_typevar != return_annotation_typevar {
-            return false;
+            return None;
         }
 
         is_likely_private_typevar(cls_annotation_typevar, self.type_params)
+            .then_some(cls_annotation_typevar)
     }
 }
 
@@ -243,28 +234,22 @@ struct InstanceMethod<'a> {
 }
 
 impl InstanceMethod<'_> {
-    /// Returns `true` if the instance method is annotated with
+    /// Returns `Some(typevar_name)` if the instance method is annotated with
     /// a custom `TypeVar` that is likely private.
-    fn uses_custom_var(&self) -> bool {
-        let ast::Expr::Name(ast::ExprName {
+    fn custom_typevar(&self) -> Option<&str> {
+        let ast::ExprName {
             id: first_arg_type, ..
-        }) = self.self_annotation
-        else {
-            return false;
-        };
+        } = self.self_annotation.as_name_expr()?;
 
-        let ast::Expr::Name(ast::ExprName {
+        let ast::ExprName {
             id: return_type, ..
-        }) = self.returns
-        else {
-            return false;
-        };
+        } = self.returns.as_name_expr()?;
 
         if first_arg_type != return_type {
-            return false;
+            return None;
         }
 
-        is_likely_private_typevar(first_arg_type, self.type_params)
+        is_likely_private_typevar(first_arg_type, self.type_params).then_some(first_arg_type)
     }
 }
 
