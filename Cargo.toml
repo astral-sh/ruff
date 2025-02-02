@@ -134,7 +134,12 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2" }
-snapbox = { version = "0.6.0", features = ["diff", "term-svg", "cmd", "examples"] }
+snapbox = { version = "0.6.0", features = [
+    "diff",
+    "term-svg",
+    "cmd",
+    "examples",
+] }
 static_assertions = "1.1.0"
 strum = { version = "0.26.0", features = ["strum_macros"] }
 strum_macros = { version = "0.26.0" }
@@ -159,7 +164,6 @@ unicode-ident = { version = "1.0.12" }
 unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
-ureq = { version = "2.9.6" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = [
     "v4",
@@ -305,7 +309,11 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker"]
 # Publish jobs to run in CI
 publish-jobs = ["./publish-pypi", "./publish-wasm"]
 # Post-announce jobs to run in CI
-post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground"]
+post-announce-jobs = [
+    "./notify-dependents",
+    "./publish-docs",
+    "./publish-playground",
+]
 # Custom permissions for GitHub Jobs
 github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
 # Whether to install an updater program
