@@ -1,4 +1,7 @@
+use std::io::{self, BufWriter, Write};
 use std::process::{ExitCode, Termination};
+
+use anyhow::Result;
 use std::sync::Mutex;
 
 use crate::args::{Args, CheckCommand, Command};
@@ -20,6 +23,7 @@ mod args;
 mod logging;
 mod python_version;
 mod verbosity;
+mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
@@ -49,7 +53,15 @@ fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Version => version().map(|()| ExitStatus::Success),
     }
+}
+
+pub(crate) fn version() -> Result<()> {
+    let mut stdout = BufWriter::new(io::stdout().lock());
+    let version_info = crate::version::version();
+    writeln!(stdout, "red knot {}", &version_info)?;
+    Ok(())
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {

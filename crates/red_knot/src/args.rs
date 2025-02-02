@@ -25,6 +25,9 @@ pub(crate) enum Command {
 
     /// Start the language server
     Server,
+
+    /// Display Red Knot's version
+    Version,
 }
 
 #[derive(Debug, Parser)]
