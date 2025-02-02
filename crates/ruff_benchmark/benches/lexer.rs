@@ -56,6 +56,11 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
                             _ => {}
                         }
                     }
+
+                    assert!(
+                        lexer.finish().is_empty(),
+                        "Input to be valid python source code"
+                    );
                 });
             },
         );

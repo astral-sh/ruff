@@ -119,9 +119,15 @@ impl TestFile {
             Ok(TestFile::new(name.to_string(), content))
         } else {
             // File not yet cached, download and cache it in the target directory
-            let mut response = ureq::get(url.as_str()).call()?;
+            let response = ureq::get(url.as_str()).call()?;
 
-            let content = String::from_utf8_lossy(&response.body_mut().read_to_vec()?).to_string();
+            // Using `with_config` here because without, the `loosy_utf8` results in invalid
+            // UTF8 for unknown reasons
+            let content = response
+                .into_body()
+                .with_config()
+                .limit(10 * 1024 * 1024)
+                .read_to_string()?;
 
             // SAFETY: There's always the `target` directory
             let parent = cached_filename.parent().unwrap();
