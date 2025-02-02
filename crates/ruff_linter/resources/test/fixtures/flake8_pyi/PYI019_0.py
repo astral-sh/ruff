@@ -99,7 +99,7 @@ import builtins
 
 class UsesFullyQualifiedType:
     @classmethod
-    def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
+    def m[S](cls: builtins.type[S]) -> S: ...  # False negative (#15821)
 
 
 def shadowed_type():

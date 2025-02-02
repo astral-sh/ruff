@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI019_0.pyi:7:62: PYI019 Methods like `__new__` should return `Self` instead of a custom `TypeVar`
+PYI019_0.pyi:7:62: PYI019 [*] Methods like `__new__` should return `Self` instead of a custom `TypeVar`
   |
 6 | class BadClass:
 7 |     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
@@ -9,7 +9,7 @@ PYI019_0.pyi:7:62: PYI019 Methods like `__new__` should return `Self` instead of
   |
   = help: Replace with `Self`
 
-ℹ Display-only fix
+ℹ Safe fix
 4 4 | _S2 = TypeVar("_S2", BadClass, GoodClass)
 5 5 | 
 6 6 | class BadClass:
@@ -19,14 +19,14 @@ PYI019_0.pyi:7:62: PYI019 Methods like `__new__` should return `Self` instead of
 9 9 | 
 10 10 |     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
 
-PYI019_0.pyi:10:54: PYI019 Methods like `bad_instance_method` should return `Self` instead of a custom `TypeVar`
+PYI019_0.pyi:10:54: PYI019 [*] Methods like `bad_instance_method` should return `Self` instead of a custom `TypeVar`
    |
 10 |     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
    |                                                      ^^ PYI019
    |
    = help: Replace with `Self`
 
-ℹ Display-only fix
+ℹ Safe fix
 7  7  |     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
 8  8  | 
 9  9  | 
@@ -36,7 +36,7 @@ PYI019_0.pyi:10:54: PYI019 Methods like `bad_instance_method` should return `Sel
 12 12 | 
 13 13 |     @classmethod
 
-PYI019_0.pyi:14:54: PYI019 Methods like `bad_class_method` should return `Self` instead of a custom `TypeVar`
+PYI019_0.pyi:14:54: PYI019 [*] Methods like `bad_class_method` should return `Self` instead of a custom `TypeVar`
    |
 13 |     @classmethod
 14 |     def bad_class_method(cls: type[_S], arg: int) -> _S: ...  # PYI019
@@ -44,7 +44,7 @@ PYI019_0.pyi:14:54: PYI019 Methods like `bad_class_method` should return `Self` 
    |
    = help: Replace with `Self`
 
-ℹ Display-only fix
+ℹ Safe fix
 11 11 | 
 12 12 | 
 13 13 |     @classmethod
@@ -72,7 +72,7 @@ PYI019_0.pyi:18:55: PYI019 [*] Methods like `bad_posonly_class_method` should re
 20 20 | 
 21 21 |     @classmethod
 
-PYI019_0.pyi:39:63: PYI019 Methods like `__new__` should return `Self` instead of a custom `TypeVar`
+PYI019_0.pyi:39:63: PYI019 [*] Methods like `__new__` should return `Self` instead of a custom `TypeVar`
    |
 37 | # Python > 3.12
 38 | class PEP695BadDunderNew[T]:
@@ -81,7 +81,7 @@ PYI019_0.pyi:39:63: PYI019 Methods like `__new__` should return `Self` instead o
    |
    = help: Replace with `Self`
 
-ℹ Display-only fix
+ℹ Safe fix
 36 36 | 
 37 37 | # Python > 3.12
 38 38 | class PEP695BadDunderNew[T]:
@@ -377,7 +377,7 @@ PYI019_0.pyi:85:81: PYI019 [*] Methods like `instance_method_unbound_with_anothe
 87 87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 88 88 | 
 
-PYI019_0.pyi:87:94: PYI019 Methods like `multiple_type_vars` should return `Self` instead of a custom `TypeVar`
+PYI019_0.pyi:87:94: PYI019 [*] Methods like `multiple_type_vars` should return `Self` instead of a custom `TypeVar`
    |
 85 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
 86 |
@@ -388,7 +388,7 @@ PYI019_0.pyi:87:94: PYI019 Methods like `multiple_type_vars` should return `Self
    |
    = help: Replace with `Self`
 
-ℹ Display-only fix
+ℹ Safe fix
 84 84 | 
 85 85 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
 86 86 | 
@@ -398,7 +398,7 @@ PYI019_0.pyi:87:94: PYI019 Methods like `multiple_type_vars` should return `Self
 89 89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
 90 90 | 
 
-PYI019_0.pyi:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` should return `Self` instead of a custom `TypeVar`
+PYI019_0.pyi:89:75: PYI019 [*] Methods like `mixing_old_and_new_style_type_vars` should return `Self` instead of a custom `TypeVar`
    |
 87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 88 |
@@ -407,7 +407,7 @@ PYI019_0.pyi:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` sho
    |
    = help: Replace with `Self`
 
-ℹ Display-only fix
+ℹ Safe fix
 86 86 | 
 87 87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 88 88 | 
@@ -416,25 +416,6 @@ PYI019_0.pyi:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` sho
 90 90 | 
 91 91 | 
 92 92 | class InvalidButWeDoNotPanic:
-
-PYI019_0.pyi:102:40: PYI019 [*] Methods like `m` should return `Self` instead of a custom `TypeVar`
-    |
-100 | class UsesFullyQualifiedType:
-101 |     @classmethod
-102 |     def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
-    |                                        ^ PYI019
-    |
-    = help: Replace with `Self`
-
-ℹ Safe fix
-99  99  | 
-100 100 | class UsesFullyQualifiedType:
-101 101 |     @classmethod
-102     |-    def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
-    102 |+    def m(cls) -> Self: ...  # PYI019
-103 103 | 
-104 104 | 
-105 105 | def shadowed_type():
 
 PYI019_0.pyi:114:31: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
     |
@@ -459,3 +440,81 @@ PYI019_0.pyi:118:29: PYI019 [*] Methods like `f` should return `Self` instead of
 117 117 | class PEP695TypeParameterAtTheVeryEndOfTheList:
 118     |-    def f[T, S](self: S) -> S: ...
     118 |+    def f[T](self) -> Self: ...
+119 119 | 
+120 120 | 
+121 121 | class PEP695Again:
+
+PYI019_0.pyi:122:100: PYI019 [*] Methods like `mixing_and_nested` should return `Self` instead of a custom `TypeVar`
+    |
+121 | class PEP695Again:
+122 |     def mixing_and_nested[T](self: _S695, a: list[_S695], b: dict[_S695, str | T | set[_S695]]) -> _S695: ...
+    |                                                                                                    ^^^^^ PYI019
+123 |     def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
+    |
+    = help: Replace with `Self`
+
+ℹ Safe fix
+119 119 | 
+120 120 | 
+121 121 | class PEP695Again:
+122     |-    def mixing_and_nested[T](self: _S695, a: list[_S695], b: dict[_S695, str | T | set[_S695]]) -> _S695: ...
+    122 |+    def mixing_and_nested[T](self, a: list[Self], b: dict[Self, str | T | set[Self]]) -> Self: ...
+123 123 |     def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
+124 124 | 
+125 125 |     @classmethod
+
+PYI019_0.pyi:132:10: PYI019 [*] Methods like `comment_in_fix_range` should return `Self` instead of a custom `TypeVar`
+    |
+130 |         a: T,
+131 |         b: tuple[S, T]
+132 |     ) -> S: ...
+    |          ^ PYI019
+133 |
+134 |     def comment_outside_fix_range[T, S](
+    |
+    = help: Replace with `Self`
+
+ℹ Unsafe fix
+123 123 |     def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
+124 124 | 
+125 125 |     @classmethod
+126     |-    def comment_in_fix_range[T, S](
+127     |-        cls: type[  # Lorem ipsum
+128     |-            S
+129     |-        ],
+    126 |+    def comment_in_fix_range[T](
+    127 |+        cls,
+130 128 |         a: T,
+131     |-        b: tuple[S, T]
+132     |-    ) -> S: ...
+    129 |+        b: tuple[Self, T]
+    130 |+    ) -> Self: ...
+133 131 | 
+134 132 |     def comment_outside_fix_range[T, S](
+135 133 |         self: S,
+
+PYI019_0.pyi:141:10: PYI019 [*] Methods like `comment_outside_fix_range` should return `Self` instead of a custom `TypeVar`
+    |
+139 |             S, T
+140 |         ]
+141 |     ) -> S: ...
+    |          ^ PYI019
+    |
+    = help: Replace with `Self`
+
+ℹ Safe fix
+131 131 |         b: tuple[S, T]
+132 132 |     ) -> S: ...
+133 133 | 
+134     |-    def comment_outside_fix_range[T, S](
+135     |-        self: S,
+    134 |+    def comment_outside_fix_range[T](
+    135 |+        self,
+136 136 |         a: T,
+137 137 |         b: tuple[
+138 138 |             # Lorem ipsum
+139     |-            S, T
+    139 |+            Self, T
+140 140 |         ]
+141     |-    ) -> S: ...
+    141 |+    ) -> Self: ...

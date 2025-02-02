@@ -207,15 +207,6 @@ PYI019_0.py:89:75: PYI019 Methods like `mixing_old_and_new_style_type_vars` shou
    |
    = help: Replace with `Self`
 
-PYI019_0.py:102:40: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
-    |
-100 | class UsesFullyQualifiedType:
-101 |     @classmethod
-102 |     def m[S](cls: builtins.type[S]) -> S: ...  # PYI019
-    |                                        ^ PYI019
-    |
-    = help: Replace with `Self`
-
 PYI019_0.py:114:31: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
     |
 112 | class SubscriptReturnType:
