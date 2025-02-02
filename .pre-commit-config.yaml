@@ -5,6 +5,7 @@ exclude: |
     .github/workflows/release.yml|
     crates/red_knot_vendored/vendor/.*|
     crates/red_knot_project/resources/.*|
+    crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff_notebook/resources/.*|
