@@ -3,9 +3,7 @@ use std::cmp;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{
-    self as ast, Expr, ExprName, ExprSubscript, Parameters, TypeParam, TypeParams,
-};
+use ruff_python_ast::{self as ast, Expr, ExprName, ExprSubscript, TypeParam, TypeParams};
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel};
@@ -94,13 +92,13 @@ pub(crate) fn custom_type_var_return_type(
     let parameters = &*function_def.parameters;
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
-    let self_or_cls_annotation = parameters
+    let self_or_cls_parameter = parameters
         .posonlyargs
         .iter()
         .chain(&parameters.args)
-        .next()?
-        .annotation()?;
+        .next()?;
 
+    let self_or_cls_annotation = self_or_cls_parameter.annotation()?;
     let decorator_list = &*function_def.decorator_list;
 
     // Skip any abstract, static, and overloaded methods.
@@ -141,8 +139,15 @@ pub(crate) fn custom_type_var_return_type(
         returns.range(),
     );
 
-    diagnostic
-        .try_set_optional_fix(|| replace_custom_typevar_with_self(checker, function_def, returns));
+    diagnostic.try_set_optional_fix(|| {
+        replace_custom_typevar_with_self(
+            checker,
+            function_def,
+            self_or_cls_parameter,
+            self_or_cls_annotation,
+            returns,
+        )
+    });
 
     Some(diagnostic)
 }
@@ -286,6 +291,8 @@ fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&TypeParam
 fn replace_custom_typevar_with_self(
     checker: &Checker,
     function_def: &ast::StmtFunctionDef,
+    self_or_cls_parameter: &ast::ParameterWithDefault,
+    self_or_cls_annotation: &ast::Expr,
     returns: &Expr,
 ) -> anyhow::Result<Option<Fix>> {
     if checker.settings.preview.is_disabled() {
@@ -310,17 +317,12 @@ fn replace_custom_typevar_with_self(
 
     let (import_edit, self_symbol_binding) = import_self(checker, returns.start())?;
 
-    let mut other_edits = vec![replace_return_annotation_with_self(
-        &self_symbol_binding,
-        returns,
+    let mut other_edits = vec![Edit::deletion(
+        self_or_cls_parameter.name().end(),
+        self_or_cls_annotation.end(),
     )];
 
-    let replace_references_range = {
-        let edit = remove_first_parameter_annotation(&function_def.parameters);
-        let first_parameter_end = edit.end();
-        other_edits.push(edit);
-        TextRange::new(first_parameter_end, returns.start())
-    };
+    let replace_references_range = TextRange::new(self_or_cls_annotation.end(), returns.end());
 
     other_edits.extend(remove_typevar_declaration(
         function_def.type_params.as_deref(),
@@ -364,18 +366,6 @@ fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), 
     let (importer, semantic) = (checker.importer(), checker.semantic());
     let request = ImportRequest::import_from(source_module, "Self");
     importer.get_or_import_symbol(&request, position, semantic)
-}
-
-fn remove_first_parameter_annotation(parameters: &Parameters) -> Edit {
-    // The first parameter is guaranteed to be `self`/`cls`,
-    // as verified by `uses_custom_var()`.
-    let mut non_variadic_positional = parameters.posonlyargs.iter().chain(&parameters.args);
-    let first = &non_variadic_positional.next().unwrap();
-    Edit::deletion(first.name().end(), first.end())
-}
-
-fn replace_return_annotation_with_self(self_symbol_binding: &str, returns: &Expr) -> Edit {
-    Edit::range_replacement(self_symbol_binding.to_string(), returns.range())
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`,
