@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -72,14 +73,30 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
                 call.end(),
             );
 
-            // Delete the open bracket (`[`).
-            let argument_start =
-                Edit::deletion(argument.start(), argument.start() + TextSize::from(1));
+            // If the list comprehension is parenthesized, remove the parentheses in addition to
+            // removing the brackets.
+            if let Some(range) = parenthesized_range(
+                argument.into(),
+                (&call.arguments).into(),
+                checker.comment_ranges(),
+                checker.locator().contents(),
+            ) {
+                // The generator produces the brackets that need to be removed
+                let generator = checker.generator().expr(argument);
+                let generator = generator[1..generator.len() - 1].to_string();
+                let replacement = Edit::range_replacement(generator, range);
+                Fix::unsafe_edits(call_start, [call_end, replacement])
+            } else {
+                // Delete the open bracket (`[`).
+                let argument_start =
+                    Edit::deletion(argument.start(), argument.start() + TextSize::from(1));
 
-            // Delete the close bracket (`]`).
-            let argument_end = Edit::deletion(argument.end() - TextSize::from(1), argument.end());
+                // Delete the close bracket (`]`).
+                let argument_end =
+                    Edit::deletion(argument.end() - TextSize::from(1), argument.end());
 
-            Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
+                Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
+            }
         };
         checker.diagnostics.push(diagnostic.with_fix(fix));
     }

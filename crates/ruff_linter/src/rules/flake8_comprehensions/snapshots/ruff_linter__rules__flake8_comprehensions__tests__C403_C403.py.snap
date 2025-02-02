@@ -220,6 +220,8 @@ C403.py:21:5: C403 [*] Unnecessary list comprehension (rewrite as a set comprehe
 22 | |     x for x in range(3)
 23 | | ])
    | |__^ C403
+24 |
+25 |   s = set(([x for x in range(3)]))
    |
    = help: Rewrite as a set comprehension
 
@@ -232,3 +234,21 @@ C403.py:21:5: C403 [*] Unnecessary list comprehension (rewrite as a set comprehe
 22 22 |     x for x in range(3)
 23    |-])
    23 |+}
+24 24 | 
+25 25 | s = set(([x for x in range(3)]))
+
+C403.py:25:5: C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
+   |
+23 | ])
+24 |
+25 | s = set(([x for x in range(3)]))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C403
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+22 22 |     x for x in range(3)
+23 23 | ])
+24 24 | 
+25    |-s = set(([x for x in range(3)]))
+   25 |+s = {x for x in range(3)}
