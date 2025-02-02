@@ -1,5 +1,5 @@
-This directory vendors some files from actual project.
-This is to benchmark Ruff's performance against real world
+This directory vendors some files from actual projects.
+This is to benchmark Ruff's performance against real-world
 code instead of synthetic benchmarks.
 
 The following files are included:
