@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
 
 use crate::{checkers::ast::Checker, renamer::Renamer};
@@ -83,15 +83,9 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return None;
     }
 
-    let (kind, type_params) = match stmt {
-        Stmt::FunctionDef(StmtFunctionDef {
-            type_params: Some(type_params),
-            ..
-        }) => (ParamKind::Function, type_params),
-        Stmt::ClassDef(StmtClassDef {
-            type_params: Some(type_params),
-            ..
-        }) => (ParamKind::Class, type_params),
+    let kind = match stmt {
+        Stmt::FunctionDef(_) => ParamKind::Function,
+        Stmt::ClassDef(_) => ParamKind::Class,
         _ => return None,
     };
 
@@ -105,7 +99,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     let new_name = old_name.trim_start_matches('_');
 
-    let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, type_params.range);
+    let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
 
     diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
