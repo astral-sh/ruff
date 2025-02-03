@@ -40,13 +40,15 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// ## See also
 ///
 /// This rule renames private [PEP 695] type parameters but doesn't convert pre-[PEP 695] generics
-/// to the new format. See [`non-pep695-generic-function`](non-pep695-generic-function.md) and
-/// [`non-pep695-generic-class`](non-pep695-generic-class.md) for rules that will make this
-/// transformation. Those rules do not remove unused type variables after their changes, so you may
-/// also want to consider enabling [`unused-private-type-var`](unused-private-type-var.md) to
-/// complete the transition to [PEP 695] generics.
+/// to the new format. See [`non-pep695-generic-function`] and [`non-pep695-generic-class`] for
+/// rules that will make this transformation. Those rules do not remove unused type variables after
+/// their changes, so you may also want to consider enabling [`unused-private-type-var`] to complete
+/// the transition to [PEP 695] generics.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
+/// [`non-pep695-generic-function`]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
+/// [`non-pep695-generic-class`]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
+/// [`unused-private-type-var`]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
