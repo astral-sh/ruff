@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF059.py:6:15: RUF059 Parameter overshadows symbol from outer scope
+  |
+5 | def outer(a):
+6 |     def inner(a): ...
+  |               ^ RUF059
+  |
+  = help: Rename parameter
+
+RUF059.py:11:15: RUF059 Parameter overshadows symbol from outer scope
+   |
+ 9 | def outer():
+10 |     a = 1
+11 |     def inner(a): ...
+   |               ^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:15:15: RUF059 Parameter overshadows symbol from outer scope
+   |
+14 | def outer():
+15 |     def inner(a): ...
+   |               ^ RUF059
+16 |     a = 1
+   |
+   = help: Rename parameter
+
+RUF059.py:20:15: RUF059 Parameter overshadows symbol from outer scope
+   |
+19 | def outer():
+20 |     def inner(outer): ...
+   |               ^^^^^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:23:11: RUF059 Parameter overshadows symbol from outer scope
+   |
+23 | def outer(global_a): ...
+   |           ^^^^^^^^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:27:15: RUF059 Parameter overshadows symbol from outer scope
+   |
+26 | def outer():
+27 |     def inner(global_a): ...
+   |               ^^^^^^^^ RUF059
+   |
+   = help: Rename parameter
