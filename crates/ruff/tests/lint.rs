@@ -2175,6 +2175,20 @@ fn flake8_import_convention_unused_aliased_import() {
         .pass_stdin("1"));
 }
 
+#[test]
+fn flake8_import_convention_unused_aliased_import_no_conflict() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
+        .args(["--select", "I002,ICN001,F401"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--unsafe-fixes")
+        .arg("--fix")
+        .arg("-")
+        .pass_stdin("1"));
+}
+
 /// Test that private, old-style `TypeVar` generics
 /// 1. Get replaced with PEP 695 type parameters (UP046, UP047)
 /// 2. Get renamed to remove leading underscores (UP049)
