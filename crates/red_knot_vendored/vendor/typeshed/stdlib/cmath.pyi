@@ -1,13 +1,13 @@
-from typing import SupportsComplex, SupportsFloat, SupportsIndex
+from typing import Final, SupportsComplex, SupportsFloat, SupportsIndex
 from typing_extensions import TypeAlias
 
-e: float
-pi: float
-inf: float
-infj: complex
-nan: float
-nanj: complex
-tau: float
+e: Final[float]
+pi: Final[float]
+inf: Final[float]
+infj: Final[complex]
+nan: Final[float]
+nanj: Final[complex]
+tau: Final[float]
 
 _C: TypeAlias = SupportsFloat | SupportsComplex | SupportsIndex | complex
 

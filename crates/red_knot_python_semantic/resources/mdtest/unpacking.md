@@ -361,6 +361,8 @@ def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str])
 ### Nested
 
 ```py
+from typing import Literal
+
 def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"]]):
     a, (b, c) = arg
     reveal_type(a)  # revealed: int | tuple[int, bytes]

@@ -58,14 +58,17 @@ use ruff_source_file::LineRanges;
 /// ```
 ///
 /// ## See also
-/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+/// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
-/// - [`quoted-type-alias`](quoted-type-alias.md): A rule that removes unnecessary quotes
+/// - [`quoted-type-alias`][TC008]: A rule that removes unnecessary quotes
 ///   from type aliases.
 ///
 /// ## References
 /// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html#module-__future__)
+///
+/// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
+/// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedAnnotation;
 

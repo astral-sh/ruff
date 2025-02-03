@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::ExprSubscript;
+use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_python_semantic::SemanticModel;
 
 use crate::{checkers::ast::Checker, settings::types::PythonVersion};
@@ -142,7 +142,7 @@ fn in_vararg(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
         .parameters
         .vararg
         .as_ref()
-        .and_then(|vararg| vararg.annotation.as_ref())
-        .and_then(|annotation| annotation.as_subscript_expr())
+        .and_then(|vararg| vararg.annotation())
+        .and_then(Expr::as_subscript_expr)
         == Some(expr)
 }

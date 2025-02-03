@@ -13,6 +13,8 @@ python-version = "3.10"
 Here, we simply make sure that we pick up the global configuration from the root section:
 
 ```py
+import sys
+
 reveal_type(sys.version_info[:2] == (3, 10))  # revealed: Literal[True]
 ```
 
@@ -25,6 +27,8 @@ reveal_type(sys.version_info[:2] == (3, 10))  # revealed: Literal[True]
 The same should work for arbitrarily nested sections:
 
 ```py
+import sys
+
 reveal_type(sys.version_info[:2] == (3, 10))  # revealed: Literal[True]
 ```
 
@@ -38,6 +42,8 @@ python-version = "3.11"
 ```
 
 ```py
+import sys
+
 reveal_type(sys.version_info[:2] == (3, 11))  # revealed: Literal[True]
 ```
 
@@ -46,6 +52,8 @@ reveal_type(sys.version_info[:2] == (3, 11))  # revealed: Literal[True]
 There is no global state. This section should again use the root configuration:
 
 ```py
+import sys
+
 reveal_type(sys.version_info[:2] == (3, 10))  # revealed: Literal[True]
 ```
 
@@ -63,5 +71,7 @@ python-version = "3.12"
 ### Grandchild
 
 ```py
+import sys
+
 reveal_type(sys.version_info[:2] == (3, 12))  # revealed: Literal[True]
 ```

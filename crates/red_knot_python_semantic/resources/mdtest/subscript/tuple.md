@@ -97,7 +97,7 @@ reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Unknown, Literal[object]]
 `typing.Tuple` can be used interchangeably with `tuple`:
 
 ```py
-from typing import Tuple
+from typing import Any, Tuple
 
 class A: ...
 

@@ -28,14 +28,21 @@ fn config_override() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        error[lint:unresolved-attribute] <temp_dir>/test.py:5:7 Type `<module 'sys'>` has no attribute `last_exc`
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-attribute
+     --> <temp_dir>/test.py:5:7
+      |
+    4 | # Access `sys.last_exc` that was only added in Python 3.12
+    5 | print(sys.last_exc)
+      |       ^^^^^^^^^^^^ Type `<module 'sys'>` has no attribute `last_exc`
+      |
 
-        ----- stderr -----
-    ");
+
+    ----- stderr -----
+    "###);
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
         success: true
@@ -91,14 +98,22 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r#"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        error[lint:unresolved-import] <temp_dir>/child/test.py:2:1 Cannot resolve import `utils`
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-import
+     --> <temp_dir>/child/test.py:2:1
+      |
+    2 | from utils import add
+      | ^^^^^^^^^^^^^^^^^^^^^ Cannot resolve import `utils`
+    3 |
+    4 | stat = add(10, 15)
+      |
 
-        ----- stderr -----
-    "#);
+
+    ----- stderr -----
+    "###);
 
     assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")).arg("--extra-search-path").arg("../libs"), @r"
         success: true
@@ -180,15 +195,31 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
-        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:division-by-zero
+     --> <temp_dir>/test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
 
-        ----- stderr -----
-    ");
+    warning: lint:possibly-unresolved-reference
+     --> <temp_dir>/test.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)  # possibly-unresolved-reference
+      |       - Name `x` used when possibly not defined
+      |
+
+
+    ----- stderr -----
+    "###);
 
     case.write_file(
         "pyproject.toml",
@@ -199,14 +230,22 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
 
-        ----- stderr -----
-    ");
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }
@@ -230,16 +269,42 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        error[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
-        error[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
-        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:9:7 Name `x` used when possibly not defined
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-import
+     --> <temp_dir>/test.py:2:8
+      |
+    2 | import does_not_exit
+      |        ^^^^^^^^^^^^^ Cannot resolve import `does_not_exit`
+    3 |
+    4 | y = 4 / 0
+      |
 
-        ----- stderr -----
-    ");
+    error: lint:division-by-zero
+     --> <temp_dir>/test.py:4:5
+      |
+    2 | import does_not_exit
+    3 |
+    4 | y = 4 / 0
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+    5 |
+    6 | for a in range(0, y):
+      |
+
+    warning: lint:possibly-unresolved-reference
+     --> <temp_dir>/test.py:9:7
+      |
+    7 |     x = a
+    8 |
+    9 | print(x)  # possibly-unresolved-reference
+      |       - Name `x` used when possibly not defined
+      |
+
+
+    ----- stderr -----
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -250,15 +315,33 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--warn")
             .arg("unresolved-import"),
-        @r"
-    success: false
-    exit_code: 1
+        @r###"
+    success: true
+    exit_code: 0
     ----- stdout -----
-    warning[lint:unresolved-import] <temp_dir>/test.py:2:8 Cannot resolve import `does_not_exit`
-    warning[lint:division-by-zero] <temp_dir>/test.py:4:5 Cannot divide object of type `Literal[4]` by zero
+    warning: lint:unresolved-import
+     --> <temp_dir>/test.py:2:8
+      |
+    2 | import does_not_exit
+      |        ------------- Cannot resolve import `does_not_exit`
+    3 |
+    4 | y = 4 / 0
+      |
+
+    warning: lint:division-by-zero
+     --> <temp_dir>/test.py:4:5
+      |
+    2 | import does_not_exit
+    3 |
+    4 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    5 |
+    6 | for a in range(0, y):
+      |
+
 
     ----- stderr -----
-    "
+    "###
     );
 
     Ok(())
@@ -282,15 +365,31 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        error[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
-        warning[lint:possibly-unresolved-reference] <temp_dir>/test.py:7:7 Name `x` used when possibly not defined
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:division-by-zero
+     --> <temp_dir>/test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
 
-        ----- stderr -----
-    ");
+    warning: lint:possibly-unresolved-reference
+     --> <temp_dir>/test.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)  # possibly-unresolved-reference
+      |       - Name `x` used when possibly not defined
+      |
+
+
+    ----- stderr -----
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -302,14 +401,22 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             // Override the error severity with warning
             .arg("--ignore")
             .arg("possibly-unresolved-reference"),
-        @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        warning[lint:division-by-zero] <temp_dir>/test.py:2:5 Cannot divide object of type `Literal[4]` by zero
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
 
-        ----- stderr -----
-        "
+
+    ----- stderr -----
+    "###
     );
 
     Ok(())
@@ -329,14 +436,21 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         ("test.py", "print(10)"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        warning[unknown-rule] <temp_dir>/pyproject.toml:3:1 Unknown lint rule `division-by-zer`
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: unknown-rule
+     --> <temp_dir>/pyproject.toml:3:1
+      |
+    2 | [tool.knot.rules]
+    3 | division-by-zer = "warn" # incorrect rule name
+      | --------------- Unknown lint rule `division-by-zer`
+      |
 
-        ----- stderr -----
-    ");
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }
@@ -346,14 +460,228 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", "print(10)")?;
 
-    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        warning[unknown-rule] Unknown lint rule `division-by-zer`
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: unknown-rule: Unknown lint rule `division-by-zer`
 
-        ----- stderr -----
-    ");
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_only_warnings() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       - Name `x` used when not defined
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_only_info() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        from typing_extensions import reveal_type
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info: revealed-type
+     --> <temp_dir>/test.py:3:1
+      |
+    2 | from typing_extensions import reveal_type
+    3 | reveal_type(1)
+      | -------------- info: Revealed type is `Literal[1]`
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        from typing_extensions import reveal_type
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info: revealed-type
+     --> <temp_dir>/test.py:3:1
+      |
+    2 | from typing_extensions import reveal_type
+    3 | reveal_type(1)
+      | -------------- info: Revealed type is `Literal[1]`
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       - Name `x` used when not defined
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:2:7
+      |
+    2 | print(x)     # [unresolved-reference]
+      |       - Name `x` used when not defined
+    3 | print(4[1])  # [non-subscriptable]
+      |
+
+    error: lint:non-subscriptable
+     --> <temp_dir>/test.py:3:7
+      |
+    2 | print(x)     # [unresolved-reference]
+    3 | print(4[1])  # [non-subscriptable]
+      |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r###"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "###,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:2:7
+      |
+    2 | print(x)     # [unresolved-reference]
+      |       - Name `x` used when not defined
+    3 | print(4[1])  # [non-subscriptable]
+      |
+
+    error: lint:non-subscriptable
+     --> <temp_dir>/test.py:3:7
+      |
+    2 | print(x)     # [unresolved-reference]
+    3 | print(4[1])  # [non-subscriptable]
+      |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:2:7
+      |
+    2 | print(x)     # [unresolved-reference]
+      |       - Name `x` used when not defined
+    3 | print(4[1])  # [non-subscriptable]
+      |
+
+    error: lint:non-subscriptable
+     --> <temp_dir>/test.py:3:7
+      |
+    2 | print(x)     # [unresolved-reference]
+    3 | print(4[1])  # [non-subscriptable]
+      |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+      |
+
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }

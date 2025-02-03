@@ -220,16 +220,18 @@ pub(crate) fn bad_generator_return_type(
         },
         function_def.identifier(),
     );
-    if let Some(fix) = generate_fix(
-        function_def,
-        returns,
-        yield_type_info,
-        module,
-        member,
-        checker,
-    ) {
-        diagnostic.set_fix(fix);
-    };
+
+    diagnostic.try_set_fix(|| {
+        generate_fix(
+            function_def,
+            returns,
+            yield_type_info,
+            module,
+            member,
+            checker,
+        )
+    });
+
     checker.diagnostics.push(diagnostic);
 }
 
@@ -246,17 +248,14 @@ fn generate_fix(
     module: Module,
     member: Generator,
     checker: &Checker,
-) -> Option<Fix> {
+) -> anyhow::Result<Fix> {
     let expr = map_subscript(returns);
 
-    let (import_edit, binding) = checker
-        .importer()
-        .get_or_import_symbol(
-            &ImportRequest::import_from(&module.to_string(), &member.to_iter().to_string()),
-            expr.start(),
-            checker.semantic(),
-        )
-        .ok()?;
+    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import_from(&module.to_string(), &member.to_iter().to_string()),
+        expr.start(),
+        checker.semantic(),
+    )?;
     let binding_edit = Edit::range_replacement(binding, expr.range());
     let yield_edit = yield_type_info.map(|yield_type_info| {
         Edit::range_replacement(
@@ -272,7 +271,7 @@ fn generate_fix(
         Applicability::Unsafe
     };
 
-    Some(Fix::applicable_edits(
+    Ok(Fix::applicable_edits(
         import_edit,
         std::iter::once(binding_edit).chain(yield_edit),
         applicability,

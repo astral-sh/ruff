@@ -88,6 +88,8 @@ with Manager():
 ## Context manager with non-callable `__exit__` attribute
 
 ```py
+from typing_extensions import Self
+
 class Manager:
     def __enter__(self) -> Self: ...
 

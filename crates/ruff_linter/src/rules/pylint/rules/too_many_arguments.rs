@@ -68,12 +68,7 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::Stmt
     let num_arguments = function_def
         .parameters
         .iter_non_variadic_params()
-        .filter(|arg| {
-            !checker
-                .settings
-                .dummy_variable_rgx
-                .is_match(&arg.parameter.name)
-        })
+        .filter(|param| !checker.settings.dummy_variable_rgx.is_match(param.name()))
         .count();
 
     if num_arguments <= checker.settings.pylint.max_args {

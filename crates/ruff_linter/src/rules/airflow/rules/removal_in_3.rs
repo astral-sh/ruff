@@ -164,14 +164,14 @@ fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionD
     }
 
     for param in function_def.parameters.iter_non_variadic_params() {
-        let param_name = param.parameter.name.as_str();
-        if REMOVED_CONTEXT_KEYS.contains(&param_name) {
+        let param_name = param.name();
+        if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
             checker.diagnostics.push(Diagnostic::new(
                 Airflow3Removal {
                     deprecated: param_name.to_string(),
                     replacement: Replacement::None,
                 },
-                param.parameter.name.range(),
+                param_name.range(),
             ));
         }
     }

@@ -3,6 +3,8 @@
 ## Class instances
 
 ```py
+from typing import Literal
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
@@ -136,6 +138,8 @@ reveal_type(No() // Yes())  # revealed: Unknown
 ## Subclass reflections override superclass dunders
 
 ```py
+from typing import Literal
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
@@ -294,6 +298,8 @@ itself. (For these operators to work on the class itself, they would have to be 
 class's type, i.e. `type`.)
 
 ```py
+from typing import Literal
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
@@ -312,6 +318,8 @@ reveal_type(No + No)  # revealed: Unknown
 ## Subclass
 
 ```py
+from typing import Literal
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
