@@ -1,6 +1,8 @@
-use rustc_hash::FxHashMap;
-
 use crate::semantic_index::expression::Expression;
+
+use ruff_python_ast::name::Name;
+
+use rustc_hash::FxHashMap;
 
 /// Describes an (annotated) attribute assignment that we discovered in a method
 /// body, typically of the form `self.x: int`, `self.x: int = …` or `self.x = …`.
@@ -14,4 +16,4 @@ pub(crate) enum AttributeAssignment<'db> {
     Unannotated { value: Expression<'db> },
 }
 
-pub(crate) type AttributeAssignments<'db> = FxHashMap<&'db str, Vec<AttributeAssignment<'db>>>;
+pub(crate) type AttributeAssignments<'db> = FxHashMap<Name, Vec<AttributeAssignment<'db>>>;

@@ -457,7 +457,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 self.attribute_assignments
                     .entry(class_body_scope)
                     .or_default()
-                    .entry(attr.id().as_str())
+                    .entry(attr.id().clone())
                     .or_default()
                     .push(attribute_assignment);
             }
