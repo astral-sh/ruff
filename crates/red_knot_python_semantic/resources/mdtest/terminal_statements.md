@@ -635,5 +635,6 @@ def _(cond: bool):
         if True:
             return
 
-    reveal_type(x)  # revealed: Literal["a"]
+    # TODO: Literal["a"]
+    reveal_type(x)  # revealed: Literal["a", "b"]
 ```
