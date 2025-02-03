@@ -72,7 +72,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &mut Checker, call: &Expr
                 return;
             }
 
-            if attr != "log" && LoggingLevel::from_attribute(attr).is_none() {
+            if LoggingLevel::from_attribute(attr).is_none() {
                 return;
             }
         }
