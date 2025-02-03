@@ -1489,38 +1489,6 @@ if True:
 from module import symbol
 ```
 
-## Known limitations
-
-We currently have a limitation in the complexity (depth) of the visibility constraints that are
-supported. This is to avoid pathological cases that would require us to recurse deeply.
-
-TODO: We don't! Remove this!
-
-```py
-x = 1
-
-False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or (x := 2)  # fmt: skip
-
-# This still works fine:
-reveal_type(x)  # revealed: Literal[2]
-
-y = 1
-
-False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or (y := 2)  # fmt: skip
-
-reveal_type(y)  # revealed: Literal[2]
-```
-
 ## Unsupported features
 
 We do not support full unreachable code analysis yet. We also raise diagnostics from
