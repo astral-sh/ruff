@@ -24,6 +24,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::PytestUnittestRaisesAssertion,
         Rule::ForLoopWrites,
         Rule::CustomTypeVarReturnType,
+        Rule::OvershadowingParameter,
     ]) {
         return;
     }
@@ -120,6 +121,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
             if let Some(diagnostic) =
                 flake8_pyi::rules::custom_type_var_return_type(checker, binding)
             {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::OvershadowingParameter) {
+            if let Some(diagnostic) = ruff::rules::overshadowing_parameter(checker, binding) {
                 checker.diagnostics.push(diagnostic);
             }
         }
