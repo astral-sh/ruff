@@ -1,7 +1,7 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
 use clap::{ArgAction, ArgMatches, Error, Parser};
-use red_knot_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_python_semantic::lint;
 use ruff_db::system::SystemPathBuf;
@@ -105,9 +105,6 @@ impl CheckCommand {
                 ..EnvironmentOptions::default()
             }),
             rules,
-            terminal: Some(TerminalOptions {
-                error_on_warning: self.error_on_warning.then_some(true),
-            }),
             ..Default::default()
         }
     }
