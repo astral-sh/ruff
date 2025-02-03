@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI019_1.pyi:4:26: PYI019 Methods like `m` should return `Self` instead of a custom `TypeVar`
+PYI019_1.pyi:4:26: PYI019 Use `Self` instead of custom TypeVar `S`
   |
 3 | class F:
 4 |     def m[S](self: S) -> S: ...
   |                          ^ PYI019
   |
-  = help: Replace with `Self`
+  = help: Replace TypeVar `S` with `Self`

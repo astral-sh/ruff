@@ -23,7 +23,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UsedDummyVariable,
         Rule::PytestUnittestRaisesAssertion,
         Rule::ForLoopWrites,
-        Rule::CustomTypeVarReturnType,
+        Rule::CustomTypeVarForSelf,
     ]) {
         return;
     }
@@ -116,9 +116,9 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker.enabled(Rule::CustomTypeVarReturnType) {
+        if checker.enabled(Rule::CustomTypeVarForSelf) {
             if let Some(diagnostic) =
-                flake8_pyi::rules::custom_type_var_return_type(checker, binding)
+                flake8_pyi::rules::custom_type_var_instead_of_self(checker, binding)
             {
                 checker.diagnostics.push(diagnostic);
             }
