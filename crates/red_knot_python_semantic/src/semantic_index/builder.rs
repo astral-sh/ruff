@@ -22,7 +22,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
@@ -54,25 +54,9 @@ impl LoopState {
     }
 }
 
-/// Used in the scope-stack of the [`SemanticIndexBuilder`] to keep track of whether
-/// or not the current scope belongs to a method in a class, which is the case if
-/// the current scope is a `BuilderScopeKind::FunctionBody` and the parent scope is
-/// a `BuilderScopeKind::ClassBody`.
-///
-/// This is called `BuilderScopeKind` to distinguish it from the `ScopeKind` enum,
-/// which is not fine-grained enough for this use case (functions and lambdas are
-/// both `ScopeKind::Function`)
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum BuilderScopeKind {
-    ClassBody,
-    FunctionBody,
-    Other,
-}
-
 struct ScopeInfo {
     file_scope_id: FileScopeId,
     loop_state: LoopState,
-    scope_kind: BuilderScopeKind,
 }
 
 pub(super) struct SemanticIndexBuilder<'db> {
@@ -172,10 +156,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         let current = scopes_rev.next()?;
         let parent = scopes_rev.next()?;
 
-        match (current.scope_kind, parent.scope_kind) {
-            (BuilderScopeKind::FunctionBody, BuilderScopeKind::ClassBody) => {
-                Some(parent.file_scope_id)
-            }
+        match (
+            self.scopes[current.file_scope_id].kind(),
+            self.scopes[parent.file_scope_id].kind(),
+        ) {
+            (ScopeKind::Function, ScopeKind::Class) => Some(parent.file_scope_id),
             _ => None,
         }
     }
@@ -217,16 +202,9 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
-        let scope_kind = match node {
-            NodeWithScopeRef::Class(_) => BuilderScopeKind::ClassBody,
-            NodeWithScopeRef::Function(_) => BuilderScopeKind::FunctionBody,
-            _ => BuilderScopeKind::Other,
-        };
-
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             loop_state: LoopState::NotInLoop,
-            scope_kind,
         });
     }
 
