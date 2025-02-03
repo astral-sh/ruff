@@ -25,12 +25,10 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{
-    FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
-};
+use crate::semantic_index::use_def::{FlowSnapshot, ScopedConstraintId, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::visibility_constraints::VisibilityConstraint;
+use crate::visibility_constraints::{ScopedVisibilityConstraintId, VisibilityConstraintsBuilder};
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -232,6 +230,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &self.use_def_maps[scope_id]
     }
 
+    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder<'db> {
+        let scope_id = self.current_scope();
+        &mut self.use_def_maps[scope_id].visibility_constraints
+    }
+
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
@@ -367,21 +370,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         id
     }
 
-    /// Adds a new visibility constraint, but does not record it. Returns the constraint ID
-    /// for later recording using [`SemanticIndexBuilder::record_visibility_constraint_id`].
-    fn add_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .add_visibility_constraint(constraint)
-    }
-
     /// Records a previously added visibility constraint by applying it to all live bindings
     /// and declarations.
     fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint_id(constraint);
+            .record_visibility_constraint(constraint);
     }
 
     /// Negates the given visibility constraint and then adds it to all live bindings and declarations.
@@ -389,8 +382,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         constraint: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
+        let id = self
+            .current_visibility_constraints_mut()
+            .add_not_constraint(constraint);
+        self.record_visibility_constraint_id(id);
+        id
     }
 
     /// Records a visibility constraint by applying it to all live bindings and declarations.
@@ -398,8 +394,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         constraint: Constraint<'db>,
     ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 0))
+        let id = self
+            .current_visibility_constraints_mut()
+            .add_atom(constraint, 0);
+        self.record_visibility_constraint_id(id);
+        id
     }
 
     /// Records that all remaining statements in the current block are unreachable, and therefore
@@ -408,10 +407,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().mark_unreachable();
     }
 
-    /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
-    fn record_ambiguous_visibility(&mut self) -> ScopedVisibilityConstraintId {
+    /// Records a visibility constraint that always evaluates to "ambiguous".
+    fn record_ambiguous_visibility(&mut self) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::Ambiguous)
+            .record_visibility_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);
     }
 
     /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
@@ -1091,10 +1090,12 @@ where
                 // We need multiple copies of the visibility constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
-                let first_vis_constraint_id =
-                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 0));
-                let later_vis_constraint_id =
-                    self.add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint, 1));
+                let first_vis_constraint_id = self
+                    .current_visibility_constraints_mut()
+                    .add_atom(constraint, 0);
+                let later_vis_constraint_id = self
+                    .current_visibility_constraints_mut()
+                    .add_atom(constraint, 1);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -1665,9 +1666,9 @@ where
                             ast::BoolOp::And => (constraint, self.add_constraint(constraint)),
                             ast::BoolOp::Or => self.add_negated_constraint(constraint),
                         };
-                        let visibility_constraint = self.add_visibility_constraint(
-                            VisibilityConstraint::VisibleIf(constraint, 0),
-                        );
+                        let visibility_constraint = self
+                            .current_visibility_constraints_mut()
+                            .add_atom(constraint, 0);
 
                         let after_expr = self.flow_snapshot();
 
