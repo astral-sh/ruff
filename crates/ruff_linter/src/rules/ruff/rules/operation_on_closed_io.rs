@@ -168,8 +168,5 @@ fn for_loop_io_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<
         return None;
     }
 
-    let start = for_loop.target.start();
-    let end = iter.end();
-
-    Some(TextRange::new(start, end))
+    Some(TextRange::new(for_loop.target.start(), iter.end()))
 }
