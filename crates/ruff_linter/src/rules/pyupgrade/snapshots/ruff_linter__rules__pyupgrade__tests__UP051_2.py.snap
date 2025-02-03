@@ -3,33 +3,79 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
 UP051_2.py:2:10: UP051 [*] Generic class uses private type parameters
   |
-1 | # bounds
-2 | class Foo[_T: str]: ...
+1 | # bound
+2 | class Foo[_T: str]:
   |          ^^^^^^^^^ UP051
-3 |
-4 | # tuple
+3 |     var: _T
   |
   = help: Remove the leading underscores
 
 ℹ Safe fix
-1 1 | # bounds
-2   |-class Foo[_T: str]: ...
-  2 |+class Foo[T: str]: ...
-3 3 | 
-4 4 | # tuple
-5 5 | class Foo[*_Ts]: ...
+1 1 | # bound
+2   |-class Foo[_T: str]:
+3   |-    var: _T
+  2 |+class Foo[T: str]:
+  3 |+    var: T
+4 4 | 
+5 5 | 
+6 6 | # constraint
 
-UP051_2.py:5:10: UP051 [*] Generic class uses private type parameters
+UP051_2.py:7:10: UP051 [*] Generic class uses private type parameters
   |
-4 | # tuple
-5 | class Foo[*_Ts]: ...
-  |          ^^^^^^ UP051
+6 | # constraint
+7 | class Foo[_T: (str, bytes)]:
+  |          ^^^^^^^^^^^^^^^^^^ UP051
+8 |     var: _T
   |
   = help: Remove the leading underscores
 
 ℹ Safe fix
-2 2 | class Foo[_T: str]: ...
-3 3 | 
-4 4 | # tuple
-5   |-class Foo[*_Ts]: ...
-  5 |+class Foo[*Ts]: ...
+4 4 | 
+5 5 | 
+6 6 | # constraint
+7   |-class Foo[_T: (str, bytes)]:
+8   |-    var: _T
+  7 |+class Foo[T: (str, bytes)]:
+  8 |+    var: T
+9 9 | 
+10 10 | 
+11 11 | # tuple
+
+UP051_2.py:12:10: UP051 [*] Generic class uses private type parameters
+   |
+11 | # tuple
+12 | class Foo[*_Ts]:
+   |          ^^^^^^ UP051
+13 |     var: tuple[*_Ts]
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+9  9  | 
+10 10 | 
+11 11 | # tuple
+12    |-class Foo[*_Ts]:
+13    |-    var: tuple[*_Ts]
+   12 |+class Foo[*Ts]:
+   13 |+    var: tuple[*Ts]
+14 14 | 
+15 15 | 
+16 16 | # paramspec
+
+UP051_2.py:17:8: UP051 [*] Generic class uses private type parameters
+   |
+16 | # paramspec
+17 | class C[**_P]:
+   |        ^^^^^^ UP051
+18 |     var: _P
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+14 14 | 
+15 15 | 
+16 16 | # paramspec
+17    |-class C[**_P]:
+18    |-    var: _P
+   17 |+class C[**P]:
+   18 |+    var: P
