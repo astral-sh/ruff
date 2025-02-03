@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -67,8 +67,12 @@ pub(crate) fn exc_info_outside_except_handler(checker: &mut Checker, call: &Expr
     }
 
     match &*call.func {
-        func @ Expr::Attribute(_) => {
+        func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
             if !is_logger_candidate(func, semantic, &checker.settings.logger_objects) {
+                return;
+            }
+
+            if attr != "log" && LoggingLevel::from_attribute(attr).is_none() {
                 return;
             }
         }

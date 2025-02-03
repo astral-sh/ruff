@@ -52,3 +52,6 @@ def _():
     except ...:
         logging.info("", exc_info=True)
         logger.info("", exc_info=True)
+
+
+some_variable_that_ends_with_logger.not_a_recognized_method("", exc_info=True)
