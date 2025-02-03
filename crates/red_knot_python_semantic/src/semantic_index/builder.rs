@@ -407,7 +407,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().mark_unreachable();
     }
 
-    /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
+    /// Records a visibility constraint that always evaluates to "ambiguous".
     fn record_ambiguous_visibility(&mut self) {
         self.current_use_def_map_mut()
             .record_visibility_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);

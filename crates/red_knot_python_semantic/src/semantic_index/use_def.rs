@@ -287,7 +287,7 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of [`Constraint`] in this scope.
     all_constraints: AllConstraints<'db>,
 
-    /// Array of [`VisibilityConstraint`]s in this scope.
+    /// Array of visibility constraints in this scope.
     visibility_constraints: VisibilityConstraints<'db>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
@@ -489,7 +489,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Constraint`].
     all_constraints: AllConstraints<'db>,
 
-    /// Append-only array of [`VisibilityConstraint`].
+    /// Builder of visibility constraints.
     pub(super) visibility_constraints: VisibilityConstraintsBuilder<'db>,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
