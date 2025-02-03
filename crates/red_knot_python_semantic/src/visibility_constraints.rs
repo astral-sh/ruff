@@ -152,6 +152,7 @@
 
 use std::cmp::Ordering;
 
+use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::{
@@ -212,6 +213,12 @@ struct InteriorNode {
     if_false: ScopedVisibilityConstraintId,
 }
 
+#[newtype_index]
+struct ConstraintId;
+
+#[newtype_index]
+struct InteriorNodeId;
+
 /// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
 /// this is (one of the copies of) a `Constraint` that represents some runtime property of the
 /// Python code that we are evaluating. We intern these constraints in an arena
@@ -223,15 +230,16 @@ struct Atom(u32);
 impl Atom {
     /// Deconstruct an atom into a constraint index and a copy number.
     #[inline]
-    fn into_index_and_copy(self) -> (u32, u8) {
+    fn into_index_and_copy(self) -> (ConstraintId, u8) {
         let copy = self.0 >> 24;
         let index = self.0 & 0x00ff_ffff;
-        (index, copy as u8)
+        (index.into(), copy as u8)
     }
 
     /// Construct an atom from a constraint index and a copy number.
     #[inline]
-    fn from_index_and_copy(index: u32, copy: u8) -> Self {
+    fn from_index_and_copy(index: ConstraintId, copy: u8) -> Self {
+        let index = index.as_u32();
         debug_assert!(index <= 0x00ff_ffff);
         Self((u32::from(copy) << 24) | index)
     }
@@ -242,7 +250,10 @@ impl Atom {
 impl std::fmt::Debug for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (index, copy) = self.into_index_and_copy();
-        f.debug_tuple("Atom").field(&index).field(&copy).finish()
+        f.debug_tuple("Atom")
+            .field(&index.as_u32())
+            .field(&copy)
+            .finish()
     }
 }
 
@@ -274,16 +285,16 @@ const SMALLEST_TERMINAL: u32 = ALWAYS_FALSE.0;
 /// maintain a separate set of visibility constraints for each scope in file.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
-    constraints: Vec<Constraint<'db>>,
-    interiors: Vec<InteriorNode>,
+    constraints: IndexVec<ConstraintId, Constraint<'db>>,
+    interiors: IndexVec<InteriorNodeId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraintsBuilder<'db> {
-    constraints: Vec<Constraint<'db>>,
-    interiors: Vec<InteriorNode>,
-    constraint_cache: FxHashMap<Constraint<'db>, u32>,
-    interior_cache: FxHashMap<InteriorNode, u32>,
+    constraints: IndexVec<ConstraintId, Constraint<'db>>,
+    interiors: IndexVec<InteriorNodeId, InteriorNode>,
+    constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
+    interior_cache: FxHashMap<InteriorNode, InteriorNodeId>,
     not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
     and_cache: FxHashMap<
         (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
@@ -305,7 +316,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 
     fn interior_node(&self, a: ScopedVisibilityConstraintId) -> InteriorNode {
         debug_assert!(!a.is_terminal());
-        self.interiors[a.0 as usize]
+        self.interiors[InteriorNodeId::from(a.0)]
     }
 
     /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
@@ -330,11 +341,10 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     /// Adds a constraint, ensuring that we only store any particular constraint once.
     #[allow(clippy::cast_possible_truncation)]
     fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
-        let index = *self.constraint_cache.entry(constraint).or_insert_with(|| {
-            let index = self.constraints.len() as u32;
-            self.constraints.push(constraint);
-            index
-        });
+        let index = *self
+            .constraint_cache
+            .entry(constraint)
+            .or_insert_with(|| self.constraints.push(constraint));
         Atom::from_index_and_copy(index, copy)
     }
 
@@ -348,11 +358,11 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             return node.if_true;
         }
 
-        let index = *self.interior_cache.entry(node).or_insert_with(|| {
-            let index = self.interiors.len() as u32;
-            self.interiors.push(node);
-            index
-        });
+        let index = *self
+            .interior_cache
+            .entry(node)
+            .or_insert_with(|| self.interiors.push(node));
+        let index = index.as_u32();
         debug_assert!(index < SMALLEST_TERMINAL);
         ScopedVisibilityConstraintId(index)
     }
@@ -390,7 +400,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         if let Some(cached) = self.not_cache.get(&a) {
             return *cached;
         }
-        let a_node = self.interiors[a.0 as usize];
+        let a_node = self.interior_node(a);
         let if_true = self.add_not_constraint(a_node.if_true);
         let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
         let if_false = self.add_not_constraint(a_node.if_false);
@@ -540,7 +550,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 impl<'db> VisibilityConstraints<'db> {
     fn interior_node(&self, a: ScopedVisibilityConstraintId) -> InteriorNode {
         debug_assert!(!a.is_terminal());
-        self.interiors[a.0 as usize]
+        self.interiors[InteriorNodeId::from(a.0)]
     }
 
     /// Analyze the statically known visibility for a given visibility constraint.
@@ -557,7 +567,7 @@ impl<'db> VisibilityConstraints<'db> {
                 _ => self.interior_node(id),
             };
             let (index, _) = node.atom.into_index_and_copy();
-            let constraint = &self.constraints[index as usize];
+            let constraint = &self.constraints[index];
             match Self::analyze_single(db, constraint) {
                 Truthiness::AlwaysTrue => id = node.if_true,
                 Truthiness::Ambiguous => id = node.if_ambiguous,
