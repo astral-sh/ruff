@@ -82,8 +82,7 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
     };
 
     if checker.settings.preview.is_disabled()
-        && !other_arg.is_name_expr()
-        && !other_arg.is_none_literal_expr()
+        && !matches!(other, Expr::Name(_) | Expr::NoneLiteral(_))
     {
         return;
     }
