@@ -215,13 +215,14 @@ struct InteriorNode {
 /// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
 /// this is (one of the copies of) a `Constraint` that represents some runtime property of the
 /// Python code that we are evaluating. We intern these constraints in an arena
-/// ([VisibilityConstraints::constraints]). An atom consists of an index into this arena, and a
+/// ([`VisibilityConstraints::constraints`]). An atom consists of an index into this arena, and a
 /// copy number.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Atom(u32);
 
 impl Atom {
     /// Deconstruct an atom into a constraint index and a copy number.
+    #[allow(clippy::inline_always)]
     #[inline(always)]
     fn into_index_and_copy(self) -> (u32, u8) {
         let copy = self.0 >> 24;
@@ -230,6 +231,7 @@ impl Atom {
     }
 
     /// Construct an atom from a constraint index and a copy number.
+    #[allow(clippy::inline_always)]
     #[inline(always)]
     fn from_index_and_copy(index: u32, copy: u8) -> Self {
         debug_assert!(index <= 0x00ff_ffff);
