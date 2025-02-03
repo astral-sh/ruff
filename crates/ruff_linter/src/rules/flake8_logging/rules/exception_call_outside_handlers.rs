@@ -2,7 +2,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::logging;
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,15 +63,11 @@ impl Violation for ExceptionCallOutsideHandlers {
 pub(crate) fn exception_call_outside_handlers(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    if !semantic.seen_module(Modules::LOGGING) {
-        return;
-    }
-
     if !outside_handlers(call.start(), semantic) {
         return;
     }
 
-    let fix = match call.func.as_ref() {
+    let fix = match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
             let logger_objects = &checker.settings.logger_objects;
 
@@ -89,8 +84,8 @@ pub(crate) fn exception_call_outside_handlers(checker: &mut Checker, call: &Expr
             Some(Fix::unsafe_edit(edit))
         }
 
-        expr @ Expr::Name(_) => {
-            let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        func @ Expr::Name(_) => {
+            let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
                 return;
             };
 

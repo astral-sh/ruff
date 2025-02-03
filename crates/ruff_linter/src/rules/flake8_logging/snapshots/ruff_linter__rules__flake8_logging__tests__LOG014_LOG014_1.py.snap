@@ -1,0 +1,16 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+---
+LOG014_1.py:4:17: LOG014 [*] `exc_info=` outside exception handlers
+  |
+4 | logger.info("", exc_info=True)
+  |                 ^^^^^^^^^^^^^ LOG014
+  |
+  = help: Remove `exc_info=`
+
+ℹ Unsafe fix
+1 1 | _ = (logger := __import__("somewhere").logger)
+2 2 | 
+3 3 | 
+4   |-logger.info("", exc_info=True)
+  4 |+logger.info("")

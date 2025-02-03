@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG004.py:13:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:13:1: LOG004 [*] `.exception()` call outside exception handlers
    |
 11 | ### Errors
 12 |
@@ -22,7 +22,7 @@ LOG004.py:13:1: LOG004 [*] `.exception()` call outside exception handlers
 15 15 | exc("")
 16 16 | 
 
-LOG004.py:14:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:14:1: LOG004 [*] `.exception()` call outside exception handlers
    |
 13 | logging.exception("")
 14 | logger.exception("")
@@ -41,7 +41,7 @@ LOG004.py:14:1: LOG004 [*] `.exception()` call outside exception handlers
 16 16 | 
 17 17 | 
 
-LOG004.py:15:1: LOG004 `.exception()` call outside exception handlers
+LOG004_0.py:15:1: LOG004 `.exception()` call outside exception handlers
    |
 13 | logging.exception("")
 14 | logger.exception("")
@@ -50,7 +50,7 @@ LOG004.py:15:1: LOG004 `.exception()` call outside exception handlers
    |
    = help: Replace with `.error()`
 
-LOG004.py:19:5: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:19:5: LOG004 [*] `.exception()` call outside exception handlers
    |
 18 | def _():
 19 |     logging.exception("")
@@ -70,7 +70,7 @@ LOG004.py:19:5: LOG004 [*] `.exception()` call outside exception handlers
 21 21 |     exc("")
 22 22 | 
 
-LOG004.py:20:5: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:20:5: LOG004 [*] `.exception()` call outside exception handlers
    |
 18 | def _():
 19 |     logging.exception("")
@@ -90,7 +90,7 @@ LOG004.py:20:5: LOG004 [*] `.exception()` call outside exception handlers
 22 22 | 
 23 23 | 
 
-LOG004.py:21:5: LOG004 `.exception()` call outside exception handlers
+LOG004_0.py:21:5: LOG004 `.exception()` call outside exception handlers
    |
 19 |     logging.exception("")
 20 |     logger.exception("")
@@ -99,7 +99,7 @@ LOG004.py:21:5: LOG004 `.exception()` call outside exception handlers
    |
    = help: Replace with `.error()`
 
-LOG004.py:28:9: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:28:9: LOG004 [*] `.exception()` call outside exception handlers
    |
 26 | except ...:
 27 |     def _():
@@ -120,7 +120,7 @@ LOG004.py:28:9: LOG004 [*] `.exception()` call outside exception handlers
 30 30 |         exc("")
 31 31 | 
 
-LOG004.py:29:9: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:29:9: LOG004 [*] `.exception()` call outside exception handlers
    |
 27 |     def _():
 28 |         logging.exception("")
@@ -140,7 +140,7 @@ LOG004.py:29:9: LOG004 [*] `.exception()` call outside exception handlers
 31 31 | 
 32 32 | 
 
-LOG004.py:30:9: LOG004 `.exception()` call outside exception handlers
+LOG004_0.py:30:9: LOG004 `.exception()` call outside exception handlers
    |
 28 |         logging.exception("")
 29 |         logger.exception("")

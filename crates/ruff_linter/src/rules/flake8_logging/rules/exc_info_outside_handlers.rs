@@ -1,9 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
-use ruff_python_semantic::Modules;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
@@ -16,7 +15,7 @@ use crate::rules::flake8_logging::rules::helpers::outside_handlers;
 ///
 /// ## Why is this bad?
 /// Using `exc_info=True` outside of an exception handler
-/// attaches ``None`` as the exception information, leading to confusing messages:
+/// attaches `None` as the exception information, leading to confusing messages:
 ///
 /// ```pycon
 /// >>> logging.warning("Uh oh", exc_info=True)
@@ -43,41 +42,39 @@ use crate::rules::flake8_logging::rules::helpers::outside_handlers;
 /// ```
 ///
 /// ## Fix safety
-/// The fix will always be marked as unsafe, as it changes runtime behavior.
+/// The fix is always marked as unsafe, as it changes runtime behavior.
 #[derive(ViolationMetadata)]
 pub(crate) struct ExcInfoOutsideHandlers;
 
-impl AlwaysFixableViolation for ExcInfoOutsideHandlers {
+impl Violation for ExcInfoOutsideHandlers {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`exc_info=` outside exception handlers".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Remove `exc_info=`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove `exc_info=`".to_string())
     }
 }
 
 pub(crate) fn exc_info_outside_handlers(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    if !semantic.seen_module(Modules::LOGGING) {
-        return;
-    }
-
     if !outside_handlers(call.start(), semantic) {
         return;
     }
 
-    match call.func.as_ref() {
+    match &*call.func {
         func @ Expr::Attribute(_) => {
             if !is_logger_candidate(func, semantic, &checker.settings.logger_objects) {
                 return;
             }
         }
 
-        name @ Expr::Name(_) => {
-            let Some(qualified_name) = semantic.resolve_qualified_name(name) else {
+        func @ Expr::Name(_) => {
+            let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
                 return;
             };
 
@@ -99,19 +96,19 @@ pub(crate) fn exc_info_outside_handlers(checker: &mut Checker, call: &ExprCall) 
 
     let truthiness = Truthiness::from_expr(&exc_info.value, |id| semantic.has_builtin_binding(id));
 
-    if !truthiness.is_true() && !truthiness.is_truthy() {
+    if truthiness.into_bool() != Some(true) {
         return;
     }
 
     let arguments = &call.arguments;
     let source = checker.source();
 
-    let Ok(edit) = remove_argument(exc_info, arguments, Parentheses::Preserve, source) else {
-        unreachable!("Failed to remove `exc_info=`");
-    };
-    let fix = Fix::unsafe_edit(edit);
+    let mut diagnostic = Diagnostic::new(ExcInfoOutsideHandlers, exc_info.range);
 
-    let diagnostic = Diagnostic::new(ExcInfoOutsideHandlers, exc_info.range);
+    diagnostic.try_set_fix(|| {
+        let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;
+        Ok(Fix::unsafe_edit(edit))
+    });
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.diagnostics.push(diagnostic);
 }
