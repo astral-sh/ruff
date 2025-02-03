@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP051_2.py:2:10: UP051 [*] Generic class uses private type parameters
+  |
+1 | # bounds
+2 | class Foo[_T: str]: ...
+  |          ^^^^^^^^^ UP051
+3 |
+4 | # tuple
+  |
+  = help: Remove the leading underscores
+
+ℹ Safe fix
+1 1 | # bounds
+2   |-class Foo[_T: str]: ...
+  2 |+class Foo[T: str]: ...
+3 3 | 
+4 4 | # tuple
+5 5 | class Foo[*_Ts]: ...
+
+UP051_2.py:5:10: UP051 [*] Generic class uses private type parameters
+  |
+4 | # tuple
+5 | class Foo[*_Ts]: ...
+  |          ^^^^^^ UP051
+  |
+  = help: Remove the leading underscores
+
+ℹ Safe fix
+2 2 | class Foo[_T: str]: ...
+3 3 | 
+4 4 | # tuple
+5   |-class Foo[*_Ts]: ...
+  5 |+class Foo[*Ts]: ...
