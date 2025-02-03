@@ -327,7 +327,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> Ordering {
-        if a == b {
+        if a == b || (a.is_terminal() && b.is_terminal()) {
             Ordering::Equal
         } else if a.is_terminal() {
             Ordering::Greater
