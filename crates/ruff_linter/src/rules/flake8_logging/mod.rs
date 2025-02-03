@@ -17,10 +17,10 @@ mod tests {
     #[test_case(Rule::InvalidGetLoggerArgument, Path::new("LOG002.py"))]
     #[test_case(Rule::ExceptionWithoutExcInfo, Path::new("LOG007.py"))]
     #[test_case(Rule::UndocumentedWarn, Path::new("LOG009.py"))]
-    #[test_case(Rule::ExceptionCallOutsideHandlers, Path::new("LOG004_0.py"))]
-    #[test_case(Rule::ExceptionCallOutsideHandlers, Path::new("LOG004_1.py"))]
-    #[test_case(Rule::ExcInfoOutsideHandlers, Path::new("LOG014_0.py"))]
-    #[test_case(Rule::ExcInfoOutsideHandlers, Path::new("LOG014_1.py"))]
+    #[test_case(Rule::LogExceptionOutsideExceptHandler, Path::new("LOG004_0.py"))]
+    #[test_case(Rule::LogExceptionOutsideExceptHandler, Path::new("LOG004_1.py"))]
+    #[test_case(Rule::ExcInfoOutsideExceptHandler, Path::new("LOG014_0.py"))]
+    #[test_case(Rule::ExcInfoOutsideExceptHandler, Path::new("LOG014_1.py"))]
     #[test_case(Rule::RootLoggerCall, Path::new("LOG015.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

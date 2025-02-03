@@ -44,9 +44,9 @@ use crate::rules::flake8_logging::rules::helpers::outside_handlers;
 /// ## Fix safety
 /// The fix is always marked as unsafe, as it changes runtime behavior.
 #[derive(ViolationMetadata)]
-pub(crate) struct ExcInfoOutsideHandlers;
+pub(crate) struct ExcInfoOutsideExceptHandler;
 
-impl Violation for ExcInfoOutsideHandlers {
+impl Violation for ExcInfoOutsideExceptHandler {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -59,7 +59,7 @@ impl Violation for ExcInfoOutsideHandlers {
     }
 }
 
-pub(crate) fn exc_info_outside_handlers(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn exc_info_outside_except_handler(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
@@ -103,7 +103,7 @@ pub(crate) fn exc_info_outside_handlers(checker: &mut Checker, call: &ExprCall) 
     let arguments = &call.arguments;
     let source = checker.source();
 
-    let mut diagnostic = Diagnostic::new(ExcInfoOutsideHandlers, exc_info.range);
+    let mut diagnostic = Diagnostic::new(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
         let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;

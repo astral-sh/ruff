@@ -44,9 +44,9 @@ use crate::rules::flake8_logging::rules::helpers::outside_handlers;
 ///
 /// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
-pub(crate) struct ExceptionCallOutsideHandlers;
+pub(crate) struct LogExceptionOutsideExceptHandler;
 
-impl Violation for ExceptionCallOutsideHandlers {
+impl Violation for LogExceptionOutsideExceptHandler {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -60,7 +60,7 @@ impl Violation for ExceptionCallOutsideHandlers {
 }
 
 /// LOG004
-pub(crate) fn exception_call_outside_handlers(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn log_exception_outside_except_handler(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
@@ -99,7 +99,7 @@ pub(crate) fn exception_call_outside_handlers(checker: &mut Checker, call: &Expr
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(ExceptionCallOutsideHandlers, call.range);
+    let mut diagnostic = Diagnostic::new(LogExceptionOutsideExceptHandler, call.range);
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
