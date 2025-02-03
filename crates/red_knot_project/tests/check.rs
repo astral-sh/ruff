@@ -270,8 +270,6 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // related to circular references in nested functions
-    ("crates/ruff_linter/resources/test/fixtures/flake8_return/RET503.py", false, true),
     // related to circular references in class definitions
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_27.py", true, true),
