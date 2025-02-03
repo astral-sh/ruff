@@ -35,8 +35,7 @@ n: Not[int, str]
 
 ```py
 from knot_extensions import Intersection, Not, is_subtype_of, static_assert
-from typing import Literal
-from typing_extensions import Never
+from typing_extensions import Literal, Never
 
 class S: ...
 class T: ...
