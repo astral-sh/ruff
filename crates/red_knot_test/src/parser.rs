@@ -294,7 +294,7 @@ impl<'s> Parser<'s> {
                             continue;
                         }
                     }
-                    _ => {}
+                    _ => unreachable!(),
                 }
             }
 
