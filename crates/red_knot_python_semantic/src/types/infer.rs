@@ -44,7 +44,7 @@ use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
 };
-use crate::semantic_index::expression::Expression;
+use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
@@ -832,10 +832,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        if expression.infer_as_type_expression(self.db()) {
-            self.infer_type_expression(expression.node_ref(self.db()));
-        } else {
-            self.infer_expression_impl(expression.node_ref(self.db()));
+        match expression.kind(self.db()) {
+            ExpressionKind::Normal => {
+                self.infer_expression_impl(expression.node_ref(self.db()));
+            }
+            ExpressionKind::TypeExpression => {
+                self.infer_type_expression(expression.node_ref(self.db()));
+            }
         }
     }
 

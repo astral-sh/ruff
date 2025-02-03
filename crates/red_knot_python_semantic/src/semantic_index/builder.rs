@@ -20,7 +20,7 @@ use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
-use crate::semantic_index::expression::Expression;
+use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
@@ -540,19 +540,19 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, false)
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal)
     }
 
     /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
     /// *type* expression, which makes sure that it will later be inferred as such.
     fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, true)
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression)
     }
 
     fn add_standalone_expression_impl(
         &mut self,
         expression_node: &ast::Expr,
-        infer_as_type_expression: bool,
+        expression_kind: ExpressionKind,
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
@@ -562,7 +562,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             unsafe {
                 AstNodeRef::new(self.module.clone(), expression_node)
             },
-            infer_as_type_expression,
+            expression_kind,
             countme::Count::default(),
         );
         self.expressions_by_node
