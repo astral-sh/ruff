@@ -71,9 +71,9 @@ pub(crate) fn operation_on_closed_io(
             continue;
         };
 
-        let Some(range) = method_reference_range(expression_id, semantic)
-            .or_else(|| contains_check_range(expression_id, semantic))
-            .or_else(|| for_loop_target_in_iter_range(expression_id, semantic))
+        let Some(range) = io_method_range(expression_id, semantic)
+            .or_else(|| in_io_range(expression_id, semantic))
+            .or_else(|| for_loop_io_range(expression_id, semantic))
         else {
             continue;
         };
@@ -87,7 +87,7 @@ pub(crate) fn operation_on_closed_io(
 }
 
 // `f.write(...)`
-fn method_reference_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
+fn io_method_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
     let mut ancestors = semantic.expressions(expression_id);
 
     let _io_object_ref = ancestors.next()?;
@@ -124,7 +124,7 @@ fn is_io_operation_method(name: &str) -> bool {
 }
 
 // `_ in f`
-fn contains_check_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
+fn in_io_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
     let mut ancestors = semantic.expressions(expression_id);
 
     let io_object_ref = AnyNodeRef::from(ancestors.next()?);
@@ -150,17 +150,13 @@ fn contains_check_range(expression_id: NodeId, semantic: &SemanticModel) -> Opti
             } else {
                 compare.comparators[index - 1].start()
             };
-            let end = comparator.end();
 
-            Some(TextRange::new(start, end))
+            Some(TextRange::new(start, comparator.end()))
         })
 }
 
 // `for _ in f: ...`
-fn for_loop_target_in_iter_range(
-    expression_id: NodeId,
-    semantic: &SemanticModel,
-) -> Option<TextRange> {
+fn for_loop_io_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
     let mut ancestor_statements = semantic.statements(expression_id);
 
     let io_object_ref = AnyNodeRef::from(semantic.expression(expression_id)?);
