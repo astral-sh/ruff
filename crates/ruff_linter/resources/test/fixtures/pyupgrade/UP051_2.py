@@ -27,3 +27,16 @@ class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
     @staticmethod
     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
         return None
+
+
+# this should not be fixed because the new name is a keyword
+class F[_async]: ...
+
+
+# and this should not be fixed because of the conflict with the outer X
+def f():
+    X = 5
+
+    class ScopeConflict[_X]:
+        var: _X
+        x: X

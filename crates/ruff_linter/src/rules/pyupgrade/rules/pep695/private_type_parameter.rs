@@ -3,7 +3,10 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
 
-use crate::{checkers::ast::Checker, renamer::Renamer};
+use crate::{
+    checkers::ast::Checker,
+    renamer::{try_shadowed_kind, Renamer},
+};
 
 /// ## What it does
 ///
@@ -97,6 +100,9 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return None;
     }
 
+    if try_shadowed_kind(old_name, checker, binding.scope).is_some_and(|kind| kind.shadows_any()) {
+        return None;
+    }
     let new_name = old_name.trim_start_matches('_');
 
     let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);

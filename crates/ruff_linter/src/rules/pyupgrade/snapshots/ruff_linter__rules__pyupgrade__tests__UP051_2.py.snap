@@ -104,6 +104,8 @@ UP051_2.py:26:18: UP051 [*] Generic class uses private type parameters
 28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    28 |+    def transform(t: T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, T] | None:
 29 29 |         return None
+30 30 | 
+31 31 | 
 
 UP051_2.py:26:22: UP051 [*] Generic class uses private type parameters
    |
@@ -126,6 +128,8 @@ UP051_2.py:26:22: UP051 [*] Generic class uses private type parameters
 28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    28 |+    def transform(t: _T, u: U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
 29 29 |         return None
+30 30 | 
+31 31 | 
 
 UP051_2.py:26:31: UP051 [*] Generic class uses private type parameters
    |
@@ -148,6 +152,8 @@ UP051_2.py:26:31: UP051 [*] Generic class uses private type parameters
 28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    28 |+    def transform(t: _T, u: _U, v: V) -> tuple[*_W] | Callable[_X, _T] | None:
 29 29 |         return None
+30 30 | 
+31 31 | 
 
 UP051_2.py:26:50: UP051 [*] Generic class uses private type parameters
    |
@@ -170,6 +176,8 @@ UP051_2.py:26:50: UP051 [*] Generic class uses private type parameters
 28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    28 |+    def transform(t: _T, u: _U, v: _V) -> tuple[*W] | Callable[_X, _T] | None:
 29 29 |         return None
+30 30 | 
+31 31 | 
 
 UP051_2.py:26:56: UP051 [*] Generic class uses private type parameters
    |
@@ -192,3 +200,5 @@ UP051_2.py:26:56: UP051 [*] Generic class uses private type parameters
 28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    28 |+    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[X, _T] | None:
 29 29 |         return None
+30 30 | 
+31 31 |
