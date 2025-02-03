@@ -342,8 +342,9 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     /// equal nodes.
     #[allow(clippy::cast_possible_truncation)]
     fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
-        // Reduce!
-        if node.if_true == node.if_ambiguous && node.if_true == node.if_false {
+        // If the true and false branches lead to the same node, we can override the ambiguous
+        // branch to go there too. And this node is then redundant and can be reduced.
+        if node.if_true == node.if_false {
             return node.if_true;
         }
 
