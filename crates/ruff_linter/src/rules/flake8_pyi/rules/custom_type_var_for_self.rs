@@ -602,13 +602,13 @@ fn remove_pep695_typevar_declaration(
     custom_typevar: &TypeVar,
 ) -> Option<Edit> {
     if let [sole_typevar] = &**type_params {
-        return (sole_typevar.range() == custom_typevar.range())
+        return (sole_typevar.name().range() == custom_typevar.range())
             .then(|| Edit::range_deletion(type_params.range));
     }
 
     let tvar_index = type_params
         .iter()
-        .position(|param| param.range() == custom_typevar.range())?;
+        .position(|param| param.name().range() == custom_typevar.range())?;
 
     let last_index = type_params.len() - 1;
 
