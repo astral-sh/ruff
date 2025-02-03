@@ -1,4 +1,3 @@
-use anyhow::bail;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
@@ -96,59 +95,28 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         _ => return None,
     };
 
-    // this rule is a bit of a hack. we're in a binding-based rule, but we only use the binding to
-    // obtain the scope for the rename and then loop over all of the type parameters anyway instead
-    // of limiting the fix to the single binding that initially triggered the rule. the upside of
-    // this is that we can give a single diagnostic for all of the affected type parameters instead
-    // of one diagnostic per parameter. additionally, this avoids issues with the `Binding::name`
-    // method, which returns `_T: str` for a type parameter with a bound, for example.
-    let to_rename: Vec<_> = type_params
-        .iter()
-        .flat_map(|tp| {
-            let name = tp.name().as_str();
-            // this covers the sunder `_T_`, dunder `__T__`, and all all-under `_` or `__` cases
-            // that should be skipped
-            if name.starts_with('_') && !name.ends_with('_') {
-                let new_name = name.trim_start_matches('_');
-                if semantic.is_available(new_name) {
-                    Some((name, new_name))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect();
+    let old_name = binding.name(&checker.source());
 
-    dbg!(&to_rename);
-
-    if to_rename.is_empty() {
+    // this covers the sunder `_T_`, dunder `__T__`, and all all-under `_` or `__` cases
+    // that should be skipped
+    if !old_name.starts_with('_') || old_name.ends_with('_') {
         return None;
     }
 
-    // TODO this could be a good place for multi-range diagnostics to mark only the affected params
+    let new_name = old_name.trim_start_matches('_');
+
     let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, type_params.range);
 
     diagnostic.try_set_fix(|| {
-        let mut edits = Vec::new();
-        for (old_name, new_name) in to_rename {
-            let (first, rest) = dbg!(Renamer::rename(
-                old_name,
-                new_name,
-                &semantic.scopes[binding.scope],
-                checker.semantic(),
-                checker.stylist(),
-            ))?;
-            edits.push(first);
-            edits.extend(rest);
-        }
+        let (first, rest) = Renamer::rename(
+            old_name,
+            new_name,
+            &semantic.scopes[binding.scope],
+            checker.semantic(),
+            checker.stylist(),
+        )?;
 
-        if edits.is_empty() {
-            bail!("No variables found to rename");
-        }
-
-        Ok(Fix::safe_edits(edits.swap_remove(0), edits))
+        Ok(Fix::safe_edits(first, rest))
     });
 
     Some(diagnostic)
