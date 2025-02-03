@@ -1,229 +1,229 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF061.py:7:5: RUF061 IO operation performed on closed IO object
+RUF050.py:7:5: RUF050 IO operation performed on closed IO object
   |
 5 |         ...
 6 |
 7 |     f.__iter__()
-  |     ^^^^^^^^^^ RUF061
+  |     ^^^^^^^^^^ RUF050
 8 |     f.__next__()
 9 |     f.detach()
   |
 
-RUF061.py:8:5: RUF061 IO operation performed on closed IO object
+RUF050.py:8:5: RUF050 IO operation performed on closed IO object
    |
  7 |     f.__iter__()
  8 |     f.__next__()
-   |     ^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^ RUF050
  9 |     f.detach()
 10 |     f.fileno()
    |
 
-RUF061.py:9:5: RUF061 IO operation performed on closed IO object
+RUF050.py:9:5: RUF050 IO operation performed on closed IO object
    |
  7 |     f.__iter__()
  8 |     f.__next__()
  9 |     f.detach()
-   |     ^^^^^^^^ RUF061
+   |     ^^^^^^^^ RUF050
 10 |     f.fileno()
 11 |     f.flush()
    |
 
-RUF061.py:10:5: RUF061 IO operation performed on closed IO object
+RUF050.py:10:5: RUF050 IO operation performed on closed IO object
    |
  8 |     f.__next__()
  9 |     f.detach()
 10 |     f.fileno()
-   |     ^^^^^^^^ RUF061
+   |     ^^^^^^^^ RUF050
 11 |     f.flush()
 12 |     f.isatty()
    |
 
-RUF061.py:11:5: RUF061 IO operation performed on closed IO object
+RUF050.py:11:5: RUF050 IO operation performed on closed IO object
    |
  9 |     f.detach()
 10 |     f.fileno()
 11 |     f.flush()
-   |     ^^^^^^^ RUF061
+   |     ^^^^^^^ RUF050
 12 |     f.isatty()
 13 |     f.read()
    |
 
-RUF061.py:12:5: RUF061 IO operation performed on closed IO object
+RUF050.py:12:5: RUF050 IO operation performed on closed IO object
    |
 10 |     f.fileno()
 11 |     f.flush()
 12 |     f.isatty()
-   |     ^^^^^^^^ RUF061
+   |     ^^^^^^^^ RUF050
 13 |     f.read()
 14 |     f.readline()
    |
 
-RUF061.py:13:5: RUF061 IO operation performed on closed IO object
+RUF050.py:13:5: RUF050 IO operation performed on closed IO object
    |
 11 |     f.flush()
 12 |     f.isatty()
 13 |     f.read()
-   |     ^^^^^^ RUF061
+   |     ^^^^^^ RUF050
 14 |     f.readline()
 15 |     f.readlines()
    |
 
-RUF061.py:14:5: RUF061 IO operation performed on closed IO object
+RUF050.py:14:5: RUF050 IO operation performed on closed IO object
    |
 12 |     f.isatty()
 13 |     f.read()
 14 |     f.readline()
-   |     ^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^ RUF050
 15 |     f.readlines()
 16 |     f.reconfigure()
    |
 
-RUF061.py:15:5: RUF061 IO operation performed on closed IO object
+RUF050.py:15:5: RUF050 IO operation performed on closed IO object
    |
 13 |     f.read()
 14 |     f.readline()
 15 |     f.readlines()
-   |     ^^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^^ RUF050
 16 |     f.reconfigure()
 17 |     f.seek()
    |
 
-RUF061.py:16:5: RUF061 IO operation performed on closed IO object
+RUF050.py:16:5: RUF050 IO operation performed on closed IO object
    |
 14 |     f.readline()
 15 |     f.readlines()
 16 |     f.reconfigure()
-   |     ^^^^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^^^^ RUF050
 17 |     f.seek()
 18 |     f.seekable()
    |
 
-RUF061.py:17:5: RUF061 IO operation performed on closed IO object
+RUF050.py:17:5: RUF050 IO operation performed on closed IO object
    |
 15 |     f.readlines()
 16 |     f.reconfigure()
 17 |     f.seek()
-   |     ^^^^^^ RUF061
+   |     ^^^^^^ RUF050
 18 |     f.seekable()
 19 |     f.tell()
    |
 
-RUF061.py:18:5: RUF061 IO operation performed on closed IO object
+RUF050.py:18:5: RUF050 IO operation performed on closed IO object
    |
 16 |     f.reconfigure()
 17 |     f.seek()
 18 |     f.seekable()
-   |     ^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^ RUF050
 19 |     f.tell()
 20 |     f.truncate()
    |
 
-RUF061.py:19:5: RUF061 IO operation performed on closed IO object
+RUF050.py:19:5: RUF050 IO operation performed on closed IO object
    |
 17 |     f.seek()
 18 |     f.seekable()
 19 |     f.tell()
-   |     ^^^^^^ RUF061
+   |     ^^^^^^ RUF050
 20 |     f.truncate()
 21 |     f.writable()
    |
 
-RUF061.py:20:5: RUF061 IO operation performed on closed IO object
+RUF050.py:20:5: RUF050 IO operation performed on closed IO object
    |
 18 |     f.seekable()
 19 |     f.tell()
 20 |     f.truncate()
-   |     ^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^ RUF050
 21 |     f.writable()
 22 |     f.write()
    |
 
-RUF061.py:21:5: RUF061 IO operation performed on closed IO object
+RUF050.py:21:5: RUF050 IO operation performed on closed IO object
    |
 19 |     f.tell()
 20 |     f.truncate()
 21 |     f.writable()
-   |     ^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^ RUF050
 22 |     f.write()
 23 |     f.writelines()
    |
 
-RUF061.py:22:5: RUF061 IO operation performed on closed IO object
+RUF050.py:22:5: RUF050 IO operation performed on closed IO object
    |
 20 |     f.truncate()
 21 |     f.writable()
 22 |     f.write()
-   |     ^^^^^^^ RUF061
+   |     ^^^^^^^ RUF050
 23 |     f.writelines()
    |
 
-RUF061.py:23:5: RUF061 IO operation performed on closed IO object
+RUF050.py:23:5: RUF050 IO operation performed on closed IO object
    |
 21 |     f.writable()
 22 |     f.write()
 23 |     f.writelines()
-   |     ^^^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^^^ RUF050
 24 |
 25 | def contains():
    |
 
-RUF061.py:29:9: RUF061 IO operation performed on closed IO object
+RUF050.py:29:9: RUF050 IO operation performed on closed IO object
    |
 27 |         ...
 28 |
 29 |     _ = '' in f
-   |         ^^^^^^^ RUF061
+   |         ^^^^^^^ RUF050
 30 |     _ = '' not in f
 31 |     _ = '' in f is {}
    |
 
-RUF061.py:30:9: RUF061 IO operation performed on closed IO object
+RUF050.py:30:9: RUF050 IO operation performed on closed IO object
    |
 29 |     _ = '' in f
 30 |     _ = '' not in f
-   |         ^^^^^^^^^^^ RUF061
+   |         ^^^^^^^^^^^ RUF050
 31 |     _ = '' in f is {}
 32 |     _ = '' not in f == {}
    |
 
-RUF061.py:31:9: RUF061 IO operation performed on closed IO object
+RUF050.py:31:9: RUF050 IO operation performed on closed IO object
    |
 29 |     _ = '' in f
 30 |     _ = '' not in f
 31 |     _ = '' in f is {}
-   |         ^^^^^^^ RUF061
+   |         ^^^^^^^ RUF050
 32 |     _ = '' not in f == {}
    |
 
-RUF061.py:32:9: RUF061 IO operation performed on closed IO object
+RUF050.py:32:9: RUF050 IO operation performed on closed IO object
    |
 30 |     _ = '' not in f
 31 |     _ = '' in f is {}
 32 |     _ = '' not in f == {}
-   |         ^^^^^^^^^^^ RUF061
+   |         ^^^^^^^^^^^ RUF050
    |
 
-RUF061.py:39:9: RUF061 IO operation performed on closed IO object
+RUF050.py:39:9: RUF050 IO operation performed on closed IO object
    |
 37 |         ...
 38 |
 39 |     for _ in f: ...
-   |         ^^^^^^ RUF061
+   |         ^^^^^^ RUF050
    |
 
-RUF061.py:46:5: RUF061 IO operation performed on closed IO object
+RUF050.py:46:5: RUF050 IO operation performed on closed IO object
    |
 44 |         ...
 45 |
 46 |     f.write()
-   |     ^^^^^^^ RUF061
+   |     ^^^^^^^ RUF050
    |
 
-RUF061.py:54:5: RUF061 IO operation performed on closed IO object
+RUF050.py:54:5: RUF050 IO operation performed on closed IO object
    |
 53 |     _ = f.name
 54 |     f.readlines()
-   |     ^^^^^^^^^^^ RUF061
+   |     ^^^^^^^^^^^ RUF050
    |

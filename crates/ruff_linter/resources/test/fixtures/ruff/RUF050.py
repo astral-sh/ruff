@@ -56,6 +56,14 @@ def _():
 
 ### No errors
 
+def non_io():
+    from somewhere import Lorem
+
+    with Lorem() as l:
+        l.write("")
+
+    print(l.read())
+
 def non_operations():
     with open() as f:
         ...

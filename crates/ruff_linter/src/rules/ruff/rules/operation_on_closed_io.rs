@@ -2,6 +2,7 @@ use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::AnyNodeRef;
+use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, BindingKind, NodeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -41,7 +42,7 @@ impl Violation for OperationOnClosedIO {
     }
 }
 
-/// RUF061
+/// RUF050
 pub(crate) fn operation_on_closed_io(
     checker: &Checker,
     binding: &Binding,
@@ -52,6 +53,10 @@ pub(crate) fn operation_on_closed_io(
 
     let semantic = checker.semantic();
     let with = binding.statement(semantic)?.as_with_stmt()?;
+
+    if !typing::is_io_base(binding, semantic) {
+        return None;
+    }
 
     let mut diagnostics = vec![];
 
@@ -66,9 +71,9 @@ pub(crate) fn operation_on_closed_io(
             continue;
         };
 
-        let Some(range) = method_reference(expression_id, semantic)
-            .or_else(|| contains_check(expression_id, semantic))
-            .or_else(|| for_loop(expression_id, semantic))
+        let Some(range) = method_reference_range(expression_id, semantic)
+            .or_else(|| contains_check_range(expression_id, semantic))
+            .or_else(|| for_loop_target_in_iter_range(expression_id, semantic))
         else {
             continue;
         };
@@ -81,8 +86,8 @@ pub(crate) fn operation_on_closed_io(
     Some(diagnostics)
 }
 
-/// `f.write(...)`
-fn method_reference(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
+// `f.write(...)`
+fn method_reference_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
     let mut ancestors = semantic.expressions(expression_id);
 
     let _io_object_ref = ancestors.next()?;
@@ -118,8 +123,8 @@ fn is_io_operation_method(name: &str) -> bool {
     )
 }
 
-/// `_ in f`
-fn contains_check(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
+// `_ in f`
+fn contains_check_range(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
     let mut ancestors = semantic.expressions(expression_id);
 
     let io_object_ref = AnyNodeRef::from(ancestors.next()?);
@@ -151,8 +156,11 @@ fn contains_check(expression_id: NodeId, semantic: &SemanticModel) -> Option<Tex
         })
 }
 
-/// `for _ in f: ...`
-fn for_loop(expression_id: NodeId, semantic: &SemanticModel) -> Option<TextRange> {
+// `for _ in f: ...`
+fn for_loop_target_in_iter_range(
+    expression_id: NodeId,
+    semantic: &SemanticModel,
+) -> Option<TextRange> {
     let mut ancestor_statements = semantic.statements(expression_id);
 
     let io_object_ref = AnyNodeRef::from(semantic.expression(expression_id)?);
