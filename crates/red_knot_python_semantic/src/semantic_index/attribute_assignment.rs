@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 use crate::semantic_index::expression::Expression;
 
 /// Describes an (annotated) attribute assignment that we discovered in a method
@@ -11,3 +13,5 @@ pub(crate) enum AttributeAssignment<'db> {
     /// An attribute assignment without a type annotation, e.g. `self.x = <value>`.
     Unannotated { value: Expression<'db> },
 }
+
+pub(crate) type AttributeAssignments<'db> = FxHashMap<&'db str, Vec<AttributeAssignment<'db>>>;

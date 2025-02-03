@@ -14,7 +14,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::attribute_assignment::AttributeAssignment;
+use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
 use crate::semantic_index::constraint::PatternConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
@@ -92,8 +92,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    attribute_assignments:
-        FxHashMap<FileScopeId, FxHashMap<&'db str, Vec<AttributeAssignment<'db>>>>,
+    attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -744,7 +743,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            attribute_assignments: self.attribute_assignments,
+            attribute_assignments: self
+                .attribute_assignments
+                .into_iter()
+                .map(|(k, v)| (k, Arc::new(v)))
+                .collect(),
         }
     }
 }

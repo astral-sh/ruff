@@ -25,10 +25,11 @@ use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
-    global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
+    attribute_assignments, global_scope, imported_modules, semantic_index, symbol_table,
+    use_def_map, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
     DeclarationsIterator,
 };
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
@@ -4146,7 +4147,15 @@ impl<'db> Class<'db> {
         name: &str,
         inferred_type_from_class_body: Option<Type<'db>>,
     ) -> Symbol<'db> {
-        let index = semantic_index(db, class_body_scope.file(db));
+        // We use a separate salsa query here to prevent unrelated changes in the AST of an external
+        // file from triggering re-evaluations of downstream queries.
+        // See the `dependency_implicit_instance_attribute` test for more information.
+        #[salsa::tracked]
+        fn infer_expression_type<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Type<'db> {
+            let inference = infer_expression_types(db, expression);
+            let expr_scope = expression.scope(db);
+            inference.expression_type(expression.node_ref(db).scoped_expression_id(db, expr_scope))
+        }
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
@@ -4158,7 +4167,11 @@ impl<'db> Class<'db> {
             union_of_inferred_types = union_of_inferred_types.add(ty);
         }
 
-        let Some(attribute_assignments) = index.attribute_assignments(db, class_body_scope, name)
+        let attribute_assignments = attribute_assignments(db, class_body_scope);
+
+        let Some(attribute_assignments) = attribute_assignments
+            .as_deref()
+            .and_then(|assignments| assignments.get(name))
         else {
             if inferred_type_from_class_body.is_some() {
                 return union_of_inferred_types.build().into();
@@ -4175,11 +4188,7 @@ impl<'db> Class<'db> {
                     //     self.name: <annotation>
                     //     self.name: <annotation> = …
 
-                    let inference = infer_expression_types(db, *annotation);
-                    let expr_scope = annotation.scope(db);
-                    let annotation_ty = inference.expression_type(
-                        annotation.node_ref(db).scoped_expression_id(db, expr_scope),
-                    );
+                    let annotation_ty = infer_expression_type(db, *annotation);
 
                     // TODO: check if there are conflicting declarations
                     return annotation_ty.into();
@@ -4189,10 +4198,7 @@ impl<'db> Class<'db> {
                     //
                     //     self.name = <value>
 
-                    let inference = infer_expression_types(db, *value);
-                    let expr_scope = value.scope(db);
-                    let inferred_ty = inference
-                        .expression_type(value.node_ref(db).scoped_expression_id(db, expr_scope));
+                    let inferred_ty = infer_expression_type(db, *value);
 
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
