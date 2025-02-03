@@ -107,6 +107,7 @@ mod tests {
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP051.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP051_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
