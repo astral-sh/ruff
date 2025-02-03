@@ -79,6 +79,7 @@ globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
 hashbrown = { version = "0.15.0", default-features = false, features = [
     "raw-entry",
+    "equivalent",
     "inline-more",
 ] }
 ignore = { version = "0.4.22" }
