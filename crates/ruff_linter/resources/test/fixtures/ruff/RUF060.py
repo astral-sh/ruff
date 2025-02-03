@@ -7,11 +7,11 @@ _C = TypeVar('_C', str, bytes)
 _D = TypeVar('_D', default=int)
 _E = TypeVar('_E', bound=int, default=int)
 _F = TypeVar('_F', str, bytes, default=str)
+_G = TypeVar('_G', str, a := int)
 
 _As = TypeVarTuple('_As')
 _Bs = TypeVarTuple('_Bs', bound=tuple[int, str])
 _Cs = TypeVarTuple('_Cs', default=tuple[int, str])
-
 
 _P1 = ParamSpec('_P1')
 _P2 = ParamSpec('_P2', bound=[bytes, bool])
@@ -82,6 +82,24 @@ class C[T](Generic[*_As, _A]): ...
 from somewhere import APublicTypeVar
 class C[T](Generic[APublicTypeVar]): ...
 class C[T](Generic[APublicTypeVar, _A]): ...
+
+
+# `_G` has two constraints: `str` and `a := int`.
+# The latter cannot be used as a PEP 695 constraint,
+# as named expressions are forbidden within type parameter lists.
+# See also the `_Z` example above.
+class C[T](Generic[_G]): ...  # Should be moved down below eventually
+
+
+# Single-element constraints should not be converted to a bound.
+class C[T: (str,)](Generic[_A]): ...
+class C[T: [a]](Generic[_A]): ...
+
+
+# Existing bounds should not be deparenthesized.
+# class C[T: (_Y := int)](Generic[_A]): ...  # TODO: Uncomment this
+# class C[T: (*a,)](Generic[_A]): ...        # TODO: Uncomment this
+
 
 ### No errors
 

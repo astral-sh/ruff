@@ -414,7 +414,62 @@ RUF060.py:84:12: RUF060 Class with type parameter list inherits from `Generic`
 83 | class C[T](Generic[APublicTypeVar]): ...
 84 | class C[T](Generic[APublicTypeVar, _A]): ...
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF060
-85 |
-86 | ### No errors
    |
    = help: Remove `Generic` base class
+
+RUF060.py:91:12: RUF060 [*] Class with type parameter list inherits from `Generic`
+   |
+89 | # as named expressions are forbidden within type parameter lists.
+90 | # See also the `_Z` example above.
+91 | class C[T](Generic[_G]): ...  # Should be moved down below eventually
+   |            ^^^^^^^^^^^ RUF060
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+88 88 | # The latter cannot be used as a PEP 695 constraint,
+89 89 | # as named expressions are forbidden within type parameter lists.
+90 90 | # See also the `_Z` example above.
+91    |-class C[T](Generic[_G]): ...  # Should be moved down below eventually
+   91 |+class C[T, _G: (str, a := int)]: ...  # Should be moved down below eventually
+92 92 | 
+93 93 | 
+94 94 | # Single-element constraints should not be converted to a bound.
+
+RUF060.py:95:20: RUF060 [*] Class with type parameter list inherits from `Generic`
+   |
+94 | # Single-element constraints should not be converted to a bound.
+95 | class C[T: (str,)](Generic[_A]): ...
+   |                    ^^^^^^^^^^^ RUF060
+96 | class C[T: [a]](Generic[_A]): ...
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+92 92 | 
+93 93 | 
+94 94 | # Single-element constraints should not be converted to a bound.
+95    |-class C[T: (str,)](Generic[_A]): ...
+   95 |+class C[T: (str), _A]: ...
+96 96 | class C[T: [a]](Generic[_A]): ...
+97 97 | 
+98 98 | 
+
+RUF060.py:96:17: RUF060 [*] Class with type parameter list inherits from `Generic`
+   |
+94 | # Single-element constraints should not be converted to a bound.
+95 | class C[T: (str,)](Generic[_A]): ...
+96 | class C[T: [a]](Generic[_A]): ...
+   |                 ^^^^^^^^^^^ RUF060
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+93 93 | 
+94 94 | # Single-element constraints should not be converted to a bound.
+95 95 | class C[T: (str,)](Generic[_A]): ...
+96    |-class C[T: [a]](Generic[_A]): ...
+   96 |+class C[T: [a], _A]: ...
+97 97 | 
+98 98 | 
+99 99 | # Existing bounds should not be deparenthesized.
