@@ -222,8 +222,7 @@ struct Atom(u32);
 
 impl Atom {
     /// Deconstruct an atom into a constraint index and a copy number.
-    #[allow(clippy::inline_always)]
-    #[inline(always)]
+    #[inline]
     fn into_index_and_copy(self) -> (u32, u8) {
         let copy = self.0 >> 24;
         let index = self.0 & 0x00ff_ffff;
@@ -231,8 +230,7 @@ impl Atom {
     }
 
     /// Construct an atom from a constraint index and a copy number.
-    #[allow(clippy::inline_always)]
-    #[inline(always)]
+    #[inline]
     fn from_index_and_copy(index: u32, copy: u8) -> Self {
         debug_assert!(index <= 0x00ff_ffff);
         Self((u32::from(copy) << 24) | index)
