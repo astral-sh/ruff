@@ -356,7 +356,7 @@ impl<'s> Parser<'s> {
         }
 
         if captures.name("config").is_some() {
-            return Err(anyhow::anyhow!("Configs are no longer allowed."));
+            return Err(anyhow::anyhow!("Trailing code-block metadata is not supported. Only the code block language can be specified."));
         }
 
         // CODE_RE can't match without matches for 'lang' and 'code'.
@@ -375,11 +375,12 @@ impl<'s> Parser<'s> {
 
         if let Some(explicit_path) = explicit_path {
             if !lang.is_empty()
+                && lang != "text"
                 && explicit_path.contains('.')
                 && !explicit_path.ends_with(&format!(".{lang}"))
             {
                 return Err(anyhow::anyhow!(
-                    "File `{explicit_path}` has mismatching `lang={lang}`"
+                    "File ending of test file path `{explicit_path}` does not match `lang={lang}` of code block"
                 ));
             }
         }
@@ -390,8 +391,14 @@ impl<'s> Parser<'s> {
                 self.unnamed_file_count += 1;
 
                 match lang {
-                    "pyi" => format!("test_{}.pyi", self.unnamed_file_count),
-                    _ => format!("test_{}.py", self.unnamed_file_count),
+                    "py" | "pyi" => format!("mdtest_snippet__{}.{lang}", self.unnamed_file_count),
+                    "" => format!("mdtest_snippet__{}.py", self.unnamed_file_count),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Cannot generate name for `lang={}`: Unsupported extension",
+                            lang
+                        ))
+                    }
                 }
             }
         };
@@ -478,7 +485,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_1.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
     }
@@ -503,7 +510,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_1.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
     }
@@ -549,7 +556,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_1.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
 
@@ -557,7 +564,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_2.py");
+        assert_eq!(file.path, "mdtest_snippet__2.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "y = 2");
 
@@ -565,11 +572,11 @@ mod tests {
             panic!("expected two files");
         };
 
-        assert_eq!(file_1.path, "test_3.pyi");
+        assert_eq!(file_1.path, "mdtest_snippet__3.pyi");
         assert_eq!(file_1.lang, "pyi");
         assert_eq!(file_1.code, "a: int");
 
-        assert_eq!(file_2.path, "test_4.pyi");
+        assert_eq!(file_2.path, "mdtest_snippet__4.pyi");
         assert_eq!(file_2.lang, "pyi");
         assert_eq!(file_2.code, "b: str");
     }
@@ -624,7 +631,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_1.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "y = 2");
     }
@@ -720,6 +727,22 @@ mod tests {
     }
 
     #[test]
+    fn cannot_generate_name_for_lang() {
+        let source = dedent(
+            "
+            ```json
+            {}
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Cannot generate name for `lang=json`: Unsupported extension"
+        );
+    }
+
+    #[test]
     fn mismatching_lang() {
         let source = dedent(
             "
@@ -731,13 +754,42 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "File `a.py` has mismatching `lang=pyi`");
+        assert_eq!(
+            err.to_string(),
+            "File ending of test file path `a.py` does not match `lang=pyi` of code block"
+        );
     }
+
     #[test]
     fn files_with_no_extension_can_have_any_lang() {
         let source = dedent(
             "
             `lorem`:
+
+            ```foo
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "lorem");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn files_with_lang_text_can_have_any_paths() {
+        let source = dedent(
+            "
+            `lorem.yaml`:
 
             ```text
             x = 1
@@ -754,7 +806,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "lorem");
+        assert_eq!(file.path, "lorem.yaml");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -838,7 +890,7 @@ mod tests {
     fn no_duplicate_name_files_in_test_2() {
         let source = dedent(
             "
-            `test_1.py`:
+            `mdtest_snippet__1.py`:
 
             ```py
             x = 1
@@ -852,7 +904,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "Test `file.md` has duplicate files named `test_1.py`."
+            "Test `file.md` has duplicate files named `mdtest_snippet__1.py`."
         );
     }
 
@@ -977,7 +1029,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_1.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1002,7 +1054,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test_1.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1016,6 +1068,6 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Configs are no longer allowed.");
+        assert_eq!(err.to_string(), "Trailing code-block metadata is not supported. Only the code block language can be specified.");
     }
 }
