@@ -9,13 +9,6 @@ no_sep = None
 	itemC
 """.split()
 
-"""
-"itemA"
-'itemB'
-'''itemC'''
-"'itemD'"
-""".split()
-
 "a,b,c,d".split(",")
 "a,b,c,d".split(None)
 "a,b,c,d".split(",", 1)
@@ -104,3 +97,12 @@ b"TesT.WwW.ExamplE.CoM".split(b".")
 "hello\nworld".splitlines()
 "hello\nworld".splitlines(keepends=True)
 "hello\nworld".splitlines(keepends=False)
+
+
+# another positive demonstrating quote preservation
+"""
+"itemA"
+'itemB'
+'''itemC'''
+"'itemD'"
+""".split()
