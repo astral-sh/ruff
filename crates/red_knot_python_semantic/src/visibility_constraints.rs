@@ -427,30 +427,36 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             Ordering::Equal => {
                 let a_node = self.interior_node(a);
                 let b_node = self.interior_node(b);
-                (
-                    a_node.atom,
-                    self.add_or_constraint(a_node.if_true, b_node.if_true),
-                    self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
-                    self.add_or_constraint(a_node.if_false, b_node.if_false),
-                )
+                let if_true = self.add_or_constraint(a_node.if_true, b_node.if_true);
+                let if_false = self.add_or_constraint(a_node.if_false, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Less => {
                 let a_node = self.interior_node(a);
-                (
-                    a_node.atom,
-                    self.add_or_constraint(a_node.if_true, b),
-                    self.add_or_constraint(a_node.if_ambiguous, b),
-                    self.add_or_constraint(a_node.if_false, b),
-                )
+                let if_true = self.add_or_constraint(a_node.if_true, b);
+                let if_false = self.add_or_constraint(a_node.if_false, b);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_or_constraint(a_node.if_ambiguous, b)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Greater => {
                 let b_node = self.interior_node(b);
-                (
-                    b_node.atom,
-                    self.add_or_constraint(a, b_node.if_true),
-                    self.add_or_constraint(a, b_node.if_ambiguous),
-                    self.add_or_constraint(a, b_node.if_false),
-                )
+                let if_true = self.add_or_constraint(a, b_node.if_true);
+                let if_false = self.add_or_constraint(a, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_or_constraint(a, b_node.if_ambiguous)
+                };
+                (b_node.atom, if_true, if_ambiguous, if_false)
             }
         };
 
@@ -487,30 +493,36 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             Ordering::Equal => {
                 let a_node = self.interior_node(a);
                 let b_node = self.interior_node(b);
-                (
-                    a_node.atom,
-                    self.add_and_constraint(a_node.if_true, b_node.if_true),
-                    self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous),
-                    self.add_and_constraint(a_node.if_false, b_node.if_false),
-                )
+                let if_true = self.add_and_constraint(a_node.if_true, b_node.if_true);
+                let if_false = self.add_and_constraint(a_node.if_false, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Less => {
                 let a_node = self.interior_node(a);
-                (
-                    a_node.atom,
-                    self.add_and_constraint(a_node.if_true, b),
-                    self.add_and_constraint(a_node.if_ambiguous, b),
-                    self.add_and_constraint(a_node.if_false, b),
-                )
+                let if_true = self.add_and_constraint(a_node.if_true, b);
+                let if_false = self.add_and_constraint(a_node.if_false, b);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_and_constraint(a_node.if_ambiguous, b)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Greater => {
                 let b_node = self.interior_node(b);
-                (
-                    b_node.atom,
-                    self.add_and_constraint(a, b_node.if_true),
-                    self.add_and_constraint(a, b_node.if_ambiguous),
-                    self.add_and_constraint(a, b_node.if_false),
-                )
+                let if_true = self.add_and_constraint(a, b_node.if_true);
+                let if_false = self.add_and_constraint(a, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_and_constraint(a, b_node.if_ambiguous)
+                };
+                (b_node.atom, if_true, if_ambiguous, if_false)
             }
         };
 
