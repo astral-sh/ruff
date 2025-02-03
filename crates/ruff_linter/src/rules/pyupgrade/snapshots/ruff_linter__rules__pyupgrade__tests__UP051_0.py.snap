@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP051.py:2:15: UP051 [*] Generic class uses private type parameters
+UP051_0.py:2:15: UP051 [*] Generic class uses private type parameters
   |
 1 | # simple case, replace _T in signature and body
 2 | class Generic[_T]:
@@ -23,7 +23,7 @@ UP051.py:2:15: UP051 [*] Generic class uses private type parameters
 7 7 | 
 8 8 | 
 
-UP051.py:10:12: UP051 [*] Generic function uses private type parameters
+UP051_0.py:10:12: UP051 [*] Generic function uses private type parameters
    |
  9 | # simple case, replace _T in signature and body
 10 | def second[_T](var: tuple[_T]) -> _T:
@@ -45,7 +45,7 @@ UP051.py:10:12: UP051 [*] Generic function uses private type parameters
 13 13 | 
 14 14 | 
 
-UP051.py:17:5: UP051 [*] Generic function uses private type parameters
+UP051_0.py:17:5: UP051 [*] Generic function uses private type parameters
    |
 15 | # one diagnostic for each variable, comments are preserved
 16 | def many_generics[
@@ -66,7 +66,7 @@ UP051.py:17:5: UP051 [*] Generic function uses private type parameters
 19 19 | ](args):
 20 20 |     return args
 
-UP051.py:18:5: UP051 [*] Generic function uses private type parameters
+UP051_0.py:18:5: UP051 [*] Generic function uses private type parameters
    |
 16 | def many_generics[
 17 |     _T,  # first generic
@@ -87,7 +87,7 @@ UP051.py:18:5: UP051 [*] Generic function uses private type parameters
 20 20 |     return args
 21 21 | 
 
-UP051.py:27:7: UP051 [*] Generic function uses private type parameters
+UP051_0.py:27:7: UP051 [*] Generic function uses private type parameters
    |
 27 | def f[_T](v):
    |       ^^ UP051

@@ -1,18 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP051_1.py:10:16: UP046 [*] Generic class `OldStyle` uses `Generic` subclass instead of type parameters
-   |
-10 | class OldStyle(Generic[_T]):
-   |                ^^^^^^^^^^^ UP046
-11 |     var: _T
-   |
-   = help: Use type parameters
 
-ℹ Unsafe fix
-7  7  | _T = TypeVar("_T")
-8  8  | 
-9  9  | 
-10    |-class OldStyle(Generic[_T]):
-   10 |+class OldStyle[_T]:
-11 11 |     var: _T

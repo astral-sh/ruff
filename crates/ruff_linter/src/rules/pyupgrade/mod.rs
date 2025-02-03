@@ -106,29 +106,14 @@ mod tests {
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
-    #[test_case(Rule::PrivateTypeParameter, Path::new("UP051.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP051_0.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP051_1.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP051_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Path::new("UP051_1.py"))]
-    fn full_pep695(path: &Path) -> Result<()> {
-        let snapshot = path.to_string_lossy().to_string();
-        let diagnostics = test_path(
-            Path::new("pyupgrade").join(path).as_path(),
-            &settings::LinterSettings::for_rules([
-                Rule::NonPEP695GenericClass,
-                Rule::NonPEP695GenericFunction,
-                Rule::PrivateTypeParameter,
-                Rule::UnusedPrivateTypeVar,
-            ]),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
