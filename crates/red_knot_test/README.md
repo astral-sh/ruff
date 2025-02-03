@@ -20,7 +20,7 @@ reveal_type(1)  # revealed: Literal[1]
 ````
 
 When running this test, the mdtest framework will write a file with these contents to the default
-file path (`/src/mdtest_snippet.py`) in its in-memory file system, run a type check on that file,
+file path (`/src/mdtest_snippet__1.py`) in its in-memory file system, run a type check on that file,
 and then match the resulting diagnostics with the assertions in the test. Assertions are in the form
 of Python comments. If all diagnostics and all assertions are matched, the test passes; otherwise,
 it fails.
@@ -129,8 +129,12 @@ assertion as the line of source code on which the matched diagnostics are emitte
 ## Multi-file tests
 
 Some tests require multiple files, with imports from one file into another. Multiple fenced code
-blocks represent multiple embedded files. Since files must have unique names, at most one file can
-use the default name of `/src/test.py`. Other files must explicitly specify their file name:
+blocks represent multiple embedded files. If there are multiple unnamed files, mdtest will name them
+according to the numbered scheme `/src/mdtest_snippet__1.py`, `/src/mdtest_snippet__2.py`, etc. (If
+they are `pyi` files, they will be named with a `pyi` extension instead.)
+
+Tests should not rely on these default names. If a test must import from a file, then it should
+explicitly specify the file name:
 
 ````markdown
 ```py
@@ -151,8 +155,8 @@ is, the equivalent of a runtime entry on `sys.path`).
 The default workspace root is `/src/`. Currently it is not possible to customize this in a test, but
 this is a feature we will want to add in the future.
 
-So the above test creates two files, `/src/test.py` and `/src/b.py`, and sets the workspace root to
-`/src/`, allowing `test.py` to import from `b.py` using the module name `b`.
+So the above test creates two files, `/src/mdtest_snippet__1.py` and `/src/b.py`, and sets the
+workspace root to `/src/`, allowing imports from `b.py` using the module name `b`.
 
 ## Multi-test suites
 
@@ -361,7 +365,7 @@ This is just an example, not a proposal that red-knot would ever actually output
 precisely this format:
 
 ```output
-test.py, line 1, col 1: revealed type is 'Literal[1]'
+mdtest_snippet__1.py, line 1, col 1: revealed type is 'Literal[1]'
 ```
 ````
 
@@ -369,8 +373,9 @@ We will want to build tooling to automatically capture and update these “full 
 blocks, when tests are run in an update-output mode (probably specified by an environment variable.)
 
 By default, an `output` block will specify diagnostic output for the file
-`<workspace-root>/test.py`. An `output` block can be prefixed by a <code>`&lt;path>`:</code> label
-as usual, to explicitly specify the Python file for which it asserts diagnostic output.
+`<workspace-root>/mdtest_snippet__1.py`. An `output` block can be prefixed by a
+<code>`&lt;path>`:</code> label as usual, to explicitly specify the Python file for which it asserts
+diagnostic output.
 
 It is an error for an `output` block to exist, if there is no `py` or `python` block in the same
 test for the same file path.
@@ -388,7 +393,7 @@ fenced code blocks in the test:
 
 ## modify a file
 
-Initial version of `test.py` and `b.py`:
+Initial file contents:
 
 ```py
 from b import x
@@ -401,10 +406,10 @@ reveal_type(x)
 x = 1
 ```
 
-Initial expected output for `test.py`:
+Initial expected output for the unnamed file:
 
 ```output
-/src/test.py, line 1, col 1: revealed type is 'Literal[1]'
+/src/mdtest_snippet__1.py, line 1, col 1: revealed type is 'Literal[1]'
 ```
 
 Now in our first incremental stage, modify the contents of `b.py`:
@@ -416,15 +421,15 @@ Now in our first incremental stage, modify the contents of `b.py`:
 x = 2
 ```
 
-And this is our updated expected output for `test.py` at stage 1:
+And this is our updated expected output for the unnamed file at stage 1:
 
 ```output stage=1
-/src/test.py, line 1, col 1: revealed type is 'Literal[2]'
+/src/mdtest_snippet__1.py, line 1, col 1: revealed type is 'Literal[2]'
 ```
 
-(One reason to use full-diagnostic-output blocks in this test is that updating
-inline-comment diagnostic assertions for `test.py` would require specifying new
-contents for `test.py` in stage 1, which we don't want to do in this test.)
+(One reason to use full-diagnostic-output blocks in this test is that updating inline-comment
+diagnostic assertions for `mdtest_snippet__1.py` would require specifying new contents for
+`mdtest_snippet__1.py` in stage 1, which we don't want to do in this test.)
 ````
 
 It will be possible to provide any number of stages in an incremental test. If a stage re-specifies
