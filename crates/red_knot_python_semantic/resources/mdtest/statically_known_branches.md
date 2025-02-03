@@ -181,8 +181,8 @@ demonstrate this, since semantic index building is inherently single-module:
 from typing import Literal
 
 class AlwaysTrue:
-  def __bool__(self) -> Literal[True]:
-    return True
+    def __bool__(self) -> Literal[True]:
+        return True
 ```
 
 ```py
