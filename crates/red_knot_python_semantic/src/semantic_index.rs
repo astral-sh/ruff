@@ -11,6 +11,7 @@ use ruff_index::{IndexSlice, IndexVec};
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
+use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
@@ -21,6 +22,7 @@ use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
+pub mod attribute_assignment;
 mod builder;
 pub(crate) mod constraint;
 pub mod definition;
@@ -93,6 +95,25 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     index.use_def_map(scope.file_scope_id(db))
 }
 
+/// Returns all attribute assignments for a specific class body scope.
+///
+/// Using [`attribute_assignments`] over [`semantic_index`] has the advantage that
+/// Salsa can avoid invalidating dependent queries if this scope's instance attributes
+/// are unchanged.
+#[salsa::tracked]
+pub(crate) fn attribute_assignments<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> Option<Arc<AttributeAssignments<'db>>> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    index
+        .attribute_assignments
+        .get(&class_body_scope.file_scope_id(db))
+        .cloned()
+}
+
 /// Returns the module global scope of `file`.
 #[salsa::tracked]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
@@ -139,6 +160,10 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
+
+    /// Maps from class body scopes to attribute assignments that were found
+    /// in methods of that class.
+    attribute_assignments: FxHashMap<FileScopeId, Arc<AttributeAssignments<'db>>>,
 }
 
 impl<'db> SemanticIndex<'db> {

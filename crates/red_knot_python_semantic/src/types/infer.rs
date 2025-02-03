@@ -44,7 +44,7 @@ use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
 };
-use crate::semantic_index::expression::Expression;
+use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
@@ -832,7 +832,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression_impl(expression.node_ref(self.db()));
+        match expression.kind(self.db()) {
+            ExpressionKind::Normal => {
+                self.infer_expression_impl(expression.node_ref(self.db()));
+            }
+            ExpressionKind::TypeExpression => {
+                self.infer_type_expression(expression.node_ref(self.db()));
+            }
+        }
     }
 
     /// Raise a diagnostic if the given type cannot be divided by zero.
@@ -6019,7 +6026,7 @@ mod tests {
     use crate::types::check_types;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use super::*;
 
@@ -6344,6 +6351,86 @@ mod tests {
             first_public_binding(&db, a, "x"),
             &events,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
+            let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+            let ast = parsed_module(db, file_main);
+            // Get the second statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+
+            let index = semantic_index(db, file_main);
+            index.expression(x_rhs_node.as_ref())
+        }
+
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def f(self):
+                    self.attr: int | None = None
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from mod import C
+            x = C().attr
+            "#,
+        )?;
+
+        let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+        let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int | None");
+
+        // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def f(self):
+                    self.attr: str | None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+
+        // Add a comment; this should not trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def f(self):
+                    # a comment!
+                    self.attr: str | None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_types,
+            x_rhs_expression(&db),
+            &events,
+        );
+
         Ok(())
     }
 }
