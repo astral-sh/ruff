@@ -74,6 +74,7 @@ env_logger = { version = "0.11.0" }
 etcetera = { version = "0.8.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
+getrandom = { version = "0.3.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
@@ -177,6 +178,10 @@ wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
+
+[workspace.metadata.cargo-shear]
+ignored = ["getrandom"]
+
 
 [workspace.lints.rust]
 unsafe_code = "warn"
