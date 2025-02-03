@@ -3,5 +3,5 @@ ruff==0.9.3
 mkdocs==1.6.1
 mkdocs-material @ git+ssh://git@github.com/astral-sh/mkdocs-material-insiders.git@39da7a5e761410349e9a1b8abf593b0cdd5453ff
 mkdocs-redirects==1.2.2
-mdformat==0.7.21
+mdformat==0.7.22
 mdformat-mkdocs==4.1.2
