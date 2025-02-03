@@ -152,6 +152,8 @@ same as the "possibly bound" definition (symbol `b`). Note that we raise a `poss
 error for both `a` and `b`:
 
 ```py path=mod.py
+from typing import Any
+
 def flag() -> bool: ...
 
 if flag():

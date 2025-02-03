@@ -168,6 +168,8 @@ not some special handling of specific conditions in semantic index building. We 
 demonstrate this, since semantic index building is inherently single-module:
 
 ```py path=module.py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
