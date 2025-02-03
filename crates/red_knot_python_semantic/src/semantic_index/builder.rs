@@ -413,13 +413,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_visibility_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);
     }
 
-    /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
-    /// not see any new definitions since the given snapshot.
-    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        self.current_use_def_map_mut()
-            .simplify_visibility_constraints(snapshot);
-    }
-
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
         self.current_assignments.push(assignment);
     }
@@ -1073,8 +1066,6 @@ where
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1130,7 +1121,7 @@ where
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
+                self.flow_restore(pre_loop);
                 self.record_negated_visibility_constraint(first_vis_constraint_id);
                 self.flow_merge(post_body);
                 self.record_negated_constraint(constraint);
@@ -1145,8 +1136,6 @@ where
                     self.record_visibility_constraint_id(body_vis_constraint_id);
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1291,7 +1280,7 @@ where
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
                     post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
+                    self.flow_restore(after_subject);
 
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
@@ -1301,8 +1290,6 @@ where
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(after_subject);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -1583,13 +1570,12 @@ where
                 self.visit_expr(body);
                 let visibility_constraint = self.record_visibility_constraint(constraint);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore(pre_if);
 
                 self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
                 self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
-                self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -1646,8 +1632,6 @@ where
                 range: _,
                 op,
             }) => {
-                let pre_op = self.flow_snapshot();
-
                 let mut snapshots = vec![];
                 let mut visibility_constraints = vec![];
 
@@ -1694,8 +1678,6 @@ where
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_op);
             }
             _ => {
                 walk_expr(self, expr);
