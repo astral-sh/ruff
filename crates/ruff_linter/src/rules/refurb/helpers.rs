@@ -1,11 +1,12 @@
-use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {

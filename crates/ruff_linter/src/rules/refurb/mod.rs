@@ -60,6 +60,21 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::TypeNoneComparison, Path::new("FURB169.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("refurb").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn write_whole_file_python_39() -> Result<()> {
         let diagnostics = test_path(

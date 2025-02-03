@@ -68,8 +68,7 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let negate = false;
-    let fix = replace_with_identity_check(expr, call.range, negate, checker);
+    let fix = replace_with_identity_check(expr, call.range, false, checker);
     let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));

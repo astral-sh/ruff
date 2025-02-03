@@ -8,12 +8,14 @@ use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 
 /// ## What it does
-/// Checks for uses of `type` that compare the type of an object to the type of
-/// `None`.
+/// Checks for uses of `type` that compare the type of an object to the type of `None`.
 ///
 /// ## Why is this bad?
 /// There is only ever one instance of `None`, so it is more efficient and
 /// readable to use the `is` operator to check if an object is `None`.
+///
+/// Only name expressions (e.g., `type(foo) == type(None)`) are reported.
+/// In [preview], the rule will also report other kinds of expressions.
 ///
 /// ## Example
 /// ```python
@@ -33,6 +35,8 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct TypeNoneComparison {
     replacement: IdentityCheck,
@@ -76,6 +80,13 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
         (_, Expr::NoneLiteral(_)) => left_arg,
         _ => return,
     };
+
+    if checker.settings.preview.is_disabled()
+        && !other_arg.is_name_expr()
+        && !other_arg.is_none_literal_expr()
+    {
+        return;
+    }
 
     let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range());
 
