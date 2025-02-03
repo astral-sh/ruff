@@ -933,6 +933,7 @@ Whether to enable the Ruff extension. Modifying this setting requires restarting
 ### `format.args`
 
 !!! warning "Deprecated"
+
     This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
     deprecated in favor of the native language server. Refer to the [migration
     guide](migration.md) for more information.
@@ -956,6 +957,7 @@ Additional arguments to pass to the Ruff formatter.
 ### `ignoreStandardLibrary`
 
 !!! warning "Deprecated"
+
     This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
     deprecated in favor of the native language server. Refer to the [migration
     guide](migration.md) for more information.
@@ -1021,6 +1023,7 @@ This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
 ### `lint.args`
 
 !!! warning "Deprecated"
+
     This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
     deprecated in favor of the native language server. Refer to the [migration
     guide](migration.md) for more information.
@@ -1044,6 +1047,7 @@ Additional arguments to pass to the Ruff linter.
 ### `lint.run`
 
 !!! warning "Deprecated"
+
     This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
     deprecated in favor of the native language server. Refer to the [migration
     guide](migration.md) for more information.
@@ -1067,6 +1071,7 @@ Run Ruff on every keystroke (`onType`) or on save (`onSave`).
 ### `nativeServer`
 
 !!! warning "Deprecated"
+
     This setting has been deprecated with the deprecation of
     [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). It was mainly used to provide a way to
     switch between the native language server and
@@ -1124,6 +1129,7 @@ The first executable in the list which is exists is used. This setting takes pre
 ### `showNotifications`
 
 !!! warning "Deprecated"
+
     This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
     deprecated in favor of the native language server. Refer to the [migration
     guide](migration.md) for more information.

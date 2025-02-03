@@ -9,24 +9,22 @@ While `ruff server` supports the same feature set as [`ruff-lsp`](https://github
     settings are supported by `ruff server`. As such, this migration guide is primarily targeted at editors that lack
     explicit documentation for `ruff server` settings, such as Helix or Neovim.
 
-Refer to the [setup guide](setup.md) for instructions on how to configure your editor to use `ruff
-server`.
+Refer to the [setup guide](setup.md) for instructions on how to configure your editor to use `ruff server`.
 
 ## Unsupported Settings
 
 Several `ruff-lsp` settings are not supported by `ruff server`. These are, as follows:
 
-* `lint.run`: This setting is no longer relevant for the native language server, which runs on every
-  keystroke by default
-* `lint.args`, `format.args`: These settings have been replaced by more granular settings in `ruff
-  server` like [`lint.select`](settings.md#select), [`format.preview`](settings.md#format_preview),
-  etc. along with the ability to provide a default configuration file using
-  [`configuration`](settings.md#configuration)
-* [`path`](settings.md#path), [`interpreter`](settings.md#interpreter): These settings are no longer
-  accepted by the language server but are still used by the VS Code extension. Refer to their
-  respective documentation for more information on how it's being used by the extension.
-* `ignoreStandardLibrary`
-* `showNotifications`
+- `lint.run`: This setting is no longer relevant for the native language server, which runs on every
+    keystroke by default
+- `lint.args`, `format.args`: These settings have been replaced by more granular settings in `ruff server` like [`lint.select`](settings.md#select), [`format.preview`](settings.md#format_preview),
+    etc. along with the ability to provide a default configuration file using
+    [`configuration`](settings.md#configuration)
+- [`path`](settings.md#path), [`interpreter`](settings.md#interpreter): These settings are no longer
+    accepted by the language server but are still used by the VS Code extension. Refer to their
+    respective documentation for more information on how it's being used by the extension.
+- `ignoreStandardLibrary`
+- `showNotifications`
 
 ## New Settings
 
