@@ -54,6 +54,7 @@ pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ParamKind {
     Class,
     Function,
