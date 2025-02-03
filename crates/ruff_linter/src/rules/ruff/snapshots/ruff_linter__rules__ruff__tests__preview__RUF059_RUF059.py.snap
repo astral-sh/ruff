@@ -1,0 +1,83 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF059.py:15:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+14 | def outer_1(a):
+15 |     def inner_1(a): ...
+   |                 ^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:20:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+18 | def outer_2():
+19 |     a = 1
+20 |     def inner_2(a): ...
+   |                 ^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:24:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+23 | def outer_3():
+24 |     def inner_3(a): ...
+   |                 ^ RUF059
+25 |     a = 1
+   |
+   = help: Rename parameter
+
+RUF059.py:29:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+28 | def outer_4():
+29 |     def inner_4(outer_4): ...
+   |                 ^^^^^^^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:32:13: RUF059 Parameter overshadows symbol from outer scope
+   |
+32 | def outer_5(global_a): ...
+   |             ^^^^^^^^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:36:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+35 | def outer_6():
+36 |     def inner_6(global_a): ...
+   |                 ^^^^^^^^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:40:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+39 | def outer_7():
+40 |     def inner_7(f): ...
+   |                 ^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:44:17: RUF059 Parameter overshadows symbol from outer scope
+   |
+43 | def outer_8():
+44 |     def inner_8(yf): ...
+   |                 ^^ RUF059
+   |
+   = help: Rename parameter
+
+RUF059.py:47:13: RUF059 Parameter overshadows symbol from outer scope
+   |
+47 | def outer_9(outer_100):
+   |             ^^^^^^^^^ RUF059
+48 |     ...
+   |
+   = help: Rename parameter
+
+RUF059.py:52:18: RUF059 Parameter overshadows symbol from outer scope
+   |
+51 | def outer_10():
+52 |     def inner_10(outer_100): ...
+   |                  ^^^^^^^^^ RUF059
+   |
+   = help: Rename parameter
