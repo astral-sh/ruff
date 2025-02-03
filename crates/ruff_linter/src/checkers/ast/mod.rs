@@ -1759,12 +1759,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
         // Step 1: Binding
         match type_param {
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
-            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
-            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range, .. }) => {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. })
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => {
                 self.add_binding(
                     name.as_str(),
-                    *range,
+                    name.range(),
                     BindingKind::TypeParam,
                     BindingFlags::empty(),
                 );
