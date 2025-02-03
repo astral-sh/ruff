@@ -111,4 +111,27 @@ def shadowed_type():
 
 class SubscriptReturnType:
     @classmethod
-    def m[S](cls: type[S]) -> type[S]: ...  # PYI019, but no autofix (yet)
+    def m[S](cls: type[S]) -> type[S]: ...  # PYI019
+
+
+class SelfNotUsedInReturnAnnotation:
+    def m[S](self: S, other: S) -> int: ...
+    @classmethod
+    def n[S](cls: type[S], other: S) -> int: ...
+
+
+class _NotATypeVar: ...
+
+# Our stable-mode logic uses heuristics and thinks this is a `TypeVar`
+# because `self` and the return annotation use the same name as their annotation,
+# but our preview-mode logic is smarter about this.
+class Foo:
+    def x(self: _NotATypeVar) -> _NotATypeVar: ...
+    @classmethod
+    def y(self: type[_NotATypeVar]) -> _NotATypeVar: ...
+
+
+class NoReturnAnnotations:
+    def m[S](self: S, other: S): ...
+    @classmethod
+    def n[S](cls: type[S], other: S): ...

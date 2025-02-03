@@ -155,6 +155,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.py"))]
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.pyi"))]
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_1.pyi"))]
     fn custom_classmethod_rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
