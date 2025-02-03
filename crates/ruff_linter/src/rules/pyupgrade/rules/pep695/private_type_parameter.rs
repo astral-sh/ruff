@@ -121,6 +121,8 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         })
         .collect();
 
+    dbg!(&to_rename);
+
     if to_rename.is_empty() {
         return None;
     }
@@ -131,13 +133,14 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
     diagnostic.try_set_fix(|| {
         let mut edits = Vec::new();
         for (old_name, new_name) in to_rename {
-            let rest = Renamer::rename(
-                dbg!(old_name),
-                dbg!(new_name),
+            let (first, rest) = dbg!(Renamer::rename(
+                old_name,
+                new_name,
                 &semantic.scopes[binding.scope],
                 checker.semantic(),
                 checker.stylist(),
-            );
+            ))?;
+            edits.push(first);
             edits.extend(rest);
         }
 
