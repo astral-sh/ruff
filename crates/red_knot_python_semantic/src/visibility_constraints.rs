@@ -339,7 +339,6 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     }
 
     /// Adds a constraint, ensuring that we only store any particular constraint once.
-    #[allow(clippy::cast_possible_truncation)]
     fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
         let index = *self
             .constraint_cache
@@ -350,7 +349,6 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 
     /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
     /// equal nodes.
-    #[allow(clippy::cast_possible_truncation)]
     fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
         // If the true and false branches lead to the same node, we can override the ambiguous
         // branch to go there too. And this node is then redundant and can be reduced.
