@@ -150,8 +150,11 @@ impl<'a> Generator<'a> {
         // error otherwise), but if this assumption is violated, a `Utf8Error` will be returned from
         // `p_raw_bytes`, and we should fall back on the normal escaping behavior instead of
         // panicking
-        if flags.prefix().is_raw() && self.p_raw_bytes(s, flags).is_ok() {
-            return;
+        if flags.prefix().is_raw() {
+            if let Ok(s) = std::str::from_utf8(s) {
+                flags.write_string_contents(&mut self.buffer, s);
+                return;
+            }
         }
         let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
@@ -161,17 +164,6 @@ impl<'a> Generator<'a> {
             .bytes_repr(flags.triple_quotes())
             .write(&mut self.buffer)
             .expect("Writing to a String buffer should never fail");
-    }
-
-    /// Returns a [`std::str::Utf8Error`] if `s` is not valid UTF-8, otherwise converts `s` to a
-    /// `str` and adds it to `self`.
-    fn p_raw_bytes(
-        &mut self,
-        s: &[u8],
-        flags: BytesLiteralFlags,
-    ) -> Result<(), std::str::Utf8Error> {
-        flags.write_string_contents(&mut self.buffer, std::str::from_utf8(s)?);
-        Ok(())
     }
 
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
