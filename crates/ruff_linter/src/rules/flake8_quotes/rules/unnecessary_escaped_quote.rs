@@ -108,7 +108,9 @@ fn check_string_or_bytes(
 
     let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        flags.format_string_contents(&unescape_string(contents, opposite_quote_char)),
+        flags
+            .display_contents(&unescape_string(contents, opposite_quote_char))
+            .to_string(),
         range,
     )));
     Some(diagnostic)

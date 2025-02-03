@@ -405,7 +405,9 @@ pub(crate) fn printf_string_formatting(
         // Convert the `%`-format string to a `.format` string.
         format_strings.push((
             string_literal.range(),
-            flags.format_string_contents(&percent_to_format(&format_string)),
+            flags
+                .display_contents(&percent_to_format(&format_string))
+                .to_string(),
         ));
     }
 

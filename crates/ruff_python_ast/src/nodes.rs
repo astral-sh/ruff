@@ -1027,20 +1027,30 @@ pub trait StringFlags: Copy {
         self.quote_len()
     }
 
-    fn format_string_contents(self, contents: &str) -> String {
-        let mut buffer = String::new();
-        self.write_string_contents(&mut buffer, contents);
-        buffer
+    fn display_contents(self, contents: &str) -> DisplayFlags {
+        DisplayFlags {
+            prefix: self.prefix(),
+            quote_str: self.quote_str(),
+            contents,
+        }
     }
+}
 
-    fn write_string_contents(self, buffer: &mut String, contents: &str) {
-        buffer
-            .reserve(self.opener_len().to_usize() + contents.len() + self.closer_len().to_usize());
-        let quote_str = self.quote_str();
-        buffer.push_str(self.prefix().as_str());
-        buffer.push_str(quote_str);
-        buffer.push_str(contents);
-        buffer.push_str(quote_str);
+pub struct DisplayFlags<'a> {
+    prefix: AnyStringPrefix,
+    quote_str: &'a str,
+    contents: &'a str,
+}
+
+impl std::fmt::Display for DisplayFlags<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{prefix}{quote}{contents}{quote}",
+            prefix = self.prefix,
+            quote = self.quote_str,
+            contents = self.contents
+        )
     }
 }
 

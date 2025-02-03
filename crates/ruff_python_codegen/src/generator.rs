@@ -1,5 +1,6 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
+use std::fmt::Write;
 use std::ops::Deref;
 
 use ruff_python_ast::{
@@ -152,7 +153,8 @@ impl<'a> Generator<'a> {
         // panicking
         if flags.prefix().is_raw() {
             if let Ok(s) = std::str::from_utf8(s) {
-                flags.write_string_contents(&mut self.buffer, s);
+                write!(self.buffer, "{}", flags.display_contents(s))
+                    .expect("Writing to a String buffer should never fail");
                 return;
             }
         }
@@ -169,7 +171,8 @@ impl<'a> Generator<'a> {
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
         let flags = flags.into();
         if flags.prefix().is_raw() {
-            flags.write_string_contents(&mut self.buffer, s);
+            write!(self.buffer, "{}", flags.display_contents(s))
+                .expect("Writing to a String buffer should never fail");
             return;
         }
         self.p(flags.prefix().as_str());
