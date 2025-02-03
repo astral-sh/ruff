@@ -116,7 +116,7 @@ proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
 quick-junit = { version = "0.5.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.8.5" }
+rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
