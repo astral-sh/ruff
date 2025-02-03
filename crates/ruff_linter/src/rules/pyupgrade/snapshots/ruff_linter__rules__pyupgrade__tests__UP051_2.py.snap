@@ -79,3 +79,116 @@ UP051_2.py:17:8: UP051 [*] Generic class uses private type parameters
 18    |-    var: _P
    17 |+class C[**P]:
    18 |+    var: P
+19 19 | 
+20 20 | 
+21 21 | from typing import Callable
+
+UP051_2.py:26:17: UP051 [*] Generic class uses private type parameters
+   |
+24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 | # fixed
+26 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP051
+27 |     @staticmethod
+28 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+23 23 | 
+24 24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 25 | # fixed
+26    |-class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   26 |+class Everything[T, _U: str, _V: (int, float), *_W, **_X]:
+27 27 |     @staticmethod
+28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   28 |+    def transform(t: T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, T] | None:
+29 29 |         return None
+
+UP051_2.py:26:17: UP051 [*] Generic class uses private type parameters
+   |
+24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 | # fixed
+26 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP051
+27 |     @staticmethod
+28 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+23 23 | 
+24 24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 25 | # fixed
+26    |-class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   26 |+class Everything[_T, U: str, _V: (int, float), *_W, **_X]:
+27 27 |     @staticmethod
+28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   28 |+    def transform(t: _T, u: U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+29 29 |         return None
+
+UP051_2.py:26:17: UP051 [*] Generic class uses private type parameters
+   |
+24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 | # fixed
+26 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP051
+27 |     @staticmethod
+28 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+23 23 | 
+24 24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 25 | # fixed
+26    |-class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   26 |+class Everything[_T, _U: str, V: (int, float), *_W, **_X]:
+27 27 |     @staticmethod
+28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   28 |+    def transform(t: _T, u: _U, v: V) -> tuple[*_W] | Callable[_X, _T] | None:
+29 29 |         return None
+
+UP051_2.py:26:17: UP051 [*] Generic class uses private type parameters
+   |
+24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 | # fixed
+26 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP051
+27 |     @staticmethod
+28 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+23 23 | 
+24 24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 25 | # fixed
+26    |-class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   26 |+class Everything[_T, _U: str, _V: (int, float), *W, **_X]:
+27 27 |     @staticmethod
+28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   28 |+    def transform(t: _T, u: _U, v: _V) -> tuple[*W] | Callable[_X, _T] | None:
+29 29 |         return None
+
+UP051_2.py:26:17: UP051 [*] Generic class uses private type parameters
+   |
+24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 | # fixed
+26 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP051
+27 |     @staticmethod
+28 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   |
+   = help: Remove the leading underscores
+
+ℹ Safe fix
+23 23 | 
+24 24 | # each of these will get a separate diagnostic, but at least they'll all get
+25 25 | # fixed
+26    |-class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+   26 |+class Everything[_T, _U: str, _V: (int, float), *_W, **X]:
+27 27 |     @staticmethod
+28    |-    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+   28 |+    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[X, _T] | None:
+29 29 |         return None
