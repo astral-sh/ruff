@@ -212,22 +212,33 @@ struct InteriorNode {
     if_false: ScopedVisibilityConstraintId,
 }
 
+/// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
+/// this is (one of the copies of) a `Constraint` that represents some runtime property of the
+/// Python code that we are evaluating. We intern these constraints in an arena
+/// ([VisibilityConstraints::constraints]). An atom consists of an index into this arena, and a
+/// copy number.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Atom(u32);
 
 impl Atom {
+    /// Deconstruct an atom into a constraint index and a copy number.
+    #[inline(always)]
     fn into_index_and_copy(self) -> (u32, u8) {
         let copy = self.0 >> 24;
         let index = self.0 & 0x00ff_ffff;
         (index, copy as u8)
     }
 
+    /// Construct an atom from a constraint index and a copy number.
+    #[inline(always)]
     fn from_index_and_copy(index: u32, copy: u8) -> Self {
         debug_assert!(index <= 0x00ff_ffff);
         Self((u32::from(copy) << 24) | index)
     }
 }
 
+// A custom Debug implementation that prints out the constraint index and copy number as distinct
+// fields.
 impl std::fmt::Debug for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (index, copy) = self.into_index_and_copy();
@@ -253,11 +264,14 @@ impl ScopedVisibilityConstraintId {
     }
 }
 
+// Rebind some constants locally so that we don't need as many qualifiers below.
 const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
 const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
 const ALWAYS_FALSE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_FALSE;
 const SMALLEST_TERMINAL: u32 = ALWAYS_FALSE.0;
 
+/// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
+/// maintain a separate set of visibility constraints for each scope in file.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
     constraints: Vec<Constraint<'db>>,
@@ -294,8 +308,9 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         self.interiors[a.0 as usize]
     }
 
-    /// Returns whether `a` or `b` has a "larger" atom. Terminals are considered to have a larger
-    /// atom than any internal node.
+    /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
+    /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
+    /// any internal node, since they are leaf nodes.
     fn cmp_atoms(
         &self,
         a: ScopedVisibilityConstraintId,
@@ -341,6 +356,9 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         ScopedVisibilityConstraintId(index)
     }
 
+    /// Adds a new visibility constraint that checks a single [`Constraint`]. Provide different
+    /// values for `copy` if you need to model that the constraint can evaluate to different
+    /// results at different points in the execution of the program being modeled.
     pub(crate) fn add_atom(
         &mut self,
         constraint: Constraint<'db>,
@@ -355,6 +373,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         })
     }
 
+    /// Adds a new visibility constraint that is the ternary NOT of an existing one.
     pub(crate) fn add_not_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
@@ -384,6 +403,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         result
     }
 
+    /// Adds a new visibility constraint that is the ternary OR of two existing ones.
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
@@ -396,6 +416,8 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             _ => {}
         }
 
+        // OR is commutative, which lets us halve the cache requirements
+        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
         if let Some(cached) = self.or_cache.get(&(a, b)) {
             return *cached;
         }
@@ -441,6 +463,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         result
     }
 
+    /// Adds a new visibility constraint that is the ternary AND of two existing ones.
     pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
@@ -453,6 +476,8 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             _ => {}
         }
 
+        // AND is commutative, which lets us halve the cache requirements
+        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
         if let Some(cached) = self.and_cache.get(&(a, b)) {
             return *cached;
         }
