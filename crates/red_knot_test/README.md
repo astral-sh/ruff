@@ -20,10 +20,10 @@ reveal_type(1)  # revealed: Literal[1]
 ````
 
 When running this test, the mdtest framework will write a file with these contents to the default
-file path (`/src/test.py`) in its in-memory file system, run a type check on that file, and then
-match the resulting diagnostics with the assertions in the test. Assertions are in the form of
-Python comments. If all diagnostics and all assertions are matched, the test passes; otherwise, it
-fails.
+file path (`/src/mdtest_snippet.py`) in its in-memory file system, run a type check on that file,
+and then match the resulting diagnostics with the assertions in the test. Assertions are in the form
+of Python comments. If all diagnostics and all assertions are matched, the test passes; otherwise,
+it fails.
 
 <!---
 (If you are reading this document in raw Markdown source rather than rendered Markdown, note that
@@ -368,10 +368,9 @@ test.py, line 1, col 1: revealed type is 'Literal[1]'
 We will want to build tooling to automatically capture and update these “full diagnostic output”
 blocks, when tests are run in an update-output mode (probably specified by an environment variable.)
 
-By default, an `output` block will specify diagnostic output for the file `<workspace-root>/test.py`.
-An `output` block can have a `path=` option, to explicitly specify the Python file for which it
-asserts diagnostic output, and a `stage=` option, to specify which stage of an incremental test it
-specifies diagnostic output at. (See “incremental tests” below.)
+By default, an `output` block will specify diagnostic output for the file
+`<workspace-root>/test.py`. An `output` block can be prefixed by a <code>`&lt;path>`:</code> label
+as usual, to explicitly specify the Python file for which it asserts diagnostic output.
 
 It is an error for an `output` block to exist, if there is no `py` or `python` block in the same
 test for the same file path.

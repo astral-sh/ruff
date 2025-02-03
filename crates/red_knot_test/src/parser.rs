@@ -157,7 +157,7 @@ pub(crate) struct EmbeddedFile<'s> {
 
 /// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
 static HEADER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
+    LazyLock::new(|| Regex::new(r"^(?<level>#+)[^\S\n]+(?<title>.+)[^\S\n]*\n").unwrap());
 
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
@@ -165,12 +165,12 @@ static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?x)
         ^(?:
-            `(?<path>[^`\n]+)`\s*:\s*\n
+            `(?<path>[^`\n]+)`[^\S\n]*:[^\S\n]*\n
             \n?
         )?
         ```(?<lang>(?-u:\w)+)?\x20*(?<config>\S.*)?\n
         (?<code>[\s\S]*?)\n?
-        (?<end>```|\z)
+        (?<end>```\n?|\z)
         ",
     )
     .unwrap()
@@ -271,10 +271,14 @@ impl<'s> Parser<'s> {
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         while let Some(position) = memchr2(b'`', b'#', self.cursor.as_bytes()) {
-            self.cursor.skip_bytes(position.saturating_sub(1));
+            self.cursor.skip_bytes(position.saturating_sub(2));
 
-            // code blocks and headers must start on a new line.
-            if position == 0 || self.cursor.eat_char('\n') {
+            // Code blocks and headers must start on a new line
+            // and preceded by at least one blank line.
+            if position == 0 && self.cursor.first() == '#'
+                || position == 1 && self.cursor.eat_char('\n')
+                || self.cursor.eat_char('\n') && self.cursor.eat_char('\n')
+            {
                 match self.cursor.first() {
                     '#' => {
                         if let Some(find) = HEADER_RE.find(self.cursor.as_str()) {
@@ -290,13 +294,13 @@ impl<'s> Parser<'s> {
                             continue;
                         }
                     }
-                    _ => unreachable!(),
+                    _ => {}
                 }
             }
 
             // Skip to the end of the line
             if let Some(position) = memchr::memchr(b'\n', self.cursor.as_bytes()) {
-                self.cursor.skip_bytes(position);
+                self.cursor.skip_bytes(position + 1);
             } else {
                 break;
             }
@@ -863,6 +867,62 @@ mod tests {
     }
 
     #[test]
+    fn line_break_in_header_1() {
+        let source = dedent(
+            "
+            #
+            Foo
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(test.section.title, "file.md");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn line_break_in_header_2() {
+        let source = dedent(
+            "
+            # Foo
+
+            ##
+            Lorem
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(test.section.title, "Foo");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
     fn no_duplicate_name_files_in_test() {
         let source = dedent(
             "
@@ -1038,6 +1098,58 @@ mod tests {
         let source = dedent(
             "
             `foo`bar.py`:
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn path_colon_on_next_line() {
+        let source = dedent(
+            "
+            `foo.py`
+            :
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn random_trailing_backtick_quoted() {
+        let source = dedent(
+            "
+            A long sentence that forces a line break
+            `int`:
 
             ```py
             x = 1
