@@ -2,12 +2,13 @@ use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_semantic::{Binding, BindingId, ScopeId};
-use ruff_python_stdlib::{
-    builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
-};
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, renamer::Renamer};
+use crate::{
+    checkers::ast::Checker,
+    renamer::{try_shadowed_kind, Renamer, ShadowedKind},
+};
 
 /// ## What it does
 /// Checks for "dummy variables" (variables that are named as if to indicate they are unused)
@@ -188,19 +189,6 @@ pub(crate) fn used_dummy_variable(
     Some(diagnostic)
 }
 
-/// Enumeration of various ways in which a binding can shadow other variables
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-enum ShadowedKind {
-    /// The variable shadows a global, nonlocal or local symbol
-    Some,
-    /// The variable shadows a builtin symbol
-    BuiltIn,
-    /// The variable shadows a keyword
-    Keyword,
-    /// The variable does not shadow any other symbols
-    None,
-}
-
 /// Suggests a potential alternative name to resolve a shadowing conflict.
 fn get_possible_fix(
     name: &str,
@@ -234,38 +222,4 @@ fn get_possible_fix(
 
     // Check if the fix name is a valid identifier
     is_identifier(&fix_name).then_some(fix_name)
-}
-
-/// Determines the kind of shadowing or conflict for a given variable name.
-fn try_shadowed_kind(name: &str, checker: &Checker, scope_id: ScopeId) -> Option<ShadowedKind> {
-    // If the name starts with an underscore, we don't consider it
-    if !name.starts_with('_') {
-        return None;
-    }
-
-    // Trim the leading underscores for further checks
-    let trimmed_name = name.trim_start_matches('_');
-
-    // Check the kind in order of precedence
-    if is_keyword(trimmed_name) {
-        return Some(ShadowedKind::Keyword);
-    }
-
-    if is_python_builtin(
-        trimmed_name,
-        checker.settings.target_version.minor(),
-        checker.source_type.is_ipynb(),
-    ) {
-        return Some(ShadowedKind::BuiltIn);
-    }
-
-    if !checker
-        .semantic()
-        .is_available_in_scope(trimmed_name, scope_id)
-    {
-        return Some(ShadowedKind::Some);
-    }
-
-    // Default to no shadowing
-    Some(ShadowedKind::None)
 }
