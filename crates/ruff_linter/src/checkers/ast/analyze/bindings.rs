@@ -24,6 +24,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::PytestUnittestRaisesAssertion,
         Rule::ForLoopWrites,
         Rule::CustomTypeVarForSelf,
+        Rule::PrivateTypeParameter,
     ]) {
         return;
     }
