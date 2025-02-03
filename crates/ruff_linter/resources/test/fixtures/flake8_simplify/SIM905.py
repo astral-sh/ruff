@@ -9,6 +9,13 @@ no_sep = None
 	itemC
 """.split()
 
+"""
+"itemA"
+'itemB'
+'''itemC'''
+"'itemD'"
+""".split()
+
 "a,b,c,d".split(",")
 "a,b,c,d".split(None)
 "a,b,c,d".split(",", 1)
