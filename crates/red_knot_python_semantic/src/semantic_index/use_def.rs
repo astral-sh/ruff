@@ -575,40 +575,6 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
-    /// This method resets the visibility constraints for all symbols to a previous state
-    /// *if* there have been no new declarations or bindings since then. Consider the
-    /// following example:
-    /// ```py
-    /// x = 0
-    /// y = 0
-    /// if test_a:
-    ///     y = 1
-    /// elif test_b:
-    ///     y = 2
-    /// elif test_c:
-    ///    y = 3
-    ///
-    /// # RESET
-    /// ```
-    /// We build a complex visibility constraint for the `y = 0` binding. We build the same
-    /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
-    /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
-    pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
-
-        self.scope_start_visibility = snapshot.scope_start_visibility;
-
-        // Note that this loop terminates when we reach a symbol not present in the snapshot.
-        // This means we keep visibility constraints for all new symbols, which is intended,
-        // since these symbols have been introduced in the corresponding branch, which might
-        // be subject to visibility constraints. We only simplify/reset visibility constraints
-        // for symbols that have the same bindings and declarations present compared to the
-        // snapshot.
-        for (current, snapshot) in self.symbol_states.iter_mut().zip(snapshot.symbol_states) {
-            current.simplify_visibility_constraints(snapshot);
-        }
-    }
-
     pub(super) fn record_declaration(
         &mut self,
         symbol: ScopedSymbolId,
