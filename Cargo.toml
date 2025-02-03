@@ -74,11 +74,13 @@ env_logger = { version = "0.11.0" }
 etcetera = { version = "0.8.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
+getrandom = { version = "0.3.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
 hashbrown = { version = "0.15.0", default-features = false, features = [
     "raw-entry",
+    "equivalent",
     "inline-more",
 ] }
 ignore = { version = "0.4.22" }
@@ -116,7 +118,7 @@ proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
 quick-junit = { version = "0.5.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.8.5" }
+rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
@@ -176,6 +178,10 @@ wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
+
+[workspace.metadata.cargo-shear]
+ignored = ["getrandom"]
+
 
 [workspace.lints.rust]
 unsafe_code = "warn"
