@@ -24,7 +24,7 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.21
+    rev: 0.7.22
     hooks:
       - id: mdformat
         additional_dependencies:
@@ -60,7 +60,7 @@ repos:
           - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.29.4
+    rev: v1.29.5
     hooks:
       - id: typos
 
@@ -74,7 +74,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.3
+    rev: v0.9.4
     hooks:
       - id: ruff-format
       - id: ruff
@@ -92,12 +92,12 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.2.2
+    rev: v1.3.0
     hooks:
       - id: zizmor
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.31.0
+    rev: 0.31.1
     hooks:
       - id: check-github-workflows
 
