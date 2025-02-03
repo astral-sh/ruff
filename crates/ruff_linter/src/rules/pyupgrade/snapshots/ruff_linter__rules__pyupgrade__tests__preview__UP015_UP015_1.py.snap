@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP015_1.py:3:17: UP015 [*] Unnecessary open mode argument
+UP015_1.py:3:17: UP015 [*] Unnecessary mode argument
   |
 1 | # Not a valid type annotation but this test shouldn't result in a panic.
 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 3 | x: 'open("foo", "r")'
   |                 ^^^ UP015
   |
-  = help: Remove open mode argument
+  = help: Remove mode argument
 
 ℹ Safe fix
 1 1 | # Not a valid type annotation but this test shouldn't result in a panic.

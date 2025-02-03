@@ -39,16 +39,16 @@ impl AlwaysFixableViolation for RedundantOpenModes {
     fn message(&self) -> String {
         let RedundantOpenModes { replacement } = self;
         if replacement.is_empty() {
-            "Unnecessary open mode argument".to_string()
+            "Unnecessary mode argument".to_string()
         } else {
-            format!("Unnecessary open modes, use `{replacement}`")
+            format!("Unnecessary modes, use `{replacement}`")
         }
     }
 
     fn fix_title(&self) -> String {
         let RedundantOpenModes { replacement } = self;
         if replacement.is_empty() {
-            "Remove open mode argument".to_string()
+            "Remove mode argument".to_string()
         } else {
             format!("Replace with `{replacement}`")
         }
