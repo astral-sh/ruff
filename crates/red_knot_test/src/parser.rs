@@ -282,14 +282,14 @@ impl<'s> Parser<'s> {
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         const CODE_BLOCK_END: &[u8] = b"```";
 
-        while !self.cursor.is_eof() {
-            match self.cursor.first() {
+        while let Some(first) = self.cursor.bump() {
+            match first {
                 '#' => {
                     self.explicit_path = None;
                     self.preceding_blank_lines = 0;
 
                     // Determine header level (number of '#' characters)
-                    let mut header_level = 0;
+                    let mut header_level = 1;
                     while self.cursor.eat_char('#') {
                         header_level += 1;
                     }
@@ -304,8 +304,6 @@ impl<'s> Parser<'s> {
                     }
                 }
                 '`' => {
-                    self.cursor.eat_char('`');
-
                     match self.cursor.first() {
                         '`' if self.cursor.second() == '`' => {
                             // We see the triple-backtick beginning of a code block.
@@ -371,17 +369,20 @@ impl<'s> Parser<'s> {
                 }
                 '\n' => {
                     self.preceding_blank_lines += 1;
+                    continue;
                 }
-                _ => {
+                c => {
                     self.preceding_blank_lines = 0;
                     self.explicit_path = None;
 
-                    self.skip_whitespace();
-                    if self.cursor.eat_char('`')
-                        && self.cursor.eat_char('`')
-                        && self.cursor.eat_char('`')
-                    {
-                        bail!("Indented code blocks are not supported.");
+                    if c.is_whitespace() {
+                        self.skip_whitespace();
+                        if self.cursor.eat_char('`')
+                            && self.cursor.eat_char('`')
+                            && self.cursor.eat_char('`')
+                        {
+                            bail!("Indented code blocks are not supported.");
+                        }
                     }
                 }
             }
