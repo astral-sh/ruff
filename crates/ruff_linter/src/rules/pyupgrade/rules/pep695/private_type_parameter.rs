@@ -47,6 +47,9 @@ use crate::{
 /// situations, you can consider using a trailing underscore or a different name entirely to satisfy
 /// the lint rule.
 ///
+/// Additionally, neither a diagnostic nor a fix will be emitted for "sunder" (`_T_`) or "dunder"
+/// (`__T__`) type parameter names as these are not considered private.
+///
 /// ## See also
 ///
 /// This rule renames private [PEP 695] type parameters but doesn't convert pre-[PEP 695] generics
