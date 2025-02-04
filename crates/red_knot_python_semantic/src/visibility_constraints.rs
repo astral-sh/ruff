@@ -152,7 +152,7 @@
 
 use std::cmp::Ordering;
 
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{newtype_index, Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::{
@@ -214,9 +214,6 @@ struct InteriorNode {
 }
 
 #[newtype_index]
-struct ConstraintId;
-
-#[newtype_index]
 struct InteriorNodeId;
 
 /// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
@@ -230,18 +227,19 @@ struct Atom(u32);
 impl Atom {
     /// Deconstruct an atom into a constraint index and a copy number.
     #[inline]
-    fn into_index_and_copy(self) -> (ConstraintId, u8) {
+    fn into_index_and_copy(self) -> (u32, u8) {
         let copy = self.0 >> 24;
         let index = self.0 & 0x00ff_ffff;
-        (index.into(), copy as u8)
+        (index, copy as u8)
     }
 
-    /// Construct an atom from a constraint index and a copy number.
     #[inline]
-    fn from_index_and_copy(index: ConstraintId, copy: u8) -> Self {
-        let index = index.as_u32();
-        debug_assert!(index <= 0x00ff_ffff);
-        Self((u32::from(copy) << 24) | index)
+    fn copy_of(mut self, copy: u8) -> Self {
+        // Clear out the previous copy number
+        self.0 &= 0x00ff_ffff;
+        // OR in the new one
+        self.0 |= u32::from(copy) << 24;
+        self
     }
 }
 
@@ -250,10 +248,22 @@ impl Atom {
 impl std::fmt::Debug for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (index, copy) = self.into_index_and_copy();
-        f.debug_tuple("Atom")
-            .field(&index.as_u32())
-            .field(&copy)
-            .finish()
+        f.debug_tuple("Atom").field(&index).field(&copy).finish()
+    }
+}
+
+impl Idx for Atom {
+    #[inline]
+    fn new(value: usize) -> Self {
+        assert!(value <= 0x00ff_ffff);
+        #[allow(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    #[inline]
+    fn index(self) -> usize {
+        let (index, _) = self.into_index_and_copy();
+        index as usize
     }
 }
 
@@ -285,15 +295,15 @@ const SMALLEST_TERMINAL: u32 = ALWAYS_FALSE.0;
 /// maintain a separate set of visibility constraints for each scope in file.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
-    constraints: IndexVec<ConstraintId, Constraint<'db>>,
+    constraints: IndexVec<Atom, Constraint<'db>>,
     interiors: IndexVec<InteriorNodeId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraintsBuilder<'db> {
-    constraints: IndexVec<ConstraintId, Constraint<'db>>,
+    constraints: IndexVec<Atom, Constraint<'db>>,
     interiors: IndexVec<InteriorNodeId, InteriorNode>,
-    constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
+    constraint_cache: FxHashMap<Constraint<'db>, Atom>,
     interior_cache: FxHashMap<InteriorNode, InteriorNodeId>,
     not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
     and_cache: FxHashMap<
@@ -340,11 +350,10 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 
     /// Adds a constraint, ensuring that we only store any particular constraint once.
     fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
-        let index = *self
-            .constraint_cache
+        self.constraint_cache
             .entry(constraint)
-            .or_insert_with(|| self.constraints.push(constraint));
-        Atom::from_index_and_copy(index, copy)
+            .or_insert_with(|| self.constraints.push(constraint))
+            .copy_of(copy)
     }
 
     /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
@@ -564,8 +573,7 @@ impl<'db> VisibilityConstraints<'db> {
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.interior_node(id),
             };
-            let (index, _) = node.atom.into_index_and_copy();
-            let constraint = &self.constraints[index];
+            let constraint = &self.constraints[node.atom];
             match Self::analyze_single(db, constraint) {
                 Truthiness::AlwaysTrue => id = node.if_true,
                 Truthiness::Ambiguous => id = node.if_ambiguous,
