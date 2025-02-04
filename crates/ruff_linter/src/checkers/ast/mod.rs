@@ -268,7 +268,7 @@ impl<'a> Checker<'a> {
             stylist,
             indexer,
             importer: Importer::new(parsed, locator, stylist),
-            semantic: semantic,
+            semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
             diagnostics: Vec::default(),
