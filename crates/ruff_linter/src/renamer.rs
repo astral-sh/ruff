@@ -398,8 +398,6 @@ impl ShadowedKind {
 
 /// Determines the kind of shadowing or conflict for a given variable name.
 ///
-/// Returns `None` if `name` doesn't start with underscore `_`.
-///
 /// This function is useful for checking whether or not the `target` of a [`Rename::rename`] will
 /// shadow another binding.
 pub(crate) fn try_shadowed_kind(name: &str, checker: &Checker, scope_id: ScopeId) -> ShadowedKind {
