@@ -269,8 +269,7 @@ impl<'s> Parser<'s> {
         let start = self.offset().to_usize();
 
         while !self.cursor.is_eof() {
-            let c = self.cursor.first();
-            if end_predicate(c) {
+            if end_predicate(self.cursor.first()) {
                 return Some(&self.source[start..self.offset().to_usize()]);
             }
             self.cursor.bump();
