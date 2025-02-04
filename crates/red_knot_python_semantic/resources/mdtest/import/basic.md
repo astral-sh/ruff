@@ -116,7 +116,17 @@ reveal_type(c.C)  # revealed: Literal[C]
 class C: ...
 ```
 
+## Unresolvable module import
+
+<!-- snapshot-diagnostics -->
+
+```py
+import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+```
+
 ## Unresolvable submodule imports
+
+<!-- snapshot-diagnostics -->
 
 ```py
 # Topmost component resolvable, submodule not resolvable:

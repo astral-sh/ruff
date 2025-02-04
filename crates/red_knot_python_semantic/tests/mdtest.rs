@@ -8,20 +8,20 @@ use dir_test::{dir_test, Fixture};
 )]
 #[allow(clippy::needless_pass_by_value)]
 fn mdtest(fixture: Fixture<&str>) {
-    let fixture_path = Utf8Path::new(fixture.path());
+    let absolute_fixture_path = Utf8Path::new(fixture.path());
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
     let snapshot_path = crate_dir.join("resources").join("mdtest").join("snapshots");
     let workspace_root = crate_dir.ancestors().nth(2).unwrap();
 
-    let long_title = fixture_path.strip_prefix(workspace_root).unwrap();
-    let short_title = fixture_path.file_name().unwrap();
+    let relative_fixture_path = absolute_fixture_path.strip_prefix(workspace_root).unwrap();
+    let short_title = absolute_fixture_path.file_name().unwrap();
 
-    let test_name = test_name("mdtest", fixture_path);
+    let test_name = test_name("mdtest", absolute_fixture_path);
 
     red_knot_test::run(
-        fixture_path,
+        absolute_fixture_path,
+        relative_fixture_path,
         &snapshot_path,
-        long_title.as_str(),
         short_title,
         &test_name,
     );

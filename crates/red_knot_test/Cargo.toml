@@ -22,6 +22,7 @@ ruff_text_size = { workspace = true }
 anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
