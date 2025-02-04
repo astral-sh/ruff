@@ -539,7 +539,7 @@ impl<'db> UseDefMapBuilder<'db> {
             binding,
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
-        symbol_state.record_binding(def_id);
+        symbol_state.record_binding(def_id, self.scope_start_visibility);
     }
 
     pub(super) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
@@ -631,7 +631,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
         symbol_state.record_declaration(def_id);
-        symbol_state.record_binding(def_id);
+        symbol_state.record_binding(def_id, self.scope_start_visibility);
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
