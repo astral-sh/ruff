@@ -5,7 +5,7 @@ use ruff_python_semantic::Binding;
 
 use crate::{
     checkers::ast::Checker,
-    renamer::{try_shadowed_kind, Renamer},
+    renamer::{try_shadowed_kind, Renamer, ShadowedKind},
 };
 
 /// ## What it does
@@ -92,7 +92,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         _ => return None,
     };
 
-    let old_name = binding.name(&checker.source());
+    let old_name = binding.name(checker.source());
 
     // this covers the sunder `_T_`, dunder `__T__`, and all all-under `_` or `__` cases
     // that should be skipped
@@ -100,7 +100,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return None;
     }
 
-    if try_shadowed_kind(old_name, checker, binding.scope).is_some_and(|kind| kind.shadows_any()) {
+    if try_shadowed_kind(old_name, checker, binding.scope).is_some_and(ShadowedKind::shadows_any) {
         return None;
     }
     let new_name = old_name.trim_start_matches('_');

@@ -2175,7 +2175,7 @@ fn flake8_import_convention_unused_aliased_import() {
         .pass_stdin("1"));
 }
 
-/// Test that private, old-style TypeVar generics
+/// Test that private, old-style `TypeVar` generics
 /// 1. Get replaced with PEP 695 type parameters (UP046, UP047)
 /// 2. Get renamed to remove leading underscores (UP051)
 /// 3. Emit a warning that the standalone type variable is now unused (PYI018)
