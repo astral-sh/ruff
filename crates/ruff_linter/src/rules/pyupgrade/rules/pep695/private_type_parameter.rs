@@ -42,8 +42,10 @@ use crate::{
 ///
 /// ## Fix availability
 ///
-/// This rule avoids shadowing builtins, keywords, and other variables with new type parameter names
-/// and will offer a diagnostic but not a fix in the case of a conflict.
+/// If the name without an underscore would shadow a builtin or another variable, would be a
+/// keyword, or would otherwise be an invalid identifier, a fix will not be available. In these
+/// situations, you can consider using a trailing underscore or a different name entirely to satisfy
+/// the lint rule.
 ///
 /// ## See also
 ///
