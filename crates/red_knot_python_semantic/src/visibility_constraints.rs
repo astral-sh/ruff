@@ -238,10 +238,16 @@ struct InteriorNode {
 }
 
 /// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
-/// this is (one of the copies of) a `Constraint` that represents some runtime property of the
-/// Python code that we are evaluating. We intern these constraints in an arena
-/// ([`VisibilityConstraints::constraints`]). An atom consists of an index into this arena, and a
-/// copy number.
+/// this is a `Constraint` that represents some runtime property of the Python code that we are
+/// evaluating. We intern these constraints in an arena ([`VisibilityConstraints::constraints`]).
+/// An atom is then an index into this arena.
+///
+/// By using a 32-bit index, we would typically allow 4 billion distinct constraints within a
+/// scope. However, we sometimes have to model how a `Constraint` can have a different runtime
+/// value at different points in the execution of the program. To handle this, we reserve the top
+/// byte of an atom to represent a "copy number". This is just an opaque value that allows
+/// different `Atom`s to evaluate the same `Constraint`. This yields a maximum of 16 million
+/// distinct `Constraint`s in a scope, and 256 possible copies of each of those constraints.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Atom(u32);
 
