@@ -137,18 +137,41 @@
 //! create a state where the `x = <unbound>` binding is always visible.
 //!
 //!
-//! ### Properties
+//! ### Representing formulas
 //!
-//! The ternary `AND` and `OR` operations have the property that `~a OR ~b = ~(a AND b)`. This
-//! means we could, in principle, get rid of either of these two to simplify the representation.
+//! Given everything above, we can represent a visibility constraint as a _ternary formula_. This
+//! is like a boolean formula (which maps several true/false variables to a single true/false
+//! result), but which allows the third "ambiguous" value in addition to "true" and "false".
 //!
-//! However, we already apply negative constraints `~test1` and `~test2` to the "branches not
-//! taken" in the example above. This means that the tree-representation `~test1 OR ~test2` is much
-//! cheaper/shallower than basically creating `~(~(~test1) AND ~(~test2))`. Similarly, if we wanted
-//! to get rid of `AND`, we would also have to create additional nodes. So for performance reasons,
-//! there is a small "duplication" in the code between those two constraint types.
+//! [_Binary decision diagrams_][bdd] (BDDs) are a common way to represent boolean formulas when
+//! doing program analysis. We extend this to a _ternary decision diagram_ (TDD) to support
+//! ambiguous values.
+//!
+//! A TDD is a graph, and a ternary formula is represented by a node in this graph. There are three
+//! possible leaf nodes representing the "true", "false", and "ambiguous" constant functions.
+//! Interior nodes consist of a ternary variable to evaluate, and outgoing edges for whether the
+//! variable evaluates to true, false, or ambiguous.
+//!
+//! Our TDDs are _reduced_ and _ordered_ (as is typical for BDDs).
+//!
+//! An ordered TDD means that variables appear in the same order in all paths within the graph.
+//!
+//! A reduced TDD means two things: First, we intern the graph nodes, so that we only keep a single
+//! copy of interior nodes with the same contents. Second, we eliminate any nodes that are "noops",
+//! where the "true" and "false" outgoing edges lead to the same node. (This implies that it
+//! doesn't matter what value that variable has when evaluating the formula, and we can leave it
+//! out of the evaluation chain completely.)
+//!
+//! Reduced and ordered decision diagrams are _normal forms_, which means that two equivalent
+//! formulas (which have the same outputs for every combination of inputs) are represented by
+//! exactly the same graph node. (Because of interning, this is not _equal_ nodes, but _identical_
+//! ones.) That means that we can compare formulas for equivalence in constant time, and in
+//! particular, can check whether a visibility constraint is statically always true or false,
+//! regardless of any Python program state, by seeing if the constraint's formula is the "true" or
+//! "false" leaf node.
 //!
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
+//! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use std::cmp::Ordering;
 
