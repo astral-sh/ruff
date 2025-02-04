@@ -414,7 +414,7 @@ impl ShadowedKind {
     }
 
     /// Returns `true` if `self` shadows any global, nonlocal, or local symbol, keyword, or builtin.
-    pub(crate) fn shadows_any(self) -> bool {
+    pub(crate) const fn shadows_any(self) -> bool {
         matches!(
             self,
             ShadowedKind::Some | ShadowedKind::BuiltIn | ShadowedKind::Keyword
