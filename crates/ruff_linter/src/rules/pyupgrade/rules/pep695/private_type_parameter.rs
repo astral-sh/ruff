@@ -18,6 +18,9 @@ use crate::{
 /// [PEP 695] type parameters are already restricted in scope to the class or function in which they
 /// appear, so leading underscores just hurt readability without the usual privacy benefits.
 ///
+/// However, neither a diagnostic nor a fix will be emitted for "sunder" (`_T_`) or "dunder"
+/// (`__T__`) type parameter names as these are not considered private.
+///
 /// ## Example
 ///
 /// ```python
@@ -46,9 +49,6 @@ use crate::{
 /// keyword, or would otherwise be an invalid identifier, a fix will not be available. In these
 /// situations, you can consider using a trailing underscore or a different name entirely to satisfy
 /// the lint rule.
-///
-/// Additionally, neither a diagnostic nor a fix will be emitted for "sunder" (`_T_`) or "dunder"
-/// (`__T__`) type parameter names as these are not considered private.
 ///
 /// ## See also
 ///
