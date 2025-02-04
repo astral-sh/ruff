@@ -690,16 +690,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
             Replacement::Name("airflow.operators.branch.BaseBranchOperator")
         }
-        ["airflow", "operators", " dummy", "EmptyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "dummy", "DummyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "dummy_operator", "EmptyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "dummy_operator", "DummyOperator"] => {
+        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
             Replacement::Name("airflow.operators.empty.EmptyOperator")
         }
         ["airflow", "operators", "email_operator", "EmailOperator"] => {
@@ -728,23 +719,20 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.sensors
-        ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalDagLink")
-        }
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
             Replacement::Name("airflow.sensors.base.BaseSensorOperator")
         }
         ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
             Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
         }
-        ["airflow", "sensors", "external_task_sensor", "ExternalTaskMarker"] => {
+        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskMarker"] => {
             Replacement::Name("airflow.sensors.external_task.ExternalTaskMarker")
         }
-        ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensor"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalTaskSensor")
-        }
-        ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensorLink"] => {
+        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensorLink"] => {
             Replacement::Name("airflow.sensors.external_task.ExternalDagLink")
+        }
+        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensor"] => {
+            Replacement::Name("airflow.sensors.external_task.ExternalTaskSensor")
         }
         ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => {
             Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor")
@@ -764,10 +752,9 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "utils", "dates", "days_ago"] => {
             Replacement::Name("pendulum.today('UTC').add(days=-N, ...)")
         }
-        ["airflow", "utils", "dates", "parse_execution_date"] => Replacement::None,
-        ["airflow", "utils", "dates", "round_time"] => Replacement::None,
-        ["airflow", "utils", "dates", "scale_time_units"] => Replacement::None,
-        ["airflow", "utils", "dates", "infer_time_unit"] => Replacement::None,
+        ["airflow", "utils", "dates", "parse_execution_date" | "round_time" | "scale_time_units" | "infer_time_unit"] => {
+            Replacement::None
+        }
 
         // airflow.utils.file
         ["airflow", "utils", "file", "TemporaryDirectory"] => Replacement::None,
@@ -784,12 +771,10 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.utils.state
-        ["airflow", "utils", "state", "SHUTDOWN"] => Replacement::None,
-        ["airflow", "utils", "state", "terminating_states"] => Replacement::None,
+        ["airflow", "utils", "state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
 
         // airflow.utils.trigger_rule
-        ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY"] => Replacement::None,
-        ["airflow", "utils", "trigger_rule", "TriggerRule", "NONE_FAILED_OR_SKIPPED"] => {
+        ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY" | "NONE_FAILED_OR_SKIPPED"] => {
             Replacement::None
         }
 

@@ -75,15 +75,10 @@ from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connec
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
 from airflow.sensors.date_time_sensor import DateTimeSensor
-from airflow.sensors.external_task import (
-    ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTask,
-)
 from airflow.sensors.external_task_sensor import (
     ExternalTaskMarker,
     ExternalTaskSensor,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTaskSensor,
+    ExternalTaskSensorLink,
 )
 from airflow.sensors.time_delta_sensor import TimeDeltaSensor
 from airflow.timetables.datasets import DatasetOrTimeSchedule
@@ -249,11 +244,13 @@ BaseSensorOperator()
 DateTimeSensor()
 
 # airflow.sensors.external_task
-ExternalTaskSensorLinkFromExternalTask()
-
-# airflow.sensors.external_task_sensor
+ExternalTaskSensorLink()
 ExternalTaskMarker()
 ExternalTaskSensor()
+
+# airflow.sensors.external_task_sensor
+ExternalTaskMarkerFromExternalTaskSensor()
+ExternalTaskSensorFromExternalTaskSensor()
 ExternalTaskSensorLinkFromExternalTaskSensor()
 
 # airflow.sensors.time_delta_sensor
