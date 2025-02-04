@@ -302,14 +302,14 @@ impl ScopedVisibilityConstraintId {
         ScopedVisibilityConstraintId(0xffff_fffd);
 
     fn is_terminal(self) -> bool {
-        self.0 >= SMALLEST_TERMINAL
+        self.0 >= SMALLEST_TERMINAL.0
     }
 }
 
 impl Idx for ScopedVisibilityConstraintId {
     #[inline]
     fn new(value: usize) -> Self {
-        assert!(value <= (SMALLEST_TERMINAL as usize));
+        assert!(value <= (SMALLEST_TERMINAL.0 as usize));
         #[allow(clippy::cast_possible_truncation)]
         Self(value as u32)
     }
@@ -325,7 +325,7 @@ impl Idx for ScopedVisibilityConstraintId {
 const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
 const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
 const ALWAYS_FALSE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_FALSE;
-const SMALLEST_TERMINAL: u32 = ALWAYS_FALSE.0;
+const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
 
 /// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
 /// maintain a separate set of visibility constraints for each scope in file.
