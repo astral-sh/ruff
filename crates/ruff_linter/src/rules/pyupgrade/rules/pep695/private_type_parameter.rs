@@ -102,9 +102,13 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     let old_name = binding.name(checker.source());
 
-    // this covers the sunder `_T_`, dunder `__T__`, and all all-under `_` or `__` cases
-    // that should be skipped
-    if !old_name.starts_with('_') || old_name.ends_with('_') {
+    if !old_name.starts_with('_') {
+        return None;
+    }
+
+    // Sunder `_T_`, dunder `__T__`, and all all-under `_` or `__` cases should all be skipped, as
+    // these are not "private" names
+    if old_name.ends_with('_') {
         return None;
     }
 
