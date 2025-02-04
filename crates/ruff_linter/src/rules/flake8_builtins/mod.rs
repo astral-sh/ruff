@@ -14,7 +14,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_resource_path};
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
     #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
@@ -51,6 +51,69 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::StdlibModuleShadowing,
+        Path::new("A005/modules/utils/logging.py"),
+        true
+    )]
+    #[test_case(
+        Rule::StdlibModuleShadowing,
+        Path::new("A005/modules/utils/logging.py"),
+        false
+    )]
+    fn non_strict_checking(rule_code: Rule, path: &Path, strict: bool) -> Result<()> {
+        let snapshot = format!(
+            "{}_{}_{strict}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Test that even with strict checking disabled, a module in `src` will trigger A005
+    #[test_case(
+        Rule::StdlibModuleShadowing,
+        Path::new("A005/modules/utils/logging.py")
+    )]
+    fn non_strict_checking_src(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}_src", rule_code.noqa_code(), path.to_string_lossy());
+        let src = Path::new("fixtures/flake8_builtins");
+        let diagnostics = test_path(
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path(src.join(path.parent().unwrap()))],
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Test that even with strict checking disabled, a module in the `project_root` will trigger
+    /// A005
+    #[test_case(
+        Rule::StdlibModuleShadowing,
+        Path::new("A005/modules/utils/logging.py")
+    )]
+    fn non_strict_checking_root(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}_root", rule_code.noqa_code(), path.to_string_lossy());
+        let src = Path::new("fixtures/flake8_builtins");
+        let diagnostics = test_path(
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings {
+                project_root: test_resource_path(src.join(path.parent().unwrap())),
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
