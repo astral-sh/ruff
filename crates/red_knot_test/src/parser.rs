@@ -148,7 +148,7 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) code: &'s str,
 
     /// The offset of the backticks beginning the code block within the markdown file
-    pub(crate) md_offset: TextSize,
+    pub(crate) backtick_offset: TextSize,
 }
 
 #[derive(Debug)]
@@ -306,6 +306,8 @@ impl<'s> Parser<'s> {
                     if self.cursor.eat_char2('`', '`') {
                         // We saw the triple-backtick beginning of a code block.
 
+                        let backtick_offset = self.offset() - "```".text_len();
+
                         if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
                             bail!("Code blocks must start on a new line and be preceded by at least one blank line.");
                         }
@@ -333,7 +335,7 @@ impl<'s> Parser<'s> {
                                 code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
-                            self.process_code_block(lang, code)?;
+                            self.process_code_block(lang, code, backtick_offset)?;
                         } else {
                             let code_block_start = self.cursor.token_len();
                             let line = self.source.count_lines(TextRange::up_to(code_block_start));
@@ -414,7 +416,12 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
-    fn process_code_block(&mut self, lang: &'s str, code: &'s str) -> anyhow::Result<()> {
+    fn process_code_block(
+        &mut self,
+        lang: &'s str,
+        code: &'s str,
+        backtick_offset: TextSize,
+    ) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
 
@@ -457,7 +464,7 @@ impl<'s> Parser<'s> {
             section,
             lang,
             code,
-            md_offset: self.offset(),
+            backtick_offset,
         });
 
         if let Some(current_files) = &mut self.current_section_files {
