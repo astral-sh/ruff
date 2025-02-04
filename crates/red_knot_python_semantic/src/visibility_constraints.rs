@@ -152,11 +152,8 @@
 
 use ruff_index::{newtype_index, IndexVec};
 
-use crate::semantic_index::{
-    ast_ids::HasScopedExpressionId,
-    constraint::{Constraint, ConstraintNode, PatternConstraintKind},
-};
-use crate::types::{infer_expression_types, Truthiness};
+use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraintKind};
+use crate::types::{infer_expression_type, Truthiness};
 use crate::Db;
 
 /// The maximum depth of recursion when evaluating visibility constraints.
@@ -394,28 +391,15 @@ impl<'db> VisibilityConstraints<'db> {
     fn analyze_single(db: &dyn Db, constraint: &Constraint) -> Truthiness {
         match constraint.node {
             ConstraintNode::Expression(test_expr) => {
-                let inference = infer_expression_types(db, test_expr);
-                let scope = test_expr.scope(db);
-                let ty = inference
-                    .expression_type(test_expr.node_ref(db).scoped_expression_id(db, scope));
+                let ty = infer_expression_type(db, test_expr);
 
                 ty.bool(db).negate_if(!constraint.is_positive)
             }
             ConstraintNode::Pattern(inner) => match inner.kind(db) {
                 PatternConstraintKind::Value(value, guard) => {
                     let subject_expression = inner.subject(db);
-                    let inference = infer_expression_types(db, *subject_expression);
-                    let scope = subject_expression.scope(db);
-                    let subject_ty = inference.expression_type(
-                        subject_expression
-                            .node_ref(db)
-                            .scoped_expression_id(db, scope),
-                    );
-
-                    let inference = infer_expression_types(db, *value);
-                    let scope = value.scope(db);
-                    let value_ty = inference
-                        .expression_type(value.node_ref(db).scoped_expression_id(db, scope));
+                    let subject_ty = infer_expression_type(db, *subject_expression);
+                    let value_ty = infer_expression_type(db, *value);
 
                     if subject_ty.is_single_valued(db) {
                         let truthiness =
