@@ -375,6 +375,50 @@ impl Diagnostic for Box<dyn Diagnostic> {
     }
 }
 
+impl Diagnostic for &'_ dyn Diagnostic {
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
+    }
+
+    fn message(&self) -> Cow<str> {
+        (**self).message()
+    }
+
+    fn file(&self) -> Option<File> {
+        (**self).file()
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        (**self).range()
+    }
+
+    fn severity(&self) -> Severity {
+        (**self).severity()
+    }
+}
+
+impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
+    }
+
+    fn message(&self) -> Cow<str> {
+        (**self).message()
+    }
+
+    fn file(&self) -> Option<File> {
+        (**self).file()
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        (**self).range()
+    }
+
+    fn severity(&self) -> Severity {
+        (**self).severity()
+    }
+}
+
 #[derive(Debug)]
 pub struct ParseDiagnostic {
     file: File,
