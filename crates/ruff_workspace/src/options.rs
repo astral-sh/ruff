@@ -656,7 +656,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the same
+    /// prefix appears in both.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -742,7 +743,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the
+    /// same prefix appears in both.
     #[option(
         default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
