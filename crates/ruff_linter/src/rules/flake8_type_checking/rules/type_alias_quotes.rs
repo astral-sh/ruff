@@ -113,9 +113,9 @@ impl Violation for UnquotedTypeAlias {
 /// This rule only applies to type aliases in non-stub files. For removing quotes in other
 /// contexts or in stub files, see:
 ///
-/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+/// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
-/// - [`quoted-annotation`](quoted-annotation.md): A rule that removes unnecessary quotes
+/// - [`quoted-annotation`][UP037]: A rule that removes unnecessary quotes
 ///   from *annotations* in runtime files.
 ///
 /// ## References
@@ -126,6 +126,8 @@ impl Violation for UnquotedTypeAlias {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 613]: https://peps.python.org/pep-0613/
 /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+/// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
+/// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedTypeAlias;
 
@@ -175,6 +177,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
+        checker.default_string_flags(),
     );
     let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {

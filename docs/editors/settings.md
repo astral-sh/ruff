@@ -805,56 +805,6 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
     }
     ```
 
-### `extendIgnore`
-
-Rules to disable in addition to those in [`lint.ignore`](#ignore).
-
-**Default value**: `null`
-
-**Type**: `string[]`
-
-**Example usage**:
-
-=== "VS Code"
-
-    ```json
-    {
-        "ruff.lint.extendIgnore": ["W1"]
-    }
-    ```
-
-=== "Neovim"
-
-    ```lua
-    require('lspconfig').ruff.setup {
-      init_options = {
-        settings = {
-          lint = {
-            extendIgnore = {"W1"}
-          }
-        }
-      }
-    }
-    ```
-
-=== "Zed"
-
-    ```json
-    {
-      "lsp": {
-        "ruff": {
-          "initialization_options": {
-            "settings": {
-              "lint": {
-                "extendIgnore": ["W1"]
-              }
-            }
-          }
-        }
-      }
-    }
-    ```
-
 ## `format`
 
 Settings specific to the Ruff formatter.

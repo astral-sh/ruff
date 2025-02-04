@@ -87,3 +87,77 @@ class PEP695Fix:
     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 
     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
+
+
+class InvalidButWeDoNotPanic:
+    @classmethod
+    def m[S](cls: type[S], /) -> S[int]: ...
+    def n(self: S) -> S[int]: ...
+
+
+import builtins
+
+class UsesFullyQualifiedType:
+    @classmethod
+    def m[S](cls: builtins.type[S]) -> S: ...  # False negative (#15821)
+
+
+def shadowed_type():
+    type = 1
+    class A:
+        @classmethod
+        def m[S](cls: type[S]) -> S: ...  # no error here
+
+
+class SubscriptReturnType:
+    @classmethod
+    def m[S](cls: type[S]) -> type[S]: ...  # PYI019
+
+
+class PEP695TypeParameterAtTheVeryEndOfTheList:
+    def f[T, S](self: S) -> S: ...
+
+
+class PEP695Again:
+    def mixing_and_nested[T](self: _S695, a: list[_S695], b: dict[_S695, str | T | set[_S695]]) -> _S695: ...
+    def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
+
+    @classmethod
+    def comment_in_fix_range[T, S](
+        cls: type[  # Lorem ipsum
+            S
+        ],
+        a: T,
+        b: tuple[S, T]
+    ) -> S: ...
+
+    def comment_outside_fix_range[T, S](
+        self: S,
+        a: T,
+        b: tuple[
+            # Lorem ipsum
+            S, T
+        ]
+    ) -> S: ...
+
+
+class SelfNotUsedInReturnAnnotation:
+    def m[S](self: S, other: S) -> int: ...
+    @classmethod
+    def n[S](cls: type[S], other: S) -> int: ...
+
+
+class _NotATypeVar: ...
+
+# Our stable-mode logic uses heuristics and thinks this is a `TypeVar`
+# because `self` and the return annotation use the same name as their annotation,
+# but our preview-mode logic is smarter about this.
+class Foo:
+    def x(self: _NotATypeVar) -> _NotATypeVar: ...
+    @classmethod
+    def y(self: type[_NotATypeVar]) -> _NotATypeVar: ...
+
+class NoReturnAnnotations:
+    def m[S](self: S, other: S): ...
+    @classmethod
+    def n[S](cls: type[S], other: S): ...

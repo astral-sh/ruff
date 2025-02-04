@@ -19,13 +19,17 @@ typeshed = "/typeshed"
 
 We can then place custom stub files in `/typeshed/stdlib`, for example:
 
-```pyi path=/typeshed/stdlib/builtins.pyi
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
 class BuiltinClass: ...
 
 builtin_symbol: BuiltinClass
 ```
 
-```pyi path=/typeshed/stdlib/sys/__init__.pyi
+`/typeshed/stdlib/sys/__init__.pyi`:
+
+```pyi
 version = "my custom Python"
 ```
 
@@ -54,15 +58,21 @@ python-version = "3.10"
 typeshed = "/typeshed"
 ```
 
-```pyi path=/typeshed/stdlib/old_module.pyi
+`/typeshed/stdlib/old_module.pyi`:
+
+```pyi
 class OldClass: ...
 ```
 
-```pyi path=/typeshed/stdlib/new_module.pyi
+`/typeshed/stdlib/new_module.pyi`:
+
+```pyi
 class NewClass: ...
 ```
 
-```text path=/typeshed/stdlib/VERSIONS
+`/typeshed/stdlib/VERSIONS`:
+
+```text
 old_module: 3.0-
 new_module: 3.11-
 ```
@@ -86,7 +96,9 @@ simple untyped definition is enough to make `reveal_type` work in tests:
 typeshed = "/typeshed"
 ```
 
-```pyi path=/typeshed/stdlib/typing_extensions.pyi
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
 def reveal_type(obj, /): ...
 ```
 

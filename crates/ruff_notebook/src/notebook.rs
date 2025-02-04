@@ -177,7 +177,7 @@ impl Notebook {
                 };
                 if id.is_none() {
                     loop {
-                        let new_id = uuid::Builder::from_random_bytes(rng.gen())
+                        let new_id = uuid::Builder::from_random_bytes(rng.random())
                             .into_uuid()
                             .as_simple()
                             .to_string();

@@ -330,11 +330,11 @@ fn call<'a>(
 ) {
     diagnostics.extend(parameters.filter_map(|arg| {
         let binding = scope
-            .get(arg.name.as_str())
+            .get(arg.name())
             .map(|binding_id| semantic.binding(binding_id))?;
         if binding.kind.is_argument()
             && binding.is_unused()
-            && !dummy_variable_rgx.is_match(arg.name.as_str())
+            && !dummy_variable_rgx.is_match(arg.name())
         {
             Some(Diagnostic::new(
                 argumentable.check_for(arg.name.to_string()),

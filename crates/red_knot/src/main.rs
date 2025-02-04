@@ -1,101 +1,29 @@
+use std::io::{self, BufWriter, Write};
 use std::process::{ExitCode, Termination};
+
+use anyhow::Result;
 use std::sync::Mutex;
 
+use crate::args::{Args, CheckCommand, Command};
+use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use python_version::PythonVersion;
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
+use red_knot_project::metadata::options::Options;
 use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
-use crate::logging::{setup_tracing, Verbosity};
-
+mod args;
 mod logging;
 mod python_version;
 mod verbosity;
-
-#[derive(Debug, Parser)]
-#[command(
-    author,
-    name = "red-knot",
-    about = "An extremely fast Python type checker."
-)]
-#[command(version)]
-struct Args {
-    #[command(subcommand)]
-    pub(crate) command: Option<Command>,
-
-    /// Run the command within the given project directory.
-    ///
-    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
-    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
-    ///
-    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
-    #[arg(long, value_name = "PROJECT")]
-    project: Option<SystemPathBuf>,
-
-    /// Path to the virtual environment the project uses.
-    ///
-    /// If provided, red-knot will use the `site-packages` directory of this virtual environment
-    /// to resolve type information for the project's third-party dependencies.
-    #[arg(long, value_name = "PATH")]
-    venv_path: Option<SystemPathBuf>,
-
-    /// Custom directory to use for stdlib typeshed stubs.
-    #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
-    typeshed: Option<SystemPathBuf>,
-
-    /// Additional path to use as a module-resolution source (can be passed multiple times).
-    #[arg(long, value_name = "PATH")]
-    extra_search_path: Option<Vec<SystemPathBuf>>,
-
-    /// Python version to assume when resolving types.
-    #[arg(long, value_name = "VERSION", alias = "target-version")]
-    python_version: Option<PythonVersion>,
-
-    #[clap(flatten)]
-    verbosity: Verbosity,
-
-    /// Run in watch mode by re-running whenever files change.
-    #[arg(long, short = 'W')]
-    watch: bool,
-}
-
-impl Args {
-    fn to_options(&self) -> Options {
-        Options {
-            environment: Some(EnvironmentOptions {
-                python_version: self
-                    .python_version
-                    .map(|version| RangedValue::cli(version.into())),
-                venv_path: self.venv_path.as_ref().map(RelativePathBuf::cli),
-                typeshed: self.typeshed.as_ref().map(RelativePathBuf::cli),
-                extra_paths: self.extra_search_path.as_ref().map(|extra_search_paths| {
-                    extra_search_paths
-                        .iter()
-                        .map(RelativePathBuf::cli)
-                        .collect()
-                }),
-                ..EnvironmentOptions::default()
-            }),
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, clap::Subcommand)]
-pub enum Command {
-    /// Start the language server
-    Server,
-}
+mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
@@ -122,10 +50,21 @@ pub fn main() -> ExitStatus {
 fn run() -> anyhow::Result<ExitStatus> {
     let args = Args::parse_from(std::env::args());
 
-    if matches!(args.command, Some(Command::Server)) {
-        return run_server().map(|()| ExitStatus::Success);
+    match args.command {
+        Command::Server => run_server().map(|()| ExitStatus::Success),
+        Command::Check(check_args) => run_check(check_args),
+        Command::Version => version().map(|()| ExitStatus::Success),
     }
+}
 
+pub(crate) fn version() -> Result<()> {
+    let mut stdout = BufWriter::new(io::stdout().lock());
+    let version_info = crate::version::version();
+    writeln!(stdout, "red knot {}", &version_info)?;
+    Ok(())
+}
+
+fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
@@ -156,13 +95,21 @@ fn run() -> anyhow::Result<ExitStatus> {
         .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd);
-    let cli_options = args.to_options();
+    let watch = args.watch;
+    let exit_zero = args.exit_zero;
+    let min_error_severity = if args.error_on_warning {
+        Severity::Warning
+    } else {
+        Severity::Error
+    };
+
+    let cli_options = args.into_options();
     let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
     workspace_metadata.apply_cli_options(cli_options.clone());
 
     let mut db = ProjectDatabase::new(workspace_metadata, system)?;
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options, min_error_severity);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -174,7 +121,7 @@ fn run() -> anyhow::Result<ExitStatus> {
         }
     })?;
 
-    let exit_status = if args.watch {
+    let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
         main_loop.run(&mut db)
@@ -184,7 +131,11 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     std::mem::forget(db);
 
-    Ok(exit_status)
+    if exit_zero {
+        Ok(ExitStatus::Success)
+    } else {
+        Ok(exit_status)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -216,10 +167,18 @@ struct MainLoop {
     watcher: Option<ProjectWatcher>,
 
     cli_options: Options,
+
+    /// The minimum severity to consider an error when deciding the exit status.
+    ///
+    /// TODO(micha): Get from the terminal settings.
+    min_error_severity: Severity,
 }
 
 impl MainLoop {
-    fn new(cli_options: Options) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        cli_options: Options,
+        min_error_severity: Severity,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -228,6 +187,7 @@ impl MainLoop {
                 receiver,
                 watcher: None,
                 cli_options,
+                min_error_severity,
             },
             MainLoopCancellationToken { sender },
         )
@@ -285,7 +245,10 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
-                    let has_diagnostics = !result.is_empty();
+                    let failed = result
+                        .iter()
+                        .any(|diagnostic| diagnostic.severity() >= self.min_error_severity);
+
                     if check_revision == revision {
                         #[allow(clippy::print_stdout)]
                         for diagnostic in result {
@@ -298,7 +261,7 @@ impl MainLoop {
                     }
 
                     if self.watcher.is_none() {
-                        return if has_diagnostics {
+                        return if failed {
                             ExitStatus::Failure
                         } else {
                             ExitStatus::Success

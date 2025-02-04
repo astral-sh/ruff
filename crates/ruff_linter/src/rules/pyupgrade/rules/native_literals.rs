@@ -33,10 +33,20 @@ impl FromStr for LiteralType {
 }
 
 impl LiteralType {
-    fn as_zero_value_expr(self) -> Expr {
+    fn as_zero_value_expr(self, checker: &Checker) -> Expr {
         match self {
-            LiteralType::Str => ast::ExprStringLiteral::default().into(),
-            LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
+            LiteralType::Str => ast::StringLiteral {
+                value: Box::default(),
+                range: TextRange::default(),
+                flags: checker.default_string_flags(),
+            }
+            .into(),
+            LiteralType::Bytes => ast::BytesLiteral {
+                value: Box::default(),
+                range: TextRange::default(),
+                flags: checker.default_bytes_flags(),
+            }
+            .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
@@ -186,7 +196,7 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let expr = literal_type.as_zero_value_expr();
+            let expr = literal_type.as_zero_value_expr(checker);
             let content = checker.generator().expr(&expr);
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,

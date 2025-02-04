@@ -436,7 +436,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
       "deprecated": true,
       "type": [
         "array",
@@ -664,7 +664,7 @@
       ]
     },
     "select": {
-      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
       "deprecated": true,
       "type": [
         "array",
@@ -900,6 +900,7 @@
       "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
+      "description": "Options for the `flake8-annotations` plugin.",
       "type": "object",
       "properties": {
         "allow-star-arg-any": {
@@ -941,6 +942,7 @@
       "additionalProperties": false
     },
     "Flake8BanditOptions": {
+      "description": "Options for the `flake8-bandit` plugin.",
       "type": "object",
       "properties": {
         "check-typed-exception": {
@@ -974,6 +976,7 @@
       "additionalProperties": false
     },
     "Flake8BooleanTrapOptions": {
+      "description": "Options for the `flake8-boolean-trap` plugin",
       "type": "object",
       "properties": {
         "extend-allowed-calls": {
@@ -990,6 +993,7 @@
       "additionalProperties": false
     },
     "Flake8BugbearOptions": {
+      "description": "Options for the `flake8-bugbear` plugin.",
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
@@ -1006,6 +1010,7 @@
       "additionalProperties": false
     },
     "Flake8BuiltinsOptions": {
+      "description": "Options for the `flake8-builtins` plugin.",
       "type": "object",
       "properties": {
         "builtins-allowed-modules": {
@@ -1032,6 +1037,7 @@
       "additionalProperties": false
     },
     "Flake8ComprehensionsOptions": {
+      "description": "Options for the `flake8-comprehensions` plugin.",
       "type": "object",
       "properties": {
         "allow-dict-calls-with-keyword-arguments": {
@@ -1045,6 +1051,7 @@
       "additionalProperties": false
     },
     "Flake8CopyrightOptions": {
+      "description": "Options for the `flake8-copyright` plugin.",
       "type": "object",
       "properties": {
         "author": {
@@ -1074,6 +1081,7 @@
       "additionalProperties": false
     },
     "Flake8ErrMsgOptions": {
+      "description": "Options for the `flake8-errmsg` plugin.",
       "type": "object",
       "properties": {
         "max-string-length": {
@@ -1089,6 +1097,7 @@
       "additionalProperties": false
     },
     "Flake8GetTextOptions": {
+      "description": "Options for the `flake8-gettext` plugin.",
       "type": "object",
       "properties": {
         "extend-function-names": {
@@ -1115,6 +1124,7 @@
       "additionalProperties": false
     },
     "Flake8ImplicitStrConcatOptions": {
+      "description": "Options for the `flake8-implicit-str-concat` plugin",
       "type": "object",
       "properties": {
         "allow-multiline": {
@@ -1128,6 +1138,7 @@
       "additionalProperties": false
     },
     "Flake8ImportConventionsOptions": {
+      "description": "Options for the `flake8-import-conventions` plugin",
       "type": "object",
       "properties": {
         "aliases": {
@@ -1175,6 +1186,7 @@
       "additionalProperties": false
     },
     "Flake8PytestStyleOptions": {
+      "description": "Options for the `flake8-pytest-style` plugin",
       "type": "object",
       "properties": {
         "fixture-parentheses": {
@@ -1268,6 +1280,7 @@
       "additionalProperties": false
     },
     "Flake8QuotesOptions": {
+      "description": "Options for the `flake8-quotes` plugin.",
       "type": "object",
       "properties": {
         "avoid-escape": {
@@ -1314,6 +1327,7 @@
       "additionalProperties": false
     },
     "Flake8SelfOptions": {
+      "description": "Options for the `flake8_self` plugin.",
       "type": "object",
       "properties": {
         "extend-ignore-names": {
@@ -1340,6 +1354,7 @@
       "additionalProperties": false
     },
     "Flake8TidyImportsOptions": {
+      "description": "Options for the `flake8-tidy-imports` plugin",
       "type": "object",
       "properties": {
         "ban-relative-imports": {
@@ -1377,6 +1392,7 @@
       "additionalProperties": false
     },
     "Flake8TypeCheckingOptions": {
+      "description": "Options for the `flake8-type-checking` plugin",
       "type": "object",
       "properties": {
         "exempt-modules": {
@@ -1427,6 +1443,7 @@
       "additionalProperties": false
     },
     "Flake8UnusedArgumentsOptions": {
+      "description": "Options for the `flake8-unused-arguments` plugin",
       "type": "object",
       "properties": {
         "ignore-variadic-names": {
@@ -1566,6 +1583,7 @@
       "minimum": 1.0
     },
     "IsortOptions": {
+      "description": "Options for the `isort` plugin.",
       "type": "object",
       "properties": {
         "case-sensitive": {
@@ -2205,7 +2223,7 @@
           ]
         },
         "ignore": {
-          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
           "type": [
             "array",
             "null"
@@ -2363,7 +2381,7 @@
           ]
         },
         "select": {
-          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
           "type": [
             "array",
             "null"
@@ -2406,6 +2424,7 @@
       "additionalProperties": false
     },
     "McCabeOptions": {
+      "description": "Options for the `mccabe` plugin.",
       "type": "object",
       "properties": {
         "max-complexity": {
@@ -2463,6 +2482,7 @@
       ]
     },
     "Pep8NamingOptions": {
+      "description": "Options for the `pep8-naming` plugin.",
       "type": "object",
       "properties": {
         "classmethod-decorators": {
@@ -2509,6 +2529,7 @@
       "additionalProperties": false
     },
     "PyUpgradeOptions": {
+      "description": "Options for the `pyupgrade` plugin.",
       "type": "object",
       "properties": {
         "keep-runtime-typing": {
@@ -2522,6 +2543,7 @@
       "additionalProperties": false
     },
     "PycodestyleOptions": {
+      "description": "Options for the `pycodestyle` plugin.",
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
@@ -2557,6 +2579,7 @@
       "additionalProperties": false
     },
     "PydoclintOptions": {
+      "description": "Options for the `pydoclint` plugin.",
       "type": "object",
       "properties": {
         "ignore-one-line-docstrings": {
@@ -2570,6 +2593,7 @@
       "additionalProperties": false
     },
     "PydocstyleOptions": {
+      "description": "Options for the `pydocstyle` plugin.",
       "type": "object",
       "properties": {
         "convention": {
@@ -2614,6 +2638,7 @@
       "additionalProperties": false
     },
     "PyflakesOptions": {
+      "description": "Options for the `pyflakes` plugin.",
       "type": "object",
       "properties": {
         "allowed-unused-imports": {
@@ -2640,6 +2665,7 @@
       "additionalProperties": false
     },
     "PylintOptions": {
+      "description": "Options for the `pylint` plugin.",
       "type": "object",
       "properties": {
         "allow-dunder-method-names": {
@@ -2807,6 +2833,7 @@
       "type": "string"
     },
     "RuffOptions": {
+      "description": "Options for the `ruff` plugin",
       "type": "object",
       "properties": {
         "allowed-markup-calls": {
@@ -3384,9 +3411,11 @@
         "LOG00",
         "LOG001",
         "LOG002",
+        "LOG004",
         "LOG007",
         "LOG009",
         "LOG01",
+        "LOG014",
         "LOG015",
         "N",
         "N8",

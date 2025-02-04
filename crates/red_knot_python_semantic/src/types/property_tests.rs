@@ -467,6 +467,13 @@ mod stable {
         assignable_to_is_reflexive, db,
         forall types t. t.is_assignable_to(db, t)
     );
+
+    // For *any* pair of types, whether fully static or not,
+    // each of the pair should be assignable to the union of the two.
+    type_property_test!(
+        all_type_pairs_are_assignable_to_their_union, db,
+        forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -513,13 +520,6 @@ mod flaky {
     type_property_test!(
         all_type_pairs_can_be_assigned_from_their_intersection, db,
         forall types s, t. intersection(db, [s, t]).is_assignable_to(db, s) && intersection(db, [s, t]).is_assignable_to(db, t)
-    );
-
-    // For *any* pair of types, whether fully static or not,
-    // each of the pair should be assignable to the union of the two.
-    type_property_test!(
-        all_type_pairs_are_assignable_to_their_union, db,
-        forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
 
     // Equal element sets of intersections implies equivalence

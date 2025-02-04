@@ -347,7 +347,7 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
-```py path=a.pyi
+```pyi
 class Foo(Foo): ...  # error: [cyclic-class-definition]
 
 reveal_type(Foo)  # revealed: Literal[Foo]
@@ -365,7 +365,7 @@ reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[objec
 
 These are similarly unlikely, but we still shouldn't crash:
 
-```py path=a.pyi
+```pyi
 class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
 class Baz(Foo): ...  # error: [cyclic-class-definition]
@@ -377,7 +377,7 @@ reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[objec
 
 ## Classes with cycles in their MROs, and multiple inheritance
 
-```py path=a.pyi
+```pyi
 class Spam: ...
 class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
@@ -390,7 +390,7 @@ reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[objec
 
 ## Classes with cycles in their MRO, and a sub-graph
 
-```py path=a.pyi
+```pyi
 class FooCycle(BarCycle): ...  # error: [cyclic-class-definition]
 class Foo: ...
 class BarCycle(FooCycle): ...  # error: [cyclic-class-definition]

@@ -2,7 +2,9 @@
 
 ## Deferred annotations in stubs always resolve
 
-```pyi path=mod.pyi
+`mod.pyi`:
+
+```pyi
 def get_foo() -> Foo: ...
 class Foo: ...
 ```

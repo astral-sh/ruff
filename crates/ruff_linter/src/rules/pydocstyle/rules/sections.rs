@@ -8,7 +8,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::NewlineWithTrailingNewline;
@@ -1791,11 +1790,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
 
     // If this is a non-static method, skip `cls` or `self`.
-    for ParameterWithDefault {
-        parameter,
-        default: _,
-        range: _,
-    } in function
+    for parameter in function
         .parameters
         .iter_non_variadic_params()
         .skip(usize::from(
@@ -1803,7 +1798,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
                 && !is_staticmethod(&function.decorator_list, checker.semantic()),
         ))
     {
-        let arg_name = parameter.name.as_str();
+        let arg_name = parameter.name().as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }

@@ -5,7 +5,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
     flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_type_checking, pyflakes,
-    pylint, ruff,
+    pylint, refurb, ruff,
 };
 
 /// Run lint rules over the [`Binding`]s.
@@ -22,6 +22,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnquotedTypeAlias,
         Rule::UsedDummyVariable,
         Rule::PytestUnittestRaisesAssertion,
+        Rule::ForLoopWrites,
+        Rule::CustomTypeVarForSelf,
     ]) {
         return;
     }
@@ -105,6 +107,18 @@ pub(crate) fn bindings(checker: &mut Checker) {
         if checker.enabled(Rule::PytestUnittestRaisesAssertion) {
             if let Some(diagnostic) =
                 flake8_pytest_style::rules::unittest_raises_assertion_binding(checker, binding)
+            {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::ForLoopWrites) {
+            if let Some(diagnostic) = refurb::rules::for_loop_writes_binding(checker, binding) {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::CustomTypeVarForSelf) {
+            if let Some(diagnostic) =
+                flake8_pyi::rules::custom_type_var_instead_of_self(checker, binding)
             {
                 checker.diagnostics.push(diagnostic);
             }

@@ -3,7 +3,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, ExprStringLiteral,
-    Identifier,
+    ExprUnaryOp, Identifier, UnaryOp,
 };
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -111,8 +111,8 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     }
 
-    // Here we know the pattern is a string literal with no metacharacters, so
-    // we can proceed with the str method replacement
+    // Now we know the pattern is a string literal with no metacharacters, so
+    // we can proceed with the str method replacement.
     let new_expr = re_func.replacement();
 
     let repl = new_expr.map(|expr| checker.generator().expr(&expr));
@@ -120,16 +120,13 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
         },
-        call.range,
+        re_func.range,
     );
 
     if let Some(repl) = repl {
         diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(repl, call.range),
-            if checker
-                .comment_ranges()
-                .has_comments(call, checker.source())
-            {
+            Edit::range_replacement(repl, re_func.range),
+            if checker.comment_ranges().intersects(re_func.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -156,6 +153,8 @@ struct ReFunc<'a> {
     kind: ReFuncKind<'a>,
     pattern: &'a Expr,
     string: &'a Expr,
+    comparison_to_none: Option<ComparisonToNone>,
+    range: TextRange,
 }
 
 impl<'a> ReFunc<'a> {
@@ -165,8 +164,14 @@ impl<'a> ReFunc<'a> {
         func_name: &str,
     ) -> Option<Self> {
         // the proposed fixes for match, search, and fullmatch rely on the
-        // return value only being used for its truth value
-        let in_if_context = semantic.in_boolean_test();
+        // return value only being used for its truth value or being compared to None
+        let comparison_to_none = get_comparison_to_none(semantic);
+        let in_truthy_context = semantic.in_boolean_test() || comparison_to_none.is_some();
+
+        let (comparison_to_none, range) = match comparison_to_none {
+            Some((cmp, range)) => (Some(cmp), range),
+            None => (None, call.range),
+        };
 
         match (func_name, call.arguments.len()) {
             // `split` is the safest of these to fix, as long as metacharacters
@@ -175,6 +180,8 @@ impl<'a> ReFunc<'a> {
                 kind: ReFuncKind::Split,
                 pattern: call.arguments.find_argument_value("pattern", 0)?,
                 string: call.arguments.find_argument_value("string", 1)?,
+                comparison_to_none,
+                range,
             }),
             // `sub` is only safe to fix if `repl` is a string. `re.sub` also
             // allows it to be a function, which will *not* work in the str
@@ -209,55 +216,91 @@ impl<'a> ReFunc<'a> {
                     },
                     pattern: call.arguments.find_argument_value("pattern", 0)?,
                     string: call.arguments.find_argument_value("string", 2)?,
+                    comparison_to_none,
+                    range,
                 })
             }
-            ("match", 2) if in_if_context => Some(ReFunc {
+            ("match", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Match,
                 pattern: call.arguments.find_argument_value("pattern", 0)?,
                 string: call.arguments.find_argument_value("string", 1)?,
+                comparison_to_none,
+                range,
             }),
-            ("search", 2) if in_if_context => Some(ReFunc {
+            ("search", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Search,
                 pattern: call.arguments.find_argument_value("pattern", 0)?,
                 string: call.arguments.find_argument_value("string", 1)?,
+                comparison_to_none,
+                range,
             }),
-            ("fullmatch", 2) if in_if_context => Some(ReFunc {
+            ("fullmatch", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Fullmatch,
                 pattern: call.arguments.find_argument_value("pattern", 0)?,
                 string: call.arguments.find_argument_value("string", 1)?,
+                comparison_to_none,
+                range,
             }),
             _ => None,
         }
     }
 
+    /// Get replacement for the call or parent expression.
+    ///
+    /// Examples:
+    ///     `re.search("abc", s) is None` => `"abc" not in s`
+    ///     `re.search("abc", s)` => `"abc" in s`
     fn replacement(&self) -> Option<Expr> {
-        match self.kind {
+        match (&self.kind, &self.comparison_to_none) {
             // string.replace(pattern, repl)
-            ReFuncKind::Sub { repl } => repl
+            (ReFuncKind::Sub { repl }, _) => repl
                 .cloned()
                 .map(|repl| self.method_expr("replace", vec![self.pattern.clone(), repl])),
-            // string.startswith(pattern)
-            ReFuncKind::Match => Some(self.method_expr("startswith", vec![self.pattern.clone()])),
-            // pattern in string
-            ReFuncKind::Search => Some(self.compare_expr(CmpOp::In)),
-            // string == pattern
-            ReFuncKind::Fullmatch => Some(Expr::Compare(ExprCompare {
-                range: TextRange::default(),
-                left: Box::new(self.string.clone()),
-                ops: Box::new([CmpOp::Eq]),
-                comparators: Box::new([self.pattern.clone()]),
-            })),
             // string.split(pattern)
-            ReFuncKind::Split => Some(self.method_expr("split", vec![self.pattern.clone()])),
+            (ReFuncKind::Split, _) => Some(self.method_expr("split", vec![self.pattern.clone()])),
+            // pattern in string
+            (ReFuncKind::Search, None | Some(ComparisonToNone::IsNot)) => {
+                Some(ReFunc::compare_expr(self.pattern, CmpOp::In, self.string))
+            }
+            // pattern not in string
+            (ReFuncKind::Search, Some(ComparisonToNone::Is)) => Some(ReFunc::compare_expr(
+                self.pattern,
+                CmpOp::NotIn,
+                self.string,
+            )),
+            // string.startswith(pattern)
+            (ReFuncKind::Match, None | Some(ComparisonToNone::IsNot)) => {
+                Some(self.method_expr("startswith", vec![self.pattern.clone()]))
+            }
+            // not string.startswith(pattern)
+            (ReFuncKind::Match, Some(ComparisonToNone::Is)) => {
+                let expr = self.method_expr("startswith", vec![self.pattern.clone()]);
+                let negated_expr = Expr::UnaryOp(ExprUnaryOp {
+                    op: UnaryOp::Not,
+                    operand: Box::new(expr),
+                    range: TextRange::default(),
+                });
+                Some(negated_expr)
+            }
+            // string == pattern
+            (ReFuncKind::Fullmatch, None | Some(ComparisonToNone::IsNot)) => {
+                Some(ReFunc::compare_expr(self.string, CmpOp::Eq, self.pattern))
+            }
+            // string != pattern
+            (ReFuncKind::Fullmatch, Some(ComparisonToNone::Is)) => Some(ReFunc::compare_expr(
+                self.string,
+                CmpOp::NotEq,
+                self.pattern,
+            )),
         }
     }
 
-    /// Return a new compare expr of the form `self.pattern op self.string`
-    fn compare_expr(&self, op: CmpOp) -> Expr {
+    /// Return a new compare expr of the form `left op right`
+    fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
         Expr::Compare(ExprCompare {
-            left: Box::new(self.pattern.clone()),
+            left: Box::new(left.clone()),
             ops: Box::new([op]),
-            comparators: Box::new([self.string.clone()]),
+            comparators: Box::new([right.clone()]),
             range: TextRange::default(),
         })
     }
@@ -301,4 +344,36 @@ fn resolve_string_literal<'a>(
     }
 
     None
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ComparisonToNone {
+    Is,
+    IsNot,
+}
+
+/// If the regex call is compared to `None`, return the comparison and its range.
+///    Example: `re.search("abc", s) is None`
+fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone, TextRange)> {
+    let parent_expr = semantic.current_expression_parent()?;
+
+    let Expr::Compare(ExprCompare {
+        ops,
+        comparators,
+        range,
+        ..
+    }) = parent_expr
+    else {
+        return None;
+    };
+
+    let Some(Expr::NoneLiteral(_)) = comparators.first() else {
+        return None;
+    };
+
+    match ops.as_ref() {
+        [CmpOp::Is] => Some((ComparisonToNone::Is, *range)),
+        [CmpOp::IsNot] => Some((ComparisonToNone::IsNot, *range)),
+        _ => None,
+    }
 }

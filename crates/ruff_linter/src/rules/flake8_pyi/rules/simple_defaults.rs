@@ -1,9 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{
-    self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
-};
+use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
 use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -489,16 +487,11 @@ fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
 
 /// PYI011
 pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
-        if parameter.annotation.is_some() {
+        if parameter.annotation().is_some() {
             if !is_valid_default_value_with_annotation(
                 default,
                 true,
@@ -520,16 +513,11 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
 
 /// PYI014
 pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
-        if parameter.annotation.is_none() {
+        if parameter.annotation().is_none() {
             if !is_valid_default_value_with_annotation(
                 default,
                 true,

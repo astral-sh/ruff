@@ -893,7 +893,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 QuoteStyle::Single | QuoteStyle::Double
             )
         {
-            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
+            warn_user_once!("The `flake8-quotes.docstring-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
         }
 
         // Validate all isort settings.

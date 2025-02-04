@@ -656,7 +656,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the same
+    /// prefix appears in both.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -742,7 +743,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the
+    /// same prefix appears in both.
     #[option(
         default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
@@ -942,6 +944,7 @@ pub struct LintCommonOptions {
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
+/// Options for the `flake8-annotations` plugin.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
@@ -1011,6 +1014,7 @@ impl Flake8AnnotationsOptions {
     }
 }
 
+/// Options for the `flake8-bandit` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1059,6 +1063,7 @@ impl Flake8BanditOptions {
     }
 }
 
+/// Options for the `flake8-boolean-trap` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1085,6 +1090,7 @@ impl Flake8BooleanTrapOptions {
     }
 }
 
+/// Options for the `flake8-bugbear` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1115,6 +1121,8 @@ impl Flake8BugbearOptions {
         }
     }
 }
+
+/// Options for the `flake8-builtins` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1145,6 +1153,8 @@ impl Flake8BuiltinsOptions {
         }
     }
 }
+
+/// Options for the `flake8-comprehensions` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1170,6 +1180,7 @@ impl Flake8ComprehensionsOptions {
     }
 }
 
+/// Options for the `flake8-copyright` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1225,6 +1236,7 @@ impl Flake8CopyrightOptions {
     }
 }
 
+/// Options for the `flake8-errmsg` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1244,6 +1256,7 @@ impl Flake8ErrMsgOptions {
     }
 }
 
+/// Options for the `flake8-gettext` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1281,6 +1294,7 @@ impl Flake8GetTextOptions {
     }
 }
 
+/// Options for the `flake8-implicit-str-concat` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1315,6 +1329,7 @@ impl Flake8ImplicitStrConcatOptions {
     }
 }
 
+/// Options for the `flake8-import-conventions` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1468,6 +1483,7 @@ impl Flake8ImportConventionsOptions {
     }
 }
 
+/// Options for the `flake8-pytest-style` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1658,6 +1674,7 @@ impl Flake8PytestStyleOptions {
     }
 }
 
+/// Options for the `flake8-quotes` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1730,6 +1747,7 @@ impl Flake8QuotesOptions {
     }
 }
 
+/// Options for the `flake8_self` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1770,6 +1788,7 @@ impl Flake8SelfOptions {
     }
 }
 
+/// Options for the `flake8-tidy-imports` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1827,6 +1846,7 @@ impl Flake8TidyImportsOptions {
     }
 }
 
+/// Options for the `flake8-type-checking` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1971,6 +1991,7 @@ impl Flake8TypeCheckingOptions {
     }
 }
 
+/// Options for the `flake8-unused-arguments` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1994,6 +2015,7 @@ impl Flake8UnusedArgumentsOptions {
     }
 }
 
+/// Options for the `isort` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2641,6 +2663,7 @@ impl IsortOptions {
     }
 }
 
+/// Options for the `mccabe` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2669,6 +2692,7 @@ impl McCabeOptions {
     }
 }
 
+/// Options for the `pep8-naming` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2761,6 +2785,7 @@ impl Pep8NamingOptions {
     }
 }
 
+/// Options for the `pycodestyle` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2835,6 +2860,7 @@ impl PycodestyleOptions {
     }
 }
 
+/// Options for the `pydocstyle` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2942,6 +2968,7 @@ impl PydocstyleOptions {
     }
 }
 
+/// Options for the `pydoclint` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2971,6 +2998,7 @@ impl PydoclintOptions {
     }
 }
 
+/// Options for the `pyflakes` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3015,6 +3043,7 @@ impl PyflakesOptions {
     }
 }
 
+/// Options for the `pylint` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3124,6 +3153,7 @@ impl PylintOptions {
     }
 }
 
+/// Options for the `pyupgrade` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3179,6 +3209,7 @@ impl PyUpgradeOptions {
     }
 }
 
+/// Options for the `ruff` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]

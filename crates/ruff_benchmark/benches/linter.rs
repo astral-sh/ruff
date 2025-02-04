@@ -1,7 +1,9 @@
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
-use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
+use ruff_benchmark::{
+    TestCase, LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, UNICODE_PYPINYIN,
+};
 use ruff_linter::linter::{lint_only, ParseSource};
 use ruff_linter::rule_selector::PreviewOptions;
 use ruff_linter::settings::rule_table::RuleTable;
@@ -46,24 +48,18 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[allow(unsafe_code)]
 pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
-fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
-    Ok(vec![
-        TestCase::fast(TestFile::try_download("numpy/globals.py", "https://raw.githubusercontent.com/numpy/numpy/89d64415e349ca75a25250f22b874aa16e5c0973/numpy/_globals.py")?),
-        TestCase::fast(TestFile::try_download("unicode/pypinyin.py", "https://raw.githubusercontent.com/mozillazg/python-pinyin/9521e47d96e3583a5477f5e43a2e82d513f27a3f/pypinyin/standard.py")?),
-        TestCase::normal(TestFile::try_download(
-            "pydantic/types.py",
-            "https://raw.githubusercontent.com/pydantic/pydantic/83b3c49e99ceb4599d9286a3d793cea44ac36d4b/pydantic/types.py",
-        )?),
-        TestCase::normal(TestFile::try_download("numpy/ctypeslib.py", "https://raw.githubusercontent.com/numpy/numpy/e42c9503a14d66adfd41356ef5640c6975c45218/numpy/ctypeslib.py")?),
-        TestCase::slow(TestFile::try_download(
-            "large/dataset.py",
-            "https://raw.githubusercontent.com/DHI/mikeio/b7d26418f4db2909b0aa965253dbe83194d7bb5b/tests/test_dataset.py",
-        )?),
-    ])
+fn create_test_cases() -> Vec<TestCase> {
+    vec![
+        TestCase::fast(NUMPY_GLOBALS.clone()),
+        TestCase::fast(UNICODE_PYPINYIN.clone()),
+        TestCase::normal(PYDANTIC_TYPES.clone()),
+        TestCase::normal(NUMPY_CTYPESLIB.clone()),
+        TestCase::slow(LARGE_DATASET.clone()),
+    ]
 }
 
 fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
-    let test_cases = create_test_cases().unwrap();
+    let test_cases = create_test_cases();
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));

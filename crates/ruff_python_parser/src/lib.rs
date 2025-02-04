@@ -205,7 +205,7 @@ pub fn parse_parenthesized_expression_range(
 ///
 /// let string = StringLiteral {
 ///     value: "'''\n int | str'''".to_string().into_boxed_str(),
-///     flags: StringLiteralFlags::default(),
+///     flags: StringLiteralFlags::empty(),
 ///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
 /// };
 /// let parsed = parse_string_annotation("'''\n int | str'''", &string);

@@ -1188,3 +1188,6 @@ UP035.py:111:1: UP035 [*] Import from `warnings` instead: `deprecated`
 110 110 | # UP035 on py313+ only
 111     |-from typing_extensions import deprecated
     111 |+from warnings import deprecated
+112 112 | 
+113 113 | 
+114 114 | # https://github.com/astral-sh/ruff/issues/15780

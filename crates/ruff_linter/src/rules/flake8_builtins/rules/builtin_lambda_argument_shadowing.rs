@@ -39,9 +39,9 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &mut Checker, lambda: &
         return;
     };
     for param in parameters.iter_non_variadic_params() {
-        let name = &param.parameter.name;
+        let name = param.name();
         if shadows_builtin(
-            name.as_ref(),
+            name,
             checker.source_type,
             &checker.settings.flake8_builtins.builtins_ignorelist,
             checker.settings.target_version,

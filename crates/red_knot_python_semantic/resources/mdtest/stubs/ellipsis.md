@@ -5,7 +5,7 @@
 The ellipsis literal `...` can be used as a placeholder default value for a function parameter, in a
 stub file only, regardless of the type of the parameter.
 
-```py path=test.pyi
+```pyi
 def f(x: int = ...) -> None:
     reveal_type(x)  # revealed: int
 
@@ -18,7 +18,7 @@ def f2(x: str = ...) -> None:
 The ellipsis literal can be assigned to a class or module symbol, regardless of its declared type,
 in a stub file only.
 
-```py path=test.pyi
+```pyi
 y: bytes = ...
 reveal_type(y)  # revealed: bytes
 x = ...
@@ -35,7 +35,7 @@ reveal_type(Foo.y)  # revealed: int
 No diagnostic is emitted if an ellipsis literal is "unpacked" in a stub file as part of an
 assignment statement:
 
-```py path=test.pyi
+```pyi
 x, y = ...
 reveal_type(x)  # revealed: Unknown
 reveal_type(y)  # revealed: Unknown
@@ -46,7 +46,7 @@ reveal_type(y)  # revealed: Unknown
 Iterating over an ellipsis literal as part of a `for` loop in a stub is invalid, however, and
 results in a diagnostic:
 
-```py path=test.pyi
+```pyi
 # error: [not-iterable] "Object of type `ellipsis` is not iterable"
 for a, b in ...:
     reveal_type(a)  # revealed: Unknown
@@ -72,7 +72,7 @@ reveal_type(b)  # revealed: ellipsis
 
 There is no special treatment of the builtin name `Ellipsis` in stubs, only of `...` literals.
 
-```py path=test.pyi
+```pyi
 # error: 7 [invalid-parameter-default] "Default value of type `ellipsis` is not assignable to annotated parameter type `int`"
 def f(x: int = Ellipsis) -> None: ...
 ```

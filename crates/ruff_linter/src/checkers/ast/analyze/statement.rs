@@ -159,9 +159,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::GeneratorReturnFromIterMethod) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
-            if checker.enabled(Rule::CustomTypeVarReturnType) {
-                flake8_pyi::rules::custom_type_var_return_type(checker, function_def);
-            }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
@@ -377,7 +374,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
             if checker.enabled(Rule::Airflow3Removal) {
-                airflow::rules::removed_in_3_function_def(checker, function_def);
+                airflow::rules::airflow_3_removal_function_def(checker, function_def);
             }
             if checker.enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
@@ -1415,7 +1412,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
                 if checker.enabled(Rule::ForLoopWrites) {
-                    refurb::rules::for_loop_writes(checker, for_stmt);
+                    refurb::rules::for_loop_writes_stmt(checker, for_stmt);
                 }
             }
             if checker.enabled(Rule::NeedlessElse) {

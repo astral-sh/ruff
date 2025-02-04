@@ -199,8 +199,7 @@ pub(crate) fn bad_exit_annotation(checker: &mut Checker, function: &StmtFunction
 fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_kind: FuncKind) {
     if let Some(varargs) = &parameters.vararg {
         if let Some(annotation) = varargs
-            .annotation
-            .as_ref()
+            .annotation()
             .filter(|ann| !is_object_or_unused(ann, checker.semantic()))
         {
             let mut diagnostic = Diagnostic::new(
@@ -238,7 +237,7 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
 /// (that is not decorated with `@typing.overload`) are annotated correctly.
 fn check_positional_args_for_non_overloaded_method(
     checker: &mut Checker,
-    non_self_positional_args: &[&ParameterWithDefault],
+    non_self_positional_params: &[&ParameterWithDefault],
     kind: FuncKind,
 ) {
     // For each argument, define the predicate against which to check the annotation.
@@ -252,8 +251,10 @@ fn check_positional_args_for_non_overloaded_method(
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
     ];
 
-    for (arg, (error_info, predicate)) in non_self_positional_args.iter().take(3).zip(validations) {
-        let Some(annotation) = arg.parameter.annotation.as_ref() else {
+    for (param, (error_info, predicate)) in
+        non_self_positional_params.iter().take(3).zip(validations)
+    {
+        let Some(annotation) = param.annotation() else {
             continue;
         };
 
@@ -293,13 +294,9 @@ fn check_positional_args_for_overloaded_method(
         predicate: impl FnOnce(&Expr) -> bool,
         semantic: &SemanticModel,
     ) -> bool {
-        parameter
-            .parameter
-            .annotation
-            .as_ref()
-            .map_or(true, |annotation| {
-                predicate(annotation) || is_object_or_unused(annotation, semantic)
-            })
+        parameter.annotation().map_or(true, |annotation| {
+            predicate(annotation) || is_object_or_unused(annotation, semantic)
+        })
     }
 
     let semantic = checker.semantic();

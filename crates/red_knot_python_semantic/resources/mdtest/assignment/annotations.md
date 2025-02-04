@@ -25,7 +25,9 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not
 
 ## Tuple annotations are understood
 
-```py path=module.py
+`module.py`:
+
+```py
 from typing_extensions import Unpack
 
 a: tuple[()] = ()
@@ -40,7 +42,9 @@ i: tuple[str | int, str | int] = (42, 42)
 j: tuple[str | int] = (42,)
 ```
 
-```py path=script.py
+`script.py`:
+
+```py
 from module import a, b, c, d, e, f, g, h, i, j
 
 reveal_type(a)  # revealed: tuple[()]
@@ -114,7 +118,7 @@ reveal_type(x)  # revealed: Foo
 
 ## Annotations in stub files are deferred
 
-```pyi path=main.pyi
+```pyi
 x: Foo
 
 class Foo: ...
@@ -125,7 +129,7 @@ reveal_type(x)  # revealed: Foo
 
 ## Annotated assignments in stub files are inferred correctly
 
-```pyi path=main.pyi
+```pyi
 x: int = 1
 reveal_type(x) # revealed: Literal[1]
 ```

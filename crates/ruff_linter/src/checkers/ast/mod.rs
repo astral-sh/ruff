@@ -41,9 +41,9 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
-    UnaryOp,
+    self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
+    Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
@@ -299,11 +299,31 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        Generator::new(
-            self.stylist.indentation(),
-            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
-            self.stylist.line_ending(),
-        )
+        Generator::new(self.stylist.indentation(), self.stylist.line_ending())
+    }
+
+    /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
+    /// AST.
+    fn preferred_quote(&self) -> Quote {
+        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+    }
+
+    /// Return the default string flags a generated `StringLiteral` node should use, given where we
+    /// are in the AST.
+    pub(crate) fn default_string_flags(&self) -> ast::StringLiteralFlags {
+        ast::StringLiteralFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
+    /// Return the default bytestring flags a generated `ByteStringLiteral` node should use, given
+    /// where we are in the AST.
+    pub(crate) fn default_bytes_flags(&self) -> ast::BytesLiteralFlags {
+        ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
+    /// Return the default f-string flags a generated `FString` node should use, given where we are
+    /// in the AST.
+    pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
+        ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
@@ -1256,6 +1276,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::TypeVar)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                            {
+                                Some(typing::Callable::TypeAliasType)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
                                 Some(typing::Callable::NamedTuple)
@@ -1335,6 +1360,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    Some(typing::Callable::TypeAliasType) => {
+                        // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if matches!(&**id, "value" | "type_params") {
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
                                 }
                             }
                         }

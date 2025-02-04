@@ -119,6 +119,7 @@ impl<'db> ScopeId<'db> {
             self.node(db).scope_kind(),
             ScopeKind::Annotation
                 | ScopeKind::Function
+                | ScopeKind::Lambda
                 | ScopeKind::TypeAlias
                 | ScopeKind::Comprehension
         )
@@ -203,6 +204,7 @@ pub enum ScopeKind {
     Annotation,
     Class,
     Function,
+    Lambda,
     Comprehension,
     TypeAlias,
 }
@@ -443,7 +445,8 @@ impl NodeWithScopeKind {
         match self {
             Self::Module => ScopeKind::Module,
             Self::Class(_) => ScopeKind::Class,
-            Self::Function(_) | Self::Lambda(_) => ScopeKind::Function,
+            Self::Function(_) => ScopeKind::Function,
+            Self::Lambda(_) => ScopeKind::Lambda,
             Self::FunctionTypeParameters(_)
             | Self::ClassTypeParameters(_)
             | Self::TypeAliasTypeParameters(_) => ScopeKind::Annotation,
