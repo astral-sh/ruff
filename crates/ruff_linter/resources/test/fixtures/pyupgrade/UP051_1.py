@@ -42,7 +42,7 @@ class F[_async]: ...
 # and this should not be fixed because of the conflict with the outer X, but it
 # also gets a diagnostic
 def f():
-    X = 5
+    type X = int
 
     class ScopeConflict[_X]:
         var: _X
