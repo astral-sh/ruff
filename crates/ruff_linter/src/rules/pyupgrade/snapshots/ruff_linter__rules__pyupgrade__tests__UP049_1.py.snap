@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP051_1.py:2:11: UP051 [*] Generic class uses private type parameters
+UP049_1.py:2:11: UP049 [*] Generic class uses private type parameters
   |
 1 | # bound
 2 | class Foo[_T: str]:
-  |           ^^ UP051
+  |           ^^ UP049
 3 |     var: _T
   |
   = help: Remove the leading underscores
@@ -20,11 +20,11 @@ UP051_1.py:2:11: UP051 [*] Generic class uses private type parameters
 5 5 | 
 6 6 | # constraint
 
-UP051_1.py:7:11: UP051 [*] Generic class uses private type parameters
+UP049_1.py:7:11: UP049 [*] Generic class uses private type parameters
   |
 6 | # constraint
 7 | class Foo[_T: (str, bytes)]:
-  |           ^^ UP051
+  |           ^^ UP049
 8 |     var: _T
   |
   = help: Remove the leading underscores
@@ -41,11 +41,11 @@ UP051_1.py:7:11: UP051 [*] Generic class uses private type parameters
 10 10 | 
 11 11 | # python 3.13+ default
 
-UP051_1.py:12:11: UP051 [*] Generic class uses private type parameters
+UP049_1.py:12:11: UP049 [*] Generic class uses private type parameters
    |
 11 | # python 3.13+ default
 12 | class Foo[_T = int]:
-   |           ^^ UP051
+   |           ^^ UP049
 13 |     var: _T
    |
    = help: Remove the leading underscores
@@ -62,11 +62,11 @@ UP051_1.py:12:11: UP051 [*] Generic class uses private type parameters
 15 15 | 
 16 16 | # tuple
 
-UP051_1.py:17:12: UP051 [*] Generic class uses private type parameters
+UP049_1.py:17:12: UP049 [*] Generic class uses private type parameters
    |
 16 | # tuple
 17 | class Foo[*_Ts]:
-   |            ^^^ UP051
+   |            ^^^ UP049
 18 |     var: tuple[*_Ts]
    |
    = help: Remove the leading underscores
@@ -83,11 +83,11 @@ UP051_1.py:17:12: UP051 [*] Generic class uses private type parameters
 20 20 | 
 21 21 | # paramspec
 
-UP051_1.py:22:11: UP051 [*] Generic class uses private type parameters
+UP049_1.py:22:11: UP049 [*] Generic class uses private type parameters
    |
 21 | # paramspec
 22 | class C[**_P]:
-   |           ^^ UP051
+   |           ^^ UP049
 23 |     var: _P
    |
    = help: Remove the leading underscores
@@ -104,12 +104,12 @@ UP051_1.py:22:11: UP051 [*] Generic class uses private type parameters
 25 25 | 
 26 26 | from typing import Callable
 
-UP051_1.py:31:18: UP051 [*] Generic class uses private type parameters
+UP049_1.py:31:18: UP049 [*] Generic class uses private type parameters
    |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
 31 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
-   |                  ^^ UP051
+   |                  ^^ UP049
 32 |     @staticmethod
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
@@ -128,12 +128,12 @@ UP051_1.py:31:18: UP051 [*] Generic class uses private type parameters
 35 35 | 
 36 36 | 
 
-UP051_1.py:31:22: UP051 [*] Generic class uses private type parameters
+UP049_1.py:31:22: UP049 [*] Generic class uses private type parameters
    |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
 31 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
-   |                      ^^ UP051
+   |                      ^^ UP049
 32 |     @staticmethod
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
@@ -152,12 +152,12 @@ UP051_1.py:31:22: UP051 [*] Generic class uses private type parameters
 35 35 | 
 36 36 | 
 
-UP051_1.py:31:31: UP051 [*] Generic class uses private type parameters
+UP049_1.py:31:31: UP049 [*] Generic class uses private type parameters
    |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
 31 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
-   |                               ^^ UP051
+   |                               ^^ UP049
 32 |     @staticmethod
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
@@ -176,12 +176,12 @@ UP051_1.py:31:31: UP051 [*] Generic class uses private type parameters
 35 35 | 
 36 36 | 
 
-UP051_1.py:31:50: UP051 [*] Generic class uses private type parameters
+UP049_1.py:31:50: UP049 [*] Generic class uses private type parameters
    |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
 31 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
-   |                                                  ^^ UP051
+   |                                                  ^^ UP049
 32 |     @staticmethod
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
@@ -200,12 +200,12 @@ UP051_1.py:31:50: UP051 [*] Generic class uses private type parameters
 35 35 | 
 36 36 | 
 
-UP051_1.py:31:56: UP051 [*] Generic class uses private type parameters
+UP049_1.py:31:56: UP049 [*] Generic class uses private type parameters
    |
 29 | # each of these will get a separate diagnostic, but at least they'll all get
 30 | # fixed
 31 | class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
-   |                                                        ^^ UP051
+   |                                                        ^^ UP049
 32 |     @staticmethod
 33 |     def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
    |
@@ -224,21 +224,21 @@ UP051_1.py:31:56: UP051 [*] Generic class uses private type parameters
 35 35 | 
 36 36 | 
 
-UP051_1.py:39:9: UP051 Generic class uses private type parameters
+UP049_1.py:39:9: UP049 Generic class uses private type parameters
    |
 37 | # this should not be fixed because the new name is a keyword, but we still
 38 | # offer a diagnostic
 39 | class F[_async]: ...
-   |         ^^^^^^ UP051
+   |         ^^^^^^ UP049
    |
    = help: Remove the leading underscores
 
-UP051_1.py:47:25: UP051 Generic class uses private type parameters
+UP049_1.py:47:25: UP049 Generic class uses private type parameters
    |
 45 |     type X = int
 46 |
 47 |     class ScopeConflict[_X]:
-   |                         ^^ UP051
+   |                         ^^ UP049
 48 |         var: _X
 49 |         x: X
    |

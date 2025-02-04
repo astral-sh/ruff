@@ -97,7 +97,7 @@ impl Violation for PrivateTypeParameter {
     }
 }
 
-/// UP051
+/// UP049
 pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     let semantic = checker.semantic();
     let stmt = binding.statement(semantic)?;
