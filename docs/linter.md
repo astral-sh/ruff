@@ -8,15 +8,15 @@ and more.
 ## `ruff check`
 
 `ruff check` is the primary entrypoint to the Ruff linter. It accepts a list of files or
-directories, and lints all discovered Python files (including those in subdirectories), optionally 
-fixing any fixable errors. When linting a directory, Ruff searches for Python files recursively in 
-that directory and all its subdirectories:
+directories, and lints all discovered Python files, optionally fixing any fixable errors.
+When linting a directory, Ruff searches for Python files recursively in that directory
+and all its subdirectories:
 
 ```console
-$ ruff check                  # Lint files starting from the current directory.
-$ ruff check --fix            # Lint files starting from the current directory and fix any fixable errors.
-$ ruff check --watch          # Lint files starting from the current directory and re-lint on change.
-$ ruff check path/to/code/    # Lint files starting from `path/to/code`.
+$ ruff check                  # Lint files in the current directory.
+$ ruff check --fix            # Lint files in the current directory and fix any fixable errors.
+$ ruff check --watch          # Lint files in the current directory and re-lint on change.
+$ ruff check path/to/code/    # Lint files in `path/to/code`.
 ```
 
 For the full list of supported options, run `ruff check --help`.
