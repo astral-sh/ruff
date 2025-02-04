@@ -283,8 +283,6 @@ impl<'s> Parser<'s> {
         const CODE_BLOCK_END: &[u8] = b"```";
 
         while !self.cursor.is_eof() {
-            self.skip_whitespace();
-
             match self.cursor.first() {
                 '#' => {
                     self.explicit_path = None;
@@ -377,6 +375,14 @@ impl<'s> Parser<'s> {
                 _ => {
                     self.preceding_blank_lines = 0;
                     self.explicit_path = None;
+
+                    self.skip_whitespace();
+                    if self.cursor.eat_char('`')
+                        && self.cursor.eat_char('`')
+                        && self.cursor.eat_char('`')
+                    {
+                        bail!("Indented code blocks are not supported.");
+                    }
                 }
             }
 
@@ -892,6 +898,42 @@ mod tests {
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Unterminated code block at line 10.");
+    }
+
+    #[test]
+    fn header_start_at_beginning_of_line() {
+        let source = dedent(
+            "
+            # A test
+
+                # not a header
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+
+        assert_eq!(test.name(), "file.md - A test");
+    }
+
+    #[test]
+    fn code_blocks_must_not_be_indented() {
+        let source = dedent(
+            "
+            # A test?
+
+                ```py
+                x = 1
+                ```
+            ",
+        );
+        super::parse("file.md", &source).expect_err("Indented code blocks are not supported.");
     }
 
     #[test]
