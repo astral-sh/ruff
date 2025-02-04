@@ -457,11 +457,9 @@ def raise_in_both_branches(cond: bool):
         x = "unreachable"
     finally:
         # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
-        # TODO: Literal["before", "raise1", "raise2"]
-        reveal_type(x)  # revealed: Literal["before", "raise1", "raise2", "unreachable"]
+        reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
-    # TODO: Literal["before", "raise1", "raise2"]
-    reveal_type(x)  # revealed: Literal["before", "raise1", "raise2", "unreachable"]
+    reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
 
 def raise_in_nested_then_branch(cond1: bool, cond2: bool):
     x = "before"
