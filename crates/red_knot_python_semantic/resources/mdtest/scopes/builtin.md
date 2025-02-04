@@ -13,7 +13,7 @@ if returns_bool():
     chr: int = 1
 
 def f():
-    reveal_type(chr)  # revealed: Literal[chr] | int
+    reveal_type(chr)  # revealed: int | Literal[chr]
 ```
 
 ## Conditionally global or builtin, with annotation
@@ -28,5 +28,5 @@ if returns_bool():
     chr: int = 1
 
 def f():
-    reveal_type(chr)  # revealed: Literal[chr] | int
+    reveal_type(chr)  # revealed: int | Literal[chr]
 ```

@@ -3290,8 +3290,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Look up a name reference that isn't bound in the local scope.
     fn lookup_name(&mut self, name_node: &ast::ExprName) -> Symbol<'db> {
+        let db = self.db();
         let ast::ExprName { id: name, .. } = name_node;
-        let file_scope_id = self.scope().file_scope_id(self.db());
+        let file_scope_id = self.scope().file_scope_id(db);
         let is_bound =
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_by_name(name) {
                 symbol.is_bound()
@@ -3306,16 +3307,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         // In function-like scopes, any local variable (symbol that is bound in this scope) can
         // only have a definition in this scope, or error; it never references another scope.
         // (At runtime, it would use the `LOAD_FAST` opcode.)
-        if !is_bound || !self.scope().is_function_like(self.db()) {
+        if !is_bound || !self.scope().is_function_like(db) {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
-                let enclosing_scope_id =
-                    enclosing_scope_file_id.to_scope_id(self.db(), self.file());
-                if !enclosing_scope_id.is_function_like(self.db()) {
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                if !enclosing_scope_id.is_function_like(db) {
                     continue;
                 }
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
@@ -3328,37 +3328,41 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(self.db(), enclosing_scope_id, name);
+                    return symbol(db, enclosing_scope_id, name);
                 }
             }
 
-            // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
-            // already is module globals.
-            let global_symbol = if file_scope_id.is_global() {
-                Symbol::Unbound
-            } else {
-                global_symbol(self.db(), self.file(), name)
-            };
-
-            // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if global_symbol.possibly_unbound()
-                && Some(self.scope()) != builtins_module_scope(self.db())
-            {
-                let mut builtins_symbol = builtins_symbol(self.db(), name);
-                if builtins_symbol.is_unbound() && name == "reveal_type" {
-                    self.context.report_lint(
-                        &UNDEFINED_REVEAL,
-                        name_node.into(),
-                        format_args!(
-                            "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
-                    );
-                    builtins_symbol = typing_extensions_symbol(self.db(), name);
-                }
-
-                global_symbol.or_fall_back_to(self.db(), &builtins_symbol)
-            } else {
-                global_symbol
-            }
+            Symbol::Unbound
+                // No nonlocal binding? Check the module's globals.
+                // Avoid infinite recursion if `self.scope` already is the module's global scope.
+                .or_fall_back_to_if(
+                    db,
+                    || !file_scope_id.is_global(),
+                    || global_symbol(db, self.file(), name),
+                )
+                // Not found in globals? Fallback to builtins
+                // (without infinite recursion if we're already in builtins.)
+                .or_fall_back_to_if(
+                    db,
+                    || Some(self.scope()) != builtins_module_scope(db),
+                    || builtins_symbol(db, name),
+                )
+                // Still not found? It might be `reveal_type`...
+                .or_fall_back_to_if(
+                    db,
+                    || name == "reveal_type",
+                    || {
+                        self.context.report_lint(
+                            &UNDEFINED_REVEAL,
+                            name_node.into(),
+                            format_args!(
+                                "`reveal_type` used without importing it; \
+                            this is allowed for debugging convenience but will fail at runtime"
+                            ),
+                        );
+                        typing_extensions_symbol(db, name)
+                    },
+                )
         } else {
             Symbol::Unbound
         }

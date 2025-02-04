@@ -9,15 +9,6 @@ pub(crate) enum Boundness {
     PossiblyUnbound,
 }
 
-impl Boundness {
-    pub(crate) fn or(self, other: Boundness) -> Boundness {
-        match (self, other) {
-            (Boundness::Bound, _) | (_, Boundness::Bound) => Boundness::Bound,
-            (Boundness::PossiblyUnbound, Boundness::PossiblyUnbound) => Boundness::PossiblyUnbound,
-        }
-    }
-}
-
 /// The result of a symbol lookup, which can either be a (possibly unbound) type
 /// or a completely unbound symbol.
 ///
@@ -46,13 +37,6 @@ impl<'db> Symbol<'db> {
         matches!(self, Symbol::Unbound)
     }
 
-    pub(crate) fn possibly_unbound(&self) -> bool {
-        match self {
-            Symbol::Type(_, Boundness::PossiblyUnbound) | Symbol::Unbound => true,
-            Symbol::Type(_, Boundness::Bound) => false,
-        }
-    }
-
     /// Returns the type of the symbol, ignoring possible unboundness.
     ///
     /// If the symbol is *definitely* unbound, this function will return `None`. Otherwise,
@@ -71,18 +55,36 @@ impl<'db> Symbol<'db> {
             .expect("Expected a (possibly unbound) type, not an unbound symbol")
     }
 
+    /// Conditionally fallback to another symbol if `self` is partially or fully unbound.
+    ///
+    /// 1. If `self` is definitely bound, return `self` without evaluating `condition()` or `fallback()`.
+    /// 2. Else, evaluate `condition()`:
+    ///    a. If `condition()` is `false`, return `self` without evaluating `fallback()`.
+    ///    b. Else, evaluate `fallback()`:
+    ///       i.   If `self` is definitely unbound, return the result of `fallback()`.
+    ///       ii.  Else, if `fallback` is definitely unbound, return `self`.
+    ///       iii. Else, if `self` is possibly unbound and `other` is definitely bound,
+    ///            return `Symbol(<union of self-type and other-type>, Boundness::Bound)`
+    ///       iv.  Else, if `self` is possibly unbound and `other` is possibly unbound,
+    ///            return `Symbol(<union of self-type and other-type>, Boundness::PossiblyUnbound)`
     #[must_use]
-    pub(crate) fn or_fall_back_to(self, db: &'db dyn Db, fallback: &Symbol<'db>) -> Symbol<'db> {
-        match fallback {
-            Symbol::Type(fallback_ty, fallback_boundness) => match self {
-                Symbol::Type(_, Boundness::Bound) => self,
-                Symbol::Type(ty, boundness @ Boundness::PossiblyUnbound) => Symbol::Type(
-                    UnionType::from_elements(db, [*fallback_ty, ty]),
-                    fallback_boundness.or(boundness),
+    pub(crate) fn or_fall_back_to_if(
+        self,
+        db: &'db dyn Db,
+        condition: impl FnOnce() -> bool,
+        fallback_fn: impl FnOnce() -> Symbol<'db>,
+    ) -> Symbol<'db> {
+        match self {
+            Symbol::Type(_, Boundness::Bound) => self,
+            _ if !condition() => self,
+            Symbol::Unbound => fallback_fn(),
+            Symbol::Type(self_ty, Boundness::PossiblyUnbound) => match fallback_fn() {
+                Symbol::Unbound => self,
+                Symbol::Type(fallback_ty, fallback_boundness) => Symbol::Type(
+                    UnionType::from_elements(db, [self_ty, fallback_ty]),
+                    fallback_boundness,
                 ),
-                Symbol::Unbound => fallback.clone(),
             },
-            Symbol::Unbound => self,
         }
     }
 
@@ -100,6 +102,13 @@ mod tests {
     use super::*;
     use crate::db::tests::setup_db;
 
+    impl<'db> Symbol<'db> {
+        /// Convenience function to make unit tests easier
+        fn or_fall_back_to(self, db: &'db dyn Db, other: Symbol<'db>) -> Symbol<'db> {
+            self.or_fall_back_to_if(db, || true, || other)
+        }
+    }
+
     #[test]
     fn test_symbol_or_fall_back_to() {
         use Boundness::{Bound, PossiblyUnbound};
@@ -110,44 +119,44 @@ mod tests {
 
         // Start from an unbound symbol
         assert_eq!(
-            Symbol::Unbound.or_fall_back_to(&db, &Symbol::Unbound),
+            Symbol::Unbound.or_fall_back_to(&db, Symbol::Unbound),
             Symbol::Unbound
         );
         assert_eq!(
-            Symbol::Unbound.or_fall_back_to(&db, &Symbol::Type(ty1, PossiblyUnbound)),
+            Symbol::Unbound.or_fall_back_to(&db, Symbol::Type(ty1, PossiblyUnbound)),
             Symbol::Type(ty1, PossiblyUnbound)
         );
         assert_eq!(
-            Symbol::Unbound.or_fall_back_to(&db, &Symbol::Type(ty1, Bound)),
+            Symbol::Unbound.or_fall_back_to(&db, Symbol::Type(ty1, Bound)),
             Symbol::Type(ty1, Bound)
         );
 
         // Start from a possibly unbound symbol
         assert_eq!(
-            Symbol::Type(ty1, PossiblyUnbound).or_fall_back_to(&db, &Symbol::Unbound),
+            Symbol::Type(ty1, PossiblyUnbound).or_fall_back_to(&db, Symbol::Unbound),
             Symbol::Type(ty1, PossiblyUnbound)
         );
         assert_eq!(
             Symbol::Type(ty1, PossiblyUnbound)
-                .or_fall_back_to(&db, &Symbol::Type(ty2, PossiblyUnbound)),
-            Symbol::Type(UnionType::from_elements(&db, [ty2, ty1]), PossiblyUnbound)
+                .or_fall_back_to(&db, Symbol::Type(ty2, PossiblyUnbound)),
+            Symbol::Type(UnionType::from_elements(&db, [ty1, ty2]), PossiblyUnbound)
         );
         assert_eq!(
-            Symbol::Type(ty1, PossiblyUnbound).or_fall_back_to(&db, &Symbol::Type(ty2, Bound)),
-            Symbol::Type(UnionType::from_elements(&db, [ty2, ty1]), Bound)
+            Symbol::Type(ty1, PossiblyUnbound).or_fall_back_to(&db, Symbol::Type(ty2, Bound)),
+            Symbol::Type(UnionType::from_elements(&db, [ty1, ty2]), Bound)
         );
 
         // Start from a definitely bound symbol
         assert_eq!(
-            Symbol::Type(ty1, Bound).or_fall_back_to(&db, &Symbol::Unbound),
+            Symbol::Type(ty1, Bound).or_fall_back_to(&db, Symbol::Unbound),
             Symbol::Type(ty1, Bound)
         );
         assert_eq!(
-            Symbol::Type(ty1, Bound).or_fall_back_to(&db, &Symbol::Type(ty2, PossiblyUnbound)),
+            Symbol::Type(ty1, Bound).or_fall_back_to(&db, Symbol::Type(ty2, PossiblyUnbound)),
             Symbol::Type(ty1, Bound)
         );
         assert_eq!(
-            Symbol::Type(ty1, Bound).or_fall_back_to(&db, &Symbol::Type(ty2, Bound)),
+            Symbol::Type(ty1, Bound).or_fall_back_to(&db, Symbol::Type(ty2, Bound)),
             Symbol::Type(ty1, Bound)
         );
     }
