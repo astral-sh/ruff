@@ -126,6 +126,34 @@ Intervening empty lines or non-assertion comments are not allowed; an assertion 
 assertion per line, immediately following each other, with the line immediately following the last
 assertion as the line of source code on which the matched diagnostics are emitted.
 
+## Diagnostic Snapshotting
+
+In addition to inline assertions, one can also snapshot the full diagnostic
+output of a test. This is done by adding a `<!-- snapshot-diagnostics -->` directive
+in the corresponding section. For example:
+
+````markdown
+## Unresolvable module import
+
+<!-- snapshot-diagnostics -->
+
+```py
+import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+```
+````
+
+The `snapshot-diagnostics` directive must appear before anything else in
+the section.
+
+This will use `insta` to manage an external file snapshot of all diagnostic
+output generated.
+
+Inline assertions, as described above, may be used in conjunction with diagnostic
+snapshotting.
+
+At present, there is no way to do inline snapshotting or to request more granular
+snapshotting of specific diagnostics.
+
 ## Multi-file tests
 
 Some tests require multiple files, with imports from one file into another. Multiple fenced code
@@ -344,6 +372,11 @@ We could use an `error=` configuration option in the tag string to make an embed
 I/O error on read.
 
 ### Asserting on full diagnostic output
+
+> [!NOTE]
+> At present, one can opt into diagnostic snapshotting that is managed via external files. See
+> the section above for more details. The feature outlined below, *inline* diagnostic snapshotting,
+> is still desirable.
 
 The inline comment diagnostic assertions are useful for making quick, readable assertions about
 diagnostics in a particular location. But sometimes we will want to assert on the full diagnostic
