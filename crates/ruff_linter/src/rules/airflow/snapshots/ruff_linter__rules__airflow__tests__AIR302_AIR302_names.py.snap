@@ -9,7 +9,7 @@ AIR302_names.py:113:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
     | ^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 6)` instead
 
 AIR302_names.py:113:7: AIR302 `airflow.PY37` is removed in Airflow 3.0
     |
@@ -18,7 +18,7 @@ AIR302_names.py:113:7: AIR302 `airflow.PY37` is removed in Airflow 3.0
     |       ^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 7)` instead
 
 AIR302_names.py:113:13: AIR302 `airflow.PY38` is removed in Airflow 3.0
     |
@@ -27,7 +27,7 @@ AIR302_names.py:113:13: AIR302 `airflow.PY38` is removed in Airflow 3.0
     |             ^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 8)` instead
 
 AIR302_names.py:113:19: AIR302 `airflow.PY39` is removed in Airflow 3.0
     |
@@ -36,7 +36,7 @@ AIR302_names.py:113:19: AIR302 `airflow.PY39` is removed in Airflow 3.0
     |                   ^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 9)` instead
 
 AIR302_names.py:113:25: AIR302 `airflow.PY310` is removed in Airflow 3.0
     |
@@ -45,7 +45,7 @@ AIR302_names.py:113:25: AIR302 `airflow.PY310` is removed in Airflow 3.0
     |                         ^^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 10)` instead
 
 AIR302_names.py:113:32: AIR302 `airflow.PY311` is removed in Airflow 3.0
     |
@@ -54,7 +54,7 @@ AIR302_names.py:113:32: AIR302 `airflow.PY311` is removed in Airflow 3.0
     |                                ^^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 11)` instead
 
 AIR302_names.py:113:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
     |
@@ -63,7 +63,7 @@ AIR302_names.py:113:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
     |                                       ^^^^^ AIR302
 114 | DatasetFromRoot()
     |
-    = help: Use `sys.version_info` instead
+    = help: Use `sys.version_info == (3, 12)` instead
 
 AIR302_names.py:114:1: AIR302 `airflow.Dataset` is removed in Airflow 3.0
     |
