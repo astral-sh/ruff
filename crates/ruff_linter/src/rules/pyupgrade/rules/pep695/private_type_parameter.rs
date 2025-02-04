@@ -5,7 +5,7 @@ use ruff_python_semantic::Binding;
 
 use crate::{
     checkers::ast::Checker,
-    renamer::{try_shadowed_kind, Renamer, ShadowedKind},
+    renamer::{try_shadowed_kind, Renamer},
 };
 
 /// ## What it does
@@ -110,7 +110,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
     // a suggested fix
-    if try_shadowed_kind(old_name, checker, binding.scope).is_some_and(ShadowedKind::shadows_any) {
+    if try_shadowed_kind(old_name, checker, binding.scope).shadows_any() {
         return Some(diagnostic);
     }
 

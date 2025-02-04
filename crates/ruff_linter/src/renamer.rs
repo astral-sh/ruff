@@ -402,39 +402,24 @@ impl ShadowedKind {
 ///
 /// This function is useful for checking whether or not the `target` of a [`Rename::rename`] will
 /// shadow another binding.
-pub(crate) fn try_shadowed_kind(
-    name: &str,
-    checker: &Checker,
-    scope_id: ScopeId,
-) -> Option<ShadowedKind> {
-    // If the name doesn't start with an underscore, we don't consider it
-    if !name.starts_with('_') {
-        return None;
-    }
-
-    // Trim the leading underscores for further checks
-    let trimmed_name = name.trim_start_matches('_');
-
+pub(crate) fn try_shadowed_kind(name: &str, checker: &Checker, scope_id: ScopeId) -> ShadowedKind {
     // Check the kind in order of precedence
-    if is_keyword(trimmed_name) {
-        return Some(ShadowedKind::Keyword);
+    if is_keyword(name) {
+        return ShadowedKind::Keyword;
     }
 
     if is_python_builtin(
-        trimmed_name,
+        name,
         checker.settings.target_version.minor(),
         checker.source_type.is_ipynb(),
     ) {
-        return Some(ShadowedKind::BuiltIn);
+        return ShadowedKind::BuiltIn;
     }
 
-    if !checker
-        .semantic()
-        .is_available_in_scope(trimmed_name, scope_id)
-    {
-        return Some(ShadowedKind::Some);
+    if !checker.semantic().is_available_in_scope(name, scope_id) {
+        return ShadowedKind::Some;
     }
 
     // Default to no shadowing
-    Some(ShadowedKind::None)
+    ShadowedKind::None
 }

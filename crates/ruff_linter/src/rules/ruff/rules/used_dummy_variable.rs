@@ -165,25 +165,36 @@ pub(crate) fn used_dummy_variable(
         return None;
     }
 
-    let shadowed_kind = try_shadowed_kind(name, checker, binding.scope);
+    // If the name doesn't start with an underscore, we don't consider it for a fix
+    if !name.starts_with('_') {
+        return Some(Diagnostic::new(
+            UsedDummyVariable {
+                name: name.to_string(),
+                shadowed_kind: None,
+            },
+            binding.range(),
+        ));
+    }
+
+    // Trim the leading underscores for further checks
+    let trimmed_name = name.trim_start_matches('_');
+
+    let shadowed_kind = try_shadowed_kind(trimmed_name, checker, binding.scope);
 
     let mut diagnostic = Diagnostic::new(
         UsedDummyVariable {
             name: name.to_string(),
-            shadowed_kind,
+            shadowed_kind: Some(shadowed_kind),
         },
         binding.range(),
     );
 
-    // If fix available
-    if let Some(shadowed_kind) = shadowed_kind {
-        // Get the possible fix based on the scope
-        if let Some(fix) = get_possible_fix(name, shadowed_kind, binding.scope, checker) {
-            diagnostic.try_set_fix(|| {
-                Renamer::rename(name, &fix, scope, semantic, checker.stylist())
-                    .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
-            });
-        }
+    // Get the possible fix based on the scope
+    if let Some(fix) = get_possible_fix(trimmed_name, shadowed_kind, binding.scope, checker) {
+        diagnostic.try_set_fix(|| {
+            Renamer::rename(name, &fix, scope, semantic, checker.stylist())
+                .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
+        });
     }
 
     Some(diagnostic)
@@ -191,14 +202,11 @@ pub(crate) fn used_dummy_variable(
 
 /// Suggests a potential alternative name to resolve a shadowing conflict.
 fn get_possible_fix(
-    name: &str,
+    trimmed_name: &str,
     kind: ShadowedKind,
     scope_id: ScopeId,
     checker: &Checker,
 ) -> Option<String> {
-    // Remove leading underscores for processing
-    let trimmed_name = name.trim_start_matches('_');
-
     // Construct the potential fix name based on ShadowedKind
     let fix_name = match kind {
         ShadowedKind::Some | ShadowedKind::BuiltIn | ShadowedKind::Keyword => {
