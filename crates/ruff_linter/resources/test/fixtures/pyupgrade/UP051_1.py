@@ -8,6 +8,11 @@ class Foo[_T: (str, bytes)]:
     var: _T
 
 
+# python 3.13+ default
+class Foo[_T = int]:
+    var: _T
+
+
 # tuple
 class Foo[*_Ts]:
     var: tuple[*_Ts]
@@ -29,11 +34,13 @@ class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
         return None
 
 
-# this should not be fixed because the new name is a keyword
+# this should not be fixed because the new name is a keyword, but we still
+# offer a diagnostic
 class F[_async]: ...
 
 
-# and this should not be fixed because of the conflict with the outer X
+# and this should not be fixed because of the conflict with the outer X, but it
+# also gets a diagnostic
 def f():
     X = 5
 
