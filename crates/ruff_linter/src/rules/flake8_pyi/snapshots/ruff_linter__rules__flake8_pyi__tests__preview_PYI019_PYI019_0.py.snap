@@ -617,54 +617,76 @@ PYI019_0.py:149:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
     150 |+        x: type[Self] = type(other)
 151 151 |         return x()
 152 152 | 
-153 153 | class StringizedReferencesAreTooComplicated:
+153 153 | class StringizedReferencesCanBeFixed:
 
-PYI019_0.py:154:10: PYI019 Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:154:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |
-153 | class StringizedReferencesAreTooComplicated:
+153 | class StringizedReferencesCanBeFixed:
 154 |     def m[S](self: S) -> S:
     |          ^^^^^^^^^^^^^^^^^ PYI019
-155 |         x = cast("S", self)
+155 |         x = cast("list[tuple[S, S]]", self)
 156 |         return x
     |
     = help: Replace TypeVar `S` with `Self`
 
-PYI019_0.py:159:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
-    |
-158 | class DeletionsAreNotTouched:
-159 |     def m[S](self: S) -> S:
-    |          ^^^^^^^^^^^^^^^^^ PYI019
-160 |         # `S` is not a local variable here, and `del` can only be used with local variables,
-161 |         # so `del S` here is not actually a reference to the type variable `S`.
-    |
-    = help: Replace TypeVar `S` with `Self`
-
 ℹ Safe fix
+151 151 |         return x()
+152 152 | 
+153 153 | class StringizedReferencesCanBeFixed:
+154     |-    def m[S](self: S) -> S:
+155     |-        x = cast("list[tuple[S, S]]", self)
+    154 |+    def m(self) -> Self:
+    155 |+        x = cast("list[tuple[Self, Self]]", self)
 156 156 |         return x
 157 157 | 
-158 158 | class DeletionsAreNotTouched:
-159     |-    def m[S](self: S) -> S:
-    159 |+    def m(self) -> Self:
-160 160 |         # `S` is not a local variable here, and `del` can only be used with local variables,
-161 161 |         # so `del S` here is not actually a reference to the type variable `S`.
-162 162 |         # This `del` statement is therefore not touched by the autofix (it raises `UnboundLocalError`
+158 158 | class ButStrangeStringizedReferencesCannotBeFixed:
 
-PYI019_0.py:168:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:159:10: PYI019 Use `Self` instead of custom TypeVar `_T`
     |
-167 | class NamesShadowingTypeVarAreNotTouched:
-168 |     def m[S](self: S) -> S:
+158 | class ButStrangeStringizedReferencesCannotBeFixed:
+159 |     def m[_T](self: _T) -> _T:
+    |          ^^^^^^^^^^^^^^^^^^^^ PYI019
+160 |         x = cast('list[_\x54]', self)
+161 |         return x
+    |
+    = help: Replace TypeVar `_T` with `Self`
+
+PYI019_0.py:164:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+    |
+163 | class DeletionsAreNotTouched:
+164 |     def m[S](self: S) -> S:
     |          ^^^^^^^^^^^^^^^^^ PYI019
-169 |         type S = int
-170 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+165 |         # `S` is not a local variable here, and `del` can only be used with local variables,
+166 |         # so `del S` here is not actually a reference to the type variable `S`.
     |
     = help: Replace TypeVar `S` with `Self`
 
 ℹ Safe fix
-165 165 |         return self
-166 166 | 
-167 167 | class NamesShadowingTypeVarAreNotTouched:
-168     |-    def m[S](self: S) -> S:
-    168 |+    def m(self) -> Self:
-169 169 |         type S = int
-170 170 |         print(S)  # not a reference to the type variable, so not touched by the autofix
-171 171 |         return 42
+161 161 |         return x
+162 162 | 
+163 163 | class DeletionsAreNotTouched:
+164     |-    def m[S](self: S) -> S:
+    164 |+    def m(self) -> Self:
+165 165 |         # `S` is not a local variable here, and `del` can only be used with local variables,
+166 166 |         # so `del S` here is not actually a reference to the type variable `S`.
+167 167 |         # This `del` statement is therefore not touched by the autofix (it raises `UnboundLocalError`
+
+PYI019_0.py:173:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+    |
+172 | class NamesShadowingTypeVarAreNotTouched:
+173 |     def m[S](self: S) -> S:
+    |          ^^^^^^^^^^^^^^^^^ PYI019
+174 |         type S = int
+175 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+ℹ Safe fix
+170 170 |         return self
+171 171 | 
+172 172 | class NamesShadowingTypeVarAreNotTouched:
+173     |-    def m[S](self: S) -> S:
+    173 |+    def m(self) -> Self:
+174 174 |         type S = int
+175 175 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+176 176 |         return 42

@@ -150,9 +150,14 @@ class MethodsWithBody:
         x: type[S] = type(other)
         return x()
 
-class StringizedReferencesAreTooComplicated:
+class StringizedReferencesCanBeFixed:
     def m[S](self: S) -> S:
-        x = cast("S", self)
+        x = cast("list[tuple[S, S]]", self)
+        return x
+
+class ButStrangeStringizedReferencesCannotBeFixed:
+    def m[_T](self: _T) -> _T:
+        x = cast('list[_\x54]', self)
         return x
 
 class DeletionsAreNotTouched:

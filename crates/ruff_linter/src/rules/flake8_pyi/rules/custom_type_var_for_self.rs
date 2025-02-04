@@ -204,7 +204,7 @@ pub(crate) fn custom_type_var_instead_of_self(
 
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarForSelf {
-            typevar_name: custom_typevar.name(checker).to_string(),
+            typevar_name: custom_typevar.name(checker.source()).to_string(),
         },
         diagnostic_range,
     );
@@ -507,6 +507,7 @@ fn replace_custom_typevar_with_self(
 
     replace_typevar_usages_with_self(
         custom_typevar,
+        checker.source(),
         self_or_cls_annotation.range(),
         &self_symbol_binding,
         replace_references_range,
@@ -557,19 +558,23 @@ fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), 
 /// This ensures that no edit in this series will overlap with other edits.
 fn replace_typevar_usages_with_self<'a>(
     typevar: TypeVar<'a>,
+    source: &'a str,
     self_or_cls_annotation_range: TextRange,
     self_symbol_binding: &'a str,
     editable_range: TextRange,
     semantic: &'a SemanticModel<'a>,
     edits: &mut Vec<Edit>,
 ) -> anyhow::Result<()> {
+    let tvar_name = typevar.name(source);
     for reference in typevar.references(semantic) {
-        if reference.in_string_type_definition() {
+        let reference_range = reference.range();
+        if &source[reference_range] != tvar_name {
             bail!(
-                "Cannot apply autofix where some references to the TypeVar are in string type definitions"
+                "Cannot autofix: feference in the source code (`{}`) is not equal to the typevar name (`{}`)",
+                &source[reference_range],
+                tvar_name
             );
         }
-        let reference_range = reference.range();
         if !editable_range.contains_range(reference_range) {
             continue;
         }
@@ -629,8 +634,8 @@ impl<'a> TypeVar<'a> {
         self.0.kind.is_type_param()
     }
 
-    fn name(self, checker: &'a Checker) -> &'a str {
-        self.0.name(checker.source())
+    fn name(self, source: &'a str) -> &'a str {
+        self.0.name(source)
     }
 
     fn references(

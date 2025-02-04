@@ -277,30 +277,40 @@ PYI019_0.py:149:41: PYI019 Use `Self` instead of custom TypeVar `S`
 
 PYI019_0.py:154:26: PYI019 Use `Self` instead of custom TypeVar `S`
     |
-153 | class StringizedReferencesAreTooComplicated:
+153 | class StringizedReferencesCanBeFixed:
 154 |     def m[S](self: S) -> S:
     |                          ^ PYI019
-155 |         x = cast("S", self)
+155 |         x = cast("list[tuple[S, S]]", self)
 156 |         return x
     |
     = help: Replace TypeVar `S` with `Self`
 
-PYI019_0.py:159:26: PYI019 Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:159:28: PYI019 Use `Self` instead of custom TypeVar `_T`
     |
-158 | class DeletionsAreNotTouched:
-159 |     def m[S](self: S) -> S:
+158 | class ButStrangeStringizedReferencesCannotBeFixed:
+159 |     def m[_T](self: _T) -> _T:
+    |                            ^^ PYI019
+160 |         x = cast('list[_\x54]', self)
+161 |         return x
+    |
+    = help: Replace TypeVar `_T` with `Self`
+
+PYI019_0.py:164:26: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+163 | class DeletionsAreNotTouched:
+164 |     def m[S](self: S) -> S:
     |                          ^ PYI019
-160 |         # `S` is not a local variable here, and `del` can only be used with local variables,
-161 |         # so `del S` here is not actually a reference to the type variable `S`.
+165 |         # `S` is not a local variable here, and `del` can only be used with local variables,
+166 |         # so `del S` here is not actually a reference to the type variable `S`.
     |
     = help: Replace TypeVar `S` with `Self`
 
-PYI019_0.py:168:26: PYI019 Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:173:26: PYI019 Use `Self` instead of custom TypeVar `S`
     |
-167 | class NamesShadowingTypeVarAreNotTouched:
-168 |     def m[S](self: S) -> S:
+172 | class NamesShadowingTypeVarAreNotTouched:
+173 |     def m[S](self: S) -> S:
     |                          ^ PYI019
-169 |         type S = int
-170 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+174 |         type S = int
+175 |         print(S)  # not a reference to the type variable, so not touched by the autofix
     |
     = help: Replace TypeVar `S` with `Self`
