@@ -320,11 +320,9 @@ impl<'s> Parser<'s> {
 
                         self.skip_whitespace();
 
-                        if self.cursor.first() != '\n' {
+                        if !self.cursor.eat_char('\n') {
                             bail!("Trailing code-block metadata is not supported. Only the code block language can be specified.");
                         }
-
-                        self.skip_to_beginning_of_next_line();
 
                         if let Some(position) =
                             memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
@@ -333,7 +331,7 @@ impl<'s> Parser<'s> {
                             self.cursor.skip_bytes(position + CODE_BLOCK_END.len());
 
                             if code.ends_with('\n') {
-                                code = &code[..code.len() - 1];
+                                code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
                             self.process_code_block(lang, code)?;
