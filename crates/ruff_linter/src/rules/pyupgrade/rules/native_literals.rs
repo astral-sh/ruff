@@ -266,7 +266,9 @@ pub(crate) fn native_literals(
                             left: lhs,
                             op: Operator::Pow,
                             ..
-                        }),
+                        })
+                        // (await -1) is a syntax error
+                        | Expr::Await(ast::ExprAwait { value: lhs, .. }),
                     ),
                     _,
                     true,

@@ -73,6 +73,8 @@ int(-1)(0)                   # (-1)(0)
 
 float(-1.0).foo              # (-1.0).foo
 
+await int(-1)                # await (-1)
+
 
 int(+1) ** 0
 float(+1.0)()
