@@ -187,11 +187,12 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
         match *self {
-            ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")).finish(),
-            AMBIGUOUS => f.field(&format_args!("Ambiguous")).finish(),
-            ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")).finish(),
-            _ => f.field(&self.0).finish(),
-        }
+            ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")),
+            AMBIGUOUS => f.field(&format_args!("Ambiguous")),
+            ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")),
+            _ => f.field(&self.0),
+        };
+        f.finish()
     }
 }
 
