@@ -197,46 +197,6 @@ if x:
 
 Currently, we are concerned that allowing blank lines at the start of a block leads [to unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744). However, we will consider adopting Black's formatting at a later point with an improved heuristic. The style change is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
 
-### Hex codes and Unicode sequences
-
-Ruff normalizes hex codes and Unicode sequences in strings ([#9280](https://github.com/astral-sh/ruff/pull/9280)). Black intended to ship this change as part of the 2024 style but accidentally didn't.
-
-```python
-# Black
-a = "\x1B"
-b = "\u200B"
-c = "\U0001F977"
-d = "\N{CYRILLIC small LETTER BYELORUSSIAN-UKRAINIAN I}"
-
-# Ruff
-a = "\x1b"
-b = "\u200b"
-c = "\U0001f977"
-d = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
-```
-
-Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
-
-### Module docstrings
-
-Ruff formats module docstrings similar to class or function docstrings, whereas Black does not.
-
-```python
-# Input
-"""Module docstring
-
-"""
-
-# Black
-"""Module docstring
-
-"""
-
-# Ruff
-"""Module docstring"""
-
-```
-Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
 
 ### F-strings
 
@@ -326,47 +286,6 @@ assert len(policy_types) >= priority + num_duplicates, (
 )
 ```
 
-### Parentheses around `if`-guards in `match` statements
-Ruff automatically parenthesizes overlong `if` guards and it also removes parentheses if they're no longer required.
-
-```python
-# Input
-match some_variable:
-    case "short-guard" if (
-        other_condition
-    ):
-        pass
-
-    case "long-guard" if other_condition or some_long_call_expression(with_may, arguments) or last_condition:
-        pass
-
-
-# Black
-match some_variable:
-    case "short-guard" if (other_condition):
-        pass
-
-    case "long-guard" if other_condition or some_long_call_expression(
-        with_may, arguments
-    ) or last_condition:
-        pass
-
-
-# Ruff
-match some_variable:
-    case "short-guard" if other_condition:
-        pass
-
-    case "long-guard" if (
-        other_condition
-        or some_long_call_expression(with_may, arguments)
-        or last_condition
-    ):
-        pass
-```
-
-Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
-
 ### `global` and `nonlocal` names are broken across multiple lines by continuations
 
 If a `global` or `nonlocal` statement includes multiple names, and exceeds the configured line
@@ -384,38 +303,6 @@ global \
     analyze_motions_layer, \
     analyze_size_model
 ```
-
-### Newlines are inserted after all class docstrings
-
-Black typically enforces a single newline after a class docstring. However, it does not apply such
-formatting if the docstring is single-quoted rather than triple-quoted, while Ruff enforces a
-single newline in both cases:
-
-```python
-# Input
-class IntFromGeom(GEOSFuncFactory):
-    "Argument is a geometry, return type is an integer."
-    argtypes = [GEOM_PTR]
-    restype = c_int
-    errcheck = staticmethod(check_minus_one)
-
-# Black
-class IntFromGeom(GEOSFuncFactory):
-    "Argument is a geometry, return type is an integer."
-    argtypes = [GEOM_PTR]
-    restype = c_int
-    errcheck = staticmethod(check_minus_one)
-
-# Ruff
-class IntFromGeom(GEOSFuncFactory):
-    "Argument is a geometry, return type is an integer."
-
-    argtypes = [GEOM_PTR]
-    restype = c_int
-    errcheck = staticmethod(check_minus_one)
-```
-
-Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
 
 ### Trailing own-line comments on imports are not moved to the next line
 
@@ -601,40 +488,6 @@ cases:
 Adding parentheses around single-element tuples adds visual distinction and helps avoid "accidental"
 tuples created by extraneous trailing commas (see, e.g., [#17181](https://github.com/django/django/pull/17181)).
 
-### Trailing commas are inserted when expanding a function definition with a single argument
-
-When a function definition with a single argument is expanded over multiple lines, Black
-will add a trailing comma in some cases, depending on whether the argument includes a type
-annotation and/or a default value.
-
-For example, Black will add a trailing comma to the first and second function definitions below,
-but not the third:
-
-```python
-def func(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-) -> None:
-    ...
-
-
-def func(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=1,
-) -> None:
-    ...
-
-
-def func(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: Argument(
-        "network_messages.pickle",
-        help="The path of the pickle file that will contain the network messages",
-    ) = 1
-) -> None:
-    ...
-```
-
-Ruff will instead insert a trailing comma in all such cases for consistency.
-
-Ruff's formatting matches Black's preview formatting, and we expect it to be part of [Black's 2025 style guide](https://github.com/psf/black/issues/4522).
 
 ### Parentheses around call-chain assignment values are not preserved
 
@@ -865,4 +718,27 @@ with tempfile.TemporaryDirectory() as d1:
         tempfile.NamedTemporaryFile(dir=d3) as lock_file,
     ):
         pass
+```
+
+### Preserving parentheses around single-element lists
+
+Ruff preserves at least one parentheses around list elements, even if the list only contains a single element. The Black 2025 or newer, on the other hand, removes the parentheses 
+for single-element lists if they aren't multiline and doing so does not change semantics:
+
+```python
+# Input
+items = [(True)]
+items = [(((((True)))))]
+items = {(123)}
+
+# Black
+items = [True]
+items = [True]
+items = {123}
+
+# Ruff
+items = [(True)]
+items = [(True)]
+items = {(123)}
+
 ```

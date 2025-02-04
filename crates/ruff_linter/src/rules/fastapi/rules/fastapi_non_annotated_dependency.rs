@@ -107,8 +107,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
         .iter()
         .chain(&function_def.parameters.kwonlyargs)
     {
-        let (Some(annotation), Some(default)) =
-            (&parameter.parameter.annotation, &parameter.default)
+        let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
         else {
             seen_default |= parameter.default.is_some();
             continue;
@@ -120,7 +119,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
                 annotation,
                 default,
                 kind: dependency,
-                name: &parameter.parameter.name,
+                name: parameter.name(),
                 range: parameter.range,
             };
             seen_default = create_diagnostic(

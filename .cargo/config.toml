@@ -8,3 +8,7 @@ benchmark = "bench -p ruff_benchmark --bench linter --bench formatter --"
 # See: https://github.com/astral-sh/ruff/issues/11503
 [target.'cfg(all(target_env="msvc", target_os = "windows"))']
 rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.'wasm32-unknown-unknown']
+# See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
+rustflags = ["--cfg", 'getrandom_backend="wasm_js"']

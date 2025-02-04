@@ -15,6 +15,7 @@ directly.
 ### Negation
 
 ```py
+from typing import Literal
 from knot_extensions import Not, static_assert
 
 def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
@@ -34,7 +35,7 @@ n: Not[int, str]
 
 ```py
 from knot_extensions import Intersection, Not, is_subtype_of, static_assert
-from typing_extensions import Never
+from typing_extensions import Literal, Never
 
 class S: ...
 class T: ...
@@ -304,6 +305,7 @@ static_assert(not is_assignable_to(int, str))
 
 ```py
 from knot_extensions import is_disjoint_from, static_assert
+from typing import Literal
 
 static_assert(is_disjoint_from(None, int))
 static_assert(not is_disjoint_from(Literal[2] | str, int))
@@ -326,6 +328,7 @@ static_assert(not is_fully_static(type[Any]))
 
 ```py
 from knot_extensions import is_singleton, static_assert
+from typing import Literal
 
 static_assert(is_singleton(None))
 static_assert(is_singleton(Literal[True]))
@@ -338,6 +341,7 @@ static_assert(not is_singleton(Literal["a"]))
 
 ```py
 from knot_extensions import is_single_valued, static_assert
+from typing import Literal
 
 static_assert(is_single_valued(None))
 static_assert(is_single_valued(Literal[True]))

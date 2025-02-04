@@ -25,6 +25,9 @@ pub(crate) enum Command {
 
     /// Start the language server
     Server,
+
+    /// Display Red Knot's version
+    Version,
 }
 
 #[derive(Debug, Parser)]
@@ -62,6 +65,14 @@ pub(crate) struct CheckCommand {
 
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
+
+    /// Use exit code 1 if there are any warning-level diagnostics.
+    #[arg(long, conflicts_with = "exit_zero")]
+    pub(crate) error_on_warning: bool,
+
+    /// Always use exit code 0, even when there are error-level diagnostics.
+    #[arg(long)]
+    pub(crate) exit_zero: bool,
 
     /// Run in watch mode by re-running whenever files change.
     #[arg(long, short = 'W')]

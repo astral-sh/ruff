@@ -122,7 +122,7 @@
 //!
 //! ### Explicit ambiguity
 //!
-//! In some cases, we explicitly add a `VisibilityConstraint::Ambiguous` constraint to all bindings
+//! In some cases, we explicitly add an “ambiguous” constraint to all bindings
 //! in a certain control flow path. We do this when branching on something that we can not (or
 //! intentionally do not want to) analyze statically. `for` loops are one example:
 //! ```py
@@ -137,22 +137,47 @@
 //! create a state where the `x = <unbound>` binding is always visible.
 //!
 //!
-//! ### Properties
+//! ### Representing formulas
 //!
-//! The ternary `AND` and `OR` operations have the property that `~a OR ~b = ~(a AND b)`. This
-//! means we could, in principle, get rid of either of these two to simplify the representation.
+//! Given everything above, we can represent a visibility constraint as a _ternary formula_. This
+//! is like a boolean formula (which maps several true/false variables to a single true/false
+//! result), but which allows the third "ambiguous" value in addition to "true" and "false".
 //!
-//! However, we already apply negative constraints `~test1` and `~test2` to the "branches not
-//! taken" in the example above. This means that the tree-representation `~test1 OR ~test2` is much
-//! cheaper/shallower than basically creating `~(~(~test1) AND ~(~test2))`. Similarly, if we wanted
-//! to get rid of `AND`, we would also have to create additional nodes. So for performance reasons,
-//! there is a small "duplication" in the code between those two constraint types.
+//! [_Binary decision diagrams_][bdd] (BDDs) are a common way to represent boolean formulas when
+//! doing program analysis. We extend this to a _ternary decision diagram_ (TDD) to support
+//! ambiguous values.
+//!
+//! A TDD is a graph, and a ternary formula is represented by a node in this graph. There are three
+//! possible leaf nodes representing the "true", "false", and "ambiguous" constant functions.
+//! Interior nodes consist of a ternary variable to evaluate, and outgoing edges for whether the
+//! variable evaluates to true, false, or ambiguous.
+//!
+//! Our TDDs are _reduced_ and _ordered_ (as is typical for BDDs).
+//!
+//! An ordered TDD means that variables appear in the same order in all paths within the graph.
+//!
+//! A reduced TDD means two things: First, we intern the graph nodes, so that we only keep a single
+//! copy of interior nodes with the same contents. Second, we eliminate any nodes that are "noops",
+//! where the "true" and "false" outgoing edges lead to the same node. (This implies that it
+//! doesn't matter what value that variable has when evaluating the formula, and we can leave it
+//! out of the evaluation chain completely.)
+//!
+//! Reduced and ordered decision diagrams are _normal forms_, which means that two equivalent
+//! formulas (which have the same outputs for every combination of inputs) are represented by
+//! exactly the same graph node. (Because of interning, this is not _equal_ nodes, but _identical_
+//! ones.) That means that we can compare formulas for equivalence in constant time, and in
+//! particular, can check whether a visibility constraint is statically always true or false,
+//! regardless of any Python program state, by seeing if the constraint's formula is the "true" or
+//! "false" leaf node.
 //!
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
+//! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
-use ruff_index::IndexVec;
+use std::cmp::Ordering;
 
-use crate::semantic_index::ScopedVisibilityConstraintId;
+use ruff_index::{Idx, IndexVec};
+use rustc_hash::FxHashMap;
+
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
     constraint::{Constraint, ConstraintNode, PatternConstraintKind},
@@ -160,182 +185,431 @@ use crate::semantic_index::{
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 
-/// The maximum depth of recursion when evaluating visibility constraints.
+/// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
+/// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
+/// module documentation for more details.)
 ///
-/// This is a performance optimization that prevents us from descending deeply in case of
-/// pathological cases. The actual limit here has been derived from performance testing on
-/// the `black` codebase. When increasing the limit beyond 32, we see a 5x runtime increase
-/// resulting from a few files with a lot of boolean expressions and `if`-statements.
-const MAX_RECURSION_DEPTH: usize = 24;
+/// The primitive atoms of the formula are [`Constraint`]s, which express some property of the
+/// runtime state of the code that we are analyzing.
+///
+/// We assume that each atom has a stable value each time that the formula is evaluated. An atom
+/// that resolves to `Ambiguous` might be true or false, and we can't tell which — but within that
+/// evaluation, we assume that the atom has the _same_ unknown value each time it appears. That
+/// allows us to perform simplifications like `A ∨ !A → true` and `A ∧ !A → false`.
+///
+/// That means that when you are constructing a formula, you might need to create distinct atoms
+/// for a particular [`Constraint`], if your formula needs to consider how a particular runtime
+/// property might be different at different points in the execution of the program.
+///
+/// Visibility constraints are normalized, so equivalent constraints are guaranteed to have equal
+/// IDs.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub(crate) struct ScopedVisibilityConstraintId(u32);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum VisibilityConstraint<'db> {
-    AlwaysTrue,
-    AlwaysFalse,
-    Ambiguous,
-    VisibleIf(Constraint<'db>),
-    VisibleIfNot(ScopedVisibilityConstraintId),
-    KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-    KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+impl std::fmt::Debug for ScopedVisibilityConstraintId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
+        match *self {
+            // We use format_args instead of rendering the strings directly so that we don't get
+            // any quotes in the output: ScopedVisibilityConstraintId(AlwaysTrue) instead of
+            // ScopedVisibilityConstraintId("AlwaysTrue").
+            ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")),
+            AMBIGUOUS => f.field(&format_args!("Ambiguous")),
+            ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")),
+            _ => f.field(&self.0),
+        };
+        f.finish()
+    }
 }
 
+// Internal details:
+//
+// There are 3 terminals, with hard-coded constraint IDs: true, ambiguous, and false.
+//
+// _Atoms_ are the underlying Constraints, which are the variables that are evaluated by the
+// ternary function.
+//
+// _Interior nodes_ provide the TDD structure for the formula. Interior nodes are stored in an
+// arena Vec, with the constraint ID providing an index into the arena.
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct InteriorNode {
+    atom: Atom,
+    if_true: ScopedVisibilityConstraintId,
+    if_ambiguous: ScopedVisibilityConstraintId,
+    if_false: ScopedVisibilityConstraintId,
+}
+
+/// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
+/// this is a `Constraint` that represents some runtime property of the Python code that we are
+/// evaluating. We intern these constraints in an arena ([`VisibilityConstraints::constraints`]).
+/// An atom is then an index into this arena.
+///
+/// By using a 32-bit index, we would typically allow 4 billion distinct constraints within a
+/// scope. However, we sometimes have to model how a `Constraint` can have a different runtime
+/// value at different points in the execution of the program. To handle this, we reserve the top
+/// byte of an atom to represent a "copy number". This is just an opaque value that allows
+/// different `Atom`s to evaluate the same `Constraint`. This yields a maximum of 16 million
+/// distinct `Constraint`s in a scope, and 256 possible copies of each of those constraints.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct Atom(u32);
+
+impl Atom {
+    /// Deconstruct an atom into a constraint index and a copy number.
+    #[inline]
+    fn into_index_and_copy(self) -> (u32, u8) {
+        let copy = self.0 >> 24;
+        let index = self.0 & 0x00ff_ffff;
+        (index, copy as u8)
+    }
+
+    #[inline]
+    fn copy_of(mut self, copy: u8) -> Self {
+        // Clear out the previous copy number
+        self.0 &= 0x00ff_ffff;
+        // OR in the new one
+        self.0 |= u32::from(copy) << 24;
+        self
+    }
+}
+
+// A custom Debug implementation that prints out the constraint index and copy number as distinct
+// fields.
+impl std::fmt::Debug for Atom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (index, copy) = self.into_index_and_copy();
+        f.debug_tuple("Atom").field(&index).field(&copy).finish()
+    }
+}
+
+impl Idx for Atom {
+    #[inline]
+    fn new(value: usize) -> Self {
+        assert!(value <= 0x00ff_ffff);
+        #[allow(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    #[inline]
+    fn index(self) -> usize {
+        let (index, _) = self.into_index_and_copy();
+        index as usize
+    }
+}
+
+impl ScopedVisibilityConstraintId {
+    /// A special ID that is used for an "always true" / "always visible" constraint.
+    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId(0xffff_ffff);
+
+    /// A special ID that is used for an ambiguous constraint.
+    pub(crate) const AMBIGUOUS: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId(0xffff_fffe);
+
+    /// A special ID that is used for an "always false" / "never visible" constraint.
+    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId(0xffff_fffd);
+
+    fn is_terminal(self) -> bool {
+        self.0 >= SMALLEST_TERMINAL.0
+    }
+}
+
+impl Idx for ScopedVisibilityConstraintId {
+    #[inline]
+    fn new(value: usize) -> Self {
+        assert!(value <= (SMALLEST_TERMINAL.0 as usize));
+        #[allow(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    #[inline]
+    fn index(self) -> usize {
+        debug_assert!(!self.is_terminal());
+        self.0 as usize
+    }
+}
+
+// Rebind some constants locally so that we don't need as many qualifiers below.
+const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
+const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
+const ALWAYS_FALSE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_FALSE;
+const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
+
+/// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
+/// maintain a separate set of visibility constraints for each scope in file.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
-    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
+    constraints: IndexVec<Atom, Constraint<'db>>,
+    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
 }
 
-impl Default for VisibilityConstraints<'_> {
-    fn default() -> Self {
-        Self {
-            constraints: IndexVec::from_iter([
-                VisibilityConstraint::AlwaysTrue,
-                VisibilityConstraint::AlwaysFalse,
-            ]),
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct VisibilityConstraintsBuilder<'db> {
+    constraints: IndexVec<Atom, Constraint<'db>>,
+    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
+    constraint_cache: FxHashMap<Constraint<'db>, Atom>,
+    interior_cache: FxHashMap<InteriorNode, ScopedVisibilityConstraintId>,
+    not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
+    and_cache: FxHashMap<
+        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+        ScopedVisibilityConstraintId,
+    >,
+    or_cache: FxHashMap<
+        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+        ScopedVisibilityConstraintId,
+    >,
+}
+
+impl<'db> VisibilityConstraintsBuilder<'db> {
+    pub(crate) fn build(self) -> VisibilityConstraints<'db> {
+        VisibilityConstraints {
+            constraints: self.constraints,
+            interiors: self.interiors,
         }
     }
-}
 
-impl<'db> VisibilityConstraints<'db> {
-    pub(crate) fn add(
+    /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
+    /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
+    /// any internal node, since they are leaf nodes.
+    fn cmp_atoms(
+        &self,
+        a: ScopedVisibilityConstraintId,
+        b: ScopedVisibilityConstraintId,
+    ) -> Ordering {
+        if a == b || (a.is_terminal() && b.is_terminal()) {
+            Ordering::Equal
+        } else if a.is_terminal() {
+            Ordering::Greater
+        } else if b.is_terminal() {
+            Ordering::Less
+        } else {
+            self.interiors[a].atom.cmp(&self.interiors[b].atom)
+        }
+    }
+
+    /// Adds a constraint, ensuring that we only store any particular constraint once.
+    fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
+        self.constraint_cache
+            .entry(constraint)
+            .or_insert_with(|| self.constraints.push(constraint))
+            .copy_of(copy)
+    }
+
+    /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
+    /// equal nodes.
+    fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
+        // If the true and false branches lead to the same node, we can override the ambiguous
+        // branch to go there too. And this node is then redundant and can be reduced.
+        if node.if_true == node.if_false {
+            return node.if_true;
+        }
+
+        *self
+            .interior_cache
+            .entry(node)
+            .or_insert_with(|| self.interiors.push(node))
+    }
+
+    /// Adds a new visibility constraint that checks a single [`Constraint`]. Provide different
+    /// values for `copy` if you need to model that the constraint can evaluate to different
+    /// results at different points in the execution of the program being modeled.
+    pub(crate) fn add_atom(
         &mut self,
-        constraint: VisibilityConstraint<'db>,
+        constraint: Constraint<'db>,
+        copy: u8,
     ) -> ScopedVisibilityConstraintId {
-        match constraint {
-            VisibilityConstraint::AlwaysTrue => ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            VisibilityConstraint::AlwaysFalse => ScopedVisibilityConstraintId::ALWAYS_FALSE,
-            _ => self.constraints.push(constraint),
-        }
+        let atom = self.add_constraint(constraint, copy);
+        self.add_interior(InteriorNode {
+            atom,
+            if_true: ALWAYS_TRUE,
+            if_ambiguous: AMBIGUOUS,
+            if_false: ALWAYS_FALSE,
+        })
     }
 
+    /// Adds a new visibility constraint that is the ternary NOT of an existing one.
     pub(crate) fn add_not_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            ScopedVisibilityConstraintId::ALWAYS_FALSE
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            ScopedVisibilityConstraintId::ALWAYS_TRUE
-        } else {
-            self.add(VisibilityConstraint::VisibleIfNot(a))
+        if a == ALWAYS_TRUE {
+            return ALWAYS_FALSE;
+        } else if a == AMBIGUOUS {
+            return AMBIGUOUS;
+        } else if a == ALWAYS_FALSE {
+            return ALWAYS_TRUE;
         }
+
+        if let Some(cached) = self.not_cache.get(&a) {
+            return *cached;
+        }
+        let a_node = self.interiors[a];
+        let if_true = self.add_not_constraint(a_node.if_true);
+        let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
+        let if_false = self.add_not_constraint(a_node.if_false);
+        let result = self.add_interior(InteriorNode {
+            atom: a_node.atom,
+            if_true,
+            if_ambiguous,
+            if_false,
+        });
+        self.not_cache.insert(a, result);
+        result
     }
 
+    /// Adds a new visibility constraint that is the ternary OR of two existing ones.
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            return b;
-        } else if b == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            return a;
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_TRUE
-            || b == ScopedVisibilityConstraintId::ALWAYS_TRUE
-        {
-            return ScopedVisibilityConstraintId::ALWAYS_TRUE;
+        match (a, b) {
+            (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
+            (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
+            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ => {}
         }
-        match (&self.constraints[a], &self.constraints[b]) {
-            (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
-                ScopedVisibilityConstraintId::ALWAYS_TRUE
-            }
-            (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
-                ScopedVisibilityConstraintId::ALWAYS_TRUE
-            }
-            _ => self.add(VisibilityConstraint::KleeneOr(a, b)),
+
+        // OR is commutative, which lets us halve the cache requirements
+        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+        if let Some(cached) = self.or_cache.get(&(a, b)) {
+            return *cached;
         }
+
+        let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
+            Ordering::Equal => {
+                let a_node = self.interiors[a];
+                let b_node = self.interiors[b];
+                let if_true = self.add_or_constraint(a_node.if_true, b_node.if_true);
+                let if_false = self.add_or_constraint(a_node.if_false, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
+            }
+            Ordering::Less => {
+                let a_node = self.interiors[a];
+                let if_true = self.add_or_constraint(a_node.if_true, b);
+                let if_false = self.add_or_constraint(a_node.if_false, b);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_or_constraint(a_node.if_ambiguous, b)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
+            }
+            Ordering::Greater => {
+                let b_node = self.interiors[b];
+                let if_true = self.add_or_constraint(a, b_node.if_true);
+                let if_false = self.add_or_constraint(a, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_or_constraint(a, b_node.if_ambiguous)
+                };
+                (b_node.atom, if_true, if_ambiguous, if_false)
+            }
+        };
+
+        let result = self.add_interior(InteriorNode {
+            atom,
+            if_true,
+            if_ambiguous,
+            if_false,
+        });
+        self.or_cache.insert((a, b), result);
+        result
     }
 
+    /// Adds a new visibility constraint that is the ternary AND of two existing ones.
     pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            b
-        } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
-            a
-        } else if a == ScopedVisibilityConstraintId::ALWAYS_FALSE
-            || b == ScopedVisibilityConstraintId::ALWAYS_FALSE
-        {
-            ScopedVisibilityConstraintId::ALWAYS_FALSE
-        } else {
-            self.add(VisibilityConstraint::KleeneAnd(a, b))
+        match (a, b) {
+            (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
+            (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
+            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ => {}
         }
-    }
 
-    /// Analyze the statically known visibility for a given visibility constraint, without
-    /// performing any type inference.
-    pub(crate) fn evaluate_without_inference(
-        &self,
-        db: &'db dyn Db,
-        id: ScopedVisibilityConstraintId,
-    ) -> Truthiness {
-        self.evaluate_impl::<false>(db, id, MAX_RECURSION_DEPTH)
-    }
+        // AND is commutative, which lets us halve the cache requirements
+        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+        if let Some(cached) = self.and_cache.get(&(a, b)) {
+            return *cached;
+        }
 
+        let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
+            Ordering::Equal => {
+                let a_node = self.interiors[a];
+                let b_node = self.interiors[b];
+                let if_true = self.add_and_constraint(a_node.if_true, b_node.if_true);
+                let if_false = self.add_and_constraint(a_node.if_false, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
+            }
+            Ordering::Less => {
+                let a_node = self.interiors[a];
+                let if_true = self.add_and_constraint(a_node.if_true, b);
+                let if_false = self.add_and_constraint(a_node.if_false, b);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_and_constraint(a_node.if_ambiguous, b)
+                };
+                (a_node.atom, if_true, if_ambiguous, if_false)
+            }
+            Ordering::Greater => {
+                let b_node = self.interiors[b];
+                let if_true = self.add_and_constraint(a, b_node.if_true);
+                let if_false = self.add_and_constraint(a, b_node.if_false);
+                let if_ambiguous = if if_true == if_false {
+                    if_true
+                } else {
+                    self.add_and_constraint(a, b_node.if_ambiguous)
+                };
+                (b_node.atom, if_true, if_ambiguous, if_false)
+            }
+        };
+
+        let result = self.add_interior(InteriorNode {
+            atom,
+            if_true,
+            if_ambiguous,
+            if_false,
+        });
+        self.and_cache.insert((a, b), result);
+        result
+    }
+}
+
+impl<'db> VisibilityConstraints<'db> {
     /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
-        self.evaluate_impl::<true>(db, id, MAX_RECURSION_DEPTH)
-    }
-
-    fn evaluate_impl<const INFERENCE_ALLOWED: bool>(
+    pub(crate) fn evaluate(
         &self,
         db: &'db dyn Db,
-        id: ScopedVisibilityConstraintId,
-        max_depth: usize,
+        mut id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
-        if max_depth == 0 {
-            return Truthiness::Ambiguous;
-        }
-
-        let visibility_constraint = &self.constraints[id];
-        match visibility_constraint {
-            VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
-            VisibilityConstraint::AlwaysFalse => Truthiness::AlwaysFalse,
-            VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
-            VisibilityConstraint::VisibleIf(constraint) => {
-                if INFERENCE_ALLOWED {
-                    Self::analyze_single(db, constraint)
-                } else {
-                    Truthiness::Ambiguous
-                }
-            }
-            VisibilityConstraint::VisibleIfNot(negated) => self
-                .evaluate_impl::<INFERENCE_ALLOWED>(db, *negated, max_depth - 1)
-                .negate(),
-            VisibilityConstraint::KleeneAnd(lhs, rhs) => {
-                let lhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *lhs, max_depth - 1);
-
-                if lhs == Truthiness::AlwaysFalse {
-                    return Truthiness::AlwaysFalse;
-                }
-
-                let rhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *rhs, max_depth - 1);
-
-                if rhs == Truthiness::AlwaysFalse {
-                    Truthiness::AlwaysFalse
-                } else if lhs == Truthiness::AlwaysTrue && rhs == Truthiness::AlwaysTrue {
-                    Truthiness::AlwaysTrue
-                } else {
-                    Truthiness::Ambiguous
-                }
-            }
-            VisibilityConstraint::KleeneOr(lhs_id, rhs_id) => {
-                let lhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *lhs_id, max_depth - 1);
-
-                if lhs == Truthiness::AlwaysTrue {
-                    return Truthiness::AlwaysTrue;
-                }
-
-                let rhs = self.evaluate_impl::<INFERENCE_ALLOWED>(db, *rhs_id, max_depth - 1);
-
-                if rhs == Truthiness::AlwaysTrue {
-                    Truthiness::AlwaysTrue
-                } else if lhs == Truthiness::AlwaysFalse && rhs == Truthiness::AlwaysFalse {
-                    Truthiness::AlwaysFalse
-                } else {
-                    Truthiness::Ambiguous
-                }
+        loop {
+            let node = match id {
+                ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+                AMBIGUOUS => return Truthiness::Ambiguous,
+                ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+                _ => self.interiors[id],
+            };
+            let constraint = &self.constraints[node.atom];
+            match Self::analyze_single(db, constraint) {
+                Truthiness::AlwaysTrue => id = node.if_true,
+                Truthiness::Ambiguous => id = node.if_ambiguous,
+                Truthiness::AlwaysFalse => id = node.if_false,
             }
         }
     }

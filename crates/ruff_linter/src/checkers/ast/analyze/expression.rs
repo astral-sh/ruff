@@ -826,7 +826,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_comprehensions::rules::unnecessary_literal_within_dict_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListCall) {
-                flake8_comprehensions::rules::unnecessary_list_call(checker, expr, func, args);
+                flake8_comprehensions::rules::unnecessary_list_call(checker, expr, call);
             }
             if checker.enabled(Rule::UnnecessaryCallAroundSorted) {
                 flake8_comprehensions::rules::unnecessary_call_around_sorted(
@@ -1175,6 +1175,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
+            }
+            if checker.enabled(Rule::LogExceptionOutsideExceptHandler) {
+                flake8_logging::rules::log_exception_outside_except_handler(checker, call);
+            }
+            if checker.enabled(Rule::ExcInfoOutsideExceptHandler) {
+                flake8_logging::rules::exc_info_outside_except_handler(checker, call);
             }
         }
         Expr::Dict(dict) => {

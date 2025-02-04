@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.9.3"
+version = "0.9.4"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -35,6 +35,9 @@ console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true }
 js-sys = { workspace = true }
 log = { workspace = true }
+# Not a direct dependency but required to enable the `wasm_js` feature.
+# See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
+getrandom = { workspace = true, features = ["wasm_js"] }
 serde = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 wasm-bindgen = { workspace = true }

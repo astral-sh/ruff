@@ -1,5 +1,8 @@
 #![allow(clippy::disallowed_names)]
 
+use std::borrow::Cow;
+use std::ops::Range;
+
 use rayon::ThreadPoolBuilder;
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
@@ -8,7 +11,7 @@ use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::PythonVersion;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
@@ -21,39 +24,93 @@ struct Case {
     re_path: SystemPathBuf,
 }
 
-const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
-
-static EXPECTED_DIAGNOSTICS: &[&str] = &[
-    // We don't support `*` imports yet:
-    "error[lint:unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
-    // We don't handle intersections in `is_assignable_to` yet
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:626:46 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`",
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:632:58 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`",
-    "error[lint:invalid-argument-type] /src/tomllib/_parser.py:639:52 Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`",
-    "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive",
+// "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
+static TOMLLIB_FILES: [TestFile; 4] = [
+    TestFile::new(
+        "tomllib/__init__.py",
+        include_str!("../resources/tomllib/__init__.py"),
+    ),
+    TestFile::new(
+        "tomllib/_parser.py",
+        include_str!("../resources/tomllib/_parser.py"),
+    ),
+    TestFile::new(
+        "tomllib/_re.py",
+        include_str!("../resources/tomllib/_re.py"),
+    ),
+    TestFile::new(
+        "tomllib/_types.py",
+        include_str!("../resources/tomllib/_types.py"),
+    ),
 ];
 
-fn get_test_file(name: &str) -> TestFile {
-    let path = format!("tomllib/{name}");
-    let url = format!("{TOMLLIB_312_URL}/{name}");
-    TestFile::try_download(&path, &url).unwrap()
-}
+/// A structured set of fields we use to do diagnostic comparisons.
+///
+/// This helps assert benchmark results. Previously, we would compare
+/// the actual diagnostic output, but using `insta` inside benchmarks is
+/// problematic, and updating the strings otherwise when diagnostic rendering
+/// changes is a PITA.
+type KeyDiagnosticFields = (
+    DiagnosticId,
+    Option<&'static str>,
+    Option<Range<usize>>,
+    Cow<'static, str>,
+    Severity,
+);
 
-fn tomllib_path(filename: &str) -> SystemPathBuf {
-    SystemPathBuf::from(format!("/src/tomllib/{filename}").as_str())
+static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
+    // We don't support `*` imports yet:
+    (
+        DiagnosticId::lint("unresolved-import"),
+        Some("/src/tomllib/_parser.py"),
+        Some(192..200),
+        Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
+        Severity::Error,
+    ),
+    // We don't handle intersections in `is_assignable_to` yet
+    (
+        DiagnosticId::lint("invalid-argument-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(20158..20172),
+        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-argument-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(20464..20479),
+        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-argument-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(20774..20786),
+        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("unused-ignore-comment"),
+        Some("/src/tomllib/_parser.py"),
+        Some(22299..22333),
+        Cow::Borrowed("Unused blanket `type: ignore` directive"),
+        Severity::Warning,
+    ),
+];
+
+fn tomllib_path(file: &TestFile) -> SystemPathBuf {
+    SystemPathBuf::from("src").join(file.name())
 }
 
 fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
-    let tomllib_filenames = ["__init__.py", "_parser.py", "_re.py", "_types.py"];
-    fs.write_files(tomllib_filenames.iter().map(|filename| {
-        (
-            tomllib_path(filename),
-            get_test_file(filename).code().to_string(),
-        )
-    }))
+    fs.write_files(
+        TOMLLIB_FILES
+            .iter()
+            .map(|file| (tomllib_path(file), file.code().to_string())),
+    )
     .unwrap();
 
     let src_root = SystemPath::new("/src");
@@ -67,15 +124,22 @@ fn setup_case() -> Case {
     });
 
     let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let mut tomllib_files = FxHashSet::default();
+    let mut re: Option<File> = None;
 
-    let tomllib_files: FxHashSet<File> = tomllib_filenames
-        .iter()
-        .map(|filename| system_path_to_file(&db, tomllib_path(filename)).unwrap())
-        .collect();
+    for test_file in &TOMLLIB_FILES {
+        let file = system_path_to_file(&db, tomllib_path(test_file)).unwrap();
+        if test_file.name().ends_with("_re.py") {
+            re = Some(file);
+        }
+        tomllib_files.insert(file);
+    }
+
+    let re = re.unwrap();
+
     db.project().set_open_files(&mut db, tomllib_files);
 
-    let re_path = tomllib_path("_re.py");
-    let re = system_path_to_file(&db, &re_path).unwrap();
+    let re_path = re.path(&db).as_system_path().unwrap().to_owned();
     Case {
         db,
         fs,
@@ -106,7 +170,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
         let result: Vec<_> = case.db.check().unwrap();
 
-        assert_diagnostics(&case.db, result);
+        assert_diagnostics(&case.db, &result);
 
         case.fs
             .write_file(
@@ -151,7 +215,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, .. } = case;
                 let result: Vec<_> = db.check().unwrap();
 
-                assert_diagnostics(db, result);
+                assert_diagnostics(db, &result);
             },
             BatchSize::SmallInput,
         );
@@ -159,17 +223,19 @@ fn benchmark_cold(criterion: &mut Criterion) {
 }
 
 #[track_caller]
-fn assert_diagnostics(db: &dyn Db, diagnostics: Vec<Box<dyn Diagnostic>>) {
+fn assert_diagnostics(db: &dyn Db, diagnostics: &[Box<dyn Diagnostic>]) {
     let normalized: Vec<_> = diagnostics
-        .into_iter()
+        .iter()
         .map(|diagnostic| {
-            diagnostic
-                .display(db.upcast())
-                .to_string()
-                .replace('\\', "/")
+            (
+                diagnostic.id(),
+                diagnostic.file().map(|file| file.path(db).as_str()),
+                diagnostic.range().map(Range::<usize>::from),
+                diagnostic.message(),
+                diagnostic.severity(),
+            )
         })
         .collect();
-
     assert_eq!(&normalized, EXPECTED_DIAGNOSTICS);
 }
 

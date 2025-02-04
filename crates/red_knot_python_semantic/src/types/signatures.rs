@@ -93,10 +93,9 @@ impl<'db> Parameters<'db> {
             kwarg,
             range: _,
         } = parameters;
-        let default_ty = |parameter_with_default: &ast::ParameterWithDefault| {
-            parameter_with_default
-                .default
-                .as_deref()
+        let default_ty = |param: &ast::ParameterWithDefault| {
+            param
+                .default()
                 .map(|default| definition_expression_type(db, definition, default))
         };
         let positional_only = posonlyargs.iter().map(|arg| {
@@ -243,8 +242,7 @@ impl<'db> Parameter<'db> {
         Self {
             name: Some(parameter.name.id.clone()),
             annotated_ty: parameter
-                .annotation
-                .as_deref()
+                .annotation()
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
         }

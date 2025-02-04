@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_formatter::{format_args, write, FormatContext};
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
@@ -230,7 +230,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
             };
 
-            Some(AnyStringFlags::new(prefix, quote, false))
+            Some(AnyStringFlags::new(prefix, quote, TripleQuotes::No))
         }
 
         if !string.is_implicit_concatenated() {

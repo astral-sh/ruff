@@ -97,3 +97,12 @@ b"TesT.WwW.ExamplE.CoM".split(b".")
 "hello\nworld".splitlines()
 "hello\nworld".splitlines(keepends=True)
 "hello\nworld".splitlines(keepends=False)
+
+
+# another positive demonstrating quote preservation
+"""
+"itemA"
+'itemB'
+'''itemC'''
+"'itemD'"
+""".split()

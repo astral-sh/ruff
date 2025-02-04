@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -101,13 +101,8 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 visitor::walk_expr(self, body);
 
                 if let Some(parameters) = parameters {
-                    for ParameterWithDefault {
-                        parameter,
-                        default: _,
-                        range: _,
-                    } in parameters.iter_non_variadic_params()
-                    {
-                        self.names.remove(parameter.name.as_str());
+                    for parameter in parameters.iter_non_variadic_params() {
+                        self.names.remove(parameter.name().as_str());
                     }
                 }
             }

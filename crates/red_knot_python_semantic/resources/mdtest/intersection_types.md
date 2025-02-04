@@ -808,6 +808,7 @@ Dynamic types do not cancel each other out. Intersecting an unknown set of value
 of another unknown set of values is not necessarily empty, so we keep the positive contribution:
 
 ```py
+from typing import Any
 from knot_extensions import Intersection, Not, Unknown
 
 def any(
@@ -830,6 +831,7 @@ def unknown(
 We currently do not simplify mixed dynamic types, but might consider doing so in the future:
 
 ```py
+from typing import Any
 from knot_extensions import Intersection, Not, Unknown
 
 def mixed(

@@ -282,7 +282,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
-(a, b) = "\u9E6C"
+(a, b) = "\u9e6c"
 
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: Unknown
@@ -292,7 +292,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
-(a, b) = "\U0010FFFF"
+(a, b) = "\U0010ffff"
 
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: Unknown
@@ -301,7 +301,7 @@ reveal_type(b)  # revealed: Unknown
 ### Surrogates
 
 ```py
-(a, b) = "\uD800\uDFFF"
+(a, b) = "\ud800\udfff"
 
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
@@ -361,6 +361,8 @@ def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str])
 ### Nested
 
 ```py
+from typing import Literal
+
 def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"]]):
     a, (b, c) = arg
     reveal_type(a)  # revealed: int | tuple[int, bytes]

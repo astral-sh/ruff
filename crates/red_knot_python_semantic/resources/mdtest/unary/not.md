@@ -28,7 +28,9 @@ reveal_type(not b)  # revealed: Literal[False]
 reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 y = 1
 ```
 
@@ -123,6 +125,8 @@ classes without a `__bool__` method, with or without `__len__`, must be inferred
 truthiness.
 
 ```py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True

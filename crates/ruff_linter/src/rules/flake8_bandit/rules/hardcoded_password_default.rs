@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Parameter, ParameterWithDefault, Parameters};
+use ruff_python_ast::{Expr, Parameter, Parameters};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -70,16 +70,11 @@ fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnos
 
 /// S107
 pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Parameters) {
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
-        if let Some(diagnostic) = check_password_kwarg(parameter, default) {
+        if let Some(diagnostic) = check_password_kwarg(&parameter.parameter, default) {
             checker.diagnostics.push(diagnostic);
         }
     }

@@ -164,14 +164,14 @@ fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionD
     }
 
     for param in function_def.parameters.iter_non_variadic_params() {
-        let param_name = param.parameter.name.as_str();
-        if REMOVED_CONTEXT_KEYS.contains(&param_name) {
+        let param_name = param.name();
+        if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
             checker.diagnostics.push(Diagnostic::new(
                 Airflow3Removal {
                     deprecated: param_name.to_string(),
                     replacement: Replacement::None,
                 },
-                param.parameter.name.range(),
+                param_name.range(),
             ));
         }
     }
@@ -684,8 +684,8 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
-        ["airflow", "operators", "bash_operator", "BashOperator"] => {
-            Replacement::Name("airflow.operators.bash.BashOperator")
+        ["airflow", "operators", "bash" | "bash_operator", "BashOperator"] => {
+            Replacement::Name("airflow.providers.standard.operators.bash.BashOperator")
         }
         ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
             Replacement::Name("airflow.operators.branch.BaseBranchOperator")

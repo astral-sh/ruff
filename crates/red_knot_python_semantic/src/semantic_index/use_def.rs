@@ -255,17 +255,18 @@
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
+pub(crate) use self::symbol_state::ScopedConstraintId;
 use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstraintId};
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
-use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraints};
-use crate::Db;
+use crate::visibility_constraints::{
+    ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
+};
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -286,7 +287,7 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of [`Constraint`] in this scope.
     all_constraints: AllConstraints<'db>,
 
-    /// Array of [`VisibilityConstraint`]s in this scope.
+    /// Array of visibility constraints in this scope.
     visibility_constraints: VisibilityConstraints<'db>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
@@ -481,16 +482,14 @@ pub(super) struct FlowSnapshot {
 }
 
 pub(super) struct UseDefMapBuilder<'db> {
-    db: &'db dyn Db,
-
     /// Append-only array of [`Definition`].
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
     /// Append-only array of [`Constraint`].
     all_constraints: AllConstraints<'db>,
 
-    /// Append-only array of [`VisibilityConstraint`].
-    visibility_constraints: VisibilityConstraints<'db>,
+    /// Builder of visibility constraints.
+    pub(super) visibility_constraints: VisibilityConstraintsBuilder<'db>,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
     /// whether or not the start of the scope is visible. This is important for cases like
@@ -510,13 +509,12 @@ pub(super) struct UseDefMapBuilder<'db> {
     always_reachable: bool,
 }
 
-impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new(db: &'db dyn Db) -> Self {
+impl Default for UseDefMapBuilder<'_> {
+    fn default() -> Self {
         Self {
-            db,
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
-            visibility_constraints: VisibilityConstraints::default(),
+            visibility_constraints: VisibilityConstraintsBuilder::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
@@ -524,9 +522,11 @@ impl<'db> UseDefMapBuilder<'db> {
             always_reachable: true,
         }
     }
+}
 
+impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
-        self.record_visibility_constraint_id(ScopedVisibilityConstraintId::ALWAYS_FALSE);
+        self.record_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_FALSE);
         self.always_reachable = false;
     }
 
@@ -563,42 +563,16 @@ impl<'db> UseDefMapBuilder<'db> {
         new_constraint_id
     }
 
-    pub(super) fn add_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        self.visibility_constraints.add(constraint)
-    }
-
-    pub(super) fn record_visibility_constraint_id(
+    pub(super) fn record_visibility_constraint(
         &mut self,
         constraint: ScopedVisibilityConstraintId,
     ) {
         for state in &mut self.symbol_states {
             state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
         }
-
         self.scope_start_visibility = self
             .visibility_constraints
             .add_and_constraint(self.scope_start_visibility, constraint);
-    }
-
-    pub(super) fn record_negated_visibility_constraint_id(
-        &mut self,
-        constraint: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
-        let new_constraint_id = self.visibility_constraints.add_not_constraint(constraint);
-        self.record_visibility_constraint_id(new_constraint_id);
-        new_constraint_id
-    }
-
-    pub(super) fn record_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        let new_constraint_id = self.add_visibility_constraint(constraint);
-        self.record_visibility_constraint_id(new_constraint_id);
-        new_constraint_id
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state
@@ -716,19 +690,11 @@ impl<'db> UseDefMapBuilder<'db> {
         // we will include the flow in the merged result; the visibility constraints of its
         // bindings will include this reachability condition, so that later during type inference,
         // we can determine whether any particular binding is non-visible due to unreachability.
-        if self
-            .visibility_constraints
-            .evaluate_without_inference(self.db, snapshot.scope_start_visibility)
-            .is_always_false()
-        {
+        if snapshot.scope_start_visibility == ScopedVisibilityConstraintId::ALWAYS_FALSE {
             self.always_reachable = false;
             return;
         }
-        if self
-            .visibility_constraints
-            .evaluate_without_inference(self.db, self.scope_start_visibility)
-            .is_always_false()
-        {
+        if self.scope_start_visibility == ScopedVisibilityConstraintId::ALWAYS_FALSE {
             self.restore(snapshot);
             self.always_reachable = false;
             return;
@@ -768,7 +734,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             all_constraints: self.all_constraints,
-            visibility_constraints: self.visibility_constraints,
+            visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
             definitions_by_definition: self.definitions_by_definition,

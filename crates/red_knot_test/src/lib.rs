@@ -109,9 +109,9 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             );
 
             let full_path = if embedded.path.starts_with('/') {
-                SystemPathBuf::from(embedded.path)
+                SystemPathBuf::from(embedded.path.clone())
             } else {
-                project_root.join(embedded.path)
+                project_root.join(&embedded.path)
             };
 
             if let Some(ref typeshed_path) = custom_typeshed_path {
@@ -135,7 +135,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
 
             Some(TestFile {
                 file,
-                backtick_offset: embedded.md_offset,
+                backtick_offset: embedded.backtick_offset,
             })
         })
         .collect();

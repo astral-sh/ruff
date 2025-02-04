@@ -41,9 +41,9 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
-    UnaryOp,
+    self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
+    Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
@@ -1271,6 +1271,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::TypeVar)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                            {
+                                Some(typing::Callable::TypeAliasType)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
                                 Some(typing::Callable::NamedTuple)
@@ -1350,6 +1355,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    Some(typing::Callable::TypeAliasType) => {
+                        // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if matches!(&**id, "value" | "type_params") {
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1736,12 +1759,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
         // Step 1: Binding
         match type_param {
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
-            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
-            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range, .. }) => {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. })
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => {
                 self.add_binding(
                     name.as_str(),
-                    *range,
+                    name.range(),
                     BindingKind::TypeParam,
                     BindingFlags::empty(),
                 );

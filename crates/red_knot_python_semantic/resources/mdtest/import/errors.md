@@ -18,7 +18,9 @@ reveal_type(baz)  # revealed: Unknown
 
 ## Unresolved import from resolved module
 
-```py path=a.py
+`a.py`:
+
+```py
 ```
 
 ```py
@@ -29,7 +31,9 @@ reveal_type(thing)  # revealed: Unknown
 
 ## Resolved import of symbol from unresolved import
 
-```py path=a.py
+`a.py`:
+
+```py
 import foo as foo  # error: "Cannot resolve import `foo`"
 
 reveal_type(foo)  # revealed: Unknown
@@ -46,7 +50,9 @@ reveal_type(foo)  # revealed: Unknown
 
 ## No implicit shadowing
 
-```py path=b.py
+`b.py`:
+
+```py
 x: int
 ```
 
@@ -58,7 +64,9 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 
 ## Import cycle
 
-```py path=a.py
+`a.py`:
+
+```py
 class A: ...
 
 reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[object]]
@@ -69,7 +77,9 @@ class C(b.B): ...
 reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Literal[A], Literal[object]]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 from a import A
 
 class B(A): ...

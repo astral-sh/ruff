@@ -798,7 +798,7 @@ fn handle_parameter_comment<'a>(
     parameter: &'a Parameter,
     source: &str,
 ) -> CommentPlacement<'a> {
-    if parameter.annotation.as_deref().is_some() {
+    if parameter.annotation().is_some() {
         let colon = first_non_trivia_token(parameter.name.end(), source).expect(
             "A annotated parameter should have a colon following its name when it is valid syntax.",
         );

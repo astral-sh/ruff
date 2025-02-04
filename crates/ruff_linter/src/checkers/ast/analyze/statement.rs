@@ -159,9 +159,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::GeneratorReturnFromIterMethod) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
-            if checker.enabled(Rule::CustomTypeVarReturnType) {
-                flake8_pyi::rules::custom_type_var_return_type(checker, function_def);
-            }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);

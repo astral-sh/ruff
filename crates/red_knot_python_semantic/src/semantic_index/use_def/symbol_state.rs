@@ -49,7 +49,8 @@ use ruff_index::newtype_index;
 use smallvec::SmallVec;
 
 use crate::semantic_index::use_def::bitset::{BitSet, BitSetIterator};
-use crate::semantic_index::use_def::VisibilityConstraints;
+use crate::semantic_index::use_def::VisibilityConstraintsBuilder;
+use crate::visibility_constraints::ScopedVisibilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
@@ -98,24 +99,6 @@ type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
 
 /// Iterate over all constraints for a single binding.
 type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
-
-/// A newtype-index for a visibility constraint in a particular scope.
-#[newtype_index]
-pub(crate) struct ScopedVisibilityConstraintId;
-
-impl ScopedVisibilityConstraintId {
-    /// A special ID that is used for an "always true" / "always visible" constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 0.
-    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(0);
-
-    /// A special ID that is used for an "always false" / "never visible" constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 1.
-    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(1);
-}
 
 const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
 type InlineVisibilityConstraintsArray =
@@ -170,7 +153,7 @@ impl SymbolDeclarations {
     /// Add given visibility constraint to all live declarations.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
@@ -186,7 +169,7 @@ impl SymbolDeclarations {
         }
     }
 
-    fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraints) {
+    fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraintsBuilder) {
         let a = std::mem::take(self);
         self.live_declarations = a.live_declarations.clone();
         self.live_declarations.union(&b.live_declarations);
@@ -276,7 +259,7 @@ impl SymbolBindings {
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
@@ -293,7 +276,7 @@ impl SymbolBindings {
         }
     }
 
-    fn merge(&mut self, mut b: Self, visibility_constraints: &mut VisibilityConstraints) {
+    fn merge(&mut self, mut b: Self, visibility_constraints: &mut VisibilityConstraintsBuilder) {
         let mut a = std::mem::take(self);
         self.live_bindings = a.live_bindings.clone();
         self.live_bindings.union(&b.live_bindings);
@@ -379,7 +362,7 @@ impl SymbolState {
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
         self.bindings
@@ -407,7 +390,7 @@ impl SymbolState {
     pub(super) fn merge(
         &mut self,
         b: SymbolState,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
     ) {
         self.bindings.merge(b.bindings, visibility_constraints);
         self.declarations
@@ -590,7 +573,7 @@ mod tests {
 
     #[test]
     fn merge() {
-        let mut visibility_constraints = VisibilityConstraints::default();
+        let mut visibility_constraints = VisibilityConstraintsBuilder::default();
 
         // merging the same definition with the same constraint keeps the constraint
         let mut sym1a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
@@ -661,7 +644,7 @@ mod tests {
 
     #[test]
     fn record_declaration_merge() {
-        let mut visibility_constraints = VisibilityConstraints::default();
+        let mut visibility_constraints = VisibilityConstraintsBuilder::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
@@ -675,7 +658,7 @@ mod tests {
 
     #[test]
     fn record_declaration_merge_partial_undeclared() {
-        let mut visibility_constraints = VisibilityConstraints::default();
+        let mut visibility_constraints = VisibilityConstraintsBuilder::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 

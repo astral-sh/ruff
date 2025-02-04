@@ -244,6 +244,8 @@ C413.py:18:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
 18    |-reversed(sorted([1, 2, 3], reverse=False or True))
    18 |+sorted([1, 2, 3], reverse=not (False or True))
 19 19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
+20 20 | 
+21 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
 
 C413.py:19:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
@@ -251,6 +253,8 @@ C413.py:19:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
 18 | reversed(sorted([1, 2, 3], reverse=False or True))
 19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+20 |
+21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
    |
    = help: Remove unnecessary `reversed()` call
 
@@ -260,3 +264,70 @@ C413.py:19:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
 18 18 | reversed(sorted([1, 2, 3], reverse=False or True))
 19    |-reversed(sorted([1, 2, 3], reverse=(False or True)))
    19 |+sorted([1, 2, 3], reverse=not (False or True))
+20 20 | 
+21 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
+22 22 | # changes.
+
+C413.py:24:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+   |
+22 |   # changes.
+23 |   # See https://github.com/astral-sh/ruff/issues/15789
+24 | / reversed(sorted
+25 | | (""))
+   | |_____^ C413
+26 |   list(sorted
+27 |       (""))
+   |
+   = help: Remove unnecessary `reversed()` call
+
+ℹ Unsafe fix
+21 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
+22 22 | # changes.
+23 23 | # See https://github.com/astral-sh/ruff/issues/15789
+24    |-reversed(sorted
+25    |-(""))
+   24 |+(sorted
+   25 |+("", reverse=True))
+26 26 | list(sorted
+27 27 |     (""))
+28 28 | list(sorted
+
+C413.py:26:1: C413 [*] Unnecessary `list()` call around `sorted()`
+   |
+24 |   reversed(sorted
+25 |   (""))
+26 | / list(sorted
+27 | |     (""))
+   | |_________^ C413
+28 |   list(sorted
+29 |   ("xy"))
+   |
+   = help: Remove unnecessary `list()` call
+
+ℹ Safe fix
+23 23 | # See https://github.com/astral-sh/ruff/issues/15789
+24 24 | reversed(sorted
+25 25 | (""))
+26    |-list(sorted
+   26 |+(sorted
+27 27 |     (""))
+28 28 | list(sorted
+29 29 | ("xy"))
+
+C413.py:28:1: C413 [*] Unnecessary `list()` call around `sorted()`
+   |
+26 |   list(sorted
+27 |       (""))
+28 | / list(sorted
+29 | | ("xy"))
+   | |_______^ C413
+   |
+   = help: Remove unnecessary `list()` call
+
+ℹ Safe fix
+25 25 | (""))
+26 26 | list(sorted
+27 27 |     (""))
+28    |-list(sorted
+   28 |+(sorted
+29 29 | ("xy"))

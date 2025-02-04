@@ -104,17 +104,11 @@ pub(crate) fn no_self_use(
     }
 
     // Identify the `self` parameter.
-    let Some(parameter) = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .next()
-        .map(|param| &param.parameter)
-    else {
+    let Some(parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next() else {
         return;
     };
 
-    if parameter.name.as_str() != "self" {
+    if parameter.name() != "self" {
         return;
     }
 
