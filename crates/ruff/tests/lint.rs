@@ -2174,3 +2174,33 @@ fn flake8_import_convention_unused_aliased_import() {
         .arg("-")
         .pass_stdin("1"));
 }
+
+/// Test that private, old-style TypeVar generics
+/// 1. Get replaced with PEP 695 type parameters (UP046, UP047)
+/// 2. Get renamed to remove leading underscores (UP051)
+/// 3. Emit a warning that the standalone type variable is now unused (PYI018)
+#[test]
+fn pep695_generic_rename() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "PYI018,UP046,UP047,UP051"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--unsafe-fixes")
+        .arg("--fix")
+        .arg("--preview")
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(
+            r#"
+from typing import Generic, TypeVar
+_T = TypeVar("_T")
+
+class OldStyle(Generic[_T]):
+    var: _T
+
+def func(t: _T) -> _T:
+    x: _T
+    return x
+"#
+        ));
+}

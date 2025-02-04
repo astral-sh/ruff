@@ -1,0 +1,37 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--select"
+    - "PYI018,UP046,UP047,UP051"
+    - "--stdin-filename"
+    - test.py
+    - "--unsafe-fixes"
+    - "--fix"
+    - "--preview"
+    - "--target-version=py312"
+    - "-"
+  stdin: "\nfrom typing import Generic, TypeVar\n_T = TypeVar(\"_T\")\n\nclass OldStyle(Generic[_T]):\n    var: _T\n\ndef func(t: _T) -> _T:\n    x: _T\n    return x\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+from typing import Generic, TypeVar
+_T = TypeVar("_T")
+
+class OldStyle[T]:
+    var: T
+
+def func[T](t: T) -> T:
+    x: T
+    return x
+
+----- stderr -----
+test.py:3:1: PYI018 Private TypeVar `_T` is never used
+Found 5 errors (4 fixed, 1 remaining).
