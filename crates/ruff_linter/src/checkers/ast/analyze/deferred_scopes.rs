@@ -23,6 +23,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::ImportShadowedByLoopVar,
         Rule::InvalidFirstArgumentNameForClassMethod,
         Rule::InvalidFirstArgumentNameForMethod,
+        Rule::MutableClassDefault,
+        Rule::MutableDataclassDefault,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
@@ -379,6 +381,12 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     class_def,
                     &mut diagnostics,
                 );
+            }
+            if checker.enabled(Rule::MutableClassDefault) {
+                ruff::rules::mutable_class_default(checker, class_def, &mut diagnostics);
+            }
+            if checker.enabled(Rule::MutableDataclassDefault) {
+                ruff::rules::mutable_dataclass_default(checker, class_def, &mut diagnostics);
             }
         }
 
