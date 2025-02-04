@@ -129,7 +129,6 @@ PYI019_0.pyi:54:11: PYI019 [*] Use `Self` instead of custom TypeVar `S`
 
 PYI019_0.pyi:61:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
    |
-59 | # Only .pyi gets fixes, no fixes for .py
 60 | class PEP695Fix:
 61 |     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
@@ -140,7 +139,7 @@ PYI019_0.pyi:61:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
 
 ℹ Safe fix
 58 58 | 
-59 59 | # Only .pyi gets fixes, no fixes for .py
+59 59 | 
 60 60 | class PEP695Fix:
 61    |-    def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
    61 |+    def __new__(cls) -> Self: ...

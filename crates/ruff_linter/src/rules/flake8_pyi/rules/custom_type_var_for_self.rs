@@ -14,8 +14,8 @@ use crate::importer::{ImportRequest, ResolutionError};
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for methods that use custom `TypeVar`s in their annotations
-/// when they could use `Self` instead.
+/// Checks for methods that use custom [`TypeVar`s][typing_TypeVar] in their
+/// annotations when they could use [`Self`][Self] instead.
 ///
 /// ## Why is this bad?
 /// While the semantics are often identical, using `Self` is more intuitive
@@ -49,10 +49,11 @@ use crate::settings::types::PythonVersion;
 ///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
-/// ## Fix safety
-/// The fix is only available in stub files.
-/// It will try to remove all usages and declarations of the custom type variable.
-/// Pre-[PEP-695]-style declarations will not be removed.
+/// ## Fix behaviour and safety
+/// The fix removes all usages and declarations of the custom type variable.
+/// [PEP-695]-style `TypeVar` declarations are also removed from the [type parameter list];
+/// however, old-style `TypeVar`s do not have their declarations removed. See
+/// [`unused-private-type-var`][PYI018] for a rule to clean up unused private type variables.
 ///
 /// If there are any comments within the fix ranges, it will be marked as unsafe.
 /// Otherwise, it will be marked as safe.
@@ -71,6 +72,10 @@ use crate::settings::types::PythonVersion;
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 /// [PEP 695]: https://peps.python.org/pep-0695/
+/// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
+/// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-params
+/// [Self]: https://docs.python.org/3/library/typing.html#typing.Self
+/// [typing_TypeVar]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 #[derive(ViolationMetadata)]
 pub(crate) struct CustomTypeVarForSelf {
     typevar_name: String,
@@ -199,7 +204,7 @@ pub(crate) fn custom_type_var_instead_of_self(
 
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarForSelf {
-            typevar_name: custom_typevar.name(checker).to_string(),
+            typevar_name: custom_typevar.name(checker.source()).to_string(),
         },
         diagnostic_range,
     );
@@ -211,7 +216,6 @@ pub(crate) fn custom_type_var_instead_of_self(
             custom_typevar,
             self_or_cls_parameter,
             self_or_cls_annotation,
-            function_header_end,
         )
     });
 
@@ -466,7 +470,7 @@ fn custom_typevar_preview<'a>(
 ///
 /// * Import `Self` if necessary
 /// * Remove the first parameter's annotation
-/// * Replace other uses of the original type variable elsewhere in the signature with `Self`
+/// * Replace other uses of the original type variable elsewhere in the function with `Self`
 /// * If it was a PEP-695 type variable, removes that `TypeVar` from the PEP-695 type-parameter list
 fn replace_custom_typevar_with_self(
     checker: &Checker,
@@ -474,16 +478,8 @@ fn replace_custom_typevar_with_self(
     custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
-    function_header_end: TextSize,
 ) -> anyhow::Result<Option<Fix>> {
     if checker.settings.preview.is_disabled() {
-        return Ok(None);
-    }
-
-    // This fix cannot be suggested for non-stubs,
-    // as a non-stub fix would have to deal with references in body/at runtime as well,
-    // which is substantially harder and requires a type-aware backend.
-    if !checker.source_type.is_stub() {
         return Ok(None);
     }
 
@@ -506,18 +502,18 @@ fn replace_custom_typevar_with_self(
         other_edits.push(deletion_edit);
     }
 
-    // (4) Replace all other references to the original type variable elsewhere in the function's header
-    //     with `Self`
-    let replace_references_range =
-        TextRange::new(self_or_cls_annotation.end(), function_header_end);
+    // (4) Replace all other references to the original type variable elsewhere in the function with `Self`
+    let replace_references_range = TextRange::new(self_or_cls_annotation.end(), function_def.end());
 
-    other_edits.extend(replace_typevar_usages_with_self(
+    replace_typevar_usages_with_self(
         custom_typevar,
+        checker.source(),
         self_or_cls_annotation.range(),
         &self_symbol_binding,
         replace_references_range,
         checker.semantic(),
-    ));
+        &mut other_edits,
+    )?;
 
     // (5) Determine the safety of the fixes as a whole
     let comment_ranges = checker.comment_ranges();
@@ -562,21 +558,35 @@ fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), 
 /// This ensures that no edit in this series will overlap with other edits.
 fn replace_typevar_usages_with_self<'a>(
     typevar: TypeVar<'a>,
+    source: &'a str,
     self_or_cls_annotation_range: TextRange,
     self_symbol_binding: &'a str,
     editable_range: TextRange,
     semantic: &'a SemanticModel<'a>,
-) -> impl Iterator<Item = Edit> + 'a {
-    typevar
-        .references(semantic)
-        .map(Ranged::range)
-        .filter(move |reference_range| editable_range.contains_range(*reference_range))
-        .filter(move |reference_range| {
-            !self_or_cls_annotation_range.contains_range(*reference_range)
-        })
-        .map(|reference_range| {
-            Edit::range_replacement(self_symbol_binding.to_string(), reference_range)
-        })
+    edits: &mut Vec<Edit>,
+) -> anyhow::Result<()> {
+    let tvar_name = typevar.name(source);
+    for reference in typevar.references(semantic) {
+        let reference_range = reference.range();
+        if &source[reference_range] != tvar_name {
+            bail!(
+                "Cannot autofix: feference in the source code (`{}`) is not equal to the typevar name (`{}`)",
+                &source[reference_range],
+                tvar_name
+            );
+        }
+        if !editable_range.contains_range(reference_range) {
+            continue;
+        }
+        if self_or_cls_annotation_range.contains_range(reference_range) {
+            continue;
+        }
+        edits.push(Edit::range_replacement(
+            self_symbol_binding.to_string(),
+            reference_range,
+        ));
+    }
+    Ok(())
 }
 
 /// Create an [`Edit`] removing the `TypeVar` binding from the PEP 695 type parameter list.
@@ -624,8 +634,8 @@ impl<'a> TypeVar<'a> {
         self.0.kind.is_type_param()
     }
 
-    fn name(self, checker: &'a Checker) -> &'a str {
-        self.0.name(checker.source())
+    fn name(self, source: &'a str) -> &'a str {
+        self.0.name(source)
     }
 
     fn references(
