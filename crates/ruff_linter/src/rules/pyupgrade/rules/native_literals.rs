@@ -255,17 +255,19 @@ pub(crate) fn native_literals(
                 // (-2.0).foo != -(2.0.foo) == -2.0.foo
                 (Some(Expr::Attribute(_)), LiteralType::Float, true) => format!("({arg_code})"),
 
-                // (-2)[1] != -(2[1]) == -2[1]
-                (Some(Expr::Subscript(ast::ExprSubscript { value: lhs, .. })), _, true)
-                // (-2)() != -(2()) == -2()
-                | (Some(Expr::Call(ast::ExprCall { func: lhs, .. })), _, true)
-                // (-2) ** 2 != -(2 ** 2) == -2 ** 2
-                | (
-                    Some(Expr::BinOp(ast::ExprBinOp {
-                        left: lhs,
-                        op: Operator::Pow,
-                        ..
-                    })),
+                (
+                    Some(
+                        // (-2)[1] != -(2[1]) == -2[1]
+                        Expr::Subscript(ast::ExprSubscript { value: lhs, .. })
+                        // (-2)() != -(2()) == -2()
+                        | Expr::Call(ast::ExprCall { func: lhs, .. })
+                        // (-2) ** 2 != -(2 ** 2) == -2 ** 2
+                        | Expr::BinOp(ast::ExprBinOp {
+                            left: lhs,
+                            op: Operator::Pow,
+                            ..
+                        }),
+                    ),
                     _,
                     true,
                 ) => {
