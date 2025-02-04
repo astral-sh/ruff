@@ -12,6 +12,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::rules::flake8_builtins;
     use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
@@ -45,16 +46,18 @@ mod tests {
         Path::new("A005/modules/_abc/__init__.py")
     )]
     #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
-    #[test_case(
-        Rule::StdlibModuleShadowing,
-        Path::new("A005/modules/utils/logging.py")
-    )]
     #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                flake8_builtins: flake8_builtins::settings::Settings {
+                    builtins_strict_checking: true,
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -78,7 +81,13 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                flake8_builtins: flake8_builtins::settings::Settings {
+                    builtins_strict_checking: strict,
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -183,6 +192,7 @@ mod tests {
             &LinterSettings {
                 flake8_builtins: super::settings::Settings {
                     builtins_allowed_modules: vec!["xml".to_string(), "logging".to_string()],
+                    builtins_strict_checking: true,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![rule_code])
