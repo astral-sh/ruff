@@ -517,6 +517,14 @@ mod tests {
     ",
         "tc010_precedence_over_tc008"
     )]
+    fn contents(contents: &str, snapshot: &str) {
+        let diagnostics = test_snippet(
+            contents,
+            &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules()),
+        );
+        assert_messages!(snapshot, diagnostics);
+    }
+
     #[test_case(
         r"
         from __future__ import annotations
@@ -543,10 +551,13 @@ mod tests {
     ",
         "github_issue_15681_fix_test"
     )]
-    fn contents(contents: &str, snapshot: &str) {
+    fn contents_preview(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules()),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
+            },
         );
         assert_messages!(snapshot, diagnostics);
     }

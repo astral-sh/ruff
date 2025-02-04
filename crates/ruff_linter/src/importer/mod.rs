@@ -135,20 +135,18 @@ impl<'a> Importer<'a> {
             self.stylist,
         )?;
 
-        // Add the import to a `TYPE_CHECKING` block.
-        if let Some(block) = self.preceding_type_checking_block(at) {
-            // Add the import to the existing `TYPE_CHECKING` block.
-            return Ok(TypingImportEdit {
-                type_checking_edit: None,
-                add_import_edit: self.add_to_type_checking_block(&content, block.start()),
-            });
+        if semantic.use_new_type_checking_block_detection_semantics() {
+            // Add the import to a `TYPE_CHECKING` block.
+            if let Some(block) = self.preceding_type_checking_block(at) {
+                // Add the import to the existing `TYPE_CHECKING` block.
+                return Ok(TypingImportEdit {
+                    type_checking_edit: None,
+                    add_import_edit: self.add_to_type_checking_block(&content, block.start()),
+                });
+            }
         }
 
         // Import the `TYPE_CHECKING` symbol from the typing module.
-        // TODO: Should we provide an option to avoid this import?
-        //       E.g. either through an explicit setting, or implicitly
-        //       when `typing` isn't part of the exempt modules and there
-        //       are no other existing runtime imports of `typing`.
         let (type_checking_edit, type_checking) =
             if let Some(type_checking) = Self::find_type_checking(at, semantic)? {
                 // Special-case: if the `TYPE_CHECKING` symbol is imported as part of the same
@@ -192,10 +190,13 @@ impl<'a> Importer<'a> {
                 (Some(edit), name)
             };
 
-        // Add the import to a new `TYPE_CHECKING` block.
-        Ok(TypingImportEdit {
-            type_checking_edit,
-            add_import_edit: self.add_type_checking_block(
+        // Add the import to a `TYPE_CHECKING` block.
+        let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
+            // Add the import to the `TYPE_CHECKING` block.
+            self.add_to_type_checking_block(&content, block.start())
+        } else {
+            // Add the import to a new `TYPE_CHECKING` block.
+            self.add_type_checking_block(
                 &format!(
                     "{}if {type_checking}:{}{}",
                     self.stylist.line_ending().as_str(),
@@ -203,7 +204,12 @@ impl<'a> Importer<'a> {
                     indent(&content, self.stylist.indentation())
                 ),
                 at,
-            )?,
+            )?
+        };
+
+        Ok(TypingImportEdit {
+            type_checking_edit,
+            add_import_edit,
         })
     }
 
