@@ -45,6 +45,10 @@ mod tests {
         Path::new("A005/modules/_abc/__init__.py")
     )]
     #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
+    #[test_case(
+        Rule::StdlibModuleShadowing,
+        Path::new("A005/modules/utils/logging.py")
+    )]
     #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
