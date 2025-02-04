@@ -222,4 +222,24 @@ UP051_1.py:31:56: UP051 [*] Generic class uses private type parameters
    33 |+    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[X, _T] | None:
 34 34 |         return None
 35 35 | 
-36 36 |
+36 36 | 
+
+UP051_1.py:39:9: UP051 Generic class uses private type parameters
+   |
+37 | # this should not be fixed because the new name is a keyword, but we still
+38 | # offer a diagnostic
+39 | class F[_async]: ...
+   |         ^^^^^^ UP051
+   |
+   = help: Remove the leading underscores
+
+UP051_1.py:47:25: UP051 Generic class uses private type parameters
+   |
+45 |     X = 5
+46 |
+47 |     class ScopeConflict[_X]:
+   |                         ^^ UP051
+48 |         var: _X
+49 |         x: X
+   |
+   = help: Remove the leading underscores

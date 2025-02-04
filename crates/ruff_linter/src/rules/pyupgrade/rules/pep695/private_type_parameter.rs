@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
@@ -40,6 +40,11 @@ use crate::{
 ///     return var[0]
 /// ```
 ///
+/// ## Fix availability
+///
+/// This rule avoids shadowing builtins, keywords, and other variables with new type parameter names
+/// and will offer a diagnostic but not a fix in the case of a conflict.
+///
 /// ## See also
 ///
 /// This rule renames private [PEP 695] type parameters but doesn't convert pre-[PEP 695] generics
@@ -63,7 +68,8 @@ enum ParamKind {
     Function,
 }
 
-impl AlwaysFixableViolation for PrivateTypeParameter {
+impl Violation for PrivateTypeParameter {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let kind = match self.kind {
@@ -73,8 +79,8 @@ impl AlwaysFixableViolation for PrivateTypeParameter {
         format!("Generic {kind} uses private type parameters")
     }
 
-    fn fix_title(&self) -> String {
-        "Remove the leading underscores".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove the leading underscores".to_string())
     }
 }
 
@@ -100,12 +106,15 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return None;
     }
 
-    if try_shadowed_kind(old_name, checker, binding.scope).is_some_and(ShadowedKind::shadows_any) {
-        return None;
-    }
-    let new_name = old_name.trim_start_matches('_');
-
     let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
+
+    // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
+    // a suggested fix
+    if try_shadowed_kind(old_name, checker, binding.scope).is_some_and(ShadowedKind::shadows_any) {
+        return Some(diagnostic);
+    }
+
+    let new_name = old_name.trim_start_matches('_');
 
     diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
