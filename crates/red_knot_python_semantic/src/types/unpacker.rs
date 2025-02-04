@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
+use crate::types::{infer_expression_type, todo_type, Type, TypeCheckDiagnostics};
 use crate::unpack::UnpackValue;
 use crate::Db;
 
@@ -42,8 +42,7 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let mut value_ty = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.scoped_expression_id(self.db(), self.scope));
+        let mut value_ty = infer_expression_type(self.db(), value.expression());
 
         if value.is_assign()
             && self.context.in_stub()
