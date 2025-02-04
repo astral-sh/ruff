@@ -703,7 +703,9 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 
 ## Module attributes
 
-```py path=mod.py
+`mod.py`:
+
+```py
 global_symbol: str = "a"
 ```
 
@@ -737,13 +739,19 @@ for mod.global_symbol in IntIterable():
 
 ## Nested attributes
 
-```py path=outer/__init__.py
+`outer/__init__.py`:
+
+```py
 ```
 
-```py path=outer/nested/__init__.py
+`outer/nested/__init__.py`:
+
+```py
 ```
 
-```py path=outer/nested/inner.py
+`outer/nested/inner.py`:
+
+```py
 class Outer:
     class Nested:
         class Inner:
@@ -766,7 +774,9 @@ outer.nested.inner.Outer.Nested.Inner.attr = "a"
 Most attribute accesses on function-literal types are delegated to `types.FunctionType`, since all
 functions are instances of that class:
 
-```py path=a.py
+`a.py`:
+
+```py
 def f(): ...
 
 reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
@@ -775,7 +785,9 @@ reveal_type(f.__kwdefaults__)  # revealed: @Todo(generics) | None
 
 Some attributes are special-cased, however:
 
-```py path=b.py
+`b.py`:
+
+```py
 def f(): ...
 
 reveal_type(f.__get__)  # revealed: @Todo(`__get__` method on functions)
@@ -787,14 +799,18 @@ reveal_type(f.__call__)  # revealed: @Todo(`__call__` method on functions)
 Most attribute accesses on int-literal types are delegated to `builtins.int`, since all literal
 integers are instances of that class:
 
-```py path=a.py
+`a.py`:
+
+```py
 reveal_type((2).bit_length)  # revealed: @Todo(bound method)
 reveal_type((2).denominator)  # revealed: @Todo(@property)
 ```
 
 Some attributes are special-cased, however:
 
-```py path=b.py
+`b.py`:
+
+```py
 reveal_type((2).numerator)  # revealed: Literal[2]
 reveal_type((2).real)  # revealed: Literal[2]
 ```
@@ -804,14 +820,18 @@ reveal_type((2).real)  # revealed: Literal[2]
 Most attribute accesses on bool-literal types are delegated to `builtins.bool`, since all literal
 bols are instances of that class:
 
-```py path=a.py
+`a.py`:
+
+```py
 reveal_type(True.__and__)  # revealed: @Todo(bound method)
 reveal_type(False.__or__)  # revealed: @Todo(bound method)
 ```
 
 Some attributes are special-cased, however:
 
-```py path=b.py
+`b.py`:
+
+```py
 reveal_type(True.numerator)  # revealed: Literal[1]
 reveal_type(False.real)  # revealed: Literal[0]
 ```

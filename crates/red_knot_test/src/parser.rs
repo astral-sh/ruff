@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use anyhow::bail;
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
@@ -147,7 +147,7 @@ struct EmbeddedFileId;
 #[derive(Debug)]
 pub(crate) struct EmbeddedFile<'s> {
     section: SectionId,
-    pub(crate) path: &'s str,
+    pub(crate) path: String,
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
 
@@ -157,16 +157,20 @@ pub(crate) struct EmbeddedFile<'s> {
 
 /// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
 static HEADER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
+    LazyLock::new(|| Regex::new(r"^(?<level>#+)[^\S\n]+(?<title>.+)[^\S\n]*\n").unwrap());
 
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?x)
-        ^```(?<lang>(?-u:\w)+)?(?<config>(?:\x20+\S+)*)\s*\n
-        (?<code>(?:.|\n)*?)\n?
-        (?<end>```|\z)
+        ^(?:
+            `(?<path>[^`\n]+)`[^\S\n]*:[^\S\n]*\n
+            \n?
+        )?
+        ```(?<lang>(?-u:\w)+)?\x20*(?<config>\S.*)?\n
+        (?<code>[\s\S]*?)\n?
+        (?<end>```\n?|\z)
         ",
     )
     .unwrap()
@@ -210,6 +214,7 @@ struct Parser<'s> {
 
     /// [`EmbeddedFile`]s of the final [`MarkdownTestSuite`].
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
+    unnamed_file_count: usize,
 
     /// The unparsed remainder of the Markdown source.
     cursor: Cursor<'s>,
@@ -221,7 +226,7 @@ struct Parser<'s> {
     stack: SectionStack,
 
     /// Names of embedded files in current active section.
-    current_section_files: Option<FxHashSet<&'s str>>,
+    current_section_files: Option<FxHashSet<String>>,
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
@@ -240,6 +245,7 @@ impl<'s> Parser<'s> {
             sections,
             source,
             files: IndexVec::default(),
+            unnamed_file_count: 0,
             cursor: Cursor::new(source),
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
@@ -265,10 +271,14 @@ impl<'s> Parser<'s> {
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         while let Some(position) = memchr2(b'`', b'#', self.cursor.as_bytes()) {
-            self.cursor.skip_bytes(position.saturating_sub(1));
+            self.cursor.skip_bytes(position.saturating_sub(2));
 
-            // code blocks and headers must start on a new line.
-            if position == 0 || self.cursor.eat_char('\n') {
+            // Code blocks and headers must start on a new line
+            // and preceded by at least one blank line.
+            if position == 0 && self.cursor.first() == '#'
+                || position == 1 && self.cursor.eat_char('\n')
+                || self.cursor.eat_char('\n') && self.cursor.eat_char('\n')
+            {
                 match self.cursor.first() {
                     '#' => {
                         if let Some(find) = HEADER_RE.find(self.cursor.as_str()) {
@@ -290,7 +300,7 @@ impl<'s> Parser<'s> {
 
             // Skip to the end of the line
             if let Some(position) = memchr::memchr(b'\n', self.cursor.as_bytes()) {
-                self.cursor.skip_bytes(position);
+                self.cursor.skip_bytes(position + 1);
             } else {
                 break;
             }
@@ -349,25 +359,9 @@ impl<'s> Parser<'s> {
             return Err(anyhow::anyhow!("Unterminated code block at line {line}."));
         }
 
-        let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
-
-        if let Some(config_match) = captures.name("config") {
-            for item in config_match.as_str().split_whitespace() {
-                let mut parts = item.split('=');
-                let key = parts.next().unwrap();
-                let Some(val) = parts.next() else {
-                    return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
-                };
-                if parts.next().is_some() {
-                    return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
-                }
-                if config.insert(key, val).is_some() {
-                    return Err(anyhow::anyhow!("Duplicate config item `{}`.", item));
-                }
-            }
+        if captures.name("config").is_some() {
+            return Err(anyhow::anyhow!("Trailing code-block metadata is not supported. Only the code block language can be specified."));
         }
-
-        let path = config.get("path").copied().unwrap_or("test.py");
 
         // CODE_RE can't match without matches for 'lang' and 'code'.
         let lang = captures
@@ -381,26 +375,48 @@ impl<'s> Parser<'s> {
             return self.parse_config(code);
         }
 
+        let explicit_path = captures.name("path").map(|it| it.as_str());
+
+        if let Some(explicit_path) = explicit_path {
+            if !lang.is_empty()
+                && lang != "text"
+                && explicit_path.contains('.')
+                && !explicit_path.ends_with(&format!(".{lang}"))
+            {
+                return Err(anyhow::anyhow!(
+                    "File ending of test file path `{explicit_path}` does not match `lang={lang}` of code block"
+                ));
+            }
+        }
+
+        let path = match explicit_path {
+            Some(path) => path.to_string(),
+            None => {
+                self.unnamed_file_count += 1;
+
+                match lang {
+                    "py" | "pyi" => format!("mdtest_snippet__{}.{lang}", self.unnamed_file_count),
+                    "" => format!("mdtest_snippet__{}.py", self.unnamed_file_count),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Cannot generate name for `lang={}`: Unsupported extension",
+                            lang
+                        ))
+                    }
+                }
+            }
+        };
+
         self.files.push(EmbeddedFile {
-            path,
+            path: path.clone(),
             section,
             lang,
-
             code,
-
             md_offset: self.offset(),
         });
 
         if let Some(current_files) = &mut self.current_section_files {
-            if !current_files.insert(path) {
-                if path == "test.py" {
-                    return Err(anyhow::anyhow!(
-                        "Test `{}` has duplicate files named `{path}`. \
-                                (This is the default filename; \
-                                 consider giving some files an explicit name with `path=...`.)",
-                        self.sections[section].title
-                    ));
-                }
+            if !current_files.insert(path.clone()) {
                 return Err(anyhow::anyhow!(
                     "Test `{}` has duplicate files named `{path}`.",
                     self.sections[section].title
@@ -473,7 +489,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
     }
@@ -498,7 +514,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
     }
@@ -518,22 +534,33 @@ mod tests {
             ```py
             y = 2
             ```
+
+            # Three
+
+            ```pyi
+            a: int
+            ```
+
+            ```pyi
+            b: str
+            ```
             ",
         );
         let mf = super::parse("file.md", &source).unwrap();
 
-        let [test1, test2] = &mf.tests().collect::<Vec<_>>()[..] else {
-            panic!("expected two tests");
+        let [test1, test2, test3] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected three tests");
         };
 
         assert_eq!(test1.name(), "file.md - One");
         assert_eq!(test2.name(), "file.md - Two");
+        assert_eq!(test3.name(), "file.md - Three");
 
         let [file] = test1.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
 
@@ -541,9 +568,21 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test.py");
+        assert_eq!(file.path, "mdtest_snippet__2.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "y = 2");
+
+        let [file_1, file_2] = test3.files().collect::<Vec<_>>()[..] else {
+            panic!("expected two files");
+        };
+
+        assert_eq!(file_1.path, "mdtest_snippet__3.pyi");
+        assert_eq!(file_1.lang, "pyi");
+        assert_eq!(file_1.code, "a: int");
+
+        assert_eq!(file_2.path, "mdtest_snippet__4.pyi");
+        assert_eq!(file_2.lang, "pyi");
+        assert_eq!(file_2.code, "b: str");
     }
 
     #[test]
@@ -552,11 +591,15 @@ mod tests {
             "
             # One
 
-            ```py path=main.py
+            `main.py`:
+
+            ```py
             from foo import y
             ```
 
-            ```py path=foo.py
+            `foo.py`:
+
+            ```py
             y = 2
             ```
 
@@ -592,7 +635,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "test.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "y = 2");
     }
@@ -601,7 +644,9 @@ mod tests {
     fn custom_file_path() {
         let source = dedent(
             "
-            ```py path=foo.py
+            `foo.py`:
+
+            ```py
             x = 1
             ```
             ",
@@ -686,6 +731,90 @@ mod tests {
     }
 
     #[test]
+    fn cannot_generate_name_for_lang() {
+        let source = dedent(
+            "
+            ```json
+            {}
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Cannot generate name for `lang=json`: Unsupported extension"
+        );
+    }
+
+    #[test]
+    fn mismatching_lang() {
+        let source = dedent(
+            "
+            `a.py`:
+
+            ```pyi
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "File ending of test file path `a.py` does not match `lang=pyi` of code block"
+        );
+    }
+
+    #[test]
+    fn files_with_no_extension_can_have_any_lang() {
+        let source = dedent(
+            "
+            `lorem`:
+
+            ```foo
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "lorem");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn files_with_lang_text_can_have_any_paths() {
+        let source = dedent(
+            "
+            `lorem.yaml`:
+
+            ```text
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "lorem.yaml");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
     fn unterminated_code_block_1() {
         let source = dedent(
             "
@@ -738,75 +867,74 @@ mod tests {
     }
 
     #[test]
-    fn invalid_config_item_no_equals() {
+    fn line_break_in_header_1() {
         let source = dedent(
             "
-            ```py foo
+            #
+            Foo
+
+            ```py
             x = 1
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Invalid config item `foo`.");
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(test.section.title, "file.md");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
-    fn invalid_config_item_too_many_equals() {
+    fn line_break_in_header_2() {
         let source = dedent(
             "
-            ```py foo=bar=baz
-            x = 1
-            ```
-            ",
-        );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Invalid config item `foo=bar=baz`.");
-    }
+            # Foo
 
-    #[test]
-    fn invalid_config_item_duplicate() {
-        let source = dedent(
-            "
-            ```py foo=bar foo=baz
+            ##
+            Lorem
+
+            ```py
             x = 1
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Duplicate config item `foo=baz`.");
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(test.section.title, "Foo");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
     fn no_duplicate_name_files_in_test() {
         let source = dedent(
             "
+            `foo.py`:
+
             ```py
             x = 1
             ```
 
+            `foo.py`:
+
             ```py
-            y = 2
-            ```
-            ",
-        );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(
-            err.to_string(),
-            "Test `file.md` has duplicate files named `test.py`. \
-            (This is the default filename; consider giving some files an explicit name \
-            with `path=...`.)"
-        );
-    }
-
-    #[test]
-    fn no_duplicate_name_files_in_test_non_default() {
-        let source = dedent(
-            "
-            ```py path=foo.py
-            x = 1
-            ```
-
-            ```py path=foo.py
             y = 2
             ```
             ",
@@ -816,5 +944,242 @@ mod tests {
             err.to_string(),
             "Test `file.md` has duplicate files named `foo.py`."
         );
+    }
+
+    #[test]
+    fn no_duplicate_name_files_in_test_2() {
+        let source = dedent(
+            "
+            `mdtest_snippet__1.py`:
+
+            ```py
+            x = 1
+            ```
+
+            ```py
+            y = 2
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Test `file.md` has duplicate files named `mdtest_snippet__1.py`."
+        );
+    }
+
+    #[test]
+    fn separate_path() {
+        let source = dedent(
+            "
+            `foo.py`:
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "foo.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn separate_path_whitespace_1() {
+        let source = dedent(
+            "
+            `foo.py` :
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "foo.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn separate_path_whitespace_2() {
+        let source = dedent(
+            "
+            `foo.py`:
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "foo.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn path_with_space() {
+        let source = dedent(
+            "
+            `foo bar.py`:
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "foo bar.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn path_with_line_break() {
+        let source = dedent(
+            "
+            `foo
+            .py`:
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn path_with_backtick() {
+        let source = dedent(
+            "
+            `foo`bar.py`:
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn path_colon_on_next_line() {
+        let source = dedent(
+            "
+            `foo.py`
+            :
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn random_trailing_backtick_quoted() {
+        let source = dedent(
+            "
+            A long sentence that forces a line break
+            `int`:
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "mdtest_snippet__1.py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn config_no_longer_allowed() {
+        let source = dedent(
+            "
+            ```py foo=bar
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Trailing code-block metadata is not supported. Only the code block language can be specified.");
     }
 }
