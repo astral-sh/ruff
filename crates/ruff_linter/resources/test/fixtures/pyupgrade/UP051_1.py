@@ -1,11 +1,42 @@
-from typing import Generic, TypeVar
-
-# this case should not be affected by UP051 alone, but with UP046 and PYI018,
-# the old-style generics should be replaced with type parameters, the private
-# type parameters renamed without underscores, and then the standalone _T
-# removed
-_T = TypeVar("_T")
-
-
-class OldStyle(Generic[_T]):
+# bound
+class Foo[_T: str]:
     var: _T
+
+
+# constraint
+class Foo[_T: (str, bytes)]:
+    var: _T
+
+
+# tuple
+class Foo[*_Ts]:
+    var: tuple[*_Ts]
+
+
+# paramspec
+class C[**_P]:
+    var: _P
+
+
+from typing import Callable
+
+
+# each of these will get a separate diagnostic, but at least they'll all get
+# fixed
+class Everything[_T, _U: str, _V: (int, float), *_W, **_X]:
+    @staticmethod
+    def transform(t: _T, u: _U, v: _V) -> tuple[*_W] | Callable[_X, _T] | None:
+        return None
+
+
+# this should not be fixed because the new name is a keyword
+class F[_async]: ...
+
+
+# and this should not be fixed because of the conflict with the outer X
+def f():
+    X = 5
+
+    class ScopeConflict[_X]:
+        var: _X
+        x: X
