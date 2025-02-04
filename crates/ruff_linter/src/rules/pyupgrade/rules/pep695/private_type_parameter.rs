@@ -73,15 +73,23 @@ enum ParamKind {
     Function,
 }
 
+impl ParamKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            ParamKind::Class => "class",
+            ParamKind::Function => "function",
+        }
+    }
+}
+
 impl Violation for PrivateTypeParameter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let kind = match self.kind {
-            ParamKind::Class => "class",
-            ParamKind::Function => "function",
-        };
-        format!("Generic {kind} uses private type parameters")
+        format!(
+            "Generic {} uses private type parameters",
+            self.kind.as_str()
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
