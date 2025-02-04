@@ -1,4 +1,5 @@
 use anyhow::{bail, Context};
+use itertools::Itertools;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -590,20 +591,26 @@ fn remove_pep695_typevar_declaration(
             .then(|| Edit::range_deletion(type_params.range));
     }
 
-    let tvar_index = type_params
+    // `custom_typevar.range()` will return the range of the name of the typevar binding.
+    // We need the full range of the `TypeVar` declaration (including any constraints or bounds)
+    // to determine the correct deletion range.
+    let (tvar_index, tvar_declaration) = type_params
         .iter()
-        .position(|param| param.name().range() == custom_typevar.range())?;
+        .find_position(|param| param.name().range() == custom_typevar.range())?;
 
     let last_index = type_params.len() - 1;
 
     let deletion_range = if tvar_index < last_index {
         // def f[A, B, C](): ...
         //       ^^^ Remove this
-        TextRange::new(custom_typevar.start(), type_params[tvar_index + 1].start())
+        TextRange::new(
+            tvar_declaration.start(),
+            type_params[tvar_index + 1].start(),
+        )
     } else {
         // def f[A, B, C](): ...
         //           ^^^ Remove this
-        TextRange::new(type_params[tvar_index - 1].end(), custom_typevar.end())
+        TextRange::new(type_params[tvar_index - 1].end(), tvar_declaration.end())
     };
 
     Some(Edit::range_deletion(deletion_range))
