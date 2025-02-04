@@ -1176,6 +1176,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
             }
+            if checker.enabled(Rule::LogExceptionOutsideExceptHandler) {
+                flake8_logging::rules::log_exception_outside_except_handler(checker, call);
+            }
+            if checker.enabled(Rule::ExcInfoOutsideExceptHandler) {
+                flake8_logging::rules::exc_info_outside_except_handler(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

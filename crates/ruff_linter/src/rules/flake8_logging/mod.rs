@@ -10,7 +10,6 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -18,25 +17,16 @@ mod tests {
     #[test_case(Rule::InvalidGetLoggerArgument, Path::new("LOG002.py"))]
     #[test_case(Rule::ExceptionWithoutExcInfo, Path::new("LOG007.py"))]
     #[test_case(Rule::UndocumentedWarn, Path::new("LOG009.py"))]
+    #[test_case(Rule::LogExceptionOutsideExceptHandler, Path::new("LOG004_0.py"))]
+    #[test_case(Rule::LogExceptionOutsideExceptHandler, Path::new("LOG004_1.py"))]
+    #[test_case(Rule::ExcInfoOutsideExceptHandler, Path::new("LOG014_0.py"))]
+    #[test_case(Rule::ExcInfoOutsideExceptHandler, Path::new("LOG014_1.py"))]
+    #[test_case(Rule::RootLoggerCall, Path::new("LOG015.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_logging").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RootLoggerCall, Path::new("LOG015.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_logging").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
