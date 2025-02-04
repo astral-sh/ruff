@@ -27,12 +27,18 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str) {
-    let source = std::fs::read_to_string(path).unwrap();
+pub fn run(
+    fixture_path: &Utf8Path,
+    snapshot_path: &Utf8Path,
+    long_title: &str,
+    short_title: &str,
+    test_name: &str,
+) {
+    let source = std::fs::read_to_string(fixture_path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
-            panic!("Error parsing `{path}`: {err:?}")
+            panic!("Error parsing `{fixture_path}`: {err:?}")
         }
     };
 
@@ -54,7 +60,7 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
         db.memory_file_system().remove_all();
         Files::sync_all(&mut db);
 
-        if let Err(failures) = run_test(&mut db, &test) {
+        if let Err(failures) = run_test(&mut db, snapshot_path, &test) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
@@ -89,7 +95,11 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
+fn run_test(
+    db: &mut db::Db,
+    snapshot_path: &Utf8Path,
+    test: &parser::MarkdownTest,
+) -> Result<(), Failures> {
     let project_root = db.project_root().to_path_buf();
     let src_path = SystemPathBuf::from("/src");
     let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
