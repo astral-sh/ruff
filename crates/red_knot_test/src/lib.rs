@@ -1,4 +1,5 @@
 use crate::config::Log;
+use crate::parser::{CodeBlockDimensions, CodeBlockStructure};
 use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
@@ -11,7 +12,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::TextSize;
 use std::fmt::Write;
 
 mod assertion;
@@ -67,12 +67,14 @@ pub fn run(
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
-                let backtick_line = md_index.line_index(test_failures.backtick_offset);
+                let code_block_structure =
+                    CodeBlockStructure::new(&md_index, test_failures.code_block_dimensions);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
+                    let absolute_line_number =
+                        code_block_structure.to_absolute_line_number(relative_line_number);
+
                     for failure in failures {
-                        let absolute_line_number =
-                            backtick_line.checked_add(relative_line_number).unwrap();
                         let line_info =
                             format!("{relative_fixture_path}:{absolute_line_number}").cyan();
                         println!("  {line_info} {failure}");
@@ -96,12 +98,12 @@ pub fn run(
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test(
+fn run_test<'s>(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &parser::MarkdownTest,
-) -> Result<(), Failures> {
+    test: &'s parser::MarkdownTest,
+) -> Result<(), Failures<'s>> {
     let project_root = db.project_root().to_path_buf();
     let src_path = SystemPathBuf::from("/src");
     let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
@@ -120,10 +122,10 @@ fn run_test(
                 "Supported file types are: py, pyi, text"
             );
 
-            let full_path = if embedded.path.starts_with('/') {
-                SystemPathBuf::from(embedded.path.clone())
+            let full_path = if embedded.path_str().starts_with('/') {
+                SystemPathBuf::from(embedded.path_str())
             } else {
-                project_root.join(&embedded.path)
+                project_root.join(embedded.path_str())
             };
 
             if let Some(ref typeshed_path) = custom_typeshed_path {
@@ -136,7 +138,7 @@ fn run_test(
                 }
             }
 
-            db.write_file(&full_path, embedded.code).unwrap();
+            db.write_file(&full_path, embedded.code()).unwrap();
 
             if !full_path.starts_with(&src_path) || embedded.lang == "text" {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
@@ -147,7 +149,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                backtick_offset: embedded.backtick_offset,
+                code_block_dimensions: Box::new(embedded.code_block_dimensions()),
             })
         })
         .collect();
@@ -230,7 +232,7 @@ fn run_test(
                     }
                     by_line.push(OneIndexed::from_zero_indexed(0), messages);
                     return Some(FileFailures {
-                        backtick_offset: test_file.backtick_offset,
+                        code_block_dimensions: test_file.code_block_dimensions,
                         by_line,
                     });
                 }
@@ -244,7 +246,7 @@ fn run_test(
                 match matcher::match_file(db, test_file.file, diagnostics.iter().map(|d| &**d)) {
                     Ok(()) => None,
                     Err(line_failures) => Some(FileFailures {
-                        backtick_offset: test_file.backtick_offset,
+                        code_block_dimensions: test_file.code_block_dimensions,
                         by_line: line_failures,
                     }),
                 };
@@ -277,23 +279,23 @@ fn run_test(
     }
 }
 
-type Failures = Vec<FileFailures>;
+type Failures<'s> = Vec<FileFailures<'s>>;
 
 /// The failures for a single file in a test by line number.
-#[derive(Debug)]
-struct FileFailures {
-    /// The offset of the backticks that starts the code block in the Markdown file
-    backtick_offset: TextSize,
-    /// The failures by lines in the code block.
+struct FileFailures<'s> {
+    /// Positional information about the code block(s) to reconstruct absolute line numbers.
+    code_block_dimensions: Box<dyn Iterator<Item = CodeBlockDimensions> + 's>,
+
+    /// The failures by lines in the file.
     by_line: matcher::FailuresByLine,
 }
 
 /// File in a test.
-struct TestFile {
+struct TestFile<'s> {
     file: File,
 
-    // Offset of the backticks that starts the code block in the Markdown file
-    backtick_offset: TextSize,
+    /// Positional information about the code block(s) to reconstruct absolute line numbers.
+    code_block_dimensions: Box<dyn Iterator<Item = CodeBlockDimensions> + 's>,
 }
 
 fn create_diagnostic_snapshot<D: Diagnostic>(
@@ -317,7 +319,7 @@ fn create_diagnostic_snapshot<D: Diagnostic>(
     writeln!(snapshot, "# Python source files").unwrap();
     writeln!(snapshot).unwrap();
     for file in test.files() {
-        writeln!(snapshot, "## {}", file.path).unwrap();
+        writeln!(snapshot, "## {}", file.path_str()).unwrap();
         writeln!(snapshot).unwrap();
         // Note that we don't use ```py here because the line numbering
         // we add makes it invalid Python. This sacrifices syntax
@@ -326,8 +328,8 @@ fn create_diagnostic_snapshot<D: Diagnostic>(
         // snapshots. So we keep them.
         writeln!(snapshot, "```").unwrap();
 
-        let line_number_width = file.code.lines().count().to_string().len();
-        for (i, line) in file.code.lines().enumerate() {
+        let line_number_width = file.code().lines().count().to_string().len();
+        for (i, line) in file.code().lines().enumerate() {
             let line_number = i + 1;
             writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
         }

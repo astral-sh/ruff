@@ -19,11 +19,17 @@ static_assert(is_equivalent_to(Never, tuple[int, Never]))
 static_assert(is_equivalent_to(Never, tuple[int, Never, str]))
 static_assert(is_equivalent_to(Never, tuple[int, tuple[str, Never]]))
 static_assert(is_equivalent_to(Never, tuple[tuple[str, Never], int]))
+```
 
-# The empty tuple is *not* equivalent to Never!
+The empty `tuple` is *not* equivalent to `Never`!
+
+```py
 static_assert(not is_equivalent_to(Never, tuple[()]))
+```
 
-# NoReturn is just a different spelling of Never, so the same is true for NoReturn
+`NoReturn` is just a different spelling of `Never`, so the same is true for `NoReturn`:
+
+```py
 static_assert(is_equivalent_to(NoReturn, tuple[NoReturn]))
 static_assert(is_equivalent_to(NoReturn, tuple[NoReturn, int]))
 static_assert(is_equivalent_to(NoReturn, tuple[int, NoReturn]))

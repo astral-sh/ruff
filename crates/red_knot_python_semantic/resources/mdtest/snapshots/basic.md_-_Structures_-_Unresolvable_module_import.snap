@@ -9,7 +9,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/import/basic.md
 
 # Python source files
 
-## mdtest_snippet__1.py
+## mdtest_snippet.py
 
 ```
 1 | import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
@@ -19,7 +19,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/import/basic.md
 
 ```
 error: lint:unresolved-import
- --> /src/mdtest_snippet__1.py:1:8
+ --> /src/mdtest_snippet.py:1:8
   |
 1 | import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
   |        ^^^^^^^^^^^^^^ Cannot resolve import `zqzqzqzqzqzqzq`

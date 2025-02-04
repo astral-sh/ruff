@@ -109,8 +109,6 @@ reveal_type(version_info >= (3, 9))  # revealed: bool
 
 The fields of `sys.version_info` can be accessed by name:
 
-`a.py`:
-
 ```py
 import sys
 
@@ -122,11 +120,7 @@ reveal_type(sys.version_info.minor >= 10)  # revealed: Literal[False]
 But the `micro`, `releaselevel` and `serial` fields are inferred as `@Todo` until we support
 properties on instance types:
 
-`b.py`:
-
 ```py
-import sys
-
 reveal_type(sys.version_info.micro)  # revealed: @Todo(@property)
 reveal_type(sys.version_info.releaselevel)  # revealed: @Todo(@property)
 reveal_type(sys.version_info.serial)  # revealed: @Todo(@property)
