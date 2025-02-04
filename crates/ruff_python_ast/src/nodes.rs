@@ -1027,18 +1027,20 @@ pub trait StringFlags: Copy {
         self.quote_len()
     }
 
+    fn as_any_string_flags(self) -> AnyStringFlags {
+        AnyStringFlags::new(self.prefix(), self.quote_style(), self.triple_quotes())
+    }
+
     fn display_contents(self, contents: &str) -> DisplayFlags {
         DisplayFlags {
-            prefix: self.prefix(),
-            quote_str: self.quote_str(),
+            flags: self.as_any_string_flags(),
             contents,
         }
     }
 }
 
 pub struct DisplayFlags<'a> {
-    prefix: AnyStringPrefix,
-    quote_str: &'a str,
+    flags: AnyStringFlags,
     contents: &'a str,
 }
 
@@ -1047,8 +1049,8 @@ impl std::fmt::Display for DisplayFlags<'_> {
         write!(
             f,
             "{prefix}{quote}{contents}{quote}",
-            prefix = self.prefix,
-            quote = self.quote_str,
+            prefix = self.flags.prefix(),
+            quote = self.flags.quote_str(),
             contents = self.contents
         )
     }
@@ -2241,11 +2243,7 @@ impl From<AnyStringFlags> for StringLiteralFlags {
 
 impl From<StringLiteralFlags> for AnyStringFlags {
     fn from(value: StringLiteralFlags) -> Self {
-        Self::new(
-            AnyStringPrefix::Regular(value.prefix()),
-            value.quote_style(),
-            value.triple_quotes(),
-        )
+        value.as_any_string_flags()
     }
 }
 
@@ -2266,11 +2264,7 @@ impl From<AnyStringFlags> for BytesLiteralFlags {
 
 impl From<BytesLiteralFlags> for AnyStringFlags {
     fn from(value: BytesLiteralFlags) -> Self {
-        Self::new(
-            AnyStringPrefix::Bytes(value.prefix()),
-            value.quote_style(),
-            value.triple_quotes(),
-        )
+        value.as_any_string_flags()
     }
 }
 
@@ -2291,11 +2285,7 @@ impl From<AnyStringFlags> for FStringFlags {
 
 impl From<FStringFlags> for AnyStringFlags {
     fn from(value: FStringFlags) -> Self {
-        Self::new(
-            AnyStringPrefix::Format(value.prefix()),
-            value.quote_style(),
-            value.triple_quotes(),
-        )
+        value.as_any_string_flags()
     }
 }
 
