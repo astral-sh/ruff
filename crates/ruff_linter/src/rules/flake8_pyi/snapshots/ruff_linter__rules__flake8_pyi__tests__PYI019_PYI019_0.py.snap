@@ -235,3 +235,21 @@ PYI019_0.py:131:40: PYI019 Use `Self` instead of custom TypeVar `_NotATypeVar`
     |                                        ^^^^^^^^^^^^ PYI019
     |
     = help: Replace TypeVar `_NotATypeVar` with `Self`
+
+PYI019_0.py:140:49: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+139 | class MultipleBoundParameters:
+140 |     def m[S: int, T: int](self: S, other: T) -> S: ...
+    |                                                 ^ PYI019
+141 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:141:63: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+139 | class MultipleBoundParameters:
+140 |     def m[S: int, T: int](self: S, other: T) -> S: ...
+141 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+    |                                                               ^ PYI019
+    |
+    = help: Replace TypeVar `S` with `Self`

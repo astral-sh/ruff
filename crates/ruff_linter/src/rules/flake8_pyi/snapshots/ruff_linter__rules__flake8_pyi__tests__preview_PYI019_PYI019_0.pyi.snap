@@ -623,6 +623,7 @@ PYI019_0.pyi:161:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
     161 |+    def m(self, other: Self): ...
 162 162 |     @classmethod
 163 163 |     def n[S](cls: type[S], other: S): ...
+164 164 | 
 
 PYI019_0.pyi:163:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |
@@ -630,6 +631,8 @@ PYI019_0.pyi:163:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
 162 |     @classmethod
 163 |     def n[S](cls: type[S], other: S): ...
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+164 |
+165 | class MultipleBoundParameters:
     |
     = help: Replace TypeVar `S` with `Self`
 
@@ -639,3 +642,24 @@ PYI019_0.pyi:163:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
 162 162 |     @classmethod
 163     |-    def n[S](cls: type[S], other: S): ...
     163 |+    def n(cls, other: Self): ...
+164 164 | 
+165 165 | class MultipleBoundParameters:
+166 166 |     def m[S: int, T: int](self: S, other: T) -> S: ...
+
+PYI019_0.pyi:166:10: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+165 | class MultipleBoundParameters:
+166 |     def m[S: int, T: int](self: S, other: T) -> S: ...
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+167 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.pyi:167:10: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+165 | class MultipleBoundParameters:
+166 |     def m[S: int, T: int](self: S, other: T) -> S: ...
+167 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+    |
+    = help: Replace TypeVar `S` with `Self`
