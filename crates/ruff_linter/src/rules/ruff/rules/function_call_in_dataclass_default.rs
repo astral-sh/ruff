@@ -75,8 +75,9 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 
 /// RUF009
 pub(crate) fn function_call_in_dataclass_default(
-    checker: &mut Checker,
+    checker: &Checker,
     class_def: &ast::StmtClassDef,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     let semantic = checker.semantic();
 
@@ -152,7 +153,7 @@ pub(crate) fn function_call_in_dataclass_default(
         };
         let diagnostic = Diagnostic::new(kind, expr.range());
 
-        checker.diagnostics.push(diagnostic);
+        diagnostics.push(diagnostic);
     }
 }
 

@@ -18,6 +18,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::FunctionCallInDataclassDefaultArgument,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
@@ -378,6 +379,13 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     checker,
                     scope_id,
                     scope,
+                    class_def,
+                    &mut diagnostics,
+                );
+            }
+            if checker.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+                ruff::rules::function_call_in_dataclass_default(
+                    checker,
                     class_def,
                     &mut diagnostics,
                 );
