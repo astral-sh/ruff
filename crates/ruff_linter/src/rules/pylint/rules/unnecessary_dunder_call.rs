@@ -124,7 +124,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
                         replacement,
                         checker.locator().slice(value.as_ref()),
                     ),
-                    ExprPrecedence::CallAttr,
+                    ExprPrecedence::CallAttribute,
                 ));
                 title = Some(message.to_string());
             }
@@ -278,32 +278,32 @@ impl DunderReplacement {
             "__and__" => Some(Self::Operator(
                 "&",
                 "Use `&` operator",
-                ExprPrecedence::BitwiseAnd,
+                ExprPrecedence::BitAnd,
             )),
             "__contains__" => Some(Self::ROperator(
                 "in",
                 "Use `in` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__eq__" => Some(Self::Operator(
                 "==",
                 "Use `==` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__floordiv__" => Some(Self::Operator(
                 "//",
                 "Use `//` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__ge__" => Some(Self::Operator(
                 ">=",
                 "Use `>=` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__gt__" => Some(Self::Operator(
                 ">",
                 "Use `>` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__iadd__" => Some(Self::Operator(
                 "+=",
@@ -368,42 +368,42 @@ impl DunderReplacement {
             "__le__" => Some(Self::Operator(
                 "<=",
                 "Use `<=` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__lshift__" => Some(Self::Operator(
                 "<<",
                 "Use `<<` operator",
-                ExprPrecedence::BitwiseShifts,
+                ExprPrecedence::LeftRightShift,
             )),
             "__lt__" => Some(Self::Operator(
                 "<",
                 "Use `<` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__mod__" => Some(Self::Operator(
                 "%",
                 "Use `%` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__mul__" => Some(Self::Operator(
                 "*",
                 "Use `*` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__ne__" => Some(Self::Operator(
                 "!=",
                 "Use `!=` operator",
-                ExprPrecedence::Compare,
+                ExprPrecedence::ComparisonsMembershipIdentity,
             )),
             "__or__" => Some(Self::Operator(
                 "|",
                 "Use `|` operator",
-                ExprPrecedence::BitwiseXorOr,
+                ExprPrecedence::BitXorOr,
             )),
             "__rshift__" => Some(Self::Operator(
                 ">>",
                 "Use `>>` operator",
-                ExprPrecedence::BitwiseShifts,
+                ExprPrecedence::LeftRightShift,
             )),
             "__sub__" => Some(Self::Operator(
                 "-",
@@ -413,12 +413,12 @@ impl DunderReplacement {
             "__truediv__" => Some(Self::Operator(
                 "/",
                 "Use `/` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__xor__" => Some(Self::Operator(
                 "^",
                 "Use `^` operator",
-                ExprPrecedence::BitwiseXorOr,
+                ExprPrecedence::BitXorOr,
             )),
 
             "__radd__" => Some(Self::ROperator(
@@ -429,37 +429,37 @@ impl DunderReplacement {
             "__rand__" => Some(Self::ROperator(
                 "&",
                 "Use `&` operator",
-                ExprPrecedence::BitwiseAnd,
+                ExprPrecedence::BitAnd,
             )),
             "__rfloordiv__" => Some(Self::ROperator(
                 "//",
                 "Use `//` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__rlshift__" => Some(Self::ROperator(
                 "<<",
                 "Use `<<` operator",
-                ExprPrecedence::BitwiseShifts,
+                ExprPrecedence::LeftRightShift,
             )),
             "__rmod__" => Some(Self::ROperator(
                 "%",
                 "Use `%` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__rmul__" => Some(Self::ROperator(
                 "*",
                 "Use `*` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__ror__" => Some(Self::ROperator(
                 "|",
                 "Use `|` operator",
-                ExprPrecedence::BitwiseXorOr,
+                ExprPrecedence::BitXorOr,
             )),
             "__rrshift__" => Some(Self::ROperator(
                 ">>",
                 "Use `>>` operator",
-                ExprPrecedence::BitwiseShifts,
+                ExprPrecedence::LeftRightShift,
             )),
             "__rsub__" => Some(Self::ROperator(
                 "-",
@@ -469,12 +469,12 @@ impl DunderReplacement {
             "__rtruediv__" => Some(Self::ROperator(
                 "/",
                 "Use `/` operator",
-                ExprPrecedence::MultDiv,
+                ExprPrecedence::MulDivRemain,
             )),
             "__rxor__" => Some(Self::ROperator(
                 "^",
                 "Use `^` operator",
-                ExprPrecedence::BitwiseXorOr,
+                ExprPrecedence::BitXorOr,
             )),
 
             "__aiter__" => Some(Self::Builtin("aiter", "Use `aiter()` builtin")),
@@ -573,30 +573,55 @@ fn in_dunder_method_definition(semantic: &SemanticModel) -> bool {
     })
 }
 
-#[repr(u8)]
+/// Represents the precedence levels for Python expressions.
+/// Variants at the top have lower precedence and variants at the bottom have
+/// higher precedence.
+///
+/// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ExprPrecedence {
-    /// The lowest (virtual) precedence level.
-    Min = 0,
-    Yield = 10,
-    Assign = 15,
-    Starred = 20,
-    Lambda = 25,
-    IfElse = 30,
-    BoolOr = 35,
-    BoolAnd = 40,
-    BoolNot = 45,
-    Compare = 50,
-    BitwiseXorOr = 55,
-    BitwiseAnd = 60,
-    BitwiseShifts = 65,
-    AddSub = 70,
-    MultDiv = 75,
-    Unary = 80,
-    Power = 85,
-    Await = 90,
-    CallAttr = 95,
-    Atomic = 100,
+    /// The lowest (virtual) precedence level
+    None,
+    /// Precedence of `yield` and `yield from` expressions.
+    Yield,
+    /// Precedence of assignment expressions (`name := expr`).
+    Assign,
+    /// Precedence of starred expressions (`*expr`).
+    Starred,
+    /// Precedence of lambda expressions (`lambda args: expr`).
+    Lambda,
+    /// Precedence of if/else expressions (`expr if cond else expr`).
+    IfElse,
+    /// Precedence of boolean `or` expressions.
+    Or,
+    /// Precedence of boolean `and` expressions.
+    And,
+    /// Precedence of boolean `not` expressions.
+    Not,
+    /// Precedence of comparisons (`<`, `<=`, `>`, `>=`, `!=`, `==`),
+    /// memberships (`in`, `not in`) and identity tests (`is`, `is not`).
+    ComparisonsMembershipIdentity,
+    /// Precedence of bitwise `|` and `^` operators.
+    BitXorOr,
+    /// Precedence of bitwise `&` operator.
+    BitAnd,
+    /// Precedence of left and right shift expressions (`<<`, `>>`).
+    LeftRightShift,
+    /// Precedence of addition and subtraction expressions (`+`, `-`).
+    AddSub,
+    /// Precedence of multiplication (`*`), matrix multiplication (`@`), division (`/`),
+    /// floor division (`//`) and remainder (`%`) expressions.
+    MulDivRemain,
+    /// Precedence of unary positive (`+`), negative (`-`), and bitwise NOT (`~`) expressions.
+    PosNegBitNot,
+    /// Precedence of exponentiation expressions (`**`).
+    Exponent,
+    /// Precedence of `await` expressions.
+    Await,
+    /// Precedence of call expressions (`()`), attribute access (`.`), and subscript (`[]`) expressions.
+    CallAttribute,
+    /// Precedence of atomic expressions (literals, names, containers).
+    Atomic,
 }
 
 /// A trait to determine the Python precedence of an expression.
@@ -632,19 +657,19 @@ impl Precedence for Expr {
             | Expr::FString(_) => ExprPrecedence::Atomic,
             // Subscription, slicing, call, attribute reference
             Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) | Expr::Slice(_) => {
-                ExprPrecedence::CallAttr
+                ExprPrecedence::CallAttribute
             }
 
             // Await expression
             Expr::Await(_) => ExprPrecedence::Await,
 
             // Exponentiation **
-            // 90. Handled below along with other binary operators
+            // Handled below along with other binary operators
 
             // Unary operators: +x, -x, ~x (except boolean not)
             Expr::UnaryOp(operator) => match operator.op {
-                UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => ExprPrecedence::Unary,
-                UnaryOp::Not => ExprPrecedence::BoolNot,
+                UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => ExprPrecedence::PosNegBitNot,
+                UnaryOp::Not => ExprPrecedence::Not,
             },
 
             // Math binary ops
@@ -655,28 +680,28 @@ impl Precedence for Expr {
                 | Operator::MatMult
                 | Operator::Div
                 | Operator::Mod
-                | Operator::FloorDiv => ExprPrecedence::MultDiv,
+                | Operator::FloorDiv => ExprPrecedence::MulDivRemain,
                 // Addition, subtraction
                 Operator::Add | Operator::Sub => ExprPrecedence::AddSub,
                 // Bitwise shifts: <<, >>
-                Operator::LShift | Operator::RShift => ExprPrecedence::BitwiseShifts,
+                Operator::LShift | Operator::RShift => ExprPrecedence::LeftRightShift,
                 // Bitwise operations: &, ^, |
-                Operator::BitAnd => ExprPrecedence::BitwiseAnd,
-                Operator::BitXor | Operator::BitOr => ExprPrecedence::BitwiseXorOr,
+                Operator::BitAnd => ExprPrecedence::BitAnd,
+                Operator::BitXor | Operator::BitOr => ExprPrecedence::BitXorOr,
                 // Exponentiation **
-                Operator::Pow => ExprPrecedence::Power,
+                Operator::Pow => ExprPrecedence::Exponent,
             },
 
             // Comparisons: <, <=, >, >=, ==, !=, in, not in, is, is not
-            Expr::Compare(_) => ExprPrecedence::Compare,
+            Expr::Compare(_) => ExprPrecedence::ComparisonsMembershipIdentity,
 
             // Boolean not
-            // 50. Handled above in unary operators
+            // Handled above in unary operators
 
             // Boolean operations: and, or
             Expr::BoolOp(operator) => match operator.op {
-                BoolOp::And => ExprPrecedence::BoolAnd,
-                BoolOp::Or => ExprPrecedence::BoolOr,
+                BoolOp::And => ExprPrecedence::And,
+                BoolOp::Or => ExprPrecedence::Or,
             },
 
             // Conditional expressions: x if y else z
@@ -700,7 +725,7 @@ impl Precedence for Expr {
             Expr::Yield(_) | Expr::YieldFrom(_) => ExprPrecedence::Yield,
 
             // Not a real python expression, so treat as lowest as well
-            Expr::IpyEscapeCommand(_) => ExprPrecedence::Min,
+            Expr::IpyEscapeCommand(_) => ExprPrecedence::None,
         }
     }
 }
