@@ -169,13 +169,17 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     // to the target of the comparison
     let first_cmp_arg: &str;
     let second_cmp_arg: &str;
-    if checker.locator().slice(arg1) == cmp_target {
-        first_cmp_arg = checker.locator().slice(arg1);
-        second_cmp_arg = checker.locator().slice(arg2);
+    let (first_cmp_arg, second_cmp_arg) = if checker.locator().slice(arg1) == cmp_target {
+      (
+    	  	checker.locator().slice(arg1),
+        	checker.locator().slice(arg2),
+    	)
     } else {
-        first_cmp_arg = checker.locator().slice(arg2);
-        second_cmp_arg = checker.locator().slice(arg1);
-    }
+    	(
+        checker.locator().slice(arg2),
+        checker.locator().slice(arg1),
+      )
+    };
 
     let replacement = format!("{cmp_target} = {min_max}({first_cmp_arg}, {second_cmp_arg})",);
 
