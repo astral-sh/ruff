@@ -525,6 +525,8 @@ UP018.py:74:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 73 |
 74 | float(-1.0).foo              # (-1.0).foo
    | ^^^^^^^^^^^ UP018
+75 |
+76 | await int(-1)                # await (-1)
    |
    = help: Replace with float literal
 
@@ -535,62 +537,81 @@ UP018.py:74:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 74    |-float(-1.0).foo              # (-1.0).foo
    74 |+(-1.0).foo              # (-1.0).foo
 75 75 | 
-76 76 | 
-77 77 | int(+1) ** 0
+76 76 | await int(-1)                # await (-1)
+77 77 | 
 
-UP018.py:77:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:76:7: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
-77 | int(+1) ** 0
-   | ^^^^^^^ UP018
-78 | float(+1.0)()
+74 | float(-1.0).foo              # (-1.0).foo
+75 |
+76 | await int(-1)                # await (-1)
+   |       ^^^^^^^ UP018
    |
    = help: Replace with integer literal
 
 ℹ Safe fix
+73 73 | 
 74 74 | float(-1.0).foo              # (-1.0).foo
 75 75 | 
-76 76 | 
-77    |-int(+1) ** 0
-   77 |+(+1) ** 0
-78 78 | float(+1.0)()
-79 79 | 
-80 80 | 
+76    |-await int(-1)                # await (-1)
+   76 |+await (-1)                # await (-1)
+77 77 | 
+78 78 | 
+79 79 | int(+1) ** 0
 
-UP018.py:78:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:79:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
-77 | int(+1) ** 0
-78 | float(+1.0)()
+79 | int(+1) ** 0
+   | ^^^^^^^ UP018
+80 | float(+1.0)()
+   |
+   = help: Replace with integer literal
+
+ℹ Safe fix
+76 76 | await int(-1)                # await (-1)
+77 77 | 
+78 78 | 
+79    |-int(+1) ** 0
+   79 |+(+1) ** 0
+80 80 | float(+1.0)()
+81 81 | 
+82 82 | 
+
+UP018.py:80:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+   |
+79 | int(+1) ** 0
+80 | float(+1.0)()
    | ^^^^^^^^^^^ UP018
    |
    = help: Replace with float literal
 
 ℹ Safe fix
-75 75 | 
-76 76 | 
-77 77 | int(+1) ** 0
-78    |-float(+1.0)()
-   78 |+(+1.0)()
-79 79 | 
-80 80 | 
-81 81 | str(
+77 77 | 
+78 78 | 
+79 79 | int(+1) ** 0
+80    |-float(+1.0)()
+   80 |+(+1.0)()
+81 81 | 
+82 82 | 
+83 83 | str(
 
-UP018.py:81:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
+UP018.py:83:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-81 | / str(
-82 | |     '''Lorem
-83 | |     ipsum'''  # Comment
-84 | | ).foo
+83 | / str(
+84 | |     '''Lorem
+85 | |     ipsum'''  # Comment
+86 | | ).foo
    | |_^ UP018
    |
    = help: Replace with string literal
 
 ℹ Unsafe fix
-78 78 | float(+1.0)()
-79 79 | 
-80 80 | 
-81    |-str(
-82    |-    '''Lorem
-83    |-    ipsum'''  # Comment
-84    |-).foo
-   81 |+'''Lorem
-   82 |+    ipsum'''.foo
+80 80 | float(+1.0)()
+81 81 | 
+82 82 | 
+83    |-str(
+84    |-    '''Lorem
+85    |-    ipsum'''  # Comment
+86    |-).foo
+   83 |+'''Lorem
+   84 |+    ipsum'''.foo
