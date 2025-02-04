@@ -842,4 +842,29 @@ SIM905.py:72:1: SIM905 [*] Consider using a list literal instead of `str.split`
    72 |+["a,b,c"]  # ["a,b,c"]
 73 73 | 
 74 74 | # negatives
-75 75 |
+75 75 | 
+
+SIM905.py:103:1: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+102 |   # another positive demonstrating quote preservation
+103 | / """
+104 | | "itemA"
+105 | | 'itemB'
+106 | | '''itemC'''
+107 | | "'itemD'"
+108 | | """.split()
+    | |___________^ SIM905
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+100 100 | 
+101 101 | 
+102 102 | # another positive demonstrating quote preservation
+103     |-"""
+104     |-"itemA"
+105     |-'itemB'
+106     |-'''itemC'''
+107     |-"'itemD'"
+108     |-""".split()
+    103 |+['"itemA"', "'itemB'", "'''itemC'''", "\"'itemD'\""]
