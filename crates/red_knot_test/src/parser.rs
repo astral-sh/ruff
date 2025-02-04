@@ -304,65 +304,58 @@ impl<'s> Parser<'s> {
                     }
                 }
                 '`' => {
-                    match self.cursor.first() {
-                        '`' if self.cursor.second() == '`' => {
-                            // We see the triple-backtick beginning of a code block.
-                            self.cursor.bump();
-                            self.cursor.bump();
+                    if self.cursor.eat_char2('`', '`') {
+                        // We saw the triple-backtick beginning of a code block.
 
-                            if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
-                                bail!("Code blocks must start on a new line and be preceded by at least one blank line.");
-                            }
-
-                            self.skip_whitespace();
-
-                            // Parse the code block language specifier
-                            let lang = self
-                                .consume_until(|c| matches!(c, ' ' | '\n'))
-                                .unwrap_or_default();
-
-                            self.skip_whitespace();
-
-                            if self.cursor.first() != '\n' {
-                                bail!("Trailing code-block metadata is not supported. Only the code block language can be specified.");
-                            }
-
-                            self.skip_to_beginning_of_next_line();
-
-                            if let Some(position) =
-                                memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
-                            {
-                                let mut code = &self.cursor.as_str()[..position];
-                                self.cursor.skip_bytes(position + CODE_BLOCK_END.len());
-
-                                if code.ends_with('\n') {
-                                    code = &code[..code.len() - 1];
-                                }
-
-                                self.process_code_block(lang, code)?;
-                            } else {
-                                let code_block_start = self.cursor.token_len();
-                                let line =
-                                    self.source.count_lines(TextRange::up_to(code_block_start));
-                                bail!("Unterminated code block at line {line}.");
-                            }
-
-                            self.explicit_path = None;
+                        if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
+                            bail!("Code blocks must start on a new line and be preceded by at least one blank line.");
                         }
-                        _ if self.preceding_blank_lines > 0 => {
-                            // This could be a line that specifies an explicit path for a Markdown code block (`module.py`:)
-                            self.explicit_path = None;
 
-                            if let Some(path) = self.consume_until(|c| matches!(c, '`' | '\n')) {
-                                if self.cursor.eat_char('`') {
-                                    self.skip_whitespace();
-                                    if self.cursor.eat_char(':') {
-                                        self.explicit_path = Some(path);
-                                    }
+                        self.skip_whitespace();
+
+                        // Parse the code block language specifier
+                        let lang = self
+                            .consume_until(|c| matches!(c, ' ' | '\n'))
+                            .unwrap_or_default();
+
+                        self.skip_whitespace();
+
+                        if self.cursor.first() != '\n' {
+                            bail!("Trailing code-block metadata is not supported. Only the code block language can be specified.");
+                        }
+
+                        self.skip_to_beginning_of_next_line();
+
+                        if let Some(position) =
+                            memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
+                        {
+                            let mut code = &self.cursor.as_str()[..position];
+                            self.cursor.skip_bytes(position + CODE_BLOCK_END.len());
+
+                            if code.ends_with('\n') {
+                                code = &code[..code.len() - 1];
+                            }
+
+                            self.process_code_block(lang, code)?;
+                        } else {
+                            let code_block_start = self.cursor.token_len();
+                            let line = self.source.count_lines(TextRange::up_to(code_block_start));
+                            bail!("Unterminated code block at line {line}.");
+                        }
+
+                        self.explicit_path = None;
+                    } else if self.preceding_blank_lines > 0 {
+                        // This could be a line that specifies an explicit path for a Markdown code block (`module.py`:)
+                        self.explicit_path = None;
+
+                        if let Some(path) = self.consume_until(|c| matches!(c, '`' | '\n')) {
+                            if self.cursor.eat_char('`') {
+                                self.skip_whitespace();
+                                if self.cursor.eat_char(':') {
+                                    self.explicit_path = Some(path);
                                 }
                             }
                         }
-                        _ => {}
                     }
 
                     self.preceding_blank_lines = 0;
