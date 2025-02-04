@@ -108,13 +108,13 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     let mut diagnostic = Diagnostic::new(PrivateTypeParameter { kind }, binding.range);
 
+    let new_name = old_name.trim_start_matches('_');
+
     // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
     // a suggested fix
-    if try_shadowed_kind(old_name, checker, binding.scope).shadows_any() {
+    if try_shadowed_kind(new_name, checker, binding.scope).shadows_any() {
         return Some(diagnostic);
     }
-
-    let new_name = old_name.trim_start_matches('_');
 
     diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
