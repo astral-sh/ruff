@@ -295,7 +295,7 @@ if_stmt_min_max.py:132:1: PLR1730 [*] Replace `if` statement with `min` call
 134 133 |         value.
 135 134 |         attr
 136     |-    ) = 3
-    135 |+    ) = min(3, value.attr)
+    135 |+    ) = min(value.attr, 3)
 137 136 | 
 138 137 | class Foo:
 139 138 |     _min = 0

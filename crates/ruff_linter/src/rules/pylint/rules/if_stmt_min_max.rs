@@ -121,59 +121,48 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let left_is_value = left_cmp == body_value_cmp;
     let right_is_value = right_cmp == body_value_cmp;
 
-    // Determine whether to use `min()` or `max()`, and whether to flip the
-    // order of the arguments, which is relevant for breaking ties.
+    // Determine whether to use `min()` or `max()`, and make sure that the first
+    // arg of the `min()` or `max()` method is equal to the target of the comparison.
+    // This is to be consistent with the Python implementation of the methods `min()` and `max()`.
     // Also ensure that we understand the operation we're trying to do,
     // by checking both sides of the comparison and assignment.
-    let (min_max, flip_args) = match (
+    let (min_max, arg1, arg2) = match (
         left_is_target,
         right_is_target,
         left_is_value,
         right_is_value,
     ) {
         (true, false, false, true) => match op {
-            CmpOp::Lt => (MinMax::Max, true),
-            CmpOp::LtE => (MinMax::Max, false),
-            CmpOp::Gt => (MinMax::Min, true),
-            CmpOp::GtE => (MinMax::Min, false),
+            CmpOp::Lt => (MinMax::Max, left.as_ref(), right),
+            CmpOp::LtE => (MinMax::Max, left.as_ref(), right),
+            CmpOp::Gt => (MinMax::Min, left.as_ref(), right),
+            CmpOp::GtE => (MinMax::Min, left.as_ref(), right),
             _ => return,
         },
         (false, true, true, false) => match op {
-            CmpOp::Lt => (MinMax::Min, true),
-            CmpOp::LtE => (MinMax::Min, false),
-            CmpOp::Gt => (MinMax::Max, true),
-            CmpOp::GtE => (MinMax::Max, false),
+            CmpOp::Lt => (MinMax::Min, right, left.as_ref()),
+            CmpOp::LtE => (MinMax::Min, right, left.as_ref()),
+            CmpOp::Gt => (MinMax::Max, right, left.as_ref()),
+            CmpOp::GtE => (MinMax::Max, right, left.as_ref()),
             _ => return,
         },
         _ => return,
     };
 
-    let (arg1, arg2) = if flip_args {
-        (left.as_ref(), right)
-    } else {
-        (right, left.as_ref())
-    };
-
-    // Extract the target of the comparison
-    let cmp_target = checker.locator().slice(
-        parenthesized_range(
-            body_target.into(),
-            body.into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
-        )
-        .unwrap_or(body_target.range()),
+    let replacement = format!(
+        "{} = {min_max}({}, {})",
+        checker.locator().slice(
+            parenthesized_range(
+                body_target.into(),
+                body.into(),
+                checker.comment_ranges(),
+                checker.locator().contents()
+            )
+            .unwrap_or(body_target.range())
+        ),
+        checker.locator().slice(arg1),
+        checker.locator().slice(arg2),
     );
-
-    // Make sure that the first arg of the min/max method is equal
-    // to the target of the comparison
-    let (first_cmp_arg, second_cmp_arg) = if checker.locator().slice(arg1) == cmp_target {
-        (checker.locator().slice(arg1), checker.locator().slice(arg2))
-    } else {
-        (checker.locator().slice(arg2), checker.locator().slice(arg1))
-    };
-
-    let replacement = format!("{cmp_target} = {min_max}({first_cmp_arg}, {second_cmp_arg})",);
 
     let mut diagnostic = Diagnostic::new(
         IfStmtMinMax {
