@@ -1,5 +1,5 @@
 use anyhow::bail;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
@@ -189,7 +189,12 @@ struct Parser<'s> {
 
     /// [`EmbeddedFile`]s of the final [`MarkdownTestSuite`].
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
-    unnamed_file_count: usize,
+
+    /// The counts are done by section. This gives each code block a
+    /// somewhat locally derived name. That is, adding new sections
+    /// won't change the names of files in other sections. This is
+    /// important for avoiding snapshot churn.
+    unnamed_file_count: FxHashMap<SectionId, usize>,
 
     /// The unparsed remainder of the Markdown source.
     cursor: Cursor<'s>,
@@ -226,7 +231,7 @@ impl<'s> Parser<'s> {
             sections,
             source,
             files: IndexVec::default(),
-            unnamed_file_count: 0,
+            unnamed_file_count: FxHashMap::default(),
             cursor: Cursor::new(source),
             preceding_blank_lines: 0,
             explicit_path: None,
@@ -444,11 +449,12 @@ impl<'s> Parser<'s> {
         let path = match self.explicit_path {
             Some(path) => path.to_string(),
             None => {
-                self.unnamed_file_count += 1;
+                let unnamed_file_count = self.unnamed_file_count.entry(section).or_default();
+                *unnamed_file_count += 1;
 
                 match lang {
-                    "py" | "pyi" => format!("mdtest_snippet__{}.{lang}", self.unnamed_file_count),
-                    "" => format!("mdtest_snippet__{}.py", self.unnamed_file_count),
+                    "py" | "pyi" => format!("mdtest_snippet__{unnamed_file_count}.{lang}"),
+                    "" => format!("mdtest_snippet__{unnamed_file_count}.py"),
                     _ => {
                         bail!(
                             "Cannot generate name for `lang={}`: Unsupported extension",
@@ -620,7 +626,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path, "mdtest_snippet__2.py");
+        assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "y = 2");
 
@@ -628,11 +634,11 @@ mod tests {
             panic!("expected two files");
         };
 
-        assert_eq!(file_1.path, "mdtest_snippet__3.pyi");
+        assert_eq!(file_1.path, "mdtest_snippet__1.pyi");
         assert_eq!(file_1.lang, "pyi");
         assert_eq!(file_1.code, "a: int");
 
-        assert_eq!(file_2.path, "mdtest_snippet__4.pyi");
+        assert_eq!(file_2.path, "mdtest_snippet__2.pyi");
         assert_eq!(file_2.lang, "pyi");
         assert_eq!(file_2.code, "b: str");
     }
