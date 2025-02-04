@@ -50,16 +50,20 @@ def _(
 
 ## Instances
 
+Checks that we don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
+
+### __bool__ is bool
+
 ```py
-# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
 class BoolIsBool:
     __bool__ = bool
 
-# TODO: when bool is used as a method, it is called without arguments and always returns False, but this is not yet implemented
-# see https://github.com/astral-sh/ruff/issues/15672
-
 reveal_type(bool(BoolIsBool()))  # revealed: bool
+```
 
+### Conditional __bool__ method
+
+```py
 def flag() -> bool:
     return True
 

@@ -2160,44 +2160,10 @@ impl<'db> Type<'db> {
                 self.call(db, &arguments.with_self(*receiver_ty))
             }
 
-            object_ty @ (Type::Instance(_) | Type::ClassLiteral(_)) => {
-                match object_ty.member(db, "__get__") {
-                    Symbol::Type(get_method, _) => {
-                        let descr_result = match receiver_ty {
-                            Type::Instance(_) => {
-                                let receiver_class = receiver_ty.to_meta_type(db);
-
-                                get_method.call(
-                                    db,
-                                    &CallArguments::positional([*receiver_ty, receiver_class]),
-                                )
-                            }
-                            Type::ClassLiteral(_) => get_method.call(
-                                db,
-                                &CallArguments::positional([
-                                    KnownClass::NoneType.to_instance(db),
-                                    object_ty,
-                                ]),
-                            ),
-                            _ => unreachable!(),
-                        };
-
-                        match descr_result {
-                            CallOutcome::Callable { binding } => {
-                                binding.return_type().call(db, arguments)
-                            }
-                            _ => descr_result,
-                        }
-                    }
-                    Symbol::Unbound => {
-                        // Not a descriptor, so call without passing the instance
-                        self.call(db, arguments)
-                    }
-                }
+            Type::Instance(_) | Type::ClassLiteral(_) => {
+                // TODO descriptor protocol. For now, assume non-descriptor and call without `self` argument.
+                self.call(db, arguments)
             }
-
-            // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_type(self)),
 
             Type::Union(union) => CallOutcome::union(
                 self,
@@ -2210,6 +2176,9 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call_bound()"),
             )),
+
+            // Cases that duplicate, and thus must be kept in sync with, `Type::call()`
+            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_type(self)),
 
             _ => CallOutcome::not_callable(self),
         }

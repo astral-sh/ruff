@@ -137,14 +137,6 @@ class AlwaysFalse:
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
 
-# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
-class BoolIsBool:
-    __bool__ = bool
-
-# TODO: when bool is used as a method, it is called without arguments and always returns False, but this is not yet implemented
-# revealed: bool
-reveal_type(not BoolIsBool())
-
 # At runtime, no `__bool__` and no `__len__` means truthy, but we can't rely on that, because
 # a subclass could add a `__bool__` method.
 class NoBoolMethod: ...
