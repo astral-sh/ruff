@@ -722,7 +722,7 @@ with tempfile.TemporaryDirectory() as d1:
 
 ### Preserving parentheses around single-element lists
 
-Ruff preserves parentheses around list elements, even if the list only contains a single element. The Black 2025 or newer, on the other hand, removes the parentheses 
+Ruff preserves at least one parentheses around list elements, even if the list only contains a single element. The Black 2025 or newer, on the other hand, removes the parentheses 
 for single-element lists if they aren't multiline and doing so does not change semantics:
 
 ```python
@@ -737,8 +737,8 @@ items = [True]
 items = {123}
 
 # Ruff
-items = [True]
-items = [True]
-items = {123}
+items = [(True)]
+items = [(True)]
+items = {(123)}
 
 ```
