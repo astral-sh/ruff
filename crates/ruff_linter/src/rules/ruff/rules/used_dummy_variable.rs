@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::{
     checkers::ast::Checker,
-    renamer::{try_shadowed_kind, Renamer, ShadowedKind},
+    renamer::{Renamer, ShadowedKind},
 };
 
 /// ## What it does
@@ -179,7 +179,7 @@ pub(crate) fn used_dummy_variable(
     // Trim the leading underscores for further checks
     let trimmed_name = name.trim_start_matches('_');
 
-    let shadowed_kind = try_shadowed_kind(trimmed_name, checker, binding.scope);
+    let shadowed_kind = ShadowedKind::new(trimmed_name, checker, binding.scope);
 
     let mut diagnostic = Diagnostic::new(
         UsedDummyVariable {

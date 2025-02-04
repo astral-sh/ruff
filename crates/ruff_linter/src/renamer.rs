@@ -387,6 +387,32 @@ pub(crate) enum ShadowedKind {
 }
 
 impl ShadowedKind {
+    /// Determines the kind of shadowing or conflict for a given variable name.
+    ///
+    /// This function is useful for checking whether or not the `target` of a [`Rename::rename`]
+    /// will shadow another binding.
+    pub(crate) fn new(name: &str, checker: &Checker, scope_id: ScopeId) -> ShadowedKind {
+        // Check the kind in order of precedence
+        if is_keyword(name) {
+            return ShadowedKind::Keyword;
+        }
+
+        if is_python_builtin(
+            name,
+            checker.settings.target_version.minor(),
+            checker.source_type.is_ipynb(),
+        ) {
+            return ShadowedKind::BuiltIn;
+        }
+
+        if !checker.semantic().is_available_in_scope(name, scope_id) {
+            return ShadowedKind::Some;
+        }
+
+        // Default to no shadowing
+        ShadowedKind::None
+    }
+
     /// Returns `true` if `self` shadows any global, nonlocal, or local symbol, keyword, or builtin.
     pub(crate) fn shadows_any(self) -> bool {
         matches!(
@@ -394,30 +420,4 @@ impl ShadowedKind {
             ShadowedKind::Some | ShadowedKind::BuiltIn | ShadowedKind::Keyword
         )
     }
-}
-
-/// Determines the kind of shadowing or conflict for a given variable name.
-///
-/// This function is useful for checking whether or not the `target` of a [`Rename::rename`] will
-/// shadow another binding.
-pub(crate) fn try_shadowed_kind(name: &str, checker: &Checker, scope_id: ScopeId) -> ShadowedKind {
-    // Check the kind in order of precedence
-    if is_keyword(name) {
-        return ShadowedKind::Keyword;
-    }
-
-    if is_python_builtin(
-        name,
-        checker.settings.target_version.minor(),
-        checker.source_type.is_ipynb(),
-    ) {
-        return ShadowedKind::BuiltIn;
-    }
-
-    if !checker.semantic().is_available_in_scope(name, scope_id) {
-        return ShadowedKind::Some;
-    }
-
-    // Default to no shadowing
-    ShadowedKind::None
 }
