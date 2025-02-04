@@ -40,6 +40,10 @@ mod tests {
         Rule::FunctionCallInDataclassDefaultArgument,
         Path::new("RUF009_attrs_auto_attribs.py")
     )]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_deferred.py")
+    )]
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012_deferred.py"))]
