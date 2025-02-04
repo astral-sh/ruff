@@ -284,3 +284,23 @@ PYI019_0.py:154:26: PYI019 Use `Self` instead of custom TypeVar `S`
 156 |         return x
     |
     = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:159:26: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+158 | class DeletionsAreNotTouched:
+159 |     def m[S](self: S) -> S:
+    |                          ^ PYI019
+160 |         # `S` is not a local variable here, and `del` can only be used with local variables,
+161 |         # so `del S` here is not actually a reference to the type variable `S`.
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:168:26: PYI019 Use `Self` instead of custom TypeVar `S`
+    |
+167 | class NamesShadowingTypeVarAreNotTouched:
+168 |     def m[S](self: S) -> S:
+    |                          ^ PYI019
+169 |         type S = int
+170 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+    |
+    = help: Replace TypeVar `S` with `Self`

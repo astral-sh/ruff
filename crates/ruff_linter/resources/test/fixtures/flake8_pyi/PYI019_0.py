@@ -154,3 +154,18 @@ class StringizedReferencesAreTooComplicated:
     def m[S](self: S) -> S:
         x = cast("S", self)
         return x
+
+class DeletionsAreNotTouched:
+    def m[S](self: S) -> S:
+        # `S` is not a local variable here, and `del` can only be used with local variables,
+        # so `del S` here is not actually a reference to the type variable `S`.
+        # This `del` statement is therefore not touched by the autofix (it raises `UnboundLocalError`
+        # both before and after the autofix)
+        del S
+        return self
+
+class NamesShadowingTypeVarAreNotTouched:
+    def m[S](self: S) -> S:
+        type S = int
+        print(S)  # not a reference to the type variable, so not touched by the autofix
+        return 42

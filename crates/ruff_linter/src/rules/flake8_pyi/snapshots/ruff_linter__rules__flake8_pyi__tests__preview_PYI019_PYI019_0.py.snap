@@ -628,3 +628,43 @@ PYI019_0.py:154:10: PYI019 Use `Self` instead of custom TypeVar `S`
 156 |         return x
     |
     = help: Replace TypeVar `S` with `Self`
+
+PYI019_0.py:159:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+    |
+158 | class DeletionsAreNotTouched:
+159 |     def m[S](self: S) -> S:
+    |          ^^^^^^^^^^^^^^^^^ PYI019
+160 |         # `S` is not a local variable here, and `del` can only be used with local variables,
+161 |         # so `del S` here is not actually a reference to the type variable `S`.
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+ℹ Safe fix
+156 156 |         return x
+157 157 | 
+158 158 | class DeletionsAreNotTouched:
+159     |-    def m[S](self: S) -> S:
+    159 |+    def m(self) -> Self:
+160 160 |         # `S` is not a local variable here, and `del` can only be used with local variables,
+161 161 |         # so `del S` here is not actually a reference to the type variable `S`.
+162 162 |         # This `del` statement is therefore not touched by the autofix (it raises `UnboundLocalError`
+
+PYI019_0.py:168:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+    |
+167 | class NamesShadowingTypeVarAreNotTouched:
+168 |     def m[S](self: S) -> S:
+    |          ^^^^^^^^^^^^^^^^^ PYI019
+169 |         type S = int
+170 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+ℹ Safe fix
+165 165 |         return self
+166 166 | 
+167 167 | class NamesShadowingTypeVarAreNotTouched:
+168     |-    def m[S](self: S) -> S:
+    168 |+    def m(self) -> Self:
+169 169 |         type S = int
+170 170 |         print(S)  # not a reference to the type variable, so not touched by the autofix
+171 171 |         return 42
