@@ -478,7 +478,6 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
-    always_reachable: bool,
 }
 
 pub(super) struct UseDefMapBuilder<'db> {
@@ -505,8 +504,6 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Currently live bindings and declarations for each symbol.
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
-
-    always_reachable: bool,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -519,7 +516,6 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
-            always_reachable: true,
         }
     }
 }
@@ -527,7 +523,6 @@ impl Default for UseDefMapBuilder<'_> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
         self.record_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_FALSE);
-        self.always_reachable = false;
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
@@ -596,11 +591,11 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
 
-        if !self.always_reachable {
+        // If there are any control flow paths that have become unreachable between `snapshot` and
+        // now, then it's not valid to simplify any visibility constraints to `snapshot`.
+        if self.scope_start_visibility != snapshot.scope_start_visibility {
             return;
         }
-
-        self.scope_start_visibility = snapshot.scope_start_visibility;
 
         // Note that this loop terminates when we reach a symbol not present in the snapshot.
         // This means we keep visibility constraints for all new symbols, which is intended,
@@ -653,7 +648,6 @@ impl<'db> UseDefMapBuilder<'db> {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
             scope_start_visibility: self.scope_start_visibility,
-            always_reachable: self.always_reachable,
         }
     }
 
@@ -668,7 +662,6 @@ impl<'db> UseDefMapBuilder<'db> {
         // Restore the current visible-definitions state to the given snapshot.
         self.symbol_states = snapshot.symbol_states;
         self.scope_start_visibility = snapshot.scope_start_visibility;
-        self.always_reachable = snapshot.always_reachable;
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
@@ -691,12 +684,10 @@ impl<'db> UseDefMapBuilder<'db> {
         // bindings will include this reachability condition, so that later during type inference,
         // we can determine whether any particular binding is non-visible due to unreachability.
         if snapshot.scope_start_visibility == ScopedVisibilityConstraintId::ALWAYS_FALSE {
-            self.always_reachable = false;
             return;
         }
         if self.scope_start_visibility == ScopedVisibilityConstraintId::ALWAYS_FALSE {
             self.restore(snapshot);
-            self.always_reachable = false;
             return;
         }
 
@@ -721,7 +712,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.scope_start_visibility = self
             .visibility_constraints
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
-        self.always_reachable &= snapshot.always_reachable;
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
