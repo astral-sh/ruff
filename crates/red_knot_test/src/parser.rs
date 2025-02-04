@@ -73,6 +73,10 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     pub(crate) fn configuration(&self) -> &MarkdownTestConfig {
         &self.section.config
     }
+
+    pub(super) fn should_snapshot_diagnostics(&self) -> bool {
+        self.section.snapshot_diagnostics
+    }
 }
 
 /// Iterator yielding all [`MarkdownTest`]s in a [`MarkdownTestSuite`].
@@ -122,6 +126,7 @@ struct Section<'s> {
     level: u8,
     parent_id: Option<SectionId>,
     config: MarkdownTestConfig,
+    snapshot_diagnostics: bool,
 }
 
 #[newtype_index]
@@ -226,6 +231,7 @@ impl<'s> Parser<'s> {
             level: 0,
             parent_id: None,
             config: MarkdownTestConfig::default(),
+            snapshot_diagnostics: false,
         });
         Self {
             sections,
@@ -284,10 +290,27 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
+        const SECTION_CONFIG_SNAPSHOT: &str = "<!-- snapshot-diagnostics -->";
         const CODE_BLOCK_END: &[u8] = b"```";
 
         while let Some(first) = self.cursor.bump() {
             match first {
+                '<' => {
+                    self.explicit_path = None;
+                    self.preceding_blank_lines = 0;
+                    // If we want to support more comment directives, then we should
+                    // probably just parse the directive generically first. But it's
+                    // not clear if we'll want to add more, since comments are hidden
+                    // from GitHub Markdown rendering.
+                    if self
+                        .cursor
+                        .as_str()
+                        .starts_with(&SECTION_CONFIG_SNAPSHOT[1..])
+                    {
+                        self.cursor.skip_bytes(SECTION_CONFIG_SNAPSHOT.len() - 1);
+                        self.process_snapshot_diagnostics()?;
+                    }
+                }
                 '#' => {
                     self.explicit_path = None;
                     self.preceding_blank_lines = 0;
@@ -402,6 +425,7 @@ impl<'s> Parser<'s> {
             level: header_level.try_into()?,
             parent_id: Some(parent),
             config: self.sections[parent].config.clone(),
+            snapshot_diagnostics: self.sections[parent].snapshot_diagnostics,
         };
 
         if self.current_section_files.is_some() {
@@ -496,6 +520,32 @@ impl<'s> Parser<'s> {
         current_section.config = MarkdownTestConfig::from_str(code)?;
 
         self.current_section_has_config = true;
+
+        Ok(())
+    }
+
+    fn process_snapshot_diagnostics(&mut self) -> anyhow::Result<()> {
+        if self.current_section_has_config {
+            bail!(
+                "Section config to enable snapshotting diagnostics must come before \
+                 everything else (including TOML configuration blocks).",
+            );
+        }
+        if self.current_section_files.is_some() {
+            bail!(
+                "Section config to enable snapshotting diagnostics must come before \
+                 everything else (including embedded files).",
+            );
+        }
+
+        let current_section = &mut self.sections[self.stack.top()];
+        if current_section.snapshot_diagnostics {
+            bail!(
+                "Section config to enable snapshotting diagnostics should appear \
+                 at most once.",
+            );
+        }
+        current_section.snapshot_diagnostics = true;
 
         Ok(())
     }
@@ -1294,5 +1344,75 @@ mod tests {
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Trailing code-block metadata is not supported. Only the code block language can be specified.");
+    }
+
+    #[test]
+    fn duplicate_section_directive_not_allowed() {
+        let source = dedent(
+            "
+            # Some header
+
+            <!-- snapshot-diagnostics -->
+            <!-- snapshot-diagnostics -->
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Section config to enable snapshotting diagnostics should appear at most once.",
+        );
+    }
+
+    #[test]
+    fn section_directive_must_appear_before_config() {
+        let source = dedent(
+            "
+            # Some header
+
+            ```toml
+            [environment]
+            typeshed = \"/typeshed\"
+            ```
+
+            <!-- snapshot-diagnostics -->
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Section config to enable snapshotting diagnostics must \
+             come before everything else \
+             (including TOML configuration blocks).",
+        );
+    }
+
+    #[test]
+    fn section_directive_must_appear_before_embedded_files() {
+        let source = dedent(
+            "
+            # Some header
+
+            ```py
+            x = 1
+            ```
+
+            <!-- snapshot-diagnostics -->
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Section config to enable snapshotting diagnostics must \
+             come before everything else \
+             (including embedded files).",
+        );
     }
 }

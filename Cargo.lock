@@ -2518,6 +2518,7 @@ dependencies = [
  "anyhow",
  "camino",
  "colored 3.0.0",
+ "insta",
  "memchr",
  "red_knot_python_semantic",
  "red_knot_vendored",
