@@ -4,7 +4,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::ExprGenerator;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
@@ -126,9 +127,19 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
         );
 
         // Replace `)` with `}`.
+        // Place `}` at argument's end or at trailing comma if present
+        let mut tokenizer = SimpleTokenizer::starts_at(
+            argument.end(),
+            checker.locator().slice(TextRange::up_to(call.end())),
+        );
+        let right_brace_loc = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .map_or(call.arguments.end() - TextSize::from(1), |comma| {
+                comma.end() - TextSize::from(1)
+            });
         let call_end = Edit::replacement(
             pad_end("}", call.range(), checker.locator(), checker.semantic()),
-            call.arguments.end() - TextSize::from(1),
+            right_brace_loc,
             call.end(),
         );
 

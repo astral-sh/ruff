@@ -4,7 +4,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::ExprGenerator;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -123,11 +124,17 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
         );
 
         // Replace `)` with `]`.
-        let call_end = Edit::replacement(
-            "]".to_string(),
-            call.arguments.end() - TextSize::from(1),
-            call.end(),
+        // Place `]` at argument's end or at trailing comma if present
+        let mut tokenizer = SimpleTokenizer::starts_at(
+            argument.end(),
+            checker.locator().slice(TextRange::up_to(call.end())),
         );
+        let right_bracket_loc = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .map_or(call.arguments.end() - TextSize::from(1), |comma| {
+                comma.end() - TextSize::from(1)
+            });
+        let call_end = Edit::replacement("]".to_string(), right_bracket_loc, call.end());
 
         // Remove the inner parentheses, if the expression is a generator. The easiest way to do
         // this reliably is to use the printer.
