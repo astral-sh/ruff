@@ -210,6 +210,9 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
         match *self {
+            // We use format_args instead of rendering the strings directly so that we don't get
+            // any quotes in the output: ScopedVisibilityConstraintId(AlwaysTrue) instead of
+            // ScopedVisibilityConstraintId("AlwaysTrue").
             ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")),
             AMBIGUOUS => f.field(&format_args!("Ambiguous")),
             ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")),
