@@ -152,7 +152,7 @@
 
 use std::cmp::Ordering;
 
-use ruff_index::{newtype_index, Idx, IndexVec};
+use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::{
@@ -212,9 +212,6 @@ struct InteriorNode {
     if_ambiguous: ScopedVisibilityConstraintId,
     if_false: ScopedVisibilityConstraintId,
 }
-
-#[newtype_index]
-struct InteriorNodeId;
 
 /// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
 /// this is (one of the copies of) a `Constraint` that represents some runtime property of the
@@ -285,6 +282,21 @@ impl ScopedVisibilityConstraintId {
     }
 }
 
+impl Idx for ScopedVisibilityConstraintId {
+    #[inline]
+    fn new(value: usize) -> Self {
+        assert!(value <= (SMALLEST_TERMINAL as usize));
+        #[allow(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    #[inline]
+    fn index(self) -> usize {
+        debug_assert!(!self.is_terminal());
+        self.0 as usize
+    }
+}
+
 // Rebind some constants locally so that we don't need as many qualifiers below.
 const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
 const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
@@ -296,15 +308,15 @@ const SMALLEST_TERMINAL: u32 = ALWAYS_FALSE.0;
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints<'db> {
     constraints: IndexVec<Atom, Constraint<'db>>,
-    interiors: IndexVec<InteriorNodeId, InteriorNode>,
+    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraintsBuilder<'db> {
     constraints: IndexVec<Atom, Constraint<'db>>,
-    interiors: IndexVec<InteriorNodeId, InteriorNode>,
+    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
     constraint_cache: FxHashMap<Constraint<'db>, Atom>,
-    interior_cache: FxHashMap<InteriorNode, InteriorNodeId>,
+    interior_cache: FxHashMap<InteriorNode, ScopedVisibilityConstraintId>,
     not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
     and_cache: FxHashMap<
         (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
@@ -324,11 +336,6 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         }
     }
 
-    fn interior_node(&self, a: ScopedVisibilityConstraintId) -> InteriorNode {
-        debug_assert!(!a.is_terminal());
-        self.interiors[InteriorNodeId::from(a.0)]
-    }
-
     /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
     /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
     /// any internal node, since they are leaf nodes.
@@ -344,7 +351,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         } else if b.is_terminal() {
             Ordering::Less
         } else {
-            self.interior_node(a).atom.cmp(&self.interior_node(b).atom)
+            self.interiors[a].atom.cmp(&self.interiors[b].atom)
         }
     }
 
@@ -365,13 +372,10 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             return node.if_true;
         }
 
-        let index = *self
+        *self
             .interior_cache
             .entry(node)
-            .or_insert_with(|| self.interiors.push(node));
-        let index = index.as_u32();
-        debug_assert!(index < SMALLEST_TERMINAL);
-        ScopedVisibilityConstraintId(index)
+            .or_insert_with(|| self.interiors.push(node))
     }
 
     /// Adds a new visibility constraint that checks a single [`Constraint`]. Provide different
@@ -407,7 +411,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         if let Some(cached) = self.not_cache.get(&a) {
             return *cached;
         }
-        let a_node = self.interior_node(a);
+        let a_node = self.interiors[a];
         let if_true = self.add_not_constraint(a_node.if_true);
         let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
         let if_false = self.add_not_constraint(a_node.if_false);
@@ -442,8 +446,8 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
             Ordering::Equal => {
-                let a_node = self.interior_node(a);
-                let b_node = self.interior_node(b);
+                let a_node = self.interiors[a];
+                let b_node = self.interiors[b];
                 let if_true = self.add_or_constraint(a_node.if_true, b_node.if_true);
                 let if_false = self.add_or_constraint(a_node.if_false, b_node.if_false);
                 let if_ambiguous = if if_true == if_false {
@@ -454,7 +458,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
                 (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Less => {
-                let a_node = self.interior_node(a);
+                let a_node = self.interiors[a];
                 let if_true = self.add_or_constraint(a_node.if_true, b);
                 let if_false = self.add_or_constraint(a_node.if_false, b);
                 let if_ambiguous = if if_true == if_false {
@@ -465,7 +469,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
                 (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Greater => {
-                let b_node = self.interior_node(b);
+                let b_node = self.interiors[b];
                 let if_true = self.add_or_constraint(a, b_node.if_true);
                 let if_false = self.add_or_constraint(a, b_node.if_false);
                 let if_ambiguous = if if_true == if_false {
@@ -508,8 +512,8 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
             Ordering::Equal => {
-                let a_node = self.interior_node(a);
-                let b_node = self.interior_node(b);
+                let a_node = self.interiors[a];
+                let b_node = self.interiors[b];
                 let if_true = self.add_and_constraint(a_node.if_true, b_node.if_true);
                 let if_false = self.add_and_constraint(a_node.if_false, b_node.if_false);
                 let if_ambiguous = if if_true == if_false {
@@ -520,7 +524,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
                 (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Less => {
-                let a_node = self.interior_node(a);
+                let a_node = self.interiors[a];
                 let if_true = self.add_and_constraint(a_node.if_true, b);
                 let if_false = self.add_and_constraint(a_node.if_false, b);
                 let if_ambiguous = if if_true == if_false {
@@ -531,7 +535,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
                 (a_node.atom, if_true, if_ambiguous, if_false)
             }
             Ordering::Greater => {
-                let b_node = self.interior_node(b);
+                let b_node = self.interiors[b];
                 let if_true = self.add_and_constraint(a, b_node.if_true);
                 let if_false = self.add_and_constraint(a, b_node.if_false);
                 let if_ambiguous = if if_true == if_false {
@@ -555,11 +559,6 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
 }
 
 impl<'db> VisibilityConstraints<'db> {
-    fn interior_node(&self, a: ScopedVisibilityConstraintId) -> InteriorNode {
-        debug_assert!(!a.is_terminal());
-        self.interiors[InteriorNodeId::from(a.0)]
-    }
-
     /// Analyze the statically known visibility for a given visibility constraint.
     pub(crate) fn evaluate(
         &self,
@@ -571,7 +570,7 @@ impl<'db> VisibilityConstraints<'db> {
                 ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.interior_node(id),
+                _ => self.interiors[id],
             };
             let constraint = &self.constraints[node.atom];
             match Self::analyze_single(db, constraint) {
