@@ -29,13 +29,17 @@ builtins from the "actual" vendored typeshed:
 typeshed = "/typeshed"
 ```
 
-```pyi path=/typeshed/stdlib/builtins.pyi
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
 class Custom: ...
 
 custom_builtin: Custom
 ```
 
-```pyi path=/typeshed/stdlib/typing_extensions.pyi
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
 def reveal_type(obj, /): ...
 ```
 
@@ -56,12 +60,16 @@ that point:
 typeshed = "/typeshed"
 ```
 
-```pyi path=/typeshed/stdlib/builtins.pyi
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
 foo = bar
 bar = 1
 ```
 
-```pyi path=/typeshed/stdlib/typing_extensions.pyi
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
 def reveal_type(obj, /): ...
 ```
 

@@ -198,7 +198,7 @@ pub(crate) fn custom_type_var_instead_of_self(
 
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarForSelf {
-            typevar_name: custom_typevar.name.to_string(),
+            typevar_name: custom_typevar.name(checker).to_string(),
         },
         diagnostic_range,
     );
@@ -207,7 +207,7 @@ pub(crate) fn custom_type_var_instead_of_self(
         replace_custom_typevar_with_self(
             checker,
             function_def,
-            &custom_typevar,
+            custom_typevar,
             self_or_cls_parameter,
             self_or_cls_annotation,
             function_header_end,
@@ -294,14 +294,9 @@ impl ClassMethod<'_> {
             return None;
         }
 
-        let binding = semantic
+        semantic
             .resolve_name(cls_annotation_typevar)
-            .map(|binding_id| semantic.binding(binding_id))?;
-
-        Some(TypeVar {
-            name: cls_annotation_typevar_name,
-            binding,
-        })
+            .map(|binding_id| TypeVar(semantic.binding(binding_id)))
     }
 }
 
@@ -371,14 +366,9 @@ impl InstanceMethod<'_> {
             return None;
         }
 
-        let binding = semantic
+        semantic
             .resolve_name(self_annotation)
-            .map(|binding_id| semantic.binding(binding_id))?;
-
-        Some(TypeVar {
-            name: first_arg_type,
-            binding,
-        })
+            .map(|binding_id| TypeVar(semantic.binding(binding_id)))
     }
 }
 
@@ -448,10 +438,7 @@ fn custom_typevar_preview<'a>(
             .iter()
             .filter_map(ast::TypeParam::as_type_var)
             .any(|ast::TypeParamTypeVar { name, .. }| name.id == typevar_expr.id)
-            .then_some(TypeVar {
-                name: &typevar_expr.id,
-                binding,
-            });
+            .then_some(TypeVar(binding));
     }
 
     // Example:
@@ -471,10 +458,7 @@ fn custom_typevar_preview<'a>(
 
     semantic
         .match_typing_expr(&rhs_function.func, "TypeVar")
-        .then_some(TypeVar {
-            name: &typevar_expr.id,
-            binding,
-        })
+        .then_some(TypeVar(binding))
 }
 
 /// Add a "Replace with `Self`" fix that does the following:
@@ -486,7 +470,7 @@ fn custom_typevar_preview<'a>(
 fn replace_custom_typevar_with_self(
     checker: &Checker,
     function_def: &ast::StmtFunctionDef,
-    custom_typevar: &TypeVar,
+    custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
     function_header_end: TextSize,
@@ -576,7 +560,7 @@ fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), 
 /// Only references within `editable_range` will be modified.
 /// This ensures that no edit in this series will overlap with other edits.
 fn replace_typevar_usages_with_self<'a>(
-    typevar: &'a TypeVar<'a>,
+    typevar: TypeVar<'a>,
     self_or_cls_annotation_range: TextRange,
     self_symbol_binding: &'a str,
     editable_range: TextRange,
@@ -599,7 +583,7 @@ fn replace_typevar_usages_with_self<'a>(
 /// Return `None` if we fail to find a `TypeVar` that matches the range of `typevar_binding`.
 fn remove_pep695_typevar_declaration(
     type_params: &ast::TypeParams,
-    custom_typevar: &TypeVar,
+    custom_typevar: TypeVar,
 ) -> Option<Edit> {
     if let [sole_typevar] = &**type_params {
         return (sole_typevar.name().range() == custom_typevar.range())
@@ -625,22 +609,23 @@ fn remove_pep695_typevar_declaration(
     Some(Edit::range_deletion(deletion_range))
 }
 
-#[derive(Debug)]
-struct TypeVar<'a> {
-    name: &'a str,
-    binding: &'a Binding<'a>,
-}
+#[derive(Debug, Copy, Clone)]
+struct TypeVar<'a>(&'a Binding<'a>);
 
-impl TypeVar<'_> {
-    const fn is_pep695_typevar(&self) -> bool {
-        self.binding.kind.is_type_param()
+impl<'a> TypeVar<'a> {
+    const fn is_pep695_typevar(self) -> bool {
+        self.0.kind.is_type_param()
     }
 
-    fn references<'a>(
-        &'a self,
+    fn name(self, checker: &'a Checker) -> &'a str {
+        self.0.name(checker.source())
+    }
+
+    fn references(
+        self,
         semantic: &'a SemanticModel<'a>,
     ) -> impl Iterator<Item = &'a ResolvedReference> + 'a {
-        self.binding
+        self.0
             .references()
             .map(|reference_id| semantic.reference(reference_id))
     }
@@ -648,6 +633,6 @@ impl TypeVar<'_> {
 
 impl Ranged for TypeVar<'_> {
     fn range(&self) -> TextRange {
-        self.binding.range()
+        self.0.range()
     }
 }

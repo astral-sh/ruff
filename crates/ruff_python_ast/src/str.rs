@@ -68,6 +68,24 @@ impl TryFrom<char> for Quote {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum TripleQuotes {
+    Yes,
+    No,
+}
+
+impl TripleQuotes {
+    #[must_use]
+    pub const fn is_yes(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+
+    #[must_use]
+    pub const fn is_no(self) -> bool {
+        matches!(self, Self::No)
+    }
+}
+
 /// Includes all permutations of `r`, `u`, `f`, and `fr` (`ur` is invalid, as is `uf`). This
 /// includes all possible orders, and all possible casings, for both single and triple quotes.
 ///

@@ -32,10 +32,14 @@ reveal_type(a.b.C)  # revealed: Literal[C]
 import a.b
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 class C: ...
 ```
 
@@ -55,14 +59,20 @@ reveal_type(a.b)  # revealed: <module 'a.b'>
 reveal_type(a.b.C)  # revealed: Literal[C]
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 class C: ...
 ```
 
-```py path=q.py
+`q.py`:
+
+```py
 import a as a
 import a.b as b
 ```
@@ -83,18 +93,26 @@ reveal_type(sub.b)  # revealed: <module 'sub.b'>
 reveal_type(attr.b)  # revealed: <module 'attr.b'>
 ```
 
-```py path=sub/__init__.py
+`sub/__init__.py`:
+
+```py
 b = 1
 ```
 
-```py path=sub/b.py
+`sub/b.py`:
+
+```py
 ```
 
-```py path=attr/__init__.py
+`attr/__init__.py`:
+
+```py
 from . import b as _
 
 b = 1
 ```
 
-```py path=attr/b.py
+`attr/b.py`:
+
+```py
 ```

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from airflow import (
     PY36,
     PY37,
@@ -6,6 +8,8 @@ from airflow import (
     PY310,
     PY311,
     PY312,
+)
+from airflow import (
     Dataset as DatasetFromRoot,
 )
 from airflow.api_connexion.security import requires_access, requires_access_dataset
@@ -41,7 +45,8 @@ from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
 from airflow.operators import dummy_operator
-from airflow.operators.bash_operator import BashOperator
+from airflow.operators.bash import BashOperator
+from airflow.operators.bash_operator import BashOperator as LegacyBashOperator
 from airflow.operators.branch_operator import BaseBranchOperator
 from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
 from airflow.operators.dummy import DummyOperator, EmptyOperator
@@ -76,6 +81,8 @@ from airflow.sensors.external_task import (
 from airflow.sensors.external_task_sensor import (
     ExternalTaskMarker,
     ExternalTaskSensor,
+)
+from airflow.sensors.external_task_sensor import (
     ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTaskSensor,
 )
 from airflow.sensors.time_delta_sensor import TimeDeltaSensor
@@ -164,8 +171,9 @@ AllowListValidator(), BlockListValidator()
 dummy_operator.EmptyOperator()
 dummy_operator.DummyOperator()
 
-# airflow.operators.bash_operator
+# airflow.operators.bash / airflow.operators.bash_operator
 BashOperator()
+LegacyBashOperator()
 
 # airflow.operators.branch_operator
 BaseBranchOperator()

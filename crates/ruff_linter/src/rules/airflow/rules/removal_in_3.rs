@@ -684,8 +684,8 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
-        ["airflow", "operators", "bash_operator", "BashOperator"] => {
-            Replacement::Name("airflow.operators.bash.BashOperator")
+        ["airflow", "operators", "bash" | "bash_operator", "BashOperator"] => {
+            Replacement::Name("airflow.providers.standard.operators.bash.BashOperator")
         }
         ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
             Replacement::Name("airflow.operators.branch.BaseBranchOperator")
