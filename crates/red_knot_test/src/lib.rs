@@ -135,7 +135,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
 
             Some(TestFile {
                 file,
-                backtick_offset: embedded.md_offset,
+                backtick_offset: embedded.backtick_offset,
             })
         })
         .collect();
