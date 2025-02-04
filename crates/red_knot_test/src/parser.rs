@@ -1,8 +1,4 @@
-use std::sync::LazyLock;
-
 use anyhow::bail;
-use memchr::memchr2;
-use regex::{Captures, Match, Regex};
 use rustc_hash::FxHashSet;
 
 use ruff_index::{newtype_index, IndexVec};
@@ -155,27 +151,6 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) md_offset: TextSize,
 }
 
-/// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
-static HEADER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(?<level>#+)[^\S\n]+(?<title>.+)[^\S\n]*\n").unwrap());
-
-/// Matches a code block fenced by triple backticks, possibly with language and `key=val`
-/// configuration items following the opening backticks (in the "tag string" of the code block).
-static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?x)
-        ^(?:
-            `(?<path>[^`\n]+)`[^\S\n]*:[^\S\n]*\n
-            \n?
-        )?
-        ```(?<lang>(?-u:\w)+)?\x20*(?<config>\S.*)?\n
-        (?<code>[\s\S]*?)\n?
-        (?<end>```\n?|\z)
-        ",
-    )
-    .unwrap()
-});
-
 #[derive(Debug)]
 struct SectionStack(Vec<SectionId>);
 
@@ -219,6 +194,12 @@ struct Parser<'s> {
     /// The unparsed remainder of the Markdown source.
     cursor: Cursor<'s>,
 
+    // Number of consecutive empty lines.
+    preceding_blank_lines: usize,
+
+    // Explicitly specified path for the upcoming code block.
+    explicit_path: Option<&'s str>,
+
     source: &'s str,
     source_len: TextSize,
 
@@ -247,6 +228,8 @@ impl<'s> Parser<'s> {
             files: IndexVec::default(),
             unnamed_file_count: 0,
             cursor: Cursor::new(source),
+            preceding_blank_lines: 0,
+            explicit_path: None,
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
@@ -269,39 +252,135 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_impl(&mut self) -> anyhow::Result<()> {
-        while let Some(position) = memchr2(b'`', b'#', self.cursor.as_bytes()) {
-            self.cursor.skip_bytes(position.saturating_sub(2));
+    fn skip_whitespace(&mut self) {
+        self.cursor.eat_while(|c| c.is_whitespace() && c != '\n');
+    }
 
-            // Code blocks and headers must start on a new line
-            // and preceded by at least one blank line.
-            if position == 0 && self.cursor.first() == '#'
-                || position == 1 && self.cursor.eat_char('\n')
-                || self.cursor.eat_char('\n') && self.cursor.eat_char('\n')
-            {
-                match self.cursor.first() {
-                    '#' => {
-                        if let Some(find) = HEADER_RE.find(self.cursor.as_str()) {
-                            self.parse_header(find.as_str())?;
-                            self.cursor.skip_bytes(find.len());
-                            continue;
+    fn skip_to_beginning_of_next_line(&mut self) -> bool {
+        if let Some(position) = memchr::memchr(b'\n', self.cursor.as_bytes()) {
+            self.cursor.skip_bytes(position + 1);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn consume_until(&mut self, mut end_predicate: impl FnMut(char) -> bool) -> Option<&'s str> {
+        let start = self.offset().to_usize();
+
+        while !self.cursor.is_eof() {
+            let c = self.cursor.first();
+            if end_predicate(c) {
+                return Some(&self.source[start..self.offset().to_usize()]);
+            }
+            self.cursor.bump();
+        }
+
+        None
+    }
+
+    fn parse_impl(&mut self) -> anyhow::Result<()> {
+        const CODE_BLOCK_END: &[u8] = b"```";
+
+        while !self.cursor.is_eof() {
+            self.skip_whitespace();
+
+            match self.cursor.first() {
+                '#' => {
+                    self.explicit_path = None;
+                    self.preceding_blank_lines = 0;
+
+                    // Determine header level (number of '#' characters)
+                    let mut header_level = 0;
+                    while self.cursor.eat_char('#') {
+                        header_level += 1;
+                    }
+
+                    // Parse header title
+                    if let Some(title) = self.consume_until(|c| c == '\n') {
+                        let title = title.trim();
+
+                        if !title.is_empty() {
+                            self.process_header(header_level, title)?;
                         }
                     }
-                    '`' => {
-                        if let Some(captures) = CODE_RE.captures(self.cursor.as_str()) {
-                            self.parse_code_block(&captures)?;
-                            self.cursor.skip_bytes(captures.get(0).unwrap().len());
-                            continue;
+                }
+                '`' => {
+                    self.cursor.eat_char('`');
+
+                    match self.cursor.first() {
+                        '`' if self.cursor.second() == '`' => {
+                            // We see the triple-backtick beginning of a code block.
+                            self.cursor.bump();
+                            self.cursor.bump();
+
+                            if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
+                                bail!("Code blocks must start on a new line and be preceded by at least one blank line.");
+                            }
+
+                            self.skip_whitespace();
+
+                            // Parse the code block language specifier
+                            let lang = self
+                                .consume_until(|c| matches!(c, ' ' | '\n'))
+                                .unwrap_or_default();
+
+                            self.skip_whitespace();
+
+                            if self.cursor.first() != '\n' {
+                                bail!("Trailing code-block metadata is not supported. Only the code block language can be specified.");
+                            }
+
+                            self.skip_to_beginning_of_next_line();
+
+                            if let Some(position) =
+                                memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
+                            {
+                                let mut code = &self.cursor.as_str()[..position];
+                                self.cursor.skip_bytes(position + CODE_BLOCK_END.len());
+
+                                if code.ends_with('\n') {
+                                    code = &code[..code.len() - 1];
+                                }
+
+                                self.process_code_block(lang, code)?;
+                            } else {
+                                let code_block_start = self.cursor.token_len();
+                                let line =
+                                    self.source.count_lines(TextRange::up_to(code_block_start));
+                                bail!("Unterminated code block at line {line}.");
+                            }
+
+                            self.explicit_path = None;
                         }
+                        _ if self.preceding_blank_lines > 0 => {
+                            // This could be a line that specifies an explicit path for a Markdown code block (`module.py`:)
+                            self.explicit_path = None;
+
+                            if let Some(path) = self.consume_until(|c| matches!(c, '`' | '\n')) {
+                                if self.cursor.eat_char('`') {
+                                    self.skip_whitespace();
+                                    if self.cursor.eat_char(':') {
+                                        self.explicit_path = Some(path);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => unreachable!(),
+
+                    self.preceding_blank_lines = 0;
+                }
+                '\n' => {
+                    self.preceding_blank_lines += 1;
+                }
+                _ => {
+                    self.preceding_blank_lines = 0;
+                    self.explicit_path = None;
                 }
             }
 
-            // Skip to the end of the line
-            if let Some(position) = memchr::memchr(b'\n', self.cursor.as_bytes()) {
-                self.cursor.skip_bytes(position + 1);
-            } else {
+            if !self.skip_to_beginning_of_next_line() {
                 break;
             }
         }
@@ -309,17 +388,7 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
-    fn parse_header(&mut self, header: &'s str) -> anyhow::Result<()> {
-        let mut trimmed = header.trim();
-
-        let mut header_level = 0usize;
-        while let Some(rest) = trimmed.strip_prefix('#') {
-            header_level += 1;
-            trimmed = rest;
-        }
-
-        let title = trimmed.trim_start();
-
+    fn process_header(&mut self, header_level: usize, title: &'s str) -> anyhow::Result<()> {
         self.pop_sections_to_level(header_level);
 
         let parent = self.stack.top();
@@ -332,11 +401,11 @@ impl<'s> Parser<'s> {
         };
 
         if self.current_section_files.is_some() {
-            return Err(anyhow::anyhow!(
+            bail!(
                 "Header '{}' not valid inside a test case; parent '{}' has code files.",
                 section.title,
                 self.sections[parent].title,
-            ));
+            );
         }
 
         let section_id = self.sections.push(section);
@@ -348,48 +417,27 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
-    fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
+    fn process_code_block(&mut self, lang: &'s str, code: &'s str) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
 
-        if captures.name("end").unwrap().is_empty() {
-            let code_block_start = self.cursor.token_len();
-            let line = self.source.count_lines(TextRange::up_to(code_block_start)) + 1;
-
-            return Err(anyhow::anyhow!("Unterminated code block at line {line}."));
-        }
-
-        if captures.name("config").is_some() {
-            return Err(anyhow::anyhow!("Trailing code-block metadata is not supported. Only the code block language can be specified."));
-        }
-
-        // CODE_RE can't match without matches for 'lang' and 'code'.
-        let lang = captures
-            .name("lang")
-            .as_ref()
-            .map(Match::as_str)
-            .unwrap_or_default();
-        let code = captures.name("code").unwrap().into();
-
         if lang == "toml" {
-            return self.parse_config(code);
+            return self.process_config_block(code);
         }
 
-        let explicit_path = captures.name("path").map(|it| it.as_str());
-
-        if let Some(explicit_path) = explicit_path {
+        if let Some(explicit_path) = self.explicit_path {
             if !lang.is_empty()
                 && lang != "text"
                 && explicit_path.contains('.')
                 && !explicit_path.ends_with(&format!(".{lang}"))
             {
-                return Err(anyhow::anyhow!(
+                bail!(
                     "File ending of test file path `{explicit_path}` does not match `lang={lang}` of code block"
-                ));
+                );
             }
         }
 
-        let path = match explicit_path {
+        let path = match self.explicit_path {
             Some(path) => path.to_string(),
             None => {
                 self.unnamed_file_count += 1;
@@ -398,10 +446,10 @@ impl<'s> Parser<'s> {
                     "py" | "pyi" => format!("mdtest_snippet__{}.{lang}", self.unnamed_file_count),
                     "" => format!("mdtest_snippet__{}.py", self.unnamed_file_count),
                     _ => {
-                        return Err(anyhow::anyhow!(
+                        bail!(
                             "Cannot generate name for `lang={}`: Unsupported extension",
                             lang
-                        ))
+                        );
                     }
                 }
             }
@@ -417,10 +465,10 @@ impl<'s> Parser<'s> {
 
         if let Some(current_files) = &mut self.current_section_files {
             if !current_files.insert(path.clone()) {
-                return Err(anyhow::anyhow!(
+                bail!(
                     "Test `{}` has duplicate files named `{path}`.",
                     self.sections[section].title
-                ));
+                );
             };
         } else {
             self.current_section_files = Some(FxHashSet::from_iter([path]));
@@ -429,7 +477,7 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
-    fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
+    fn process_config_block(&mut self, code: &str) -> anyhow::Result<()> {
         if self.current_section_has_config {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
@@ -1168,6 +1216,25 @@ mod tests {
 
         assert_eq!(file.path, "mdtest_snippet__1.py");
         assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn no_newline_between_prose_and_code() {
+        // Regression test for https://github.com/astral-sh/ruff/issues/15923
+        let source = dedent(
+            "
+            Some code:
+            No newline between prose and code:
+            ```py
+            # A syntax error:
+            §
+            ```
+            ",
+        );
+
+        super::parse("file.md", &source).expect_err(
+            "Code blocks must start on a new line and be preceded by at least one blank line.",
+        );
     }
 
     #[test]
