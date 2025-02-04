@@ -190,9 +190,11 @@ pub(crate) fn used_dummy_variable(
     );
 
     // Get the possible fix based on the scope
-    if let Some(fix) = get_possible_fix(trimmed_name, shadowed_kind, binding.scope, checker) {
+    if let Some(new_name) =
+        get_possible_new_name(trimmed_name, shadowed_kind, binding.scope, checker)
+    {
         diagnostic.try_set_fix(|| {
-            Renamer::rename(name, &fix, scope, semantic, checker.stylist())
+            Renamer::rename(name, &new_name, scope, semantic, checker.stylist())
                 .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
         });
     }
@@ -201,7 +203,7 @@ pub(crate) fn used_dummy_variable(
 }
 
 /// Suggests a potential alternative name to resolve a shadowing conflict.
-fn get_possible_fix(
+fn get_possible_new_name(
     trimmed_name: &str,
     kind: ShadowedKind,
     scope_id: ScopeId,
