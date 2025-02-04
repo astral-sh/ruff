@@ -1143,6 +1143,13 @@ pub struct Flake8BuiltinsOptions {
     )]
     /// List of builtin module names to allow.
     pub builtins_allowed_modules: Option<Vec<String>>,
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = "builtins-strict-checking = bool"
+    )]
+    /// Compare module names instead of full module paths.
+    pub builtins_strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
@@ -1150,6 +1157,7 @@ impl Flake8BuiltinsOptions {
         ruff_linter::rules::flake8_builtins::settings::Settings {
             builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
             builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
+            builtins_strict_checking: self.builtins_strict_checking.unwrap_or_default(),
         }
     }
 }
