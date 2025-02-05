@@ -1,5 +1,5 @@
 use crate::config::Log;
-use crate::parser::{CodeBlockDimensions, EmbeddedFileSourceMap};
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
@@ -68,7 +68,7 @@ pub fn run(
 
             for test_failures in failures {
                 let source_map =
-                    EmbeddedFileSourceMap::new(&md_index, test_failures.code_block_dimensions);
+                    EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
                     let absolute_line_number =
@@ -98,11 +98,11 @@ pub fn run(
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test<'s>(
+fn run_test(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &'s parser::MarkdownTest,
+    test: &parser::MarkdownTest,
 ) -> Result<(), Failures> {
     let project_root = db.project_root().to_path_buf();
     let src_path = SystemPathBuf::from("/src");
@@ -145,7 +145,7 @@ fn run_test<'s>(
 
             Some(TestFile {
                 file,
-                code_block_dimensions: embedded.code_block_dimensions.clone(),
+                backtick_offsets: embedded.backtick_offsets.clone(),
             })
         })
         .collect();
@@ -228,7 +228,7 @@ fn run_test<'s>(
                     }
                     by_line.push(OneIndexed::from_zero_indexed(0), messages);
                     return Some(FileFailures {
-                        code_block_dimensions: test_file.code_block_dimensions,
+                        backtick_offsets: test_file.backtick_offsets,
                         by_line,
                     });
                 }
@@ -242,7 +242,7 @@ fn run_test<'s>(
                 match matcher::match_file(db, test_file.file, diagnostics.iter().map(|d| &**d)) {
                     Ok(()) => None,
                     Err(line_failures) => Some(FileFailures {
-                        code_block_dimensions: test_file.code_block_dimensions,
+                        backtick_offsets: test_file.backtick_offsets,
                         by_line: line_failures,
                     }),
                 };
@@ -280,7 +280,7 @@ type Failures = Vec<FileFailures>;
 /// The failures for a single file in a test by line number.
 struct FileFailures {
     /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    code_block_dimensions: Vec<CodeBlockDimensions>,
+    backtick_offsets: Vec<BacktickOffsets>,
 
     /// The failures by lines in the file.
     by_line: matcher::FailuresByLine,
@@ -291,7 +291,7 @@ struct TestFile {
     file: File,
 
     /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    code_block_dimensions: Vec<CodeBlockDimensions>,
+    backtick_offsets: Vec<BacktickOffsets>,
 }
 
 fn create_diagnostic_snapshot<D: Diagnostic>(

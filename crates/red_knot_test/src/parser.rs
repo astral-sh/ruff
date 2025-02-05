@@ -136,22 +136,12 @@ struct Section<'s> {
 #[newtype_index]
 struct EmbeddedFileId;
 
-/// Holds information about the position and the length of a single code block in a
-/// Markdown file.
+/// Holds information about the start and the end of a code block in a Markdown file.
+///
+/// The start is the offset of the first triple-backtick in the code block, and the end is the
+/// offset of the (start of the) closing triple-backtick.
 #[derive(Debug, Clone)]
-pub(crate) struct CodeBlockDimensions {
-    backtick_offset: TextSize,
-    line_count: usize,
-}
-
-impl CodeBlockDimensions {
-    fn new(backtick_offset: TextSize, code: &str) -> CodeBlockDimensions {
-        CodeBlockDimensions {
-            backtick_offset,
-            line_count: code.lines().count(),
-        }
-    }
-}
+pub(crate) struct BacktickOffsets(TextSize, TextSize);
 
 /// Holds information about the position and length of all code blocks that are part of
 /// a single embedded file in a Markdown file. This is used to reconstruct absolute line
@@ -193,12 +183,17 @@ pub(crate) struct EmbeddedFileSourceMap {
 impl EmbeddedFileSourceMap {
     pub(crate) fn new(
         md_index: &LineIndex,
-        dimensions: impl IntoIterator<Item = CodeBlockDimensions>,
+        dimensions: impl IntoIterator<Item = BacktickOffsets>,
     ) -> EmbeddedFileSourceMap {
         EmbeddedFileSourceMap {
             start_line_and_line_count: dimensions
                 .into_iter()
-                .map(|d| (md_index.line_index(d.backtick_offset).get(), d.line_count))
+                .map(|d| {
+                    let start_line = md_index.line_index(d.0).get();
+                    let end_line = md_index.line_index(d.1).get();
+                    let code_line_count = (end_line - start_line) - 1;
+                    (start_line, code_line_count)
+                })
                 .collect(),
         }
     }
@@ -208,8 +203,8 @@ impl EmbeddedFileSourceMap {
         let mut relative_line_number = relative_line_number.get();
 
         for (start_line, line_count) in &self.start_line_and_line_count {
-            if let Some(updated) = relative_line_number.checked_sub(*line_count) {
-                relative_line_number = updated;
+            if relative_line_number > *line_count {
+                relative_line_number -= *line_count;
             } else {
                 absolute_line_number = start_line + relative_line_number;
                 break;
@@ -266,19 +261,18 @@ pub(crate) struct EmbeddedFile<'s> {
     path: EmbeddedFilePath<'s>,
     pub(crate) lang: &'s str,
     pub(crate) code: Cow<'s, str>,
-    pub(crate) code_block_dimensions: Vec<CodeBlockDimensions>,
+    pub(crate) backtick_offsets: Vec<BacktickOffsets>,
 }
 
 impl EmbeddedFile<'_> {
-    fn append_code(&mut self, backtick_offset: TextSize, new_code: &str) {
-        self.code_block_dimensions
-            .push(CodeBlockDimensions::new(backtick_offset, new_code));
-
+    fn append_code(&mut self, backtick_offsets: BacktickOffsets, new_code: &str) {
         // Treat empty code blocks as non-existent, instead of creating
         // an additional empty line:
         if new_code.is_empty() {
             return;
         }
+
+        self.backtick_offsets.push(backtick_offsets);
 
         match self.code {
             Cow::Borrowed(existing_code) => {
@@ -476,7 +470,7 @@ impl<'s> Parser<'s> {
                     if self.cursor.eat_char2('`', '`') {
                         // We saw the triple-backtick beginning of a code block.
 
-                        let backtick_offset = self.offset() - "```".text_len();
+                        let backtick_offset_start = self.offset() - "```".text_len();
 
                         if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
                             bail!("Code blocks must start on a new line and be preceded by at least one blank line.");
@@ -505,7 +499,13 @@ impl<'s> Parser<'s> {
                                 code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
-                            self.process_code_block(lang, code, backtick_offset)?;
+                            let backtick_offset_end = self.offset() - "```".text_len();
+
+                            self.process_code_block(
+                                lang,
+                                code,
+                                BacktickOffsets(backtick_offset_start, backtick_offset_end),
+                            )?;
                         } else {
                             let code_block_start = self.cursor.token_len();
                             let line = self.source.count_lines(TextRange::up_to(code_block_start));
@@ -591,7 +591,7 @@ impl<'s> Parser<'s> {
         &mut self,
         lang: &'s str,
         code: &'s str,
-        backtick_offset: TextSize,
+        backtick_offsets: BacktickOffsets,
     ) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
@@ -652,7 +652,7 @@ impl<'s> Parser<'s> {
                     section,
                     lang,
                     code: Cow::Borrowed(code),
-                    code_block_dimensions: vec![CodeBlockDimensions::new(backtick_offset, code)],
+                    backtick_offsets: vec![backtick_offsets],
                 });
                 entry.insert(index);
             }
@@ -669,7 +669,7 @@ impl<'s> Parser<'s> {
                 }
 
                 let index = *entry.get();
-                self.files[index].append_code(backtick_offset, code);
+                self.files[index].append_code(backtick_offsets, code);
             }
         }
 
@@ -685,7 +685,7 @@ impl<'s> Parser<'s> {
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
             .values()
-            .any(|id| self.files[*id].code_block_dimensions.len() > 1)
+            .any(|id| self.files[*id].backtick_offsets.len() > 1)
     }
 
     fn process_config_block(&mut self, code: &str) -> anyhow::Result<()> {
