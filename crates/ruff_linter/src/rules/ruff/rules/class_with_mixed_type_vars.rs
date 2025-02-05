@@ -229,14 +229,15 @@ fn generic_arguments_to_type_vars<'a>(
 ///     * It must not be unpacked
 ///     * It must not have any restrictions
 fn type_var_is_valid(type_var: &TypeVar, unpacked: bool) -> bool {
-    match (&type_var.kind, unpacked, &type_var.restriction) {
-        (TypeParamKind::TypeVarTuple, false, _) => false,
-        (TypeParamKind::TypeVar, true, _) => false,
-        (TypeParamKind::ParamSpec, true, _) => false,
+    let is_type_var_tuple = matches!(&type_var.kind, TypeParamKind::TypeVarTuple);
 
-        (TypeParamKind::TypeVarTuple, _, Some(_)) => false,
-        (TypeParamKind::ParamSpec, _, Some(_)) => false,
-
-        _ => true,
+    if is_type_var_tuple && !unpacked || !is_type_var_tuple && unpacked {
+        return false;
     }
+
+    if !matches!(&type_var.kind, TypeParamKind::TypeVar) && type_var.restriction.is_some() {
+        return false;
+    }
+
+    true
 }
