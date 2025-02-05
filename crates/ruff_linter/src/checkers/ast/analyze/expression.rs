@@ -1746,9 +1746,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
-        Expr::Lambda(lambda_expr) => {
+        Expr::Lambda(lambda) => {
             if checker.enabled(Rule::ReimplementedOperator) {
-                refurb::rules::reimplemented_operator(checker, &lambda_expr.into());
+                refurb::rules::reimplemented_operator(checker, &lambda.into());
+            }
+            if checker.enabled(Rule::InvalidArgumentName) {
+                pep8_naming::rules::invalid_argument_name_lambda(checker, lambda);
             }
         }
         _ => {}
