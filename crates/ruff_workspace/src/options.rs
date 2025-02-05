@@ -1144,9 +1144,9 @@ pub struct Flake8BuiltinsOptions {
     /// List of builtin module names to allow.
     pub builtins_allowed_modules: Option<Vec<String>>,
     #[option(
-        default = r#"false"#,
+        default = r#"true"#,
         value_type = "bool",
-        example = "builtins-strict-checking = bool"
+        example = "builtins-strict-checking = false"
     )]
     /// Compare module names instead of full module paths.
     pub builtins_strict_checking: Option<bool>,
