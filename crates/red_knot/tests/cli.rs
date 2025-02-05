@@ -103,10 +103,10 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error: lint:unresolved-import
-     --> <temp_dir>/child/test.py:2:1
+     --> <temp_dir>/child/test.py:2:6
       |
     2 | from utils import add
-      | ^^^^^^^^^^^^^^^^^^^^^ Cannot resolve import `utils`
+      |      ^^^^^ Cannot resolve import `utils`
     3 |
     4 | stat = add(10, 15)
       |

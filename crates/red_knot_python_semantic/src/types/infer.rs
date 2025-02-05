@@ -2538,6 +2538,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // - Absolute `*` imports (`from collections import *`)
         // - Relative `*` imports (`from ...foo import *`)
         let ast::StmtImportFrom { module, level, .. } = import_from;
+        // For diagnostics, we want to highlight the unresolvable
+        // module and not the entire `from ... import ...` statement.
+        let module_ref = module
+            .as_ref()
+            .map(AnyNodeRef::from)
+            .unwrap_or_else(|| AnyNodeRef::from(import_from));
         let module = module.as_deref();
 
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
@@ -2572,7 +2578,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                report_unresolved_module(&self.context, import_from, *level, module);
+                report_unresolved_module(&self.context, module_ref, *level, module);
                 self.add_unknown_declaration_with_binding(alias.into(), definition);
                 return;
             }
@@ -2582,14 +2588,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
-                report_unresolved_module(&self.context, import_from, *level, module);
+                report_unresolved_module(&self.context, module_ref, *level, module);
                 self.add_unknown_declaration_with_binding(alias.into(), definition);
                 return;
             }
         };
 
         let Some(module_ty) = self.module_type_from_name(&module_name) else {
-            report_unresolved_module(&self.context, import_from, *level, module);
+            report_unresolved_module(&self.context, module_ref, *level, module);
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
