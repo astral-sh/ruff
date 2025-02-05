@@ -1,12 +1,13 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+
+use super::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for the use of `IOBase.write` in a for loop.
@@ -244,27 +245,4 @@ fn loop_variables_are_used_outside_loop(
     binding_names
         .iter()
         .any(|name| name_overwrites_outer(name) || name_is_used_later(name))
-}
-
-pub(super) fn parenthesize_loop_iter_if_necessary(for_stmt: &StmtFor, checker: &Checker) -> String {
-    let locator = checker.locator();
-    let iter = for_stmt.iter.as_ref();
-
-    let original_parenthesized_range = parenthesized_range(
-        iter.into(),
-        for_stmt.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    );
-
-    if let Some(range) = original_parenthesized_range {
-        return locator.slice(range).to_string();
-    }
-
-    let iter_in_source = locator.slice(iter);
-
-    match iter {
-        Expr::Tuple(tuple) if !tuple.parenthesized => format!("({iter_in_source})"),
-        _ => iter_in_source.to_string(),
-    }
 }

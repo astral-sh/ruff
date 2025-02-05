@@ -4,7 +4,8 @@ use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
-use crate::rules::refurb::rules::for_loop_writes::parenthesize_loop_iter_if_necessary;
+
+use super::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for code that updates a set with the contents of an iterable by
@@ -34,6 +35,10 @@ use crate::rules::refurb::rules::for_loop_writes::parenthesize_loop_iter_if_nece
 /// s.update((1, 2, 3))
 /// s.difference_update((1, 2, 3))
 /// ```
+///
+/// ## Fix safety
+/// The fix will be marked as unsafe if applying the fix would delete any comments.
+/// Otherwise, it is marked as safe.
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
