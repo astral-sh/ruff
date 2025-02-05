@@ -128,15 +128,12 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
 
         // Replace `)` with `}`.
         // Place `}` at argument's end or at trailing comma if present
-        let mut tokenizer = SimpleTokenizer::starts_at(
-            argument.end(),
-            checker.locator().slice(TextRange::up_to(call.end())),
-        );
+        let mut tokenizer =
+            SimpleTokenizer::new(checker.source(), TextRange::new(argument.end(), call.end()));
         let right_brace_loc = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Comma)
-            .map_or(call.arguments.end() - TextSize::from(1), |comma| {
-                comma.end() - TextSize::from(1)
-            });
+            .map_or(call.arguments.end(), |comma| comma.end())
+            - TextSize::from(1);
         let call_end = Edit::replacement(
             pad_end("}", call.range(), checker.locator(), checker.semantic()),
             right_brace_loc,

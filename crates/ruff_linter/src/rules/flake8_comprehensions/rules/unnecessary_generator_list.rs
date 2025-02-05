@@ -125,15 +125,12 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
 
         // Replace `)` with `]`.
         // Place `]` at argument's end or at trailing comma if present
-        let mut tokenizer = SimpleTokenizer::starts_at(
-            argument.end(),
-            checker.locator().slice(TextRange::up_to(call.end())),
-        );
+        let mut tokenizer =
+            SimpleTokenizer::new(checker.source(), TextRange::new(argument.end(), call.end()));
         let right_bracket_loc = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Comma)
-            .map_or(call.arguments.end() - TextSize::from(1), |comma| {
-                comma.end() - TextSize::from(1)
-            });
+            .map_or(call.arguments.end(), |comma| comma.end())
+            - TextSize::from(1);
         let call_end = Edit::replacement("]".to_string(), right_bracket_loc, call.end());
 
         // Remove the inner parentheses, if the expression is a generator. The easiest way to do
