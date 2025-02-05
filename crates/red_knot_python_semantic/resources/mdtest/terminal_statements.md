@@ -453,7 +453,7 @@ def raise_in_both_branches(cond: bool):
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     else:
         # This branch is unreachable, since all control flows in the `try` clause raise exceptions.
-        # As a result, this binding should never be reachable, since new bindings are visibile only
+        # As a result, this binding should never be reachable, since new bindings are visible only
         # when they are reachable.
         x = "unreachable"
     finally:
