@@ -121,32 +121,32 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let left_is_value = left_cmp == body_value_cmp;
     let right_is_value = right_cmp == body_value_cmp;
 
-    // Determine whether to use `min()` or `max()`, and make sure that the first
-    // arg of the `min()` or `max()` method is equal to the target of the comparison.
-    // This is to be consistent with the Python implementation of the methods `min()` and `max()`.
-    // Also ensure that we understand the operation we're trying to do,
-    // by checking both sides of the comparison and assignment.
-    let (min_max, arg1, arg2) = match (
+    let min_max = match (
         left_is_target,
         right_is_target,
         left_is_value,
         right_is_value,
     ) {
         (true, false, false, true) => match op {
-            CmpOp::Lt => (MinMax::Max, left.as_ref(), right),
-            CmpOp::LtE => (MinMax::Max, left.as_ref(), right),
-            CmpOp::Gt => (MinMax::Min, left.as_ref(), right),
-            CmpOp::GtE => (MinMax::Min, left.as_ref(), right),
+            CmpOp::Lt | CmpOp::LtE => MinMax::Max,
+            CmpOp::Gt | CmpOp::GtE => MinMax::Min,
             _ => return,
         },
         (false, true, true, false) => match op {
-            CmpOp::Lt => (MinMax::Min, right, left.as_ref()),
-            CmpOp::LtE => (MinMax::Min, right, left.as_ref()),
-            CmpOp::Gt => (MinMax::Max, right, left.as_ref()),
-            CmpOp::GtE => (MinMax::Max, right, left.as_ref()),
+            CmpOp::Lt | CmpOp::LtE => MinMax::Min,
+            CmpOp::Gt | CmpOp::GtE => MinMax::Max,
             _ => return,
         },
         _ => return,
+    };
+
+    // Determine whether to use `min()` or `max()`, and make sure that the first
+    // arg of the `min()` or `max()` method is equal to the target of the comparison.
+    // This is to be consistent with the Python implementation of the methods `min()` and `max()`.
+    let (arg1, arg2) = if left_is_target {
+        (&**left, right)
+    } else {
+        (right, &**left)
     };
 
     let replacement = format!(
