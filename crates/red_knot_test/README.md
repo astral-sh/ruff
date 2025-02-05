@@ -132,7 +132,7 @@ If multiple code blocks (without an explicit path, see below) are present in a s
 be merged into a single file in the order they appear in the Markdown file. This allows for tests that
 interleave code and explanations:
 
-`````markdown
+````markdown
 # My literal test
 
 This first snippet here:
@@ -149,7 +149,7 @@ will be merged with this second snippet here, i.e. `f` is defined here:
 ```py
 f(2)  # error: [invalid-argument-type]
 ```
-
+````
 
 ## Diagnostic Snapshotting
 
@@ -195,7 +195,7 @@ reveal_type(C)  # revealed: Literal[C]
 ```py
 class C: pass
 ```
-`````
+````
 
 Relative file names are always relative to the "workspace root", which is also an import root (that
 is, the equivalent of a runtime entry on `sys.path`).
