@@ -66,11 +66,11 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     todo_type, typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType,
-    DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
+    DeclaredType, DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
     IterationOutcome, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate,
     MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -246,7 +246,7 @@ pub(crate) struct TypeInference<'db> {
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The types and type qualifiers of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    declarations: FxHashMap<Definition<'db>, DeclaredType<'db>>,
 
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
@@ -285,7 +285,7 @@ impl<'db> TypeInference<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
+    pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> DeclaredType<'db> {
         self.declarations[&definition]
     }
 
@@ -330,7 +330,7 @@ enum DeclaredAndInferredType<'db> {
     AreTheSame(Type<'db>),
     /// Declared and inferred types might be different, we need to check assignability.
     MightBeDifferent {
-        declared_ty: TypeAndQualifiers<'db>,
+        declared_ty: DeclaredType<'db>,
         inferred_ty: Type<'db>,
     },
 }
@@ -907,7 +907,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         node: AnyNodeRef,
         declaration: Definition<'db>,
-        ty: TypeAndQualifiers<'db>,
+        ty: DeclaredType<'db>,
     ) {
         debug_assert!(declaration.is_declaration(self.db()));
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
@@ -4805,7 +4805,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> DeclaredType<'db> {
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
         let annotation_ty = self.infer_annotation_expression_impl(annotation);
         self.deferred_state = previous_deferred_state;
@@ -4820,17 +4820,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         annotation: Option<&ast::Expr>,
         deferred_state: DeferredExpressionState,
-    ) -> Option<TypeAndQualifiers<'db>> {
+    ) -> Option<DeclaredType<'db>> {
         annotation.map(|expr| self.infer_annotation_expression(expr, deferred_state))
     }
 
     /// Implementation of [`infer_annotation_expression`].
     ///
     /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
-    fn infer_annotation_expression_impl(
-        &mut self,
-        annotation: &ast::Expr,
-    ) -> TypeAndQualifiers<'db> {
+    fn infer_annotation_expression_impl(&mut self, annotation: &ast::Expr) -> DeclaredType<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let annotation_ty = match annotation {
             // String annotations: https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
@@ -4863,10 +4860,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let name_expr_ty = self.infer_name_expression(name);
                     match name_expr_ty {
                         Type::KnownInstance(KnownInstanceType::ClassVar) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
+                            DeclaredType::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
                         }
                         Type::KnownInstance(KnownInstanceType::Final) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
+                            DeclaredType::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
                         _ => name_expr_ty
                             .in_type_expression(self.db())
@@ -4974,7 +4971,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_string_annotation_expression(
         &mut self,
         string: &ast::ExprStringLiteral,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> DeclaredType<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
                 // String annotations are always evaluated in the deferred context.

@@ -285,7 +285,7 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 }
 
 /// Infer the type of a declaration.
-fn declaration_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
+fn declaration_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> DeclaredType<'db> {
     let inference = infer_definition_types(db, definition);
     inference.declaration_type(definition)
 }
@@ -434,7 +434,7 @@ impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
 
 /// The result of looking up a declared type from declarations; see [`symbol_from_declarations`].
 type SymbolFromDeclarationsResult<'db> =
-    Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
+    Result<SymbolAndQualifiers<'db>, (DeclaredType<'db>, Box<[Type<'db>]>)>;
 
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
@@ -492,7 +492,7 @@ fn symbol_from_declarations<'db>(
                 builder = builder.add(other_ty);
                 qualifiers = qualifiers.union(other.qualifiers());
             }
-            TypeAndQualifiers::new(builder.build(), qualifiers)
+            DeclaredType::new(builder.build(), qualifiers)
         } else {
             first
         };
@@ -2583,20 +2583,29 @@ bitflags! {
     }
 }
 
-/// When inferring the type of an annotation expression, we can also encounter type qualifiers
-/// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
-/// control how a particular symbol can be accessed or modified. This struct holds a type and
-/// a set of type qualifiers.
+/// Represents a declared type.
 ///
-/// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
-/// qualifier `ClassVar`.
+/// This is a wrapper around [`Type`] that adds other information that's relevant for a declared
+/// type like type qualifiers (e.g. `ClassVar`, `Final`), etc.
 #[derive(Clone, Debug, Copy, Eq, PartialEq)]
-pub(crate) struct TypeAndQualifiers<'db> {
+pub(crate) struct DeclaredType<'db> {
     inner: Type<'db>,
+
+    /// When inferring the type of an annotation expression, we can also encounter type qualifiers
+    /// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
+    /// control how a particular symbol can be accessed or modified. This struct holds a type and a
+    /// set of type qualifiers.
+    ///
+    /// For example:
+    /// ```py
+    /// Annotated[ClassVar[tuple[int]], "metadata"]
+    /// ```
+    ///
+    /// In this case, the inner type would be `tuple[int]`, and the qualifiers would be `ClassVar`.
     qualifiers: TypeQualifiers,
 }
 
-impl<'db> TypeAndQualifiers<'db> {
+impl<'db> DeclaredType<'db> {
     pub(crate) fn new(inner: Type<'db>, qualifiers: TypeQualifiers) -> Self {
         Self { inner, qualifiers }
     }
@@ -2617,7 +2626,7 @@ impl<'db> TypeAndQualifiers<'db> {
     }
 }
 
-impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
+impl<'db> From<Type<'db>> for DeclaredType<'db> {
     fn from(inner: Type<'db>) -> Self {
         Self {
             inner,
