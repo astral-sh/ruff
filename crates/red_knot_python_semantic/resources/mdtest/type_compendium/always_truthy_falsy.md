@@ -105,27 +105,39 @@ f = maybe_empty_list()
 ```py
 from knot_extensions import static_assert, is_subtype_of, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Literal
+```
 
-# These two types are disjoint, so types (that are not equivalent to Never) can only
-# be a subtype of either one of them.
+These two types are disjoint, so types (that are not equivalent to Never) can only be a subtype of
+either one of them.
+
+```py
 static_assert(is_disjoint_from(AlwaysTruthy, AlwaysFalsy))
+```
 
-# Types that only contain always-truthy values
+Types that only contain always-truthy values
+
+```py
 static_assert(is_subtype_of(Literal[True], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[-1], AlwaysTruthy))
 static_assert(is_subtype_of(Literal["non empty"], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[b"non empty"], AlwaysTruthy))
+```
 
-# Types that only contain always-falsy values
+Types that only contain always-falsy values
+
+```py
 static_assert(is_subtype_of(None, AlwaysFalsy))
 static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
 static_assert(is_subtype_of(Literal[0], AlwaysFalsy))
 static_assert(is_subtype_of(Literal[""], AlwaysFalsy))
 static_assert(is_subtype_of(Literal[b""], AlwaysFalsy))
 static_assert(is_subtype_of(Literal[False] | Literal[0], AlwaysFalsy))
+```
 
-# Ambiguous truthiness types
+Ambiguous truthiness types
+
+```py
 static_assert(not is_subtype_of(bool, AlwaysTruthy))
 static_assert(not is_subtype_of(bool, AlwaysFalsy))
 

@@ -10,7 +10,7 @@ inhabitant. The reason for this is that there might be multiple Python runtime o
 memory locations) that all represent the same integer value. For example, the following code snippet
 may print `False`.
 
-```py path=interned.py
+```py
 x = 54165
 y = 54165
 
@@ -36,7 +36,7 @@ This has implications for type-narrowing. For example, you can not use the `is n
 check whether a variable has a specific integer literal type, but this is not a recommended practice
 anyway.
 
-```py path=type_narrowing.py
+```py
 def f(x: int):
     if x is 54165:
         # This works, because if `x` is the same object as that left-hand-side literal, then it
@@ -64,7 +64,7 @@ static_assert(is_single_valued(Literal[54165]))
 
 And this can be used for type-narrowing using not-equal comparisons:
 
-```py path=type_narrowing.py
+```py
 def f(x: int):
     if x == 54165:
         # The reason that no narrowing occurs here is that there might be subclasses of `int`
@@ -94,9 +94,7 @@ It is tempting to think that `int` is equivalent to the union of all integer lit
 `… | Literal[-1] | Literal[0] | Literal[1] | …`, but this is not the case. `True` and `False` are
 also inhabitants of the `int` type, but they are not inhabitants of any integer literal type:
 
-```py path=true_and_false.py
-from knot_extensions import static_assert, is_subtype_of
-
+```py
 static_assert(is_subtype_of(Literal[True], int))
 static_assert(is_subtype_of(Literal[False], int))
 
@@ -106,9 +104,9 @@ static_assert(not is_subtype_of(Literal[False], Literal[0]))
 
 ### No subtypes of `float` and `complex`
 
-Integer literals are _not_ subtypes of `float`, but the typing spec describes a
-[special cases for `float` and `complex`] which accepts integer literals in places where a `float`
-or `complex` is expected.
+Integer literals are _not_ subtypes of `float`, but the typing spec describes a special case for
+[`float` and `complex`] which accepts integer literals in places where a `float` or `complex` is
+expected.
 
 ```py
 from knot_extensions import static_assert, is_subtype_of
@@ -156,7 +154,8 @@ static_assert(not is_disjoint_from(Literal[54165], Literal[54165]))
 
 ## Integer literal math
 
-We support a whole range of arithmetic operations on integer literal types. For example:
+We support a whole range of arithmetic operations on integer literal types. For example, we can
+statically verify that (3, 4, 5) is a Pythagorean triple:
 
 ```py
 from knot_extensions import static_assert
@@ -180,8 +179,7 @@ static_assert(54165)
 
 This can be used for type-narrowing:
 
-```py path=type_narrowing.py
-from knot_extensions import static_assert
+```py
 from typing_extensions import Literal, assert_type
 
 def f(x: Literal[0, 1, 54365]):
@@ -191,4 +189,4 @@ def f(x: Literal[0, 1, 54365]):
         assert_type(x, Literal[0])
 ```
 
-[special cases for `float` and `complex`]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+[`float` and `complex`]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
