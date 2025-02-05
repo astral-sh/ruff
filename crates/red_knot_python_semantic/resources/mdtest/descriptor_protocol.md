@@ -41,6 +41,42 @@ c.ten = 11
 C.ten = 11
 ```
 
+## Different types for `__get__` and `__set__`
+
+The return type of `__get__` and the value type of `__set__` can be different:
+
+```py
+class FlexibleInt:
+    def __init__(self):
+        self._value: int | None = None
+
+    def __get__(self, instance: object, owner: type | None = None) -> int | None:
+        return self._value
+
+    def __set__(self, instance: object, value: int | str) -> None:
+        self._value = int(value)
+
+class C:
+    flexible_int = FlexibleInt()
+
+c = C()
+
+# TODO: should be `int | None`
+reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
+
+c.flexible_int = 42  # okay
+c.flexible_int = "42"  # also okay!
+
+# TODO: should be `int | None`
+reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
+
+# TODO: should be an error
+c.flexible_int = None  # not okay
+
+# TODO: should be `int | None`
+reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
+```
+
 ## Descriptors only work when used as class variables
 
 From the descriptor guide:
