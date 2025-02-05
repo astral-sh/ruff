@@ -51,7 +51,7 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Fix safety
 /// As the fix changes runtime behaviour, it is always marked as unsafe.
-/// Additionally, it might remove comments.
+/// Additionally, comments within the fix range will not be preserved.
 ///
 /// ## References
 /// - [Python documentation: User-defined generic types](https://docs.python.org/3/library/typing.html#user-defined-generic-types)
