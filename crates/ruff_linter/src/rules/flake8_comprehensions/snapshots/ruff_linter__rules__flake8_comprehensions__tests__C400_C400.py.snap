@@ -127,7 +127,7 @@ C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
    16 |+[2 * x for x in range(3)]
 17 17 | list((((2 * x for x in range(3)))))
 18 18 | 
-19 19 | # Not built-in list.
+19 19 | # Account for trailing comma in fix
 
 C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
    |
@@ -136,7 +136,7 @@ C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
 17 | list((((2 * x for x in range(3)))))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C400
 18 |
-19 | # Not built-in list.
+19 | # Account for trailing comma in fix
    |
    = help: Rewrite as a list comprehension
 
@@ -147,5 +147,57 @@ C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
 17    |-list((((2 * x for x in range(3)))))
    17 |+[2 * x for x in range(3)]
 18 18 | 
-19 19 | # Not built-in list.
-20 20 | def list(*args, **kwargs):
+19 19 | # Account for trailing comma in fix
+20 20 | # See https://github.com/astral-sh/ruff/issues/15852
+
+C400.py:21:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+   |
+19 | # Account for trailing comma in fix
+20 | # See https://github.com/astral-sh/ruff/issues/15852
+21 | list((0 for _ in []),)
+   | ^^^^^^^^^^^^^^^^^^^^^^ C400
+22 | list(
+23 |      (0 for _ in [])
+   |
+   = help: Rewrite as a list comprehension
+
+ℹ Unsafe fix
+18 18 | 
+19 19 | # Account for trailing comma in fix
+20 20 | # See https://github.com/astral-sh/ruff/issues/15852
+21    |-list((0 for _ in []),)
+   21 |+[0 for _ in []]
+22 22 | list(
+23 23 |      (0 for _ in [])
+24 24 |      # some comments
+
+C400.py:22:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+   |
+20 |   # See https://github.com/astral-sh/ruff/issues/15852
+21 |   list((0 for _ in []),)
+22 | / list(
+23 | |      (0 for _ in [])
+24 | |      # some comments
+25 | |      ,
+26 | |      # some more
+27 | |  )
+   | |__^ C400
+   |
+   = help: Rewrite as a list comprehension
+
+ℹ Unsafe fix
+19 19 | # Account for trailing comma in fix
+20 20 | # See https://github.com/astral-sh/ruff/issues/15852
+21 21 | list((0 for _ in []),)
+22    |-list(
+23    |-     (0 for _ in [])
+   22 |+[
+   23 |+     0 for _ in []
+24 24 |      # some comments
+25    |-     ,
+26    |-     # some more
+27    |- )
+   25 |+     ]
+28 26 | 
+29 27 | 
+30 28 | # Not built-in list.
