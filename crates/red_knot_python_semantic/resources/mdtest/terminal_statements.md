@@ -643,7 +643,9 @@ def _(cond: bool):
 
 ## Bindings after a terminal statement are unreachable
 
-Any bindings introduced after a terminal statement are unreachable, and are considered not visible.
+Any bindings introduced after a terminal statement are unreachable, and are currently considered not
+visible. We [anticipate](https://github.com/astral-sh/ruff/issues/15797) that we want to provide a
+more useful analysis for code after terminal statements.
 
 ```py
 def f(cond: bool) -> str:
@@ -652,6 +654,7 @@ def f(cond: bool) -> str:
         reveal_type(x)  # revealed: Literal["before"]
         return
         x = "after-return"
+        # TODO: no unresolved-reference error
         # error: [unresolved-reference]
         reveal_type(x)  # revealed: Unknown
     else:
