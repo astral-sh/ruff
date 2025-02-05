@@ -794,10 +794,13 @@ where
                             &mut first_parameter_name,
                         );
 
-                        // HACK: Visit the function body, but treat the last statement specially if
-                        // it is a return. If it is, this would cause all definitions in the
-                        // function to be marked as non-visible with our current treatment of
-                        // terminal statements. Since we currently model the externally visible
+                        // TODO: Fix how we determine the public types of symbols in a
+                        // function-like scope: https://github.com/astral-sh/ruff/issues/15777
+                        //
+                        // In the meantime, visit the function body, but treat the last statement
+                        // specially if it is a return. If it is, this would cause all definitions
+                        // in the function to be marked as non-visible with our current treatment
+                        // of terminal statements. Since we currently model the externally visible
                         // definitions in a function scope as the set of bindings that are visible
                         // at the end of the body, we then consider this function to have no
                         // externally visible definitions. To get around this, we take a flow
