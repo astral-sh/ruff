@@ -391,6 +391,44 @@ reveal_type(D.x)  # revealed: Unknown
 reveal_type(D().x)  # revealed: Unknown | Literal[1]
 ```
 
+If `staticmethod` is something else, that should not influence the behavior:
+
+`other.py`:
+
+```py
+def staticmethod(f):
+    return f
+
+class C:
+    @staticmethod
+    def f(self) -> None:
+        self.x = 1
+
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+```
+
+And if `staticmethod` is fully qualified, that should also be recognized:
+
+`fully_qualified.py`:
+
+```py
+import builtins
+
+class Other:
+    x: int
+
+class C:
+    @builtins.staticmethod
+    def f(other: Other) -> None:
+        other.x = 1
+
+# error: [unresolved-attribute]
+reveal_type(C.x)  # revealed: Unknown
+
+# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+```
+
 #### Attributes defined in statically-known-to-be-false branches
 
 ```py
