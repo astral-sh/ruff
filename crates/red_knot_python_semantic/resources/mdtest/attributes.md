@@ -210,6 +210,8 @@ def get_str() -> str:
     return "a"
 
 class C:
+    z: int
+
     def __init__(self) -> None:
         self.x = get_int()
         self.y: int = 1
@@ -220,12 +222,18 @@ class C:
         # TODO: this redeclaration should be an error
         self.y: str = "a"
 
+        # TODO: this redeclaration should be an error
+        self.z: str = "a"
+
 c_instance = C()
 
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
 
 # TODO: We should probably infer `int | str` here.
 reveal_type(c_instance.y)  # revealed: int
+
+# TODO: We should probably infer `int | str` here.
+reveal_type(c_instance.z)  # revealed: int
 ```
 
 #### Attributes defined in tuple unpackings
@@ -354,6 +362,39 @@ class C:
 reveal_type(C().declared_and_bound)  # revealed: Unknown
 ```
 
+#### Static methods do not influence implicitly defined attributes
+
+```py
+class Other:
+    x: int
+
+class C:
+    @staticmethod
+    def f(other: Other) -> None:
+        other.x = 1
+
+# error: [unresolved-attribute]
+reveal_type(C.x)  # revealed: Unknown
+
+# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+
+# This also works if `staticmethod` is aliased:
+
+my_staticmethod = staticmethod
+
+class D:
+    @my_staticmethod
+    def f(other: Other) -> None:
+        other.x = 1
+
+# error: [unresolved-attribute]
+reveal_type(D.x)  # revealed: Unknown
+
+# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
+reveal_type(D().x)  # revealed: Unknown | Literal[1]
+```
+
 #### Attributes defined in statically-known-to-be-false branches
 
 ```py
@@ -440,12 +481,14 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 C.pure_class_variable = "overwritten on class"
 
-# TODO: should be `Literal["overwritten on class"]`
+# TODO: should be  `Unknown | Literal["value set in class method"]` or
+# Literal["overwritten on class"]`, once/if we support local narrowing.
 # error: [unresolved-attribute]
 reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 c_instance = C()
-# TODO: should be `Literal["overwritten on class"]`
+# TODO: should be `Literal["overwritten on class"]` once/if we support
+# local narrowing.
 reveal_type(c_instance.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
 
 # TODO: should raise an error.
