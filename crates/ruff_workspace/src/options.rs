@@ -1094,7 +1094,20 @@ pub struct Flake8BanditOptions {
 }
 
 impl Flake8BanditOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_bandit::settings::Settings {
+    pub fn into_settings(
+        self,
+        ruff_options: Option<&RuffOptions>,
+    ) -> ruff_linter::rules::flake8_bandit::settings::Settings {
+        let (ruff_extend_markup_names, ruff_allowed_markup_calls) =
+            if let Some(ruff_options) = ruff_options {
+                #[allow(deprecated)]
+                (
+                    ruff_options.extend_markup_names.as_ref(),
+                    ruff_options.allowed_markup_calls.as_ref(),
+                )
+            } else {
+                (None, None)
+            };
         ruff_linter::rules::flake8_bandit::settings::Settings {
             hardcoded_tmp_directory: self
                 .hardcoded_tmp_directory
@@ -1103,8 +1116,12 @@ impl Flake8BanditOptions {
                 .chain(self.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
             check_typed_exception: self.check_typed_exception.unwrap_or(false),
-            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
-            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
+            extend_markup_names: self
+                .extend_markup_names
+                .unwrap_or_else(|| ruff_extend_markup_names.cloned().unwrap_or_default()),
+            allowed_markup_calls: self
+                .allowed_markup_calls
+                .unwrap_or_else(|| ruff_allowed_markup_calls.cloned().unwrap_or_default()),
         }
     }
 }
