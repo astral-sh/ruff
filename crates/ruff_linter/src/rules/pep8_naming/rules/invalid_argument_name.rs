@@ -1,11 +1,12 @@
-use ruff_python_ast::Parameter;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::StmtFunctionDef;
+use ruff_python_semantic::analyze::visibility::is_override;
+use ruff_python_semantic::ScopeKind;
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
-use crate::rules::pep8_naming::settings::IgnoreNames;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for argument names that do not follow the `snake_case` convention.
@@ -22,6 +23,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// > mixedCase is allowed only in contexts where that’s already the
 /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
+/// In [preview], overridden methods are ignored.
+///
 /// ## Example
 /// ```python
 /// def my_function(A, myArg):
@@ -35,6 +38,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidArgumentName {
     name: String,
@@ -49,22 +53,37 @@ impl Violation for InvalidArgumentName {
 }
 
 /// N803
-pub(crate) fn invalid_argument_name(
-    name: &str,
-    parameter: &Parameter,
-    ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
-    if !str::is_lowercase(name) {
-        // Ignore any explicitly-allowed names.
-        if ignore_names.matches(name) {
-            return None;
+pub(crate) fn invalid_argument_name(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    let semantic = checker.semantic();
+    let scope = semantic.current_scope();
+
+    if checker.settings.preview.is_enabled()
+        && matches!(scope.kind, ScopeKind::Class(_))
+        && is_override(&function_def.decorator_list, semantic)
+    {
+        return;
+    }
+
+    let ignore_names = &checker.settings.pep8_naming.ignore_names;
+
+    for parameter in &function_def.parameters {
+        let name = parameter.name().as_str();
+
+        if str::is_lowercase(name) {
+            continue;
         }
-        return Some(Diagnostic::new(
+
+        if ignore_names.matches(name) {
+            continue;
+        }
+
+        let diagnostic = Diagnostic::new(
             InvalidArgumentName {
                 name: name.to_string(),
             },
             parameter.range(),
-        ));
+        );
+
+        checker.diagnostics.push(diagnostic);
     }
-    None
 }
