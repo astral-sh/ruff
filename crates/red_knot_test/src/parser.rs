@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::hash_map::Entry};
 
 use anyhow::bail;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashMap;
 
 use ruff_index::{newtype_index, IndexVec};
@@ -269,7 +270,7 @@ pub(crate) struct EmbeddedFile<'s> {
 }
 
 impl EmbeddedFile<'_> {
-    fn append_code(&mut self, new_code: &str, backtick_offset: TextSize) {
+    fn append_code(&mut self, backtick_offset: TextSize, new_code: &str) {
         self.code_block_dimensions
             .push(CodeBlockDimensions::new(backtick_offset, new_code));
 
@@ -290,8 +291,17 @@ impl EmbeddedFile<'_> {
         }
     }
 
-    pub(crate) fn path_str(&self) -> &str {
+    pub(crate) fn relative_path(&self) -> &str {
         self.path.as_str()
+    }
+
+    pub(crate) fn full_path(&self, project_root: &SystemPath) -> SystemPathBuf {
+        let relative_path = self.relative_path();
+        if relative_path.starts_with('/') {
+            SystemPathBuf::from(relative_path)
+        } else {
+            project_root.join(relative_path)
+        }
     }
 }
 
@@ -657,7 +667,7 @@ impl<'s> Parser<'s> {
                 }
 
                 let index = *entry.get();
-                self.files[index].append_code(code, backtick_offset);
+                self.files[index].append_code(backtick_offset, code);
             }
         }
 
@@ -868,11 +878,11 @@ mod tests {
             panic!("expected two files");
         };
 
-        assert_eq!(file_1.path_str(), "mod_a.pyi");
+        assert_eq!(file_1.relative_path(), "mod_a.pyi");
         assert_eq!(file_1.lang, "pyi");
         assert_eq!(file_1.code, "a: int");
 
-        assert_eq!(file_2.path_str(), "mod_b.pyi");
+        assert_eq!(file_2.relative_path(), "mod_b.pyi");
         assert_eq!(file_2.lang, "pyi");
         assert_eq!(file_2.code, "b: str");
     }
@@ -915,11 +925,11 @@ mod tests {
             panic!("expected two files");
         };
 
-        assert_eq!(main.path_str(), "main.py");
+        assert_eq!(main.relative_path(), "main.py");
         assert_eq!(main.lang, "py");
         assert_eq!(main.code, "from foo import y");
 
-        assert_eq!(foo.path_str(), "foo.py");
+        assert_eq!(foo.relative_path(), "foo.py");
         assert_eq!(foo.lang, "py");
         assert_eq!(foo.code, "y = 2");
 
@@ -1098,7 +1108,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "foo.py");
+        assert_eq!(file.relative_path(), "foo.py");
         assert_eq!(file.lang, "py");
         assert_eq!(file.code, "x = 1");
     }
@@ -1218,7 +1228,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "lorem");
+        assert_eq!(file.relative_path(), "lorem");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1243,7 +1253,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "lorem.yaml");
+        assert_eq!(file.relative_path(), "lorem.yaml");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1465,7 +1475,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "foo.py");
+        assert_eq!(file.relative_path(), "foo.py");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1490,7 +1500,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "foo.py");
+        assert_eq!(file.relative_path(), "foo.py");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1514,7 +1524,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "foo.py");
+        assert_eq!(file.relative_path(), "foo.py");
         assert_eq!(file.code, "x = 1");
     }
 
@@ -1539,7 +1549,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.path_str(), "foo bar.py");
+        assert_eq!(file.relative_path(), "foo bar.py");
         assert_eq!(file.code, "x = 1");
     }
 

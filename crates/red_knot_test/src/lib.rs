@@ -122,11 +122,7 @@ fn run_test<'s>(
                 "Supported file types are: py, pyi, text"
             );
 
-            let full_path = if embedded.path_str().starts_with('/') {
-                SystemPathBuf::from(embedded.path_str())
-            } else {
-                project_root.join(embedded.path_str())
-            };
+            let full_path = embedded.full_path(&project_root);
 
             if let Some(ref typeshed_path) = custom_typeshed_path {
                 if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
@@ -319,7 +315,7 @@ fn create_diagnostic_snapshot<D: Diagnostic>(
     writeln!(snapshot, "# Python source files").unwrap();
     writeln!(snapshot).unwrap();
     for file in test.files() {
-        writeln!(snapshot, "## {}", file.path_str()).unwrap();
+        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
         writeln!(snapshot).unwrap();
         // Note that we don't use ```py here because the line numbering
         // we add makes it invalid Python. This sacrifices syntax
