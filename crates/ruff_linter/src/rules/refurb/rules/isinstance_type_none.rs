@@ -1,11 +1,10 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::{self as ast, CmpOp, Expr, Operator};
-
+use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::rules::refurb::helpers::replace_with_identity_check;
 
 /// ## What it does
 /// Checks for uses of `isinstance` that check if an object is of type `None`.
@@ -69,7 +68,7 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let fix = replace_with_identity_check(expr, call.range, checker);
+    let fix = replace_with_identity_check(expr, call.range, false, checker);
     let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
@@ -137,32 +136,4 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
         }
     }
     inner(expr, false, semantic)
-}
-
-fn replace_with_identity_check(expr: &Expr, range: TextRange, checker: &Checker) -> Fix {
-    let (semantic, generator) = (checker.semantic(), checker.generator());
-
-    let new_expr = Expr::Compare(ast::ExprCompare {
-        left: expr.clone().into(),
-        ops: [CmpOp::Is].into(),
-        comparators: [ast::ExprNoneLiteral::default().into()].into(),
-        range: TextRange::default(),
-    });
-
-    let new_content = generator.expr(&new_expr);
-    let new_content = if semantic.current_expression_parent().is_some() {
-        format!("({new_content})")
-    } else {
-        new_content
-    };
-
-    let applicability = if checker.comment_ranges().intersects(range) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    let edit = Edit::range_replacement(new_content, range);
-
-    Fix::applicable_edit(edit, applicability)
 }
