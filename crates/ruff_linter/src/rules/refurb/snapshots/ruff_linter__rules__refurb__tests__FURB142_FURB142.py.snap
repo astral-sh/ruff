@@ -193,7 +193,7 @@ FURB142.py:31:1: FURB142 [*] Use of `set.add()` in a for loop
 32 | |     s.add(x + num)
    | |__________________^ FURB142
 33 |
-34 |   # False negative
+34 |   # https://github.com/astral-sh/ruff/issues/15936
    |
    = help: Replace with `.update()`
 
@@ -205,5 +205,78 @@ FURB142.py:31:1: FURB142 [*] Use of `set.add()` in a for loop
 32    |-    s.add(x + num)
    31 |+s.update(x + num for x in (1, 2, 3))
 33 32 | 
-34 33 | # False negative
-35 34 |
+34 33 | # https://github.com/astral-sh/ruff/issues/15936
+35 34 | for x in 1, 2, 3:
+
+FURB142.py:35:1: FURB142 [*] Use of `set.add()` in a for loop
+   |
+34 |   # https://github.com/astral-sh/ruff/issues/15936
+35 | / for x in 1, 2, 3:
+36 | |     s.add(x)
+   | |____________^ FURB142
+37 |
+38 |   for x in 1, 2, 3:
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+32 32 |     s.add(x + num)
+33 33 | 
+34 34 | # https://github.com/astral-sh/ruff/issues/15936
+35    |-for x in 1, 2, 3:
+36    |-    s.add(x)
+   35 |+s.update((1, 2, 3))
+37 36 | 
+38 37 | for x in 1, 2, 3:
+39 38 |     s.add(f"{x}")
+
+FURB142.py:38:1: FURB142 [*] Use of `set.add()` in a for loop
+   |
+36 |       s.add(x)
+37 |
+38 | / for x in 1, 2, 3:
+39 | |     s.add(f"{x}")
+   | |_________________^ FURB142
+40 |
+41 |   for x in (
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+35 35 | for x in 1, 2, 3:
+36 36 |     s.add(x)
+37 37 | 
+38    |-for x in 1, 2, 3:
+39    |-    s.add(f"{x}")
+   38 |+s.update(f"{x}" for x in (1, 2, 3))
+40 39 | 
+41 40 | for x in (
+42 41 |     1,  # Comment
+
+FURB142.py:41:1: FURB142 [*] Use of `set.add()` in a for loop
+   |
+39 |       s.add(f"{x}")
+40 |
+41 | / for x in (
+42 | |     1,  # Comment
+43 | |     2, 3
+44 | | ):
+45 | |     s.add(f"{x}")
+   | |_________________^ FURB142
+   |
+   = help: Replace with `.update()`
+
+ℹ Unsafe fix
+38 38 | for x in 1, 2, 3:
+39 39 |     s.add(f"{x}")
+40 40 | 
+41    |-for x in (
+   41 |+s.update(f"{x}" for x in (
+42 42 |     1,  # Comment
+43 43 |     2, 3
+44    |-):
+45    |-    s.add(f"{x}")
+   44 |+))
+46 45 | 
+47 46 | 
+48 47 | # False negative
