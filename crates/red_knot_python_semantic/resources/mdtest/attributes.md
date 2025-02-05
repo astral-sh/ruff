@@ -228,11 +228,7 @@ class C:
 c_instance = C()
 
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
-
-# TODO: We should probably infer `int | str` here.
 reveal_type(c_instance.y)  # revealed: int
-
-# TODO: We should probably infer `int | str` here.
 reveal_type(c_instance.z)  # revealed: int
 ```
 
