@@ -57,7 +57,25 @@ use super::{
 /// `TypeAliasType` assignments if there are any comments in the replacement range that would be
 /// deleted.
 ///
+/// ## See also
+///
+/// This rule only applies to `TypeAlias`es and `TypeAliasType`s. See
+/// [`non-pep695-generic-class`][UP046] and [`non-pep695-generic-function`][UP047] for similar
+/// transformations for generic classes and functions.
+///
+/// This rule replaces standalone type variables in aliases but doesn't remove the corresponding
+/// type variables even if they are unused after the fix. See [`unused-private-type-var`][PYI018]
+/// for a rule to clean up unused private type variables.
+///
+/// This rule will not rename private type variables to remove leading underscores, even though the
+/// new type parameters are restricted in scope to their associated aliases. See
+/// [`private-type-parameter`][UP049] for a rule to update these names.
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
+/// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
+/// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class/
+/// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
+/// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695TypeAlias {
     name: String,
