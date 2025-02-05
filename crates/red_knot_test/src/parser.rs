@@ -153,6 +153,36 @@ pub(crate) struct CodeBlockDimensions {
 /// Holds information about the position and length of all code blocks that are part of
 /// a single embedded file in a Markdown file. This is used to reconstruct absolute line
 /// numbers (in the Markdown file) from relative line numbers (in the embedded file).
+///
+/// If we have a Markdown section with multiple code blocks like this:
+///
+///    01   # Test
+///    02
+///    03   Part 1:
+///    04
+///    05   ```py
+///    06   a = 1    # Relative line number: 1
+///    07   b = 2    # Relative line number: 2
+///    08   ```
+///    09
+///    10   Part 2:
+///    11
+///    12   ```py
+///    13   c = 3    # Relative line number: 3
+///    14   ```
+///
+/// We want to reconstruct the absolute line number (left) from relative
+/// line numbers. The information we have is the start line and the line
+/// count of each code block:
+///
+///    - Block 1: (start =  5, count = 2)
+///    - Block 2: (start = 12, count = 1)
+///
+/// For example, if we see a relative line number of 3, we see that it is
+/// larger than the line count of the first block, so we subtract the line
+/// count of the first block, and then add the new relative line number (1)
+/// to the absolute start line of the second block (12), resulting in an
+/// absolute line number of 13.
 pub(crate) struct CodeBlockStructure {
     start_line_and_line_count: Vec<(usize, usize)>,
 }
@@ -170,36 +200,6 @@ impl CodeBlockStructure {
     }
 
     pub(crate) fn to_absolute_line_number(&self, relative_line_number: OneIndexed) -> OneIndexed {
-        // If we have a Markdown section with multiple code blocks like this:
-        //
-        //     01   # Test
-        //     02
-        //     03   Part 1:
-        //     04
-        //     05   ```py
-        //     06   a = 1    # Relative line number: 1
-        //     07   b = 2    # Relative line number: 2
-        //     08   ```
-        //     09
-        //     10   Part 2:
-        //     11
-        //     12   ```py
-        //     13   c = 3    # Relative line number: 3
-        //     14   ```
-        //
-        // We want to reconstruct the absolute line number (left) from relative
-        // line numbers. The information we have is the start line and the line
-        // count of each code block:
-        //
-        //    - Block 1: (start =  5, count = 2)
-        //    - Block 2: (start = 12, count = 1)
-        //
-        // For example, if we see a relative line number of 3, we see that it is
-        // larger than the line count of the first block, so we subtract the line
-        // count of the first block, and then add the new relative line number (1)
-        // to the absolute start line of the second block (12), resulting in an
-        // absolute line number of 13.
-
         let mut absolute_line_number = 0;
         let mut relative_line_number = relative_line_number.get();
 
