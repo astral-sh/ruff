@@ -1,5 +1,5 @@
 use crate::config::Log;
-use crate::parser::{CodeBlockDimensions, CodeBlockStructure};
+use crate::parser::{CodeBlockDimensions, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
@@ -67,12 +67,12 @@ pub fn run(
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
-                let code_block_structure =
-                    CodeBlockStructure::new(&md_index, test_failures.code_block_dimensions);
+                let source_map =
+                    EmbeddedFileSourceMap::new(&md_index, test_failures.code_block_dimensions);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
                     let absolute_line_number =
-                        code_block_structure.to_absolute_line_number(relative_line_number);
+                        source_map.to_absolute_line_number(relative_line_number);
 
                     for failure in failures {
                         let line_info =

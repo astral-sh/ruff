@@ -183,16 +183,16 @@ pub(crate) struct CodeBlockDimensions {
 /// count of the first block, and then add the new relative line number (1)
 /// to the absolute start line of the second block (12), resulting in an
 /// absolute line number of 13.
-pub(crate) struct CodeBlockStructure {
+pub(crate) struct EmbeddedFileSourceMap {
     start_line_and_line_count: Vec<(usize, usize)>,
 }
 
-impl CodeBlockStructure {
+impl EmbeddedFileSourceMap {
     pub(crate) fn new(
         md_index: &LineIndex,
         dimensions: impl Iterator<Item = CodeBlockDimensions>,
-    ) -> CodeBlockStructure {
-        CodeBlockStructure {
+    ) -> EmbeddedFileSourceMap {
+        EmbeddedFileSourceMap {
             start_line_and_line_count: dimensions
                 .map(|d| (md_index.line_index(d.backtick_offset).get(), d.line_count))
                 .collect(),
