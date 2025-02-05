@@ -28,7 +28,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -1153,11 +1153,17 @@ pub struct Flake8BuiltinsOptions {
 }
 
 impl Flake8BuiltinsOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+    pub fn into_settings(
+        self,
+        preview: PreviewMode,
+    ) -> ruff_linter::rules::flake8_builtins::settings::Settings {
         ruff_linter::rules::flake8_builtins::settings::Settings {
             builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
             builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
-            builtins_strict_checking: self.builtins_strict_checking.unwrap_or_default(),
+            builtins_strict_checking: self
+                .builtins_strict_checking
+                // use the old default of true on non-preview
+                .unwrap_or(preview.is_disabled()),
         }
     }
 }
