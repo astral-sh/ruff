@@ -2379,7 +2379,7 @@ fn a005_module_shadowing_strict() -> Result<()> {
         Found 8 errors.
 
         ----- stderr -----
-        ")
+        ");
     });
 
     Ok(())
