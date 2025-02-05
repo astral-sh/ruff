@@ -842,13 +842,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_comprehensions::rules::unnecessary_subscript_reversal(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryMap) {
-                flake8_comprehensions::rules::unnecessary_map(
-                    checker,
-                    expr,
-                    checker.semantic.current_expression_parent(),
-                    func,
-                    args,
-                );
+                flake8_comprehensions::rules::unnecessary_map(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryComprehensionInCall) {
                 flake8_comprehensions::rules::unnecessary_comprehension_in_call(
