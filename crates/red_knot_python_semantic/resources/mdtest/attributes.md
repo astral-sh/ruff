@@ -487,8 +487,6 @@ C.pure_class_variable = "overwritten on class"
 reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 c_instance = C()
-# TODO: should be `Literal["overwritten on class"]` once/if we support
-# local narrowing.
 reveal_type(c_instance.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
 
 # TODO: should raise an error.
