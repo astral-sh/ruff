@@ -20,3 +20,10 @@ class Extended(Class):
 
 @override  # Incorrect usage
 def func(_, a, A): ...
+
+
+func = lambda _, a, A: ...
+
+
+class Extended(Class):
+    method = override(lambda self, _, a, A: ...)  # Incorrect usage

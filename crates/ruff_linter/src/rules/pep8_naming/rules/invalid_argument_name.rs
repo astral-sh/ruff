@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast::{ExprLambda, Parameters, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility::is_override;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_stdlib::str;
@@ -53,7 +53,10 @@ impl Violation for InvalidArgumentName {
 }
 
 /// N803
-pub(crate) fn invalid_argument_name(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn invalid_argument_name_function(
+    checker: &mut Checker,
+    function_def: &StmtFunctionDef,
+) {
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
 
@@ -64,9 +67,23 @@ pub(crate) fn invalid_argument_name(checker: &mut Checker, function_def: &StmtFu
         return;
     }
 
+    invalid_argument_name(checker, &function_def.parameters);
+}
+
+/// N803
+pub(crate) fn invalid_argument_name_lambda(checker: &mut Checker, lambda: &ExprLambda) {
+    let Some(parameters) = &lambda.parameters else {
+        return;
+    };
+
+    invalid_argument_name(checker, parameters);
+}
+
+/// N803
+fn invalid_argument_name(checker: &mut Checker, parameters: &Parameters) {
     let ignore_names = &checker.settings.pep8_naming.ignore_names;
 
-    for parameter in &function_def.parameters {
+    for parameter in parameters {
         let name = parameter.name().as_str();
 
         if str::is_lowercase(name) {

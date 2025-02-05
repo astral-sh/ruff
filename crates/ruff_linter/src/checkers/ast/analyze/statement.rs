@@ -380,7 +380,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }
             if checker.enabled(Rule::InvalidArgumentName) {
-                pep8_naming::rules::invalid_argument_name(checker, function_def);
+                pep8_naming::rules::invalid_argument_name_function(checker, function_def);
             }
         }
         Stmt::Return(_) => {
