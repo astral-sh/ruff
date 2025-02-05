@@ -65,6 +65,10 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// [`unused-private-type-var`][PYI018] for a rule to clean up unused
 /// private type variables.
 ///
+/// This rule will not rename private type variables to remove leading underscores, even though the
+/// new type parameters are restricted in scope to their associated class. See
+/// [`private-type-parameter`][UP049] for a rule to update these names.
+///
 /// This rule will correctly handle classes with multiple base classes, as long as the single
 /// `Generic` base class is at the end of the argument list, as checked by
 /// [`generic-not-last-base-class`][PYI059]. If a `Generic` base class is
@@ -78,6 +82,7 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [PYI059]: https://docs.astral.sh/ruff/rules/generic-not-last-base-class/
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
+/// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695GenericClass {
     name: String,

@@ -64,6 +64,10 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// [`unused-private-type-var`][PYI018] for a rule to clean up unused
 /// private type variables.
 ///
+/// This rule will not rename private type variables to remove leading underscores, even though the
+/// new type parameters are restricted in scope to their associated function. See
+/// [`private-type-parameter`][UP049] for a rule to update these names.
+///
 /// This rule only applies to generic functions and does not include generic classes. See
 /// [`non-pep695-generic-class`][UP046] for the class version.
 ///
@@ -71,6 +75,7 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class/
+/// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
