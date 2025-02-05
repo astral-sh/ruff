@@ -105,6 +105,10 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 src: vec![test_resource_path(src.join(path.parent().unwrap()))],
+                flake8_builtins: flake8_builtins::settings::Settings {
+                    builtins_strict_checking: false,
+                    ..Default::default()
+                },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -125,6 +129,10 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 project_root: test_resource_path(src.join(path.parent().unwrap())),
+                flake8_builtins: flake8_builtins::settings::Settings {
+                    builtins_strict_checking: false,
+                    ..Default::default()
+                },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
