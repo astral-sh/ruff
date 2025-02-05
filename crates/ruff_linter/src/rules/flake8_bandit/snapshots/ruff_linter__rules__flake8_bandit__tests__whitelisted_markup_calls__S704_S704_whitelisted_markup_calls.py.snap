@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S704_whitelisted_markup_calls.py:9:1: S704 Unsafe use of `markupsafe.Markup` detected
+  |
+7 | # indirect assignments are currently not supported
+8 | cleaned = clean(content)
+9 | Markup(cleaned)  # S704
+  | ^^^^^^^^^^^^^^^ S704
+  |

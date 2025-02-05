@@ -225,6 +225,8 @@ linter.flake8_bandit.hardcoded_tmp_directory = [
 	/dev/shm,
 ]
 linter.flake8_bandit.check_typed_exception = false
+linter.flake8_bandit.extend_markup_names = []
+linter.flake8_bandit.allowed_markup_calls = []
 linter.flake8_bugbear.extend_immutable_calls = []
 linter.flake8_builtins.builtins_allowed_modules = []
 linter.flake8_builtins.builtins_ignorelist = []
@@ -367,8 +369,6 @@ linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
-linter.ruff.extend_markup_names = []
-linter.ruff.allowed_markup_calls = []
 
 # Formatter Settings
 formatter.exclude = []
