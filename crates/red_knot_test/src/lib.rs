@@ -103,7 +103,7 @@ fn run_test<'s>(
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &'s parser::MarkdownTest,
-) -> Result<(), Failures<'s>> {
+) -> Result<(), Failures> {
     let project_root = db.project_root().to_path_buf();
     let src_path = SystemPathBuf::from("/src");
     let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
@@ -138,7 +138,7 @@ fn run_test<'s>(
                 }
             }
 
-            db.write_file(&full_path, embedded.code()).unwrap();
+            db.write_file(&full_path, &embedded.code).unwrap();
 
             if !full_path.starts_with(&src_path) || embedded.lang == "text" {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
@@ -149,7 +149,7 @@ fn run_test<'s>(
 
             Some(TestFile {
                 file,
-                code_block_dimensions: Box::new(embedded.code_block_dimensions()),
+                code_block_dimensions: embedded.code_block_dimensions.clone(),
             })
         })
         .collect();
@@ -279,23 +279,23 @@ fn run_test<'s>(
     }
 }
 
-type Failures<'s> = Vec<FileFailures<'s>>;
+type Failures = Vec<FileFailures>;
 
 /// The failures for a single file in a test by line number.
-struct FileFailures<'s> {
+struct FileFailures {
     /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    code_block_dimensions: Box<dyn Iterator<Item = CodeBlockDimensions> + 's>,
+    code_block_dimensions: Vec<CodeBlockDimensions>,
 
     /// The failures by lines in the file.
     by_line: matcher::FailuresByLine,
 }
 
 /// File in a test.
-struct TestFile<'s> {
+struct TestFile {
     file: File,
 
     /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    code_block_dimensions: Box<dyn Iterator<Item = CodeBlockDimensions> + 's>,
+    code_block_dimensions: Vec<CodeBlockDimensions>,
 }
 
 fn create_diagnostic_snapshot<D: Diagnostic>(
@@ -328,8 +328,8 @@ fn create_diagnostic_snapshot<D: Diagnostic>(
         // snapshots. So we keep them.
         writeln!(snapshot, "```").unwrap();
 
-        let line_number_width = file.code().lines().count().to_string().len();
-        for (i, line) in file.code().lines().enumerate() {
+        let line_number_width = file.code.lines().count().to_string().len();
+        for (i, line) in file.code.lines().enumerate() {
             let line_number = i + 1;
             writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
         }

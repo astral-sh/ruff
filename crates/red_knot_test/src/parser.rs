@@ -135,20 +135,21 @@ struct Section<'s> {
 #[newtype_index]
 struct EmbeddedFileId;
 
-#[derive(Debug)]
-pub(crate) struct CodeBlock<'s> {
-    pub(crate) code: &'s str,
-
-    /// The offset of the backticks beginning the code block within the markdown file
-    pub(crate) backtick_offset: TextSize,
-}
-
 /// Holds information about the position and the length of a single code block in a
 /// Markdown file.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct CodeBlockDimensions {
-    pub(crate) backtick_offset: TextSize,
-    pub(crate) line_count: usize,
+    backtick_offset: TextSize,
+    line_count: usize,
+}
+
+impl CodeBlockDimensions {
+    fn new(backtick_offset: TextSize, code: &str) -> CodeBlockDimensions {
+        CodeBlockDimensions {
+            backtick_offset,
+            line_count: code.lines().count(),
+        }
+    }
 }
 
 /// Holds information about the position and length of all code blocks that are part of
@@ -191,10 +192,11 @@ pub(crate) struct EmbeddedFileSourceMap {
 impl EmbeddedFileSourceMap {
     pub(crate) fn new(
         md_index: &LineIndex,
-        dimensions: impl Iterator<Item = CodeBlockDimensions>,
+        dimensions: impl IntoIterator<Item = CodeBlockDimensions>,
     ) -> EmbeddedFileSourceMap {
         EmbeddedFileSourceMap {
             start_line_and_line_count: dimensions
+                .into_iter()
                 .map(|d| (md_index.line_index(d.backtick_offset).get(), d.line_count))
                 .collect(),
         }
@@ -262,42 +264,34 @@ pub(crate) struct EmbeddedFile<'s> {
     section: SectionId,
     path: EmbeddedFilePath<'s>,
     pub(crate) lang: &'s str,
-    code_blocks: Vec<CodeBlock<'s>>,
+    pub(crate) code: Cow<'s, str>,
+    pub(crate) code_block_dimensions: Vec<CodeBlockDimensions>,
 }
 
 impl EmbeddedFile<'_> {
-    /// Returns the full code for the embedded file, which can consist
-    /// of multiple code blocks.
-    pub(crate) fn code(&self) -> Cow<'_, str> {
-        if self.code_blocks.len() == 1 {
-            Cow::Borrowed(self.code_blocks[0].code)
-        } else {
-            let mut merged_code = String::new();
-            for block in &self.code_blocks {
-                // Treat empty code blocks as non-existent, instead of creating
-                // an additional empty line:
-                if block.code.is_empty() {
-                    continue;
-                }
+    fn append_code(&mut self, new_code: &str, backtick_offset: TextSize) {
+        self.code_block_dimensions
+            .push(CodeBlockDimensions::new(backtick_offset, new_code));
 
-                if !merged_code.is_empty() {
-                    merged_code.push('\n');
-                }
-                merged_code.push_str(block.code);
+        // Treat empty code blocks as non-existent, instead of creating
+        // an additional empty line:
+        if new_code.is_empty() {
+            return;
+        }
+
+        match self.code {
+            Cow::Borrowed(existing_code) => {
+                self.code = Cow::Owned(format!("{existing_code}\n{new_code}"));
             }
-            Cow::Owned(merged_code)
+            Cow::Owned(ref mut existing_code) => {
+                existing_code.push('\n');
+                existing_code.push_str(new_code);
+            }
         }
     }
 
     pub(crate) fn path_str(&self) -> &str {
         self.path.as_str()
-    }
-
-    pub(crate) fn code_block_dimensions(&self) -> impl Iterator<Item = CodeBlockDimensions> + '_ {
-        self.code_blocks.iter().map(|b| CodeBlockDimensions {
-            backtick_offset: b.backtick_offset,
-            line_count: b.code.lines().count(),
-        })
     }
 }
 
@@ -631,11 +625,6 @@ impl<'s> Parser<'s> {
             },
         };
 
-        let code_block = CodeBlock {
-            code,
-            backtick_offset,
-        };
-
         let has_merged_snippets = self.current_section_has_merged_snippets();
         let has_explicit_file_paths = self.current_section_has_explicit_file_paths();
 
@@ -649,7 +638,8 @@ impl<'s> Parser<'s> {
                     path: path.clone(),
                     section,
                     lang,
-                    code_blocks: vec![code_block],
+                    code: Cow::Borrowed(code),
+                    code_block_dimensions: vec![CodeBlockDimensions::new(backtick_offset, code)],
                 });
                 entry.insert(index);
             }
@@ -667,10 +657,7 @@ impl<'s> Parser<'s> {
                 }
 
                 let index = *entry.get();
-                self.files[index].code_blocks.push(CodeBlock {
-                    code,
-                    backtick_offset,
-                });
+                self.files[index].append_code(code, backtick_offset);
             }
         }
 
@@ -686,7 +673,7 @@ impl<'s> Parser<'s> {
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
             .values()
-            .any(|id| self.files[*id].code_blocks.len() > 1)
+            .any(|id| self.files[*id].code_block_dimensions.len() > 1)
     }
 
     fn process_config_block(&mut self, code: &str) -> anyhow::Result<()> {
@@ -783,7 +770,7 @@ mod tests {
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -811,7 +798,7 @@ mod tests {
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -864,7 +851,7 @@ mod tests {
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
 
         let [file] = test2.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -875,7 +862,7 @@ mod tests {
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "y = 2");
+        assert_eq!(file.code, "y = 2");
 
         let [file_1, file_2] = test3.files().collect::<Vec<_>>()[..] else {
             panic!("expected two files");
@@ -883,11 +870,11 @@ mod tests {
 
         assert_eq!(file_1.path_str(), "mod_a.pyi");
         assert_eq!(file_1.lang, "pyi");
-        assert_eq!(file_1.code(), "a: int");
+        assert_eq!(file_1.code, "a: int");
 
         assert_eq!(file_2.path_str(), "mod_b.pyi");
         assert_eq!(file_2.lang, "pyi");
-        assert_eq!(file_2.code(), "b: str");
+        assert_eq!(file_2.code, "b: str");
     }
 
     #[test]
@@ -930,11 +917,11 @@ mod tests {
 
         assert_eq!(main.path_str(), "main.py");
         assert_eq!(main.lang, "py");
-        assert_eq!(main.code(), "from foo import y");
+        assert_eq!(main.code, "from foo import y");
 
         assert_eq!(foo.path_str(), "foo.py");
         assert_eq!(foo.lang, "py");
-        assert_eq!(foo.code(), "y = 2");
+        assert_eq!(foo.code, "y = 2");
 
         let [file] = test2.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -945,7 +932,7 @@ mod tests {
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "y = 2");
+        assert_eq!(file.code, "y = 2");
     }
 
     #[test]
@@ -988,7 +975,7 @@ mod tests {
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "x = 1\ny = 2\nz = 3");
+        assert_eq!(file.code, "x = 1\ny = 2\nz = 3");
     }
 
     #[test]
@@ -1113,7 +1100,7 @@ mod tests {
 
         assert_eq!(file.path_str(), "foo.py");
         assert_eq!(file.lang, "py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1135,7 +1122,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.code(), "x = 1\ny = 2");
+        assert_eq!(file.code, "x = 1\ny = 2");
     }
 
     #[test]
@@ -1156,7 +1143,7 @@ mod tests {
             panic!("expected one file");
         };
 
-        assert_eq!(file.code(), "");
+        assert_eq!(file.code, "");
     }
 
     #[test]
@@ -1232,7 +1219,7 @@ mod tests {
         };
 
         assert_eq!(file.path_str(), "lorem");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1257,7 +1244,7 @@ mod tests {
         };
 
         assert_eq!(file.path_str(), "lorem.yaml");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1376,7 +1363,7 @@ mod tests {
             file.path,
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1408,7 +1395,7 @@ mod tests {
             file.path,
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1479,7 +1466,7 @@ mod tests {
         };
 
         assert_eq!(file.path_str(), "foo.py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1504,7 +1491,7 @@ mod tests {
         };
 
         assert_eq!(file.path_str(), "foo.py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1528,7 +1515,7 @@ mod tests {
         };
 
         assert_eq!(file.path_str(), "foo.py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1553,7 +1540,7 @@ mod tests {
         };
 
         assert_eq!(file.path_str(), "foo bar.py");
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1582,7 +1569,7 @@ mod tests {
             file.path,
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1610,7 +1597,7 @@ mod tests {
             file.path,
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1639,7 +1626,7 @@ mod tests {
             file.path,
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
@@ -1668,7 +1655,7 @@ mod tests {
             file.path,
             EmbeddedFilePath::Autogenerated(PySourceType::Python)
         );
-        assert_eq!(file.code(), "x = 1");
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]
