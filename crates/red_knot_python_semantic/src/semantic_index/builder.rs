@@ -793,9 +793,30 @@ where
                             &mut builder.current_first_parameter_name,
                             &mut first_parameter_name,
                         );
-                        builder.visit_body(body);
-                        builder.current_first_parameter_name = first_parameter_name;
 
+                        // TODO: Fix how we determine the public types of symbols in a
+                        // function-like scope: https://github.com/astral-sh/ruff/issues/15777
+                        //
+                        // In the meantime, visit the function body, but treat the last statement
+                        // specially if it is a return. If it is, this would cause all definitions
+                        // in the function to be marked as non-visible with our current treatment
+                        // of terminal statements. Since we currently model the externally visible
+                        // definitions in a function scope as the set of bindings that are visible
+                        // at the end of the body, we then consider this function to have no
+                        // externally visible definitions. To get around this, we take a flow
+                        // snapshot just before processing the return statement, and use _that_ as
+                        // the "end-of-body" state that we resolve external references against.
+                        if let Some((last_stmt, first_stmts)) = body.split_last() {
+                            builder.visit_body(first_stmts);
+                            let pre_return_state = matches!(last_stmt, ast::Stmt::Return(_))
+                                .then(|| builder.flow_snapshot());
+                            builder.visit_stmt(last_stmt);
+                            if let Some(pre_return_state) = pre_return_state {
+                                builder.flow_restore(pre_return_state);
+                            }
+                        }
+
+                        builder.current_first_parameter_name = first_parameter_name;
                         builder.pop_scope()
                     },
                 );

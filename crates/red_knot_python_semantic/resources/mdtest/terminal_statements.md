@@ -452,6 +452,9 @@ def raise_in_both_branches(cond: bool):
         # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     else:
+        # This branch is unreachable, since all control flows in the `try` clause raise exceptions.
+        # As a result, this binding should never be reachable, since new bindings are visible only
+        # when they are reachable.
         x = "unreachable"
     finally:
         # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
@@ -623,9 +626,9 @@ def return_from_nested_if(cond1: bool, cond2: bool):
 
 ## Statically known terminal statements
 
-Terminal statements do not yet interact correctly with statically known bounds. In this example, we
-should see that the `return` statement is always executed, and therefore that the `"b"` assignment
-is not visible to the `reveal_type`.
+We model reachability using the same visibility constraints that we use to model statically known
+bounds. In this example, we see that the `return` statement is always executed, and therefore that
+the `"b"` assignment is not visible to the `reveal_type`.
 
 ```py
 def _(cond: bool):
@@ -635,6 +638,26 @@ def _(cond: bool):
         if True:
             return
 
-    # TODO: Literal["a"]
-    reveal_type(x)  # revealed: Literal["a", "b"]
+    reveal_type(x)  # revealed: Literal["a"]
+```
+
+## Bindings after a terminal statement are unreachable
+
+Any bindings introduced after a terminal statement are unreachable, and are currently considered not
+visible. We [anticipate](https://github.com/astral-sh/ruff/issues/15797) that we want to provide a
+more useful analysis for code after terminal statements.
+
+```py
+def f(cond: bool) -> str:
+    x = "before"
+    if cond:
+        reveal_type(x)  # revealed: Literal["before"]
+        return
+        x = "after-return"
+        # TODO: no unresolved-reference error
+        # error: [unresolved-reference]
+        reveal_type(x)  # revealed: Unknown
+    else:
+        x = "else"
+    reveal_type(x)  # revealed: Literal["else"]
 ```
