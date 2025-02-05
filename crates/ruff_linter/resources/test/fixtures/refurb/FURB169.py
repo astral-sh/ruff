@@ -38,6 +38,10 @@ type(
     a := 1
 ) == type(None)
 
+type(
+    a for a in range(0)
+) is not type(None)
+
 
 # Ok.
 

@@ -2,7 +2,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
@@ -87,7 +86,7 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
         return;
     }
 
-    let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range());
+    let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range);
 
     let negate = replacement == IdentityCheck::IsNot;
     let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);
