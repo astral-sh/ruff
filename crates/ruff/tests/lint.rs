@@ -2341,6 +2341,8 @@ fn a005_module_shadowing_strict() -> Result<()> {
 
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.flake8-builtins.builtins-strict-checking = false"#)
             .args(["--select", "A005"])
             .current_dir(tempdir.path()),
             @r"
@@ -2349,35 +2351,12 @@ fn a005_module_shadowing_strict() -> Result<()> {
         ----- stdout -----
         abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
         collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        Found 6 errors.
+        collections/abc/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        collections/foobar/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        Found 4 errors.
 
         ----- stderr -----
-        ");
-
-        // TODO(brent) Default should currently match the strict version, but after the next minor
-        // release it will match the non-strict version directly above
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--select", "A005"])
-            .current_dir(tempdir.path()),
-            @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        Found 6 errors.
-
-        ----- stderr -----
-        ");
+        ")
     });
 
     Ok(())
