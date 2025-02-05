@@ -637,11 +637,12 @@ impl<'s> Parser<'s> {
 
         let has_merged_snippets = self.current_section_has_merged_snippets();
         let has_explicit_file_paths = self.current_section_has_explicit_file_paths();
+        let test_name = self.sections[section].title;
 
         match self.current_section_files.entry(path.clone()) {
             Entry::Vacant(entry) => {
                 if has_merged_snippets {
-                    bail!("Merged snippets are not allowed in the presence of other files.");
+                    bail!("Merged snippets in test `{test_name}` are not allowed in the presence of other files.");
                 }
 
                 let index = self.files.push(EmbeddedFile {
@@ -656,14 +657,13 @@ impl<'s> Parser<'s> {
             Entry::Occupied(entry) => {
                 if path.is_explicit() {
                     bail!(
-                        "Test `{}` has duplicate files named `{}`.",
-                        self.sections[section].title,
+                        "Test `{test_name}` has duplicate files named `{}`.",
                         path.as_str(),
                     );
                 };
 
                 if has_explicit_file_paths {
-                    bail!("Merged snippets are not allowed in the presence of other files.");
+                    bail!("Merged snippets in test `{test_name}` are not allowed in the presence of other files.");
                 }
 
                 let index = *entry.get();
@@ -1057,7 +1057,7 @@ mod tests {
             let err = super::parse("file.md", &dedent(source)).expect_err("Should fail to parse");
             assert_eq!(
                 err.to_string(),
-                "Merged snippets are not allowed in the presence of other files."
+                "Merged snippets in test `One` are not allowed in the presence of other files."
             );
         }
     }
@@ -1084,7 +1084,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "Merged snippets are not allowed in the presence of other files."
+            "Merged snippets in test `One` are not allowed in the presence of other files."
         );
     }
 
