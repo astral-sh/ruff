@@ -480,6 +480,7 @@ pub(super) struct FlowSnapshot {
     scope_start_visibility: ScopedVisibilityConstraintId,
 }
 
+#[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`].
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
