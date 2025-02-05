@@ -217,6 +217,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
+      # There are spurious CRL server offline errors when downloading
+      # `cargo-bloat` with curl below, so we just disable them for now
+      - name: "Disable SChannel CRL checks"
+        run: |
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /v EnableCRLCheck /t REG_DWORD /d 0 /f
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
