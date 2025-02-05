@@ -77,6 +77,74 @@ c.flexible_int = None  # not okay
 reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
 ```
 
+## Built-in `property` descriptor
+
+The built-in `property` decorator creates a descriptor. The names for attribute reads/writes are
+determined by the return type of the `name` method and the parameter type of the setter,
+respectively.
+
+```py
+class C:
+    _name: str | None = None
+
+    @property
+    def name(self) -> str:
+        return self._name or "Unset"
+    # TODO: No diagnostic should be emitted here
+    # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"
+    @name.setter
+    def name(self, value: str | None) -> None:
+        self._value = value
+
+c = C()
+
+reveal_type(c._name)  # revealed: str | None
+
+# Should be `str`
+reveal_type(c.name)  # revealed: @Todo(bound method)
+
+# Should be `builtins.property`
+reveal_type(C.name)  # revealed: Literal[name]
+
+# This is fine:
+c.name = "new"
+
+c.name = None
+
+# TODO: this should be an error
+c.name = 42
+```
+
+## Built-in `classmethod` descriptor
+
+Similarly to `property`, `classmethod` decorator creates an implicit descriptor that binds the first
+argument to the class instead of the instance.
+
+```py
+class C:
+    def __init__(self, value: str) -> None:
+        self._name: str = value
+
+    @classmethod
+    def factory(cls, value: str) -> "C":
+        return cls(value)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.__name__
+
+c1 = C.factory("test")  # okay
+
+# TODO: should be `C`
+reveal_type(c1)  # revealed: @Todo(return type)
+
+# TODO: should be `str`
+reveal_type(C.get_name())  # revealed: @Todo(return type)
+
+# TODO: should be `str`
+reveal_type(C("42").get_name())  # revealed: @Todo(bound method)
+```
+
 ## Descriptors only work when used as class variables
 
 From the descriptor guide:
