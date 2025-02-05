@@ -49,7 +49,7 @@ def f(divisor: int) -> None:
 function always raises an exception, if it calls `sys.exit()`, if it enters an infinite loop, or if
 it calls itself recursively. All of these functions "Never" return control back to the caller:
 
-```py path=returns_never.py
+```py
 from typing_extensions import Never
 
 def raises_unconditionally() -> Never:
@@ -71,9 +71,7 @@ def recursive_never() -> Never:
 Similarly, if `Never` is used in parameter positions, it indicates that the function can "Never" be
 called, because it can never be passed a value of type `Never` (there are none):
 
-```py path=never_param.py
-from typing_extensions import Never
-
+```py
 def can_not_be_called(n: Never) -> int: ...
 ```
 

@@ -1,22 +1,26 @@
 # `Any`
 
+## Introduction
+
 The type `Any` is the dynamic type in Python's gradual type system. It represents an unknown
 fully-static type, which means that it represents an *unknown* set of runtime values.
-
-## `Any` is a dynamic type
 
 ```py
 from knot_extensions import static_assert, is_fully_static
 from typing import Any
+```
 
+`Any` is a dynamic type:
+
+```py
 static_assert(not is_fully_static(Any))
 ```
 
 ## Every type is assignable to `Any`, and `Any` is assignable to every type
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
-from typing_extensions import Any, Never
+from knot_extensions import static_assert, is_fully_static, is_assignable_to
+from typing_extensions import Never
 
 class C: ...
 
@@ -34,20 +38,22 @@ static_assert(is_assignable_to(Any, type))
 
 static_assert(is_assignable_to(type[Any], Any))
 static_assert(is_assignable_to(Any, type[Any]))
+```
 
+`Any` is also assignable to itself (like every type):
+
+```py
 static_assert(is_assignable_to(Any, Any))
 ```
 
-## Unions with `Any`
-
-### `Any | T`
+## Unions with `Any`: `Any | T`
 
 The union `Any | T` of `Any` with a fully static type `T` describes an unknown set of values that is
 *at least as large* as the set of values described by `T`. It represents an unknown fully-static
 type with *lower bound* `T`. Again, this can be demonstrated using the assignable-to relation:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from knot_extensions import static_assert, is_assignable_to, is_equivalent_to
 from typing_extensions import Any
 
 # A class hierarchy Small <: Medium <: Big
@@ -63,28 +69,22 @@ static_assert(is_assignable_to(Any | Medium, Medium))
 static_assert(not is_assignable_to(Any | Medium, Small))
 ```
 
-### `Any | object`
-
-The union `Any | object` is equivalent to `object`:
+The union `Any | object` is equivalent to `object`. This is true for every union with `object`, but
+it is worth demonstrating:
 
 ```py
-from knot_extensions import static_assert, is_equivalent_to
-from typing import Any
-
 static_assert(is_equivalent_to(Any | object, object))
 static_assert(is_equivalent_to(object | Any, object))
 ```
 
-## Intersections with `Any`
-
-### `Any & T`
+## Intersections with `Any`: `Any & T`
 
 The intersection `Any & T` of `Any` with a fully static type `T` describes an unknown set of values
 that is *no larger than* the set of values described by `T`. It represents an unknown fully-static
 type with *upper bound* `T`:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Intersection
+from knot_extensions import static_assert, is_assignable_to, Intersection, is_equivalent_to
 from typing import Any
 
 class Big: ...
@@ -96,19 +96,19 @@ class Small(Medium): ...
 static_assert(is_assignable_to(Small, Intersection[Any, Medium]))
 # error: [static-assert-error]
 static_assert(is_assignable_to(Medium, Intersection[Any, Medium]))
-
-# `Any & Medium` is no larger than `Medium`, so we can not assign `Big` to it. There is no possible
-# materialization of `Any & Medium` that would make it as big as `Big`:
-static_assert(not is_assignable_to(Big, Intersection[Any, Medium]))
 ```
 
-### `Any & Never`
+`Any & Medium` is no larger than `Medium`, so we can not assign `Big` to it. There is no possible
+materialization of `Any & Medium` that would make it as big as `Big`:
+
+```py
+static_assert(not is_assignable_to(Big, Intersection[Any, Medium]))
+```
 
 `Any & Never` represents an "unknown" fully-static type which is no larger than `Never`. There is no
 such fully-static type, except for `Never` itself. So `Any & Never` is equivalent to `Never`:
 
 ```py
-from knot_extensions import static_assert, is_equivalent_to, Intersection
 from typing_extensions import Never
 
 static_assert(is_equivalent_to(Intersection[Any, Never], Never))
