@@ -9,7 +9,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unreso
 
 # Python source files
 
-## mdtest_snippet__1.py
+## mdtest_snippet.py
 
 ```
 1 | from .does_not_exist.foo.bar import add  # error: [unresolved-import]
@@ -21,7 +21,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unreso
 
 ```
 error: lint:unresolved-import
- --> /src/mdtest_snippet__1.py:1:7
+ --> /src/mdtest_snippet.py:1:7
   |
 1 | from .does_not_exist.foo.bar import add  # error: [unresolved-import]
   |       ^^^^^^^^^^^^^^^^^^^^^^ Cannot resolve import `.does_not_exist.foo.bar`

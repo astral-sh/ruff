@@ -16,7 +16,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unreso
 2 | does_exist2 = 2
 ```
 
-## mdtest_snippet__1.py
+## mdtest_snippet.py
 
 ```
 1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
@@ -26,7 +26,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unreso
 
 ```
 error: lint:unresolved-import
- --> /src/mdtest_snippet__1.py:1:28
+ --> /src/mdtest_snippet.py:1:28
   |
 1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
   |                            ^^^^^^^^^^^^^^ Module `a` has no member `does_not_exist`

@@ -2525,6 +2525,7 @@ dependencies = [
  "regex",
  "ruff_db",
  "ruff_index",
+ "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",

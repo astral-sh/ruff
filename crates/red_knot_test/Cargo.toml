@@ -18,6 +18,7 @@ ruff_index = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
+ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
 camino = { workspace = true }

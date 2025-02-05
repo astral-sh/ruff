@@ -84,8 +84,11 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: tuple[str, Unknown]
     reveal_type(z)  # revealed: Unknown | Literal[1]
+```
 
-# Unknown can be subclassed, just like Any
+`Unknown` can be subclassed, just like `Any`:
+
+```py
 class C(Unknown): ...
 
 # revealed: tuple[Literal[C], Unknown, Literal[object]]
@@ -238,9 +241,12 @@ error_message = "A custom message "
 error_message += "constructed from multiple string literals"
 # error: "Static assertion error: A custom message constructed from multiple string literals"
 static_assert(False, error_message)
+```
 
-# There are limitations to what we can still infer as a string literal. In those cases,
-# we simply fall back to the default message.
+There are limitations to what we can still infer as a string literal. In those cases, we simply fall
+back to the default message:
+
+```py
 shouted_message = "A custom message".upper()
 # error: "Static assertion error: argument evaluates to `False`"
 static_assert(False, shouted_message)
@@ -371,8 +377,11 @@ static_assert(is_subtype_of(TypeOf[str], type[str]))
 
 class Base: ...
 class Derived(Base): ...
+```
 
-# `TypeOf` can be used in annotations:
+`TypeOf` can also be used in annotations:
+
+```py
 def type_of_annotation() -> None:
     t1: TypeOf[Base] = Base
     t2: TypeOf[Base] = Derived  # error: [invalid-assignment]

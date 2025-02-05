@@ -29,8 +29,6 @@ completing. The type of `x` at the beginning of the `except` suite in this examp
 `x = could_raise_returns_str()` redefinition, but we *also* could have jumped to the `except` suite
 *after* that redefinition.
 
-`union_type_inferred.py`:
-
 ```py
 def could_raise_returns_str() -> str:
     return "foo"
@@ -52,12 +50,7 @@ reveal_type(x)  # revealed: str | Literal[2]
 If `x` has the same type at the end of both branches, however, the branches unify and `x` is not
 inferred as having a union type following the `try`/`except` block:
 
-`branches_unify_to_non_union_type.py`:
-
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
-
 x = 1
 
 try:
@@ -137,8 +130,6 @@ the `except` suite:
 - At the end of `else`, `x == 3`
 - At the end of `except`, `x == 2`
 
-`single_except.py`:
-
 ```py
 def could_raise_returns_str() -> str:
     return "foo"
@@ -167,9 +158,6 @@ been executed in its entirety, or the `try` suite and the `else` suite must both
 in their entireties:
 
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
-
 x = 1
 
 try:
@@ -198,8 +186,6 @@ A `finally` suite is *always* executed. As such, if we reach the `reveal_type` c
 this example, we know that `x` *must* have been reassigned to `2` during the `finally` suite. The
 type of `x` at the end of the example is therefore `Literal[2]`:
 
-`redef_in_finally.py`:
-
 ```py
 def could_raise_returns_str() -> str:
     return "foo"
@@ -225,12 +211,7 @@ at this point than there were when we were inside the `finally` block.
 (Our current model does *not* correctly infer the types *inside* `finally` suites, however; this is
 still a TODO item for us.)
 
-`no_redef_in_finally.py`:
-
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
-
 x = 1
 
 try:
@@ -258,8 +239,6 @@ suites:
 - Or we could have jumped from halfway through the `try` suite to an `except` suite, only for an
     exception raised in the `except` suite to cause us to jump to the `finally` suite before the
     `except` suite ran to completion
-
-`redef_in_finally.py`:
 
 ```py
 def could_raise_returns_str() -> str:
@@ -298,18 +277,7 @@ itself. (In some control-flow possibilities, some exceptions were merely *suspen
 `finally` suite; these lead to the scope's termination following the conclusion of the `finally`
 suite.)
 
-`no_redef_in_finally.py`:
-
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
-
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
-
-def could_raise_returns_bool() -> bool:
-    return True
-
 x = 1
 
 try:
@@ -331,18 +299,7 @@ reveal_type(x)  # revealed: str | bool
 
 An example with multiple `except` branches and a `finally` branch:
 
-`multiple_except_branches.py`:
-
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
-
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
-
-def could_raise_returns_bool() -> bool:
-    return True
-
 def could_raise_returns_memoryview() -> memoryview:
     return memoryview(b"")
 
@@ -379,8 +336,6 @@ reveal_type(x)  # revealed: str | bool | float
 If the exception handler has an `else` branch, we must also take into account the possibility that
 control flow could have jumped to the `finally` suite from partway through the `else` suite due to
 an exception raised *there*.
-
-`single_except_branch.py`:
 
 ```py
 def could_raise_returns_str() -> str:
@@ -425,24 +380,7 @@ reveal_type(x)  # revealed: bool | float
 
 The same again, this time with multiple `except` branches:
 
-`multiple_except_branches.py`:
-
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
-
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
-
-def could_raise_returns_bool() -> bool:
-    return True
-
-def could_raise_returns_memoryview() -> memoryview:
-    return memoryview(b"")
-
-def could_raise_returns_float() -> float:
-    return 3.14
-
 def could_raise_returns_range() -> range:
     return range(42)
 
