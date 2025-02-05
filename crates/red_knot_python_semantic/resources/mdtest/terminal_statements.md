@@ -623,9 +623,9 @@ def return_from_nested_if(cond1: bool, cond2: bool):
 
 ## Statically known terminal statements
 
-Terminal statements do not yet interact correctly with statically known bounds. In this example, we
-should see that the `return` statement is always executed, and therefore that the `"b"` assignment
-is not visible to the `reveal_type`.
+We model reachability using the same visibility constraints that we use to model statically known
+bounds. In this example, we see that the `return` statement is always executed, and therefore that
+the `"b"` assignment is not visible to the `reveal_type`.
 
 ```py
 def _(cond: bool):
