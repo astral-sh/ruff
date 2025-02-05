@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use std::iter;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -5,7 +6,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Arguments, Expr, ExprStarred, ExprSubscript, ExprTuple, StmtClassDef, TypeParams,
 };
-use ruff_python_semantic::{Binding, BindingKind, SemanticModel};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
@@ -139,12 +140,13 @@ fn convert_type_vars(
         .map(TypeVar::from)
         .collect::<Vec<_>>();
 
+    let semantic = checker.semantic();
     let mut converted_type_vars = match old_style_type_vars {
         Expr::Tuple(ExprTuple { elts, .. }) => {
-            generic_arguments_to_type_vars(elts.iter(), type_params, checker)?
+            generic_arguments_to_type_vars(elts.iter(), type_params, semantic)?
         }
         expr @ (Expr::Subscript(_) | Expr::Name(_)) => {
-            generic_arguments_to_type_vars(iter::once(expr), type_params, checker)?
+            generic_arguments_to_type_vars(iter::once(expr), type_params, semantic)?
         }
         _ => return None,
     };
@@ -171,22 +173,13 @@ fn convert_type_vars(
 fn generic_arguments_to_type_vars<'a>(
     exprs: impl Iterator<Item = &'a Expr>,
     existing_type_params: &TypeParams,
-    checker: &'a Checker,
+    semantic: &'a SemanticModel,
 ) -> Option<Vec<TypeVar<'a>>> {
-    let is_existing_param_of_same_class = |binding: &Binding| {
-        // This first check should have been unnecessary,
-        // as a type parameter list can only contain type-parameter bindings.
-        // Named expressions, for example, are syntax errors.
-        // However, Ruff doesn't know that yet (#11118),
-        // so here it shall remain.
-        matches!(binding.kind, BindingKind::TypeParam)
-            && existing_type_params.range.contains_range(binding.range)
-    };
-
-    let semantic = checker.semantic();
-
     let mut type_vars = vec![];
-    let mut encountered: Vec<&str> = vec![];
+    let mut encountered: FxHashSet<&str> = existing_type_params
+        .iter()
+        .map(|tp| tp.name().as_str())
+        .collect();
 
     for expr in exprs {
         let (name, unpacked) = match expr {
@@ -204,26 +197,14 @@ fn generic_arguments_to_type_vars<'a>(
             _ => return None,
         };
 
-        let binding = semantic.only_binding(name).map(|id| semantic.binding(id))?;
-        let name_as_str = name.id.as_str();
-
-        if is_existing_param_of_same_class(binding) || encountered.contains(&name_as_str) {
+        if !encountered.insert(name.id.as_str()) {
             continue;
         }
 
-        encountered.push(name_as_str);
-
         let type_var = expr_name_to_type_var(semantic, name)?;
 
-        match (&type_var.kind, unpacked, &type_var.restriction) {
-            (TypeParamKind::TypeVarTuple, false, _) => return None,
-            (TypeParamKind::TypeVar, true, _) => return None,
-            (TypeParamKind::ParamSpec, true, _) => return None,
-
-            (TypeParamKind::TypeVarTuple, _, Some(_)) => return None,
-            (TypeParamKind::ParamSpec, _, Some(_)) => return None,
-
-            _ => {}
+        if !type_var_is_valid(&type_var, unpacked) {
+            return None;
         }
 
         // TODO: Type parameter defaults
@@ -235,4 +216,27 @@ fn generic_arguments_to_type_vars<'a>(
     }
 
     Some(type_vars)
+}
+
+/// Returns true in the following cases:
+///
+/// * If `type_var` is a `TypeVar`:
+///     * It must not be unpacked
+/// * If `type_var` is a `TypeVarTuple`:
+///     * It must be unpacked
+///     * It must not have any restrictions
+/// * If `type_var` is a `ParamSpec`:
+///     * It must not be unpacked
+///     * It must not have any restrictions
+fn type_var_is_valid(type_var: &TypeVar, unpacked: bool) -> bool {
+    match (&type_var.kind, unpacked, &type_var.restriction) {
+        (TypeParamKind::TypeVarTuple, false, _) => false,
+        (TypeParamKind::TypeVar, true, _) => false,
+        (TypeParamKind::ParamSpec, true, _) => false,
+
+        (TypeParamKind::TypeVarTuple, _, Some(_)) => false,
+        (TypeParamKind::ParamSpec, _, Some(_)) => false,
+
+        _ => true,
+    }
 }
