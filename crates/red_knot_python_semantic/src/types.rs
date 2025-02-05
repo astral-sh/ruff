@@ -264,9 +264,7 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
             .iter()
             .any(|module_type_member| &**module_type_member == name)
         {
-            // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
-            // on instance types yet.
-            KnownClass::ModuleType.to_class_literal(db).member(db, name)
+            KnownClass::ModuleType.to_instance(db).member(db, name)
         } else {
             Symbol::Unbound
         }
@@ -3810,8 +3808,7 @@ impl<'db> ModuleLiteralType<'db> {
             if name == "__getattr__" {
                 Symbol::Unbound
             } else {
-                // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
-                KnownClass::ModuleType.to_class_literal(db).member(db, name)
+                KnownClass::ModuleType.to_instance(db).member(db, name)
             }
         })
     }
