@@ -51,7 +51,11 @@ impl Violation for MutableClassDefault {
 }
 
 /// RUF012
-pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_class_default(
+    checker: &Checker,
+    class_def: &ast::StmtClassDef,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -75,9 +79,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                         return;
                     }
 
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                    diagnostics.push(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
@@ -89,9 +91,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                         return;
                     }
 
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                    diagnostics.push(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             _ => (),

@@ -515,15 +515,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NonUniqueEnums) {
                 flake8_pie::rules::non_unique_enums(checker, stmt, body);
             }
-            if checker.enabled(Rule::MutableClassDefault) {
-                ruff::rules::mutable_class_default(checker, class_def);
-            }
-            if checker.enabled(Rule::MutableDataclassDefault) {
-                ruff::rules::mutable_dataclass_default(checker, class_def);
-            }
-            if checker.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                ruff::rules::function_call_in_dataclass_default(checker, class_def);
-            }
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
