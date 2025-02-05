@@ -1,10 +1,12 @@
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the use of `IOBase.write` in a for loop.
@@ -51,6 +53,7 @@ impl AlwaysFixableViolation for ForLoopWrites {
     }
 }
 
+/// FURB122
 pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     if !binding.kind.is_loop_var() {
         return None;
@@ -73,6 +76,7 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> O
     for_loop_writes(checker, for_stmt, binding.scope, &binding_names)
 }
 
+/// FURB122
 pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
     // Loops with bindings are handled later.
     if !binding_names(&for_stmt.target).is_empty() {
@@ -114,6 +118,7 @@ fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
     names
 }
 
+/// FURB122
 fn for_loop_writes(
     checker: &Checker,
     for_stmt: &StmtFor,
@@ -155,40 +160,41 @@ fn for_loop_writes(
         return None;
     }
 
+    let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), write_arg) {
         (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
             format!(
                 "{}.writelines({})",
-                checker.locator().slice(io_object_name),
-                checker.locator().slice(for_stmt.iter.as_ref()),
+                locator.slice(io_object_name),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker),
             )
         }
         (for_target, write_arg) => {
             format!(
                 "{}.writelines({} for {} in {})",
-                checker.locator().slice(io_object_name),
-                checker.locator().slice(write_arg),
-                checker.locator().slice(for_target),
-                checker.locator().slice(for_stmt.iter.as_ref()),
+                locator.slice(io_object_name),
+                locator.slice(write_arg),
+                locator.slice(for_target),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker),
             )
         }
     };
 
-    let applicability = if checker.comment_ranges().intersects(for_stmt.range()) {
+    let applicability = if checker.comment_ranges().intersects(for_stmt.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
+    let fix = Fix::applicable_edit(
+        Edit::range_replacement(content, for_stmt.range),
+        applicability,
+    );
 
     let diagnostic = Diagnostic::new(
         ForLoopWrites {
             name: io_object_name.id.to_string(),
         },
         for_stmt.range,
-    );
-    let fix = Fix::applicable_edit(
-        Edit::range_replacement(content, for_stmt.range),
-        applicability,
     );
 
     Some(diagnostic.with_fix(fix))
@@ -238,4 +244,27 @@ fn loop_variables_are_used_outside_loop(
     binding_names
         .iter()
         .any(|name| name_overwrites_outer(name) || name_is_used_later(name))
+}
+
+pub(super) fn parenthesize_loop_iter_if_necessary(for_stmt: &StmtFor, checker: &Checker) -> String {
+    let locator = checker.locator();
+    let iter = for_stmt.iter.as_ref();
+
+    let original_parenthesized_range = parenthesized_range(
+        iter.into(),
+        for_stmt.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    );
+
+    if let Some(range) = original_parenthesized_range {
+        return locator.slice(range).to_string();
+    }
+
+    let iter_in_source = locator.slice(iter);
+
+    match iter {
+        Expr::Tuple(tuple) if !tuple.parenthesized => format!("({iter_in_source})"),
+        _ => iter_in_source.to_string(),
+    }
 }
