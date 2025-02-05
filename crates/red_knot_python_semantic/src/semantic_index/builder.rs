@@ -61,6 +61,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
+    // A shared clone of the path of the file being analyzed. We use this as a label for all of the
+    // metrics that we export, and this avoids cloning the path into a new string each time.
+    file_path: Arc<str>,
     module: &'db ParsedModule,
     scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
@@ -95,9 +98,11 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
 impl<'db> SemanticIndexBuilder<'db> {
     pub(super) fn new(db: &'db dyn Db, file: File, parsed: &'db ParsedModule) -> Self {
+        let file_path = Arc::from(file.path(db).as_str());
         let mut builder = Self {
             db,
             file,
+            file_path,
             module: parsed,
             scope_stack: Vec::new(),
             current_assignments: vec![],
@@ -175,6 +180,12 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+        metrics::counter!(
+            "semantic_index.scope_count",
+            "file" => self.file_path.clone(),
+        )
+        .increment(1);
+
         let children_start = self.scopes.next_index() + 1;
 
         #[allow(unsafe_code)]

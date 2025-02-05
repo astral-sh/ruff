@@ -105,6 +105,7 @@ lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f
 ] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
+metrics = { version = "0.24.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
