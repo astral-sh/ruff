@@ -452,6 +452,9 @@ def raise_in_both_branches(cond: bool):
         # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     else:
+        # This branch is unreachable, since all control flows in the `try` clause raise exceptions.
+        # As a result, this binding should never be reachable, since new bindings are visibile only
+        # when they are reachable.
         x = "unreachable"
     finally:
         # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
@@ -636,4 +639,22 @@ def _(cond: bool):
             return
 
     reveal_type(x)  # revealed: Literal["a"]
+```
+
+## Bindings after a terminal statement are unreachable
+
+Any bindings introduced after a terminal statement are unreachable, and are considered not visible.
+
+```py
+def f(cond: bool) -> str:
+    x = "before"
+    if cond:
+        reveal_type(x)  # revealed: Literal["before"]
+        return
+        x = "after-return"
+        # error: [unresolved-reference]
+        reveal_type(x)  # revealed: Unknown
+    else:
+        x = "else"
+    reveal_type(x)  # revealed: Literal["else"]
 ```
