@@ -280,7 +280,7 @@ jobs:
 
   cargo-build-msrv:
     name: "cargo build (msrv)"
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest-8
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
