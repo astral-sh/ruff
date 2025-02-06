@@ -382,6 +382,22 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
+    if semantic.use_new_type_checking_block_detection_semantics() {
+        return match test.as_ref() {
+            // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
+            // for this specific check even if it's defined somewhere else, like the current module.
+            // Ex) `if TYPE_CHECKING:`
+            Expr::Name(ast::ExprName { id, .. }) => {
+                id == "TYPE_CHECKING"
+                // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
+                || semantic.match_typing_expr(test, "TYPE_CHECKING")
+            }
+            // Ex) `if typing.TYPE_CHECKING:`
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
+            _ => false,
+        };
+    }
+
     // Ex) `if False:`
     if is_const_false(test) {
         return true;

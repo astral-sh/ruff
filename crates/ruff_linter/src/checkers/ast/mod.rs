@@ -248,6 +248,11 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
+        let mut semantic = SemanticModel::new(&settings.typing_modules, path, module);
+        if settings.preview.is_enabled() {
+            // Set the feature flag to test `TYPE_CHECKING` semantic changes
+            semantic.flags |= SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION;
+        }
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -263,7 +268,7 @@ impl<'a> Checker<'a> {
             stylist,
             indexer,
             importer: Importer::new(parsed, locator, stylist),
-            semantic: SemanticModel::new(&settings.typing_modules, path, module),
+            semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
             diagnostics: Vec::default(),
