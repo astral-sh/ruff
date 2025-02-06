@@ -15,6 +15,8 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use thiserror::Error;
 
+use super::settings::{Settings, TerminalSettings};
+
 /// The options for the project.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -30,6 +32,9 @@ pub struct Options {
     /// Configures the enabled lints and their severity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Rules>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<TerminalOptions>,
 }
 
 impl Options {
@@ -110,7 +115,22 @@ impl Options {
     }
 
     #[must_use]
-    pub(crate) fn to_rule_selection(&self, db: &dyn Db) -> (RuleSelection, Vec<OptionDiagnostic>) {
+    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
+        let (rules, diagnostics) = self.to_rule_selection(db);
+
+        let mut settings = Settings::new(rules);
+
+        if let Some(terminal) = self.terminal.as_ref() {
+            settings.set_terminal(TerminalSettings {
+                error_on_warning: terminal.error_on_warning.unwrap_or_default(),
+            });
+        }
+
+        (settings, diagnostics)
+    }
+
+    #[must_use]
+    fn to_rule_selection(&self, db: &dyn Db) -> (RuleSelection, Vec<OptionDiagnostic>) {
         let registry = db.lint_registry();
         let mut diagnostics = Vec::new();
 
@@ -242,6 +262,15 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
             inner: iter.into_iter().collect(),
         }
     }
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct TerminalOptions {
+    /// Use exit code 1 if there are any warning-level diagnostics.
+    ///
+    /// Defaults to `false`.
+    pub error_on_warning: Option<bool>,
 }
 
 #[cfg(feature = "schemars")]
