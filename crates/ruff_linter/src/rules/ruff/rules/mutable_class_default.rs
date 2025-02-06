@@ -24,7 +24,12 @@ use crate::rules::ruff::rules::helpers::{
 /// `typing.ClassVar`. When mutability is not required, values should be
 /// immutable types, like `tuple` or `frozenset`.
 ///
+/// For mutable variables, prefer to initialize them in `__init__`.
+///
 /// ## Examples
+///
+/// Using `ClassVar` and imutable types:
+///
 /// ```python
 /// class A:
 ///     mutable_default: list[int] = []
@@ -32,6 +37,7 @@ use crate::rules::ruff::rules::helpers::{
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from typing import ClassVar
 ///
@@ -40,6 +46,27 @@ use crate::rules::ruff::rules::helpers::{
 ///     mutable_default: ClassVar[list[int]] = []
 ///     immutable_default: tuple[int, ...] = ()
 /// ```
+///
+/// Using instance variables instead of class variables:
+///
+/// ```python
+/// class A:
+///     instance_dict: dict[str, str] = {"key": "value"}
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// class A:
+///     instance_dict: ClassVar[dict[str, str]]
+///
+///     def __init__(self) -> None:
+///         self.instance_dict: dict[str, str] = {"key": "value"}
+/// ```
+///
+/// In cases where memory efficiency is a priority, `MappingProxyType`
+/// can be used to create immutable dictionaries that are shared between
+/// instances.
 #[derive(ViolationMetadata)]
 pub(crate) struct MutableClassDefault;
 
