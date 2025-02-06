@@ -239,11 +239,9 @@ impl<'a> Importer<'a> {
         while let Expr::Attribute(ast::ExprAttribute { value, .. }) = source.as_ref() {
             source = value;
         }
-        let Some(binding_id) = semantic.resolve_name(source.as_name_expr()?) else {
-            return None;
-        };
-
-        semantic.binding(binding_id).statement(semantic)
+        semantic
+            .binding(semantic.resolve_name(source.as_name_expr()?)?)
+            .statement(semantic)
     }
 
     /// Find a reference to `typing.TYPE_CHECKING`.
