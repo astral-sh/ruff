@@ -906,7 +906,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::bad_open_mode(checker, call);
             }
             if checker.enabled(Rule::BadStrStripCall) {
-                pylint::rules::bad_str_strip_call(checker, func, args);
+                pylint::rules::bad_str_strip_call(checker, call);
             }
             if checker.enabled(Rule::ShallowCopyEnviron) {
                 pylint::rules::shallow_copy_environ(checker, call);

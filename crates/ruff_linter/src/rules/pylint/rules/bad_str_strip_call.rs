@@ -47,6 +47,7 @@ use crate::settings::types::PythonVersion;
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[derive(ViolationMetadata)]
 pub(crate) struct BadStrStripCall {
+    duplicated: char,
     strip: StripKind,
     removal: Option<RemovalKind>,
 }
@@ -54,13 +55,35 @@ pub(crate) struct BadStrStripCall {
 impl Violation for BadStrStripCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { strip, removal } = self;
+        let Self {
+            duplicated,
+            strip,
+            removal,
+        } = self;
+
         if let Some(removal) = removal {
             format!(
-                "String `{strip}` call contains duplicate characters (did you mean `{removal}`?)",
+                "String `{strip}` call contains duplicate character {duplicated:#?} \
+                (did you mean `{removal}`?)",
             )
         } else {
-            format!("String `{strip}` call contains duplicate characters")
+            format!("String `{strip}` call contains duplicate character {duplicated:#?}")
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum ValueKind {
+    String,
+    Bytes,
+}
+
+impl ValueKind {
+    fn from(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::StringLiteral(_) => Some(Self::String),
+            Expr::BytesLiteral(_) => Some(Self::Bytes),
+            _ => None,
         }
     }
 }
@@ -120,52 +143,72 @@ impl fmt::Display for RemovalKind {
     }
 }
 
-/// Return `true` if a string contains duplicate characters, taking into account
-/// escapes.
-fn has_duplicates(s: &ast::StringLiteralValue) -> bool {
-    let mut escaped = false;
+fn find_duplicate_in_string(string: &ast::StringLiteralValue) -> Option<char> {
+    find_duplicate(string.chars())
+}
+
+fn find_duplicate_in_bytes(bytes: &ast::BytesLiteralValue) -> Option<char> {
+    find_duplicate(bytes.bytes().map(char::from))
+}
+
+/// Return `true` if a string or byte sequence contains duplicate characters.
+fn find_duplicate(mut chars: impl Iterator<Item = char>) -> Option<char> {
     let mut seen = FxHashSet::default();
-    for ch in s.chars() {
-        if escaped {
-            escaped = false;
-            let pair = format!("\\{ch}");
-            if !seen.insert(pair) {
-                return true;
-            }
-        } else if ch == '\\' {
-            escaped = true;
-        } else if !seen.insert(ch.to_string()) {
-            return true;
-        }
-    }
-    false
+
+    chars.find(|&char| !seen.insert(char))
 }
 
 /// PLE1310
-pub(crate) fn bad_str_strip_call(checker: &Checker, func: &Expr, args: &[Expr]) {
-    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
-        if matches!(
-            value.as_ref(),
-            Expr::StringLiteral(_) | Expr::BytesLiteral(_)
-        ) {
-            if let Some(strip) = StripKind::from_str(attr.as_str()) {
-                if let Some(arg) = args.first() {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &arg {
-                        if has_duplicates(value) {
-                            let removal = if checker.settings.target_version >= PythonVersion::Py39
-                            {
-                                RemovalKind::for_strip(strip)
-                            } else {
-                                None
-                            };
-                            checker.report_diagnostic(Diagnostic::new(
-                                BadStrStripCall { strip, removal },
-                                arg.range(),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
+pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
+    if checker.settings.target_version < PythonVersion::Py39 {
+        return;
     }
+
+    let (func, arguments) = (&call.func, &call.arguments);
+
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        return;
+    };
+
+    let Some(strip) = StripKind::from_str(attr.as_str()) else {
+        return;
+    };
+
+    if !arguments.keywords.is_empty() {
+        return;
+    }
+
+    let [arg] = arguments.args.as_ref() else {
+        return;
+    };
+
+    let Some(value_kind) = ValueKind::from(value.as_ref()) else {
+        return;
+    };
+
+    let duplicated = match arg {
+        Expr::StringLiteral(string) if value_kind == ValueKind::String => {
+            find_duplicate_in_string(&string.value)
+        }
+        Expr::BytesLiteral(bytes) if value_kind == ValueKind::Bytes => {
+            find_duplicate_in_bytes(&bytes.value)
+        }
+        _ => return,
+    };
+
+    let Some(duplicated) = duplicated else {
+        return;
+    };
+    let removal = RemovalKind::for_strip(strip);
+
+    let diagnostic = Diagnostic::new(
+        BadStrStripCall {
+            duplicated,
+            strip,
+            removal,
+        },
+        arg.range(),
+    );
+
+    checker.report_diagnostic(diagnostic);
 }
