@@ -14,7 +14,8 @@ use crate::fix;
 ///
 /// ## Why is this bad?
 /// A private `TypeVar` that is defined but not used is likely a mistake. It
-/// should either be used, made public, or removed to avoid confusion.
+/// should either be used, made public, or removed to avoid confusion. A type
+/// variable is considered "private" if its name starts with an underscore.
 ///
 /// ## Example
 /// ```pyi
@@ -24,6 +25,11 @@ use crate::fix;
 /// _T = typing.TypeVar("_T")
 /// _Ts = typing_extensions.TypeVarTuple("_Ts")
 /// ```
+///
+/// ## Fix safety and availability
+/// This rule's fix is available when [`preview`] mode is enabled.
+/// It is always marked as unsafe, as it would break your code if the type
+/// variable is imported by another module.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedPrivateTypeVar {
     type_var_like_name: String,
@@ -31,7 +37,7 @@ pub(crate) struct UnusedPrivateTypeVar {
 }
 
 impl Violation for UnusedPrivateTypeVar {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -232,9 +238,9 @@ pub(crate) fn unused_private_type_var(
         );
 
         if checker.settings.preview.is_enabled() {
-	        let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
-	        diagnostic.set_fix(Fix::unsafe_edit(edit));
-	    }
+            let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
+            diagnostic.set_fix(Fix::unsafe_edit(edit));
+        }
 
         diagnostics.push(diagnostic);
     }

@@ -195,6 +195,8 @@ mod tests {
     }
 
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.py"))]
+    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
