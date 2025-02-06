@@ -1,0 +1,5 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+assertion_line: 135
+---
+

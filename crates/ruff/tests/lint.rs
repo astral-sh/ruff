@@ -2218,13 +2218,11 @@ def func(t: _T) -> _T:
     return x
 "#
         ),
-        @r#"
-    success: false
-    exit_code: 1
+        @r"
+    success: true
+    exit_code: 0
     ----- stdout -----
 
-    from typing import TypeVar
-    _T = TypeVar("_T")
 
     class OldStyle[T]:
         var: T
@@ -2234,8 +2232,7 @@ def func(t: _T) -> _T:
         return x
 
     ----- stderr -----
-    test.py:3:1: PYI018 Private TypeVar `_T` is never used
-    Found 6 errors (5 fixed, 1 remaining).
-    "#
+    Found 7 errors (7 fixed, 0 remaining).
+    "
     );
 }

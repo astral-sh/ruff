@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -6,6 +6,7 @@ use ruff_python_semantic::{Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix;
 
 /// ## What it does
 /// Checks for the presence of unused private `TypeVar`, `ParamSpec` or
@@ -30,6 +31,8 @@ pub(crate) struct UnusedPrivateTypeVar {
 }
 
 impl Violation for UnusedPrivateTypeVar {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedPrivateTypeVar {
@@ -37,6 +40,16 @@ impl Violation for UnusedPrivateTypeVar {
             type_var_like_kind,
         } = self;
         format!("Private {type_var_like_kind} `{type_var_like_name}` is never used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let UnusedPrivateTypeVar {
+            type_var_like_name,
+            type_var_like_kind,
+        } = self;
+        Some(format!(
+            "Remove unused private {type_var_like_kind} `{type_var_like_name}`"
+        ))
     }
 }
 
@@ -178,7 +191,7 @@ pub(crate) fn unused_private_type_var(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
+        let stmt @ Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
             checker.semantic().statement(source)
         else {
             continue;
@@ -210,13 +223,18 @@ pub(crate) fn unused_private_type_var(
             continue;
         };
 
-        diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             UnusedPrivateTypeVar {
                 type_var_like_name: id.to_string(),
                 type_var_like_kind: type_var_like_kind.to_string(),
             },
             binding.range(),
-        ));
+        );
+
+        let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
+        diagnostic.set_fix(Fix::safe_edit(edit));
+
+        diagnostics.push(diagnostic);
     }
 }
 
