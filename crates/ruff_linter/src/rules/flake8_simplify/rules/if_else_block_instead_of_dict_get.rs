@@ -5,7 +5,9 @@ use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
-use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block, is_known_to_be_of_type_dict};
+use ruff_python_semantic::analyze::typing::{
+    is_known_to_be_of_type_dict, is_sys_version_block, is_type_checking_block,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
