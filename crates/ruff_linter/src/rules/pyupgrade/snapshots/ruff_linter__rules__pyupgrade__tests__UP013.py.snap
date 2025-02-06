@@ -267,12 +267,13 @@ UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax
    |
    = help: Convert `X` to class syntax
 
-ℹ Unsafe fix
+ℹ Safe fix
 43 43 | MyType = TypedDict("MyType", dict())
 44 44 | 
 45 45 | # Unsafe fix if comments are present
 46    |-X = TypedDict("X", {
 47    |-    "some_config": int,  # important
 48    |-})
-   46 |+class X(TypedDict):
-   47 |+    some_config: int
+   46 |+# important
+   47 |+class X(TypedDict):
+   48 |+    some_config: int

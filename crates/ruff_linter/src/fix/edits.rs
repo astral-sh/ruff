@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use itertools::Itertools;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
@@ -10,8 +11,8 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
-    SimpleTokenizer,
+    has_leading_content, indentation_at_offset, is_python_whitespace, CommentRanges,
+    PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -107,6 +108,82 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
 }
 
+pub(crate) fn delete_around_comments(
+    start: TextSize,
+    end: TextSize,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> Vec<Edit> {
+    let delete_range = TextRange::new(start, end);
+    // Begin by restricting attention to the comment ranges
+    // that intersect the deletion range. Suppose it looks like:
+    //
+    // (s1,e1),(s2,e2),...,(sn,en)
+    //
+    // Flatten, then prepend and append by the start and
+    // end of the deletion range to get:
+    //
+    // s0, s1, e1, s2, ..., sn, en, e0
+    //
+    // Now pair up to get the desired deletion ranges
+    // in the complement of the comments:
+    //
+    // (s0,s1), (e1,s2), ..., (en,e0)
+    let mut edits: Vec<Edit> = std::iter::once(start)
+        .chain(
+            comment_ranges
+                .iter()
+                .filter(|range| range.intersect(delete_range).is_some())
+                // extend comment range to include last newline
+                .flat_map(|range| [range.start(), range.end() + TextSize::from(1)]),
+        )
+        .chain(std::iter::once(end))
+        // Here we clamp the comment intervals to the deletion range
+        // (somewhat awkwardly: each conditional branch triggers
+        // at most once, and the remaining is a no-op.)
+        .map(|locn| {
+            if locn < start {
+                return start;
+            }
+            if locn > end {
+                return end;
+            }
+            locn
+        })
+        .tuples::<(_, _)>()
+        .map(|(left, right)| Edit::deletion(left, right))
+        .collect();
+    // Adjust the last deletion so remaining content matches the
+    // indentation at start of original deletion range.
+    let Some(last_edit) = edits.last_mut() else {
+        return edits;
+    };
+    let Some(start_indent) = indentation_at_offset(start, source) else {
+        return edits;
+    };
+    if !start_indent.is_empty() {
+        *last_edit = Edit::range_replacement(start_indent.to_string(), last_edit.range());
+    };
+    edits
+}
+
+pub(crate) fn replace_around_comments(
+    content: &str,
+    start: TextSize,
+    end: TextSize,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> Vec<Edit> {
+    let mut edits = delete_around_comments(start, end, comment_ranges, source);
+    let Some(last_edit) = edits.last_mut() else {
+        return edits;
+    };
+    *last_edit = Edit::range_replacement(
+        format!("{}{}", last_edit.content().unwrap_or_default(), content),
+        last_edit.range(),
+    );
+    edits
+}
 /// Generate a `Fix` to remove the specified imports from an `import` statement.
 pub(crate) fn remove_unused_imports<'a>(
     member_names: impl Iterator<Item = &'a str>,
