@@ -649,13 +649,13 @@ pub(crate) fn fix_unnecessary_comprehension(
 
 /// (C417) Convert `map(lambda x: x * 2, bar)` to `(x * 2 for x in bar)`.
 pub(crate) fn fix_unnecessary_map(
-    range: TextRange,
+    range_to_replace: TextRange,
     parent: Option<&Expr>,
     object_type: ObjectType,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let module_text = locator.slice(range);
+    let module_text = locator.slice(range_to_replace);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
 
@@ -800,7 +800,7 @@ pub(crate) fn fix_unnecessary_map(
         }
     }
 
-    Ok(Edit::range_replacement(content, range))
+    Ok(Edit::range_replacement(content, range_to_replace))
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`

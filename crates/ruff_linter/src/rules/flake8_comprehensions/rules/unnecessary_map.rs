@@ -98,10 +98,6 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
         }
 
         ObjectType::List | ObjectType::Set | ObjectType::Dict => {
-            if !arguments.keywords.is_empty() {
-                return;
-            }
-
             let [Expr::Call(inner_call)] = arguments.args.as_ref() else {
                 return;
             };
@@ -128,17 +124,16 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
         }
     };
 
-    // For example, (x+1 for x in (c:=a)) is invalid syntax
-    // so we can't suggest it.
-    if iterables
-        .iter()
-        .any(|iterable| any_over_expr(iterable, &|expr| expr.is_named_expr()))
-    {
-        return;
-    }
+    for iterable in iterables {
+        // For example, (x+1 for x in (c:=a)) is invalid syntax
+        // so we can't suggest it.
+        if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
+            return;
+        }
 
-    if iterables.iter().any(Expr::is_starred_expr) {
-        return;
+        if iterable.is_starred_expr() {
+            return;
+        }
     }
 
     if !lambda_has_expected_arity(parameters, body) {
@@ -184,7 +179,7 @@ fn map_lambda_and_iterables<'a>(
         return None;
     }
 
-    let [Expr::Lambda(lambda), iterables @ ..] = arguments.args.as_ref() else {
+    let Some((Expr::Lambda(lambda), iterables)) = arguments.args.split_first() else {
         return None;
     };
 
