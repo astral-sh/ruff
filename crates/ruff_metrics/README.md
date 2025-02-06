@@ -36,6 +36,26 @@ the maxmimum values of the counter for each value of this field.
 $ uv run crates/ruff_metrics/plot_metrics.py histogram semantic_index.scope_count --group-by file
 ```
 
+## Before/after comparisons
+
+red-knot will include the executable name as a field called `executable` in every metric data point
+that it outputs. You can use this to compare the values of a metric between two versions of
+red-knot:
+
+```console
+$ git switch main
+$ cargo build --bin red_knot --profile=profiling
+$ cp target/profiling/red_knot red_knot_main
+$ ./red_knot_main check --metrics [rest of arguments]
+
+$ git switch feature-branch
+$ cargo build --bin red_knot --profile=profiling
+$ cp target/profiling/red_knot red_knot_feature
+$ ./red_knot_feature check --metrics [rest of arguments]
+
+$ uv run crates/ruff_metrics/plot_metrics.py -o output.png counter semantic_index.scope_count --group-by executable
+```
+
 ## Saving output to a file
 
 You can save the plot to a file instead of displaying it by passing in the `-o` or `--output`
