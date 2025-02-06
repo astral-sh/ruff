@@ -36,6 +36,18 @@ the maxmimum values of the counter for each value of this field.
 $ uv run crates/ruff_metrics/plot_metrics.py histogram semantic_index.scope_count --group-by file
 ```
 
+## Saving output to a file
+
+You can save the plot to a file instead of displaying it by passing in the `-o` or `--output`
+option:
+
+```console
+$ uv run crates/ruff_metrics/plot_metrics.py -o output.png counter semantic_index.scope_count --group-by file
+```
+
+(Note that the `--output` option must come before the subcommand selecting which kind of plot you
+want.)
+
 ## Overriding the metrics file
 
 You can optionally provide a filename for the `--metrics` option, in which case we will output

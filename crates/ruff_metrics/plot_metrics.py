@@ -21,6 +21,7 @@ import pandas as pd
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--metrics", help="JSON file with metrics data", default="metrics.json")
+parser.add_argument("-o", "--output", help="save image to the given filename")
 subparsers = parser.add_subparsers(dest="command")
 
 counter_parser = subparsers.add_parser("counter")
@@ -48,6 +49,12 @@ def plot_counter(d: pd.DataFrame, label: str=None) -> None:
     d["total"] = d["delta"].cumsum()
     plt.plot("since_start", "total", data=d, label=label)
 
+def show_plot():
+    if args.output:
+        plt.savefig(args.output, dpi=600)
+    else:
+        plt.show()
+
 def cmd_counter() -> None:
     data = get_metric(all_data, args.key)
     plt.ylabel(args.key)
@@ -58,7 +65,7 @@ def cmd_counter() -> None:
             plot_counter(gd, group)
         if data[args.group_by].nunique() <= 10:
             plt.legend(loc="best")
-    plt.show()
+    show_plot()
 
 def cmd_histogram() -> None:
     data = get_metric(all_data, args.key)
@@ -68,7 +75,7 @@ def cmd_histogram() -> None:
     plt.ylabel("Count")
     plt.yscale("log")
     plt.hist(data["value"], bins=bins)
-    plt.show()
+    show_plot()
 
 if args.command == "counter":
     cmd_counter()
