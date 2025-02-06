@@ -151,7 +151,7 @@ fn find_duplicate_in_bytes(bytes: &ast::BytesLiteralValue) -> Option<char> {
     find_duplicate(bytes.bytes().map(char::from))
 }
 
-/// Return `true` if a string or byte sequence contains duplicate characters.
+/// Return the first duplicated character of a string or byte sequence, if any.
 fn find_duplicate(mut chars: impl Iterator<Item = char>) -> Option<char> {
     let mut seen = FxHashSet::default();
 
@@ -160,10 +160,6 @@ fn find_duplicate(mut chars: impl Iterator<Item = char>) -> Option<char> {
 
 /// PLE1310
 pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
-    if checker.settings.target_version < PythonVersion::Py39 {
-        return;
-    }
-
     let (func, arguments) = (&call.func, &call.arguments);
 
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
@@ -199,7 +195,12 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
     let Some(duplicated) = duplicated else {
         return;
     };
-    let removal = RemovalKind::for_strip(strip);
+
+    let removal = if checker.settings.target_version >= PythonVersion::Py39 {
+        RemovalKind::for_strip(strip)
+    } else {
+        None
+    };
 
     let diagnostic = Diagnostic::new(
         BadStrStripCall {
