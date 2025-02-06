@@ -27,7 +27,9 @@ use crate::rules::ruff::rules::helpers::{
 /// For mutable variables, prefer to initialize them in `__init__`.
 ///
 /// ## Examples
+///
 /// Using `ClassVar` and imutable types:
+///
 /// ```python
 /// class A:
 ///     mutable_default: list[int] = []
@@ -35,6 +37,7 @@ use crate::rules::ruff::rules::helpers::{
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from typing import ClassVar
 ///
@@ -45,15 +48,18 @@ use crate::rules::ruff::rules::helpers::{
 /// ```
 ///
 /// Using instance variables instead of class variables:
+///
 /// ```python
 /// class A:
 ///     instance_dict: dict[str, str] = {"key": "value"}
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class A:
 ///     instance_dict: ClassVar[dict[str, str]]
+///
 ///     def __init__(self) -> None:
 ///         self.instance_dict: dict[str, str] = {"key": "value"}
 /// ```
