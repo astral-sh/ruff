@@ -68,7 +68,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
-    setup_metrics(&args.metrics);
+    setup_metrics(args.metrics.as_ref());
 
     // The base path to which all CLI arguments are relative to.
     let cli_base_path = {

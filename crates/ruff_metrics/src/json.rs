@@ -157,7 +157,7 @@ impl Metric {
         // Render into a thread-local String buffer, and then output the resulting line in a single
         // call. This ensures that the output from multiple threads does not get intermingled.
         thread_local! {
-            static BUFFERS: RefCell<String> = RefCell::new(String::new());
+            static BUFFERS: RefCell<String> = const { RefCell::new(String::new()) };
         }
         BUFFERS.with(|buffer| {
             let mut buffer = buffer.borrow_mut();
@@ -177,7 +177,7 @@ impl Metric {
             f(&mut buffer);
             buffer.push_str("}\n");
             let _ = self.dest.lock().unwrap().write(buffer.as_bytes());
-        })
+        });
     }
 }
 

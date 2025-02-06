@@ -67,6 +67,7 @@ pub(crate) struct CheckCommand {
     /// will be written to that file. If you provide this option but don't provide a path, metrics
     /// will be written to a file called `metrics.json` in the current directory. We will _append_
     /// metrics to the file if it already exists.
+    #[allow(clippy::option_option)]
     #[arg(long, value_name = "PATH", num_args=0..=1)]
     pub(crate) metrics: Option<Option<SystemPathBuf>>,
 

@@ -255,7 +255,8 @@ where
     }
 }
 
-pub(crate) fn setup_metrics(dest: &Option<Option<SystemPathBuf>>) {
+#[allow(clippy::option_option)]
+pub(crate) fn setup_metrics(dest: Option<&Option<SystemPathBuf>>) {
     // If --metrics is not provided at all, don't collect any metrics.
     let Some(dest) = dest else {
         return;
