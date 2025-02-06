@@ -1,0 +1,28 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unpacking.md - Unpacking - Too few values to unpack
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpacking.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | a, b = (1,)  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-assignment
+ --> /src/mdtest_snippet.py:1:1
+  |
+1 | a, b = (1,)  # error: [invalid-assignment]
+  | ^^^^ Not enough values to unpack (expected 2, got 1)
+  |
+
+```
