@@ -7,35 +7,36 @@ branches whose conditions we can statically determine to be always true or alway
 useful for `sys.version_info` branches, which can make new features available based on the Python
 version:
 
-```py path=module1.py
-import sys
-
-if sys.version_info >= (3, 9):
-    SomeFeature: str = "available"
-```
-
 If we can statically determine that the condition is always true, then we can also understand that
 `SomeFeature` is always bound, without raising any errors:
 
-```py path=test1.py
-from module1 import SomeFeature
+```py
+import sys
 
-# SomeFeature is unconditionally available here, because we are on Python 3.9 or newer:
-reveal_type(SomeFeature)  # revealed: str
+class C:
+    if sys.version_info >= (3, 9):
+        SomeFeature: str = "available"
+
+# C.SomeFeature is unconditionally available here, because we are on Python 3.9 or newer:
+reveal_type(C.SomeFeature)  # revealed: str
 ```
 
 Another scenario where this is useful is for `typing.TYPE_CHECKING` branches, which are often used
 for conditional imports:
 
-```py path=module2.py
+`module.py`:
+
+```py
 class SomeType: ...
 ```
 
-```py path=test2.py
+`main.py`:
+
+```py
 import typing
 
 if typing.TYPE_CHECKING:
-    from module2 import SomeType
+    from module import SomeType
 
 # `SomeType` is unconditionally available here for type checkers:
 def f(s: SomeType) -> None: ...
@@ -167,7 +168,11 @@ statically known conditions, but here, we show that the results are truly based 
 not some special handling of specific conditions in semantic index building. We use two modules to
 demonstrate this, since semantic index building is inherently single-module:
 
-```py path=module.py
+`module.py`:
+
+```py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
@@ -1424,7 +1429,9 @@ def f():
 
 #### Always false, unbound
 
-```py path=module.py
+`module.py`:
+
+```py
 if False:
     symbol = 1
 ```
@@ -1436,7 +1443,9 @@ from module import symbol
 
 #### Always true, bound
 
-```py path=module.py
+`module.py`:
+
+```py
 if True:
     symbol = 1
 ```
@@ -1448,7 +1457,9 @@ from module import symbol
 
 #### Ambiguous, possibly unbound
 
-```py path=module.py
+`module.py`:
+
+```py
 def flag() -> bool:
     return True
 
@@ -1463,7 +1474,9 @@ from module import symbol
 
 #### Always false, undeclared
 
-```py path=module.py
+`module.py`:
+
+```py
 if False:
     symbol: int
 ```
@@ -1477,7 +1490,9 @@ reveal_type(symbol)  # revealed: Unknown
 
 #### Always true, declared
 
-```py path=module.py
+`module.py`:
+
+```py
 if True:
     symbol: int
 ```
@@ -1485,37 +1500,6 @@ if True:
 ```py
 # no error
 from module import symbol
-```
-
-## Known limitations
-
-We currently have a limitation in the complexity (depth) of the visibility constraints that are
-supported. This is to avoid pathological cases that would require us to recurse deeply.
-
-```py
-x = 1
-
-False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or (x := 2)  # fmt: skip
-
-# This still works fine:
-reveal_type(x)  # revealed: Literal[2]
-
-y = 1
-
-False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or False or \
-    False or False or False or (y := 2)  # fmt: skip
-
-# TODO: This should ideally be `Literal[2]` as well:
-reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Unsupported features

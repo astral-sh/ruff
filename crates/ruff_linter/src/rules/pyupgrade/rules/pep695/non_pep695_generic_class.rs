@@ -62,19 +62,27 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// This rule replaces standalone type variables in classes but doesn't remove
 /// the corresponding type variables even if they are unused after the fix. See
-/// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused
+/// [`unused-private-type-var`][PYI018] for a rule to clean up unused
 /// private type variables.
+///
+/// This rule will not rename private type variables to remove leading underscores, even though the
+/// new type parameters are restricted in scope to their associated class. See
+/// [`private-type-parameter`][UP049] for a rule to update these names.
 ///
 /// This rule will correctly handle classes with multiple base classes, as long as the single
 /// `Generic` base class is at the end of the argument list, as checked by
-/// [`generic-not-last-base-class`](generic-not-last-base-class.md). If a `Generic` base class is
+/// [`generic-not-last-base-class`][PYI059]. If a `Generic` base class is
 /// found outside of the last position, a diagnostic is emitted without a suggested fix.
 ///
 /// This rule only applies to generic classes and does not include generic functions. See
-/// [`non-pep695-generic-function`](non-pep695-generic-function.md) for the function version.
+/// [`non-pep695-generic-function`][UP047] for the function version.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
+/// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
+/// [PYI059]: https://docs.astral.sh/ruff/rules/generic-not-last-base-class/
+/// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
+/// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695GenericClass {
     name: String,

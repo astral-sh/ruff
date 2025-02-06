@@ -100,7 +100,7 @@ pub(crate) fn pep_484_positional_parameter(
 
 /// Returns `true` if the [`ParameterWithDefault`] is an old-style positional-only parameter (i.e.,
 /// its name starts with `__` and does not end with `__`).
-fn is_old_style_positional_only(arg: &ParameterWithDefault) -> bool {
-    let arg_name = &arg.parameter.name;
+fn is_old_style_positional_only(param: &ParameterWithDefault) -> bool {
+    let arg_name = param.name();
     arg_name.starts_with("__") && !arg_name.ends_with("__")
 }

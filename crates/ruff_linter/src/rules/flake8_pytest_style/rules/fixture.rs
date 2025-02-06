@@ -809,7 +809,7 @@ fn check_fixture_returns(checker: &mut Checker, name: &str, body: &[Stmt], retur
 /// PT019
 fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
-        let name = &parameter.parameter.name;
+        let name = parameter.name();
         if name.starts_with('_') {
             checker.diagnostics.push(Diagnostic::new(
                 PytestFixtureParamWithoutValue {

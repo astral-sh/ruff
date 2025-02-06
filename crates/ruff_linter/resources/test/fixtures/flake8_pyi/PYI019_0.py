@@ -1,4 +1,4 @@
-from typing import TypeVar, Self, Type
+from typing import TypeVar, Self, Type, cast
 
 _S = TypeVar("_S", bound=BadClass)
 _S2 = TypeVar("_S2", BadClass, GoodClass)
@@ -56,7 +56,7 @@ class CustomClassMethod:
 
 _S695 = TypeVar("_S695", bound="PEP695Fix")
 
-# Only .pyi gets fixes, no fixes for .py
+
 class PEP695Fix:
     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
 
@@ -87,3 +87,90 @@ class PEP695Fix:
     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 
     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
+
+
+class InvalidButWeDoNotPanic:
+    @classmethod
+    def m[S](cls: type[S], /) -> S[int]: ...
+    def n(self: S) -> S[int]: ...
+
+
+import builtins
+
+class UsesFullyQualifiedType:
+    @classmethod
+    def m[S](cls: builtins.type[S]) -> S: ...  # False negative (#15821)
+
+
+def shadowed_type():
+    type = 1
+    class A:
+        @classmethod
+        def m[S](cls: type[S]) -> S: ...  # no error here
+
+
+class SubscriptReturnType:
+    @classmethod
+    def m[S](cls: type[S]) -> type[S]: ...  # PYI019
+
+
+class SelfNotUsedInReturnAnnotation:
+    def m[S](self: S, other: S) -> int: ...
+    @classmethod
+    def n[S](cls: type[S], other: S) -> int: ...
+
+
+class _NotATypeVar: ...
+
+# Our stable-mode logic uses heuristics and thinks this is a `TypeVar`
+# because `self` and the return annotation use the same name as their annotation,
+# but our preview-mode logic is smarter about this.
+class Foo:
+    def x(self: _NotATypeVar) -> _NotATypeVar: ...
+    @classmethod
+    def y(self: type[_NotATypeVar]) -> _NotATypeVar: ...
+
+
+class NoReturnAnnotations:
+    def m[S](self: S, other: S): ...
+    @classmethod
+    def n[S](cls: type[S], other: S): ...
+
+class MultipleBoundParameters:
+    def m[S: int, T: int](self: S, other: T) -> S: ...
+    def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+
+class MethodsWithBody:
+    def m[S](self: S, other: S) -> S:
+        x: S = other
+        return x
+
+    @classmethod
+    def n[S](cls: type[S], other: S) -> S:
+        x: type[S] = type(other)
+        return x()
+
+class StringizedReferencesCanBeFixed:
+    def m[S](self: S) -> S:
+        x = cast("list[tuple[S, S]]", self)
+        return x
+
+class ButStrangeStringizedReferencesCannotBeFixed:
+    def m[_T](self: _T) -> _T:
+        x = cast('list[_\x54]', self)
+        return x
+
+class DeletionsAreNotTouched:
+    def m[S](self: S) -> S:
+        # `S` is not a local variable here, and `del` can only be used with local variables,
+        # so `del S` here is not actually a reference to the type variable `S`.
+        # This `del` statement is therefore not touched by the autofix (it raises `UnboundLocalError`
+        # both before and after the autofix)
+        del S
+        return self
+
+class NamesShadowingTypeVarAreNotTouched:
+    def m[S](self: S) -> S:
+        type S = int
+        print(S)  # not a reference to the type variable, so not touched by the autofix
+        return 42

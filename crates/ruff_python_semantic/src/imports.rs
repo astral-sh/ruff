@@ -43,7 +43,7 @@ impl NameImports {
 
 impl NameImport {
     /// Returns the name under which the member is bound (e.g., given `from foo import bar as baz`, returns `baz`).
-    fn bound_name(&self) -> &str {
+    pub fn bound_name(&self) -> &str {
         match self {
             NameImport::Import(import) => {
                 import.name.as_name.as_deref().unwrap_or(&import.name.name)

@@ -24,7 +24,12 @@ use crate::rules::ruff::rules::helpers::{
 /// `typing.ClassVar`. When mutability is not required, values should be
 /// immutable types, like `tuple` or `frozenset`.
 ///
+/// For mutable variables, prefer to initialize them in `__init__`.
+///
 /// ## Examples
+///
+/// Using `ClassVar` and imutable types:
+///
 /// ```python
 /// class A:
 ///     mutable_default: list[int] = []
@@ -32,6 +37,7 @@ use crate::rules::ruff::rules::helpers::{
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from typing import ClassVar
 ///
@@ -40,6 +46,27 @@ use crate::rules::ruff::rules::helpers::{
 ///     mutable_default: ClassVar[list[int]] = []
 ///     immutable_default: tuple[int, ...] = ()
 /// ```
+///
+/// Using instance variables instead of class variables:
+///
+/// ```python
+/// class A:
+///     instance_dict: dict[str, str] = {"key": "value"}
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// class A:
+///     instance_dict: ClassVar[dict[str, str]]
+///
+///     def __init__(self) -> None:
+///         self.instance_dict: dict[str, str] = {"key": "value"}
+/// ```
+///
+/// In cases where memory efficiency is a priority, `MappingProxyType`
+/// can be used to create immutable dictionaries that are shared between
+/// instances.
 #[derive(ViolationMetadata)]
 pub(crate) struct MutableClassDefault;
 
@@ -51,7 +78,11 @@ impl Violation for MutableClassDefault {
 }
 
 /// RUF012
-pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_class_default(
+    checker: &Checker,
+    class_def: &ast::StmtClassDef,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -75,9 +106,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                         return;
                     }
 
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                    diagnostics.push(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
@@ -89,9 +118,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                         return;
                     }
 
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                    diagnostics.push(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             _ => (),

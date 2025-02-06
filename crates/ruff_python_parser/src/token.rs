@@ -10,11 +10,11 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
-use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
+use ruff_python_ast::{BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -718,8 +718,12 @@ impl StringFlags for TokenFlags {
         }
     }
 
-    fn is_triple_quoted(self) -> bool {
-        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING)
+    fn triple_quotes(self) -> TripleQuotes {
+        if self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) {
+            TripleQuotes::Yes
+        } else {
+            TripleQuotes::No
+        }
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -765,11 +769,6 @@ impl TokenFlags {
     /// Returns `true` if the token is a raw string.
     pub(crate) const fn is_raw_string(self) -> bool {
         self.intersects(TokenFlags::RAW_STRING)
-    }
-
-    /// Converts this type to [`AnyStringFlags`], setting the equivalent flags.
-    pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {
-        AnyStringFlags::new(self.prefix(), self.quote_style(), self.is_triple_quoted())
     }
 }
 

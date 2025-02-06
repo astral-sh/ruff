@@ -542,6 +542,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "045") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP604AnnotationOptional),
         (Pyupgrade, "046") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP695GenericFunction),
+        (Pyupgrade, "049") => (RuleGroup::Preview, rules::pyupgrade::rules::PrivateTypeParameter),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -765,7 +766,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "016") => (RuleGroup::Stable, rules::flake8_pyi::rules::DuplicateUnionMember),
         (Flake8Pyi, "017") => (RuleGroup::Stable, rules::flake8_pyi::rules::ComplexAssignmentInStub),
         (Flake8Pyi, "018") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnusedPrivateTypeVar),
-        (Flake8Pyi, "019") => (RuleGroup::Stable, rules::flake8_pyi::rules::CustomTypeVarReturnType),
+        (Flake8Pyi, "019") => (RuleGroup::Stable, rules::flake8_pyi::rules::CustomTypeVarForSelf),
         (Flake8Pyi, "020") => (RuleGroup::Stable, rules::flake8_pyi::rules::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Stable, rules::flake8_pyi::rules::DocstringInStub),
         (Flake8Pyi, "024") => (RuleGroup::Stable, rules::flake8_pyi::rules::CollectionsNamedTuple),
@@ -1125,8 +1126,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),
         (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
+        (Flake8Logging, "004") => (RuleGroup::Preview, rules::flake8_logging::rules::LogExceptionOutsideExceptHandler),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
+        (Flake8Logging, "014") => (RuleGroup::Preview, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
         (Flake8Logging, "015") => (RuleGroup::Preview, rules::flake8_logging::rules::RootLoggerCall),
 
         _ => return None,

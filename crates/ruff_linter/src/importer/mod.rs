@@ -9,7 +9,7 @@ use anyhow::Result;
 use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, ModModule, Stmt};
+use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::{
@@ -125,7 +125,7 @@ impl<'a> Importer<'a> {
         &self,
         import: &ImportedMembers,
         at: TextSize,
-        semantic: &SemanticModel,
+        semantic: &SemanticModel<'a>,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = fix::codemods::retain_imports(
@@ -134,6 +134,39 @@ impl<'a> Importer<'a> {
             self.locator,
             self.stylist,
         )?;
+
+        // Add the import to an existing `TYPE_CHECKING` block.
+        if let Some(block) = self.preceding_type_checking_block(at) {
+            // Add the import to the existing `TYPE_CHECKING` block.
+            let type_checking_edit =
+                if let Some(statement) = Self::type_checking_binding_statement(semantic, block) {
+                    if statement == import.statement {
+                        // Special-case: if the `TYPE_CHECKING` symbol is imported as part of the same
+                        // statement that we're modifying, avoid adding a no-op edit. For example, here,
+                        // the `TYPE_CHECKING` no-op edit would overlap with the edit to remove `Final`
+                        // from the import:
+                        // ```python
+                        // from __future__ import annotations
+                        //
+                        // from typing import Final, TYPE_CHECKING
+                        //
+                        // Const: Final[dict] = {}
+                        // ```
+                        None
+                    } else {
+                        Some(Edit::range_replacement(
+                            self.locator.slice(statement.range()).to_string(),
+                            statement.range(),
+                        ))
+                    }
+                } else {
+                    None
+                };
+            return Ok(TypingImportEdit {
+                type_checking_edit,
+                add_import_edit: self.add_to_type_checking_block(&content, block.start()),
+            });
+        }
 
         // Import the `TYPE_CHECKING` symbol from the typing module.
         let (type_checking_edit, type_checking) =
@@ -179,13 +212,10 @@ impl<'a> Importer<'a> {
                 (Some(edit), name)
             };
 
-        // Add the import to a `TYPE_CHECKING` block.
-        let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
-            // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start())
-        } else {
-            // Add the import to a new `TYPE_CHECKING` block.
-            self.add_type_checking_block(
+        // Add the import to a new `TYPE_CHECKING` block.
+        Ok(TypingImportEdit {
+            type_checking_edit,
+            add_import_edit: self.add_type_checking_block(
                 &format!(
                     "{}if {type_checking}:{}{}",
                     self.stylist.line_ending().as_str(),
@@ -193,13 +223,25 @@ impl<'a> Importer<'a> {
                     indent(&content, self.stylist.indentation())
                 ),
                 at,
-            )?
+            )?,
+        })
+    }
+
+    fn type_checking_binding_statement(
+        semantic: &SemanticModel<'a>,
+        type_checking_block: &Stmt,
+    ) -> Option<&'a Stmt> {
+        let Stmt::If(ast::StmtIf { test, .. }) = type_checking_block else {
+            return None;
         };
 
-        Ok(TypingImportEdit {
-            type_checking_edit,
-            add_import_edit,
-        })
+        let mut source = test;
+        while let Expr::Attribute(ast::ExprAttribute { value, .. }) = source.as_ref() {
+            source = value;
+        }
+        semantic
+            .binding(semantic.resolve_name(source.as_name_expr()?)?)
+            .statement(semantic)
     }
 
     /// Find a reference to `typing.TYPE_CHECKING`.

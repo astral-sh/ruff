@@ -92,6 +92,18 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Eats the next two characters if they are `c1` and `c2`. Does not
+    /// consume any input otherwise, even if the first character matches.
+    pub fn eat_char2(&mut self, c1: char, c2: char) -> bool {
+        if self.first() == c1 && self.second() == c2 {
+            self.bump();
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn eat_char_back(&mut self, c: char) -> bool {
         if self.last() == c {
             self.bump_back();

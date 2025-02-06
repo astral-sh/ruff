@@ -1576,9 +1576,20 @@ fn conflicting_import_settings(
     use std::fmt::Write;
     let mut err_body = String::new();
     for required_import in &isort.required_imports {
-        let name = required_import.qualified_name().to_string();
-        if let Some(alias) = flake8_import_conventions.aliases.get(&name) {
-            writeln!(err_body, "    - `{name}` -> `{alias}`").unwrap();
+        // Ex: `from foo import bar as baz` OR `import foo.bar as baz`
+        // - qualified name: `foo.bar`
+        // - bound name: `baz`
+        // - conflicts with: `{"foo.bar":"buzz"}`
+        // - does not conflict with either of
+        //   - `{"bar":"buzz"}`
+        //   - `{"foo.bar":"baz"}`
+        let qualified_name = required_import.qualified_name().to_string();
+        let bound_name = required_import.bound_name();
+        let Some(alias) = flake8_import_conventions.aliases.get(&qualified_name) else {
+            continue;
+        };
+        if alias != bound_name {
+            writeln!(err_body, "    - `{qualified_name}` -> `{alias}`").unwrap();
         }
     }
 

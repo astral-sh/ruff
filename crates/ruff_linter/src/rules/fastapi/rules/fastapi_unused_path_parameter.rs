@@ -183,7 +183,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             .parameters
             .posonlyargs
             .iter()
-            .any(|arg| arg.parameter.name.as_str() == path_param);
+            .any(|param| param.name() == path_param);
 
         let mut diagnostic = Diagnostic::new(
             FastApiUnusedPathParameter {
@@ -258,25 +258,17 @@ impl<'a> Dependency<'a> {
     /// ): ...
     /// ```
     fn from_parameter(
-        parameter_with_default: &'a ParameterWithDefault,
+        parameter: &'a ParameterWithDefault,
         semantic: &SemanticModel<'a>,
     ) -> Option<Self> {
-        let ParameterWithDefault {
-            parameter, default, ..
-        } = parameter_with_default;
-
-        if let Some(dependency) = default
-            .as_deref()
+        if let Some(dependency) = parameter
+            .default()
             .and_then(|default| Self::from_default(default, semantic))
         {
             return Some(dependency);
         }
 
-        let Expr::Subscript(ExprSubscript { value, slice, .. }) =
-            &parameter.annotation.as_deref()?
-        else {
-            return None;
-        };
+        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
 
         if !semantic.match_typing_expr(value, "Annotated") {
             return None;
@@ -327,7 +319,7 @@ impl<'a> Dependency<'a> {
         };
 
         let parameter_names = non_posonly_non_variadic_parameters(function_def)
-            .map(|ParameterWithDefault { parameter, .. }| &*parameter.name)
+            .map(|param| param.name().as_str())
             .collect();
 
         Some(Self::Function(parameter_names))

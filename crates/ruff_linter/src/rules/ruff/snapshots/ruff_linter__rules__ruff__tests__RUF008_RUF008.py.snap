@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF008.py:10:34: RUF008 Do not use mutable default values for dataclass attributes
    |
@@ -20,4 +19,32 @@ RUF008.py:20:34: RUF008 Do not use mutable default values for dataclass attribut
    |                                  ^^ RUF008
 21 |     immutable_annotation: Sequence[int] = []
 22 |     without_annotation = []
+   |
+
+RUF008.py:31:36: RUF008 Do not use mutable default values for dataclass attributes
+   |
+29 | @dataclass
+30 | class AWithQuotes:
+31 |     mutable_default: 'list[int]' = []
+   |                                    ^^ RUF008
+32 |     immutable_annotation: 'typing.Sequence[int]' = []
+33 |     without_annotation = []
+   |
+
+RUF008.py:32:52: RUF008 Do not use mutable default values for dataclass attributes
+   |
+30 | class AWithQuotes:
+31 |     mutable_default: 'list[int]' = []
+32 |     immutable_annotation: 'typing.Sequence[int]' = []
+   |                                                    ^^ RUF008
+33 |     without_annotation = []
+34 |     correct_code: 'list[int]' = KNOWINGLY_MUTABLE_DEFAULT
+   |
+
+RUF008.py:36:51: RUF008 Do not use mutable default values for dataclass attributes
+   |
+34 |     correct_code: 'list[int]' = KNOWINGLY_MUTABLE_DEFAULT
+35 |     perfectly_fine: 'list[int]' = field(default_factory=list)
+36 |     class_variable: 'typing.ClassVar[list[int]]'= []
+   |                                                   ^^ RUF008
    |

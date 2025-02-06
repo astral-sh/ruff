@@ -198,7 +198,14 @@ pub(crate) fn generate() -> String {
             for (opt, rules) in rules_by_upstream_category {
                 if opt.is_some() {
                     let UpstreamCategoryAndPrefix { category, prefix } = opt.unwrap();
-                    table_out.push_str(&format!("#### {category} ({prefix})"));
+                    match codes_csv.as_str() {
+                        "PL" => {
+                            table_out.push_str(&format!("#### {category} ({codes_csv}{prefix})"));
+                        }
+                        _ => {
+                            table_out.push_str(&format!("#### {category} ({prefix})"));
+                        }
+                    }
                 }
                 table_out.push('\n');
                 table_out.push('\n');

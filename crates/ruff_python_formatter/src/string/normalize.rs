@@ -5,8 +5,9 @@ use std::iter::FusedIterator;
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    str::Quote, AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements,
-    FStringFlags, StringFlags, StringLikePart, StringLiteral,
+    str::{Quote, TripleQuotes},
+    AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements, FStringFlags,
+    StringFlags, StringLikePart, StringLiteral,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
@@ -273,7 +274,7 @@ impl QuoteMetadata {
 
     pub(crate) fn from_str(text: &str, flags: AnyStringFlags, preferred_quote: Quote) -> Self {
         let kind = if flags.is_raw_string() {
-            QuoteMetadataKind::raw(text, preferred_quote, flags.is_triple_quoted())
+            QuoteMetadataKind::raw(text, preferred_quote, flags.triple_quotes())
         } else if flags.is_triple_quoted() {
             QuoteMetadataKind::triple_quoted(text, preferred_quote)
         } else {
@@ -528,7 +529,7 @@ impl QuoteMetadataKind {
 
     /// Computes if a raw string uses the preferred quote. If it does, then it's not possible
     /// to change the quote style because it would require escaping which isn't possible in raw strings.
-    fn raw(text: &str, preferred: Quote, triple_quoted: bool) -> Self {
+    fn raw(text: &str, preferred: Quote, triple_quotes: TripleQuotes) -> Self {
         let mut chars = text.chars().peekable();
         let preferred_quote_char = preferred.as_char();
 
@@ -540,7 +541,7 @@ impl QuoteMetadataKind {
                 }
                 // `"` or `'`
                 Some(c) if c == preferred_quote_char => {
-                    if !triple_quoted {
+                    if triple_quotes.is_no() {
                         break true;
                     }
 
@@ -1057,7 +1058,7 @@ mod tests {
     use std::borrow::Cow;
 
     use ruff_python_ast::{
-        str::Quote,
+        str::{Quote, TripleQuotes},
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
         AnyStringFlags,
     };
@@ -1086,7 +1087,7 @@ mod tests {
             AnyStringFlags::new(
                 AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
                 Quote::Double,
-                false,
+                TripleQuotes::No,
             ),
             false,
         );
