@@ -3,6 +3,7 @@ use std::fmt::Write as _;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use metrics::{
     Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, KeyName, Metadata, Recorder,
@@ -111,6 +112,9 @@ impl Metric {
             let mut buffer = buffer.borrow_mut();
             buffer.clear();
             buffer.push_str(&self.name_and_labels);
+            if let Ok(timestamp) = SystemTime::now().duration_since(UNIX_EPOCH) {
+                write!(&mut buffer, ",\"timestamp\":{}", timestamp.as_secs_f64()).unwrap();
+            }
             f(&mut buffer);
             buffer.push_str("}\n");
             let _ = self.dest.lock().unwrap().write(buffer.as_bytes());
