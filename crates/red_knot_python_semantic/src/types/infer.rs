@@ -2513,32 +2513,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
         let mut level = level.get();
         if module.kind().is_package() {
-            level = level.saturating_sub(1);
+            level -= 1;
         }
-
         let mut module_name = module.name().clone();
-        let tail = tail
-            .map(|tail| ModuleName::new(tail).ok_or(ModuleNameResolutionError::InvalidSyntax))
-            .transpose()?;
-
-        for remaining_dots in (0..level).rev() {
-            if let Some(parent) = module_name.parent() {
-                module_name = parent;
-            } else if remaining_dots == 0 {
-                // If we reached a search path root and this was the last dot return the tail if any.
-                // If there's no tail, then we have a relative import that's too deep.
-                return tail.ok_or(ModuleNameResolutionError::TooManyDots);
-            } else {
-                // We're at a search path root. This is a too deep relative import if there's more than
-                // one dot remaining.
-                return Err(ModuleNameResolutionError::TooManyDots);
-            }
+        for _ in 0..level {
+            module_name = module_name
+                .parent()
+                .ok_or(ModuleNameResolutionError::TooManyDots)?;
         }
-
         if let Some(tail) = tail {
+            let tail = ModuleName::new(tail).ok_or(ModuleNameResolutionError::InvalidSyntax)?;
             module_name.extend(&tail);
         }
-
         Ok(module_name)
     }
 
