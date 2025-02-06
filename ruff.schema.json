@@ -879,7 +879,7 @@
       "anyOf": [
         {
           "description": "Wrap docstring code examples at a fixed line width.",
-          "allOf": [
+          "oneOf": [
             {
               "$ref": "#/definitions/LineWidth"
             }
@@ -887,17 +887,9 @@
         },
         {
           "description": "Respect the line length limit setting for the surrounding Python code.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Dynamic"
-            }
-          ]
+          "const": "dynamic"
         }
       ]
-    },
-    "Dynamic": {
-      "type": "string",
-      "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
       "description": "Options for the `flake8-annotations` plugin.",
