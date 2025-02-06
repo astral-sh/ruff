@@ -274,15 +274,9 @@ impl EmbeddedFile<'_> {
 
         self.backtick_offsets.push(backtick_offsets);
 
-        match self.code {
-            Cow::Borrowed(existing_code) => {
-                self.code = Cow::Owned(format!("{existing_code}\n{new_code}"));
-            }
-            Cow::Owned(ref mut existing_code) => {
-                existing_code.push('\n');
-                existing_code.push_str(new_code);
-            }
-        }
+        let existing_code = self.code.to_mut();
+        existing_code.push('\n');
+        existing_code.push_str(new_code);
     }
 
     pub(crate) fn relative_path(&self) -> &str {
