@@ -2,6 +2,8 @@
 # Positive cases
 ###
 
+a_dict = {}
+
 # SIM401 (pattern-1)
 if key in a_dict:
     var = a_dict[key]
@@ -25,6 +27,8 @@ if keys[idx] in a_dict:
     var = a_dict[keys[idx]]
 else:
     var = "default"
+
+dicts = {"key": a_dict}
 
 # SIM401 (complex expression in dict)
 if key in dicts[idx]:
