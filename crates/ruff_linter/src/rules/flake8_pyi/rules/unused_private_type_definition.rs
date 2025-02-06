@@ -231,8 +231,10 @@ pub(crate) fn unused_private_type_var(
             binding.range(),
         );
 
-        let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::safe_edit(edit));
+        if checker.settings.preview.is_enabled() {
+	        let edit = fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
+	        diagnostic.set_fix(Fix::unsafe_edit(edit));
+	    }
 
         diagnostics.push(diagnostic);
     }
