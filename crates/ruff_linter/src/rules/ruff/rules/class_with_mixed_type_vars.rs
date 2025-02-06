@@ -105,15 +105,15 @@ pub(crate) fn class_with_mixed_type_vars(checker: &mut Checker, class_def: &Stmt
 
     let mut diagnostic = Diagnostic::new(ClassWithMixedTypeVars, generic_base.range);
 
-    if let Some(fix) = convert_type_vars(
-        generic_base,
-        old_style_type_vars,
-        type_params,
-        arguments,
-        checker,
-    ) {
-        diagnostic.set_fix(fix);
-    }
+    diagnostic.try_set_optional_fix(|| {
+        convert_type_vars(
+            generic_base,
+            old_style_type_vars,
+            type_params,
+            arguments,
+            checker,
+        )
+    });
 
     checker.diagnostics.push(diagnostic);
 }
@@ -133,25 +133,25 @@ fn convert_type_vars(
     type_params: &TypeParams,
     class_arguments: &Arguments,
     checker: &Checker,
-) -> Option<Fix> {
-    let mut type_vars = type_params
-        .type_params
-        .iter()
-        .map(TypeVar::from)
-        .collect::<Vec<_>>();
+) -> anyhow::Result<Option<Fix>> {
+    let mut type_vars: Vec<_> = type_params.type_params.iter().map(TypeVar::from).collect();
 
     let semantic = checker.semantic();
-    let mut converted_type_vars = match old_style_type_vars {
+    let converted_type_vars = match old_style_type_vars {
         Expr::Tuple(ExprTuple { elts, .. }) => {
-            generic_arguments_to_type_vars(elts.iter(), type_params, semantic)?
+            generic_arguments_to_type_vars(elts.iter(), type_params, semantic)
         }
         expr @ (Expr::Subscript(_) | Expr::Name(_)) => {
-            generic_arguments_to_type_vars(iter::once(expr), type_params, semantic)?
+            generic_arguments_to_type_vars(iter::once(expr), type_params, semantic)
         }
-        _ => return None,
+        _ => None,
     };
 
-    type_vars.append(&mut converted_type_vars);
+    let Some(converted_type_vars) = converted_type_vars else {
+        return Ok(None);
+    };
+
+    type_vars.extend(converted_type_vars);
 
     let source = checker.source();
     let new_type_params = DisplayTypeVars {
@@ -160,16 +160,20 @@ fn convert_type_vars(
     };
 
     let remove_generic_base =
-        remove_argument(generic_base, class_arguments, Parentheses::Remove, source).ok()?;
+        remove_argument(generic_base, class_arguments, Parentheses::Remove, source)?;
     let replace_type_params =
         Edit::range_replacement(new_type_params.to_string(), type_params.range);
 
-    Some(Fix::unsafe_edits(
+    Ok(Some(Fix::unsafe_edits(
         remove_generic_base,
         [replace_type_params],
-    ))
+    )))
 }
 
+/// Returns the type variables `exprs` represent.
+///
+/// If at least one of them cannot be converted to [`TypeVar`],
+/// `None` is returned.
 fn generic_arguments_to_type_vars<'a>(
     exprs: impl Iterator<Item = &'a Expr>,
     existing_type_params: &TypeParams,
