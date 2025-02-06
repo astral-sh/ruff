@@ -54,7 +54,11 @@ pub(crate) fn invalid_class_name(
     name: &str,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    let stripped = name.strip_prefix('_').unwrap_or(name);
+    let stripped = name
+        .strip_prefix("__")
+        .or_else(|| name.strip_prefix('_'))
+        .unwrap_or(name);
+
     if !stripped.chars().next().is_some_and(char::is_uppercase) || stripped.contains('_') {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) {
