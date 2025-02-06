@@ -5,7 +5,7 @@ use anyhow::Result;
 use std::sync::Mutex;
 
 use crate::args::{Args, CheckCommand, Command};
-use crate::logging::setup_tracing;
+use crate::logging::{setup_metrics, setup_tracing};
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
@@ -68,6 +68,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
+    setup_metrics();
 
     // The base path to which all CLI arguments are relative to.
     let cli_base_path = {

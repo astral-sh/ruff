@@ -2,6 +2,7 @@
 
 use anyhow::Context;
 use colored::Colorize;
+use ruff_metrics::JsonRecorder;
 use std::fmt;
 use std::fs::File;
 use std::io::BufWriter;
@@ -251,4 +252,10 @@ where
 
         writeln!(writer)
     }
+}
+
+pub(crate) fn setup_metrics() {
+    let dest = std::io::stderr();
+    let recorder = JsonRecorder::new(dest);
+    metrics::set_global_recorder(recorder).expect("metrics recorder already registered");
 }

@@ -16,6 +16,7 @@ red_knot_python_semantic = { workspace = true }
 red_knot_project = { workspace = true, features = ["zstd"] }
 red_knot_server = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_metrics = { workspace = true }
 
 anyhow = { workspace = true }
 chrono = { workspace = true }
@@ -24,6 +25,7 @@ colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
+metrics = { workspace = true }
 rayon = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
