@@ -13,11 +13,24 @@ use metrics_util::registry::{Registry, Storage};
 use serde_json::value::Map;
 use serde_json::Value;
 
+/// A [metrics] recorder that outputs metrics in a simple JSON format, typically to a file for
+/// later analysis. We do not buffer the metrics.
+///
+/// Each output record will include a `key` field with the name of the metric. Any labels will also
+/// appear as additional JSON fields.
+///
+/// Counters and gauges will include `delta` and `value` fields, providing the amount that the
+/// counter changed by, and the resulting total value.
+///
+/// Histograms will include `value` and `count` fields. We do not aggregate histogram data in any
+/// way.
 pub struct JsonRecorder {
     registry: Registry<Key, PrerenderedAtomicStorage>,
 }
 
 impl JsonRecorder {
+    /// Creates a new `JsonRecorder` that will output JSON metrics to a destination that implements
+    /// [`std::io::Write`].
     pub fn new<D>(dest: D) -> JsonRecorder
     where
         D: Write + Send + 'static,
