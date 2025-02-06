@@ -19,10 +19,10 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpack
 
 ```
 error: lint:not-iterable
- --> /src/mdtest_snippet.py:1:1
+ --> /src/mdtest_snippet.py:1:8
   |
 1 | a, b = 1  # error: [not-iterable]
-  | ^^^^ Object of type `Literal[1]` is not iterable
+  |        ^ Object of type `Literal[1]` is not iterable
   |
 
 ```
