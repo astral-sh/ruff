@@ -84,6 +84,9 @@ b''.rstrip(b'http://')
 b"".strip("//")
 "".strip(b"//")
 
+# OK: Escapes
+'\\test'.strip('\\')
+
 # OK: Extra/missing arguments
 "".strip("//", foo)
 b"".lstrip(b"//", foo = "bar")
