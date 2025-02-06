@@ -3,10 +3,9 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprName, ExprContext, Identifier, Stmt,
+    self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
-use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block, is_dict};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block, is_known_to_be_of_type_dict};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -120,15 +119,12 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     let Expr::Compare(comp) = test.as_ref() else {
         return;
     };
-
     let [Expr::Name(test_dict)] = comp.comparators.as_ref() else {
         return;
     };
-
     if !is_known_to_be_of_type_dict(checker.semantic(), test_dict) {
         return;
     }
-
     let Expr::Compare(ast::ExprCompare {
         left: test_key,
         ops,
@@ -324,14 +320,4 @@ pub(crate) fn if_exp_instead_of_dict_get(
         )));
     }
     checker.diagnostics.push(diagnostic);
-}
-
-type Dict = ExprName;
-
-fn is_known_to_be_of_type_dict(semantic: &SemanticModel, dict: &Dict) -> bool {
-    let Some(binding) = semantic.only_binding(dict).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    is_dict(binding, semantic)
 }

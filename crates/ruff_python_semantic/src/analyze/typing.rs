@@ -4,7 +4,7 @@ use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
-    self as ast, Expr, ExprCall, Int, Operator, ParameterWithDefault, Parameters, Stmt, StmtAssign,
+    self as ast, Expr, ExprCall, ExprName, Int, Operator, ParameterWithDefault, Parameters, Stmt, StmtAssign,
 };
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
@@ -44,6 +44,14 @@ pub enum SubscriptKind {
     ///
     /// [PEP 764]: https://github.com/python/peps/pull/4082
     TypedDict,
+}
+
+pub fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) -> bool {
+    let Some(binding) = semantic.only_binding(expr).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    is_dict(binding, semantic)
 }
 
 pub fn match_annotated_subscript<'a>(
