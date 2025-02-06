@@ -218,3 +218,33 @@ import package
 # error: [unresolved-attribute] "Type `<module 'package'>` has no attribute `foo`"
 reveal_type(package.foo.X)  # revealed: Unknown
 ```
+
+## In the src-root
+
+`parser.py`:
+
+```py
+X: int = 42
+```
+
+`__main__.py`:
+
+```py
+from .parser import X
+
+reveal_type(X)  # revealed: int
+```
+
+## Beyond the src-root
+
+`parser.py`:
+
+```py
+X: int = 42
+```
+
+`__main__.py`:
+
+```py
+from ..parser import X  # error: [unresolved-import]
+```
