@@ -36,7 +36,14 @@ impl JsonRecorder {
         D: Write + Send + 'static,
     {
         let dest = Arc::new(Mutex::new(dest));
-        let storage = PrerenderedAtomicStorage { dest };
+        let executable = std::env::current_exe()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let storage = PrerenderedAtomicStorage { dest, executable };
         let registry = Registry::new(storage);
         JsonRecorder { registry }
     }
@@ -66,6 +73,7 @@ impl Recorder for JsonRecorder {
 
 struct PrerenderedAtomicStorage {
     dest: Arc<Mutex<dyn Write + Send>>,
+    executable: String,
 }
 
 impl Storage<Key> for PrerenderedAtomicStorage {
@@ -74,15 +82,15 @@ impl Storage<Key> for PrerenderedAtomicStorage {
     type Histogram = Arc<Metric>;
 
     fn counter(&self, key: &Key) -> Self::Counter {
-        Arc::new(Metric::new(key, self.dest.clone()))
+        Arc::new(Metric::new(self.executable.clone(), key, self.dest.clone()))
     }
 
     fn gauge(&self, key: &Key) -> Self::Gauge {
-        Arc::new(Metric::new(key, self.dest.clone()))
+        Arc::new(Metric::new(self.executable.clone(), key, self.dest.clone()))
     }
 
     fn histogram(&self, key: &Key) -> Self::Histogram {
-        Arc::new(Metric::new(key, self.dest.clone()))
+        Arc::new(Metric::new(self.executable.clone(), key, self.dest.clone()))
     }
 }
 
@@ -96,8 +104,9 @@ struct Metric {
 }
 
 impl Metric {
-    fn new(key: &Key, dest: Arc<Mutex<dyn Write + Send>>) -> Metric {
+    fn new(executable: String, key: &Key, dest: Arc<Mutex<dyn Write + Send>>) -> Metric {
         let mut json = Map::default();
+        json.insert("executable".to_string(), executable.into());
         json.insert("key".to_string(), key.name().into());
         for label in key.labels() {
             json.insert(label.key().to_string(), label.value().into());
