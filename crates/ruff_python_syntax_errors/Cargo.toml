@@ -1,0 +1,28 @@
+[package]
+name = "ruff_python_syntax_errors"
+version = "0.9.5"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_diagnostics = { workspace = true }
+ruff_linter = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_text_size = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
+
+[lints]
+workspace = true
