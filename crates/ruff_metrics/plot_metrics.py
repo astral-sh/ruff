@@ -9,18 +9,20 @@
 # ]
 # ///
 
-"""Render metrics that have been produced by the ruff_metrics crate.
-"""
+"""Render metrics that have been produced by the ruff_metrics crate."""
+
+from __future__ import annotations
 
 import argparse
 import json
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--metrics", help="JSON file with metrics data", default="metrics.json")
+parser.add_argument(
+    "--metrics", help="JSON file with metrics data", default="metrics.json"
+)
 parser.add_argument("-o", "--output", help="save image to the given filename")
 subparsers = parser.add_subparsers(dest="command")
 
@@ -41,19 +43,23 @@ with open(args.metrics) as f:
         results.append(json.loads(line))
 all_data = pd.DataFrame(results)
 
+
 def get_metric(d: pd.DataFrame, key: str) -> pd.DataFrame:
     return d[d["key"] == key]
 
-def plot_counter(d: pd.DataFrame, label: str=None) -> None:
+
+def plot_counter(d: pd.DataFrame, label: str | None = None) -> None:
     plt.xlabel("Time [s]")
     d["total"] = d["delta"].cumsum()
     plt.plot("since_start", "total", data=d, label=label)
+
 
 def show_plot():
     if args.output:
         plt.savefig(args.output, dpi=600)
     else:
         plt.show()
+
 
 def cmd_counter() -> None:
     data = get_metric(all_data, args.key)
@@ -67,6 +73,7 @@ def cmd_counter() -> None:
             plt.legend(loc="best")
     show_plot()
 
+
 def cmd_histogram() -> None:
     data = get_metric(all_data, args.key)
     bins = int(args.bins) if args.bins else "auto"
@@ -76,6 +83,7 @@ def cmd_histogram() -> None:
     plt.yscale("log")
     plt.hist(data["value"], bins=bins)
     show_plot()
+
 
 if args.command == "counter":
     cmd_counter()

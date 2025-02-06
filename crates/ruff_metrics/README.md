@@ -30,7 +30,7 @@ $ uv run crates/ruff_metrics/plot_metrics.py counter semantic_index.scope_count 
 ### `histogram`
 
 Shows the distribution of values of a counter. You must provide a metric field to group by; shows
-the maxmimum values of the counter for each value of this field.
+the maximum values of the counter for each value of this field.
 
 ```console
 $ uv run crates/ruff_metrics/plot_metrics.py histogram semantic_index.scope_count --group-by file
