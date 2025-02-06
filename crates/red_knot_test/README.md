@@ -133,7 +133,7 @@ be merged into a single file in the order they appear in the Markdown file. This
 interleave code and explanations:
 
 ````markdown
-# My literal test
+# My literate test
 
 This first snippet here:
 

@@ -393,8 +393,6 @@ reveal_type(D().x)  # revealed: Unknown | Literal[1]
 
 If `staticmethod` is something else, that should not influence the behavior:
 
-`other.py`:
-
 ```py
 def staticmethod(f):
     return f
@@ -408,8 +406,6 @@ reveal_type(C().x)  # revealed: Unknown | Literal[1]
 ```
 
 And if `staticmethod` is fully qualified, that should also be recognized:
-
-`fully_qualified.py`:
 
 ```py
 import builtins
