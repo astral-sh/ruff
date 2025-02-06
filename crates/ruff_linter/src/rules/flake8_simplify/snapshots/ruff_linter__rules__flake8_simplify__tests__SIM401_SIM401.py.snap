@@ -132,42 +132,42 @@ SIM401.py:49:5: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead 
 54 51 | ###
 55 52 | # Negative cases
 
-SIM401.py:127:7: SIM401 [*] Use `a_dict.get(key, "default3")` instead of an `if` block
+SIM401.py:149:7: SIM401 [*] Use `a_dict.get(key, "default3")` instead of an `if` block
     |
-126 | # SIM401
-127 | var = a_dict[key] if key in a_dict else "default3"
+148 | # SIM401
+149 | var = a_dict[key] if key in a_dict else "default3"
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM401
-128 |
-129 | # SIM401
+150 |
+151 | # SIM401
     |
     = help: Replace with `a_dict.get(key, "default3")`
 
 ℹ Unsafe fix
-124 124 | ###
-125 125 | 
-126 126 | # SIM401
-127     |-var = a_dict[key] if key in a_dict else "default3"
-    127 |+var = a_dict.get(key, "default3")
-128 128 | 
-129 129 | # SIM401
-130 130 | var = "default-1" if key not in a_dict else a_dict[key]
+146 146 | ###
+147 147 | 
+148 148 | # SIM401
+149     |-var = a_dict[key] if key in a_dict else "default3"
+    149 |+var = a_dict.get(key, "default3")
+150 150 | 
+151 151 | # SIM401
+152 152 | var = "default-1" if key not in a_dict else a_dict[key]
 
-SIM401.py:130:7: SIM401 [*] Use `a_dict.get(key, "default-1")` instead of an `if` block
+SIM401.py:152:7: SIM401 [*] Use `a_dict.get(key, "default-1")` instead of an `if` block
     |
-129 | # SIM401
-130 | var = "default-1" if key not in a_dict else a_dict[key]
+151 | # SIM401
+152 | var = "default-1" if key not in a_dict else a_dict[key]
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM401
-131 |
-132 | # OK (default contains effect)
+153 |
+154 | # OK (default contains effect)
     |
     = help: Replace with `a_dict.get(key, "default-1")`
 
 ℹ Unsafe fix
-127 127 | var = a_dict[key] if key in a_dict else "default3"
-128 128 | 
-129 129 | # SIM401
-130     |-var = "default-1" if key not in a_dict else a_dict[key]
-    130 |+var = a_dict.get(key, "default-1")
-131 131 | 
-132 132 | # OK (default contains effect)
-133 133 | var = a_dict[key] if key in a_dict else val1 + val2
+149 149 | var = a_dict[key] if key in a_dict else "default3"
+150 150 | 
+151 151 | # SIM401
+152     |-var = "default-1" if key not in a_dict else a_dict[key]
+    152 |+var = a_dict.get(key, "default-1")
+153 153 | 
+154 154 | # OK (default contains effect)
+155 155 | var = a_dict[key] if key in a_dict else val1 + val2
