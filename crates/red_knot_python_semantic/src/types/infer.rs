@@ -2512,19 +2512,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         let module = file_to_module(self.db(), self.file())
             .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
         let mut level = level.get();
+
         if module.kind().is_package() {
-            level -= 1;
+            level = level.saturating_sub(1);
         }
-        let mut module_name = module.name().clone();
-        for _ in 0..level {
-            module_name = module_name
-                .parent()
-                .ok_or(ModuleNameResolutionError::TooManyDots)?;
-        }
+
+        let mut module_name = module
+            .name()
+            .ancestors()
+            .nth(level as usize)
+            .ok_or(ModuleNameResolutionError::TooManyDots)?;
+
         if let Some(tail) = tail {
             let tail = ModuleName::new(tail).ok_or(ModuleNameResolutionError::InvalidSyntax)?;
             module_name.extend(&tail);
         }
+
         Ok(module_name)
     }
 
