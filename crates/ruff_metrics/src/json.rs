@@ -82,10 +82,6 @@ struct Metric {
     value: AtomicU64,
 }
 
-thread_local! {
-    static BUFFERS: RefCell<String> = RefCell::new(String::new());
-}
-
 impl Metric {
     fn new(key: &Key, dest: Arc<Mutex<dyn Write + Send>>) -> Metric {
         let mut json = Map::default();
@@ -108,6 +104,11 @@ impl Metric {
     where
         F: FnOnce(&mut String),
     {
+        // Render into a thread-local String buffer, and then output the resulting line in a single
+        // call. This ensures that the output from multiple threads does not get intermingled.
+        thread_local! {
+            static BUFFERS: RefCell<String> = RefCell::new(String::new());
+        }
         BUFFERS.with(|buffer| {
             let mut buffer = buffer.borrow_mut();
             buffer.clear();
