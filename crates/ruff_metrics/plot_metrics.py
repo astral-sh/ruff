@@ -27,6 +27,11 @@ counter_parser = subparsers.add_parser("counter")
 counter_parser.add_argument("key", help="the counter metric to render")
 counter_parser.add_argument("--group-by", required=False)
 
+histogram_parser = subparsers.add_parser("histogram")
+histogram_parser.add_argument("key", help="the metric to render")
+histogram_parser.add_argument("--group-by")
+histogram_parser.add_argument("--bins", help="number of bins (default: auto)")
+
 args = parser.parse_args()
 
 with open(args.metrics) as f:
@@ -55,8 +60,20 @@ def cmd_counter() -> None:
             plt.legend(loc="best")
     plt.show()
 
+def cmd_histogram() -> None:
+    data = get_metric(all_data, args.key)
+    bins = int(args.bins) if args.bins else "auto"
+    data = data.groupby(args.group_by).last()
+    plt.xlabel(args.key)
+    plt.ylabel("Count")
+    plt.yscale("log")
+    plt.hist(data["value"], bins=bins)
+    plt.show()
+
 if args.command == "counter":
     cmd_counter()
+elif args.command == "histogram":
+    cmd_histogram()
 else:
     print("Missing command")
     parser.print_usage()
