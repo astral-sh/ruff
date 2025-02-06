@@ -79,8 +79,6 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
         ..
     } = stmt_if;
 
-    // TODO: check for dict type
-
     let [body_stmt] = body.as_slice() else {
         return;
     };
