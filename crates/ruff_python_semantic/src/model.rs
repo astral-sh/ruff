@@ -2163,7 +2163,7 @@ bitflags! {
 bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct SemanticModelFlags: u32 {
+    pub struct SemanticModelFlags: u64 {
         /// The model is in a type annotation that will only be evaluated when running a type
         /// checker.
         ///
