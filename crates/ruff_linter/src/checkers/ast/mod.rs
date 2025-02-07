@@ -9,11 +9,6 @@
 //! parent scopes have been fully traversed. Individual rules may also perform internal traversals
 //! of the AST.
 //!
-//! While the [`Checker`] is typically passed by mutable reference to the individual lint rule
-//! implementations, most of its constituent components are intended to be treated immutably, with
-//! the exception of the [`Diagnostic`] vector, which is intended to be mutated by the individual
-//! lint rules. In the future, this should be formalized in the API.
-//!
 //! The individual [`Visitor`] implementations within the [`Checker`] typically proceed in four
 //! steps:
 //!
