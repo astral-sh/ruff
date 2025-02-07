@@ -24,6 +24,7 @@ mod tests {
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_4.py"))]
     #[test_case(Rule::ReturnInTryExceptFinally, Path::new("SIM107.py"))]
     #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
+    #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108_1.py"))]
     #[test_case(Rule::CompareWithTuple, Path::new("SIM109.py"))]
     #[test_case(Rule::ReimplementedBuiltin, Path::new("SIM110.py"))]
     #[test_case(Rule::ReimplementedBuiltin, Path::new("SIM111.py"))]
@@ -60,6 +61,7 @@ mod tests {
 
     #[test_case(Rule::NeedlessBool, Path::new("SIM103.py"))]
     #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
+    #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
