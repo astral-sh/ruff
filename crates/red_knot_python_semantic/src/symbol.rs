@@ -199,7 +199,7 @@ mod tests {
             Symbol::Type(ty1, ReExport::Yes, PossiblyUnbound)
                 .or_fall_back_to(&db, || Symbol::Type(ty2, ReExport::Yes, PossiblyUnbound)),
             Symbol::Type(
-                UnionType::from_elements(&db, [ty2, ty1]),
+                UnionType::from_elements(&db, [ty1, ty2]),
                 ReExport::Yes,
                 PossiblyUnbound
             )
@@ -208,7 +208,7 @@ mod tests {
             Symbol::Type(ty1, ReExport::Yes, PossiblyUnbound)
                 .or_fall_back_to(&db, || Symbol::Type(ty2, ReExport::Yes, Bound)),
             Symbol::Type(
-                UnionType::from_elements(&db, [ty2, ty1]),
+                UnionType::from_elements(&db, [ty1, ty2]),
                 ReExport::Yes,
                 Bound
             )
