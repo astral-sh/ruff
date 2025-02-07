@@ -6,7 +6,6 @@
 //! The implementation is heavily inspired by the `Checker` from the `ruff_linter` crate but with a
 //! sole focus of detecting syntax errors rather than being a more general diagnostic tool.
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_python_ast::{
     visitor::{self, Visitor},
     ModModule, Stmt, StmtMatch,
@@ -67,21 +66,6 @@ impl SyntaxError {
                 major = self.target_version.major,
                 minor = self.target_version.minor,
             ),
-        }
-    }
-}
-
-impl From<SyntaxError> for Diagnostic {
-    fn from(value: SyntaxError) -> Self {
-        Self {
-            kind: DiagnosticKind {
-                name: value.kind.as_str().to_string(),
-                body: value.message(),
-                suggestion: None,
-            },
-            range: value.range,
-            fix: None,
-            parent: None,
         }
     }
 }
