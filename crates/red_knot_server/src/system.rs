@@ -187,6 +187,10 @@ impl System for LSPSystem {
         self.os_system.current_directory()
     }
 
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        self.os_system.user_config_directory()
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,

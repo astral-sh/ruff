@@ -99,6 +99,11 @@ pub trait System: Debug {
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
 
+    /// Returns the directory path where user configurations are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn user_config_directory(&self) -> Option<SystemPathBuf>;
+
     /// Iterate over the contents of the directory at `path`.
     ///
     /// The returned iterator must have the following properties:

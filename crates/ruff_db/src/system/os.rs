@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
+use etcetera::BaseStrategy as _;
 use filetime::FileTime;
 
 use ruff_notebook::{Notebook, NotebookError};
@@ -96,6 +97,11 @@ impl System for OsSystem {
 
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
+    }
+
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
+        SystemPathBuf::from_path_buf(strategy.config_dir()).ok()
     }
 
     /// Creates a builder to recursively walk `path`.
