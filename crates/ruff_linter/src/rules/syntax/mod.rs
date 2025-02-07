@@ -4,8 +4,9 @@ use ruff_python_syntax_errors::{SyntaxError, SyntaxErrorKind};
 
 /// Create wrapper `Violation` types for `SyntaxError`s.
 macro_rules! syntax_errors {
-    ($($error_type:ident$(,)*)*) => {
+    ($($(#[$outer:meta])*$error_type:ident$(,)*)*) => {
         $(#[derive(ViolationMetadata)]
+        $(#[$outer])*
         pub(crate) struct $error_type(SyntaxError);
 
         impl Violation for $error_type {
@@ -18,6 +19,32 @@ macro_rules! syntax_errors {
 }
 
 syntax_errors! {
+    /// ## What it does
+    ///
+    /// Checks for the use of the `match` statement before Python 3.10.
+    ///
+    /// ## Why is this bad?
+    ///
+    /// Such usage causes a `SyntaxError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// match var:
+    ///     case 1:
+    ///         print("it's one")
+    ///     case 2:
+    ///         print("it's two")
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// if var == 1:
+    ///     print("it's one")
+    /// elif var == 2:
+    ///     print("it's two")
+    /// ```
     MatchBeforePython310,
 }
 
