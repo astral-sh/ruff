@@ -4255,7 +4255,7 @@ impl<'db> Class<'db> {
                     //     [.., self.name, ..] = <value>
 
                     let inferred_ty =
-                        infer_unpack_types(db, *unpack).type_for(*attribute_expression_id);
+                        infer_unpack_types(db, *unpack).expression_type(*attribute_expression_id);
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }

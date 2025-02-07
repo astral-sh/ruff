@@ -274,7 +274,7 @@ impl<'db> UnpackResult<'db> {
     /// Panics if a scoped expression ID is passed in that does not correspond to a sub-
     /// expression of the target.
     #[track_caller]
-    pub(crate) fn type_for(&self, expr_id: ScopedExpressionId) -> Type<'db> {
+    pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
         self.targets[&expr_id]
     }
 }
