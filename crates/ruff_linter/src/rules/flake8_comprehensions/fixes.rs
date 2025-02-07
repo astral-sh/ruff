@@ -11,7 +11,7 @@ use libcst_native::{
 };
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -649,13 +649,13 @@ pub(crate) fn fix_unnecessary_comprehension(
 
 /// (C417) Convert `map(lambda x: x * 2, bar)` to `(x * 2 for x in bar)`.
 pub(crate) fn fix_unnecessary_map(
-    expr: &Expr,
+    call_ast_node: &ExprCall,
     parent: Option<&Expr>,
     object_type: ObjectType,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(call_ast_node);
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
 
@@ -800,7 +800,7 @@ pub(crate) fn fix_unnecessary_map(
         }
     }
 
-    Ok(Edit::range_replacement(content, expr.range()))
+    Ok(Edit::range_replacement(content, call_ast_node.range()))
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`
