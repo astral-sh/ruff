@@ -1,3 +1,4 @@
+use configuration_file::{ConfigurationFile, ConfigurationFileError};
 use red_knot_python_semantic::ProgramSettings;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
@@ -10,6 +11,7 @@ use crate::metadata::value::ValueSource;
 use options::KnotTomlError;
 use options::Options;
 
+mod configuration_file;
 pub mod options;
 pub mod pyproject;
 pub mod settings;
@@ -24,6 +26,15 @@ pub struct ProjectMetadata {
 
     /// The raw options
     pub(super) options: Options,
+
+    /// Paths of configurations other than the project's configuration that were combined into [`Self::options`].
+    ///
+    /// This field stores the paths of the configuration files, mainly for
+    /// knowing which files to watch for changes.
+    ///
+    /// The path ordering doesn't imply precedence.
+    #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
+    pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
 }
 
 impl ProjectMetadata {
@@ -32,6 +43,7 @@ impl ProjectMetadata {
         Self {
             name,
             root,
+            extra_configuration_paths: Vec::default(),
             options: Options::default(),
         }
     }
@@ -64,6 +76,7 @@ impl ProjectMetadata {
             name,
             root,
             options,
+            extra_configuration_paths: Vec::new(),
         }
     }
 
@@ -192,6 +205,10 @@ impl ProjectMetadata {
         &self.options
     }
 
+    pub fn extra_configuration_paths(&self) -> &[SystemPathBuf] {
+        &self.extra_configuration_paths
+    }
+
     pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
         self.options.to_program_settings(self.root(), system)
     }
@@ -201,9 +218,31 @@ impl ProjectMetadata {
         self.options = options.combine(std::mem::take(&mut self.options));
     }
 
-    /// Combine the project options with the user options where project options take precedence.
-    pub fn apply_user_options(&mut self, options: Options) {
-        self.options.combine_with(options);
+    /// Applies the options from the configuration files to the project's options.
+    ///
+    /// This includes:
+    ///
+    /// * The user-level configuration
+    pub fn apply_configuration_files(
+        &mut self,
+        system: &dyn System,
+    ) -> Result<(), ConfigurationFileError> {
+        if let Some(user) = ConfigurationFile::user(system)? {
+            tracing::debug!(
+                "Applying user-level configuration loaded from `{path}`.",
+                path = user.path()
+            );
+            self.apply_configuration_file(user);
+        }
+
+        Ok(())
+    }
+
+    /// Applies a lower-precedence configuration files to the project's options.
+    fn apply_configuration_file(&mut self, options: ConfigurationFile) {
+        self.extra_configuration_paths
+            .push(options.path().to_owned());
+        self.options.combine_with(options.into_options());
     }
 }
 
