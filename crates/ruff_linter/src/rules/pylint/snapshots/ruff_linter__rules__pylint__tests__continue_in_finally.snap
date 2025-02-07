@@ -20,6 +20,18 @@ continue_in_finally.py:16:13: PLE0116 `continue` not supported inside `finally` 
 17 |         pass
    |
 
+continue_in_finally.py:24:9: SYN001 Cannot use `match` statement on Python 3.7 (syntax was new in Python 3.10)
+   |
+22 |       finally:
+23 |           test = "aa"
+24 | /         match test:
+25 | |             case "aa":
+26 | |                 continue  # [continue-in-finally]
+   | |________________________^ SYN001
+27 |
+28 |   while True:
+   |
+
 continue_in_finally.py:26:17: PLE0116 `continue` not supported inside `finally` clause
    |
 24 |         match test:

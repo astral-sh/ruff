@@ -182,6 +182,10 @@ match var:
             SyntaxError {
                 kind: MatchBeforePy310,
                 range: 1..49,
+                target_version: PythonVersion {
+                    major: 3,
+                    minor: 9,
+                },
             },
         ]
         ");

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
-snapshot_kind: text
 ---
 auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public function `func`
   |
@@ -310,6 +309,17 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
 83 84 |     match x:
 84 85 |         case [1, 2, 3]:
 85 86 |             return 1
+
+auto_return_type.py:83:5: SYN001 Cannot use `match` statement on Python 3.8 (syntax was new in Python 3.10)
+   |
+82 |   def func(x: int):
+83 | /     match x:
+84 | |         case [1, 2, 3]:
+85 | |             return 1
+86 | |         case 4 as y:
+87 | |             return "foo"
+   | |________________________^ SYN001
+   |
 
 auto_return_type.py:90:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -873,3 +883,14 @@ auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public 
 300 300 |     match x:
 301 301 |         case [1, 2, 3]:
 302 302 |             return 1
+
+auto_return_type.py:300:5: SYN001 Cannot use `match` statement on Python 3.8 (syntax was new in Python 3.10)
+    |
+299 |   def func(x: int):
+300 | /     match x:
+301 | |         case [1, 2, 3]:
+302 | |             return 1
+303 | |         case y:
+304 | |             return "foo"
+    | |________________________^ SYN001
+    |
