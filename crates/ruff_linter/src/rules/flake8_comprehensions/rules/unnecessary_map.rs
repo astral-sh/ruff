@@ -4,9 +4,9 @@ use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
+use ruff_python_ast::{visitor, ExprLambda};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -78,7 +78,7 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
 
     let parent = semantic.current_expression_parent();
 
-    let (parameters, body, iterables) = match object_type {
+    let (lambda, iterables) = match object_type {
         ObjectType::Generator => {
             let parent_call_func = match parent {
                 Some(Expr::Call(call)) => Some(&call.func),
@@ -102,15 +102,13 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
                 return;
             };
 
-            let Some((parameters, body, iterables)) =
-                map_lambda_and_iterables(inner_call, semantic)
-            else {
+            let Some((lambda, iterables)) = map_lambda_and_iterables(inner_call, semantic) else {
                 return;
             };
 
             if object_type == ObjectType::Dict {
                 let (Expr::Tuple(ast::ExprTuple { elts, .. })
-                | Expr::List(ast::ExprList { elts, .. })) = body
+                | Expr::List(ast::ExprList { elts, .. })) = &*lambda.body
                 else {
                     return;
                 };
@@ -120,7 +118,7 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
                 }
             }
 
-            (parameters, body, iterables)
+            (lambda, iterables)
         }
     };
 
@@ -136,7 +134,7 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
         }
     }
 
-    if !lambda_has_expected_arity(parameters, body) {
+    if !lambda_has_expected_arity(lambda) {
         return;
     }
 
@@ -168,7 +166,7 @@ fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
 fn map_lambda_and_iterables<'a>(
     call: &'a ast::ExprCall,
     semantic: &'a SemanticModel,
-) -> Option<(&'a Parameters, &'a Expr, &'a [Expr])> {
+) -> Option<(&'a ExprLambda, &'a [Expr])> {
     if !semantic.match_builtin_expr(&call.func, "map") {
         return None;
     }
@@ -183,7 +181,7 @@ fn map_lambda_and_iterables<'a>(
         return None;
     };
 
-    Some((lambda.parameters.as_deref()?, &lambda.body, iterables))
+    Some((lambda, iterables))
 }
 
 /// A lambda as the first argument to `map()` has the "expected" arity when:
@@ -191,8 +189,12 @@ fn map_lambda_and_iterables<'a>(
 /// * It has exactly one parameter
 /// * That parameter is not variadic
 /// * That parameter does not have a default value
-fn lambda_has_expected_arity(parameters: &Parameters, body: &Expr) -> bool {
-    let [parameter] = &parameters.args[..] else {
+fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
+    let Some(parameters) = lambda.parameters.as_deref() else {
+        return false;
+    };
+
+    let [parameter] = &*parameters.args else {
         return false;
     };
 
@@ -204,7 +206,7 @@ fn lambda_has_expected_arity(parameters: &Parameters, body: &Expr) -> bool {
         return false;
     }
 
-    if late_binding(parameters, body) {
+    if late_binding(parameters, &lambda.body) {
         return false;
     }
 
