@@ -104,12 +104,12 @@ pub(crate) fn stdlib_module_shadowing(
 /// Return the longest prefix of `path` between `settings.src` and `settings.project_root`.
 fn get_prefix<'a>(settings: &'a LinterSettings, path: &Path) -> Option<&'a PathBuf> {
     let mut prefix = None;
-    let mut prefix_len = 0;
     for dir in settings.src.iter().chain([&settings.project_root]) {
-        let len = dir.as_os_str().len();
-        if len > prefix_len && path.starts_with(dir) {
+        if path.starts_with(dir)
+            // TODO `is_none_or` when MSRV >= 1.82
+            && (prefix.is_none() || prefix.is_some_and(|existing| existing < dir))
+        {
             prefix = Some(dir);
-            prefix_len = len;
         }
     }
     prefix
