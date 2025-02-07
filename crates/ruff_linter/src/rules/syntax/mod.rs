@@ -1,6 +1,6 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_syntax_errors::SyntaxError;
+use ruff_python_syntax_errors::{SyntaxError, SyntaxErrorKind};
 
 /// Create wrapper `Violation` types for `SyntaxError`s.
 macro_rules! syntax_errors {
@@ -19,4 +19,12 @@ macro_rules! syntax_errors {
 
 syntax_errors! {
     MatchBeforePython310,
+}
+
+pub(crate) fn diagnostic_from_syntax_error(
+    error @ SyntaxError { kind, range, .. }: SyntaxError,
+) -> Diagnostic {
+    match kind {
+        SyntaxErrorKind::MatchBeforePy310 => Diagnostic::new(MatchBeforePython310(error), range),
+    }
 }
