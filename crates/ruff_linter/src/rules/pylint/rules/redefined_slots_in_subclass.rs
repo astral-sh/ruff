@@ -67,11 +67,10 @@ pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast
     }
 
     let semantic = checker.semantic();
-    let mut diagnostics: Vec<_> = class_slots
+    let diagnostics = class_slots
         .iter()
-        .filter_map(|slot| check_super_slots(class_def, semantic, slot))
-        .collect();
-    checker.diagnostics.append(&mut diagnostics);
+        .filter_map(|slot| check_super_slots(class_def, semantic, slot));
+    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Clone, Debug)]

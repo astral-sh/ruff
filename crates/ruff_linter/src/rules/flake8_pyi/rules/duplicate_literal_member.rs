@@ -109,5 +109,5 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
         }
     };
 
-    checker.diagnostics.append(&mut diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

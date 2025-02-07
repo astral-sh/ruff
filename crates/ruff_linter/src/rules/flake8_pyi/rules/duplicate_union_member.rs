@@ -129,7 +129,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
     }
 
     // Add all diagnostics to the checker
-    checker.diagnostics.append(&mut diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
