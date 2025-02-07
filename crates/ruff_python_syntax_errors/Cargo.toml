@@ -14,7 +14,6 @@ license = { workspace = true }
 
 [dependencies]
 ruff_diagnostics = { workspace = true }
-ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }

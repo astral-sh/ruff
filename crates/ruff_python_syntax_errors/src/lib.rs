@@ -6,7 +6,6 @@
 //! The implementation is heavily inspired by the `Checker` from the `ruff_linter` crate but with a
 //! sole focus of detecting syntax errors rather than being a more general diagnostic tool.
 
-use ruff_linter::settings::types::PythonVersion;
 use ruff_python_ast::{
     visitor::{self, Visitor},
     ModModule, Stmt, StmtMatch,
@@ -34,15 +33,51 @@ impl<'a> Checker<'a> {
     }
 }
 
+/// Representation of a Python version.
+///
+/// Based on the flexible implementation in the `red_knot_python_semantic` crate for easier
+/// interoperability.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct PythonVersion {
+    pub major: u8,
+    pub minor: u8,
+}
+
+impl PythonVersion {
+    pub const PY39: PythonVersion = PythonVersion { major: 3, minor: 9 };
+    pub const PY310: PythonVersion = PythonVersion {
+        major: 3,
+        minor: 10,
+    };
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SyntaxError {
-    kind: SyntaxErrorKind,
-    range: TextRange,
+    pub kind: SyntaxErrorKind,
+    pub range: TextRange,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SyntaxErrorKind {
     MatchBeforePy310,
+}
+
+impl SyntaxErrorKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
+        }
+    }
+
+    pub fn message(self, target_version: PythonVersion) -> String {
+        match self {
+            SyntaxErrorKind::MatchBeforePy310 => format!(
+                "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
+                major = target_version.major,
+                minor = target_version.minor,
+            ),
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -61,7 +96,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Stmt::If(_) => {}
             Stmt::With(_) => {}
             Stmt::Match(StmtMatch { range, .. }) => {
-                if self.target_version < PythonVersion::Py310 {
+                if self.target_version < PythonVersion::PY310 {
                     self.errors.push(SyntaxError {
                         kind: SyntaxErrorKind::MatchBeforePy310,
                         range: *range,
@@ -100,19 +135,16 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_debug_snapshot;
-    use ruff_linter::{settings::types::PythonVersion, source_kind::SourceKind};
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
 
-    use crate::{check_syntax, SyntaxError};
+    use crate::{check_syntax, PythonVersion, SyntaxError};
 
     /// Run [`check_path`] on a snippet of Python code.
     fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SyntaxError> {
         let path = Path::new("<filename>");
-        let contents = SourceKind::Python(dedent(contents).into_owned());
         let source_type = PySourceType::from(path);
-        let parsed =
-            ruff_python_parser::parse_unchecked_source(contents.source_code(), source_type);
+        let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
         check_syntax(&parsed, target_version)
     }
 
@@ -124,7 +156,7 @@ match var:
     case 1:
         print("it's one")
 "#,
-            PythonVersion::Py39,
+            PythonVersion::PY39,
         ), @r#"
         [
             Diagnostic {

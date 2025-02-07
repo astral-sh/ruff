@@ -18,6 +18,7 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
+use ruff_python_syntax_errors as syntax;
 
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
@@ -59,6 +60,13 @@ impl From<PythonVersion> for Pep440Version {
     fn from(version: PythonVersion) -> Self {
         let (major, minor) = version.as_tuple();
         Self::new([u64::from(major), u64::from(minor)])
+    }
+}
+
+impl From<PythonVersion> for syntax::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        let (major, minor) = value.as_tuple();
+        Self { major, minor }
     }
 }
 

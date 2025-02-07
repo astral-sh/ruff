@@ -31,6 +31,7 @@ ruff_python_literal = { path = "crates/ruff_python_literal" }
 ruff_python_parser = { path = "crates/ruff_python_parser" }
 ruff_python_semantic = { path = "crates/ruff_python_semantic" }
 ruff_python_stdlib = { path = "crates/ruff_python_stdlib" }
+ruff_python_syntax_errors = { path = "crates/ruff_python_syntax_errors" }
 ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }

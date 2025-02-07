@@ -5,8 +5,9 @@ pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use red_knot_python_semantic::register_lints;
+use red_knot_python_semantic::syntax::SyntaxDiagnostic;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::{register_lints, PythonVersion};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
@@ -14,6 +15,7 @@ use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::{FileType, SystemPath};
 use ruff_python_ast::PySourceType;
+use ruff_python_syntax_errors::check_syntax;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::Durability;
@@ -318,11 +320,29 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         return diagnostics;
     }
 
+    // TODO pass a real version from the user config
+    let target_version = PythonVersion::PY312;
+
     let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
         let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
         diagnostic
     }));
+
+    if parsed.errors().is_empty() {
+        diagnostics.extend(
+            check_syntax(parsed, target_version.into())
+                .iter()
+                .map(|error| {
+                    let boxed: Box<dyn Diagnostic> = Box::new(SyntaxDiagnostic::from_syntax_error(
+                        error,
+                        target_version,
+                        file,
+                    ));
+                    boxed
+                }),
+        );
+    }
 
     diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
         let boxed: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
