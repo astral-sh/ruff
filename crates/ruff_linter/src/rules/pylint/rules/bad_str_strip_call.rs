@@ -5,6 +5,8 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -72,10 +74,20 @@ pub(crate) enum ValueKind {
 }
 
 impl ValueKind {
-    fn from(expr: &Expr) -> Option<Self> {
+    fn from(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
         match expr {
             Expr::StringLiteral(_) => Some(Self::String),
             Expr::BytesLiteral(_) => Some(Self::Bytes),
+            Expr::Name(name) => {
+                let binding_id = semantic.only_binding(name)?;
+                let binding = semantic.binding(binding_id);
+
+                match () {
+                    () if typing::is_string(binding, semantic) => Some(Self::String),
+                    () if typing::is_bytes(binding, semantic) => Some(Self::Bytes),
+                    () => None,
+                }
+            }
             _ => None,
         }
     }
@@ -171,7 +183,15 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let Some(value_kind) = ValueKind::from(value.as_ref()) else {
+    let value = value.as_ref();
+
+    if checker.settings.preview.is_disabled()
+        && !matches!(value, Expr::StringLiteral(_) | Expr::BytesLiteral(_))
+    {
+        return;
+    }
+
+    let Some(value_kind) = ValueKind::from(value, checker.semantic()) else {
         return;
     };
 
