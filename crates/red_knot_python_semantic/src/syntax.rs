@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
@@ -7,12 +6,6 @@ use ruff_python_syntax_errors::{self as syntax, SyntaxError};
 use ruff_text_size::TextRange;
 
 use crate::PythonVersion;
-
-/// Mirrors the structure of `TypeCheckDiagnostics`
-#[derive(Default, Eq, PartialEq)]
-pub struct SyntaxDiagnostics {
-    diagnostics: Vec<Arc<SyntaxDiagnostic>>,
-}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SyntaxDiagnostic {
