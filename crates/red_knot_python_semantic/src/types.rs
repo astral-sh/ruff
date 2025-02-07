@@ -342,6 +342,10 @@ fn symbol_from_bindings<'db>(
              visibility_constraint,
          }| {
             let binding = binding?;
+            if binding.in_stub(db) && !binding.is_reexported(db) {
+                return None;
+            }
+
             let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
             if static_visibility.is_always_false() {
@@ -460,6 +464,10 @@ fn symbol_from_declarations<'db>(
              visibility_constraint,
          }| {
             let declaration = declaration?;
+            if declaration.in_stub(db) && !declaration.is_reexported(db) {
+                return None;
+            }
+
             let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
             if static_visibility.is_always_false() {

@@ -742,7 +742,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_alias_definition(type_alias.node(), definition);
             }
             DefinitionKind::Import(import) => {
-                self.infer_import_definition(import.node(), definition);
+                self.infer_import_definition(import.alias(), definition);
             }
             DefinitionKind::ImportFrom(import_from) => {
                 self.infer_import_from_definition(

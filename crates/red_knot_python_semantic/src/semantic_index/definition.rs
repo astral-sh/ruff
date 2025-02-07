@@ -53,6 +53,10 @@ impl<'db> Definition<'db> {
         self.kind(db).category()
     }
 
+    pub(crate) fn in_stub(self, db: &'db dyn Db) -> bool {
+        self.file(db).is_stub(db.upcast())
+    }
+
     pub(crate) fn is_declaration(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_declaration()
     }
@@ -60,11 +64,15 @@ impl<'db> Definition<'db> {
     pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_binding()
     }
+
+    pub(crate) fn is_reexported(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_reexported()
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'a> {
-    Import(&'a ast::Alias),
+    Import(ImportDefinitionNodeRef<'a>),
     ImportFrom(ImportFromDefinitionNodeRef<'a>),
     For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
@@ -122,12 +130,6 @@ impl<'a> From<&'a ast::StmtAugAssign> for DefinitionNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
-    fn from(node_ref: &'a ast::Alias) -> Self {
-        Self::Import(node_ref)
-    }
-}
-
 impl<'a> From<&'a ast::TypeParamTypeVar> for DefinitionNodeRef<'a> {
     fn from(value: &'a ast::TypeParamTypeVar) -> Self {
         Self::TypeVar(value)
@@ -143,6 +145,12 @@ impl<'a> From<&'a ast::TypeParamParamSpec> for DefinitionNodeRef<'a> {
 impl<'a> From<&'a ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'a> {
     fn from(value: &'a ast::TypeParamTypeVarTuple) -> Self {
         Self::TypeVarTuple(value)
+    }
+}
+
+impl<'a> From<ImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node_ref: ImportDefinitionNodeRef<'a>) -> Self {
+        Self::Import(node_ref)
     }
 }
 
@@ -189,9 +197,16 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub(crate) struct ImportDefinitionNodeRef<'a> {
+    pub(crate) alias: &'a ast::Alias,
+    pub(crate) is_reexported: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
     pub(crate) alias_index: usize,
+    pub(crate) is_reexported: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -247,15 +262,22 @@ impl<'db> DefinitionNodeRef<'db> {
     #[allow(unsafe_code)]
     pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
         match self {
-            DefinitionNodeRef::Import(alias) => {
-                DefinitionKind::Import(AstNodeRef::new(parsed, alias))
-            }
-            DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef { node, alias_index }) => {
-                DefinitionKind::ImportFrom(ImportFromDefinitionKind {
-                    node: AstNodeRef::new(parsed, node),
-                    alias_index,
-                })
-            }
+            DefinitionNodeRef::Import(ImportDefinitionNodeRef {
+                alias,
+                is_reexported,
+            }) => DefinitionKind::Import(ImportDefinitionKind {
+                alias: AstNodeRef::new(parsed, alias),
+                is_reexported,
+            }),
+            DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
+                node,
+                alias_index,
+                is_reexported,
+            }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind {
+                node: AstNodeRef::new(parsed, node),
+                alias_index,
+                is_reexported,
+            }),
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(AstNodeRef::new(parsed, function))
             }
@@ -357,10 +379,15 @@ impl<'db> DefinitionNodeRef<'db> {
 
     pub(super) fn key(self) -> DefinitionNodeKey {
         match self {
-            Self::Import(node) => node.into(),
-            Self::ImportFrom(ImportFromDefinitionNodeRef { node, alias_index }) => {
-                (&node.names[alias_index]).into()
-            }
+            Self::Import(ImportDefinitionNodeRef {
+                alias,
+                is_reexported: _,
+            }) => alias.into(),
+            Self::ImportFrom(ImportFromDefinitionNodeRef {
+                node,
+                alias_index,
+                is_reexported: _,
+            }) => (&node.names[alias_index]).into(),
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::TypeAlias(node) => node.into(),
@@ -437,7 +464,7 @@ impl DefinitionCategory {
 
 #[derive(Clone, Debug)]
 pub enum DefinitionKind<'db> {
-    Import(AstNodeRef<ast::Alias>),
+    Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
@@ -460,6 +487,14 @@ pub enum DefinitionKind<'db> {
 }
 
 impl DefinitionKind<'_> {
+    pub(crate) fn is_reexported(&self) -> bool {
+        match self {
+            DefinitionKind::Import(import) => import.is_reexported(),
+            DefinitionKind::ImportFrom(import) => import.is_reexported(),
+            _ => true,
+        }
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,
@@ -468,7 +503,7 @@ impl DefinitionKind<'_> {
     /// This is mainly used for logging and debugging purposes.
     pub(crate) fn target_range(&self) -> TextRange {
         match self {
-            DefinitionKind::Import(alias) => alias.range(),
+            DefinitionKind::Import(import) => import.alias().range(),
             DefinitionKind::ImportFrom(import) => import.alias().range(),
             DefinitionKind::Function(function) => function.name.range(),
             DefinitionKind::Class(class) => class.name.range(),
@@ -600,9 +635,26 @@ impl ComprehensionDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
+pub struct ImportDefinitionKind {
+    alias: AstNodeRef<ast::Alias>,
+    is_reexported: bool,
+}
+
+impl ImportDefinitionKind {
+    pub(crate) fn alias(&self) -> &ast::Alias {
+        self.alias.node()
+    }
+
+    pub(crate) fn is_reexported(&self) -> bool {
+        self.is_reexported
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
+    is_reexported: bool,
 }
 
 impl ImportFromDefinitionKind {
@@ -612,6 +664,10 @@ impl ImportFromDefinitionKind {
 
     pub(crate) fn alias(&self) -> &ast::Alias {
         &self.node.node().names[self.alias_index]
+    }
+
+    pub(crate) fn is_reexported(&self) -> bool {
+        self.is_reexported
     }
 }
 
