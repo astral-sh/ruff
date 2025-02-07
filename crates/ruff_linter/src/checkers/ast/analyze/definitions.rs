@@ -306,6 +306,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             ]);
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
+                    definition,
                     &docstring,
                     checker.settings.pydocstyle.convention(),
                 );

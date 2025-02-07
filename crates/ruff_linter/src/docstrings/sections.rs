@@ -2,7 +2,9 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use ruff_python_ast::docstrings::{leading_space, leading_words};
+use ruff_python_semantic::Definition;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 use strum_macros::EnumIter;
 
 use ruff_source_file::{Line, NewlineWithTrailingNewline, UniversalNewlines};
@@ -140,7 +142,11 @@ pub(crate) struct SectionContexts<'a> {
 
 impl<'a> SectionContexts<'a> {
     /// Extract all `SectionContext` values from a docstring.
-    pub(crate) fn from_docstring(docstring: &'a Docstring<'a>, style: SectionStyle) -> Self {
+    pub(crate) fn from_docstring(
+        definition: &'a Definition<'a>,
+        docstring: &'a Docstring<'a>,
+        style: SectionStyle,
+    ) -> Self {
         let contents = docstring.body();
 
         let mut contexts = Vec::new();
@@ -167,6 +173,7 @@ impl<'a> SectionContexts<'a> {
                     last.as_ref(),
                     previous_line.as_ref(),
                     lines.peek(),
+                    definition,
                 ) {
                     if let Some(mut last) = last.take() {
                         last.range = TextRange::new(last.start(), line.start());
@@ -424,7 +431,19 @@ fn is_docstring_section(
     previous_section: Option<&SectionContextData>,
     previous_line: Option<&Line>,
     next_line: Option<&Line>,
+    definition: &Definition<'_>,
 ) -> bool {
+    // for function definitions, track the known argument names for more accurate section detection.
+    let known_args: FxHashSet<_> = definition
+        .as_function_def()
+        .map(|func| {
+            func.parameters
+                .iter()
+                .map(|param| param.name().as_str())
+                .collect()
+        })
+        .unwrap_or_default();
+
     // Determine whether the current line looks like a section header, e.g., "Args:".
     let section_name_suffix = line[usize::from(indent_size + section_name_size)..].trim();
     let this_looks_like_a_section_name =
@@ -494,7 +513,8 @@ fn is_docstring_section(
         //     """
         // ```
         if previous_section.indent_size < indent_size {
-            if section_kind.as_str() != verbatim {
+            let section_name = section_kind.as_str();
+            if section_name != verbatim || known_args.contains(section_name) {
                 return false;
             }
         }

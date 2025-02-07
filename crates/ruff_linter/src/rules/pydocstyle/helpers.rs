@@ -71,14 +71,17 @@ pub(crate) fn should_ignore_definition(
 }
 
 pub(crate) fn get_section_contexts<'a>(
+    definition: &'a Definition<'a>,
     docstring: &'a Docstring<'a>,
     convention: Option<Convention>,
 ) -> SectionContexts<'a> {
     match convention {
         Some(Convention::Google) => {
-            SectionContexts::from_docstring(docstring, SectionStyle::Google)
+            SectionContexts::from_docstring(definition, docstring, SectionStyle::Google)
         }
-        Some(Convention::Numpy) => SectionContexts::from_docstring(docstring, SectionStyle::Numpy),
+        Some(Convention::Numpy) => {
+            SectionContexts::from_docstring(definition, docstring, SectionStyle::Numpy)
+        }
         Some(Convention::Pep257) | None => {
             // There are some overlapping section names, between the Google and NumPy conventions
             // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
@@ -86,7 +89,8 @@ pub(crate) fn get_section_contexts<'a>(
 
             // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
             // convention.
-            let numpy_sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
+            let numpy_sections =
+                SectionContexts::from_docstring(definition, docstring, SectionStyle::Numpy);
             if numpy_sections.iter().any(|context| {
                 matches!(
                     context.kind(),
@@ -99,7 +103,8 @@ pub(crate) fn get_section_contexts<'a>(
             }
 
             // If the docstring contains any argument specifier, use the Google convention.
-            let google_sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
+            let google_sections =
+                SectionContexts::from_docstring(definition, docstring, SectionStyle::Google);
             if google_sections.iter().any(|context| {
                 matches!(
                     context.kind(),
