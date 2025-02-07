@@ -58,7 +58,7 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
 /// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
-    checker: &mut Checker,
+    checker: &Checker,
     dict_comp: &ast::ExprDictComp,
 ) {
     let [generator] = dict_comp.generators.as_slice() else {

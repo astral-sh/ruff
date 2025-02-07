@@ -99,7 +99,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
     for (left, right) in std::iter::once(left).chain(comparators).tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants

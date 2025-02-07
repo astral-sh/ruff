@@ -55,7 +55,7 @@ impl Violation for StarmapZip {
 }
 
 /// RUF058
-pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !call.arguments.keywords.is_empty() {

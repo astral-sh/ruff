@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for ShallowCopyEnviron {
 }
 
 /// PLW1507
-pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
     if !(checker.semantic().seen_module(Modules::OS)
         && checker.semantic().seen_module(Modules::COPY))
     {

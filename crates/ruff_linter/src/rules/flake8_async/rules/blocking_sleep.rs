@@ -43,7 +43,7 @@ fn is_blocking_sleep(qualified_name: &QualifiedName) -> bool {
 }
 
 /// ASYNC251
-pub(crate) fn blocking_sleep(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn blocking_sleep(checker: &Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
         if checker
             .semantic()

@@ -78,7 +78,7 @@ impl AlwaysFixableViolation for NotIsTest {
 }
 
 /// E713, E714
-pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
+pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
     if !unary_op.op.is_not() {
         return;
     }

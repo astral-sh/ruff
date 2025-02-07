@@ -36,7 +36,7 @@ impl Violation for InvalidAssertMessageLiteralArgument {
 }
 
 /// RUF040
-pub(crate) fn invalid_assert_message_literal_argument(checker: &mut Checker, stmt: &StmtAssert) {
+pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &StmtAssert) {
     let Some(message) = stmt.msg.as_deref() else {
         return;
     };

@@ -51,7 +51,7 @@ impl Violation for ComparisonOfConstant {
 
 /// PLR0133
 pub(crate) fn comparison_of_constant(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],

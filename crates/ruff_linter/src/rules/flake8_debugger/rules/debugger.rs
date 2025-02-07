@@ -47,7 +47,7 @@ impl Violation for Debugger {
 }
 
 /// Checks for the presence of a debugger call.
-pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     if let Some(using_type) =
         checker
             .semantic()

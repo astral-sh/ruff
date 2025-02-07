@@ -53,7 +53,7 @@ impl Violation for DatetimeMinMax {
 }
 
 /// DTZ901
-pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn datetime_max_min(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::DATETIME) {

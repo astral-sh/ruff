@@ -53,10 +53,7 @@ impl Violation for ExceptWithNonExceptionClasses {
 }
 
 /// B030
-pub(crate) fn except_with_non_exception_classes(
-    checker: &mut Checker,
-    except_handler: &ExceptHandler,
-) {
+pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handler: &ExceptHandler) {
     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
         except_handler;
     let Some(type_) = type_ else {

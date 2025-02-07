@@ -62,7 +62,7 @@ impl Violation for CollapsibleElseIf {
 }
 
 /// PLR5501
-pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
     let Stmt::If(ast::StmtIf {
         elif_else_clauses, ..
     }) = stmt

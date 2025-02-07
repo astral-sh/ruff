@@ -47,7 +47,7 @@ impl Violation for HashlibDigestHex {
 }
 
 /// FURB181
-pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
     if !checker.semantic().seen_module(Modules::HASHLIB) {
         return;
     }

@@ -137,7 +137,7 @@ impl Violation for UnexpectedSpecialMethodSignature {
 
 /// PLE0302
 pub(crate) fn unexpected_special_method_signature(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],

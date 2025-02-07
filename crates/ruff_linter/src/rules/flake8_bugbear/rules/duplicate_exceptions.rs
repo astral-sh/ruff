@@ -120,7 +120,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
 
 /// B014
 fn duplicate_handler_exceptions<'a>(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
 ) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
@@ -175,7 +175,7 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 /// B025
-pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {

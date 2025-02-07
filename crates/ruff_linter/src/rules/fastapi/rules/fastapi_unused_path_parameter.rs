@@ -105,7 +105,7 @@ impl Violation for FastApiUnusedPathParameter {
 
 /// FAST003
 pub(crate) fn fastapi_unused_path_parameter(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {

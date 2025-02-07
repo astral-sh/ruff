@@ -88,7 +88,7 @@ impl Violation for TryExceptInLoop {
 }
 
 /// PERF203
-pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
     if checker.settings.target_version >= PythonVersion::Py311 {
         return;
     }

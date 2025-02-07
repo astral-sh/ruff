@@ -166,7 +166,7 @@ impl AlwaysFixableViolation for OverIndentation {
 }
 
 /// D206, D207, D208
-pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     // Split the docstring into lines.

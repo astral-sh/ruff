@@ -89,7 +89,7 @@ impl Violation for UnrecognizedPlatformName {
 }
 
 /// PYI007, PYI008
-pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
+pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,

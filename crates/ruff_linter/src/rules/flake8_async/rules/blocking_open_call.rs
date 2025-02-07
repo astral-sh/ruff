@@ -44,7 +44,7 @@ impl Violation for BlockingOpenCallInAsyncFunction {
 }
 
 /// ASYNC230
-pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;
     }

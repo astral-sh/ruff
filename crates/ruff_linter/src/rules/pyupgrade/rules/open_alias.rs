@@ -46,7 +46,7 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(func)

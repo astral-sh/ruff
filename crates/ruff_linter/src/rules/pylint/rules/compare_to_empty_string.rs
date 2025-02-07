@@ -59,7 +59,7 @@ impl Violation for CompareToEmptyString {
 
 /// PLC1901
 pub(crate) fn compare_to_empty_string(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],

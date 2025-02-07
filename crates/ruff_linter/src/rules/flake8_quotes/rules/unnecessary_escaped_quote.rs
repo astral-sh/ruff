@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for UnnecessaryEscapedQuote {
 }
 
 /// Q004
-pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLike) {
     if checker.semantic().in_pep_257_docstring() {
         return;
     }

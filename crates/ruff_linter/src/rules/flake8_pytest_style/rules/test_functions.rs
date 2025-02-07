@@ -50,10 +50,7 @@ impl Violation for PytestParameterWithDefaultArgument {
 }
 
 /// PT028
-pub(crate) fn parameter_with_default_argument(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &StmtFunctionDef) {
     if !is_likely_pytest_test(function_def, checker) {
         return;
     }

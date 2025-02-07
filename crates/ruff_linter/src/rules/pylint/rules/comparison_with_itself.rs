@@ -48,7 +48,7 @@ impl Violation for ComparisonWithItself {
 
 /// PLR0124
 pub(crate) fn comparison_with_itself(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],

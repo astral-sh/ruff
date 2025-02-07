@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for BitCount {
 }
 
 /// FURB161
-pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     // `int.bit_count()` was added in Python 3.10
     if checker.settings.target_version < PythonVersion::Py310 {
         return;

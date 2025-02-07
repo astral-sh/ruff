@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UselessReturn {
 
 /// PLR1711
 pub(crate) fn useless_return(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     returns: Option<&Expr>,

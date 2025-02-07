@@ -43,7 +43,7 @@ impl Violation for TooManyBooleanExpressions {
 }
 
 /// PLR0916
-pub(crate) fn too_many_boolean_expressions(checker: &mut Checker, stmt: &StmtIf) {
+pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
     if let Some(bool_op) = stmt.test.as_bool_op_expr() {
         let expressions = count_bools(bool_op);
         if expressions > checker.settings.pylint.max_bool_expr {

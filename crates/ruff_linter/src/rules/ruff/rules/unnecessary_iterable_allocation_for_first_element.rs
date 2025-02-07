@@ -72,10 +72,7 @@ impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
 }
 
 /// RUF015
-pub(crate) fn unnecessary_iterable_allocation_for_first_element(
-    checker: &mut Checker,
-    expr: &Expr,
-) {
+pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checker, expr: &Expr) {
     let value = match expr {
         // Ex) `list(x)[0]`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {

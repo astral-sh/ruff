@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for AsyncZeroSleep {
 }
 
 /// ASYNC115
-pub(crate) fn async_zero_sleep(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
     if !(checker.semantic().seen_module(Modules::TRIO)
         || checker.semantic().seen_module(Modules::ANYIO))
     {

@@ -47,7 +47,7 @@ impl Violation for StaticKeyDictComprehension {
 }
 
 /// RUF011
-pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, dict_comp: &ast::ExprDictComp) {
+pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::ExprDictComp) {
     // Collect the bound names in the comprehension's generators.
     let names = {
         let mut visitor = StoredNameFinder::default();

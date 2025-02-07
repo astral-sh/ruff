@@ -38,7 +38,7 @@ impl AlwaysFixableViolation for DeprecatedCElementTree {
     }
 }
 
-fn add_check_for_node<T>(checker: &mut Checker, node: &T)
+fn add_check_for_node<T>(checker: &Checker, node: &T)
 where
     T: Ranged,
 {
@@ -52,7 +52,7 @@ where
 }
 
 /// UP023
-pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
     match stmt {
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             // Ex) `import xml.etree.cElementTree as ET`

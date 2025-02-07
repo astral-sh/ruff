@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for NonEmptyStubBody {
 }
 
 /// PYI010
-pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
     // Ignore multi-statement bodies (covered by PYI048).
     let [stmt] = body else {
         return;

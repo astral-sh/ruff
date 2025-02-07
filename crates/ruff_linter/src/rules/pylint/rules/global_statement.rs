@@ -52,7 +52,7 @@ impl Violation for GlobalStatement {
 }
 
 /// PLW0603
-pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
+pub(crate) fn global_statement(checker: &Checker, name: &str) {
     if let Some(range) = checker.semantic().global(name) {
         checker.report_diagnostic(Diagnostic::new(
             GlobalStatement {

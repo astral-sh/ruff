@@ -35,7 +35,7 @@ impl Violation for UnintentionalTypeAnnotation {
 
 /// B032
 pub(crate) fn unintentional_type_annotation(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     value: Option<&Expr>,
     stmt: &Stmt,

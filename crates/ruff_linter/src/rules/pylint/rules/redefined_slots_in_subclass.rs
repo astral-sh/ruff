@@ -52,7 +52,7 @@ impl Violation for RedefinedSlotsInSubclass {
 }
 
 // PLW0244
-pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::StmtClassDef) {
     // Early return if this is not a subclass
     if class_def.bases().is_empty() {
         return;

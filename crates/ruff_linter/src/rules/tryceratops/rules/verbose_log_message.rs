@@ -44,7 +44,7 @@ impl Violation for VerboseLogMessage {
 }
 
 /// TRY401
-pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
 

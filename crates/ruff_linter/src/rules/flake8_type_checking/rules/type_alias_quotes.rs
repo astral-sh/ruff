@@ -267,7 +267,7 @@ fn collect_typing_references<'a>(
 
 /// TC008
 pub(crate) fn quoted_type_alias(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {

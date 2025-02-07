@@ -46,16 +46,16 @@ impl AlwaysFixableViolation for ReadlinesInFor {
 }
 
 /// FURB129
-pub(crate) fn readlines_in_for(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &StmtFor) {
     readlines_in_iter(checker, for_stmt.iter.as_ref());
 }
 
 /// FURB129
-pub(crate) fn readlines_in_comprehension(checker: &mut Checker, comprehension: &Comprehension) {
+pub(crate) fn readlines_in_comprehension(checker: &Checker, comprehension: &Comprehension) {
     readlines_in_iter(checker, &comprehension.iter);
 }
 
-fn readlines_in_iter(checker: &mut Checker, iter_expr: &Expr) {
+fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     let Expr::Call(expr_call) = iter_expr else {
         return;
     };

@@ -68,7 +68,7 @@ impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
 
 /// C414
 pub(crate) fn unnecessary_double_cast_or_process(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     outer_func: &Expr,
     args: &[Expr],

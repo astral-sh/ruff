@@ -46,7 +46,7 @@ impl Violation for AssertOnStringLiteral {
 }
 
 /// PLW0129
-pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
+pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
     match test {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             checker.report_diagnostic(Diagnostic::new(

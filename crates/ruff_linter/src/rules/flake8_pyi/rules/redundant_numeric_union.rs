@@ -81,13 +81,13 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         check_annotation(checker, annotation);
     }
 }
 
-fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
+fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {

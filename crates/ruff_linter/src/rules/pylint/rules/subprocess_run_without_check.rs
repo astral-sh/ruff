@@ -60,7 +60,7 @@ impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
 }
 
 /// PLW1510
-pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }

@@ -148,7 +148,7 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
 }
 
 /// UP012
-pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
     let Some(variable) = match_encoded_variable(&call.func) else {
         return;
     };

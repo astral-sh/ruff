@@ -128,7 +128,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings

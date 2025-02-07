@@ -50,7 +50,7 @@ impl Violation for SubprocessPopenPreexecFn {
 }
 
 /// PLW1509
-pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }

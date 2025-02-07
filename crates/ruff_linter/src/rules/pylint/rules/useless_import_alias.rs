@@ -55,7 +55,7 @@ impl Violation for UselessImportAlias {
 }
 
 /// PLC0414
-pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     let Some(asname) = &alias.asname else {
         return;
     };
@@ -86,7 +86,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
 /// PLC0414
 pub(crate) fn useless_import_from_alias(
-    checker: &mut Checker,
+    checker: &Checker,
     alias: &Alias,
     module: Option<&str>,
     level: u32,

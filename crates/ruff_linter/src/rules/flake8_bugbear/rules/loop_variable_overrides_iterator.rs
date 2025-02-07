@@ -50,7 +50,7 @@ impl Violation for LoopVariableOverridesIterator {
 }
 
 /// B020
-pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr, iter: &Expr) {
     let target_names = {
         let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);

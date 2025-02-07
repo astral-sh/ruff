@@ -55,7 +55,7 @@ impl Violation for PandasUseOfPdMerge {
 }
 
 /// PD015
-pub(crate) fn use_of_pd_merge(checker: &mut Checker, func: &Expr) {
+pub(crate) fn use_of_pd_merge(checker: &Checker, func: &Expr) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }

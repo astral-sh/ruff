@@ -49,7 +49,7 @@ impl Violation for BadOpenMode {
 }
 
 /// PLW1501
-pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCall) {
     let Some(kind) = is_open(call.func.as_ref(), checker.semantic()) else {
         return;
     };

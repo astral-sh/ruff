@@ -56,7 +56,7 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
+pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr) {
     let Some(builtin) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };

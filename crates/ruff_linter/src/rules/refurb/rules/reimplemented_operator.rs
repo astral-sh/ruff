@@ -90,7 +90,7 @@ impl Violation for ReimplementedOperator {
 }
 
 /// FURB118
-pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
     // Ignore methods.
     // Methods can be defined via a `def` statement in a class scope,
     // or via a lambda appearing on the right-hand side of an assignment in a class scope.

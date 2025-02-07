@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }

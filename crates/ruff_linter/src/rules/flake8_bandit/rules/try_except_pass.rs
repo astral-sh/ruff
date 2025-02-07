@@ -49,7 +49,7 @@ impl Violation for TryExceptPass {
 
 /// S110
 pub(crate) fn try_except_pass(
-    checker: &mut Checker,
+    checker: &Checker,
     except_handler: &ExceptHandler,
     type_: Option<&Expr>,
     body: &[Stmt],

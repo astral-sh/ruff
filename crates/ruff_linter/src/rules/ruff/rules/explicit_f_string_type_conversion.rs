@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
 }
 
 /// RUF010
-pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string: &ast::FString) {
+pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &ast::FString) {
     for (index, element) in f_string.elements.iter().enumerate() {
         let Some(ast::FStringExpressionElement {
             expression,

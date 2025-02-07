@@ -175,7 +175,7 @@ impl Violation for DotFormatInException {
 }
 
 /// EM101, EM102, EM103
-pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
+pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
     if let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, .. },
         ..

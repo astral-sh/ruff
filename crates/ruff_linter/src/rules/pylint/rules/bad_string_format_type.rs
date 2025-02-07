@@ -211,7 +211,7 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
 
 /// PLE1307
 pub(crate) fn bad_string_format_type(
-    checker: &mut Checker,
+    checker: &Checker,
     bin_op: &ast::ExprBinOp,
     format_string: &ast::ExprStringLiteral,
 ) {

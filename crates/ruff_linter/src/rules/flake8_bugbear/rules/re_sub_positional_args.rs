@@ -56,7 +56,7 @@ impl Violation for ReSubPositionalArgs {
 }
 
 /// B034
-pub(crate) fn re_sub_positional_args(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn re_sub_positional_args(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::RE) {
         return;
     }

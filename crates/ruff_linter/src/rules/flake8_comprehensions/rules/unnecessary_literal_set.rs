@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "set",
         &call.func,

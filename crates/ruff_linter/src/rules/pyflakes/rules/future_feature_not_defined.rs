@@ -30,7 +30,7 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
-pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn future_feature_not_defined(checker: &Checker, alias: &Alias) {
     if is_feature_name(&alias.name) {
         return;
     }

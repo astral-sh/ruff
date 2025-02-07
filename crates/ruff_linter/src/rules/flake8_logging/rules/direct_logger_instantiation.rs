@@ -54,7 +54,7 @@ impl Violation for DirectLoggerInstantiation {
 }
 
 /// LOG001
-pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }

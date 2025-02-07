@@ -45,7 +45,7 @@ impl Violation for InvalidBoolReturnType {
 }
 
 /// PLE0304
-pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__bool__" {
         return;
     }

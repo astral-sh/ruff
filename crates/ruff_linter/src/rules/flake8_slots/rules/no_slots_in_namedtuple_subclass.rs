@@ -74,7 +74,7 @@ impl fmt::Display for NamedTupleKind {
 
 /// SLOT002
 pub(crate) fn no_slots_in_namedtuple_subclass(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     class: &StmtClassDef,
 ) {

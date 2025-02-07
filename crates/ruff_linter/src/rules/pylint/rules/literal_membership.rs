@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for LiteralMembership {
 }
 
 /// PLR6201
-pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
     let [op] = &*compare.ops else {
         return;
     };

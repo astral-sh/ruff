@@ -75,7 +75,7 @@ impl Violation for UnnecessaryNestedLiteral {
 }
 
 /// RUF039
-pub(crate) fn unnecessary_nested_literal<'a>(checker: &mut Checker, literal_expr: &'a Expr) {
+pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     let mut is_nested = false;
 
     // Traverse the type expressions in the `Literal`.

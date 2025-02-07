@@ -156,7 +156,7 @@ impl AlwaysFixableViolation for BlankLineBeforeClass {
 }
 
 /// D203, D204, D211
-pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring) {
     let Some(class) = docstring.definition.as_class_def() else {
         return;
     };

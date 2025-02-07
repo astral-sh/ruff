@@ -44,7 +44,7 @@ impl Violation for ClassAsDataStructure {
 }
 
 /// B903
-pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtClassDef) {
     // skip stub files
     if checker.source_type.is_stub() {
         return;

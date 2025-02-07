@@ -51,7 +51,7 @@ impl Violation for InvalidIndexReturnType {
 }
 
 /// E0305
-pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__index__" {
         return;
     }

@@ -47,7 +47,7 @@ impl Violation for FlaskDebugTrue {
 }
 
 /// S201
-pub(crate) fn flask_debug_true(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn flask_debug_true(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };

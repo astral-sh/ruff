@@ -43,7 +43,7 @@ impl Violation for InvalidEnvvarDefault {
 }
 
 /// PLW1508
-pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }

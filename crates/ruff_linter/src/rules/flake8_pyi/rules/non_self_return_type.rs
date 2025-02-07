@@ -108,7 +108,7 @@ impl Violation for NonSelfReturnType {
 
 /// PYI034
 pub(crate) fn non_self_return_type(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     is_async: bool,
     name: &str,
@@ -187,7 +187,7 @@ pub(crate) fn non_self_return_type(
 
 /// Add a diagnostic for the given method.
 fn add_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
@@ -207,7 +207,7 @@ fn add_diagnostic(
 }
 
 fn replace_with_self_fix(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,

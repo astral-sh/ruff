@@ -62,7 +62,7 @@ impl Violation for MissingTerminalPunctuation {
 }
 
 /// D415
-pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {

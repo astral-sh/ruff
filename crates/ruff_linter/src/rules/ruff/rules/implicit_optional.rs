@@ -162,7 +162,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(Expr::NoneLiteral(_)) = parameter.default() else {
             continue;

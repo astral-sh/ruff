@@ -45,7 +45,7 @@ impl Violation for InvalidStrReturnType {
 }
 
 /// E0307
-pub(crate) fn invalid_str_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__str__" {
         return;
     }

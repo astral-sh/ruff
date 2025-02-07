@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for ListReverseCopy {
 }
 
 /// FURB187
-pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
+pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
     let [Expr::Name(target_expr)] = assign.targets.as_slice() else {
         return;
     };

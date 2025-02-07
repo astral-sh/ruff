@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
 
 /// C404 (`dict([...])`)
 pub(crate) fn unnecessary_list_comprehension_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

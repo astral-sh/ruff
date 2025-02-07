@@ -51,7 +51,7 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::Mod { .. },

@@ -43,7 +43,7 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 }
 
 /// RUF051
-pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
+pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
     let [Stmt::Delete(delete)] = &stmt.body[..] else {
         return;
     };

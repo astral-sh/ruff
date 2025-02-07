@@ -664,7 +664,7 @@ fn fixture_decorator<'a>(
 }
 
 fn pytest_fixture_parentheses(
-    checker: &mut Checker,
+    checker: &Checker,
     decorator: &Decorator,
     fix: Fix,
     expected: Parentheses,
@@ -679,7 +679,7 @@ fn pytest_fixture_parentheses(
 }
 
 /// PT001, PT002, PT003
-fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Decorator) {
+fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decorator) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
@@ -753,7 +753,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
 }
 
 /// PT022
-fn check_fixture_returns(checker: &mut Checker, name: &str, body: &[Stmt], returns: Option<&Expr>) {
+fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: Option<&Expr>) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
@@ -807,7 +807,7 @@ fn check_fixture_returns(checker: &mut Checker, name: &str, body: &[Stmt], retur
 }
 
 /// PT019
-fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
+fn check_test_function_args(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let name = parameter.name();
         if name.starts_with('_') {
@@ -822,7 +822,7 @@ fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
 }
 
 /// PT020
-fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
+fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
     if is_pytest_yield_fixture(decorator, checker.semantic()) {
         checker.report_diagnostic(Diagnostic::new(
             PytestDeprecatedYieldFixture,
@@ -832,7 +832,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, body: &[Stmt]) {
+fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: &[Stmt]) {
     if !parameters.includes("request") {
         return;
     }
@@ -852,7 +852,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, bo
 }
 
 /// PT024, PT025
-fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
+fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
     for (expr, marker) in get_mark_decorators(decorators) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
@@ -877,7 +877,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
 }
 
 pub(crate) fn fixture(
-    checker: &mut Checker,
+    checker: &Checker,
     name: &str,
     parameters: &Parameters,
     returns: Option<&Expr>,

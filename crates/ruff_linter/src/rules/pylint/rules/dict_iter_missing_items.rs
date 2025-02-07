@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for DictIterMissingItems {
 }
 
 /// PLE1141
-pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &Expr) {
     let Expr::Tuple(tuple) = target else {
         return;
     };

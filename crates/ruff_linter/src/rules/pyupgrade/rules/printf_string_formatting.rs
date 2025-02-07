@@ -361,7 +361,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 
 /// UP031
 pub(crate) fn printf_string_formatting(
-    checker: &mut Checker,
+    checker: &Checker,
     bin_op: &ast::ExprBinOp,
     string_expr: &ast::ExprStringLiteral,
 ) {

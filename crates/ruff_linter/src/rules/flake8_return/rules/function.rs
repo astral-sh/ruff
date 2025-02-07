@@ -366,7 +366,7 @@ impl Violation for SuperfluousElseBreak {
 }
 
 /// RET501
-fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], stack: &Stack) {
+fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stack: &Stack) {
     for stmt in &stack.returns {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
@@ -394,7 +394,7 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
 }
 
 /// RET502
-fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
+fn implicit_return_value(checker: &Checker, stack: &Stack) {
     for stmt in &stack.returns {
         if stmt.value.is_some() {
             continue;
@@ -453,7 +453,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         || semantic.match_typing_qualified_name(&qualified_name, "Never")
 }
 
-fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
+fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
     let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
     if let Some(indent) = indentation(checker.source(), stmt) {
         let mut content = String::new();
@@ -545,7 +545,7 @@ fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
 }
 
 /// RET503
-fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
+fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
     let implicit_stmts = implicit_returns(checker, stmt);
 
     if implicit_stmts.is_empty() {
@@ -562,7 +562,7 @@ fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, s
 }
 
 /// RET504
-fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
+fn unnecessary_assign(checker: &Checker, stack: &Stack) {
     for (assign, return_, stmt) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
@@ -657,7 +657,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
 
 /// RET505, RET506, RET507, RET508
 fn superfluous_else_node(
-    checker: &mut Checker,
+    checker: &Checker,
     if_elif_body: &[Stmt],
     elif_else: &ElifElseClause,
 ) -> bool {
@@ -748,14 +748,14 @@ fn superfluous_else_node(
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
+fn superfluous_elif_else(checker: &Checker, stack: &Stack) {
     for (if_elif_body, elif_else) in &stack.elifs_elses {
         superfluous_else_node(checker, if_elif_body, elif_else);
     }
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     let ast::StmtFunctionDef {
         decorator_list,
         returns,

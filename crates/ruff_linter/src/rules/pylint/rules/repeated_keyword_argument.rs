@@ -35,7 +35,7 @@ impl Violation for RepeatedKeywordArgument {
     }
 }
 
-pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
     let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);

@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_open_modes(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)

@@ -82,7 +82,7 @@ enum Reason {
 }
 
 /// UP036
-pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
         let Expr::Compare(ast::ExprCompare {
             left,
@@ -366,7 +366,7 @@ fn fix_always_false_branch(
 /// if sys.version_info >= (3, 8): ...
 /// ```
 fn fix_always_true_branch(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &StmtIf,
     branch: &IfElifBranch,
 ) -> Option<Fix> {

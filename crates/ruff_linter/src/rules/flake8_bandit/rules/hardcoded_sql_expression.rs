@@ -55,7 +55,7 @@ impl Violation for HardcodedSQLExpression {
 }
 
 /// S608
-pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     let content = match expr {
         // "select * from table where val = " + "str" + ...
         Expr::BinOp(ast::ExprBinOp {

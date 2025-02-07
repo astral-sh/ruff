@@ -46,7 +46,7 @@ impl Violation for RequestWithNoCertValidation {
 }
 
 /// S501
-pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::ExprCall) {
     if let Some(target) = checker
         .semantic()
         .resolve_qualified_name(&call.func)

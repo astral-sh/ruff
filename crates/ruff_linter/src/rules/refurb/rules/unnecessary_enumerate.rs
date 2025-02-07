@@ -87,7 +87,7 @@ impl Violation for UnnecessaryEnumerate {
 }
 
 /// FURB148
-pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) {
     // Check the for statement is of the form `for x, y in func(...)`.
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;

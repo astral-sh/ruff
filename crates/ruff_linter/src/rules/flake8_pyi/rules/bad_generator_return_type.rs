@@ -88,10 +88,7 @@ impl Violation for GeneratorReturnFromIterMethod {
 }
 
 /// PYI058
-pub(crate) fn bad_generator_return_type(
-    function_def: &ast::StmtFunctionDef,
-    checker: &mut Checker,
-) {
+pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, checker: &Checker) {
     if function_def.is_async {
         return;
     }

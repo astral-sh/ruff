@@ -197,7 +197,7 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     if !is_open_call(semantic, call) {

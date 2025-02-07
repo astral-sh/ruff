@@ -56,7 +56,7 @@ impl Violation for StripWithMultiCharacters {
 
 /// B005
 pub(crate) fn strip_with_multi_characters(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

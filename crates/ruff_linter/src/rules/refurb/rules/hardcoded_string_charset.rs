@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for HardcodedStringCharset {
 }
 
 /// FURB156
-pub(crate) fn hardcoded_string_charset_literal(checker: &mut Checker, expr: &ExprStringLiteral) {
+pub(crate) fn hardcoded_string_charset_literal(checker: &Checker, expr: &ExprStringLiteral) {
     if let Some(charset) = check_charset_exact(expr.value.to_str().as_bytes()) {
         push_diagnostic(checker, expr.range, charset);
     }
@@ -122,7 +122,7 @@ fn check_charset_exact(bytes: &[u8]) -> Option<&NamedCharset> {
         .find(|&charset| charset.bytes == bytes)
 }
 
-fn push_diagnostic(checker: &mut Checker, range: TextRange, charset: &NamedCharset) {
+fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) {
     let name = charset.name;
     let mut diagnostic = Diagnostic::new(HardcodedStringCharset { name }, range);
     diagnostic.try_set_fix(|| {

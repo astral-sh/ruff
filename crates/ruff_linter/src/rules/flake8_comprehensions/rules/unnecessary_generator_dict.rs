@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
 pub(crate) fn unnecessary_generator_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

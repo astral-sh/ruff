@@ -48,7 +48,7 @@ impl Violation for SslWithBadDefaults {
 }
 
 /// S503
-pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFunctionDef) {
     for default in function_def
         .parameters
         .iter_non_variadic_params()

@@ -72,7 +72,7 @@ fn is_empty(body: &[Stmt]) -> bool {
 
 /// SIM105
 pub(crate) fn suppressible_exception(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     try_body: &[Stmt],
     handlers: &[ExceptHandler],

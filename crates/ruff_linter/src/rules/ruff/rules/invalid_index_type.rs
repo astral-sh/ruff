@@ -51,7 +51,7 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF016
-pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
+pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
     let ExprSubscript {
         value,
         slice: index,

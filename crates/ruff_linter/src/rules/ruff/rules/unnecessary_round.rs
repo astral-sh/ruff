@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 }
 
 /// RUF057
-pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     if !checker.semantic().match_builtin_expr(&call.func, "round") {
         return;
     }

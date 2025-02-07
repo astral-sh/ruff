@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for FalsyDictGetFallback {
     }
 }
 
-pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     // Check if we are in a boolean test

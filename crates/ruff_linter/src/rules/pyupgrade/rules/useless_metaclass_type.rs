@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UselessMetaclassType {
 
 /// UP001
 pub(crate) fn useless_metaclass_type(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     value: &Expr,
     targets: &[Expr],

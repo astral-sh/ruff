@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
 }
 
 /// B905
-pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     if semantic.match_builtin_expr(&call.func, "zip")

@@ -908,7 +908,7 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
-pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
     suspicious_function(
         checker,
         call.func.as_ref(),
@@ -917,7 +917,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
     );
 }
 
-pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) {
+pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     if checker.settings.preview.is_disabled() {
         return;
     }
@@ -953,7 +953,7 @@ pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) 
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 fn suspicious_function(
-    checker: &mut Checker,
+    checker: &Checker,
     func: &Expr,
     arguments: Option<&Arguments>,
     range: TextRange,
@@ -1181,7 +1181,7 @@ fn suspicious_function(
 }
 
 /// S308
-pub(crate) fn suspicious_function_decorator(checker: &mut Checker, decorator: &Decorator) {
+pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
     if checker.settings.preview.is_disabled() {
         suspicious_function(checker, &decorator.expression, None, decorator.range);

@@ -61,7 +61,7 @@ impl Violation for SingleItemMembershipTest {
 
 /// FURB171
 pub(crate) fn single_item_membership_test(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],

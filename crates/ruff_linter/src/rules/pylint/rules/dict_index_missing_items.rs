@@ -58,7 +58,7 @@ impl Violation for DictIndexMissingItems {
 }
 
 /// PLC0206
-pub(crate) fn dict_index_missing_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFor) {
     let ast::StmtFor {
         target, iter, body, ..
     } = stmt_for;

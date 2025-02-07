@@ -44,7 +44,7 @@ impl Violation for DjangoExtra {
 }
 
 /// S610
-pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return;
     };

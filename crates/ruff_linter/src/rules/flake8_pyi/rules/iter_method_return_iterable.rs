@@ -86,7 +86,7 @@ impl Violation for IterMethodReturnIterable {
 }
 
 /// PYI045
-pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
+pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Definition) {
     let Definition::Member(Member {
         kind: MemberKind::Method(function),
         ..

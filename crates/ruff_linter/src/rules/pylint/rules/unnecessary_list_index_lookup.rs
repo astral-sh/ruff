@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
 }
 
 /// PLR1736
-pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
+pub(crate) fn unnecessary_list_index_lookup(checker: &Checker, stmt_for: &StmtFor) {
     let Some((sequence, index_name, value_name)) =
         enumerate_items(&stmt_for.iter, &stmt_for.target, checker.semantic())
     else {
@@ -71,7 +71,7 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
 }
 
 /// PLR1736
-pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
     let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })

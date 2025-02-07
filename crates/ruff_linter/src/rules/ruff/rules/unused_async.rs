@@ -154,7 +154,7 @@ where
 
 /// RUF029
 pub(crate) fn unused_async(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def @ ast::StmtFunctionDef {
         is_async,
         name,

@@ -53,7 +53,7 @@ impl Violation for ReplaceStdoutStderr {
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }

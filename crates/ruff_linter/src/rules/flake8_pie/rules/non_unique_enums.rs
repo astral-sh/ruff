@@ -54,7 +54,7 @@ impl Violation for NonUniqueEnums {
 }
 
 /// PIE796
-pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
+pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) {
     let semantic = checker.semantic();
 
     let Stmt::ClassDef(parent) = parent else {

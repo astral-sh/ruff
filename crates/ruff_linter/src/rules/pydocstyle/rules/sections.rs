@@ -1322,7 +1322,7 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
 pub(crate) fn sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
@@ -1338,7 +1338,7 @@ pub(crate) fn sections(
 }
 
 fn blanks_and_section_underline(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     style: SectionStyle,
@@ -1643,7 +1643,7 @@ fn blanks_and_section_underline(
 }
 
 fn common_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
@@ -1781,7 +1781,7 @@ fn common_section(
     blanks_and_section_underline(checker, docstring, context, style);
 }
 
-fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
+fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
@@ -1899,7 +1899,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
         .collect::<FxHashSet<String>>()
 }
 
-fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+fn parameters_section(checker: &Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FxHashSet<String> = FxHashSet::default();
     let section_level_indent = leading_space(context.summary_line());
@@ -1941,7 +1941,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 }
 
 fn numpy_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
@@ -1976,7 +1976,7 @@ fn numpy_section(
 }
 
 fn google_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
@@ -2004,7 +2004,7 @@ fn google_section(
 }
 
 fn parse_numpy_sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
@@ -2015,7 +2015,7 @@ fn parse_numpy_sections(
 }
 
 fn parse_google_sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {

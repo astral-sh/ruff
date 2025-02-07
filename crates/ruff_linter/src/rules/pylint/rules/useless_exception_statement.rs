@@ -50,7 +50,7 @@ impl Violation for UselessExceptionStatement {
 }
 
 /// PLW0133
-pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::StmtExpr) {
+pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExpr) {
     let Expr::Call(ast::ExprCall { func, .. }) = expr.value.as_ref() else {
         return;
     };

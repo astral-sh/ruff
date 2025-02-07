@@ -121,7 +121,7 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 }
 
 /// SIM112
-pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -178,7 +178,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     ));
 }
 
-fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
+fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -236,7 +236,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM910
-pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },

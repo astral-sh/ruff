@@ -68,7 +68,7 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
     if checker.settings.target_version < PythonVersion::Py39 {
         return;
     }
@@ -99,7 +99,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::StmtIf) {
+pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIf) {
     if checker.settings.target_version < PythonVersion::Py39 {
         return;
     }

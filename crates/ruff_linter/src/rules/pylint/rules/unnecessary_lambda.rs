@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryLambda {
 }
 
 /// PLW0108
-pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
+pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     let ExprLambda {
         parameters,
         body,

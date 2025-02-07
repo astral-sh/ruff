@@ -62,7 +62,7 @@ impl Violation for ReimplementedStarmap {
 }
 
 /// FURB140
-pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandidate) {
+pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
     let [comprehension] = target.generators() else {
         return;

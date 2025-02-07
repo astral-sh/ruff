@@ -59,7 +59,7 @@ impl Violation for UnnecessaryFromFloat {
 }
 
 /// FURB164
-pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &*call.func else {
         return;
     };

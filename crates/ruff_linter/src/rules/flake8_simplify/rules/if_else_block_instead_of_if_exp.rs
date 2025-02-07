@@ -89,7 +89,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,

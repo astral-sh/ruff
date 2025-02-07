@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
 }
 
 /// PTH201
-pub(crate) fn path_constructor_current_directory(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprCall) {
     let applicability = |range| {
         if checker.comment_ranges().intersects(range) {
             Applicability::Unsafe

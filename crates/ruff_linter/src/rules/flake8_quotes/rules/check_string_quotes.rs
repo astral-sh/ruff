@@ -250,7 +250,7 @@ fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool
 }
 
 /// Q002
-fn docstring(checker: &mut Checker, range: TextRange) {
+fn docstring(checker: &Checker, range: TextRange) {
     let quotes_settings = &checker.settings.flake8_quotes;
     let locator = checker.locator();
 
@@ -302,7 +302,7 @@ fn docstring(checker: &mut Checker, range: TextRange) {
 }
 
 /// Q000, Q001
-fn strings(checker: &mut Checker, sequence: &[TextRange]) {
+fn strings(checker: &Checker, sequence: &[TextRange]) {
     let quotes_settings = &checker.settings.flake8_quotes;
     let locator = checker.locator();
 
@@ -439,7 +439,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     // Ignore if the string is part of a forward reference. For example,
     // `x: "Literal['foo', 'bar']"`.
     if checker.semantic().in_string_type_definition() {

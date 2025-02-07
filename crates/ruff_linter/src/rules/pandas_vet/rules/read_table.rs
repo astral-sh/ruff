@@ -46,7 +46,7 @@ impl Violation for PandasUseOfDotReadTable {
 }
 
 /// PD012
-pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }

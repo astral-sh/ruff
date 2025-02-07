@@ -486,7 +486,7 @@ fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
@@ -512,7 +512,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
@@ -538,7 +538,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
 }
 
 /// PYI015
-pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], value: &Expr) {
     let [target] = targets else {
         return;
     };
@@ -568,7 +568,7 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
 
 /// PYI015
 pub(crate) fn annotated_assignment_default_in_stub(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     value: &Expr,
     annotation: &Expr,
@@ -601,11 +601,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
 }
 
 /// PYI052
-pub(crate) fn unannotated_assignment_in_stub(
-    checker: &mut Checker,
-    targets: &[Expr],
-    value: &Expr,
-) {
+pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr], value: &Expr) {
     let [target] = targets else {
         return;
     };
@@ -640,11 +636,7 @@ pub(crate) fn unannotated_assignment_in_stub(
 }
 
 /// PYI035
-pub(crate) fn unassigned_special_variable_in_stub(
-    checker: &mut Checker,
-    target: &Expr,
-    stmt: &Stmt,
-) {
+pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Expr, stmt: &Stmt) {
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
@@ -662,7 +654,7 @@ pub(crate) fn unassigned_special_variable_in_stub(
 }
 
 /// PYI026
-pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, targets: &[Expr]) {
     let [target] = targets else {
         return;
     };

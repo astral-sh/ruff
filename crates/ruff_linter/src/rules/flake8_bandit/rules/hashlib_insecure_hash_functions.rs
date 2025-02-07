@@ -64,7 +64,7 @@ impl Violation for HashlibInsecureHashFunction {
 }
 
 /// S324
-pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .seen_module(Modules::HASHLIB | Modules::CRYPT)
@@ -105,7 +105,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
 }
 
 fn detect_insecure_hashlib_calls(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     hashlib_call: HashlibCall,
 ) {
@@ -149,7 +149,7 @@ fn detect_insecure_hashlib_calls(
     }
 }
 
-fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
+fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
     let Some(method) = checker
         .semantic()
         .resolve_qualified_name(&call.func)

@@ -859,7 +859,7 @@ fn is_one_line(docstring: &Docstring) -> bool {
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     docstring: &Docstring,
     section_contexts: &SectionContexts,

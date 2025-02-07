@@ -49,7 +49,7 @@ impl Violation for UndocumentedWarn {
 }
 
 /// LOG009
-pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }

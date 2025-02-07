@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for UnnecessaryListCast {
 }
 
 /// PERF101
-pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[Stmt]) {
+pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt]) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments:

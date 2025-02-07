@@ -53,7 +53,7 @@ impl Violation for TryExceptContinue {
 
 /// S112
 pub(crate) fn try_except_continue(
-    checker: &mut Checker,
+    checker: &Checker,
     except_handler: &ExceptHandler,
     type_: Option<&Expr>,
     body: &[Stmt],

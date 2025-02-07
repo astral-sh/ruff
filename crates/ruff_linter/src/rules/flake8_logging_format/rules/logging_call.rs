@@ -42,7 +42,7 @@ fn is_reserved_attr(attr: &str) -> bool {
 }
 
 /// Check logging messages for violations.
-fn check_msg(checker: &mut Checker, msg: &Expr) {
+fn check_msg(checker: &Checker, msg: &Expr) {
     match msg {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
@@ -80,7 +80,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
 }
 
 /// Check contents of the `extra` argument to logging calls.
-fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
+fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
     match &extra.value {
         Expr::Dict(dict) => {
             for invalid_key in dict.iter_keys().filter_map(|key| {
@@ -138,7 +138,7 @@ impl LoggingCallType {
 }
 
 /// Check logging calls for violations.
-pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
     let (logging_call_type, range) = match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {

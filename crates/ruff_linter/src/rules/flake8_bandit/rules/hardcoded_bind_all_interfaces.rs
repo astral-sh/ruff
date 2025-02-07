@@ -37,7 +37,7 @@ impl Violation for HardcodedBindAllInterfaces {
 }
 
 /// S104
-pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, string: StringLike) {
+pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLike) {
     match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => {
             if value == "0.0.0.0" {

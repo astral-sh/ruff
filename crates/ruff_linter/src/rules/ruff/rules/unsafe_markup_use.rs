@@ -90,7 +90,7 @@ impl Violation for UnsafeMarkupUse {
 /// Checks for unsafe calls to `[markupsafe.Markup]`.
 ///
 /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
-pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
     if checker.settings.ruff.extend_markup_names.is_empty()
         && !(checker.semantic().seen_module(Modules::MARKUPSAFE)
             || checker.semantic().seen_module(Modules::FLASK))

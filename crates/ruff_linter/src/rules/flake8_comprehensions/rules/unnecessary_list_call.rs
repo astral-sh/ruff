@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UnnecessaryListCall {
 }
 
 /// C411
-pub(crate) fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, call: &ExprCall) {
+pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprCall) {
     let ExprCall {
         func,
         arguments,

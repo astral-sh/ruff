@@ -48,7 +48,7 @@ impl Violation for DjangoAllWithModelForm {
 }
 
 /// DJ007
-pub(crate) fn all_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }

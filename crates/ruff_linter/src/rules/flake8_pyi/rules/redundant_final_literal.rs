@@ -56,7 +56,7 @@ impl Violation for RedundantFinalLiteral {
 }
 
 /// PYI064
-pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::StmtAnnAssign) {
+pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtAnnAssign) {
     if !checker.semantic().seen_typing() {
         return;
     }

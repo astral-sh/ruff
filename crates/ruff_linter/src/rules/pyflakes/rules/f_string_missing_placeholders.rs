@@ -68,7 +68,7 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::ExprFString) {
+pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprFString) {
     if expr.value.f_strings().any(|f_string| {
         f_string
             .elements

@@ -78,7 +78,7 @@ static DEPRECATED_ALIASES: LazyLock<FxHashMap<&'static str, &'static str>> = Laz
 });
 
 /// UP005
-pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };

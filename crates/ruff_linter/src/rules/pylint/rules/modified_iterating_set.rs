@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
 }
 
 /// PLE4703
-pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     let Some(name) = for_stmt.iter.as_name_expr() else {
         return;
     };

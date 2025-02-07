@@ -57,7 +57,7 @@ impl Violation for TooManyPositionalArguments {
 
 /// PLR0917
 pub(crate) fn too_many_positional_arguments(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535

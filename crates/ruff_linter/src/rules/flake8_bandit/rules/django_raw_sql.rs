@@ -35,7 +35,7 @@ impl Violation for DjangoRawSql {
 }
 
 /// S611
-pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }

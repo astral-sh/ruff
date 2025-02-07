@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
 
 /// UP029
 pub(crate) fn unnecessary_builtin_import(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     module: &str,
     names: &[Alias],

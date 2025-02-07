@@ -525,7 +525,7 @@ fn has_star_args(args: &[Expr]) -> bool {
 
 /// F502
 pub(crate) fn percent_format_expected_mapping(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: TextRange,
@@ -539,7 +539,7 @@ pub(crate) fn percent_format_expected_mapping(
             | Expr::ListComp(_)
             | Expr::SetComp(_)
             | Expr::Generator(_) => {
-                checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedMapping, location))
+                checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedMapping, location));
             }
             _ => {}
         }
@@ -548,7 +548,7 @@ pub(crate) fn percent_format_expected_mapping(
 
 /// F503
 pub(crate) fn percent_format_expected_sequence(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: TextRange,
@@ -560,7 +560,7 @@ pub(crate) fn percent_format_expected_sequence(
 
 /// F504
 pub(crate) fn percent_format_extra_named_arguments(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: TextRange,
@@ -618,7 +618,7 @@ pub(crate) fn percent_format_extra_named_arguments(
 
 /// F505
 pub(crate) fn percent_format_missing_arguments(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: TextRange,
@@ -665,7 +665,7 @@ pub(crate) fn percent_format_missing_arguments(
 
 /// F506
 pub(crate) fn percent_format_mixed_positional_and_named(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     location: TextRange,
 ) {
@@ -679,7 +679,7 @@ pub(crate) fn percent_format_mixed_positional_and_named(
 
 /// F507
 pub(crate) fn percent_format_positional_count_mismatch(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: TextRange,
@@ -711,7 +711,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
 
 /// F508
 pub(crate) fn percent_format_star_requires_sequence(
-    checker: &mut Checker,
+    checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
     location: TextRange,
@@ -727,7 +727,7 @@ pub(crate) fn percent_format_star_requires_sequence(
 
 /// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
     keywords: &[Keyword],
@@ -776,7 +776,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
 /// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
     args: &[Expr],
@@ -846,7 +846,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 
 /// F524
 pub(crate) fn string_dot_format_missing_argument(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
     args: &[Expr],
@@ -889,7 +889,7 @@ pub(crate) fn string_dot_format_missing_argument(
 
 /// F525
 pub(crate) fn string_dot_format_mixing_automatic(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
 ) {

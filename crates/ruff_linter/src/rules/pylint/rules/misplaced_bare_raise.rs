@@ -51,7 +51,7 @@ impl Violation for MisplacedBareRaise {
 }
 
 /// PLE0704
-pub(crate) fn misplaced_bare_raise(checker: &mut Checker, raise: &ast::StmtRaise) {
+pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
     if raise.exc.is_some() {
         return;
     }

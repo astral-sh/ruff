@@ -102,7 +102,7 @@ static INNER_FUNCTION_OR_CLASS_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
 
 /// D201, D202
-pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };

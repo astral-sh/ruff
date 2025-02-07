@@ -62,7 +62,7 @@ impl AlwaysFixableViolation for IncorrectDictIterator {
 }
 
 /// PERF102
-pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor) {
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;
     };

@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionSet {
 }
 
 /// C403 (`set([...])`)
-pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "set",
         &call.func,

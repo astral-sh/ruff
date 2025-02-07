@@ -45,7 +45,7 @@ impl Violation for AirflowVariableNameTaskIdMismatch {
 }
 
 /// AIR001
-pub(crate) fn variable_name_task_id(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }

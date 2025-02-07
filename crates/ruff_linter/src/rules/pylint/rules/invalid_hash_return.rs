@@ -49,7 +49,7 @@ impl Violation for InvalidHashReturnType {
 }
 
 /// E0309
-pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__hash__" {
         return;
     }

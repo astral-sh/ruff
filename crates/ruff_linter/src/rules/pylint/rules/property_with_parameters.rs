@@ -46,7 +46,7 @@ impl Violation for PropertyWithParameters {
 
 /// PLR0206
 pub(crate) fn property_with_parameters(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     decorator_list: &[Decorator],
     parameters: &Parameters,

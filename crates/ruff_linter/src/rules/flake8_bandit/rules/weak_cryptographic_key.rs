@@ -49,7 +49,7 @@ impl Violation for WeakCryptographicKey {
 }
 
 /// S505
-pub(crate) fn weak_cryptographic_key(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCall) {
     let Some((cryptographic_key, range)) = extract_cryptographic_key(checker, call) else {
         return;
     };
@@ -98,7 +98,7 @@ impl Display for CryptographicKey {
 }
 
 fn extract_cryptographic_key(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ExprCall,
 ) -> Option<(CryptographicKey, TextRange)> {
     let qualified_name = checker.semantic().resolve_qualified_name(&call.func)?;

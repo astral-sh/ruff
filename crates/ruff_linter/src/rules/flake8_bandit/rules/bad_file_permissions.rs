@@ -61,7 +61,7 @@ enum Reason {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }

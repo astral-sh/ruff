@@ -44,7 +44,7 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }

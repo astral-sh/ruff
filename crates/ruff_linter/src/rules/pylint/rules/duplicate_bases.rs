@@ -57,7 +57,7 @@ impl Violation for DuplicateBases {
 }
 
 /// PLE0241
-pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Option<&Arguments>) {
+pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&Arguments>) {
     let Some(arguments) = arguments else {
         return;
     };

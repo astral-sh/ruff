@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,

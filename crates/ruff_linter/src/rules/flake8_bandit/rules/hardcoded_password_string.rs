@@ -72,7 +72,7 @@ fn password_target(target: &Expr) -> Option<&str> {
 
 /// S105
 pub(crate) fn compare_to_hardcoded_password_string(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     comparators: &[Expr],
 ) {
@@ -89,11 +89,7 @@ pub(crate) fn compare_to_hardcoded_password_string(
 }
 
 /// S105
-pub(crate) fn assign_hardcoded_password_string(
-    checker: &mut Checker,
-    value: &Expr,
-    targets: &[Expr],
-) {
+pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, targets: &[Expr]) {
     if string_literal(value)
         .filter(|string| !string.is_empty())
         .is_some()

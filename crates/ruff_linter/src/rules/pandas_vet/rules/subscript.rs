@@ -143,7 +143,7 @@ impl Violation for PandasUseOfDotIat {
     }
 }
 
-pub(crate) fn subscript(checker: &mut Checker, value: &Expr, expr: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }

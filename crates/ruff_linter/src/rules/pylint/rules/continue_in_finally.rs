@@ -46,7 +46,7 @@ impl Violation for ContinueInFinally {
     }
 }
 
-fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
+fn traverse_body(checker: &Checker, body: &[Stmt]) {
     for stmt in body {
         if stmt.is_continue_stmt() {
             checker.report_diagnostic(Diagnostic::new(ContinueInFinally, stmt.range()));
@@ -84,6 +84,6 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// PLE0116
-pub(crate) fn continue_in_finally(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn continue_in_finally(checker: &Checker, body: &[Stmt]) {
     traverse_body(checker, body);
 }

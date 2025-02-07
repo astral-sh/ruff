@@ -223,7 +223,7 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], comparators: &[Expr]) {
+pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators: &[Expr]) {
     match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(value, "version_info", checker.semantic()) =>

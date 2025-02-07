@@ -58,7 +58,7 @@ impl std::fmt::Display for ByteStringOrigin {
 }
 
 /// PYI057
-pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
+pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
     let semantic = checker.semantic();
     if !semantic
         .seen
@@ -81,7 +81,7 @@ pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
 }
 
 /// PYI057
-pub(crate) fn bytestring_import(checker: &mut Checker, import_from: &ast::StmtImportFrom) {
+pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImportFrom) {
     let ast::StmtImportFrom { names, module, .. } = import_from;
 
     let module_id = match module {

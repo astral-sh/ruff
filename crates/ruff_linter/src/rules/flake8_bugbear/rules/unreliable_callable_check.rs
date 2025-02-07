@@ -51,7 +51,7 @@ impl Violation for UnreliableCallableCheck {
 
 /// B004
 pub(crate) fn unreliable_callable_check(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

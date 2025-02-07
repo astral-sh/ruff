@@ -268,7 +268,7 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 
 /// PT009
 pub(crate) fn unittest_assertion(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -367,7 +367,7 @@ impl Violation for PytestUnittestRaisesAssertion {
 }
 
 /// PT027
-pub(crate) fn unittest_raises_assertion_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ast::ExprCall) {
     // Bindings in `with` statements are handled by `unittest_raises_assertion_bindings`.
     if let Stmt::With(ast::StmtWith { items, .. }) = checker.semantic().current_statement() {
         let call_ref = AnyNodeRef::from(call);
@@ -587,7 +587,7 @@ fn to_pytest_raises_args<'a>(
 }
 
 /// PT015
-pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
         checker.report_diagnostic(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
@@ -595,7 +595,7 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
     checker.report_diagnostics(handlers.iter().flat_map(|handler| match handler {
         ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
             if let Some(name) = name {
@@ -824,12 +824,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 }
 
 /// PT018
-pub(crate) fn composite_condition(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    msg: Option<&Expr>,
-) {
+pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());

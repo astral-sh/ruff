@@ -65,7 +65,7 @@ impl Violation for RedundantLogBase {
 }
 
 /// FURB163
-pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     }

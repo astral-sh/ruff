@@ -58,7 +58,7 @@ impl Violation for ReimplementedContainerBuiltin {
 }
 
 /// PIE807
-pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &ExprLambda) {
+pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLambda) {
     let ExprLambda {
         parameters,
         body,

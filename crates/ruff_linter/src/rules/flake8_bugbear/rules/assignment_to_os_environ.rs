@@ -50,7 +50,7 @@ impl Violation for AssignmentToOsEnviron {
 }
 
 /// B003
-pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
+pub(crate) fn assignment_to_os_environ(checker: &Checker, targets: &[Expr]) {
     let [target] = targets else {
         return;
     };

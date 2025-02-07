@@ -53,7 +53,7 @@ impl Violation for JumpStatementInFinally {
     }
 }
 
-fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
+fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.report_diagnostic(Diagnostic::new(
@@ -89,7 +89,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 }
 
 /// B012
-pub(crate) fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
+pub(crate) fn jump_statement_in_finally(checker: &Checker, finalbody: &[Stmt]) {
     walk_stmt(checker, finalbody, |stmt| {
         matches!(stmt, Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return(_))
     });

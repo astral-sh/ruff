@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for QuadraticListSummation {
 }
 
 /// RUF017
-pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments,

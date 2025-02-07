@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for StrOrReprDefinedInStub {
 }
 
 /// PYI029
-pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     let Stmt::FunctionDef(ast::StmtFunctionDef {
         name,
         decorator_list,

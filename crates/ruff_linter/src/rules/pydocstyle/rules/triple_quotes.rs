@@ -63,7 +63,7 @@ impl Violation for TripleSingleQuotes {
 }
 
 /// D300
-pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     let leading_quote = docstring.leading_quote();
 
     let prefixes = leading_quote.trim_end_matches(['\'', '"']).to_owned();

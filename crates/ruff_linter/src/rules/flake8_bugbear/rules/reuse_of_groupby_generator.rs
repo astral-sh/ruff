@@ -307,7 +307,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
 
 /// B031
 pub(crate) fn reuse_of_groupby_generator(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     body: &[Stmt],
     iter: &Expr,

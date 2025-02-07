@@ -73,7 +73,7 @@ impl Violation for DefaultFactoryKwarg {
 }
 
 /// RUF026
-pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
     // If the call isn't a `defaultdict` constructor, return.
     if !checker
         .semantic()

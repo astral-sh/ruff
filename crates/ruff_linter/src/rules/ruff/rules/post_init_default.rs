@@ -83,7 +83,7 @@ impl Violation for PostInitDefault {
 }
 
 /// RUF033
-pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if &function_def.name != "__post_init__" {
         return;
     }

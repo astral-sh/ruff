@@ -130,7 +130,7 @@ impl Violation for NonPEP604AnnotationOptional {
 
 /// UP007, UP045
 pub(crate) fn non_pep604_annotation(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     slice: &Expr,
     operator: Pep604Operator,

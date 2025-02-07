@@ -56,7 +56,7 @@ impl Violation for LongSleepNotForever {
 }
 
 /// ASYNC116
-pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
     if !(checker.semantic().seen_module(Modules::TRIO)
         || checker.semantic().seen_module(Modules::ANYIO))
     {

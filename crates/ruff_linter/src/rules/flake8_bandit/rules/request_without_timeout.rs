@@ -51,7 +51,7 @@ impl Violation for RequestWithoutTimeout {
 }
 
 /// S113
-pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn request_without_timeout(checker: &Checker, call: &ast::ExprCall) {
     if let Some(module) = checker
         .semantic()
         .resolve_qualified_name(&call.func)

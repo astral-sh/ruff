@@ -60,7 +60,7 @@ impl Violation for NonSlotAssignment {
 }
 
 /// PLE0237
-pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
     // If the class inherits from another class (aside from `object`), then it's possible that

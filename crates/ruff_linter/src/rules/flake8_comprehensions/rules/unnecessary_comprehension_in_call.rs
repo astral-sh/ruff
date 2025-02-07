@@ -88,7 +88,7 @@ impl Violation for UnnecessaryComprehensionInCall {
 
 /// C419
 pub(crate) fn unnecessary_comprehension_in_call(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

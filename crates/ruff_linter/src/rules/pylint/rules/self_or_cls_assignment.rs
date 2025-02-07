@@ -64,7 +64,7 @@ impl Violation for SelfOrClsAssignment {
 }
 
 /// PLW0127
-pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
+pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -108,7 +108,7 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
     check_expr(checker, target, method_type);
 }
 
-fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
+fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
     match target {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {

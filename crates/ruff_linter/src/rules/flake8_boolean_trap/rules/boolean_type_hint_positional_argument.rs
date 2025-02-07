@@ -110,7 +110,7 @@ impl Violation for BooleanTypeHintPositionalArgument {
 
 /// FBT001
 pub(crate) fn boolean_type_hint_positional_argument(
-    checker: &mut Checker,
+    checker: &Checker,
     name: &str,
     decorator_list: &[Decorator],
     parameters: &Parameters,

@@ -50,7 +50,7 @@ impl Violation for UselessContextlibSuppress {
 
 /// B022
 pub(crate) fn useless_contextlib_suppress(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

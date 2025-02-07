@@ -45,7 +45,7 @@ impl Violation for AmbiguousVariableName {
 }
 
 /// E741
-pub(crate) fn ambiguous_variable_name(checker: &mut Checker, name: &str, range: TextRange) {
+pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: TextRange) {
     if checker.source_type.is_stub() {
         return;
     }

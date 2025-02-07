@@ -58,7 +58,7 @@ impl Violation for BuiltinVariableShadowing {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
+pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: TextRange) {
     if shadows_builtin(
         name,
         checker.source_type,

@@ -88,7 +88,7 @@ impl Violation for FastApiNonAnnotatedDependency {
 
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI)
@@ -219,7 +219,7 @@ impl<'a> DependencyCall<'a> {
 /// necessary to determine this while generating the fix, thus the need to return an updated
 /// `seen_default` here.
 fn create_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     parameter: &DependencyParameter,
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,

@@ -96,7 +96,7 @@ impl Violation for NonPEP695GenericFunction {
 }
 
 /// UP047
-pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &StmtFunctionDef) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.settings.target_version < PythonVersion::Py312 {
         return;

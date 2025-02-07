@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for InvalidEscapeSequence {
 }
 
 /// W605
-pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike) {
     let locator = checker.locator();
 
     for part in string_like.parts() {

@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for IsLiteral {
 
 /// F632
 pub(crate) fn invalid_literal_comparison(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],

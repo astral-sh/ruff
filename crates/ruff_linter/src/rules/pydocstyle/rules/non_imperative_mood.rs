@@ -64,11 +64,7 @@ impl Violation for NonImperativeMood {
 }
 
 /// D401
-pub(crate) fn non_imperative_mood(
-    checker: &mut Checker,
-    docstring: &Docstring,
-    settings: &Settings,
-) {
+pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, settings: &Settings) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };

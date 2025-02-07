@@ -110,7 +110,7 @@ impl Violation for EqWithoutHash {
 }
 
 /// W1641
-pub(crate) fn object_without_hash_method(checker: &mut Checker, class: &StmtClassDef) {
+pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef) {
     if checker.source_type.is_stub() {
         return;
     }

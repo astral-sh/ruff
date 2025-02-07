@@ -78,7 +78,7 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> O
 }
 
 /// FURB122
-pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &StmtFor) {
     // Loops with bindings are handled later.
     if !binding_names(&for_stmt.target).is_empty() {
         return;

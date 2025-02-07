@@ -71,7 +71,7 @@ impl Violation for UselessExpression {
 }
 
 /// B018
-pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
+pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
     if value.is_compare_expr() {
         return;

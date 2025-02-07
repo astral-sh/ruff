@@ -48,7 +48,7 @@ impl Violation for SurroundingWhitespace {
 }
 
 /// D210
-pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines = NewlineWithTrailingNewline::from(body.as_str());

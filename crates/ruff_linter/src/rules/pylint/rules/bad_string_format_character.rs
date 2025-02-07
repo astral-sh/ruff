@@ -41,7 +41,7 @@ impl Violation for BadStringFormatCharacter {
 
 /// PLE1300
 /// Ex) `"{:z}".format("1")`
-pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
+pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
     if let Ok(format_string) = FormatString::from_str(string) {
         for part in &format_string.format_parts {
             let FormatPart::Field { format_spec, .. } = part else {
@@ -89,7 +89,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 
 /// PLE1300
 /// Ex) `"%z" % "1"`
-pub(crate) fn percent(checker: &mut Checker, expr: &Expr, format_string: &ExprStringLiteral) {
+pub(crate) fn percent(checker: &Checker, expr: &Expr, format_string: &ExprStringLiteral) {
     for StringLiteral {
         value: _,
         range,

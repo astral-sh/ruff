@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for RepeatedGlobal {
 }
 
 /// FURB154
-pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
+pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
     while let Some(idx) = suite
         .iter()
         .position(|stmt| GlobalKind::from_stmt(stmt).is_some())

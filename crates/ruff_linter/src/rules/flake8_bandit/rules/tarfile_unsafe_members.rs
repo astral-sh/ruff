@@ -48,7 +48,7 @@ impl Violation for TarfileUnsafeMembers {
 }
 
 /// S202
-pub(crate) fn tarfile_unsafe_members(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::TARFILE) {
         return;
     }

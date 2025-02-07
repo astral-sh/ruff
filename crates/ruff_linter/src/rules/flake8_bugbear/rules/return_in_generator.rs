@@ -91,7 +91,7 @@ impl Violation for ReturnInGenerator {
 }
 
 /// B901
-pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunctionDef) {
     if function_def.name.id == "__await__" {
         return;
     }

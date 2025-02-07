@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for NeedlessElse {
 }
 
 /// RUF047
-pub(crate) fn needless_else(checker: &mut Checker, stmt: AnyNodeWithOrElse) {
+pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
     let source = checker.source();
     let tokens = checker.tokens();
 

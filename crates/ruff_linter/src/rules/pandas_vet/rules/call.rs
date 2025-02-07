@@ -163,7 +163,7 @@ impl Violation for PandasUseOfDotStack {
     }
 }
 
-pub(crate) fn call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn call(checker: &Checker, func: &Expr) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }

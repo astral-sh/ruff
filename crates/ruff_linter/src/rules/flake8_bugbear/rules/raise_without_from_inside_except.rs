@@ -68,7 +68,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 
 /// B904
 pub(crate) fn raise_without_from_inside_except(
-    checker: &mut Checker,
+    checker: &Checker,
     name: Option<&str>,
     body: &[Stmt],
 ) {

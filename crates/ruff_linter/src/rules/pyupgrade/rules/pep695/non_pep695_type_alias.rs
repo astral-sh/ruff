@@ -110,7 +110,7 @@ impl Violation for NonPEP695TypeAlias {
 }
 
 /// UP040
-pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssign) {
+pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
     if checker.settings.target_version < PythonVersion::Py312 {
         return;
     }
@@ -194,7 +194,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
 }
 
 /// UP040
-pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign) {
+pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
     if checker.settings.target_version < PythonVersion::Py312 {
         return;
     }

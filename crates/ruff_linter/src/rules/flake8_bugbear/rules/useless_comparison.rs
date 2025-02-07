@@ -57,7 +57,7 @@ impl Violation for UselessComparison {
 }
 
 /// B015
-pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
     if expr.is_compare_expr() {
         let semantic = checker.semantic();
 

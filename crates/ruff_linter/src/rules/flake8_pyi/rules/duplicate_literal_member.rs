@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for DuplicateLiteralMember {
 }
 
 /// PYI062
-pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr) {
+pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
     let mut diagnostics: Vec<Diagnostic> = Vec::new();

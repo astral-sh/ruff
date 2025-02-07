@@ -59,7 +59,7 @@ impl Violation for SplitStaticString {
 
 /// SIM905
 pub(crate) fn split_static_string(
-    checker: &mut Checker,
+    checker: &Checker,
     attr: &str,
     call: &ExprCall,
     str_value: &StringLiteralValue,

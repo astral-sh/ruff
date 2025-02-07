@@ -58,7 +58,7 @@ impl Violation for SingleStringSlots {
 }
 
 /// PLC0205
-pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
+pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
     for stmt in &class.body {
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {

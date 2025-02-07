@@ -96,7 +96,7 @@ impl Violation for ManualListComprehension {
 }
 
 /// PERF401
-pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
     let Expr::Name(ast::ExprName {
         id: for_stmt_target_id,
         ..

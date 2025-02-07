@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
+pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFor) {
     let Some((dict_name, index_name, value_name)) = dict_items(&stmt_for.iter, &stmt_for.target)
     else {
         return;
@@ -69,7 +69,7 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
     let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })

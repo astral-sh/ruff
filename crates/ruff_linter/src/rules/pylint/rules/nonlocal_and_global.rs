@@ -54,7 +54,7 @@ impl Violation for NonlocalAndGlobal {
 }
 
 /// E115
-pub(crate) fn nonlocal_and_global(checker: &mut Checker, nonlocal: &ast::StmtNonlocal) {
+pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
     // Determine whether any of the newly declared `nonlocal` variables are already declared as
     // `global`.
     for name in &nonlocal.names {

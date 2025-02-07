@@ -696,7 +696,7 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtImportFrom) {
+pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImportFrom) {
     // Avoid relative and star imports.
     if import_from_stmt.level > 0 {
         return;

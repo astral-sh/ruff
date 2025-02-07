@@ -331,7 +331,7 @@ fn get_parametrize_name_range(
 }
 
 /// PT006
-fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
+fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
@@ -512,7 +512,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
 }
 
 /// PT007
-fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
+fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
     let values_type = checker.settings.flake8_pytest_style.parametrize_values_type;
 
     let values_row_type = checker
@@ -648,7 +648,7 @@ fn trailing_comma(element: &Expr, source: &str, max_index: TextSize) -> TextSize
 }
 
 /// PT014
-fn check_duplicates(checker: &mut Checker, values: &Expr) {
+fn check_duplicates(checker: &Checker, values: &Expr) {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
         values
     else {
@@ -684,7 +684,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     }
 }
 
-fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
+fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
             single_argument: true,
@@ -764,7 +764,7 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
 }
 
 fn handle_value_rows(
-    checker: &mut Checker,
+    checker: &Checker,
     elts: &[Expr],
     values_type: types::ParametrizeValuesType,
     values_row_type: types::ParametrizeValuesRowType,
@@ -863,7 +863,7 @@ fn handle_value_rows(
     }
 }
 
-pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn parametrize(checker: &Checker, call: &ExprCall) {
     if !is_pytest_parametrize(call, checker.semantic()) {
         return;
     }

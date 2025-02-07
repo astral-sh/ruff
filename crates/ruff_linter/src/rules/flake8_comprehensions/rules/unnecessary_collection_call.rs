@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 
 /// C408
 pub(crate) fn unnecessary_collection_call(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     settings: &Settings,
 ) {

@@ -63,7 +63,7 @@ impl Violation for RaiseVanillaClass {
 }
 
 /// TRY002
-pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_vanilla_class(checker: &Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(map_callable(expr))

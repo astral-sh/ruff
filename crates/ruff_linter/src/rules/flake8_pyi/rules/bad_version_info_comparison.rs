@@ -109,11 +109,7 @@ impl Violation for BadVersionInfoOrder {
 }
 
 /// PYI006, PYI066
-pub(crate) fn bad_version_info_comparison(
-    checker: &mut Checker,
-    test: &Expr,
-    has_else_clause: bool,
-) {
+pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_else_clause: bool) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,

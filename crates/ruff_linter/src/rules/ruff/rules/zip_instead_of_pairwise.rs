@@ -102,7 +102,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments: Arguments { args, .. },

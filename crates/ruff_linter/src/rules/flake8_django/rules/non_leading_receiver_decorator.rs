@@ -51,7 +51,7 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 }
 
 /// DJ013
-pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: &[Decorator]) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }

@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     }

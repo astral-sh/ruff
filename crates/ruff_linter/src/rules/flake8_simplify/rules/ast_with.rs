@@ -89,7 +89,7 @@ fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
 ///     with resource1(), resource2():
 ///         ...
 /// ```
-fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
+fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
     let [with_item] = with_items else {
         return false;
     };
@@ -114,7 +114,7 @@ fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
 
 /// SIM117
 pub(crate) fn multiple_with_statements(
-    checker: &mut Checker,
+    checker: &Checker,
     with_stmt: &ast::StmtWith,
     with_parent: Option<&Stmt>,
 ) {

@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for DuplicateClassFieldDefinition {
 }
 
 /// PIE794
-pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt]) {
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.

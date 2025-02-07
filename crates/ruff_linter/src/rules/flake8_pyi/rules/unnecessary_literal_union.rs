@@ -52,7 +52,7 @@ impl Violation for UnnecessaryLiteralUnion {
 }
 
 /// PYI030
-pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Expr) {
+pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
     let mut literal_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 

@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for FirstWordUncapitalized {
 }
 
 /// D403
-pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
     if docstring.definition.as_function_def().is_none() {
         return;
     }

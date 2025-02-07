@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralDict {
 
 /// C406 (`dict([(1, 2)])`)
 pub(crate) fn unnecessary_literal_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],

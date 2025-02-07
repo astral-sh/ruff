@@ -145,7 +145,7 @@ impl AlwaysFixableViolation for NativeLiterals {
 
 /// UP018
 pub(crate) fn native_literals(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     parent_expr: Option<&ast::Expr>,
 ) {

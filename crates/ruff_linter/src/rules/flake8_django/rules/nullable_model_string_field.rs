@@ -54,7 +54,7 @@ impl Violation for DjangoNullableModelStringField {
 }
 
 /// DJ001
-pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }

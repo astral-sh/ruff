@@ -51,7 +51,7 @@ impl Violation for UnaryPrefixIncrementDecrement {
 
 /// B002
 pub(crate) fn unary_prefix_increment_decrement(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,

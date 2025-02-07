@@ -70,7 +70,7 @@ impl Violation for RedundantNoneLiteral {
 }
 
 /// PYI061
-pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'a Expr) {
+pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     let semantic = checker.semantic();
 
     if !semantic.seen_typing() {

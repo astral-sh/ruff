@@ -49,7 +49,7 @@ impl Violation for InvalidMockAccess {
 }
 
 /// PGH005
-pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr {
         if matches!(
             attr.as_str(),
@@ -72,7 +72,7 @@ pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PGH005
-pub(crate) fn non_existent_mock_method(checker: &mut Checker, test: &Expr) {
+pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
     let attr = match test {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
         Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {

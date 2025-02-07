@@ -37,7 +37,7 @@ impl Violation for SelfAssigningVariable {
 }
 
 /// PLW0127
-pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
+pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
     if checker.semantic().current_scope().kind.is_class() {
@@ -57,7 +57,7 @@ pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
 }
 
 /// PLW0127
-pub(crate) fn self_annotated_assignment(checker: &mut Checker, assign: &ast::StmtAnnAssign) {
+pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnnAssign) {
     let Some(value) = assign.value.as_ref() else {
         return;
     };

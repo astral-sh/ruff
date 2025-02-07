@@ -58,7 +58,7 @@ impl Violation for UselessWithLock {
 }
 
 /// PLW2101
-pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
+pub(crate) fn useless_with_lock(checker: &Checker, with: &ast::StmtWith) {
     for item in &with.items {
         let Some(call) = item.context_expr.as_call_expr() else {
             continue;

@@ -168,7 +168,7 @@ impl Violation for SysVersionSlice1 {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
     if is_sys(value, "version", checker.semantic()) {
         match slice {
             Expr::Slice(ast::ExprSlice {

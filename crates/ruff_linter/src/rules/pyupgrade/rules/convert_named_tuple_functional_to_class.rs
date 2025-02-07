@@ -72,7 +72,7 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
 
 /// UP014
 pub(crate) fn convert_named_tuple_functional_to_class(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,

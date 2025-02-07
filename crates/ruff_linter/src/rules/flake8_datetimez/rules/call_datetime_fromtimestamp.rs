@@ -69,7 +69,7 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
-pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }

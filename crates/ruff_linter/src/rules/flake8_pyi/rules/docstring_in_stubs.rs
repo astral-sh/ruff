@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for DocstringInStub {
 
 /// PYI021
 pub(crate) fn docstring_in_stubs(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     docstring: Option<&ExprStringLiteral>,
 ) {

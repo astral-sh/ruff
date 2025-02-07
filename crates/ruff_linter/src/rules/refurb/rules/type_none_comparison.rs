@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for TypeNoneComparison {
 }
 
 /// FURB169
-pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let ([op], [right]) = (&*compare.ops, &*compare.comparators) else {
         return;
     };

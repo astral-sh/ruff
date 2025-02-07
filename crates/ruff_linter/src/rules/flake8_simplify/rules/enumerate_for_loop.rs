@@ -48,7 +48,7 @@ impl Violation for EnumerateForLoop {
 }
 
 /// SIM113
-pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
     // If the loop is async, abort.
     if for_stmt.is_async {
         return;

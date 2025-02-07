@@ -29,7 +29,7 @@ impl Violation for PotentialIndexError {
 }
 
 /// PLE0643
-pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Expr) {
     // Determine the length of the sequence.
     let length = match value {
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {

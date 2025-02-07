@@ -96,7 +96,7 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {

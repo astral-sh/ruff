@@ -81,12 +81,7 @@ impl AlwaysFixableViolation for NonPEP604Isinstance {
 }
 
 /// UP038
-pub(crate) fn use_pep604_isinstance(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let Some(types) = args.get(1) else {
         return;
     };

@@ -74,7 +74,7 @@ impl Violation for CachedInstanceMethod {
 }
 
 /// B019
-pub(crate) fn cached_instance_method(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     let scope = checker.semantic().current_scope();
 
     // Parent scope _must_ be a class.

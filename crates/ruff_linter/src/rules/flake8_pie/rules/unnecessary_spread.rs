@@ -44,7 +44,7 @@ impl Violation for UnnecessarySpread {
 }
 
 /// PIE800
-pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
+pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
     // The first "end" is the start of the dictionary, immediately following the open bracket.
     let mut prev_end = dict.start() + TextSize::from(1);
     for ast::DictItem { key, value } in dict {

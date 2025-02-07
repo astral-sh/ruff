@@ -77,7 +77,7 @@ impl Violation for OverloadWithDocstring {
 }
 
 /// D418
-pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };

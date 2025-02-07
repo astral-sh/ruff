@@ -80,7 +80,7 @@ enum Replacement {
 }
 
 /// AIR302
-pub(crate) fn airflow_3_removal_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -117,10 +117,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &mut Checker, expr: &Expr) {
 }
 
 /// AIR302
-pub(crate) fn airflow_3_removal_function_def(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &StmtFunctionDef) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -156,7 +153,7 @@ const REMOVED_CONTEXT_KEYS: [&str; 12] = [
 ///     #            'execution_date' is removed in Airflow 3.0
 ///     pass
 /// ```
-fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionDef) {
+fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) {
     if !is_airflow_task(function_def, checker.semantic())
         && !is_execute_method_inherits_from_airflow_operator(function_def, checker.semantic())
     {
@@ -186,11 +183,7 @@ fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionD
 ///
 /// DAG(schedule_interval="@daily")
 /// ```
-fn check_call_arguments(
-    checker: &mut Checker,
-    qualified_name: &QualifiedName,
-    arguments: &Arguments,
-) {
+fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             checker.report_diagnostics(diagnostic_for_argument(
@@ -286,7 +279,7 @@ fn check_call_arguments(
 /// info = DatasetLineageInfo()
 /// info.dataset
 /// ```
-fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) {
+fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     let ExprAttribute { value, attr, .. } = attribute_expr;
 
     let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
@@ -348,7 +341,7 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
 /// def my_task(**context):
 ///     context.get("conf")  # 'conf' is removed in Airflow 3.0
 /// ```
-fn check_context_key_usage_in_call(checker: &mut Checker, call_expr: &ExprCall) {
+fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
     if !in_airflow_task_function(checker.semantic()) {
         return;
     }
@@ -397,7 +390,7 @@ fn check_context_key_usage_in_call(checker: &mut Checker, call_expr: &ExprCall) 
 
 /// Check if a subscript expression accesses a removed Airflow context variable.
 /// If a removed key is found, push a corresponding diagnostic.
-fn check_context_key_usage_in_subscript(checker: &mut Checker, subscript: &ExprSubscript) {
+fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubscript) {
     if !in_airflow_task_function(checker.semantic()) {
         return;
     }
@@ -461,7 +454,7 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
 /// manager = DatasetManager()
 /// manager.register_datsaet_change()
 /// ```
-fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
+fn check_method(checker: &Checker, call_expr: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {
         return;
     };
@@ -550,7 +543,7 @@ fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
 /// # Or, directly
 /// SubDagOperator()
 /// ```
-fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
+fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
         return;
     };
@@ -895,7 +888,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
 ///     executors = "some.third.party.executor"
 /// ```
 fn check_airflow_plugin_extension(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     name: &str,
     class_def: &StmtClassDef,

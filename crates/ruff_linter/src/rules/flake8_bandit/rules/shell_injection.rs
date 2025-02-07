@@ -288,7 +288,7 @@ impl Violation for UnixCommandWildcardInjection {
 }
 
 /// S602, S603, S604, S605, S606, S607, S609
-pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
     let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
 

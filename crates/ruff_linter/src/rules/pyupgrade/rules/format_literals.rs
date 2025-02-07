@@ -59,11 +59,7 @@ impl Violation for FormatLiterals {
 }
 
 /// UP030
-pub(crate) fn format_literals(
-    checker: &mut Checker,
-    call: &ast::ExprCall,
-    summary: &FormatSummary,
-) {
+pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     // The format we expect is, e.g.: `"{0} {1}".format(...)`
     if summary.has_nested_parts {
         return;
