@@ -142,11 +142,7 @@ pub(crate) struct SectionContexts<'a> {
 
 impl<'a> SectionContexts<'a> {
     /// Extract all `SectionContext` values from a docstring.
-    pub(crate) fn from_docstring(
-        definition: &'a Definition<'a>,
-        docstring: &'a Docstring<'a>,
-        style: SectionStyle,
-    ) -> Self {
+    pub(crate) fn from_docstring(docstring: &'a Docstring<'a>, style: SectionStyle) -> Self {
         let contents = docstring.body();
 
         let mut contexts = Vec::new();
@@ -173,7 +169,7 @@ impl<'a> SectionContexts<'a> {
                     last.as_ref(),
                     previous_line.as_ref(),
                     lines.peek(),
-                    definition,
+                    docstring.definition,
                 ) {
                     if let Some(mut last) = last.take() {
                         last.range = TextRange::new(last.start(), line.start());
