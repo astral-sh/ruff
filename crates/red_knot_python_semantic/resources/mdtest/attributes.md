@@ -291,6 +291,18 @@ reveal_type(c_instance.c2)  # revealed: Unknown | int
 reveal_type(c_instance.d2)  # revealed: Unknown | str
 ```
 
+#### Starred assignments
+
+```py
+class C:
+    def __init__(self) -> None:
+        self.a, *self.b = (1, 2, 3)
+
+c_instance = C()
+reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.b)  # revealed: Unknown | @Todo(starred unpacking)
+```
+
 #### Attributes defined in for-loop (unpacking)
 
 ```py
