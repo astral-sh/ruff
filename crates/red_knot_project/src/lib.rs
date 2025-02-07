@@ -7,7 +7,7 @@ pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::syntax::SyntaxDiagnostic;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{register_lints, PythonVersion};
+use red_knot_python_semantic::{register_lints, Program};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
@@ -320,15 +320,7 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         return diagnostics;
     }
 
-    let target_version: PythonVersion = db
-        .project()
-        .metadata(db)
-        .options
-        .environment
-        .as_ref()
-        .and_then(|env| env.python_version.as_ref())
-        .map(|ranged_value| ranged_value.clone().into_inner())
-        .unwrap_or_default();
+    let target_version = Program::get(db).python_version(db);
 
     let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
