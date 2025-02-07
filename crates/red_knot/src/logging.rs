@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 use colored::Colorize;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::SystemPathBuf;
 use ruff_metrics::JsonRecorder;
 use std::fmt;
 use std::fs::{File, OpenOptions};
@@ -255,18 +255,11 @@ where
     }
 }
 
-#[allow(clippy::option_option)]
-pub(crate) fn setup_metrics(dest: Option<&Option<SystemPathBuf>>) {
+pub(crate) fn setup_metrics(dest: Option<&SystemPathBuf>) {
     // If --metrics is not provided at all, don't collect any metrics.
     let Some(dest) = dest else {
         return;
     };
-
-    // If --metrics is provided with no value, use the default path.
-    let dest = dest
-        .as_ref()
-        .map(SystemPathBuf::as_path)
-        .unwrap_or(SystemPath::new("metrics.json"));
 
     let dest = OpenOptions::new()
         .append(true)
