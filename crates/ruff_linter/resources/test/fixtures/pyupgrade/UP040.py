@@ -113,3 +113,8 @@ PositiveList = TypeAliasType(
         Annotated[T, Gt(0)],  # preserved comment
     ], type_params=(T,)
 )
+
+T: TypeAlias = (
+    int
+    | str
+)
