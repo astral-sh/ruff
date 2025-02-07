@@ -1,10 +1,11 @@
-use pep440_rs::{Version, VersionSpecifiers};
-use serde::{Deserialize, Deserializer, Serialize};
-use std::ops::Deref;
-use thiserror::Error;
-
 use crate::metadata::options::Options;
 use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
+use pep440_rs::{release_specifiers_to_ranges, Version, VersionSpecifiers};
+use red_knot_python_semantic::PythonVersion;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::Bound;
+use std::ops::Deref;
+use thiserror::Error;
 
 /// A `pyproject.toml` as specified in PEP 517.
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -53,6 +54,67 @@ pub struct Project {
     pub version: Option<RangedValue<Version>>,
     /// The Python versions this project is compatible with.
     pub requires_python: Option<RangedValue<VersionSpecifiers>>,
+}
+
+impl Project {
+    pub(super) fn resolve_requires_python_lower_bound(
+        &self,
+    ) -> Result<Option<RangedValue<PythonVersion>>, TooLargeRequiresPythonError> {
+        let Some(requires_python) = self.requires_python.as_ref() else {
+            return Ok(None);
+        };
+
+        tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
+
+        let ranges = release_specifiers_to_ranges((&**requires_python).clone());
+        let Some((lower, _)) = ranges.bounding_range() else {
+            return Ok(None);
+        };
+
+        let version = match lower {
+            // Ex) `>=3.10.1` -> `>=3.10`
+            Bound::Included(version) => version,
+
+            // Ex) `>3.10.1` -> `>=3.10` or `>3.10` -> `>=3.10`
+            // The second example looks obscure at first but it is required because
+            // `3.10.1 > 3.10` is true but we only have two digits here. So including 3.10 is the
+            // right move. Overall, using `>` without a patch release is most likely bogus.
+            Bound::Excluded(version) => version,
+
+            // Ex) `<3.10`
+            Bound::Unbounded => return Ok(None),
+        };
+
+        // Take the major and minor version
+        let mut versions = version.release().iter().take(2);
+
+        let Some(major) = versions.next().copied() else {
+            return Ok(None);
+        };
+
+        let minor = versions.next().copied().unwrap_or_default();
+
+        tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
+
+        let major = u8::try_from(major).map_err(|_| TooLargeRequiresPythonError::Major(major))?;
+        let minor = u8::try_from(minor).map_err(|_| TooLargeRequiresPythonError::Major(minor))?;
+
+        let python_version = PythonVersion::from((major, minor));
+
+        Ok(Some(if let Some(range) = requires_python.range() {
+            RangedValue::with_range(python_version, requires_python.source().clone(), range)
+        } else {
+            RangedValue::new(python_version, requires_python.source().clone())
+        }))
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum TooLargeRequiresPythonError {
+    #[error("The major version `{0}` is larger than the maximum supported value 255")]
+    Major(u64),
+    #[error("The minor version `{0}` is larger than the maximum supported value 255")]
+    Minor(u64),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

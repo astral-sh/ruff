@@ -3,14 +3,11 @@ source: crates/red_knot_project/src/metadata.rs
 expression: root
 ---
 ProjectMetadata(
-  name: Name("super-app"),
+  name: Name("app"),
   root: "/app",
   options: Options(
     environment: Some(EnvironmentOptions(
       r#python-version: Some("3.12"),
-    )),
-    src: Some(SrcOptions(
-      root: Some("src"),
     )),
   ),
 )
