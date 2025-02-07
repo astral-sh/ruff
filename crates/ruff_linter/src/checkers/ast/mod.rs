@@ -31,7 +31,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -223,7 +223,7 @@ pub(crate) struct Checker<'a> {
     /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: RefCell<Vec<Diagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
-    pub(crate) flake8_bugbear_seen: Vec<TextRange>,
+    pub(crate) flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
@@ -272,7 +272,7 @@ impl<'a> Checker<'a> {
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
             diagnostics: RefCell::new(Vec::default()),
-            flake8_bugbear_seen: Vec::default(),
+            flake8_bugbear_seen: RefCell::new(FxHashSet::default()),
             cell_offsets,
             notebook_index,
             last_stmt_end: TextSize::default(),
@@ -375,6 +375,15 @@ impl<'a> Checker<'a> {
     {
         let mut checker_diagnostics = self.diagnostics.borrow_mut();
         checker_diagnostics.extend(diagnostics);
+    }
+
+    /// Adds a [`TextRange`] to the set of ranges of variable names
+    /// flagged in `flake8-bugbear` violations so far.
+    ///
+    /// Returns whether the value was newly inserted.
+    pub(crate) fn insert_flake8_bugbear_range(&self, range: TextRange) -> bool {
+        let mut ranges = self.flake8_bugbear_seen.borrow_mut();
+        ranges.insert(range)
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
