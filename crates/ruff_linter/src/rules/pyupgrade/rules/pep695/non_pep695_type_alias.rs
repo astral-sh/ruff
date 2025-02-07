@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use std::cmp;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -177,7 +176,6 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         &target_name.id,
         value,
         &vars,
-        Applicability::Safe,
         TypeAliasKind::TypeAliasType,
     ));
 }
@@ -237,13 +235,6 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         name,
         value,
         &vars,
-        // The fix is only safe in a type stub because new-style aliases have different runtime behavior
-        // See https://github.com/astral-sh/ruff/issues/6434
-        if checker.source_type.is_stub() {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        },
         TypeAliasKind::TypeAlias,
     ));
 }
@@ -255,7 +246,6 @@ fn create_diagnostic(
     name: &Name,
     value: &Expr,
     type_vars: &[TypeVar],
-    base_applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
     let source = checker.source();
@@ -272,19 +262,28 @@ fn create_diagnostic(
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
-    // it would be easier to check for comments in the whole `stmt.range`, but because
-    // `create_diagnostic` uses the full source text of `value`, comments within `value` are
-    // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
-    let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
-    let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
     let applicability =
-        if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
+        if type_alias_kind == TypeAliasKind::TypeAlias && !checker.source_type.is_stub() {
+            // The fix is always unsafe in non-stubs stub
+            // because new-style aliases have different runtime behavior at runtime.
+            // See https://github.com/astral-sh/ruff/issues/6434
             Applicability::Unsafe
         } else {
-            Applicability::Safe
-        };
+            // In stub files, or in non-stub files for `TypeAliasType` assignments,
+            // the fix is only unsafe if it would delete comments.
+            //
+            // it would be easier to check for comments in the whole `stmt.range`, but because
+            // `create_diagnostic` uses the full source text of `value`, comments within `value` are
+            // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
+            let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
+            let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
 
-    let fix = Fix::applicable_edit(edit, cmp::min(applicability, base_applicability));
+            if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            }
+        };
 
     Diagnostic::new(
         NonPEP695TypeAlias {
@@ -293,5 +292,5 @@ fn create_diagnostic(
         },
         stmt.range(),
     )
-    .with_fix(fix)
+    .with_fix(Fix::applicable_edit(edit, applicability))
 }
