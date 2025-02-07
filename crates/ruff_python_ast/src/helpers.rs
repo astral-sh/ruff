@@ -1437,33 +1437,22 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
 }
 
 /// Format the expressions as a `typing.Union`-style union.
+///
+/// Note: It is a syntax error to have `Union[]` so the caller
+/// should ensure that the `elts` argument is nonempty.
 pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
-    fn tuple(elts: &[Expr], binding: Name) -> Expr {
-        match elts {
-            [] => Expr::Tuple(ast::ExprTuple {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                parenthesized: true,
-            }),
-            [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
-            [elt] => elt.clone(),
-            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(tuple(rest, binding)),
-                op: Operator::BitOr,
-                right: Box::new(elt.clone()),
-                range: TextRange::default(),
-            }),
-        }
-    }
-
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding.clone(),
+            id: binding,
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
-        slice: Box::new(tuple(elts, binding)),
+        slice: Box::new(Expr::Tuple(ast::ExprTuple {
+            range: TextRange::default(),
+            elts: elts.to_vec(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     })
