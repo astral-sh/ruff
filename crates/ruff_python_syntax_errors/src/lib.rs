@@ -157,19 +157,13 @@ match var:
         print("it's one")
 "#,
             PythonVersion::PY39,
-        ), @r#"
+        ), @r"
         [
-            Diagnostic {
-                kind: DiagnosticKind {
-                    name: "MatchBeforePy310",
-                    body: "`match` can only be used on Python 3.10+",
-                    suggestion: None,
-                },
-                range: 0..0,
-                fix: None,
-                parent: None,
+            SyntaxError {
+                kind: MatchBeforePy310,
+                range: 1..49,
             },
         ]
-        "#);
+        ");
     }
 }
