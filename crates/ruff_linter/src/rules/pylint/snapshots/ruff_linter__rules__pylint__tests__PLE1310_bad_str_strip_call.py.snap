@@ -148,8 +148,36 @@ bad_str_strip_call.py:64:12: PLE1310 String `lstrip` call contains duplicate cha
 bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
    |
 66 | # PLE1310
-67 | b''.rstrip('http://')
-   |            ^^^^^^^^^ PLE1310
+67 | b''.rstrip(b'http://')
+   |            ^^^^^^^^^^ PLE1310
 68 |
 69 | # OK
+   |
+
+bad_str_strip_call.py:79:10: PLE1310 String `strip` call contains duplicate characters
+   |
+78 | # Errors: Multiple backslashes
+79 | ''.strip('\\b\\x09')
+   |          ^^^^^^^^^^ PLE1310
+80 | ''.strip(r'\b\x09')
+81 | ''.strip('\\\x5C')
+   |
+
+bad_str_strip_call.py:80:10: PLE1310 String `strip` call contains duplicate characters
+   |
+78 | # Errors: Multiple backslashes
+79 | ''.strip('\\b\\x09')
+80 | ''.strip(r'\b\x09')
+   |          ^^^^^^^^^ PLE1310
+81 | ''.strip('\\\x5C')
+   |
+
+bad_str_strip_call.py:81:10: PLE1310 String `strip` call contains duplicate characters
+   |
+79 | ''.strip('\\b\\x09')
+80 | ''.strip(r'\b\x09')
+81 | ''.strip('\\\x5C')
+   |          ^^^^^^^^ PLE1310
+82 |
+83 | # OK: Different types
    |

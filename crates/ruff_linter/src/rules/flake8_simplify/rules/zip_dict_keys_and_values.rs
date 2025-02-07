@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCall) {
+pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
@@ -113,7 +113,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {

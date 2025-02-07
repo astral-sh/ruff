@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 }
 
 /// RUF032: `Decimal()` called with float literal argument
-pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::ExprCall) {
     let Some(arg) = call.arguments.args.first() else {
         return;
     };
@@ -63,7 +63,7 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
             let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
                 fix_float_literal(arg.range(), float, checker.locator(), checker.stylist()),
             );
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

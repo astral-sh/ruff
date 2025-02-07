@@ -162,7 +162,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(Expr::NoneLiteral(_)) = parameter.default() else {
             continue;
@@ -188,7 +188,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
                 if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         } else {
             // Unquoted annotation.
@@ -204,7 +204,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

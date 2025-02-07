@@ -97,11 +97,7 @@ enum Action {
 }
 
 /// TC004
-pub(crate) fn runtime_import_in_type_checking_block(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &Scope) {
     // Collect all runtime imports by statement.
     let mut actions: FxHashMap<(NodeId, Action), Vec<ImportBinding>> = FxHashMap::default();
 
@@ -206,7 +202,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     if let Some(fix) = fix.as_ref() {
                         diagnostic.set_fix(fix.clone());
                     }
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -233,7 +229,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                         diagnostic.set_parent(range.start());
                     }
                     diagnostic.set_fix(fix.clone());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -257,7 +253,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

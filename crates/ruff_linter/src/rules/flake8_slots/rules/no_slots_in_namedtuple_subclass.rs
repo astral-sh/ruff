@@ -74,7 +74,7 @@ impl fmt::Display for NamedTupleKind {
 
 /// SLOT002
 pub(crate) fn no_slots_in_namedtuple_subclass(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     class: &StmtClassDef,
 ) {
@@ -88,7 +88,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
 
     if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
         if !has_slots(&class.body) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass(namedtuple_kind),
                 stmt.identifier(),
             ));

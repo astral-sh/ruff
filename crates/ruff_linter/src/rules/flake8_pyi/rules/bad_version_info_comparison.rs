@@ -109,11 +109,7 @@ impl Violation for BadVersionInfoOrder {
 }
 
 /// PYI006, PYI066
-pub(crate) fn bad_version_info_comparison(
-    checker: &mut Checker,
-    test: &Expr,
-    has_else_clause: bool,
-) {
+pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_else_clause: bool) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -147,16 +143,12 @@ pub(crate) fn bad_version_info_comparison(
             && (checker.source_type.is_stub() || checker.settings.preview.is_enabled())
         {
             if has_else_clause {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(BadVersionInfoOrder, test.range()));
+                checker.report_diagnostic(Diagnostic::new(BadVersionInfoOrder, test.range()));
             }
         }
     } else {
         if checker.enabled(Rule::BadVersionInfoComparison) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
+            checker.report_diagnostic(Diagnostic::new(BadVersionInfoComparison, test.range()));
         };
     }
 }

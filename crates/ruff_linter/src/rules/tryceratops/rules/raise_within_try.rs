@@ -75,7 +75,7 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
 }
 
 /// TRY301
-pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
+pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
     if handlers.is_empty() {
         return;
     }
@@ -115,9 +115,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(RaiseWithinTry, stmt.range()));
         }
     }
 }

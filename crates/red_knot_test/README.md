@@ -20,7 +20,7 @@ reveal_type(1)  # revealed: Literal[1]
 ````
 
 When running this test, the mdtest framework will write a file with these contents to the default
-file path (`/src/mdtest_snippet__1.py`) in its in-memory file system, run a type check on that file,
+file path (`/src/mdtest_snippet.py`) in its in-memory file system, run a type check on that file,
 and then match the resulting diagnostics with the assertions in the test. Assertions are in the form
 of Python comments. If all diagnostics and all assertions are matched, the test passes; otherwise,
 it fails.
@@ -34,7 +34,8 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 See actual example mdtest suites in
 [`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
 
-> ℹ️ Note: If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
+> [!NOTE]
+> If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
 > as with the example in `crates/red_knot_python_semantic/tests/mdtest.rs`,
 > you will likely want to also make sure that the crate the tests are in is rebuilt every time a
 > Markdown file is added or removed from the directory. See
@@ -126,15 +127,63 @@ Intervening empty lines or non-assertion comments are not allowed; an assertion 
 assertion per line, immediately following each other, with the line immediately following the last
 assertion as the line of source code on which the matched diagnostics are emitted.
 
+## Literate style
+
+If multiple code blocks (without an explicit path, see below) are present in a single test, they will
+be merged into a single file in the order they appear in the Markdown file. This allows for tests that
+interleave code and explanations:
+
+````markdown
+# My literate test
+
+This first snippet here:
+
+```py
+from typing import Literal
+
+def f(x: Literal[1]):
+    pass
+```
+
+will be merged with this second snippet here, i.e. `f` is defined here:
+
+```py
+f(2)  # error: [invalid-argument-type]
+```
+````
+
+## Diagnostic Snapshotting
+
+In addition to inline assertions, one can also snapshot the full diagnostic
+output of a test. This is done by adding a `<!-- snapshot-diagnostics -->` directive
+in the corresponding section. For example:
+
+````markdown
+## Unresolvable module import
+
+<!-- snapshot-diagnostics -->
+
+```py
+import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+```
+````
+
+The `snapshot-diagnostics` directive must appear before anything else in
+the section.
+
+This will use `insta` to manage an external file snapshot of all diagnostic
+output generated.
+
+Inline assertions, as described above, may be used in conjunction with diagnostic
+snapshotting.
+
+At present, there is no way to do inline snapshotting or to request more granular
+snapshotting of specific diagnostics.
+
 ## Multi-file tests
 
-Some tests require multiple files, with imports from one file into another. Multiple fenced code
-blocks represent multiple embedded files. If there are multiple unnamed files, mdtest will name them
-according to the numbered scheme `/src/mdtest_snippet__1.py`, `/src/mdtest_snippet__2.py`, etc. (If
-they are `pyi` files, they will be named with a `pyi` extension instead.)
-
-Tests should not rely on these default names. If a test must import from a file, then it should
-explicitly specify the file name:
+Some tests require multiple files, with imports from one file into another. For this purpose,
+tests can specify explicit file paths in a separate line before the code block (`b.py` below):
 
 ````markdown
 ```py
@@ -155,8 +204,8 @@ is, the equivalent of a runtime entry on `sys.path`).
 The default workspace root is `/src/`. Currently it is not possible to customize this in a test, but
 this is a feature we will want to add in the future.
 
-So the above test creates two files, `/src/mdtest_snippet__1.py` and `/src/b.py`, and sets the
-workspace root to `/src/`, allowing imports from `b.py` using the module name `b`.
+So the above test creates two files, `/src/mdtest_snippet.py` and `/src/b.py`, and sets the workspace
+root to `/src/`, allowing imports from `b.py` using the module name `b`.
 
 ## Multi-test suites
 
@@ -345,6 +394,11 @@ I/O error on read.
 
 ### Asserting on full diagnostic output
 
+> [!NOTE]
+> At present, one can opt into diagnostic snapshotting that is managed via external files. See
+> the section above for more details. The feature outlined below, *inline* diagnostic snapshotting,
+> is still desirable.
+
 The inline comment diagnostic assertions are useful for making quick, readable assertions about
 diagnostics in a particular location. But sometimes we will want to assert on the full diagnostic
 output of checking an embedded Python file. Or sometimes (see “incremental tests” below) we will
@@ -365,7 +419,7 @@ This is just an example, not a proposal that red-knot would ever actually output
 precisely this format:
 
 ```output
-mdtest_snippet__1.py, line 1, col 1: revealed type is 'Literal[1]'
+mdtest_snippet.py, line 1, col 1: revealed type is 'Literal[1]'
 ```
 ````
 
@@ -373,7 +427,7 @@ We will want to build tooling to automatically capture and update these “full 
 blocks, when tests are run in an update-output mode (probably specified by an environment variable.)
 
 By default, an `output` block will specify diagnostic output for the file
-`<workspace-root>/mdtest_snippet__1.py`. An `output` block can be prefixed by a
+`<workspace-root>/mdtest_snippet.py`. An `output` block can be prefixed by a
 <code>`&lt;path>`:</code> label as usual, to explicitly specify the Python file for which it asserts
 diagnostic output.
 
@@ -409,7 +463,7 @@ x = 1
 Initial expected output for the unnamed file:
 
 ```output
-/src/mdtest_snippet__1.py, line 1, col 1: revealed type is 'Literal[1]'
+/src/mdtest_snippet.py, line 1, col 1: revealed type is 'Literal[1]'
 ```
 
 Now in our first incremental stage, modify the contents of `b.py`:
@@ -424,12 +478,12 @@ x = 2
 And this is our updated expected output for the unnamed file at stage 1:
 
 ```output stage=1
-/src/mdtest_snippet__1.py, line 1, col 1: revealed type is 'Literal[2]'
+/src/mdtest_snippet.py, line 1, col 1: revealed type is 'Literal[2]'
 ```
 
 (One reason to use full-diagnostic-output blocks in this test is that updating inline-comment
-diagnostic assertions for `mdtest_snippet__1.py` would require specifying new contents for
-`mdtest_snippet__1.py` in stage 1, which we don't want to do in this test.)
+diagnostic assertions for `mdtest_snippet.py` would require specifying new contents for
+`mdtest_snippet.py` in stage 1, which we don't want to do in this test.)
 ````
 
 It will be possible to provide any number of stages in an incremental test. If a stage re-specifies

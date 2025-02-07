@@ -70,7 +70,7 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::StringLiteral) {
+pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLiteral) {
     let semantic = checker.semantic();
 
     // we want to avoid statement expressions that are just a string literal.
@@ -107,7 +107,7 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
     if should_be_fstring(literal, checker.locator(), semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

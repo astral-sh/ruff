@@ -63,13 +63,13 @@ enum Kind {
 }
 
 /// PLC2403
-pub(crate) fn non_ascii_module_import(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
     if let Some(asname) = &alias.asname {
         if asname.as_str().is_ascii() {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NonAsciiImportName {
                 name: asname.to_string(),
                 kind: Kind::Aliased,
@@ -81,7 +81,7 @@ pub(crate) fn non_ascii_module_import(checker: &mut Checker, alias: &Alias) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NonAsciiImportName {
                 name: alias.name.to_string(),
                 kind: Kind::Unaliased,

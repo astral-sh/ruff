@@ -64,10 +64,42 @@ u''.strip('http://')
 u''.lstrip('http://')
 
 # PLE1310
-b''.rstrip('http://')
+b''.rstrip(b'http://')
 
 # OK
 ''.strip('Hi')
 
 # OK
 ''.strip()
+
+
+### https://github.com/astral-sh/ruff/issues/15968
+
+# Errors: Multiple backslashes
+''.strip('\\b\\x09')
+''.strip(r'\b\x09')
+''.strip('\\\x5C')
+
+# OK: Different types
+b"".strip("//")
+"".strip(b"//")
+
+# OK: Escapes
+'\\test'.strip('\\')
+
+# OK: Extra/missing arguments
+"".strip("//", foo)
+b"".lstrip(b"//", foo = "bar")
+"".rstrip()
+
+# OK: Not literals
+foo: str = ""; bar: bytes = b""
+"".strip(foo)
+b"".strip(bar)
+
+# False negative
+foo.rstrip("//")
+bar.lstrip(b"//")
+
+# OK: Not `.[lr]?strip`
+"".mobius_strip("")

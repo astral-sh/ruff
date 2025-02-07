@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for IterationOverSet {
 }
 
 /// PLC0208
-pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn iteration_over_set(checker: &Checker, expr: &Expr) {
     let Expr::Set(set) = expr else {
         return;
     };
@@ -74,5 +74,5 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
     };
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(tuple, expr.range())));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

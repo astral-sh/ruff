@@ -63,7 +63,7 @@ impl Violation for MissingTrailingPeriod {
 }
 
 /// D400
-pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn ends_with_period(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {
@@ -114,7 +114,7 @@ pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                     line.start() + trimmed.text_len(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         };
     }
 }

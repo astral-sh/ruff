@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for UnnecessaryEmptyIterableWithinDequeCall {
 }
 
 /// RUF037
-pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &ast::ExprCall) {
     let ast::ExprCall {
         func, arguments, ..
     } = deque;
@@ -100,7 +100,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque
 
     diagnostic.set_fix(fix_unnecessary_literal_in_deque(checker, deque, maxlen));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn fix_unnecessary_literal_in_deque(

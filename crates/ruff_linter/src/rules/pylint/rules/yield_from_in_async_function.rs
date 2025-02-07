@@ -38,13 +38,11 @@ impl Violation for YieldFromInAsyncFunction {
 }
 
 /// PLE1700
-pub(crate) fn yield_from_in_async_function(checker: &mut Checker, expr: &ast::ExprYieldFrom) {
+pub(crate) fn yield_from_in_async_function(checker: &Checker, expr: &ast::ExprYieldFrom) {
     if matches!(
         checker.semantic().current_scope().kind,
         ScopeKind::Function(ast::StmtFunctionDef { is_async: true, .. })
     ) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));
     }
 }

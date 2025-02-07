@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionSet {
 }
 
 /// C403 (`set([...])`)
-pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "set",
         &call.func,
@@ -90,5 +90,5 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
     let replacement =
         Edit::range_replacement(checker.source()[span].to_string(), replacement_range);
     let fix = Fix::unsafe_edits(call_start, [call_end, replacement]);
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

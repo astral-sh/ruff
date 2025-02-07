@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for NoExplicitStacklevel {
 }
 
 /// B028
-pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -88,5 +88,5 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -331,7 +331,7 @@ fn get_parametrize_name_range(
 }
 
 /// PT006
-fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
+fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
@@ -373,7 +373,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                             format!("({})", checker.generator().expr(&node)),
                             name_range,
                         )));
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
                         let name_range = get_parametrize_name_range(
@@ -408,7 +408,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                             checker.generator().expr(&node),
                             name_range,
                         )));
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {}
                 }
@@ -437,7 +437,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                             checker.generator().expr(&node),
                             expr.range(),
                         )));
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
@@ -455,7 +455,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                                 expr.range(),
                             )));
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                 }
             };
@@ -484,7 +484,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                             format!("({})", checker.generator().expr(&node)),
                             expr.range(),
                         )));
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
@@ -502,7 +502,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
                                 expr.range(),
                             )));
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                 }
             };
@@ -512,7 +512,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &
 }
 
 /// PT007
-fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
+fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
     let values_type = checker.settings.flake8_pytest_style.parametrize_values_type;
 
     let values_row_type = checker
@@ -568,7 +568,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     );
                     Fix::unsafe_edits(values_start, [values_end])
                 });
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
 
             if is_multi_named {
@@ -616,7 +616,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
 
                     Fix::unsafe_edits(values_start, [values_end])
                 });
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
 
             if is_multi_named {
@@ -648,7 +648,7 @@ fn trailing_comma(element: &Expr, source: &str, max_index: TextSize) -> TextSize
 }
 
 /// PT014
-fn check_duplicates(checker: &mut Checker, values: &Expr) {
+fn check_duplicates(checker: &Checker, values: &Expr) {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
         values
     else {
@@ -677,14 +677,14 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(deletion_range)));
                     }
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             })
             .or_insert(index);
         prev = Some(element);
     }
 }
 
-fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
+fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
             single_argument: true,
@@ -728,7 +728,7 @@ fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argv
         Fix::safe_edits(argnames_edit, argvalues_edits)
     };
     diagnostic.set_fix(fix);
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
@@ -764,7 +764,7 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
 }
 
 fn handle_value_rows(
-    checker: &mut Checker,
+    checker: &Checker,
     elts: &[Expr],
     values_type: types::ParametrizeValuesType,
     values_row_type: types::ParametrizeValuesRowType,
@@ -811,7 +811,7 @@ fn handle_value_rows(
                         let elt_end = Edit::replacement("]".into(), start, elt.end());
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             Expr::List(ast::ExprList { elts, .. }) => {
@@ -855,7 +855,7 @@ fn handle_value_rows(
                         );
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             _ => {}
@@ -863,7 +863,7 @@ fn handle_value_rows(
     }
 }
 
-pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn parametrize(checker: &Checker, call: &ExprCall) {
     if !is_pytest_parametrize(call, checker.semantic()) {
         return;
     }

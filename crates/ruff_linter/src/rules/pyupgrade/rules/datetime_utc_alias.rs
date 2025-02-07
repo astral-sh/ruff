@@ -50,7 +50,7 @@ impl Violation for DatetimeTimezoneUTC {
 }
 
 /// UP017
-pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(expr)
@@ -68,6 +68,6 @@ pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
             let reference_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [reference_edit]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

@@ -90,7 +90,7 @@ impl Violation for UnsafeMarkupUse {
 /// Checks for unsafe calls to `[markupsafe.Markup]`.
 ///
 /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
-pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
     if checker
         .settings
         .flake8_bandit
@@ -114,7 +114,7 @@ pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnsafeMarkupUse {
             name: qualified_name.to_string(),
         },

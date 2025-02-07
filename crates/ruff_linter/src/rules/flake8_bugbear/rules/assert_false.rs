@@ -74,7 +74,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
 }
 
 /// B011
-pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn assert_false(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     if !is_const_false(test) {
         return;
     }
@@ -84,5 +84,5 @@ pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
         checker.generator().stmt(&assertion_error(msg)),
         stmt.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

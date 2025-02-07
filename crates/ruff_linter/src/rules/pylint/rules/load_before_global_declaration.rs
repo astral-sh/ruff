@@ -55,10 +55,10 @@ impl Violation for LoadBeforeGlobalDeclaration {
 }
 
 /// PLE0118
-pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
+pub(crate) fn load_before_global_declaration(checker: &Checker, name: &str, expr: &Expr) {
     if let Some(stmt) = checker.semantic().global(name) {
         if expr.start() < stmt.start() {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 LoadBeforeGlobalDeclaration {
                     name: name.to_string(),
                     row: checker.compute_source_row(stmt.start()),

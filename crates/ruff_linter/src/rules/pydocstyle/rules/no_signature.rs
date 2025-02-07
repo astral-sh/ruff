@@ -51,7 +51,7 @@ impl Violation for SignatureInDocstring {
 }
 
 /// D402
-pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
@@ -86,8 +86,6 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
             true
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(SignatureInDocstring, docstring.range()));
+        checker.report_diagnostic(Diagnostic::new(SignatureInDocstring, docstring.range()));
     }
 }

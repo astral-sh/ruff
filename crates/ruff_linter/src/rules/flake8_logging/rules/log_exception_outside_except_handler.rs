@@ -60,7 +60,7 @@ impl Violation for LogExceptionOutsideExceptHandler {
 }
 
 /// LOG004
-pub(crate) fn log_exception_outside_except_handler(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
@@ -105,5 +105,5 @@ pub(crate) fn log_exception_outside_except_handler(checker: &mut Checker, call: 
         diagnostic.set_fix(fix);
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

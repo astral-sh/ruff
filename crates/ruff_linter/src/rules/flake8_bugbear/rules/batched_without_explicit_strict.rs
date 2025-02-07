@@ -58,7 +58,7 @@ impl Violation for BatchedWithoutExplicitStrict {
 }
 
 /// B911
-pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall) {
     if checker.settings.target_version < PythonVersion::Py313 {
         return;
     }
@@ -87,5 +87,5 @@ pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &Expr
     }
 
     let diagnostic = Diagnostic::new(BatchedWithoutExplicitStrict, call.range);
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

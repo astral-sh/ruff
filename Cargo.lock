@@ -2439,6 +2439,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.1.0",
  "salsa",
+ "schemars",
  "serde",
  "thiserror 2.0.11",
  "toml",
@@ -2478,6 +2479,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.1.0",
  "salsa",
+ "schemars",
  "serde",
  "smallvec",
  "static_assertions",
@@ -2518,12 +2520,14 @@ dependencies = [
  "anyhow",
  "camino",
  "colored 3.0.0",
+ "insta",
  "memchr",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "regex",
  "ruff_db",
  "ruff_index",
+ "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
@@ -2638,7 +2642,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.9.4"
+version = "0.9.5"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2766,6 +2770,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.1.0",
  "salsa",
+ "schemars",
  "serde",
  "tempfile",
  "thiserror 2.0.11",
@@ -2790,6 +2795,7 @@ dependencies = [
  "libcst",
  "pretty_assertions",
  "rayon",
+ "red_knot_project",
  "regex",
  "ruff",
  "ruff_diagnostics",
@@ -2870,7 +2876,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.9.4"
+version = "0.9.5"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3188,7 +3194,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.9.4"
+version = "0.9.5"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

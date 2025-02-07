@@ -31,6 +31,20 @@ for x in (1, 2, 3):
 for x in (1, 2, 3):
     s.add(x + num)
 
+# https://github.com/astral-sh/ruff/issues/15936
+for x in 1, 2, 3:
+    s.add(x)
+
+for x in 1, 2, 3:
+    s.add(f"{x}")
+
+for x in (
+    1,  # Comment
+    2, 3
+):
+    s.add(f"{x}")
+
+
 # False negative
 
 class C:
@@ -40,6 +54,7 @@ class C:
 c = C()
 for x in (1, 2, 3):
     c.s.add(x)
+
 
 # Ok
 

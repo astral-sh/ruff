@@ -40,6 +40,7 @@ use crate::types::call::{
 };
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
+use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -256,26 +257,19 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 
 /// Looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
-    let explicit_symbol = symbol(db, global_scope(db, file), name);
-
-    if !explicit_symbol.possibly_unbound() {
-        return explicit_symbol;
-    }
-
     // Not defined explicitly in the global scope?
     // All modules are instances of `types.ModuleType`;
     // look it up there (with a few very special exceptions)
-    if module_type_symbols(db)
-        .iter()
-        .any(|module_type_member| &**module_type_member == name)
-    {
-        // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
-        // on instance types yet.
-        let module_type_member = KnownClass::ModuleType.to_class_literal(db).member(db, name);
-        return explicit_symbol.or_fall_back_to(db, &module_type_member);
-    }
-
-    explicit_symbol
+    symbol(db, global_scope(db, file), name).or_fall_back_to(db, || {
+        if module_type_symbols(db)
+            .iter()
+            .any(|module_type_member| &**module_type_member == name)
+        {
+            KnownClass::ModuleType.to_instance(db).member(db, name)
+        } else {
+            Symbol::Unbound
+        }
+    })
 }
 
 /// Infer the type of a binding.
@@ -3796,10 +3790,8 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        let global_lookup = symbol(db, global_scope(db, self.module(db).file()), name);
-
-        // If it's unbound, check if it's present as an instance on `types.ModuleType`
-        // or `builtins.object`.
+        // If it's not found in the global scope, check if it's present as an instance
+        // on `types.ModuleType` or `builtins.object`.
         //
         // We do a more limited version of this in `global_symbol_ty`,
         // but there are two crucial differences here:
@@ -3813,14 +3805,13 @@ impl<'db> ModuleLiteralType<'db> {
         // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
         // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
         // where we know exactly which module we're dealing with.
-        if name != "__getattr__" && global_lookup.possibly_unbound() {
-            // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
-            let module_type_instance_member =
-                KnownClass::ModuleType.to_class_literal(db).member(db, name);
-            global_lookup.or_fall_back_to(db, &module_type_instance_member)
-        } else {
-            global_lookup
-        }
+        symbol(db, global_scope(db, self.module(db).file()), name).or_fall_back_to(db, || {
+            if name == "__getattr__" {
+                Symbol::Unbound
+            } else {
+                KnownClass::ModuleType.to_instance(db).member(db, name)
+            }
+        })
     }
 }
 
@@ -4239,6 +4230,32 @@ impl<'db> Class<'db> {
 
                     let inferred_ty = infer_expression_type(db, *value);
 
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::Iterable { iterable } => {
+                    // We found an attribute assignment like:
+                    //
+                    //     for self.name in <iterable>:
+
+                    // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+
+                    let iterable_ty = infer_expression_type(db, *iterable);
+                    let inferred_ty = iterable_ty.iterate(db).unwrap_without_diagnostic();
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::Unpack {
+                    attribute_expression_id,
+                    unpack,
+                } => {
+                    // We found an unpacking assignment like:
+                    //
+                    //     .., self.name, .. = <value>
+                    //     (.., self.name, ..) = <value>
+                    //     [.., self.name, ..] = <value>
+
+                    let inferred_ty =
+                        infer_unpack_types(db, *unpack).expression_type(*attribute_expression_id);
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }

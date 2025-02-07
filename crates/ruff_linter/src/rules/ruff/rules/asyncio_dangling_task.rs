@@ -7,6 +7,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{analyze::typing, Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
 /// that do not store a reference to the returned result.
@@ -116,11 +118,8 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_binding(
-    scope: &Scope,
-    semantic: &SemanticModel,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn asyncio_dangling_binding(scope: &Scope, checker: &Checker) {
+    let semantic = checker.semantic();
     for binding_id in scope.binding_ids() {
         // If the binding itself is used, or it's not an assignment, skip it.
         let binding = semantic.binding(binding_id);
@@ -165,7 +164,7 @@ pub(crate) fn asyncio_dangling_binding(
             };
 
             if let Some(diagnostic) = diagnostic {
-                diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

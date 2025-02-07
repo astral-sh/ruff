@@ -39,7 +39,7 @@ impl Violation for IfTuple {
 }
 
 /// F634
-pub(crate) fn if_tuple(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn if_tuple(checker: &Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
         let Expr::Tuple(tuple) = &branch.test else {
             continue;
@@ -47,8 +47,6 @@ pub(crate) fn if_tuple(checker: &mut Checker, stmt_if: &StmtIf) {
         if tuple.is_empty() {
             continue;
         }
-        checker
-            .diagnostics
-            .push(Diagnostic::new(IfTuple, branch.test.range()));
+        checker.report_diagnostic(Diagnostic::new(IfTuple, branch.test.range()));
     }
 }

@@ -1,9 +1,11 @@
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
 /// Format a code snippet to call `name.method()`.
@@ -39,31 +41,45 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     generator.stmt(&stmt.into())
 }
 
-/// Format a code snippet comparing `name` to `None` (e.g., `name is None`).
-pub(super) fn generate_none_identity_comparison(
-    name: Name,
+/// Returns a fix that replace `range` with
+/// a generated `a is None`/`a is not None` check.
+pub(super) fn replace_with_identity_check(
+    left: &Expr,
+    range: TextRange,
     negate: bool,
-    generator: Generator,
-) -> String {
-    // Construct `name`.
-    let var = ast::ExprName {
-        id: name,
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-    };
-    // Construct `name is None` or `name is not None`.
+    checker: &Checker,
+) -> Fix {
+    let (semantic, generator) = (checker.semantic(), checker.generator());
+
     let op = if negate {
         ast::CmpOp::IsNot
     } else {
         ast::CmpOp::Is
     };
-    let compare = ast::ExprCompare {
-        left: Box::new(var.into()),
-        ops: Box::from([op]),
-        comparators: Box::from([ast::Expr::NoneLiteral(ast::ExprNoneLiteral::default())]),
+
+    let new_expr = Expr::Compare(ast::ExprCompare {
+        left: left.clone().into(),
+        ops: [op].into(),
+        comparators: [ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
+    });
+
+    let new_content = generator.expr(&new_expr);
+    let new_content = if semantic.current_expression_parent().is_some() {
+        format!("({new_content})")
+    } else {
+        new_content
     };
-    generator.expr(&compare.into())
+
+    let applicability = if checker.comment_ranges().intersects(range) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    let edit = Edit::range_replacement(new_content, range);
+
+    Fix::applicable_edit(edit, applicability)
 }
 
 // Helpers for read-whole-file and write-whole-file

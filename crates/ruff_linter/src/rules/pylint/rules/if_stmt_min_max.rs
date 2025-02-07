@@ -68,7 +68,7 @@ impl Violation for IfStmtMinMax {
 }
 
 /// R1730, R1731
-pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
@@ -121,37 +121,32 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let left_is_value = left_cmp == body_value_cmp;
     let right_is_value = right_cmp == body_value_cmp;
 
-    // Determine whether to use `min()` or `max()`, and whether to flip the
-    // order of the arguments, which is relevant for breaking ties.
-    // Also ensure that we understand the operation we're trying to do,
-    // by checking both sides of the comparison and assignment.
-    let (min_max, flip_args) = match (
+    let min_max = match (
         left_is_target,
         right_is_target,
         left_is_value,
         right_is_value,
     ) {
         (true, false, false, true) => match op {
-            CmpOp::Lt => (MinMax::Max, true),
-            CmpOp::LtE => (MinMax::Max, false),
-            CmpOp::Gt => (MinMax::Min, true),
-            CmpOp::GtE => (MinMax::Min, false),
+            CmpOp::Lt | CmpOp::LtE => MinMax::Max,
+            CmpOp::Gt | CmpOp::GtE => MinMax::Min,
             _ => return,
         },
         (false, true, true, false) => match op {
-            CmpOp::Lt => (MinMax::Min, true),
-            CmpOp::LtE => (MinMax::Min, false),
-            CmpOp::Gt => (MinMax::Max, true),
-            CmpOp::GtE => (MinMax::Max, false),
+            CmpOp::Lt | CmpOp::LtE => MinMax::Min,
+            CmpOp::Gt | CmpOp::GtE => MinMax::Max,
             _ => return,
         },
         _ => return,
     };
 
-    let (arg1, arg2) = if flip_args {
-        (left.as_ref(), right)
+    // Determine whether to use `min()` or `max()`, and make sure that the first
+    // arg of the `min()` or `max()` method is equal to the target of the comparison.
+    // This is to be consistent with the Python implementation of the methods `min()` and `max()`.
+    let (arg1, arg2) = if left_is_target {
+        (&**left, right)
     } else {
-        (right, left.as_ref())
+        (right, &**left)
     };
 
     let replacement = format!(
@@ -184,7 +179,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

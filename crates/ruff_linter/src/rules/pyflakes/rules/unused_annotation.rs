@@ -34,11 +34,7 @@ impl Violation for UnusedAnnotation {
 }
 
 /// F842
-pub(crate) fn unused_annotation(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
     for (name, range) in scope.bindings().filter_map(|(name, binding_id)| {
         let binding = checker.semantic().binding(binding_id);
         if binding.kind.is_annotation()
@@ -50,6 +46,6 @@ pub(crate) fn unused_annotation(
             None
         }
     }) {
-        diagnostics.push(Diagnostic::new(UnusedAnnotation { name }, range));
+        checker.report_diagnostic(Diagnostic::new(UnusedAnnotation { name }, range));
     }
 }

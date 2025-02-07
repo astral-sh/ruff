@@ -338,7 +338,7 @@ fn assignment_targets_from_assign_targets<'a>(
 }
 
 /// PLW2901
-pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
@@ -399,5 +399,5 @@ pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

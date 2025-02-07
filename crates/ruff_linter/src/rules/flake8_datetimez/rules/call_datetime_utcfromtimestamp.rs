@@ -60,11 +60,7 @@ impl Violation for CallDatetimeUtcfromtimestamp {
     }
 }
 
-pub(crate) fn call_datetime_utcfromtimestamp(
-    checker: &mut Checker,
-    func: &Expr,
-    location: TextRange,
-) {
+pub(crate) fn call_datetime_utcfromtimestamp(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -86,7 +82,5 @@ pub(crate) fn call_datetime_utcfromtimestamp(
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
+    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
 }

@@ -1,10 +1,13 @@
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::checkers::ast::Checker;
+
+use super::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for the use of `IOBase.write` in a for loop.
@@ -51,6 +54,7 @@ impl AlwaysFixableViolation for ForLoopWrites {
     }
 }
 
+/// FURB122
 pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     if !binding.kind.is_loop_var() {
         return None;
@@ -73,7 +77,8 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> O
     for_loop_writes(checker, for_stmt, binding.scope, &binding_names)
 }
 
-pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
+/// FURB122
+pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &StmtFor) {
     // Loops with bindings are handled later.
     if !binding_names(&for_stmt.target).is_empty() {
         return;
@@ -82,7 +87,7 @@ pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
     let scope_id = checker.semantic().scope_id;
 
     if let Some(diagnostic) = for_loop_writes(checker, for_stmt, scope_id, &[]) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -114,6 +119,7 @@ fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
     names
 }
 
+/// FURB122
 fn for_loop_writes(
     checker: &Checker,
     for_stmt: &StmtFor,
@@ -155,40 +161,41 @@ fn for_loop_writes(
         return None;
     }
 
+    let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), write_arg) {
         (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
             format!(
                 "{}.writelines({})",
-                checker.locator().slice(io_object_name),
-                checker.locator().slice(for_stmt.iter.as_ref()),
+                locator.slice(io_object_name),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker),
             )
         }
         (for_target, write_arg) => {
             format!(
                 "{}.writelines({} for {} in {})",
-                checker.locator().slice(io_object_name),
-                checker.locator().slice(write_arg),
-                checker.locator().slice(for_target),
-                checker.locator().slice(for_stmt.iter.as_ref()),
+                locator.slice(io_object_name),
+                locator.slice(write_arg),
+                locator.slice(for_target),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker),
             )
         }
     };
 
-    let applicability = if checker.comment_ranges().intersects(for_stmt.range()) {
+    let applicability = if checker.comment_ranges().intersects(for_stmt.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
+    let fix = Fix::applicable_edit(
+        Edit::range_replacement(content, for_stmt.range),
+        applicability,
+    );
 
     let diagnostic = Diagnostic::new(
         ForLoopWrites {
             name: io_object_name.id.to_string(),
         },
         for_stmt.range,
-    );
-    let fix = Fix::applicable_edit(
-        Edit::range_replacement(content, for_stmt.range),
-        applicability,
     );
 
     Some(diagnostic.with_fix(fix))

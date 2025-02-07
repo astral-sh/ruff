@@ -65,7 +65,7 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
     if dataclass_kind(class_def, semantic).is_none() {
@@ -88,7 +88,7 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::
         {
             let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

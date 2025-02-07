@@ -35,7 +35,7 @@ impl Violation for DjangoRawSql {
 }
 
 /// S611
-pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -55,9 +55,7 @@ pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
             .find_argument_value("sql", 0)
             .is_some_and(Expr::is_string_literal_expr)
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(DjangoRawSql, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(DjangoRawSql, call.func.range()));
         }
     }
 }

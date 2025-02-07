@@ -64,7 +64,7 @@ impl Violation for PrivateMemberAccess {
 }
 
 /// SLF001
-pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };
@@ -206,7 +206,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         PrivateMemberAccess {
             access: attr.to_string(),
         },

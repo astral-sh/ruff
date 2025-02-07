@@ -63,7 +63,7 @@ impl Violation for BuiltinArgumentShadowing {
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
+pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Parameter) {
     if shadows_builtin(
         parameter.name(),
         checker.source_type,
@@ -92,7 +92,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },

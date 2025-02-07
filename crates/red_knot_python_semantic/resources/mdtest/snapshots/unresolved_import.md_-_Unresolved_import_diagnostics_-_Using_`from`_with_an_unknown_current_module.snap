@@ -1,0 +1,32 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unresolved_import.md - Unresolved import diagnostics - Using `from` with an unknown current module
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unresolved_import.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from .does_not_exist import add  # error: [unresolved-import]
+2 | 
+3 | stat = add(10, 15)
+```
+
+# Diagnostics
+
+```
+error: lint:unresolved-import
+ --> /src/mdtest_snippet.py:1:7
+  |
+1 | from .does_not_exist import add  # error: [unresolved-import]
+  |       ^^^^^^^^^^^^^^ Cannot resolve import `.does_not_exist`
+2 |
+3 | stat = add(10, 15)
+  |
+
+```

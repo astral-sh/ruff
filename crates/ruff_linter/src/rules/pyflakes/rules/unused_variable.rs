@@ -249,7 +249,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 }
 
 /// F841
-pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+pub(crate) fn unused_variable(checker: &Checker, scope: &Scope) {
     if scope.uses_locals() && scope.kind.is_function() {
         return;
     }
@@ -290,6 +290,6 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
         if let Some(fix) = remove_unused_variable(binding, checker) {
             diagnostic.set_fix(fix);
         }
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

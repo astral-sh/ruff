@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
 }
 
 /// C418
-pub(crate) fn unnecessary_literal_within_dict_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -89,7 +89,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &mut Checker, call: 
         Fix::unsafe_edits(call_start, [call_end])
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

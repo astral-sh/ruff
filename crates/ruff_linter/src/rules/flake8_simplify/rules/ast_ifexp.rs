@@ -140,7 +140,7 @@ impl AlwaysFixableViolation for IfExprWithTwistedArms {
 
 /// SIM210
 pub(crate) fn if_expr_with_true_false(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -196,12 +196,12 @@ pub(crate) fn if_expr_with_true_false(
             expr.range(),
         )));
     };
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM211
 pub(crate) fn if_expr_with_false_true(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -223,12 +223,12 @@ pub(crate) fn if_expr_with_false_true(
         ),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM212
 pub(crate) fn twisted_arms_in_ifexpr(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -277,5 +277,5 @@ pub(crate) fn twisted_arms_in_ifexpr(
         checker.generator().expr(&node3.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

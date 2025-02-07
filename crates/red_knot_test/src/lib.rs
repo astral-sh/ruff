@@ -1,4 +1,5 @@
 use crate::config::Log;
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
@@ -11,7 +12,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::TextSize;
 use std::fmt::Write;
 
 mod assertion;
@@ -27,12 +27,18 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str) {
-    let source = std::fs::read_to_string(path).unwrap();
+pub fn run(
+    absolute_fixture_path: &Utf8Path,
+    relative_fixture_path: &Utf8Path,
+    snapshot_path: &Utf8Path,
+    short_title: &str,
+    test_name: &str,
+) {
+    let source = std::fs::read_to_string(absolute_fixture_path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
-            panic!("Error parsing `{path}`: {err:?}")
+            panic!("Error parsing `{absolute_fixture_path}`: {err:?}")
         }
     };
 
@@ -54,20 +60,23 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
         db.memory_file_system().remove_all();
         Files::sync_all(&mut db);
 
-        if let Err(failures) = run_test(&mut db, &test) {
+        if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
-                let backtick_line = md_index.line_index(test_failures.backtick_offset);
+                let source_map =
+                    EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
+                    let absolute_line_number =
+                        source_map.to_absolute_line_number(relative_line_number);
+
                     for failure in failures {
-                        let absolute_line_number =
-                            backtick_line.checked_add(relative_line_number).unwrap();
-                        let line_info = format!("{long_title}:{absolute_line_number}").cyan();
+                        let line_info =
+                            format!("{relative_fixture_path}:{absolute_line_number}").cyan();
                         println!("  {line_info} {failure}");
                     }
                 }
@@ -89,7 +98,12 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
+fn run_test(
+    db: &mut db::Db,
+    relative_fixture_path: &Utf8Path,
+    snapshot_path: &Utf8Path,
+    test: &parser::MarkdownTest,
+) -> Result<(), Failures> {
     let project_root = db.project_root().to_path_buf();
     let src_path = SystemPathBuf::from("/src");
     let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
@@ -108,11 +122,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 "Supported file types are: py, pyi, text"
             );
 
-            let full_path = if embedded.path.starts_with('/') {
-                SystemPathBuf::from(embedded.path.clone())
-            } else {
-                project_root.join(&embedded.path)
-            };
+            let full_path = embedded.full_path(&project_root);
 
             if let Some(ref typeshed_path) = custom_typeshed_path {
                 if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
@@ -124,7 +134,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 }
             }
 
-            db.write_file(&full_path, embedded.code).unwrap();
+            db.write_file(&full_path, &embedded.code).unwrap();
 
             if !full_path.starts_with(&src_path) || embedded.lang == "text" {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
@@ -135,7 +145,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
 
             Some(TestFile {
                 file,
-                backtick_offset: embedded.backtick_offset,
+                backtick_offsets: embedded.backtick_offsets.clone(),
             })
         })
         .collect();
@@ -176,6 +186,10 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
         )
         .expect("Failed to update Program settings in TestDb");
 
+    // When snapshot testing is enabled, this is populated with
+    // all diagnostics. Otherwise it remains empty.
+    let mut snapshot_diagnostics = vec![];
+
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
@@ -214,7 +228,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                     }
                     by_line.push(OneIndexed::from_zero_indexed(0), messages);
                     return Some(FileFailures {
-                        backtick_offset: test_file.backtick_offset,
+                        backtick_offsets: test_file.backtick_offsets,
                         by_line,
                     });
                 }
@@ -224,15 +238,35 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 diagnostic
             }));
 
-            match matcher::match_file(db, test_file.file, diagnostics) {
-                Ok(()) => None,
-                Err(line_failures) => Some(FileFailures {
-                    backtick_offset: test_file.backtick_offset,
-                    by_line: line_failures,
-                }),
+            let failure =
+                match matcher::match_file(db, test_file.file, diagnostics.iter().map(|d| &**d)) {
+                    Ok(()) => None,
+                    Err(line_failures) => Some(FileFailures {
+                        backtick_offsets: test_file.backtick_offsets,
+                        by_line: line_failures,
+                    }),
+                };
+            if test.should_snapshot_diagnostics() {
+                snapshot_diagnostics.extend(diagnostics);
             }
+            failure
         })
         .collect();
+
+    if !snapshot_diagnostics.is_empty() {
+        let snapshot =
+            create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
+        let name = test.name().replace(' ', "_");
+        insta::with_settings!(
+            {
+                snapshot_path => snapshot_path,
+                input_file => name.clone(),
+                filters => vec![(r"\\", "/")],
+                prepend_module_to_snapshot => false,
+            },
+            { insta::assert_snapshot!(name, snapshot) }
+        );
+    }
 
     if failures.is_empty() {
         Ok(())
@@ -245,9 +279,10 @@ type Failures = Vec<FileFailures>;
 
 /// The failures for a single file in a test by line number.
 struct FileFailures {
-    /// The offset of the backticks that starts the code block in the Markdown file
-    backtick_offset: TextSize,
-    /// The failures by lines in the code block.
+    /// Positional information about the code block(s) to reconstruct absolute line numbers.
+    backtick_offsets: Vec<BacktickOffsets>,
+
+    /// The failures by lines in the file.
     by_line: matcher::FailuresByLine,
 }
 
@@ -255,6 +290,58 @@ struct FileFailures {
 struct TestFile {
     file: File,
 
-    // Offset of the backticks that starts the code block in the Markdown file
-    backtick_offset: TextSize,
+    /// Positional information about the code block(s) to reconstruct absolute line numbers.
+    backtick_offsets: Vec<BacktickOffsets>,
+}
+
+fn create_diagnostic_snapshot<D: Diagnostic>(
+    db: &mut db::Db,
+    relative_fixture_path: &Utf8Path,
+    test: &parser::MarkdownTest,
+    diagnostics: impl IntoIterator<Item = D>,
+) -> String {
+    // TODO(ag): Do something better than requiring this
+    // global state to be twiddled everywhere.
+    colored::control::set_override(false);
+
+    let mut snapshot = String::new();
+    writeln!(snapshot).unwrap();
+    writeln!(snapshot, "---").unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
+    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
+    writeln!(snapshot, "---").unwrap();
+    writeln!(snapshot).unwrap();
+
+    writeln!(snapshot, "# Python source files").unwrap();
+    writeln!(snapshot).unwrap();
+    for file in test.files() {
+        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
+        writeln!(snapshot).unwrap();
+        // Note that we don't use ```py here because the line numbering
+        // we add makes it invalid Python. This sacrifices syntax
+        // highlighting when you look at the snapshot on GitHub,
+        // but the line numbers are extremely useful for analyzing
+        // snapshots. So we keep them.
+        writeln!(snapshot, "```").unwrap();
+
+        let line_number_width = file.code.lines().count().to_string().len();
+        for (i, line) in file.code.lines().enumerate() {
+            let line_number = i + 1;
+            writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
+        }
+        writeln!(snapshot, "```").unwrap();
+        writeln!(snapshot).unwrap();
+    }
+
+    writeln!(snapshot, "# Diagnostics").unwrap();
+    writeln!(snapshot).unwrap();
+    for (i, diag) in diagnostics.into_iter().enumerate() {
+        if i > 0 {
+            writeln!(snapshot).unwrap();
+        }
+        writeln!(snapshot, "```").unwrap();
+        writeln!(snapshot, "{}", diag.display(db)).unwrap();
+        writeln!(snapshot, "```").unwrap();
+    }
+    snapshot
 }

@@ -63,7 +63,7 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
 
 /// PD101
 pub(crate) fn nunique_constant_series_check(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -114,7 +114,7 @@ pub(crate) fn nunique_constant_series_check(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         PandasNuniqueConstantSeriesCheck,
         expr.range(),
     ));

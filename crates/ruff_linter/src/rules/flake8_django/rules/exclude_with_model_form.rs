@@ -46,7 +46,7 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -71,9 +71,10 @@ pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::St
                     continue;
                 };
                 if id == "exclude" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        DjangoExcludeWithModelForm,
+                        target.range(),
+                    ));
                     return;
                 }
             }

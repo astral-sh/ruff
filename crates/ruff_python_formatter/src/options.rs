@@ -374,12 +374,15 @@ impl fmt::Display for DocstringCode {
 }
 
 #[derive(Copy, Clone, Default, Eq, PartialEq, CacheKey)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
-#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(untagged, rename_all = "lowercase")
+)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum DocstringCodeLineWidth {
     /// Wrap docstring code examples at a fixed line width.
+    #[cfg_attr(feature = "schemars", schemars(schema_with = "schema::fixed"))]
     Fixed(LineWidth),
 
     /// Respect the line length limit setting for the surrounding Python code.
@@ -388,27 +391,45 @@ pub enum DocstringCodeLineWidth {
         feature = "serde",
         serde(deserialize_with = "deserialize_docstring_code_line_width_dynamic")
     )]
-    #[cfg_attr(feature = "schemars", schemars(with = "DynamicSchema"))]
+    #[cfg_attr(feature = "schemars", schemars(schema_with = "schema::dynamic"))]
     Dynamic,
 }
 
-/// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
 #[cfg(feature = "schemars")]
-struct DynamicSchema;
+mod schema {
+    use ruff_formatter::LineWidth;
+    use schemars::gen::SchemaGenerator;
+    use schemars::schema::{Metadata, Schema, SubschemaValidation};
 
-#[cfg(feature = "schemars")]
-impl schemars::JsonSchema for DynamicSchema {
-    fn schema_name() -> String {
-        "Dynamic".to_string()
-    }
-
-    fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::String.into()),
+    /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
+    pub(super) fn dynamic(_: &mut SchemaGenerator) -> Schema {
+        Schema::Object(schemars::schema::SchemaObject {
             const_value: Some("dynamic".to_string().into()),
             ..Default::default()
-        }
-        .into()
+        })
+    }
+
+    // We use a manual schema for `fixed` even thought it isn't strictly necessary according to the
+    // JSON schema specification to work around a bug in Even Better TOML with `allOf`.
+    // https://github.com/astral-sh/ruff/issues/15978#issuecomment-2639547101
+    //
+    // The only difference to the automatically derived schema is that we use `oneOf` instead of
+    // `allOf`. There's no semantic difference between `allOf` and `oneOf` for single element lists.
+    pub(super) fn fixed(gen: &mut SchemaGenerator) -> Schema {
+        let schema = gen.subschema_for::<LineWidth>();
+        Schema::Object(schemars::schema::SchemaObject {
+            metadata: Some(Box::new(Metadata {
+                description: Some(
+                    "Wrap docstring code examples at a fixed line width.".to_string(),
+                ),
+                ..Metadata::default()
+            })),
+            subschemas: Some(Box::new(SubschemaValidation {
+                one_of: Some(vec![schema]),
+                ..SubschemaValidation::default()
+            })),
+            ..Default::default()
+        })
     }
 }
 

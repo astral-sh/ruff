@@ -101,7 +101,7 @@ impl Violation for BooleanDefaultValuePositionalArgument {
 
 /// FBT002
 pub(crate) fn boolean_default_value_positional_argument(
-    checker: &mut Checker,
+    checker: &Checker,
     name: &str,
     decorator_list: &[Decorator],
     parameters: &Parameters,
@@ -131,7 +131,7 @@ pub(crate) fn boolean_default_value_positional_argument(
                 return;
             }
 
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BooleanDefaultValuePositionalArgument,
                 param.identifier(),
             ));

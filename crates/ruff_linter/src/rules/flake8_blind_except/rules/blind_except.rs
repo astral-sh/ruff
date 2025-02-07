@@ -76,7 +76,7 @@ impl Violation for BlindExcept {
 
 /// BLE001
 pub(crate) fn blind_except(
-    checker: &mut Checker,
+    checker: &Checker,
     type_: Option<&Expr>,
     name: Option<&str>,
     body: &[Stmt],
@@ -107,7 +107,7 @@ pub(crate) fn blind_except(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BlindExcept {
             name: builtin_exception_type.to_string(),
         },

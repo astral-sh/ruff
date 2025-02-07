@@ -56,7 +56,7 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 /// PIE804
-pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
     let mut duplicate_keywords = None;
     for keyword in &*call.arguments.keywords {
         // keyword is a spread operator (indicated by None).
@@ -75,9 +75,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
             );
-            checker
-                .diagnostics
-                .push(diagnostic.with_fix(Fix::safe_edit(edit)));
+            checker.report_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)));
             continue;
         }
 
@@ -141,7 +139,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             }
         }
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

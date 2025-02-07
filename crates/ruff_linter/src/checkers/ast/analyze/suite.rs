@@ -6,7 +6,7 @@ use crate::rules::flake8_pie;
 use crate::rules::refurb;
 
 /// Run lint rules over a suite of [`Stmt`] syntax nodes.
-pub(crate) fn suite(suite: &[Stmt], checker: &mut Checker) {
+pub(crate) fn suite(suite: &[Stmt], checker: &Checker) {
     if checker.enabled(Rule::UnnecessaryPlaceholder) {
         flake8_pie::rules::unnecessary_placeholder(checker, suite);
     }

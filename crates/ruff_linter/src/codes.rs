@@ -1006,6 +1006,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "049") => (RuleGroup::Preview, rules::ruff::rules::DataclassEnum),
         (Ruff, "051") => (RuleGroup::Preview, rules::ruff::rules::IfKeyInDictDel),
         (Ruff, "052") => (RuleGroup::Preview, rules::ruff::rules::UsedDummyVariable),
+        (Ruff, "053") => (RuleGroup::Preview, rules::ruff::rules::ClassWithMixedTypeVars),
         (Ruff, "055") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
         (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRound),

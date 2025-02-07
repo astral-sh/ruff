@@ -29,8 +29,6 @@ def foo():
 However, three attributes on `types.ModuleType` are not present as implicit module globals; these
 are excluded:
 
-`unbound_dunders.py`:
-
 ```py
 # error: [unresolved-reference]
 # revealed: Unknown
@@ -56,10 +54,10 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: Literal[__init__]
+reveal_type(typing.__init__)  # revealed: @Todo(bound method)
 
 # These come from `builtins.object`, not `types.ModuleType`:
-reveal_type(typing.__eq__)  # revealed: Literal[__eq__]
+reveal_type(typing.__eq__)  # revealed: @Todo(bound method)
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 
@@ -72,11 +70,7 @@ Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType`
 dynamic imports; but we ignore that for module-literal types where we know exactly which module
 we're dealing with:
 
-`__getattr__.py`:
-
 ```py
-import typing
-
 # error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```

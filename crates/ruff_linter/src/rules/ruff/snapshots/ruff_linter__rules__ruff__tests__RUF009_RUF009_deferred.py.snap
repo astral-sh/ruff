@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF009_deferred.py:10:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+   |
+ 8 | @dataclass()
+ 9 | class A:
+10 |     hidden_mutable_default: list[int] = default_function()
+   |                                         ^^^^^^^^^^^^^^^^^^ RUF009
+11 |     class_variable: typing.ClassVar[list[int]] = default_function()
+12 |     another_class_var: ClassVar[list[int]] = default_function()
+   |
+
+RUF009_deferred.py:11:50: RUF009 Do not perform function call `default_function` in dataclass defaults
+   |
+ 9 | class A:
+10 |     hidden_mutable_default: list[int] = default_function()
+11 |     class_variable: typing.ClassVar[list[int]] = default_function()
+   |                                                  ^^^^^^^^^^^^^^^^^^ RUF009
+12 |     another_class_var: ClassVar[list[int]] = default_function()
+   |
