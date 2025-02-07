@@ -104,7 +104,7 @@ impl Violation for NonPEP695GenericClass {
 }
 
 /// UP046
-pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtClassDef) {
+pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassDef) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.settings.target_version < PythonVersion::Py312 {
         return;
@@ -154,7 +154,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
     if generic_idx != arguments.len() - 1 {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -210,5 +210,5 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

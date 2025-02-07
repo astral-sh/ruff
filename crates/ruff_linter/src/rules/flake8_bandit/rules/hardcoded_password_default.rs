@@ -69,13 +69,13 @@ fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnos
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn hardcoded_password_default(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
         if let Some(diagnostic) = check_password_kwarg(&parameter.parameter, default) {
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

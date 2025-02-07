@@ -82,7 +82,7 @@ impl AlwaysFixableViolation for UnnecessaryPlaceholder {
 }
 
 /// PIE790
-pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
     if body.len() < 2 {
         return;
     }
@@ -115,7 +115,7 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
 
 /// Add a diagnostic for the given statement.
 fn add_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     next_stmt: Option<&Stmt>,
     placeholder_kind: Placeholder,
@@ -145,7 +145,7 @@ fn add_diagnostic(
         stmt.range(),
     );
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 #[derive(Debug, PartialEq, Eq)]

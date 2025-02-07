@@ -43,7 +43,7 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 }
 
 /// RUF051
-pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
+pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
     let [Stmt::Delete(delete)] = &stmt.body[..] else {
         return;
     };
@@ -67,7 +67,7 @@ pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
 
     let diagnostic = Diagnostic::new(IfKeyInDictDel, delete.range);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {

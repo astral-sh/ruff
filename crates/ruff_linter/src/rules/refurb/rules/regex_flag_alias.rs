@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for RegexFlagAlias {
 }
 
 /// FURB167
-pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn regex_flag_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::RE) {
         return;
     }
@@ -86,7 +86,7 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
             [edit],
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

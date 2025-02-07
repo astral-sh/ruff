@@ -142,7 +142,7 @@ fn has_duplicates(s: &ast::StringLiteralValue) -> bool {
 }
 
 /// PLE1310
-pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn bad_str_strip_call(checker: &Checker, func: &Expr, args: &[Expr]) {
     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
         if matches!(
             value.as_ref(),
@@ -158,7 +158,7 @@ pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Exp
                             } else {
                                 None
                             };
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 BadStrStripCall { strip, removal },
                                 arg.range(),
                             ));

@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for StrOrReprDefinedInStub {
 }
 
 /// PYI029
-pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     let Stmt::FunctionDef(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -94,5 +94,5 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

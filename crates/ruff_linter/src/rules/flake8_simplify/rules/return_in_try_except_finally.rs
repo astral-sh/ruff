@@ -56,7 +56,7 @@ fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
 
 /// SIM107
 pub(crate) fn return_in_try_except_finally(
-    checker: &mut Checker,
+    checker: &Checker,
     body: &[Stmt],
     handlers: &[ExceptHandler],
     finalbody: &[Stmt],
@@ -69,7 +69,7 @@ pub(crate) fn return_in_try_except_finally(
 
     if try_has_return || except_has_return {
         if let Some(finally_return) = find_return(finalbody) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 ReturnInTryExceptFinally,
                 finally_return.range(),
             ));

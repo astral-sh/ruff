@@ -51,7 +51,7 @@ impl Violation for AsyncBusyWait {
 }
 
 /// ASYNC110
-pub(crate) fn async_busy_wait(checker: &mut Checker, while_stmt: &ast::StmtWhile) {
+pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &ast::StmtWhile) {
     // The body should be a single `await` call.
     let [stmt] = while_stmt.body.as_slice() else {
         return;
@@ -74,7 +74,7 @@ pub(crate) fn async_busy_wait(checker: &mut Checker, while_stmt: &ast::StmtWhile
         qualified_name.segments(),
         ["trio" | "anyio", "sleep" | "sleep_until"] | ["asyncio", "sleep"]
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             AsyncBusyWait {
                 module: AsyncModule::try_from(&qualified_name).unwrap(),
             },

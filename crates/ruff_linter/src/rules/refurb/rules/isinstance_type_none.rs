@@ -48,7 +48,7 @@ impl Violation for IsinstanceTypeNone {
 }
 
 /// FURB168
-pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
@@ -71,7 +71,7 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
     let fix = replace_with_identity_check(expr, call.range, false, checker);
     let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Returns `true` if the given expression is equivalent to checking if the

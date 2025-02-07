@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for NeedlessElse {
 }
 
 /// RUF047
-pub(crate) fn needless_else(checker: &mut Checker, stmt: AnyNodeWithOrElse) {
+pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
     let source = checker.source();
     let tokens = checker.tokens();
 
@@ -72,7 +72,7 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: AnyNodeWithOrElse) {
 
     let diagnostic = Diagnostic::new(NeedlessElse, else_range);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Whether `body` contains only one `pass` or `...` statement.

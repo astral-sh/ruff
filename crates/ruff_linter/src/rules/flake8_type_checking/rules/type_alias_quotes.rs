@@ -267,7 +267,7 @@ fn collect_typing_references<'a>(
 
 /// TC008
 pub(crate) fn quoted_type_alias(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
@@ -297,7 +297,7 @@ pub(crate) fn quoted_type_alias(
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Traverses the type expression and checks if the expression can safely

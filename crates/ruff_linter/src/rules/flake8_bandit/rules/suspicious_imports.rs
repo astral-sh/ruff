@@ -351,7 +351,7 @@ impl Violation for SuspiciousPyghmiImport {
 }
 
 /// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413, S415
-pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
     // Skip stub files.
     if checker.source_type.is_stub() {
         return;
@@ -602,13 +602,9 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
     };
 }
 
-fn check_and_push_diagnostic(
-    checker: &mut Checker,
-    diagnostic_kind: DiagnosticKind,
-    range: TextRange,
-) {
+fn check_and_push_diagnostic(checker: &Checker, diagnostic_kind: DiagnosticKind, range: TextRange) {
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

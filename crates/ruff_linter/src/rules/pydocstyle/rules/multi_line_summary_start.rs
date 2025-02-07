@@ -136,7 +136,7 @@ impl AlwaysFixableViolation for MultiLineSummarySecondLine {
 }
 
 /// D212, D213
-pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 
@@ -165,7 +165,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     break;
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     } else if first_line.as_str().ends_with('\\') {
         // Ignore the edge case whether a single quoted string is multiple lines through an
@@ -218,7 +218,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     first_line.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

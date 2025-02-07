@@ -65,7 +65,7 @@ impl Violation for UnnecessaryDunderCall {
 }
 
 /// PLC2801
-pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -210,7 +210,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
         )));
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.

@@ -139,13 +139,11 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     &checker.semantic,
                 )
             }) {
-                checker
-                    .diagnostics
-                    .extend(flake8_annotations::rules::definition(
-                        checker,
-                        definition,
-                        *visibility,
-                    ));
+                checker.report_diagnostics(flake8_annotations::rules::definition(
+                    checker,
+                    definition,
+                    *visibility,
+                ));
             }
             overloaded_name =
                 flake8_annotations::helpers::overloaded_name(definition, &checker.semantic);

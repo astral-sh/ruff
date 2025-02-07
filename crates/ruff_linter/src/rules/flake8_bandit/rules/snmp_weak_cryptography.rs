@@ -40,7 +40,7 @@ impl Violation for SnmpWeakCryptography {
 }
 
 /// S509
-pub(crate) fn snmp_weak_cryptography(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn snmp_weak_cryptography(checker: &Checker, call: &ast::ExprCall) {
     if call.arguments.len() < 3 {
         if checker
             .semantic()
@@ -52,9 +52,7 @@ pub(crate) fn snmp_weak_cryptography(checker: &mut Checker, call: &ast::ExprCall
                 )
             })
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
         }
     }
 }

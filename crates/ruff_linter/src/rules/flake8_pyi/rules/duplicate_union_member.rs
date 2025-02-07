@@ -61,7 +61,7 @@ impl Violation for DuplicateUnionMember {
 }
 
 /// PYI016
-pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) {
+pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
@@ -129,7 +129,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
     }
 
     // Add all diagnostics to the checker
-    checker.diagnostics.append(&mut diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

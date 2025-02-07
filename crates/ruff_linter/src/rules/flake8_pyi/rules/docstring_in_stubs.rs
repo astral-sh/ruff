@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for DocstringInStub {
 
 /// PYI021
 pub(crate) fn docstring_in_stubs(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     docstring: Option<&ExprStringLiteral>,
 ) {
@@ -66,5 +66,5 @@ pub(crate) fn docstring_in_stubs(
     let fix = Fix::unsafe_edit(edit);
     let diagnostic = Diagnostic::new(DocstringInStub, docstring_range).with_fix(fix);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

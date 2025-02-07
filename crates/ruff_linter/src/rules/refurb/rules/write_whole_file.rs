@@ -52,7 +52,7 @@ impl Violation for WriteWholeFile {
 }
 
 /// FURB103
-pub(crate) fn write_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
+pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
     // `async` check here is more of a precaution.
     if with.is_async {
         return;
@@ -90,7 +90,7 @@ pub(crate) fn write_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
             )
         })
         .collect();
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// AST visitor that matches `open` operations with the corresponding `write` calls.

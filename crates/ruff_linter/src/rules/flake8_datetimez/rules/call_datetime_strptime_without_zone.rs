@@ -84,7 +84,7 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
 }
 
 /// DTZ007
-pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -139,7 +139,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
         semantic.current_expression_grandparent(),
         semantic.current_expression_parent(),
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone(antipattern),
             call.range,
         ));

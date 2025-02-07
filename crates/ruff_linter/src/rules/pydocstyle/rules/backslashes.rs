@@ -58,7 +58,7 @@ impl Violation for EscapeSequenceInDocstring {
 }
 
 /// D301
-pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
     // Docstring is already raw.
     if docstring.leading_quote().contains(['r', 'R']) {
         return;
@@ -106,7 +106,7 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
                 )));
             }
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
             break;
         }
     }

@@ -41,7 +41,7 @@ impl Violation for ExceptionWithoutExcInfo {
 }
 
 /// LOG007
-pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
     match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if !matches!(
@@ -74,13 +74,11 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
     }
 
     if exc_info_arg_is_falsey(call, checker) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
+        checker.report_diagnostic(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
     }
 }
 
-fn exc_info_arg_is_falsey(call: &ExprCall, checker: &mut Checker) -> bool {
+fn exc_info_arg_is_falsey(call: &ExprCall, checker: &Checker) -> bool {
     call.arguments
         .find_keyword("exc_info")
         .map(|keyword| &keyword.value)

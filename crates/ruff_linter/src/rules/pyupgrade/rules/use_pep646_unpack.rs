@@ -52,7 +52,7 @@ impl Violation for NonPEP646Unpack {
 }
 
 /// UP044
-pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
+pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
     if checker.settings.target_version < PythonVersion::Py311 {
         return;
     }
@@ -93,7 +93,7 @@ pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
         format!("*{}", checker.locator().slice(slice.as_ref())),
         *range,
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Determine whether the [`ExprSubscript`] is in a subscript index (e.g., `Generic[Unpack[int]]`).

@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for TypeNoneComparison {
 }
 
 /// FURB169
-pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let ([op], [right]) = (&*compare.ops, &*compare.comparators) else {
         return;
     };
@@ -91,7 +91,7 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
     let negate = replacement == IdentityCheck::IsNot;
     let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Returns the object passed to the function, if the expression is a call to

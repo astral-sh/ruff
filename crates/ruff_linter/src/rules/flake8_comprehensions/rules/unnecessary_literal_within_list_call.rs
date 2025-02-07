@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         }
     };
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

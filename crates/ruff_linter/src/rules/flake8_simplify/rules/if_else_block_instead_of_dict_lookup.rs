@@ -40,7 +40,7 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
     }
 }
 /// SIM116
-pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &ast::StmtIf) {
     // Throughout this rule:
     // * Each if or elif statement's test must consist of a constant equality check with the same variable.
     // * Each if or elif statement's body must consist of a single `return`.
@@ -156,7 +156,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         IfElseBlockInsteadOfDictLookup,
         stmt_if.range(),
     ));

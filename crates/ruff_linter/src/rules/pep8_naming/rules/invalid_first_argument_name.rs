@@ -176,11 +176,7 @@ impl FunctionType {
 }
 
 /// N804, N805
-pub(crate) fn invalid_first_argument_name(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         parameters,
@@ -258,7 +254,7 @@ pub(crate) fn invalid_first_argument_name(
             checker.stylist(),
         )
     });
-    diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.

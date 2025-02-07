@@ -62,7 +62,7 @@ impl Violation for ReimplementedStarmap {
 }
 
 /// FURB140
-pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandidate) {
+pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
     let [comprehension] = target.generators() else {
         return;
@@ -156,7 +156,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         );
         Ok(Fix::safe_edits(import_edit, [main_edit]))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.

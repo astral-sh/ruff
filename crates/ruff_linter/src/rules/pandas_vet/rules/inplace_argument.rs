@@ -51,7 +51,7 @@ impl Violation for PandasUseOfInplaceArgument {
 }
 
 /// PD002
-pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
     // If the function was imported from another module, and it's _not_ Pandas, abort.
     if checker
         .semantic()
@@ -100,7 +100,7 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                     }
                 }
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
 
             // Duplicate keywords is a syntax error, so we can stop here.

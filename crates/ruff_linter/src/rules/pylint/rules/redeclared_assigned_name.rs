@@ -42,7 +42,7 @@ impl Violation for RedeclaredAssignedName {
 }
 
 /// PLW0128
-pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr>) {
+pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &Vec<Expr>) {
     let mut names: Vec<Name> = Vec::new();
 
     for target in targets {
@@ -50,7 +50,7 @@ pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr
     }
 }
 
-fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
+fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
     match expr {
         Expr::Tuple(tuple) => {
             for target in tuple {
@@ -63,7 +63,7 @@ fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
                 return;
             }
             if names.contains(id) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RedeclaredAssignedName {
                         name: id.to_string(),
                     },

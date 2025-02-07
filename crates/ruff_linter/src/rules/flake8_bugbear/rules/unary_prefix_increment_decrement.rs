@@ -51,7 +51,7 @@ impl Violation for UnaryPrefixIncrementDecrement {
 
 /// B002
 pub(crate) fn unary_prefix_increment_decrement(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,
@@ -61,7 +61,7 @@ pub(crate) fn unary_prefix_increment_decrement(
     };
     match (op, nested_op) {
         (UnaryOp::UAdd, UnaryOp::UAdd) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Increment,
                 },
@@ -69,7 +69,7 @@ pub(crate) fn unary_prefix_increment_decrement(
             ));
         }
         (UnaryOp::USub, UnaryOp::USub) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Decrement,
                 },

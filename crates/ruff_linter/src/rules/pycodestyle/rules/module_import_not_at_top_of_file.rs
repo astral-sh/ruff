@@ -56,9 +56,9 @@ impl Violation for ModuleImportNotAtTopOfFile {
 }
 
 /// E402
-pub(crate) fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             ModuleImportNotAtTopOfFile {
                 source_type: checker.source_type,
             },

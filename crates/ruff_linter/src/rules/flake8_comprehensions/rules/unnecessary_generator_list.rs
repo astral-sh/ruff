@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
 }
 
 /// C400 (`list(generator)`)
-pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "list",
         &call.func,
@@ -102,7 +102,7 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
                 );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
-                checker.diagnostics.push(diagnostic.with_fix(fix));
+                checker.report_diagnostic(diagnostic.with_fix(fix));
                 return;
             }
         }
@@ -156,5 +156,5 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

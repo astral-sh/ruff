@@ -50,7 +50,7 @@ impl Violation for UselessContextlibSuppress {
 
 /// B022
 pub(crate) fn useless_contextlib_suppress(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -63,8 +63,6 @@ pub(crate) fn useless_contextlib_suppress(
                 matches!(qualified_name.segments(), ["contextlib", "suppress"])
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UselessContextlibSuppress, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(UselessContextlibSuppress, expr.range()));
     }
 }

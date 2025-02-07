@@ -84,7 +84,6 @@ pub(crate) fn builtin_attribute_shadowing(
     scope_id: ScopeId,
     scope: &Scope,
     class_def: &ast::StmtClassDef,
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (name, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
@@ -136,7 +135,7 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),

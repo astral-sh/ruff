@@ -36,7 +36,7 @@ impl Violation for InvalidEnvvarValue {
 }
 
 /// PLE1507
-pub(crate) fn invalid_envvar_value(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_envvar_value(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -58,8 +58,6 @@ pub(crate) fn invalid_envvar_value(checker: &mut Checker, call: &ast::ExprCall) 
             return;
         }
 
-        checker
-            .diagnostics
-            .push(Diagnostic::new(InvalidEnvvarValue, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(InvalidEnvvarValue, expr.range()));
     }
 }

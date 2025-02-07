@@ -65,7 +65,7 @@ impl Violation for MutableFromkeysValue {
 }
 
 /// RUF024
-pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -92,7 +92,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where

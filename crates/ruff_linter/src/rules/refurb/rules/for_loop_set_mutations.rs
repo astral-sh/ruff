@@ -60,7 +60,7 @@ impl AlwaysFixableViolation for ForLoopSetMutations {
 }
 
 /// FURB142
-pub(crate) fn for_loop_set_mutations(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     if !for_stmt.orelse.is_empty() {
         return;
     }
@@ -136,5 +136,5 @@ pub(crate) fn for_loop_set_mutations(checker: &mut Checker, for_stmt: &StmtFor) 
         for_stmt.range,
     );
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

@@ -57,7 +57,7 @@ impl Violation for UselessComparison {
 }
 
 /// B015
-pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
     if expr.is_compare_expr() {
         let semantic = checker.semantic();
 
@@ -78,7 +78,7 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
                 .and_then(Stmt::as_expr_stmt)
                 .is_some_and(|last_stmt| &*last_stmt.value == expr)
             {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UselessComparison {
                         at: ComparisonLocationAt::EndOfFunction,
                     },
@@ -88,7 +88,7 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
             }
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UselessComparison {
                 at: ComparisonLocationAt::MiddleBody,
             },

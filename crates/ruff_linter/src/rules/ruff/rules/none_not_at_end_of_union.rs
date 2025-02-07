@@ -40,7 +40,7 @@ impl Violation for NoneNotAtEndOfUnion {
 }
 
 /// RUF036
-pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Expr) {
+pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let semantic = checker.semantic();
     let mut none_exprs: SmallVec<[&Expr; 1]> = SmallVec::new();
 
@@ -70,8 +70,6 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
     }
 
     for none_expr in none_exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
+        checker.report_diagnostic(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
     }
 }

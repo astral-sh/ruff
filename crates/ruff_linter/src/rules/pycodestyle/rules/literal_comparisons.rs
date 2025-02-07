@@ -171,7 +171,7 @@ impl AlwaysFixableViolation for TrueFalseComparison {
 }
 
 /// E711, E712
-pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare) {
     // Mapping from (bad operator index) to (replacement operator). As we iterate
     // through the list of operators, we apply "dummy" fixes for each error,
     // then replace the entire expression at the end with one "real" fix, to
@@ -347,5 +347,5 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

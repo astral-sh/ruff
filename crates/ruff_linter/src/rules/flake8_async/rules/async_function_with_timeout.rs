@@ -87,10 +87,7 @@ impl Violation for AsyncFunctionWithTimeout {
 }
 
 /// ASYNC109
-pub(crate) fn async_function_with_timeout(
-    checker: &mut Checker,
-    function_def: &ast::StmtFunctionDef,
-) {
+pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // Detect `async` calls with a `timeout` argument.
     if !function_def.is_async {
         return;
@@ -115,7 +112,7 @@ pub(crate) fn async_function_with_timeout(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         AsyncFunctionWithTimeout { module },
         timeout.range(),
     ));
