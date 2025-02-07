@@ -6,7 +6,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::combine::Combine;
-use crate::metadata::pyproject::{Project, PyProject, PyProjectError};
+use crate::metadata::pyproject::{Project, PyProject, PyProjectError, TooLargeRequiresPythonError};
 use crate::metadata::value::ValueSource;
 use options::KnotTomlError;
 use options::Options;
@@ -49,7 +49,10 @@ impl ProjectMetadata {
     }
 
     /// Loads a project from a `pyproject.toml` file.
-    pub(crate) fn from_pyproject(pyproject: PyProject, root: SystemPathBuf) -> Self {
+    pub(crate) fn from_pyproject(
+        pyproject: PyProject,
+        root: SystemPathBuf,
+    ) -> Result<Self, TooLargeRequiresPythonError> {
         Self::from_options(
             pyproject
                 .tool
@@ -62,22 +65,36 @@ impl ProjectMetadata {
 
     /// Loads a project from a set of options with an optional pyproject-project table.
     pub(crate) fn from_options(
-        options: Options,
+        mut options: Options,
         root: SystemPathBuf,
         project: Option<&Project>,
-    ) -> Self {
+    ) -> Result<Self, TooLargeRequiresPythonError> {
         let name = project
-            .and_then(|project| project.name.as_ref())
-            .map(|name| Name::new(&***name))
+            .and_then(|project| project.name.as_deref())
+            .map(|name| Name::new(&**name))
             .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
 
-        // TODO(https://github.com/astral-sh/ruff/issues/15491): Respect requires-python
-        Self {
+        // If the project doesn't specify a python version but the `project.requires-python` field is set, resolve the version
+        if let Some(project) = project {
+            if !options
+                .environment
+                .as_ref()
+                .is_some_and(|env| env.python_version.is_some())
+            {
+                if let Some(requires_python) = project.resolve_requires_python_lower_bound()? {
+                    let mut environment = options.environment.unwrap_or_default();
+                    environment.python_version = Some(requires_python);
+                    options.environment = Some(environment);
+                }
+            }
+        }
+
+        Ok(Self {
             name,
             root,
             options,
             extra_configuration_paths: Vec::new(),
-        }
+        })
     }
 
     /// Discovers the closest project at `path` and returns its metadata.
@@ -145,19 +162,34 @@ impl ProjectMetadata {
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
-                return Ok(ProjectMetadata::from_options(
+
+                let metadata = ProjectMetadata::from_options(
                     options,
                     project_root.to_path_buf(),
                     pyproject
                         .as_ref()
                         .and_then(|pyproject| pyproject.project.as_ref()),
-                ));
+                )
+                .map_err(|err| {
+                    ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                        source: err,
+                        path: pyproject_path,
+                    }
+                })?;
+
+                return Ok(metadata);
             }
 
             if let Some(pyproject) = pyproject {
                 let has_knot_section = pyproject.knot().is_some();
                 let metadata =
-                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf());
+                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
+                        .map_err(
+                            |err| ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                                source: err,
+                                path: pyproject_path,
+                            },
+                        )?;
 
                 if has_knot_section {
                     tracing::debug!("Found project at '{}'", project_root);
@@ -260,6 +292,12 @@ pub enum ProjectDiscoveryError {
     #[error("{path} is not a valid `knot.toml`: {source}")]
     InvalidKnotToml {
         source: Box<KnotTomlError>,
+        path: SystemPathBuf,
+    },
+
+    #[error("the `requires-python` constraint in `{path}` is invalid: {source}")]
+    InvalidRequiresPythonConstraint {
+        source: TooLargeRequiresPythonError,
         path: SystemPathBuf,
     },
 }
@@ -527,23 +565,168 @@ expected `.`, `]`
                 (
                     root.join("pyproject.toml"),
                     r#"
-                        [project]
-                        name = "super-app"
-                        requires-python = ">=3.12"
+                    [project]
+                    name = "super-app"
+                    requires-python = ">=3.12"
 
-                        [tool.knot.src]
-                        root = "this_option_is_ignored"
-                        "#,
+                    [tool.knot.src]
+                    root = "this_option_is_ignored"
+                    "#,
                 ),
                 (
                     root.join("knot.toml"),
                     r#"
-                        [src]
-                        root = "src"
-                        "#,
+                    [src]
+                    root = "src"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+    #[test]
+    fn requires_python_no_python_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3.12"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_major_only() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+
+    /// A `requires-python` constraint with major, minor and patch can be simplified
+    /// to major and minor (e.g. 3.12.1 -> 3.12).
+    #[test]
+    fn requires_python_major_minor_patch() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3.12.8"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_beta_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">= 3.13.0b0"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_greater_than_major_minor() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                # This is somewhat nonsensical because 3.12.1 > 3.12 is true.
+                # That's why simplifying the constraint to >= 3.12 is correct
+                requires-python = ">3.12"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        snapshot_project!(root);
+
+        Ok(())
+    }
+
+    /// `python-version` takes precedence if both `requires-python` and `python-version` are configured.
+    #[test]
+    fn requires_python_and_python_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3.12"
+
+                [tool.knot.environment]
+                python-version = "3.10"
+                "#,
+            )
+            .context("Failed to write file")?;
 
         let root = ProjectMetadata::discover(&root, &system)?;
 
