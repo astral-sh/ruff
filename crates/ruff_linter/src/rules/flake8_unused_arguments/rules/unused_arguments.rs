@@ -404,11 +404,8 @@ pub(crate) fn is_not_implemented_stub_with_variable(
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
-pub(crate) fn unused_arguments(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
+    let mut diagnostics = Vec::new();
     if scope.uses_locals() {
         return;
     }
@@ -450,7 +447,7 @@ pub(crate) fn unused_arguments(
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
-                            diagnostics,
+                            &mut diagnostics,
                         );
                     }
                 }
@@ -476,7 +473,7 @@ pub(crate) fn unused_arguments(
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
-                            diagnostics,
+                            &mut diagnostics,
                         );
                     }
                 }
@@ -502,7 +499,7 @@ pub(crate) fn unused_arguments(
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
-                            diagnostics,
+                            &mut diagnostics,
                         );
                     }
                 }
@@ -528,7 +525,7 @@ pub(crate) fn unused_arguments(
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
-                            diagnostics,
+                            &mut diagnostics,
                         );
                     }
                 }
@@ -547,11 +544,12 @@ pub(crate) fn unused_arguments(
                             .settings
                             .flake8_unused_arguments
                             .ignore_variadic_names,
-                        diagnostics,
+                        &mut diagnostics,
                     );
                 }
             }
         }
         _ => panic!("Expected ScopeKind::Function | ScopeKind::Lambda"),
     }
+    checker.report_diagnostics(diagnostics);
 }

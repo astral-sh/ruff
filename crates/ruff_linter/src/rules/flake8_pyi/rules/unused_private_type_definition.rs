@@ -178,11 +178,7 @@ impl Violation for UnusedPrivateTypedDict {
 }
 
 /// PYI018
-pub(crate) fn unused_private_type_var(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
     for binding in scope
         .binding_ids()
         .map(|binding_id| checker.semantic().binding(binding_id))
@@ -242,16 +238,12 @@ pub(crate) fn unused_private_type_var(
             diagnostic.set_fix(Fix::unsafe_edit(edit));
         }
 
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// PYI046
-pub(crate) fn unused_private_protocol(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
     for binding in scope
         .binding_ids()
         .map(|binding_id| checker.semantic().binding(binding_id))
@@ -279,7 +271,7 @@ pub(crate) fn unused_private_protocol(
             continue;
         }
 
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedPrivateProtocol {
                 name: class_def.name.to_string(),
             },
@@ -289,11 +281,7 @@ pub(crate) fn unused_private_protocol(
 }
 
 /// PYI047
-pub(crate) fn unused_private_type_alias(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
     let semantic = checker.semantic();
 
     for binding in scope
@@ -315,7 +303,7 @@ pub(crate) fn unused_private_type_alias(
             continue;
         };
 
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedPrivateTypeAlias {
                 name: alias_name.to_string(),
             },
@@ -345,11 +333,7 @@ fn extract_type_alias_name<'a>(stmt: &'a ast::Stmt, semantic: &SemanticModel) ->
 }
 
 /// PYI049
-pub(crate) fn unused_private_typed_dict(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
     let semantic = checker.semantic();
 
     for binding in scope
@@ -374,7 +358,7 @@ pub(crate) fn unused_private_typed_dict(
             continue;
         };
 
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedPrivateTypedDict {
                 name: class_name.to_string(),
             },

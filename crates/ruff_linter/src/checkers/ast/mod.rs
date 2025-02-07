@@ -2730,7 +2730,7 @@ pub(crate) fn check_ast(
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
     checker.analyze.scopes.push(ScopeId::global());
-    analyze::deferred_scopes(&mut checker);
+    analyze::deferred_scopes(&checker);
 
     checker.diagnostics.take()
 }
