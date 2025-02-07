@@ -493,7 +493,7 @@ impl<'a> Checker<'a> {
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
     pub(crate) fn push_type_diagnostic(&mut self, diagnostic: Diagnostic) {
         if !self.semantic.in_no_type_check() {
-            self.diagnostics.push(diagnostic);
+            self.diagnostics.get_mut().push(diagnostic);
         }
     }
 }
@@ -2576,7 +2576,7 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                            self.diagnostics.push(
+                            self.diagnostics.get_mut().push(
                                 Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
@@ -2591,7 +2591,7 @@ impl<'a> Checker<'a> {
                             if self.settings.preview.is_enabled()
                                 || !self.path.ends_with("__init__.py")
                             {
-                                self.diagnostics.push(
+                                self.diagnostics.get_mut().push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
@@ -2723,5 +2723,5 @@ pub(crate) fn check_ast(
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&mut checker);
 
-    checker.diagnostics
+    checker.diagnostics.take()
 }
