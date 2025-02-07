@@ -423,6 +423,7 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 }
 
 /// Check if the suspected context is really a section header.
+#[allow(clippy::too_many_arguments)]
 fn is_docstring_section(
     line: &Line,
     indent_size: TextSize,
