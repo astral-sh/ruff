@@ -1045,5 +1045,5 @@ pub(crate) fn check_docstring(
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

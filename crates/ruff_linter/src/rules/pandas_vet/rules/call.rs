@@ -200,7 +200,5 @@ pub(crate) fn call(checker: &mut Checker, func: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(violation, func.range()));
+    checker.report_diagnostic(Diagnostic::new(violation, func.range()));
 }

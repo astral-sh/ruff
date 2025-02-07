@@ -86,5 +86,5 @@ pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) 
         format!("{}.copy()", checker.locator().slice(arg)),
         call.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

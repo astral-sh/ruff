@@ -123,7 +123,7 @@ pub(crate) fn object_without_hash_method(checker: &mut Checker, class: &StmtClas
         }
     ) {
         let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range());
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

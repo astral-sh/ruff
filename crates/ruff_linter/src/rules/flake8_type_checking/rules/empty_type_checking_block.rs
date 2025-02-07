@@ -71,5 +71,5 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

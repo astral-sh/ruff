@@ -100,7 +100,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
@@ -150,7 +150,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
             tuple.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// UP041

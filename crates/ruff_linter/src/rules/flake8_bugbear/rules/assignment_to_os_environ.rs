@@ -66,7 +66,5 @@ pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) 
     if id != "os" {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(AssignmentToOsEnviron, target.range()));
+    checker.report_diagnostic(Diagnostic::new(AssignmentToOsEnviron, target.range()));
 }

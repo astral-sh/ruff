@@ -164,7 +164,7 @@ fn key_in_dict(
             ));
         }
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM118 in a `for` loop.

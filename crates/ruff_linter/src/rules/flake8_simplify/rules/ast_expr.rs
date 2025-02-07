@@ -169,7 +169,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -232,7 +232,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         checker.generator().expr(&new_env_var),
         slice.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM910
@@ -303,5 +303,5 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

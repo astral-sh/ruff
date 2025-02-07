@@ -80,8 +80,6 @@ pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
             return;
         }
 
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UselessWithLock, call.range()));
+        checker.report_diagnostic(Diagnostic::new(UselessWithLock, call.range()));
     }
 }

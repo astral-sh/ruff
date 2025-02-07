@@ -99,7 +99,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             continue;
         };
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             AssertRaisesException { exception },
             item.range(),
         ));

@@ -389,7 +389,7 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             "return".to_string(),
             stmt.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -404,7 +404,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
             "return None".to_string(),
             stmt.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -465,7 +465,7 @@ fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
             end_of_last_statement(stmt, checker.locator()),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns a list of all implicit returns in the given statement.
@@ -651,7 +651,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
 
             Ok(Fix::unsafe_edits(replace_assign, [delete_return]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -682,7 +682,7 @@ fn superfluous_else_node(
                         checker.stylist(),
                     )
                 });
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
             return true;
         } else if child.is_break_stmt() {
@@ -701,7 +701,7 @@ fn superfluous_else_node(
                     )
                 });
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
             return true;
         } else if child.is_raise_stmt() {
@@ -720,7 +720,7 @@ fn superfluous_else_node(
                     )
                 });
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
             return true;
         } else if child.is_continue_stmt() {
@@ -739,7 +739,7 @@ fn superfluous_else_node(
                     )
                 });
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
             return true;
         }

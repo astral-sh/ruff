@@ -118,6 +118,6 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
                 blank_end,
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

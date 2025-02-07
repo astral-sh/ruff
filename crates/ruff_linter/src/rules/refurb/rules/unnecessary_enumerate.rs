@@ -144,7 +144,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         (false, true) => {
             // Ensure the sequence object works with `len`. If it doesn't, the
@@ -205,7 +205,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

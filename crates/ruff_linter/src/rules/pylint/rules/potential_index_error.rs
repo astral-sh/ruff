@@ -66,8 +66,6 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
     // Emit a diagnostic if the index is out of bounds. If the index can't be represented as an
     // `i64`, but the length _can_, then the index is definitely out of bounds.
     if index.map_or(true, |index| index >= length || index < -length) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PotentialIndexError, slice.range()));
+        checker.report_diagnostic(Diagnostic::new(PotentialIndexError, slice.range()));
     }
 }

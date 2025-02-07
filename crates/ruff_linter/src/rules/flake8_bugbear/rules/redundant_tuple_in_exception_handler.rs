@@ -103,6 +103,6 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             ),
             type_.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

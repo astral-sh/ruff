@@ -166,7 +166,7 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
         diagnostic.set_fix(fix);
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

@@ -609,6 +609,6 @@ fn check_and_push_diagnostic(
 ) {
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

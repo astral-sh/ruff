@@ -71,7 +71,7 @@ pub(crate) fn comparison_of_constant(
                 left.range(),
             );
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         };
     }
 }

@@ -165,5 +165,5 @@ pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, call: &ast::ExprCal
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

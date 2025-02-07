@@ -86,7 +86,5 @@ pub(crate) fn call_datetime_utcfromtimestamp(
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
+    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
 }

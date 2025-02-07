@@ -158,7 +158,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             Some(diagnostic)
         });
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// Checks whether two compare expressions are simplifiable

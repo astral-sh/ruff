@@ -127,5 +127,5 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
             checker.semantic().current_statement_parent_id(),
         )))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -129,7 +129,7 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
         diagnostics.push(diagnostic);
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// Generate a [`Fix`] to transform a `__post_init__` default argument into a

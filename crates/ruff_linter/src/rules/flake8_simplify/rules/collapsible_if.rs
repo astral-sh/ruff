@@ -138,7 +138,7 @@ pub(crate) fn nested_if_statements(
             }
         });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy)]

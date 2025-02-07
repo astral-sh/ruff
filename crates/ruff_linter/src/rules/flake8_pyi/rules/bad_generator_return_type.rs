@@ -232,7 +232,7 @@ pub(crate) fn bad_generator_return_type(
         )
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the [`ast::Expr`] is a `None` literal or a `typing.Any` expression.

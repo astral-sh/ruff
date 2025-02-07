@@ -81,7 +81,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// PLC0414
@@ -119,5 +119,5 @@ pub(crate) fn useless_import_from_alias(
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

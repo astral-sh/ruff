@@ -738,7 +738,7 @@ pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtIm
                 import_from_stmt.range(),
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 
     for operation in fixer.with_renames() {
@@ -748,6 +748,6 @@ pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtIm
             },
             import_from_stmt.range(),
         );
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

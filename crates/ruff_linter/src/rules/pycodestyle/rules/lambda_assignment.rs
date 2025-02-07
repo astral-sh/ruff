@@ -130,7 +130,7 @@ pub(crate) fn lambda_assignment(
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Extract the argument types and return type from a `Callable` annotation.

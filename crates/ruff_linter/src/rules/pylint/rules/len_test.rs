@@ -90,7 +90,7 @@ pub(crate) fn len_test(checker: &mut Checker, call: &ExprCall) {
 
     let replacement = checker.locator().slice(argument.range()).to_string();
 
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(
             LenTest {
                 expression: SourceCodeSnippet::new(replacement.clone()),

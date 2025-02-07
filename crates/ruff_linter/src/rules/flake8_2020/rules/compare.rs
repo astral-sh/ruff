@@ -243,9 +243,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
                     ) = (ops, comparators)
                     {
                         if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo0Eq3, left.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                SysVersionInfo0Eq3,
+                                left.range(),
+                            ));
                         }
                     }
                 } else if *i == 1 {
@@ -258,9 +259,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
                     ) = (ops, comparators)
                     {
                         if checker.enabled(Rule::SysVersionInfo1CmpInt) {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo1CmpInt, left.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                SysVersionInfo1CmpInt,
+                                left.range(),
+                            ));
                         }
                     }
                 }
@@ -279,9 +281,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
             ) = (ops, comparators)
             {
                 if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersionInfoMinorCmpInt, left.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        SysVersionInfoMinorCmpInt,
+                        left.range(),
+                    ));
                 }
             }
         }
@@ -297,14 +300,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
         {
             if value.len() == 1 {
                 if checker.enabled(Rule::SysVersionCmpStr10) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersionCmpStr10, left.range()));
+                    checker.report_diagnostic(Diagnostic::new(SysVersionCmpStr10, left.range()));
                 }
             } else if checker.enabled(Rule::SysVersionCmpStr3) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(SysVersionCmpStr3, left.range()));
+                checker.report_diagnostic(Diagnostic::new(SysVersionCmpStr3, left.range()));
             }
         }
     }

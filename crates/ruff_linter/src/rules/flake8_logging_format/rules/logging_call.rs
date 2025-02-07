@@ -48,16 +48,12 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
                 if checker.enabled(Rule::LoggingStringConcat) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(LoggingStringConcat, msg.range()));
+                    checker.report_diagnostic(Diagnostic::new(LoggingStringConcat, msg.range()));
                 }
             }
             Operator::Mod => {
                 if checker.enabled(Rule::LoggingPercentFormat) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(LoggingPercentFormat, msg.range()));
+                    checker.report_diagnostic(Diagnostic::new(LoggingPercentFormat, msg.range()));
                 }
             }
             _ => {}
@@ -65,9 +61,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         // Check for f-strings.
         Expr::FString(_) => {
             if checker.enabled(Rule::LoggingFString) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(LoggingFString, msg.range()));
+                checker.report_diagnostic(Diagnostic::new(LoggingFString, msg.range()));
             }
         }
         // Check for .format() calls.
@@ -76,8 +70,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     if attr == "format" && value.is_literal_expr() {
                         checker
-                            .diagnostics
-                            .push(Diagnostic::new(LoggingStringFormat, msg.range()));
+                            .report_diagnostic(Diagnostic::new(LoggingStringFormat, msg.range()));
                     }
                 }
             }
@@ -98,7 +91,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                     None
                 }
             }) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     LoggingExtraAttrClash(invalid_key.value.to_string()),
                     invalid_key.range(),
                 ));
@@ -113,7 +106,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                 for keyword in keywords {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 LoggingExtraAttrClash(attr.to_string()),
                                 keyword.range(),
                             ));
@@ -196,7 +189,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
                 "warning".to_string(),
                 range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -219,16 +212,15 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             match logging_level {
                 LoggingLevel::Error => {
                     if checker.enabled(Rule::LoggingExcInfo) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(LoggingExcInfo, range));
+                        checker.report_diagnostic(Diagnostic::new(LoggingExcInfo, range));
                     }
                 }
                 LoggingLevel::Exception => {
                     if checker.enabled(Rule::LoggingRedundantExcInfo) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(LoggingRedundantExcInfo, exc_info.range()));
+                        checker.report_diagnostic(Diagnostic::new(
+                            LoggingRedundantExcInfo,
+                            exc_info.range(),
+                        ));
                     }
                 }
                 _ => {}

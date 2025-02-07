@@ -115,9 +115,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(RaiseWithinTry, stmt.range()));
         }
     }
 }

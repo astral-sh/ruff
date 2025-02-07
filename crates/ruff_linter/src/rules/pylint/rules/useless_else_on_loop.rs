@@ -86,7 +86,7 @@ pub(crate) fn useless_else_on_loop(
             checker.stylist(),
         )
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the given body contains a `break` statement.

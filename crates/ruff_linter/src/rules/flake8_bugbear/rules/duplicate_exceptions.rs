@@ -167,7 +167,7 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 expr.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -217,7 +217,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
                     .current_statement()
                     .as_try_stmt()
                     .is_some_and(|try_stmt| try_stmt.is_star);
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),
                         is_star,

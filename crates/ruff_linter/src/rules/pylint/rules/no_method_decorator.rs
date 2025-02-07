@@ -191,7 +191,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                             checker.indexer(),
                         )],
                     ));
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
                 None => {
                     continue;

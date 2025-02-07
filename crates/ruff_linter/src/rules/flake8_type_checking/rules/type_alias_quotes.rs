@@ -297,7 +297,7 @@ pub(crate) fn quoted_type_alias(
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Traverses the type expression and checks if the expression can safely

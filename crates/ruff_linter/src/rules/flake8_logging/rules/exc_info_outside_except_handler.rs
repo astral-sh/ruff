@@ -114,5 +114,5 @@ pub(crate) fn exc_info_outside_except_handler(checker: &mut Checker, call: &Expr
         Ok(Fix::unsafe_edit(edit))
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -72,7 +72,7 @@ pub(crate) fn except_with_non_exception_classes(
                 .current_statement()
                 .as_try_stmt()
                 .is_some_and(|try_stmt| try_stmt.is_star);
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 ExceptWithNonExceptionClasses { is_star },
                 expr.range(),
             ));

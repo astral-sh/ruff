@@ -115,7 +115,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &mut Checker, class_def: &Stmt
         )
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn typing_generic_base_and_arguments<'a>(

@@ -82,7 +82,5 @@ pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location:
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeUtcnow, location));
+    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcnow, location));
 }

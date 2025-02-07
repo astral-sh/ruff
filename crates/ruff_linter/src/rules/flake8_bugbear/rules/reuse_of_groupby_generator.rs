@@ -339,8 +339,6 @@ pub(crate) fn reuse_of_groupby_generator(
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
     }
 }

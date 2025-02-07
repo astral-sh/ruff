@@ -95,7 +95,7 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         diagnostic.set_fix(fix);
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Replace the `starmap` call with a call to the `map` builtin, if `map` has not been shadowed.

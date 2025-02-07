@@ -91,5 +91,5 @@ pub(crate) fn sync_call(checker: &mut Checker, call: &ExprCall) {
             call.func.start(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

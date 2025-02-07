@@ -124,7 +124,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

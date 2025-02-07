@@ -134,7 +134,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
         contents,
         stmt_for.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if the two expressions are equivalent, and both consistent solely

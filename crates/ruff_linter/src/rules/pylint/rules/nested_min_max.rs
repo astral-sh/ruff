@@ -173,6 +173,6 @@ pub(crate) fn nested_min_max(
                 expr.range(),
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

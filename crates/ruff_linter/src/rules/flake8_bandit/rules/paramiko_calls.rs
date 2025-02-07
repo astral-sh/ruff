@@ -45,8 +45,6 @@ pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
             matches!(qualified_name.segments(), ["paramiko", "exec_command"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ParamikoCall, func.range()));
+        checker.report_diagnostic(Diagnostic::new(ParamikoCall, func.range()));
     }
 }

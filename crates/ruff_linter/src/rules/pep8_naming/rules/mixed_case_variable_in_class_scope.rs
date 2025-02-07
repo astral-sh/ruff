@@ -72,7 +72,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         MixedCaseVariableInClassScope {
             name: name.to_string(),
         },

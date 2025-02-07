@@ -229,7 +229,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     clean_space(docstring.indentation),
                     TextRange::at(line.start(), line_indent.text_len()),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -266,9 +266,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
 
     if checker.enabled(Rule::DocstringTabIndentation) {
         if has_seen_tab {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(DocstringTabIndentation, docstring.range()));
+            checker.report_diagnostic(Diagnostic::new(DocstringTabIndentation, docstring.range()));
         }
     }
 
@@ -312,7 +310,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -334,7 +332,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

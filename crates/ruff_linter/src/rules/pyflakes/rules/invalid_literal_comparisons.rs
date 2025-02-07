@@ -117,7 +117,7 @@ pub(crate) fn invalid_literal_comparison(
                     bail!("Failed to fix invalid comparison due to missing op")
                 }
             });
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         left = right;
     }

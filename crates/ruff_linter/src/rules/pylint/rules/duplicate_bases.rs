@@ -83,7 +83,7 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Opti
                     )
                     .map(Fix::safe_edit)
                 });
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

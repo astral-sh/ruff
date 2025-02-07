@@ -112,7 +112,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
         diagnostic.try_set_fix(|| {
             convert_call_to_conversion_flag(f_string, index, checker.locator(), checker.stylist())
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

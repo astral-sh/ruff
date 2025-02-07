@@ -75,5 +75,5 @@ pub(crate) fn runtime_cast_value(checker: &mut Checker, type_expr: &Expr) {
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

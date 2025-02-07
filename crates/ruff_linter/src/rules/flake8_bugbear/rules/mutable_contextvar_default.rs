@@ -102,8 +102,6 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MutableContextvarDefault, default.range()));
+        checker.report_diagnostic(Diagnostic::new(MutableContextvarDefault, default.range()));
     }
 }

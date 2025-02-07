@@ -75,7 +75,5 @@ pub(crate) fn call_datetime_today(checker: &mut Checker, func: &Expr, location: 
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeToday, location));
+    checker.report_diagnostic(Diagnostic::new(CallDatetimeToday, location));
 }

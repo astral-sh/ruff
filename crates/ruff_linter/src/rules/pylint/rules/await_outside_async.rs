@@ -78,7 +78,5 @@ pub(crate) fn await_outside_async<T: Ranged>(checker: &mut Checker, node: T) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(AwaitOutsideAsync, node.range()));
+    checker.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, node.range()));
 }

@@ -56,7 +56,5 @@ pub(crate) fn complex_assignment_in_stub(checker: &mut Checker, stmt: &StmtAssig
     if matches!(stmt.targets.as_slice(), [Expr::Name(_)]) {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ComplexAssignmentInStub, stmt.range));
+    checker.report_diagnostic(Diagnostic::new(ComplexAssignmentInStub, stmt.range));
 }

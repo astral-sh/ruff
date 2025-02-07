@@ -130,7 +130,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the typename, args, keywords, and base class.

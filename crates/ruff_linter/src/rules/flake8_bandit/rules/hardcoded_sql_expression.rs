@@ -105,9 +105,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(HardcodedSQLExpression, expr.range()));
     }
 }
 

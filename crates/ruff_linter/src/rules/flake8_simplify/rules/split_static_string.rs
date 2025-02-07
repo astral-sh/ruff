@@ -112,7 +112,7 @@ pub(crate) fn split_static_string(
             },
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {

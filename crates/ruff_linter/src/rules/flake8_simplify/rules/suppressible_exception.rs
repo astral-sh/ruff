@@ -147,5 +147,5 @@ pub(crate) fn suppressible_exception(
             ))
         });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

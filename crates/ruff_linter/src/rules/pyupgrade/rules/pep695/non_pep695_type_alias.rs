@@ -182,7 +182,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         Applicability::Safe
     };
 
-    checker.diagnostics.push(create_diagnostic(
+    checker.report_diagnostic(create_diagnostic(
         checker.source(),
         stmt.range,
         &target_name.id,
@@ -242,7 +242,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         return;
     }
 
-    checker.diagnostics.push(create_diagnostic(
+    checker.report_diagnostic(create_diagnostic(
         checker.source(),
         stmt.range(),
         name,

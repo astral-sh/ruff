@@ -88,5 +88,5 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

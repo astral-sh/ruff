@@ -75,7 +75,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: String
         }
     }
 
-    checker.diagnostics.extend(rule_checker.into_diagnostics());
+    checker.report_diagnostics(rule_checker.into_diagnostics());
 }
 
 /// Checks for `Q003` violations using the [`Visitor`] implementation.

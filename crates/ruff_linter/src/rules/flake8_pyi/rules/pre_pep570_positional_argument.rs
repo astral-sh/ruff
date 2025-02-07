@@ -90,7 +90,7 @@ pub(crate) fn pep_484_positional_parameter(
 
     if let Some(arg) = function_def.parameters.args.get(skip) {
         if is_old_style_positional_only(arg) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Pep484StylePositionalOnlyParameter,
                 arg.identifier(),
             ));

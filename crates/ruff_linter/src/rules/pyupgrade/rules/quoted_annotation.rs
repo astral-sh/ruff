@@ -108,7 +108,7 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     let edit = Edit::range_replacement(new_content, range);
     let fix = Fix::safe_edit(edit);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 fn in_parameter_annotation(offset: TextSize, semantic: &SemanticModel) -> bool {

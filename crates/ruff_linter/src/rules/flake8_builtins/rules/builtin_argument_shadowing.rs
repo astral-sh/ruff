@@ -92,7 +92,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },

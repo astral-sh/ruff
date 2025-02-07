@@ -78,7 +78,7 @@ pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             YieldOutsideFunction { keyword },
             expr.range(),
         ));

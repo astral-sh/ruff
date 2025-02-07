@@ -149,7 +149,7 @@ pub(crate) fn unnecessary_map(checker: &mut Checker, call: &ast::ExprCall) {
         )
         .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {

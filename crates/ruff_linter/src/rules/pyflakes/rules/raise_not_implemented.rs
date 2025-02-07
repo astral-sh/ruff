@@ -86,5 +86,5 @@ pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

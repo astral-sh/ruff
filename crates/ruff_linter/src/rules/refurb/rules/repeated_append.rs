@@ -127,7 +127,7 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
         })
         .collect();
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Debug, Clone)]

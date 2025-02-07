@@ -23,7 +23,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
                     except_handler,
                     checker.locator,
                 ) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::RaiseWithoutFromInsideExcept) {

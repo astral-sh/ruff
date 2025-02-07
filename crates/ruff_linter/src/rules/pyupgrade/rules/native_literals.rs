@@ -202,7 +202,7 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         Some(arg) => {
             let literal_expr = if let Some(literal_expr) = arg.as_literal_expr() {
@@ -254,7 +254,7 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

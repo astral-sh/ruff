@@ -48,7 +48,7 @@ where
         contents.replacen("cElementTree", "ElementTree", 1),
         node.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// UP023

@@ -235,9 +235,9 @@ pub(crate) fn yoda_conditions(
             pad(suggestion, expr.range(), checker.locator()),
             expr.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     } else {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             YodaConditions { suggestion: None },
             expr.range(),
         ));

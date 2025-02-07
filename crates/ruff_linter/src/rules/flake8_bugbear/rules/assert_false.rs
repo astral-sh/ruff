@@ -84,5 +84,5 @@ pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
         checker.generator().stmt(&assertion_error(msg)),
         stmt.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

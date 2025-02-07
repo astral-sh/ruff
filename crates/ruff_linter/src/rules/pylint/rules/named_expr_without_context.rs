@@ -37,8 +37,6 @@ impl Violation for NamedExprWithoutContext {
 /// PLW0131
 pub(crate) fn named_expr_without_context(checker: &mut Checker, value: &Expr) {
     if let Expr::Named(ast::ExprNamed { range, .. }) = value {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NamedExprWithoutContext, *range));
+        checker.report_diagnostic(Diagnostic::new(NamedExprWithoutContext, *range));
     }
 }

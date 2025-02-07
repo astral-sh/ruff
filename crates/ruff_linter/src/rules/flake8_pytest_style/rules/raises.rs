@@ -176,7 +176,7 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
             if call.arguments.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     PytestRaisesWithoutException,
                     call.func.range(),
                 ));
@@ -230,7 +230,7 @@ pub(crate) fn complex_raises(
         };
 
         if is_too_complex {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 PytestRaisesWithMultipleStatements,
                 stmt.range(),
             ));
@@ -260,7 +260,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
                 .then_some(qualified_name)
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             PytestRaisesTooBroad {
                 exception: qualified_name,
             },

@@ -206,7 +206,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         PrivateMemberAccess {
             access: attr.to_string(),
         },

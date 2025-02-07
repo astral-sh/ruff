@@ -64,7 +64,7 @@ pub(crate) fn whitespace_after_decorator(checker: &mut Checker, decorator_list: 
 
                 let mut diagnostic = Diagnostic::new(WhitespaceAfterDecorator, range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

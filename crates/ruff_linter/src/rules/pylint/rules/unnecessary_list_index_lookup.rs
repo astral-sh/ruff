@@ -66,7 +66,7 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
             Edit::range_replacement(value_name.id.to_string(), range),
             [noop(index_name), noop(value_name)],
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker,
                 Edit::range_replacement(value_name.id.to_string(), range),
                 [noop(index_name), noop(value_name)],
             ));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

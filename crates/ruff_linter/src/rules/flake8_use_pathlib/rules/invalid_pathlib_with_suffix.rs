@@ -117,7 +117,7 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool {

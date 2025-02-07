@@ -102,7 +102,7 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
             format!("{}.copy()", checker.locator().slice(name)),
             name.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

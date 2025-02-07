@@ -177,5 +177,5 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         call.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

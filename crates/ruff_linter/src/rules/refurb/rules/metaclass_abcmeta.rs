@@ -100,5 +100,5 @@ pub(crate) fn metaclass_abcmeta(checker: &mut Checker, class_def: &StmtClassDef)
         })
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

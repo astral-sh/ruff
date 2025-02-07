@@ -136,5 +136,5 @@ pub(crate) fn for_loop_set_mutations(checker: &mut Checker, for_stmt: &StmtFor) 
         for_stmt.range,
     );
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

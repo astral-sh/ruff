@@ -87,7 +87,7 @@ pub(crate) fn for_loop_writes_stmt(checker: &mut Checker, for_stmt: &StmtFor) {
     let scope_id = checker.semantic().scope_id;
 
     if let Some(diagnostic) = for_loop_writes(checker, for_stmt, scope_id, &[]) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

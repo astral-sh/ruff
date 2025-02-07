@@ -86,5 +86,5 @@ pub(crate) fn dag_no_schedule_argument(checker: &mut Checker, expr: &Expr) {
 
     // Produce a diagnostic when the `schedule` keyword argument is not found.
     let diagnostic = Diagnostic::new(AirflowDagNoScheduleArgument, expr.range());
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -87,5 +87,5 @@ pub(crate) fn unreliable_callable_check(
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

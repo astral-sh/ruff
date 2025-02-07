@@ -90,7 +90,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     );
     let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.

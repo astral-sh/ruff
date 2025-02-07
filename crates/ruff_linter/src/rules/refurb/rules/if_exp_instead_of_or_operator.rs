@@ -86,7 +86,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
         },
     ));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Parenthesize an expression for use in an `or` operator (e.g., parenthesize `x` in `x or y`),

@@ -74,8 +74,6 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
             )
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RaiseVanillaClass, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(RaiseVanillaClass, expr.range()));
     }
 }

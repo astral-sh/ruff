@@ -56,7 +56,7 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
                 if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
                     diagnostic.set_fix(fix);
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
         prev_end = value.end();

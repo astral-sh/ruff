@@ -165,7 +165,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         _ => return,
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, PartialEq, Eq)]

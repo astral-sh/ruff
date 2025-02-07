@@ -116,6 +116,6 @@ pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
                 TextRange::new(value.end(), call.func.end()),
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

@@ -215,7 +215,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
         ),
         Applicability::Unsafe,
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Identify all `Expr::Name` nodes in an AST.

@@ -72,5 +72,5 @@ pub(crate) fn dataclass_enum(checker: &mut Checker, class_def: &StmtClassDef) {
 
     let diagnostic = Diagnostic::new(DataclassEnum, decorator.range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

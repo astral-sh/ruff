@@ -135,5 +135,5 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &mut Checker, literal_expr
         diagnostic.set_fix(fix);
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -73,8 +73,6 @@ pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, locati
             )
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDateFromtimestamp, location));
+        checker.report_diagnostic(Diagnostic::new(CallDateFromtimestamp, location));
     }
 }

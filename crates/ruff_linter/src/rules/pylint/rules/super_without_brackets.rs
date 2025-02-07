@@ -115,5 +115,5 @@ pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
         value.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

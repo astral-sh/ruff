@@ -505,7 +505,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
                     default.range(),
                 )));
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -531,7 +531,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
                     default.range(),
                 )));
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -563,7 +563,7 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
         "...".to_string(),
         value.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI015
@@ -597,7 +597,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
         "...".to_string(),
         value.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI052
@@ -631,7 +631,7 @@ pub(crate) fn unannotated_assignment_in_stub(
             return;
         }
     }
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnannotatedAssignmentInStub {
             name: id.to_string(),
         },
@@ -653,7 +653,7 @@ pub(crate) fn unassigned_special_variable_in_stub(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnassignedSpecialVariableInStub {
             name: id.to_string(),
         },
@@ -700,5 +700,5 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
             [import_edit],
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

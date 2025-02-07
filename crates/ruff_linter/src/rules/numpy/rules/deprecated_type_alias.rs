@@ -93,6 +93,6 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             let binding_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

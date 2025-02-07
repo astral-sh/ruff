@@ -106,7 +106,7 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
                 )));
             }
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
             break;
         }
     }

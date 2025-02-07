@@ -84,7 +84,7 @@ pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Ex
         .map(|binding| binding.to_string());
 
     if let Some(name) = name {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             FutureRewritableTypeAnnotation { name },
             expr.range(),
         ));

@@ -72,5 +72,5 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
             TextRange::at(body.start(), line.text_len()),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

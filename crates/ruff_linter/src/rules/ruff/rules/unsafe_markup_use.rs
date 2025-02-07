@@ -110,7 +110,7 @@ pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnsafeMarkupUse {
             name: qualified_name.to_string(),
         },

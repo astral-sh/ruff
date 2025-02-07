@@ -35,7 +35,7 @@ pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         FutureFeatureNotDefined {
             name: alias.name.to_string(),
         },

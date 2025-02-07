@@ -174,7 +174,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
 
         diagnostic.set_fix(Fix::unsafe_edits(collection_start, [collection_end]));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if the [`Expr`] contains an `await` expression.

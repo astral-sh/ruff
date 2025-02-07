@@ -110,7 +110,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
             value,
             assign.range,
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -129,7 +129,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
             value,
             assign.range,
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

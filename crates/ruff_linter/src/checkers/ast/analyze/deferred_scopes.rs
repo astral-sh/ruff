@@ -146,7 +146,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     if scope.kind.is_generator() {
                         continue;
                     }
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         pylint::rules::RedefinedArgumentFromLocal {
                             name: name.to_string(),
                         },
@@ -186,7 +186,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         continue;
                     }
 
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
                             row: checker.compute_source_row(shadowed.start()),
@@ -384,17 +384,13 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                ruff::rules::function_call_in_dataclass_default(
-                    checker,
-                    class_def,
-                    &mut diagnostics,
-                );
+                ruff::rules::function_call_in_dataclass_default(checker, class_def);
             }
             if checker.enabled(Rule::MutableClassDefault) {
-                ruff::rules::mutable_class_default(checker, class_def, &mut diagnostics);
+                ruff::rules::mutable_class_default(checker, class_def);
             }
             if checker.enabled(Rule::MutableDataclassDefault) {
-                ruff::rules::mutable_dataclass_default(checker, class_def, &mut diagnostics);
+                ruff::rules::mutable_dataclass_default(checker, class_def);
             }
         }
 
@@ -489,5 +485,5 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
     }
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

@@ -107,7 +107,7 @@ pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
@@ -123,7 +123,7 @@ pub(crate) fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },

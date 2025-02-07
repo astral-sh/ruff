@@ -67,6 +67,6 @@ pub(crate) fn parameter_with_default_argument(
         let diagnostic = Diagnostic::new(kind, default.range());
         let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
-        checker.diagnostics.push(diagnostic.with_fix(fix));
+        checker.report_diagnostic(diagnostic.with_fix(fix));
     }
 }

@@ -206,7 +206,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         diagnostics.push(diagnostic);
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// Returns an iterator over the non-positional-only, non-variadic parameters of a function.

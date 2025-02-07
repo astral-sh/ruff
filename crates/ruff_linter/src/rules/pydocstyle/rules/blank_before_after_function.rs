@@ -137,7 +137,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 blank_lines_start,
                 docstring.start() - docstring.indentation.text_len(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -191,7 +191,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 first_line_end,
                 blank_lines_end,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

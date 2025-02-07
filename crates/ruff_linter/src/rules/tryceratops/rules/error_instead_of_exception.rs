@@ -135,7 +135,7 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                         _ => {}
                     }
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

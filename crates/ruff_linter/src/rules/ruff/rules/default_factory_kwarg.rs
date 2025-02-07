@@ -107,7 +107,7 @@ pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall)
         call.range(),
     );
     diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).

@@ -106,7 +106,7 @@ pub(crate) fn raise_without_from_inside_except(
                     .as_try_stmt()
                     .is_some_and(|try_stmt| try_stmt.is_star);
 
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RaiseWithoutFromInsideExcept { is_star },
                     range,
                 ));

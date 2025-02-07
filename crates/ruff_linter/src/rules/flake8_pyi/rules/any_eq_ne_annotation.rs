@@ -100,5 +100,5 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         let binding_edit = Edit::range_replacement(binding, annotation.range());
         Ok(Fix::safe_edits(binding_edit, import_edit))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

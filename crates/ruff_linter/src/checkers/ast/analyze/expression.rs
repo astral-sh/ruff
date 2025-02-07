@@ -201,7 +201,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     check_two_starred_expressions,
                     expr.range(),
                 ) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -515,7 +515,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
-                                        checker.diagnostics.push(Diagnostic::new(
+                                        checker.report_diagnostic(Diagnostic::new(
                                             pyflakes::rules::StringDotFormatInvalidFormat {
                                                 message: pyflakes::format::error_to_string(&e),
                                             },
@@ -925,7 +925,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.any_enabled(&[
@@ -1281,7 +1281,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             ..
                         }) => {
                             if checker.enabled(Rule::PercentFormatUnsupportedFormatCharacter) {
-                                checker.diagnostics.push(Diagnostic::new(
+                                checker.report_diagnostic(Diagnostic::new(
                                     pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                         char: c,
                                     },
@@ -1291,7 +1291,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                         Err(e) => {
                             if checker.enabled(Rule::PercentFormatInvalidFormat) {
-                                checker.diagnostics.push(Diagnostic::new(
+                                checker.report_diagnostic(Diagnostic::new(
                                     pyflakes::rules::PercentFormatInvalidFormat {
                                         message: e.to_string(),
                                     },
@@ -1365,7 +1365,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker.locator,
                     checker.settings,
                 ) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::CollectionLiteralConcatenation) {

@@ -55,5 +55,5 @@ pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
         "...".to_string(),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

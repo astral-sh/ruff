@@ -99,7 +99,7 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
         format!("{}.items()", name.id),
         iter.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns true if the binding is a dictionary where each key is a tuple with two elements.

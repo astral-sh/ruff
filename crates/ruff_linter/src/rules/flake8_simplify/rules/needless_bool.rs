@@ -306,7 +306,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

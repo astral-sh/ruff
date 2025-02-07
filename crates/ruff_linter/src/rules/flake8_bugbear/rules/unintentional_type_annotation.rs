@@ -47,16 +47,16 @@ pub(crate) fn unintentional_type_annotation(
         Expr::Subscript(ast::ExprSubscript { value, .. }) => {
             if value.is_name_expr() {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
+                    .report_diagnostic(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
             }
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                 if id != "self" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        UnintentionalTypeAnnotation,
+                        stmt.range(),
+                    ));
                 }
             }
         }

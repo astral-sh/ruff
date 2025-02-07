@@ -81,9 +81,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
     };
     let reduced = mode.reduce();
     if reduced != mode {
-        checker
-            .diagnostics
-            .push(create_diagnostic(call, mode_arg, reduced, checker));
+        checker.report_diagnostic(create_diagnostic(call, mode_arg, reduced, checker));
     }
 }
 

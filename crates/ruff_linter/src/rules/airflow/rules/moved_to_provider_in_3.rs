@@ -1018,7 +1018,7 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: Tex
         },
         _ => return,
     };
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         Airflow3MovedToProvider {
             deprecated: qualified_name.to_string(),
             replacement,

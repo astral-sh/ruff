@@ -97,7 +97,7 @@ pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::E
             f_string.range(),
             checker.locator(),
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

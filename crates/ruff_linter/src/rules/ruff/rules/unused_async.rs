@@ -188,7 +188,7 @@ pub(crate) fn unused_async(
     };
 
     if !found_await_or_async {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedAsync {
                 name: name.to_string(),
             },

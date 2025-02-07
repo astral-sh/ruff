@@ -75,7 +75,7 @@ pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Par
             continue;
         };
         if let Some(diagnostic) = check_password_kwarg(&parameter.parameter, default) {
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

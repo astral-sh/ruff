@@ -50,7 +50,7 @@ pub(crate) fn ambiguous_variable_name(checker: &mut Checker, name: &str, range: 
         return;
     }
     if is_ambiguous_name(name) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             AmbiguousVariableName(name.to_string()),
             range,
         ));

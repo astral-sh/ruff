@@ -46,6 +46,6 @@ pub(crate) fn unicode_kind_prefix(checker: &mut Checker, string: &StringLiteral)
             string.start(),
             TextSize::from(1),
         ))));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

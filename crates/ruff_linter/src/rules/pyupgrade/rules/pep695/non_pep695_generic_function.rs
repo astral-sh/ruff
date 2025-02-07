@@ -163,7 +163,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
         source: checker.source(),
     };
 
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(
             NonPEP695GenericFunction {
                 name: name.to_string(),

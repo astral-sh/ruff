@@ -140,7 +140,7 @@ pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::Expr
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -61,7 +61,7 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
             "raise ".to_string(),
             expr.start(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

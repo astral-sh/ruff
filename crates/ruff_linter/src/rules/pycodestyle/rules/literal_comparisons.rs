@@ -347,5 +347,5 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

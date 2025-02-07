@@ -120,7 +120,7 @@ pub(crate) fn unordered_body_content_in_model(
                 },
                 element.range(),
             );
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         } else {
             element_types.push(element_type);
         }

@@ -93,5 +93,5 @@ pub(crate) fn getattr_with_constant(
         ),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

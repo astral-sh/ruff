@@ -95,7 +95,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// C416

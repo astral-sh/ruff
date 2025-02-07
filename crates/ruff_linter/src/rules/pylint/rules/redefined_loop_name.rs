@@ -399,5 +399,5 @@ pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

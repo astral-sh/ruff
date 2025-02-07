@@ -261,7 +261,7 @@ fn docstring(checker: &mut Checker, range: TextRange) {
     {
         // Fixing this would result in a one-sided multi-line docstring, which would
         // introduce a syntax error.
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BadQuotesDocstring {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
@@ -298,7 +298,7 @@ fn docstring(checker: &mut Checker, range: TextRange) {
         fixed_contents,
         range,
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Q000, Q001
@@ -373,7 +373,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
@@ -391,7 +391,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -406,7 +406,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -433,7 +433,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

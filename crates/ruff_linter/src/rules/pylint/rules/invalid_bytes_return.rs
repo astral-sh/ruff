@@ -68,7 +68,7 @@ pub(crate) fn invalid_bytes_return(checker: &mut Checker, function_def: &ast::St
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             InvalidBytesReturnType,
             function_def.identifier(),
         ));
@@ -87,15 +87,11 @@ pub(crate) fn invalid_bytes_return(checker: &mut Checker, function_def: &ast::St
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::Bytes)
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidBytesReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(InvalidBytesReturnType, value.range()));
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidBytesReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(InvalidBytesReturnType, stmt.range()));
         }
     }
 }

@@ -95,5 +95,5 @@ pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr
             .importer()
             .add_import(&required_import, TextSize::default()),
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

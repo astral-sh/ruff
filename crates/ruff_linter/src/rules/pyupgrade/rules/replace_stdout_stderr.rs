@@ -93,7 +93,7 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
             diagnostic
                 .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

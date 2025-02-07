@@ -309,7 +309,7 @@ pub(crate) fn unittest_assertion(
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// ## What it does
@@ -380,7 +380,7 @@ pub(crate) fn unittest_raises_assertion_call(checker: &mut Checker, call: &ast::
     }
 
     if let Some(diagnostic) = unittest_raises_assertion(call, vec![], checker) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -590,27 +590,21 @@ fn to_pytest_raises_args<'a>(
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
+        checker.report_diagnostic(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
     }
 }
 
 /// PT017
 pub(crate) fn assert_in_exception_handler(checker: &mut Checker, handlers: &[ExceptHandler]) {
-    checker
-        .diagnostics
-        .extend(handlers.iter().flat_map(|handler| match handler {
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                name, body, ..
-            }) => {
-                if let Some(name) = name {
-                    check_assert_in_except(name, body)
-                } else {
-                    Vec::new()
-                }
+    checker.report_diagnostics(handlers.iter().flat_map(|handler| match handler {
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
+            if let Some(name) = name {
+                check_assert_in_except(name, body)
+            } else {
+                Vec::new()
             }
-        }));
+        }
+    }));
 }
 
 #[derive(Copy, Clone)]
@@ -851,6 +845,6 @@ pub(crate) fn composite_condition(
                     .map(Fix::unsafe_edit)
             });
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

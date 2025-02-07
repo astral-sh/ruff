@@ -98,7 +98,7 @@ pub(crate) fn fastapi_redundant_response_model(
             )
             .map(Fix::unsafe_edit)
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

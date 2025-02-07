@@ -49,5 +49,5 @@ pub(crate) fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str,
         annotation.to_string(),
         range,
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

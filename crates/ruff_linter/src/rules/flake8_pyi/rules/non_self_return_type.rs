@@ -203,7 +203,7 @@ fn add_diagnostic(
 
     diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn replace_with_self_fix(

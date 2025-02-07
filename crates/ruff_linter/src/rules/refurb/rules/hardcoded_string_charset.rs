@@ -136,5 +136,5 @@ fn push_diagnostic(checker: &mut Checker, range: TextRange, charset: &NamedChars
             [edit],
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

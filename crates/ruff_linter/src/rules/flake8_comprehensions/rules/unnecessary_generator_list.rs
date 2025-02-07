@@ -102,7 +102,7 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
                 );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
-                checker.diagnostics.push(diagnostic.with_fix(fix));
+                checker.report_diagnostic(diagnostic.with_fix(fix));
                 return;
             }
         }
@@ -156,5 +156,5 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

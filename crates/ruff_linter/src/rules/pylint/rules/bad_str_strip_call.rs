@@ -158,7 +158,7 @@ pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Exp
                             } else {
                                 None
                             };
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 BadStrStripCall { strip, removal },
                                 arg.range(),
                             ));

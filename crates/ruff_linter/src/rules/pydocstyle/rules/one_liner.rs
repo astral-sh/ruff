@@ -82,6 +82,6 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 )));
             }
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

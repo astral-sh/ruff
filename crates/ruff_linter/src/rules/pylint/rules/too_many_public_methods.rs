@@ -121,7 +121,7 @@ pub(crate) fn too_many_public_methods(
         .count();
 
     if methods > max_methods {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             TooManyPublicMethods {
                 methods,
                 max_methods,

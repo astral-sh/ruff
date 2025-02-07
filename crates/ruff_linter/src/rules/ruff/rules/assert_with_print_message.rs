@@ -74,7 +74,7 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
                 // will cease to exist.
                 stmt.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

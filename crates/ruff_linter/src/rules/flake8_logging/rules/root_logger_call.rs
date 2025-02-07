@@ -65,7 +65,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
     };
     let diagnostic = Diagnostic::new(kind, call.range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[inline]

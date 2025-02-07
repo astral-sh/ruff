@@ -79,7 +79,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

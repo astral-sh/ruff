@@ -100,7 +100,7 @@ pub(crate) fn setattr_with_constant(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

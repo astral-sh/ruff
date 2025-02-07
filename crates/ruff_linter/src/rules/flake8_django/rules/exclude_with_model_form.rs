@@ -71,9 +71,10 @@ pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::St
                     continue;
                 };
                 if id == "exclude" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        DjangoExcludeWithModelForm,
+                        target.range(),
+                    ));
                     return;
                 }
             }

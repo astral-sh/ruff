@@ -113,7 +113,7 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
                     line.start() + trimmed.text_len(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         };
     }
 }

@@ -63,7 +63,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
             .iter()
             .any(|arg| is_infinite_iterable(arg, semantic))
     {
-        checker.diagnostics.push(
+        checker.report_diagnostic(
             Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
                 add_argument(
                     "strict=False",

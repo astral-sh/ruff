@@ -110,5 +110,5 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         right.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

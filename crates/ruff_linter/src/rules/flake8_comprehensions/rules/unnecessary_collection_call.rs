@@ -129,7 +129,7 @@ pub(crate) fn unnecessary_collection_call(
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

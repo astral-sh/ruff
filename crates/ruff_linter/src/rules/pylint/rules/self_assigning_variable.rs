@@ -43,6 +43,7 @@ pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
     if checker.semantic().current_scope().kind.is_class() {
         return;
     }
+    let mut diagnostics = Vec::new();
 
     for (left, right) in assign
         .targets
@@ -50,8 +51,9 @@ pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
         .chain(std::iter::once(assign.value.as_ref()))
         .tuple_combinations()
     {
-        visit_assignments(left, right, &mut checker.diagnostics);
+        visit_assignments(left, right, &mut diagnostics);
     }
+    checker.report_diagnostics(diagnostics);
 }
 
 /// PLW0127
@@ -65,8 +67,10 @@ pub(crate) fn self_annotated_assignment(checker: &mut Checker, assign: &ast::Stm
     if checker.semantic().current_scope().kind.is_class() {
         return;
     }
+    let mut diagnostics = Vec::new();
 
-    visit_assignments(&assign.target, value, &mut checker.diagnostics);
+    visit_assignments(&assign.target, value, &mut diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {

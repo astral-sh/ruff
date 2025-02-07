@@ -101,6 +101,6 @@ fn invalid_argument_name(checker: &mut Checker, parameters: &Parameters) {
             parameter.range(),
         );
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

@@ -115,7 +115,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                 stmt_for.target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         (false, true) => {
             // The value is unused, so replace with `dict.keys()`.
@@ -135,7 +135,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                 stmt_for.target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

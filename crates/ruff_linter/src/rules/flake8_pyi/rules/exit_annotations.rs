@@ -167,7 +167,7 @@ pub(crate) fn bad_exit_annotation(checker: &mut Checker, function: &StmtFunction
         .skip(3)
         .filter(|parameter| parameter.default.is_none())
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
@@ -182,7 +182,7 @@ pub(crate) fn bad_exit_annotation(checker: &mut Checker, function: &StmtFunction
         .iter()
         .filter(|arg| arg.default.is_none())
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
@@ -220,10 +220,10 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
                 Ok(Fix::safe_edits(binding_edit, import_edit))
             });
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     } else {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::MissingArgs,
@@ -270,7 +270,7 @@ fn check_positional_args_for_non_overloaded_method(
             continue;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BadExitAnnotation {
                 func_kind: kind,
                 error_kind: error_info,
@@ -409,7 +409,7 @@ fn check_positional_args_for_overloaded_method(
     }
 
     // Okay, neither of them match...
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BadExitAnnotation {
             func_kind: kind,
             error_kind: ErrorKind::UnrecognizedExitOverload,

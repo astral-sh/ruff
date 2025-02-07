@@ -86,5 +86,5 @@ pub(crate) fn manual_from_import(
             stmt.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

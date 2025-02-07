@@ -41,7 +41,7 @@ impl Violation for StubBodyMultipleStatements {
 /// PYI048
 pub(crate) fn stub_body_multiple_statements(checker: &mut Checker, stmt: &Stmt, body: &[Stmt]) {
     if body.len() > 1 {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StubBodyMultipleStatements,
             stmt.identifier(),
         ));

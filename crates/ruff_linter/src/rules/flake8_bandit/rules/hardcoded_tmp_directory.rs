@@ -102,7 +102,7 @@ fn check(checker: &mut Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         HardcodedTempFile {
             string: value.to_string(),
         },

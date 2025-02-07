@@ -56,7 +56,7 @@ impl Violation for JumpStatementInFinally {
 fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 JumpStatementInFinally {
                     name: match stmt {
                         Stmt::Break(_) => "break",

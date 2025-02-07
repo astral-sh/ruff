@@ -132,7 +132,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.

@@ -75,7 +75,7 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &mut Checker, expr: &
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         MixedCaseVariableInGlobalScope {
             name: name.to_string(),
         },

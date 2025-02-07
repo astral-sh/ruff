@@ -306,7 +306,7 @@ pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
             if reassigned_in_loop.contains(&name.id.as_str()) {
                 if !checker.flake8_bugbear_seen.contains(&name.range()) {
                     checker.flake8_bugbear_seen.push(name.range());
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
                         },

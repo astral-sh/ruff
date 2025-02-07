@@ -154,5 +154,5 @@ pub(crate) fn replace_str_enum(checker: &mut Checker, class_def: &ast::StmtClass
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

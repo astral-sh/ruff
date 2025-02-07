@@ -125,7 +125,7 @@ pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCal
         }
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

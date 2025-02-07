@@ -105,7 +105,7 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
                     iterator,
                     call.range(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
                 return;
             }
         }
@@ -163,5 +163,5 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

@@ -304,7 +304,7 @@ fn create_diagnostic(
     }
     diagnostic.try_set_optional_fix(|| fix);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 
     seen_default
 }

@@ -70,5 +70,5 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
         "...".to_string(),
         stmt.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

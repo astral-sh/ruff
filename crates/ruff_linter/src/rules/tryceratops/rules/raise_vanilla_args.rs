@@ -78,9 +78,7 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     }
 
     if contains_message(arg) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RaiseVanillaArgs, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(RaiseVanillaArgs, expr.range()));
     }
 }
 

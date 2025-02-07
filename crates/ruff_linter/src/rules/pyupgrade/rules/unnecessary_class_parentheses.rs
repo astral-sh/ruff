@@ -53,5 +53,5 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
         arguments.start(),
         arguments.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

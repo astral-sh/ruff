@@ -94,7 +94,5 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OsSepSplit, attr.range()));
+    checker.report_diagnostic(Diagnostic::new(OsSepSplit, attr.range()));
 }

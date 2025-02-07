@@ -59,8 +59,6 @@ pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
     }
 
     if in_dunder_method("__init__", checker.semantic(), checker.settings) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ReturnInInit, stmt.range()));
+        checker.report_diagnostic(Diagnostic::new(ReturnInInit, stmt.range()));
     }
 }

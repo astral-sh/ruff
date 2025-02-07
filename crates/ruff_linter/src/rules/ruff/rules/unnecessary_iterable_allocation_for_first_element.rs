@@ -130,7 +130,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         expr.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).

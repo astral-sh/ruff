@@ -57,6 +57,6 @@ pub(crate) fn pass_in_class_body(checker: &mut Checker, class_def: &ast::StmtCla
         diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
             checker.semantic().current_statement_id(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

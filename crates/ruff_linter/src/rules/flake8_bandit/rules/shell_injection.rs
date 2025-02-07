@@ -300,7 +300,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
                     if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             SubprocessPopenWithShellEqualsTrue {
                                 safety: Safety::from(arg),
                                 is_exact: matches!(truthiness, Truthiness::True),
@@ -315,7 +315,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                         Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
                             call.func.range(),
                         ));
@@ -324,7 +324,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 // S603
                 None => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
                             call.func.range(),
                         ));
@@ -338,7 +338,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
     {
         // S604
         if checker.enabled(Rule::CallWithShellEqualsTrue) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 CallWithShellEqualsTrue {
                     is_exact: matches!(truthiness, Truthiness::True),
                 },
@@ -351,7 +351,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
     if checker.enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
             if let Some(arg) = call.arguments.args.first() {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
                     },
@@ -364,9 +364,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
     // S606
     if checker.enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(StartProcessWithNoShell, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(StartProcessWithNoShell, call.func.range()));
         }
     }
 
@@ -375,9 +373,10 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
         if call_kind.is_some() {
             if let Some(arg) = call.arguments.args.first() {
                 if is_partial_path(arg) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(StartProcessWithPartialPath, arg.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        StartProcessWithPartialPath,
+                        arg.range(),
+                    ));
                 }
             }
         }
@@ -398,9 +397,10 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
         {
             if let Some(arg) = call.arguments.args.first() {
                 if is_wildcard_command(arg) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UnixCommandWildcardInjection, arg.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        UnixCommandWildcardInjection,
+                        arg.range(),
+                    ));
                 }
             }
         }

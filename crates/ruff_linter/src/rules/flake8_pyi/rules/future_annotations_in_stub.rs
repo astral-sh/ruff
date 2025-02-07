@@ -72,5 +72,5 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

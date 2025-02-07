@@ -65,9 +65,7 @@ pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
             .or_else(|| call.arguments.find_argument_value("msg", 0))
             .map_or(true, is_empty_or_null_string)
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
         }
     }
 }

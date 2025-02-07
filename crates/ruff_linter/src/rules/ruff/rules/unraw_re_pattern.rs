@@ -177,7 +177,7 @@ fn check_string(checker: &mut Checker, literal: &StringLiteral, module: RegexMod
             literal.range().start(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn check_bytes(checker: &mut Checker, literal: &BytesLiteral, module: RegexModule, func: &str) {
@@ -190,5 +190,5 @@ fn check_bytes(checker: &mut Checker, literal: &BytesLiteral, module: RegexModul
     let range = literal.range;
     let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

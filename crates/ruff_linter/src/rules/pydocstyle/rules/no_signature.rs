@@ -86,8 +86,6 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
             true
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(SignatureInDocstring, docstring.range()));
+        checker.report_diagnostic(Diagnostic::new(SignatureInDocstring, docstring.range()));
     }
 }

@@ -1176,7 +1176,7 @@ fn suspicious_function(
 
     let diagnostic = Diagnostic::new(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

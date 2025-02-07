@@ -91,7 +91,7 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                     )));
                 }
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
         Quote::Double => {
@@ -107,7 +107,7 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                     )));
                 }
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

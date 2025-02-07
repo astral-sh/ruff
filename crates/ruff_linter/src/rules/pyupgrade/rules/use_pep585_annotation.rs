@@ -136,5 +136,5 @@ pub(crate) fn use_pep585_annotation(
             }
         }
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

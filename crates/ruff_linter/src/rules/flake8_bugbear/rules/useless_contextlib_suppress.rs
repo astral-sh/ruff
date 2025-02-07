@@ -63,8 +63,6 @@ pub(crate) fn useless_contextlib_suppress(
                 matches!(qualified_name.segments(), ["contextlib", "suppress"])
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UselessContextlibSuppress, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(UselessContextlibSuppress, expr.range()));
     }
 }

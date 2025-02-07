@@ -77,7 +77,5 @@ pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(PandasUseOfDotValues, attribute.range()));
+    checker.report_diagnostic(Diagnostic::new(PandasUseOfDotValues, attribute.range()));
 }

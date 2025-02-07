@@ -61,7 +61,7 @@ pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
                 | "assert_has_calls"
                 | "assert_not_called"
         ) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 InvalidMockAccess {
                     reason: Reason::UncalledMethod(attr.to_string()),
                 },
@@ -90,7 +90,7 @@ pub(crate) fn non_existent_mock_method(checker: &mut Checker, test: &Expr) {
             | "has_calls"
             | "not_called"
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             InvalidMockAccess {
                 reason: Reason::NonExistentMethod(attr.to_string()),
             },

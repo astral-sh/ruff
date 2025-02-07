@@ -105,7 +105,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[St
             diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_id(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

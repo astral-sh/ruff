@@ -57,7 +57,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
         match default {
             Expr::Name(ast::ExprName { id, range, .. }) => {
                 if is_insecure_protocol(id.as_str()) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         SslWithBadDefaults {
                             protocol: id.to_string(),
                         },
@@ -67,7 +67,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
             }
             Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
                 if is_insecure_protocol(attr.as_str()) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         SslWithBadDefaults {
                             protocol: attr.to_string(),
                         },

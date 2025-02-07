@@ -103,5 +103,5 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
         TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

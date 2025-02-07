@@ -72,5 +72,5 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -127,5 +127,5 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         ),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -112,7 +112,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, call: &E
         }),
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn parent_and_next_path_fragment_range(

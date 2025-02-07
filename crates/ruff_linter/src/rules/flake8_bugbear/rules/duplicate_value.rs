@@ -72,7 +72,7 @@ pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
                     remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
                 });
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         };
     }

@@ -111,7 +111,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
     for comparison_expr in std::iter::once(left).chain(comparators) {
         if let Some(value) = as_literal(comparison_expr) {
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     MagicValueComparison {
                         value: checker.locator().slice(comparison_expr).to_string(),
                     },

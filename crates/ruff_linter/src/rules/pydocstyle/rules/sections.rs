@@ -1374,7 +1374,7 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1393,7 +1393,7 @@ fn blanks_and_section_underline(
                         dashed_line,
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1419,7 +1419,7 @@ fn blanks_and_section_underline(
                         Edit::range_replacement(contents, range)
                     }));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1439,7 +1439,7 @@ fn blanks_and_section_underline(
 
                     if following_lines.peek().is_none() {
                         if checker.enabled(Rule::EmptyDocstringSection) {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 EmptyDocstringSection {
                                     name: context.section_name().to_string(),
                                 },
@@ -1482,7 +1482,7 @@ fn blanks_and_section_underline(
                                     line_after_dashes.start(),
                                     blank_lines_after_dashes_end,
                                 )));
-                                checker.diagnostics.push(diagnostic);
+                                checker.report_diagnostic(diagnostic);
                             }
                         } else {
                             let mut diagnostic = Diagnostic::new(
@@ -1496,13 +1496,13 @@ fn blanks_and_section_underline(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
                             )));
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }
             } else {
                 if checker.enabled(Rule::EmptyDocstringSection) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         EmptyDocstringSection {
                             name: context.section_name().to_string(),
                         },
@@ -1527,7 +1527,7 @@ fn blanks_and_section_underline(
                         equal_line,
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 } else {
                     let mut diagnostic = Diagnostic::new(
                         MissingDashedUnderlineAfterSection {
@@ -1548,7 +1548,7 @@ fn blanks_and_section_underline(
                         context.summary_range().end(),
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             if num_blank_lines_after_header > 0 {
@@ -1588,7 +1588,7 @@ fn blanks_and_section_underline(
                                 context.following_range().start(),
                                 blank_lines_end,
                             )));
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                     } else {
                         let mut diagnostic = Diagnostic::new(
@@ -1602,7 +1602,7 @@ fn blanks_and_section_underline(
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -1629,10 +1629,10 @@ fn blanks_and_section_underline(
                 context.summary_range().end(),
             )));
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         if checker.enabled(Rule::EmptyDocstringSection) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
                 },
@@ -1665,7 +1665,7 @@ fn common_section(
                 capitalized_section_name.to_string(),
                 section_range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1688,7 +1688,7 @@ fn common_section(
             } else {
                 Edit::range_replacement(content, fix_range)
             }));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1714,7 +1714,7 @@ fn common_section(
                     line_end.to_string(),
                     next.start(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     } else {
@@ -1752,7 +1752,7 @@ fn common_section(
                     section_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -1774,7 +1774,7 @@ fn common_section(
                 line_end.to_string(),
                 context.start(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1832,7 +1832,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     if !missing_arg_names.is_empty() {
         if let Some(definition) = docstring.definition.name() {
             let names = missing_arg_names.into_iter().sorted().collect();
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UndocumentedParam {
                     definition: definition.to_string(),
                     names,
@@ -1964,7 +1964,7 @@ fn numpy_section(
                 suffix.text_len(),
             ))));
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1998,7 +1998,7 @@ fn google_section(
                 ":".to_string(),
                 TextRange::at(section_name_range.end(), suffix.text_len()),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

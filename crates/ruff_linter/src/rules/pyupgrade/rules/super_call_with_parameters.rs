@@ -157,7 +157,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.

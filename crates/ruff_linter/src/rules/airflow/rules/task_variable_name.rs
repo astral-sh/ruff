@@ -116,5 +116,5 @@ pub(crate) fn variable_name_task_id(checker: &mut Checker, targets: &[Expr], val
         },
         target.range(),
     );
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

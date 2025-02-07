@@ -51,7 +51,7 @@ pub(crate) fn logging_config_insecure_listen(checker: &mut Checker, call: &ast::
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             LoggingConfigInsecureListen,
             call.func.range(),
         ));

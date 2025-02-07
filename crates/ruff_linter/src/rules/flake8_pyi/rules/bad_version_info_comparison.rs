@@ -147,16 +147,12 @@ pub(crate) fn bad_version_info_comparison(
             && (checker.source_type.is_stub() || checker.settings.preview.is_enabled())
         {
             if has_else_clause {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(BadVersionInfoOrder, test.range()));
+                checker.report_diagnostic(Diagnostic::new(BadVersionInfoOrder, test.range()));
             }
         }
     } else {
         if checker.enabled(Rule::BadVersionInfoComparison) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
+            checker.report_diagnostic(Diagnostic::new(BadVersionInfoComparison, test.range()));
         };
     }
 }

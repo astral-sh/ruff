@@ -238,7 +238,7 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         OpenFileWithContextHandler,
         call.func.range(),
     ));

@@ -70,6 +70,6 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             )
             .map(Fix::safe_edit)
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

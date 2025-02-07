@@ -56,9 +56,10 @@ pub(crate) fn format_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) 
         if let Expr::Call(ast::ExprCall { func, .. }) = &first {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                 if attr == "format" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(FormatInGetTextFuncCall {}, first.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        FormatInGetTextFuncCall {},
+                        first.range(),
+                    ));
                 }
             }
         }

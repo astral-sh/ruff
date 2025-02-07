@@ -82,7 +82,7 @@ pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
         return;
     };
     if is_overload(&function.decorator_list, checker.semantic()) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             OverloadWithDocstring,
             function.identifier(),
         ));

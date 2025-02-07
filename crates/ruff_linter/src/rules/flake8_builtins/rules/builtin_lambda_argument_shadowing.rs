@@ -46,7 +46,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &mut Checker, lambda: &
             &checker.settings.flake8_builtins.builtins_ignorelist,
             checker.settings.target_version,
         ) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BuiltinLambdaArgumentShadowing {
                     name: name.to_string(),
                 },

@@ -91,7 +91,7 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
                     Applicability::Safe
                 },
             ));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

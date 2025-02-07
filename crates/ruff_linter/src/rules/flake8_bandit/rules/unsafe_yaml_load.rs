@@ -82,13 +82,13 @@ pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
                     Expr::Name(ast::ExprName { id, .. }) => Some(id.to_string()),
                     _ => None,
                 };
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UnsafeYAMLLoad { loader },
                     loader_arg.range(),
                 ));
             }
         } else {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UnsafeYAMLLoad { loader: None },
                 call.func.range(),
             ));

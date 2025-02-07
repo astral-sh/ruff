@@ -268,7 +268,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, attribute: &ast::
             "mock".to_string(),
             attribute.value.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -309,7 +309,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                                 stmt.range(),
                             )));
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -337,7 +337,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             .map(Fix::safe_edit)
                     });
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
         _ => (),

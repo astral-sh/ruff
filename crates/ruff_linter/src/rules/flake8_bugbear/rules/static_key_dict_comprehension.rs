@@ -58,7 +58,7 @@ pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, dict_comp: &a
     };
 
     if is_constant(&dict_comp.key, &names) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StaticKeyDictComprehension {
                 key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
             },

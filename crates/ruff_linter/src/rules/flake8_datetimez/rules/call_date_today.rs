@@ -69,8 +69,6 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
             matches!(qualified_name.segments(), ["datetime", "date", "today"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDateToday, location));
+        checker.report_diagnostic(Diagnostic::new(CallDateToday, location));
     }
 }

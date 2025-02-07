@@ -140,5 +140,5 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
         );
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

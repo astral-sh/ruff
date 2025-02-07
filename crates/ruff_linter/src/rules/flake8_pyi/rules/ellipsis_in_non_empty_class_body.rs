@@ -61,7 +61,7 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[St
             diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_id(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

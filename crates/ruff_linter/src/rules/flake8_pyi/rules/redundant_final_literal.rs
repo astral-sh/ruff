@@ -114,7 +114,7 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         diagnostic.set_fix(generate_fix(annotation, Some(literal), checker.locator()));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a fix to convert a `Final[Literal[...]]` annotation to a `Final` annotation.

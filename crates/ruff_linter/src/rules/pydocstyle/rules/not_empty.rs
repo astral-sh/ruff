@@ -46,9 +46,7 @@ pub(crate) fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     }
 
     if checker.enabled(Rule::EmptyDocstring) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(EmptyDocstring, docstring.range()));
+        checker.report_diagnostic(Diagnostic::new(EmptyDocstring, docstring.range()));
     }
     false
 }

@@ -195,6 +195,6 @@ pub(crate) fn multiple_with_statements(
                 }
             });
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

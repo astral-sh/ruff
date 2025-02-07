@@ -207,5 +207,5 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

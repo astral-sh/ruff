@@ -106,7 +106,5 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         return;
     };
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
+    checker.report_diagnostic(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
 }

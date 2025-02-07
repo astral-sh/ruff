@@ -88,7 +88,7 @@ pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
             )
         })
         .collect();
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// AST visitor that matches `open` operations with the corresponding `read` calls.

@@ -103,7 +103,7 @@ pub(crate) fn non_imperative_mood(
     }
 
     if matches!(MOOD.is_imperative(&first_word_norm), Some(false)) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NonImperativeMood {
                 first_line: first_line.to_string(),
             },

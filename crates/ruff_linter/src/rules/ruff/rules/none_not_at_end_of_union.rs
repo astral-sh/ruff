@@ -70,8 +70,6 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
     }
 
     for none_expr in none_exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
+        checker.report_diagnostic(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
     }
 }

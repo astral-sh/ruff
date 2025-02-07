@@ -90,5 +90,5 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
     let replacement =
         Edit::range_replacement(checker.source()[span].to_string(), replacement_range);
     let fix = Fix::unsafe_edits(call_start, [call_end, replacement]);
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

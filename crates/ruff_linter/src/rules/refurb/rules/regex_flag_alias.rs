@@ -86,7 +86,7 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
             [edit],
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

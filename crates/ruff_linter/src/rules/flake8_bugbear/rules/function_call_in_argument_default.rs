@@ -150,6 +150,6 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
     }
 
     for (check, range) in visitor.diagnostics {
-        checker.diagnostics.push(Diagnostic::new(check, range));
+        checker.report_diagnostic(Diagnostic::new(check, range));
     }
 }

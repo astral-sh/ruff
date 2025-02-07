@@ -88,5 +88,5 @@ fn readlines_in_iter(checker: &mut Checker, iter_expr: &Expr) {
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
         expr_call.range().add_start(expr_attr.value.range().len()),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

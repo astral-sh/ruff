@@ -91,5 +91,5 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

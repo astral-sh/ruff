@@ -64,6 +64,6 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 import_edit,
             ))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

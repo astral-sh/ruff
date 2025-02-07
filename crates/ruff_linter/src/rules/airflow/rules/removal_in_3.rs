@@ -166,7 +166,7 @@ fn check_function_parameters(checker: &mut Checker, function_def: &StmtFunctionD
     for param in function_def.parameters.iter_non_variadic_params() {
         let param_name = param.name();
         if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Airflow3Removal {
                     deprecated: param_name.to_string(),
                     replacement: Replacement::None,
@@ -193,22 +193,22 @@ fn check_call_arguments(
 ) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "schedule_interval",
                 Some("schedule"),
             ));
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "timetable",
                 Some("schedule"),
             ));
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "sla_miss_callback",
                 None,
             ));
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "fail_stop",
                 Some("fail_fast"),
@@ -217,7 +217,7 @@ fn check_call_arguments(
         _ => {
             if is_airflow_auth_manager(qualified_name.segments()) {
                 if !arguments.is_empty() {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         Airflow3Removal {
                             deprecated: String::from("appbuilder"),
                             replacement: Replacement::Message(
@@ -228,44 +228,42 @@ fn check_call_arguments(
                     ));
                 }
             } else if is_airflow_task_handler(qualified_name.segments()) {
-                checker.diagnostics.extend(diagnostic_for_argument(
+                checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "filename_template",
                     None,
                 ));
             } else if is_airflow_operator(qualified_name.segments()) {
-                checker
-                    .diagnostics
-                    .extend(diagnostic_for_argument(arguments, "sla", None));
-                checker.diagnostics.extend(diagnostic_for_argument(
+                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+                checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 ));
                 match qualified_name.segments() {
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "execution_date",
                             Some("logical_date"),
                         ));
                     }
                     ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
                         ));
                     }
                     ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
                         ));
                     }
                     ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
@@ -312,7 +310,7 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
     };
 
     if let Some(replacement) = replacement {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             Airflow3Removal {
                 deprecated: attr.to_string(),
                 replacement,
@@ -386,7 +384,7 @@ fn check_context_key_usage_in_call(checker: &mut Checker, call_expr: &ExprCall) 
             continue;
         };
         if value == removed_key {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Airflow3Removal {
                     deprecated: removed_key.to_string(),
                     replacement: Replacement::None,
@@ -427,7 +425,7 @@ fn check_context_key_usage_in_subscript(checker: &mut Checker, subscript: &ExprS
     }
 
     if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             Airflow3Removal {
                 deprecated: key.to_string(),
                 replacement: Replacement::None,
@@ -528,7 +526,7 @@ fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
         }
     };
     if let Some(replacement) = replacement {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             Airflow3Removal {
                 deprecated: attr.to_string(),
                 replacement,
@@ -876,7 +874,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
             replacement,
@@ -914,7 +912,7 @@ fn check_airflow_plugin_extension(
                     )
                 })
         }) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Airflow3Removal {
                     deprecated: name.to_string(),
                     replacement: Replacement::Message(

@@ -61,8 +61,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) 
         {
             if left.is_string_literal_expr() {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                    .report_diagnostic(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
             }
         }
     }

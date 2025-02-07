@@ -50,8 +50,6 @@ pub(crate) fn mako_templates(checker: &mut Checker, call: &ast::ExprCall) {
             matches!(qualified_name.segments(), ["mako", "template", "Template"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MakoTemplates, call.func.range()));
+        checker.report_diagnostic(Diagnostic::new(MakoTemplates, call.func.range()));
     }
 }

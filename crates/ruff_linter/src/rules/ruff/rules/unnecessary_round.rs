@@ -96,7 +96,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
 
     let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -49,9 +49,7 @@ impl Violation for ContinueInFinally {
 fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
         if stmt.is_continue_stmt() {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ContinueInFinally, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(ContinueInFinally, stmt.range()));
         }
 
         match stmt {

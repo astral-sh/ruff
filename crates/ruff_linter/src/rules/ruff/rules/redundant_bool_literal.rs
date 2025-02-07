@@ -124,7 +124,7 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 bitflags! {

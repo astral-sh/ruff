@@ -60,9 +60,7 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, call: &ast::ExprCall)
                     ..
                 })
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(SnmpInsecureVersion, keyword.range()));
+                checker.report_diagnostic(Diagnostic::new(SnmpInsecureVersion, keyword.range()));
             }
         }
     }

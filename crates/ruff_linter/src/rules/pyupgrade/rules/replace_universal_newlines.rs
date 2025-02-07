@@ -85,6 +85,6 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
                 arg.range(),
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

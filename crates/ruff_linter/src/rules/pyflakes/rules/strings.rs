@@ -538,9 +538,9 @@ pub(crate) fn percent_format_expected_mapping(
             | Expr::Set(_)
             | Expr::ListComp(_)
             | Expr::SetComp(_)
-            | Expr::Generator(_) => checker
-                .diagnostics
-                .push(Diagnostic::new(PercentFormatExpectedMapping, location)),
+            | Expr::Generator(_) => {
+                checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedMapping, location))
+            }
             _ => {}
         }
     }
@@ -554,9 +554,7 @@ pub(crate) fn percent_format_expected_sequence(
     location: TextRange,
 ) {
     if summary.num_positional > 1 && matches!(right, Expr::Dict(_) | Expr::DictComp(_)) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PercentFormatExpectedSequence, location));
+        checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedSequence, location));
     }
 }
 
@@ -615,7 +613,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         )?;
         Ok(Fix::safe_edit(edit))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// F505
@@ -656,7 +654,7 @@ pub(crate) fn percent_format_missing_arguments(
         .collect();
 
     if !missing.is_empty() {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             PercentFormatMissingArgument {
                 missing: missing.iter().map(|&s| s.clone()).collect(),
             },
@@ -672,7 +670,7 @@ pub(crate) fn percent_format_mixed_positional_and_named(
     location: TextRange,
 ) {
     if !(summary.num_positional == 0 || summary.keywords.is_empty()) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             PercentFormatMixedPositionalAndNamed,
             location,
         ));
@@ -700,7 +698,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
         }
 
         if found != summary.num_positional {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 PercentFormatPositionalCountMismatch {
                     wanted: summary.num_positional,
                     got: found,
@@ -721,8 +719,7 @@ pub(crate) fn percent_format_star_requires_sequence(
     if summary.starred {
         match right {
             Expr::Dict(_) | Expr::DictComp(_) => checker
-                .diagnostics
-                .push(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
+                .report_diagnostic(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
             _ => {}
         }
     }
@@ -774,7 +771,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         )?;
         Ok(Fix::safe_edit(edit))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// F523
@@ -844,7 +841,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// F524
@@ -883,7 +880,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StringDotFormatMissingArguments { missing },
             call.range(),
         ));
@@ -897,7 +894,7 @@ pub(crate) fn string_dot_format_mixing_automatic(
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StringDotFormatMixingAutomatic,
             call.range(),
         ));

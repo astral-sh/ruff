@@ -77,7 +77,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         "...".to_string(),
         string.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Count the number of visible characters in an f-string. This accounts for

@@ -195,7 +195,7 @@ pub(crate) fn negation_with_equal_op(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM202
@@ -250,7 +250,7 @@ pub(crate) fn negation_with_not_equal_op(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM208
@@ -301,5 +301,5 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             expr.range(),
         )));
     };
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

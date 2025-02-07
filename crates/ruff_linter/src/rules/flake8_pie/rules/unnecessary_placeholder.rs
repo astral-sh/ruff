@@ -145,7 +145,7 @@ fn add_diagnostic(
         stmt.range(),
     );
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 #[derive(Debug, PartialEq, Eq)]

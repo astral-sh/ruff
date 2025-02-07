@@ -51,7 +51,7 @@ pub(crate) fn blocking_sleep(checker: &mut Checker, call: &ExprCall) {
             .as_ref()
             .is_some_and(is_blocking_sleep)
         {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BlockingSleepInAsyncFunction,
                 call.func.range(),
             ));

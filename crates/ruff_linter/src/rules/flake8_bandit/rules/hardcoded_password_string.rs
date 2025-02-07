@@ -76,18 +76,16 @@ pub(crate) fn compare_to_hardcoded_password_string(
     left: &Expr,
     comparators: &[Expr],
 ) {
-    checker
-        .diagnostics
-        .extend(comparators.iter().filter_map(|comp| {
-            string_literal(comp).filter(|string| !string.is_empty())?;
-            let name = password_target(left)?;
-            Some(Diagnostic::new(
-                HardcodedPasswordString {
-                    name: name.to_string(),
-                },
-                comp.range(),
-            ))
-        }));
+    checker.report_diagnostics(comparators.iter().filter_map(|comp| {
+        string_literal(comp).filter(|string| !string.is_empty())?;
+        let name = password_target(left)?;
+        Some(Diagnostic::new(
+            HardcodedPasswordString {
+                name: name.to_string(),
+            },
+            comp.range(),
+        ))
+    }));
 }
 
 /// S105
@@ -102,7 +100,7 @@ pub(crate) fn assign_hardcoded_password_string(
     {
         for target in targets {
             if let Some(name) = password_target(target) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     HardcodedPasswordString {
                         name: name.to_string(),
                     },

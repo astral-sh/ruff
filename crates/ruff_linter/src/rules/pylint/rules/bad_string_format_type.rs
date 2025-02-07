@@ -240,8 +240,6 @@ pub(crate) fn bad_string_format_type(
         _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(BadStringFormatType, bin_op.range()));
+        checker.report_diagnostic(Diagnostic::new(BadStringFormatType, bin_op.range()));
     }
 }

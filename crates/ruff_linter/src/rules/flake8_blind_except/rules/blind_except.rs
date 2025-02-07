@@ -107,7 +107,7 @@ pub(crate) fn blind_except(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BlindExcept {
             name: builtin_exception_type.to_string(),
         },

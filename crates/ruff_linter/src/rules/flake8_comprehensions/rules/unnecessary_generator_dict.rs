@@ -73,5 +73,5 @@ pub(crate) fn unnecessary_generator_dict(
     let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

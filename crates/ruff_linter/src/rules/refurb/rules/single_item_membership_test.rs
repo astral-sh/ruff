@@ -110,7 +110,7 @@ pub(crate) fn single_item_membership_test(
 
     let fix = Fix::applicable_edit(edit, applicability);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Return the single item wrapped in `Some` if the expression contains a single

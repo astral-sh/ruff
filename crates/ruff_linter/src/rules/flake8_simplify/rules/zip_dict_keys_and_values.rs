@@ -113,7 +113,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {

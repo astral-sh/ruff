@@ -68,7 +68,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
         subscript.start(),
         subscript.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Matches `obj[:]` where `obj` is a list.

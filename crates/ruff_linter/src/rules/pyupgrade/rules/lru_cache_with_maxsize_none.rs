@@ -101,7 +101,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                         Edit::range_replacement(binding, decorator.expression.range());
                     Ok(Fix::safe_edits(import_edit, [reference_edit]))
                 });
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

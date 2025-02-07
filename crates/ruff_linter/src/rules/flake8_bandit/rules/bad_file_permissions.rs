@@ -78,7 +78,7 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
                 // The mask is a valid integer value -- check for overly permissive permissions.
                 Ok(Some(mask)) => {
                     if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             BadFilePermissions {
                                 reason: Reason::Permissive(mask),
                             },
@@ -88,7 +88,7 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
                 }
                 // The mask is an invalid integer value (i.e., it's out of range).
                 Err(_) => {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         BadFilePermissions {
                             reason: Reason::Invalid,
                         },

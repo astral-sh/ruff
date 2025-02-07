@@ -124,5 +124,5 @@ pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
         ),
         [Edit::range_replacement("0".to_string(), base.range())],
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

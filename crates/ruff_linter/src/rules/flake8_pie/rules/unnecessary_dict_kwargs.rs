@@ -75,9 +75,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
             );
-            checker
-                .diagnostics
-                .push(diagnostic.with_fix(Fix::safe_edit(edit)));
+            checker.report_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)));
             continue;
         }
 
@@ -141,7 +139,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             }
         }
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

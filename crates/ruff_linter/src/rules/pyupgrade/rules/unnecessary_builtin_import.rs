@@ -138,5 +138,5 @@ pub(crate) fn unnecessary_builtin_import(
             checker.semantic().current_statement_parent_id(),
         )))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

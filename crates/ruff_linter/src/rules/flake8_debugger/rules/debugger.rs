@@ -60,9 +60,7 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 }
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(Debugger { using_type }, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(Debugger { using_type }, expr.range()));
     }
 }
 
