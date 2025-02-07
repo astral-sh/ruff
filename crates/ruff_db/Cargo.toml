@@ -25,6 +25,7 @@ colored = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
+etcetera = { workspace = true, optional = true }
 filetime = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
@@ -50,7 +51,7 @@ tempfile = { workspace = true }
 [features]
 default = ["os"]
 cache = ["ruff_cache"]
-os = ["ignore"]
+os = ["ignore", "etcetera"]
 serde = ["dep:serde", "camino/serde1"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber", "tracing-tree"]
