@@ -213,6 +213,18 @@ impl ScopeKind {
     pub const fn is_comprehension(self) -> bool {
         matches!(self, ScopeKind::Comprehension)
     }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Module => "Module",
+            Self::Annotation => "Annotation",
+            Self::Class => "Class",
+            Self::Function => "Function",
+            Self::Lambda => "Lambda",
+            Self::Comprehension => "Comprehension",
+            Self::TypeAlias => "TypeAlias",
+        }
+    }
 }
 
 /// Symbol table for a specific [`Scope`].

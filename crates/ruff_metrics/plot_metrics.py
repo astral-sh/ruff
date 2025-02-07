@@ -26,6 +26,10 @@ parser.add_argument(
 parser.add_argument("-o", "--output", help="save image to the given filename")
 subparsers = parser.add_subparsers(dest="command")
 
+bar_parser = subparsers.add_parser("bar")
+bar_parser.add_argument("key", help="the metric to render")
+bar_parser.add_argument("--group-by")
+
 counter_parser = subparsers.add_parser("counter")
 counter_parser.add_argument("key", help="the counter metric to render")
 counter_parser.add_argument("--group-by", required=False)
@@ -59,6 +63,15 @@ def show_plot():
         plt.show()
 
 
+def cmd_bar() -> None:
+    data = get_metric(all_data, args.key)
+    groups = data.groupby(args.group_by, as_index=False)
+    plt.xlabel(args.group_by)
+    plt.ylabel("Count")
+    plt.bar(args.group_by, "delta", data=groups["delta"].sum())
+    show_plot()
+
+
 def cmd_counter() -> None:
     data = get_metric(all_data, args.key)
     plt.ylabel(args.key)
@@ -83,7 +96,9 @@ def cmd_histogram() -> None:
     show_plot()
 
 
-if args.command == "counter":
+if args.command == "bar":
+    cmd_bar()
+elif args.command == "counter":
     cmd_counter()
 elif args.command == "histogram":
     cmd_histogram()

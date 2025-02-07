@@ -180,12 +180,6 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
-        metrics::counter!(
-            "semantic_index.scope_count",
-            "file" => self.file_path.clone(),
-        )
-        .increment(1);
-
         let children_start = self.scopes.next_index() + 1;
 
         #[allow(unsafe_code)]
@@ -196,6 +190,13 @@ impl<'db> SemanticIndexBuilder<'db> {
             descendents: children_start..children_start,
         };
         self.try_node_context_stack_manager.enter_nested_scope();
+
+        metrics::counter!(
+            "semantic_index.scope_count",
+            "file" => self.file_path.clone(),
+            "kind" => scope.kind().as_str(),
+        )
+        .increment(1);
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::default());
