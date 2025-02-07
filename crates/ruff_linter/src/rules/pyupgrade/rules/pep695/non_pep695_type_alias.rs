@@ -264,8 +264,8 @@ fn create_diagnostic(
 
     let applicability =
         if type_alias_kind == TypeAliasKind::TypeAlias && !checker.source_type.is_stub() {
-            // The fix is always unsafe in non-stubs stub
-            // because new-style aliases have different runtime behavior at runtime.
+            // The fix is always unsafe in non-stubs
+            // because new-style aliases have different runtime behavior.
             // See https://github.com/astral-sh/ruff/issues/6434
             Applicability::Unsafe
         } else {
