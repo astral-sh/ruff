@@ -310,12 +310,18 @@ class TupleIterable:
     def __iter__(self) -> TupleIterator:
         return TupleIterator()
 
+class NonIterable: ...
+
 class C:
     def __init__(self):
         for self.x in IntIterable():
             pass
 
         for _, self.y in TupleIterable():
+            pass
+
+        # TODO: We should emit a diagnostic here
+        for self.z in NonIterable():
             pass
 
 reveal_type(C().x)  # revealed: Unknown | int
@@ -500,6 +506,15 @@ class C:
 # do not support this either (for conditions that can only be resolved to `False` in type
 # inference), so it does not seem to be particularly important.
 reveal_type(C().x)  # revealed: str
+```
+
+#### Diagnostics are reported for the right-hand side of attribute assignments
+
+```py
+class C:
+    def __init__(self) -> None:
+        # error: [too-many-positional-arguments]
+        self.x: int = len(1, 2, 3)
 ```
 
 ### Pure class variables (`ClassVar`)
