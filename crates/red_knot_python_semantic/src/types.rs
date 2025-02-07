@@ -4254,9 +4254,8 @@ impl<'db> Class<'db> {
                     //     (.., self.name, ..) = <value>
                     //     [.., self.name, ..] = <value>
 
-                    let inferred_ty = infer_unpack_types(db, *unpack)
-                        .get(*attribute_expression_id)
-                        .expect("Failed to look up type of attribute in unpack assignment");
+                    let inferred_ty =
+                        infer_unpack_types(db, *unpack).type_for(*attribute_expression_id);
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }
