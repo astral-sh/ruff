@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+TID251.py:40:1: TID251 `list` is banned: `list` considered harmful.
+   |
+39 | # https://github.com/astral-sh/ruff/issues/10079
+40 | list()
+   | ^^^^ TID251
+41 |
+42 | from builtins import list as l
+   |

@@ -34,3 +34,17 @@ totally_not_typing.TypedDict
 
 # relative imports are respected
 from .typing import TypedDict
+
+
+# https://github.com/astral-sh/ruff/issues/10079
+list()
+
+from builtins import list as l
+l()
+
+import builtins
+builtins.list
+
+class C:
+    @property
+    def foo(self): ...
