@@ -2724,8 +2724,8 @@ pub(crate) fn check_ast(
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
     analyze::definitions(&mut checker);
-    analyze::bindings(&mut checker);
-    analyze::unresolved_references(&mut checker);
+    analyze::bindings(&checker);
+    analyze::unresolved_references(&checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();

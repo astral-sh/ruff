@@ -9,7 +9,7 @@ use crate::rules::{
 };
 
 /// Run lint rules over the [`Binding`]s.
-pub(crate) fn bindings(checker: &mut Checker) {
+pub(crate) fn bindings(checker: &Checker) {
     if !checker.any_enabled(&[
         Rule::AssignmentInAssert,
         Rule::InvalidAllFormat,

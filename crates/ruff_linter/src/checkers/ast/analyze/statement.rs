@@ -1172,7 +1172,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder]) {
                 fn bad_version_info_comparison(
-                    checker: &mut Checker,
+                    checker: &Checker,
                     test: &Expr,
                     has_else_clause: bool,
                 ) {

@@ -7,7 +7,7 @@ use crate::codes::Rule;
 use crate::rules::pyflakes;
 
 /// Run lint rules over all [`UnresolvedReference`] entities in the [`SemanticModel`].
-pub(crate) fn unresolved_references(checker: &mut Checker) {
+pub(crate) fn unresolved_references(checker: &Checker) {
     if !checker.any_enabled(&[Rule::UndefinedLocalWithImportStarUsage, Rule::UndefinedName]) {
         return;
     }
