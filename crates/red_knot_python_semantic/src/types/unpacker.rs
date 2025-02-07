@@ -268,8 +268,14 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
-    pub(crate) fn get(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
-        self.targets.get(&expr_id).copied()
+    /// Returns the inferred type for a given sub-expression of the left-hand side target
+    /// of an unpacking assignment.
+    ///
+    /// Panics if a scoped expression ID is passed in that does not correspond to a sub-
+    /// expression of the target.
+    #[track_caller]
+    pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
+        self.targets[&expr_id]
     }
 }
 

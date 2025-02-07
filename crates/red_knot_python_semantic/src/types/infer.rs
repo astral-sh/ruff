@@ -2085,7 +2085,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                unpacked.get(name_ast_id).unwrap_or(Type::unknown())
+                unpacked.expression_type(name_ast_id)
             }
             TargetKind::Name => {
                 if self.in_stub() && value.is_ellipsis_literal_expr() {
@@ -2356,7 +2356,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.context.extend(unpacked);
                     }
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                    unpacked.get(name_ast_id).unwrap_or(Type::unknown())
+                    unpacked.expression_type(name_ast_id)
                 }
                 TargetKind::Name => iterable_ty
                     .iterate(self.db())
