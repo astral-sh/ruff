@@ -262,6 +262,10 @@ impl System for WasmSystem {
         self.fs.current_directory()
     }
 
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,

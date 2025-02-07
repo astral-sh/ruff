@@ -98,6 +98,21 @@ impl System for OsSystem {
         &self.inner.cwd
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        use etcetera::BaseStrategy as _;
+
+        let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
+        SystemPathBuf::from_path_buf(strategy.config_dir()).ok()
+    }
+
+    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
+    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
+    #[cfg(target_arch = "wasm32")]
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     /// Creates a builder to recursively walk `path`.
     ///
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
