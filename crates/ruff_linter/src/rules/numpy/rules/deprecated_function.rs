@@ -55,7 +55,7 @@ impl Violation for NumpyDeprecatedFunction {
 }
 
 /// NPY003
-pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -89,6 +89,6 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
             let replacement_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

@@ -51,7 +51,7 @@ impl Violation for RequestWithoutTimeout {
 }
 
 /// S113
-pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn request_without_timeout(checker: &Checker, call: &ast::ExprCall) {
     if let Some(module) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -67,13 +67,13 @@ pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCal
     {
         if let Some(keyword) = call.arguments.find_keyword("timeout") {
             if keyword.value.is_none_literal_expr() {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RequestWithoutTimeout { implicit: false, module: module.to_string() },
                     keyword.range(),
                 ));
             }
         } else if module == "requests" {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 RequestWithoutTimeout { implicit: true, module: module.to_string() },
                 call.func.range(),
             ));

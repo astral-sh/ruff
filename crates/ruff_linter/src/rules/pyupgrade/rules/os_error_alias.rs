@@ -70,7 +70,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
-fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
+fn atom_diagnostic(checker: &Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
         OSErrorAlias {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
@@ -88,11 +88,11 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
-fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
+fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("OSError") {
@@ -138,11 +138,11 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
             tuple.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// UP024
-pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         let Some(expr) = type_.as_ref() else {
@@ -172,14 +172,14 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptH
 }
 
 /// UP024
-pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr) {
     if is_alias(func, checker.semantic()) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP024
-pub(crate) fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn os_error_alias_raise(checker: &Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
         if is_alias(expr, checker.semantic()) {
             atom_diagnostic(checker, expr);

@@ -57,7 +57,7 @@ mod native_literals;
 mod open_alias;
 mod os_error_alias;
 mod outdated_version_block;
-mod pep695;
+pub(crate) mod pep695;
 mod printf_string_formatting;
 mod quoted_annotation;
 mod redundant_open_modes;

@@ -68,7 +68,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 
 /// B904
 pub(crate) fn raise_without_from_inside_except(
-    checker: &mut Checker,
+    checker: &Checker,
     name: Option<&str>,
     body: &[Stmt],
 ) {
@@ -106,7 +106,7 @@ pub(crate) fn raise_without_from_inside_except(
                     .as_try_stmt()
                     .is_some_and(|try_stmt| try_stmt.is_star);
 
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RaiseWithoutFromInsideExcept { is_star },
                     range,
                 ));

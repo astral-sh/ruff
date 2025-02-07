@@ -1,5 +1,7 @@
 # Truthiness
 
+## Literals
+
 ```py
 from typing_extensions import Literal, LiteralString
 from knot_extensions import AlwaysFalsy, AlwaysTruthy
@@ -44,4 +46,32 @@ def _(
     reveal_type(bool(b))  # revealed: bool
     reveal_type(bool(c))  # revealed: bool
     reveal_type(bool(d))  # revealed: bool
+```
+
+## Instances
+
+Checks that we don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
+
+### __bool__ is bool
+
+```py
+class BoolIsBool:
+    __bool__ = bool
+
+reveal_type(bool(BoolIsBool()))  # revealed: bool
+```
+
+### Conditional __bool__ method
+
+```py
+def flag() -> bool:
+    return True
+
+class Boom:
+    if flag():
+        __bool__ = bool
+    else:
+        __bool__ = int
+
+reveal_type(bool(Boom()))  # revealed: bool
 ```

@@ -54,7 +54,7 @@ impl Violation for NoReturnArgumentAnnotationInStub {
 }
 
 /// PYI050
-pub(crate) fn no_return_argument_annotation(checker: &mut Checker, parameters: &ast::Parameters) {
+pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast::Parameters) {
     // Ex) def func(arg: NoReturn): ...
     // Ex) def func(arg: NoReturn, /): ...
     // Ex) def func(*, arg: NoReturn): ...
@@ -65,7 +65,7 @@ pub(crate) fn no_return_argument_annotation(checker: &mut Checker, parameters: &
         .filter_map(ast::AnyParameterRef::annotation)
     {
         if is_no_return(annotation, checker) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 NoReturnArgumentAnnotationInStub {
                     module: if checker.settings.target_version >= Py311 {
                         TypingModule::Typing

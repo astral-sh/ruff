@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr, Parameter};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::function_type::is_stub;
@@ -85,19 +85,14 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // Skip stub files
     if checker.source_type.is_stub() {
         return;
     }
 
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in function_def.parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in function_def.parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
 
@@ -110,7 +105,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             .collect();
 
         if is_mutable_expr(default, checker.semantic())
-            && !parameter.annotation.as_ref().is_some_and(|expr| {
+            && !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
@@ -119,7 +114,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(
                 function_def,
-                parameter,
+                &parameter.parameter,
                 default,
                 checker.semantic(),
                 checker.locator(),
@@ -129,7 +124,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -165,12 +160,12 @@ fn move_initialization(
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
-    content.push_str(&format!("if {} is None:", parameter.name.as_str()));
+    content.push_str(&format!("if {} is None:", parameter.name()));
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
     content.push_str(&format!(
         "{} = {}",
-        parameter.name.as_str(),
+        parameter.name(),
         generator.expr(default)
     ));
     content.push_str(stylist.line_ending().as_str());

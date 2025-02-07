@@ -68,7 +68,7 @@ impl Violation for ErrorInsteadOfException {
 }
 
 /// TRY400
-pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         let calls = {
@@ -135,7 +135,7 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                         _ => {}
                     }
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

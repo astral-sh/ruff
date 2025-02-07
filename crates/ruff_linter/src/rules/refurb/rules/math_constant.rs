@@ -49,7 +49,7 @@ impl Violation for MathConstant {
 }
 
 /// FURB152
-pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLiteral) {
+pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral) {
     let Number::Float(value) = literal.value else {
         return;
     };
@@ -63,7 +63,7 @@ pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLite
             literal.range(),
         );
         diagnostic.try_set_fix(|| convert_to_constant(literal, constant.name(), checker));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

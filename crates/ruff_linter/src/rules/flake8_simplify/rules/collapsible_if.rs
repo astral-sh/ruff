@@ -63,7 +63,7 @@ impl Violation for CollapsibleIf {
 
 /// SIM102
 pub(crate) fn nested_if_statements(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &ast::StmtIf,
     parent: Option<&Stmt>,
 ) {
@@ -138,7 +138,7 @@ pub(crate) fn nested_if_statements(
             }
         });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy)]

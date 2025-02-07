@@ -145,7 +145,7 @@ impl AlwaysFixableViolation for NativeLiterals {
 
 /// UP018
 pub(crate) fn native_literals(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     parent_expr: Option<&ast::Expr>,
 ) {
@@ -202,7 +202,7 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         Some(arg) => {
             let literal_expr = if let Some(literal_expr) = arg.as_literal_expr() {
@@ -254,7 +254,7 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

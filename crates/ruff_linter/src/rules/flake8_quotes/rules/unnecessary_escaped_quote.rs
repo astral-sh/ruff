@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for UnnecessaryEscapedQuote {
 }
 
 /// Q004
-pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLike) {
     if checker.semantic().in_pep_257_docstring() {
         return;
     }
@@ -61,7 +61,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
                     string_literal.range(),
                     AnyStringFlags::from(string_literal.flags),
                 ) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             ast::StringLikePart::Bytes(bytes_literal) => {
@@ -70,12 +70,12 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
                     bytes_literal.range(),
                     AnyStringFlags::from(bytes_literal.flags),
                 ) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             ast::StringLikePart::FString(f_string) => {
                 if let Some(diagnostic) = check_f_string(locator, f_string) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -108,7 +108,9 @@ fn check_string_or_bytes(
 
     let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        flags.format_string_contents(&unescape_string(contents, opposite_quote_char)),
+        flags
+            .display_contents(&unescape_string(contents, opposite_quote_char))
+            .to_string(),
         range,
     )));
     Some(diagnostic)

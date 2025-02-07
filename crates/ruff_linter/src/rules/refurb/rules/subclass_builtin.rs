@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for SubclassBuiltin {
 }
 
 /// FURB189
-pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
+pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
@@ -100,7 +100,7 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
         let other_edit = Edit::range_replacement(binding, base.range());
         Ok(Fix::unsafe_edits(import_edit, [other_edit]))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

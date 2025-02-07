@@ -63,12 +63,7 @@ impl Violation for UselessElseOnLoop {
 }
 
 /// PLW0120
-pub(crate) fn useless_else_on_loop(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
-    orelse: &[Stmt],
-) {
+pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if orelse.is_empty() || loop_exits_early(body) {
         return;
     }
@@ -86,7 +81,7 @@ pub(crate) fn useless_else_on_loop(
             checker.stylist(),
         )
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the given body contains a `break` statement.

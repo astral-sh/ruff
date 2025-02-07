@@ -361,7 +361,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 
 /// UP031
 pub(crate) fn printf_string_formatting(
-    checker: &mut Checker,
+    checker: &Checker,
     bin_op: &ast::ExprBinOp,
     string_expr: &ast::ExprStringLiteral,
 ) {
@@ -384,9 +384,7 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            checker.report_diagnostic(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
             return;
         }
 
@@ -405,7 +403,9 @@ pub(crate) fn printf_string_formatting(
         // Convert the `%`-format string to a `.format` string.
         format_strings.push((
             string_literal.range(),
-            flags.format_string_contents(&percent_to_format(&format_string)),
+            flags
+                .display_contents(&percent_to_format(&format_string))
+                .to_string(),
         ));
     }
 
@@ -445,9 +445,10 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+                checker.report_diagnostic(Diagnostic::new(
+                    PrintfStringFormatting,
+                    string_expr.range(),
+                ));
                 return;
             };
             Cow::Owned(params_string)
@@ -507,7 +508,7 @@ pub(crate) fn printf_string_formatting(
         contents,
         bin_op.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[cfg(test)]

@@ -50,7 +50,7 @@ impl Violation for CollectionsNamedTuple {
 }
 
 /// PYI024
-pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::COLLECTIONS) {
         return;
     }
@@ -62,8 +62,6 @@ pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
             matches!(qualified_name.segments(), ["collections", "namedtuple"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CollectionsNamedTuple, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(CollectionsNamedTuple, expr.range()));
     }
 }

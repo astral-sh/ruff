@@ -77,12 +77,12 @@ impl Violation for OverloadWithDocstring {
 }
 
 /// D418
-pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
     if is_overload(&function.decorator_list, checker.semantic()) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             OverloadWithDocstring,
             function.identifier(),
         ));

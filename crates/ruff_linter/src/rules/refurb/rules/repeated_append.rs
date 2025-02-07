@@ -76,7 +76,7 @@ impl Violation for RepeatedAppend {
 }
 
 /// FURB113
-pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
     let Some(appends) = match_consecutive_appends(stmt, checker.semantic()) else {
         return;
     };
@@ -127,7 +127,7 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
         })
         .collect();
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Debug, Clone)]

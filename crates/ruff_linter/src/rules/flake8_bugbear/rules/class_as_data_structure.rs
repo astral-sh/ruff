@@ -44,7 +44,7 @@ impl Violation for ClassAsDataStructure {
 }
 
 /// B903
-pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtClassDef) {
     // skip stub files
     if checker.source_type.is_stub() {
         return;
@@ -105,9 +105,7 @@ pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::St
     }
 
     if has_dunder_init && public_methods == 1 {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ClassAsDataStructure, class_def.range()));
+        checker.report_diagnostic(Diagnostic::new(ClassAsDataStructure, class_def.range()));
     }
 }
 

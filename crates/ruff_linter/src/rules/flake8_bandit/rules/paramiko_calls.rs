@@ -37,7 +37,7 @@ impl Violation for ParamikoCall {
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(func)
@@ -45,8 +45,6 @@ pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
             matches!(qualified_name.segments(), ["paramiko", "exec_command"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ParamikoCall, func.range()));
+        checker.report_diagnostic(Diagnostic::new(ParamikoCall, func.range()));
     }
 }

@@ -69,11 +69,7 @@ impl Violation for ImportPrivateName {
 }
 
 /// PLC2701
-pub(crate) fn import_private_name(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
         let Some(import) = binding.as_any_import() else {
@@ -140,7 +136,7 @@ pub(crate) fn import_private_name(
         } else {
             None
         };
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             ImportPrivateName { name, module },
             binding.range(),
         ));

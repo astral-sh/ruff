@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
@@ -20,6 +21,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 camino = { workspace = true }
+colored = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
@@ -28,6 +30,7 @@ glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 salsa = { workspace = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 path-slash = { workspace = true }
 thiserror = { workspace = true }

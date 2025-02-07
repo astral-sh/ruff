@@ -77,14 +77,14 @@ impl Violation for FutureRewritableTypeAnnotation {
 }
 
 /// FA100
-pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) {
     let name = checker
         .semantic()
         .resolve_qualified_name(expr)
         .map(|binding| binding.to_string());
 
     if let Some(name) = name {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             FutureRewritableTypeAnnotation { name },
             expr.range(),
         ));

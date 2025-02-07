@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for NumericLiteralTooLong {
 }
 
 /// PYI054
-pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
     if expr.range().len() <= TextSize::new(10) {
         return;
     }
@@ -55,5 +55,5 @@ pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
         "...".to_string(),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

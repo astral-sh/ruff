@@ -6,6 +6,8 @@ If we have an intersection type `A & B` and we get a definitive true/false answe
 types, we can infer that the result for the intersection type is also true/false:
 
 ```py
+from typing import Literal
+
 class Base: ...
 
 class Child1(Base):

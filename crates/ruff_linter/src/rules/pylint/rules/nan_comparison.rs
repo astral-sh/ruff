@@ -47,18 +47,18 @@ impl Violation for NanComparison {
 }
 
 /// PLW0177
-pub(crate) fn nan_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
     for expr in std::iter::once(left).chain(comparators) {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
                 ["numpy", "nan" | "NAN" | "NaN"] => {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         NanComparison { nan: Nan::NumPy },
                         expr.range(),
                     ));
                 }
                 ["math", "nan"] => {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         NanComparison { nan: Nan::Math },
                         expr.range(),
                     ));
@@ -68,7 +68,7 @@ pub(crate) fn nan_comparison(checker: &mut Checker, left: &Expr, comparators: &[
         }
 
         if is_nan_float(expr, checker.semantic()) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 NanComparison { nan: Nan::Math },
                 expr.range(),
             ));

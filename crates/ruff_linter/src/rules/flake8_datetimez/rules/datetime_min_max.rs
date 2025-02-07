@@ -53,7 +53,7 @@ impl Violation for DatetimeMinMax {
 }
 
 /// DTZ901
-pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn datetime_max_min(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::DATETIME) {
@@ -74,9 +74,7 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
+    checker.report_diagnostic(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
 }
 
 /// Check if the current expression has the pattern `foo.replace(tzinfo=bar)` or `foo.time()`.

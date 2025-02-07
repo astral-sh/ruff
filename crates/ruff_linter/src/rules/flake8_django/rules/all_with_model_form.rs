@@ -48,7 +48,7 @@ impl Violation for DjangoAllWithModelForm {
 }
 
 /// DJ007
-pub(crate) fn all_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -78,17 +78,19 @@ pub(crate) fn all_with_model_form(checker: &mut Checker, class_def: &ast::StmtCl
                 match value.as_ref() {
                     Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                         if value == "__all__" {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(DjangoAllWithModelForm, element.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                DjangoAllWithModelForm,
+                                element.range(),
+                            ));
                             return;
                         }
                     }
                     Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                         if value == "__all__".as_bytes() {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(DjangoAllWithModelForm, element.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                DjangoAllWithModelForm,
+                                element.range(),
+                            ));
                             return;
                         }
                     }

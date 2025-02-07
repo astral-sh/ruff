@@ -6,7 +6,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -162,22 +162,16 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else { continue };
-        if !default.is_none_literal_expr() {
+pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
+    for parameter in parameters.iter_non_variadic_params() {
+        let Some(Expr::NoneLiteral(_)) = parameter.default() else {
             continue;
-        }
-        let Some(annotation) = &parameter.annotation else {
+        };
+        let Some(annotation) = parameter.annotation() else {
             continue;
         };
 
-        if let Expr::StringLiteral(string_expr) = annotation.as_ref() {
+        if let Expr::StringLiteral(string_expr) = annotation {
             // Quoted annotation.
             if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
                 let Some(expr) = type_hint_explicitly_allows_none(
@@ -194,7 +188,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
                 if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         } else {
             // Unquoted annotation.
@@ -210,7 +204,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

@@ -531,7 +531,7 @@ impl Violation for UndocumentedPublicInit {
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub(crate) fn not_missing(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     visibility: Visibility,
 ) -> bool {
@@ -552,7 +552,7 @@ pub(crate) fn not_missing(
                 return true;
             }
             if checker.enabled(Rule::UndocumentedPublicModule) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicModule,
                     TextRange::default(),
                 ));
@@ -564,7 +564,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicPackage) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicPackage,
                     TextRange::default(),
                 ));
@@ -576,9 +576,10 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicClass) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(UndocumentedPublicClass, class.identifier()));
+                checker.report_diagnostic(Diagnostic::new(
+                    UndocumentedPublicClass,
+                    class.identifier(),
+                ));
             }
             false
         }
@@ -587,7 +588,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicNestedClass) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicNestedClass,
                     function.identifier(),
                 ));
@@ -602,7 +603,7 @@ pub(crate) fn not_missing(
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicFunction,
                         function.identifier(),
                     ));
@@ -620,7 +621,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_init(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicInit) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicInit,
                         function.identifier(),
                     ));
@@ -628,7 +629,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_new(&function.name) || is_call(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
                     ));
@@ -636,7 +637,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_magic(&function.name) {
                 if checker.enabled(Rule::UndocumentedMagicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedMagicMethod,
                         function.identifier(),
                     ));
@@ -644,7 +645,7 @@ pub(crate) fn not_missing(
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
                     ));

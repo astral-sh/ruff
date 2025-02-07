@@ -56,7 +56,7 @@ impl Violation for BadDunderMethodName {
 }
 
 /// PLW3201
-pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFunctionDef) {
+pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFunctionDef) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -82,7 +82,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BadDunderMethodName {
             name: method.name.to_string(),
         },

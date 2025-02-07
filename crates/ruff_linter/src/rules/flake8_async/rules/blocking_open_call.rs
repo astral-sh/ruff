@@ -44,7 +44,7 @@ impl Violation for BlockingOpenCallInAsyncFunction {
 }
 
 /// ASYNC230
-pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;
     }
@@ -52,7 +52,7 @@ pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_open_call(&call.func, checker.semantic())
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BlockingOpenCallInAsyncFunction,
             call.func.range(),
         ));

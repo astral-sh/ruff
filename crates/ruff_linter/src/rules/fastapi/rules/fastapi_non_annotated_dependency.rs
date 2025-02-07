@@ -88,7 +88,7 @@ impl Violation for FastApiNonAnnotatedDependency {
 
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI)
@@ -107,8 +107,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
         .iter()
         .chain(&function_def.parameters.kwonlyargs)
     {
-        let (Some(annotation), Some(default)) =
-            (&parameter.parameter.annotation, &parameter.default)
+        let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
         else {
             seen_default |= parameter.default.is_some();
             continue;
@@ -120,7 +119,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
                 annotation,
                 default,
                 kind: dependency,
-                name: &parameter.parameter.name,
+                name: parameter.name(),
                 range: parameter.range,
             };
             seen_default = create_diagnostic(
@@ -220,7 +219,7 @@ impl<'a> DependencyCall<'a> {
 /// necessary to determine this while generating the fix, thus the need to return an updated
 /// `seen_default` here.
 fn create_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     parameter: &DependencyParameter,
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
@@ -305,7 +304,7 @@ fn create_diagnostic(
     }
     diagnostic.try_set_optional_fix(|| fix);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 
     seen_default
 }

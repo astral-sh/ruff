@@ -1,0 +1,44 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unresolved_import.md - Unresolved import diagnostics - Using `from` with too many leading dots
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unresolved_import.md
+---
+
+# Python source files
+
+## package/__init__.py
+
+```
+```
+
+## package/foo.py
+
+```
+1 | def add(x, y):
+2 |     return x + y
+```
+
+## package/subpackage/subsubpackage/__init__.py
+
+```
+1 | from ....foo import add  # error: [unresolved-import]
+2 | 
+3 | stat = add(10, 15)
+```
+
+# Diagnostics
+
+```
+error: lint:unresolved-import
+ --> /src/package/subpackage/subsubpackage/__init__.py:1:10
+  |
+1 | from ....foo import add  # error: [unresolved-import]
+  |          ^^^ Cannot resolve import `....foo`
+2 |
+3 | stat = add(10, 15)
+  |
+
+```

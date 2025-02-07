@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -50,7 +50,7 @@ impl Violation for LoopVariableOverridesIterator {
 }
 
 /// B020
-pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr, iter: &Expr) {
     let target_names = {
         let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);
@@ -64,7 +64,7 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &E
 
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },
@@ -101,13 +101,8 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 visitor::walk_expr(self, body);
 
                 if let Some(parameters) = parameters {
-                    for ParameterWithDefault {
-                        parameter,
-                        default: _,
-                        range: _,
-                    } in parameters.iter_non_variadic_params()
-                    {
-                        self.names.remove(parameter.name.as_str());
+                    for parameter in parameters.iter_non_variadic_params() {
+                        self.names.remove(parameter.name().as_str());
                     }
                 }
             }

@@ -45,7 +45,7 @@ impl Violation for ManualListCopy {
 }
 
 /// PERF402
-pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
     if for_stmt.is_async {
         return;
     }
@@ -119,7 +119,5 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualListCopy, *range));
+    checker.report_diagnostic(Diagnostic::new(ManualListCopy, *range));
 }

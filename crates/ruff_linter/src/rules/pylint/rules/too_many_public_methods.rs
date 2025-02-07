@@ -101,7 +101,7 @@ impl Violation for TooManyPublicMethods {
 
 /// R0904
 pub(crate) fn too_many_public_methods(
-    checker: &mut Checker,
+    checker: &Checker,
     class_def: &ast::StmtClassDef,
     max_methods: usize,
 ) {
@@ -121,7 +121,7 @@ pub(crate) fn too_many_public_methods(
         .count();
 
     if methods > max_methods {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             TooManyPublicMethods {
                 methods,
                 max_methods,

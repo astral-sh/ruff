@@ -48,11 +48,7 @@ impl Violation for BadStaticmethodArgument {
 }
 
 /// PLW0211
-pub(crate) fn bad_staticmethod_argument(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };
@@ -99,7 +95,7 @@ pub(crate) fn bad_staticmethod_argument(
         _ => return,
     }
 
-    diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },

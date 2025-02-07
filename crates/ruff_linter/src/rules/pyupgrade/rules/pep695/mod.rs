@@ -9,7 +9,7 @@ use ruff_python_ast::{
     self as ast,
     name::Name,
     visitor::{self, Visitor},
-    Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAssign, TypeParam,
+    Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAssign, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
 };
 use ruff_python_semantic::SemanticModel;
@@ -18,15 +18,17 @@ use ruff_text_size::{Ranged, TextRange};
 pub(crate) use non_pep695_generic_class::*;
 pub(crate) use non_pep695_generic_function::*;
 pub(crate) use non_pep695_type_alias::*;
+pub(crate) use private_type_parameter::*;
 
 use crate::checkers::ast::Checker;
 
 mod non_pep695_generic_class;
 mod non_pep695_generic_function;
 mod non_pep695_type_alias;
+mod private_type_parameter;
 
 #[derive(Debug)]
-enum TypeVarRestriction<'a> {
+pub(crate) enum TypeVarRestriction<'a> {
     /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
     Bound(&'a Expr),
     /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
@@ -37,31 +39,34 @@ enum TypeVarRestriction<'a> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum TypeParamKind {
+pub(crate) enum TypeParamKind {
     TypeVar,
     TypeVarTuple,
     ParamSpec,
 }
 
 #[derive(Debug)]
-struct TypeVar<'a> {
-    name: &'a str,
-    restriction: Option<TypeVarRestriction<'a>>,
-    kind: TypeParamKind,
-    default: Option<&'a Expr>,
+pub(crate) struct TypeVar<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) restriction: Option<TypeVarRestriction<'a>>,
+    pub(crate) kind: TypeParamKind,
+    pub(crate) default: Option<&'a Expr>,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
 /// *Ts, **P]`). See [`DisplayTypeVar`] for further details.
-struct DisplayTypeVars<'a> {
-    type_vars: &'a [TypeVar<'a>],
-    source: &'a str,
+pub(crate) struct DisplayTypeVars<'a> {
+    pub(crate) type_vars: &'a [TypeVar<'a>],
+    pub(crate) source: &'a str,
 }
 
 impl Display for DisplayTypeVars<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[")?;
         let nvars = self.type_vars.len();
+        if nvars == 0 {
+            return Ok(());
+        }
+        f.write_str("[")?;
         for (i, tv) in self.type_vars.iter().enumerate() {
             write!(f, "{}", tv.display(self.source))?;
             if i < nvars - 1 {
@@ -76,7 +81,7 @@ impl Display for DisplayTypeVars<'_> {
 
 /// Used for displaying `type_var`. `source` is the whole file, which will be sliced to recover the
 /// `TypeVarRestriction` values for generic bounds and constraints.
-struct DisplayTypeVar<'a> {
+pub(crate) struct DisplayTypeVar<'a> {
     type_var: &'a TypeVar<'a>,
     source: &'a str,
 }
@@ -187,6 +192,34 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
     }
 }
 
+impl<'a> From<&'a TypeParam> for TypeVar<'a> {
+    fn from(param: &'a TypeParam) -> Self {
+        let (kind, restriction) = match param {
+            TypeParam::TypeVarTuple(_) => (TypeParamKind::TypeVarTuple, None),
+            TypeParam::ParamSpec(_) => (TypeParamKind::ParamSpec, None),
+
+            TypeParam::TypeVar(param) => {
+                let restriction = match param.bound.as_deref() {
+                    None => None,
+                    Some(Expr::Tuple(constraints)) => Some(TypeVarRestriction::Constraint(
+                        constraints.elts.iter().collect::<Vec<_>>(),
+                    )),
+                    Some(bound) => Some(TypeVarRestriction::Bound(bound)),
+                };
+
+                (TypeParamKind::TypeVar, restriction)
+            }
+        };
+
+        Self {
+            name: param.name(),
+            kind,
+            restriction,
+            default: param.default(),
+        }
+    }
+}
+
 struct TypeVarReferenceVisitor<'a> {
     vars: Vec<TypeVar<'a>>,
     semantic: &'a SemanticModel<'a>,
@@ -237,7 +270,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
     }
 }
 
-fn expr_name_to_type_var<'a>(
+pub(crate) fn expr_name_to_type_var<'a>(
     semantic: &'a SemanticModel,
     name: &'a ExprName,
 ) -> Option<TypeVar<'a>> {
@@ -343,4 +376,19 @@ fn check_type_vars(vars: Vec<TypeVar<'_>>) -> Option<Vec<TypeVar<'_>>> {
         .count()
         == vars.len())
     .then_some(vars)
+}
+
+/// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
+/// any), along with its index in the class's bases tuple.
+pub(crate) fn find_generic<'a>(
+    class_bases: &'a Arguments,
+    semantic: &SemanticModel,
+) -> Option<(usize, &'a ExprSubscript)> {
+    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
+        expr.as_subscript_expr().and_then(|sub_expr| {
+            semantic
+                .match_typing_expr(&sub_expr.value, "Generic")
+                .then_some((idx, sub_expr))
+        })
+    })
 }

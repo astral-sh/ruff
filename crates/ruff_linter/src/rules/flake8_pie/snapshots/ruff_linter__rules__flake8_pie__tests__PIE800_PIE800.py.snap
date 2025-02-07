@@ -295,4 +295,168 @@ PIE800.py:65:1: PIE800 [*] Unnecessary spread `**`
    69 |+     # Comment
 70 70 |     ,
 71 71 | })
-72 72 |
+72 72 | 
+
+PIE800.py:77:9: PIE800 [*] Unnecessary spread `**`
+   |
+75 |       ** # Foo
+76 |       (  # Comment
+77 | /         { "a": b,
+78 | |           # Comment
+79 | |           }
+   | |___________^ PIE800
+80 |       ) ,
+81 |       c: 9,
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+72 72 | 
+73 73 | {
+74 74 |     "data": [],
+75    |-    ** # Foo
+76    |-    (  # Comment
+77    |-        { "a": b,
+   75 |+     # Foo
+   76 |+      # Comment
+   77 |+         "a": b
+78 78 |           # Comment
+79    |-          }
+80    |-    ) ,
+   79 |+          
+   80 |+     ,
+81 81 |     c: 9,
+82 82 | }
+83 83 | 
+
+PIE800.py:86:13: PIE800 [*] Unnecessary spread `**`
+   |
+85 | # https://github.com/astral-sh/ruff/issues/15997
+86 | {"a": [], **{},}
+   |             ^^ PIE800
+87 | {"a": [], **({}),}
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+83 83 | 
+84 84 | 
+85 85 | # https://github.com/astral-sh/ruff/issues/15997
+86    |-{"a": [], **{},}
+   86 |+{"a": [], }
+87 87 | {"a": [], **({}),}
+88 88 | 
+89 89 | {"a": [], **{}, 6: 3}
+
+PIE800.py:87:14: PIE800 [*] Unnecessary spread `**`
+   |
+85 | # https://github.com/astral-sh/ruff/issues/15997
+86 | {"a": [], **{},}
+87 | {"a": [], **({}),}
+   |              ^^ PIE800
+88 |
+89 | {"a": [], **{}, 6: 3}
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+84 84 | 
+85 85 | # https://github.com/astral-sh/ruff/issues/15997
+86 86 | {"a": [], **{},}
+87    |-{"a": [], **({}),}
+   87 |+{"a": [], }
+88 88 | 
+89 89 | {"a": [], **{}, 6: 3}
+90 90 | {"a": [], **({}), 6: 3}
+
+PIE800.py:89:13: PIE800 [*] Unnecessary spread `**`
+   |
+87 | {"a": [], **({}),}
+88 |
+89 | {"a": [], **{}, 6: 3}
+   |             ^^ PIE800
+90 | {"a": [], **({}), 6: 3}
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+86 86 | {"a": [], **{},}
+87 87 | {"a": [], **({}),}
+88 88 | 
+89    |-{"a": [], **{}, 6: 3}
+   89 |+{"a": [],  6: 3}
+90 90 | {"a": [], **({}), 6: 3}
+91 91 | 
+92 92 | {"a": [], **{
+
+PIE800.py:90:14: PIE800 [*] Unnecessary spread `**`
+   |
+89 | {"a": [], **{}, 6: 3}
+90 | {"a": [], **({}), 6: 3}
+   |              ^^ PIE800
+91 |
+92 | {"a": [], **{
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+87 87 | {"a": [], **({}),}
+88 88 | 
+89 89 | {"a": [], **{}, 6: 3}
+90    |-{"a": [], **({}), 6: 3}
+   90 |+{"a": [],  6: 3}
+91 91 | 
+92 92 | {"a": [], **{
+93 93 |     # Comment
+
+PIE800.py:92:13: PIE800 [*] Unnecessary spread `**`
+   |
+90 |   {"a": [], **({}), 6: 3}
+91 |
+92 |   {"a": [], **{
+   |  _____________^
+93 | |     # Comment
+94 | | }, 6: 3}
+   | |_^ PIE800
+95 |   {"a": [], **({
+96 |       # Comment
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+89 89 | {"a": [], **{}, 6: 3}
+90 90 | {"a": [], **({}), 6: 3}
+91 91 | 
+92    |-{"a": [], **{
+   92 |+{"a": [], 
+93 93 |     # Comment
+94    |-}, 6: 3}
+   94 |+ 6: 3}
+95 95 | {"a": [], **({
+96 96 |     # Comment
+97 97 | }), 6: 3}
+
+PIE800.py:95:14: PIE800 [*] Unnecessary spread `**`
+   |
+93 |       # Comment
+94 |   }, 6: 3}
+95 |   {"a": [], **({
+   |  ______________^
+96 | |     # Comment
+97 | | }), 6: 3}
+   | |_^ PIE800
+   |
+   = help: Remove unnecessary dict
+
+ℹ Safe fix
+92 92 | {"a": [], **{
+93 93 |     # Comment
+94 94 | }, 6: 3}
+95    |-{"a": [], **({
+   95 |+{"a": [], 
+96 96 |     # Comment
+97    |-}), 6: 3}
+   97 |+ 6: 3}
+98 98 | 
+99 99 | 
+100 100 | {**foo,    "bar": True  }  # OK

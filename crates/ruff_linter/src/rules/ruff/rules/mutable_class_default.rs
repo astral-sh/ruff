@@ -20,26 +20,69 @@ use crate::rules::ruff::rules::helpers::{
 /// changed in one instance, as those changes will unexpectedly affect all
 /// other instances.
 ///
-/// When mutable values are intended, they should be annotated with
-/// `typing.ClassVar`. When mutability is not required, values should be
-/// immutable types, like `tuple` or `frozenset`.
+/// Generally speaking, you probably want to avoid having mutable default
+/// values in the class body at all; instead, these variables should usually
+/// be initialized in `__init__`. However, other possible fixes for the issue
+/// can include:
+/// - Explicitly annotating the variable with [`typing.ClassVar`][ClassVar] to
+///   indicate that it is intended to be shared across all instances.
+/// - Using an immutable data type (e.g. a tuple instead of a list)
+///   for the default value.
 ///
-/// ## Examples
+/// ## Example
+///
 /// ```python
 /// class A:
-///     mutable_default: list[int] = []
-///     immutable_default: list[int] = []
+///     variable_1: list[int] = []
+///     variable_2: set[int] = set()
+///     variable_3: dict[str, int] = {}
 /// ```
 ///
 /// Use instead:
+///
+/// ```python
+/// class A:
+///     def __init__(self) -> None:
+///         self.variable_1: list[int] = []
+///         self.variable_2: set[int] = set()
+///         self.variable_3: dict[str, int] = {}
+/// ```
+///
+/// Or:
+///
 /// ```python
 /// from typing import ClassVar
 ///
 ///
 /// class A:
-///     mutable_default: ClassVar[list[int]] = []
-///     immutable_default: tuple[int, ...] = ()
+///     variable_1: ClassVar[list[int]] = []
+///     variable_2: ClassVar[set[int]] = set()
+///     variable_3: ClassVar[dict[str, int]] = {}
 /// ```
+///
+/// Or:
+///
+/// ```python
+/// class A:
+///     variable_1: list[int] | None = None
+///     variable_2: set[int] | None = None
+///     variable_3: dict[str, int] | None = None
+/// ```
+///
+/// Or:
+///
+/// ```python
+/// from collections.abc import Sequence, Mapping, Set as AbstractSet
+/// from types import MappingProxyType
+///
+///
+/// class A:
+///     variable_1: Sequence[int] = ()
+///     variable_2: AbstractSet[int] = frozenset()
+///     variable_3: Mapping[str, int] = MappingProxyType({})
+/// ```
+///
+/// [ClassVar]: https://docs.python.org/3/library/typing.html#typing.ClassVar
 #[derive(ViolationMetadata)]
 pub(crate) struct MutableClassDefault;
 
@@ -51,7 +94,7 @@ impl Violation for MutableClassDefault {
 }
 
 /// RUF012
-pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -75,9 +118,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                         return;
                     }
 
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
@@ -89,9 +130,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                         return;
                     }
 
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             _ => (),

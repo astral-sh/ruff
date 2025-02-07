@@ -81,12 +81,7 @@ impl AlwaysFixableViolation for NonPEP604Isinstance {
 }
 
 /// UP038
-pub(crate) fn use_pep604_isinstance(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let Some(types) = args.get(1) else {
         return;
     };
@@ -107,7 +102,7 @@ pub(crate) fn use_pep604_isinstance(
     let Some(kind) = CallKind::from_name(builtin_function_name) else {
         return;
     };
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(NonPEP604Isinstance { kind }, expr.range()).with_fix(Fix::unsafe_edit(
             Edit::range_replacement(
                 checker.generator().expr(&pep_604_union(&tuple.elts)),

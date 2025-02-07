@@ -83,7 +83,7 @@ impl Violation for Airflow3MovedToProvider {
 }
 
 /// AIR303
-pub(crate) fn moved_to_provider_in_3(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn moved_to_provider_in_3(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -112,7 +112,7 @@ enum Replacement {
     },
 }
 
-fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: TextRange) {
+fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRange) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
         return;
     };
@@ -1018,7 +1018,7 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: Tex
         },
         _ => return,
     };
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         Airflow3MovedToProvider {
             deprecated: qualified_name.to_string(),
             replacement,

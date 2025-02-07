@@ -103,3 +103,18 @@ class K(SQLModel):
 class L(SQLModel):
     id: int
     i_j: list[K] = list()
+
+# Lint should account for deferred annotations
+# See https://github.com/astral-sh/ruff/issues/15857
+class AWithQuotes:
+    __slots__ = {
+        "mutable_default": "A mutable default value",
+    }
+
+    mutable_default: 'list[int]' = []
+    immutable_annotation: 'Sequence[int]'= []
+    without_annotation = []
+    class_variable: 'ClassVar[list[int]]' = []
+    final_variable: 'Final[list[int]]' = []
+    class_variable_without_subscript: 'ClassVar' = []
+    final_variable_without_subscript: 'Final' = []

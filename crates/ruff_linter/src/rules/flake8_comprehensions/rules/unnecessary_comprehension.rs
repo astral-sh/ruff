@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for UnnecessaryComprehension {
 }
 
 /// Add diagnostic for C416 based on the expression node id.
-fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
+fn add_diagnostic(checker: &Checker, expr: &Expr) {
     let Some(comprehension_kind) = ComprehensionKind::try_from_expr(expr) else {
         return;
     };
@@ -95,12 +95,12 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// C416
 pub(crate) fn unnecessary_dict_comprehension(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     key: &Expr,
     value: &Expr,
@@ -135,7 +135,7 @@ pub(crate) fn unnecessary_dict_comprehension(
 
 /// C416
 pub(crate) fn unnecessary_list_set_comprehension(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],

@@ -325,7 +325,7 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
 }
 
 /// SIM101
-pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
@@ -462,7 +462,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -493,7 +493,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
 }
 
 /// SIM109
-pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
@@ -584,12 +584,12 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             checker.generator().expr(&in_expr),
             expr.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// SIM220
-pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::And,
         values,
@@ -639,14 +639,14 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     "False".to_string(),
                     expr.range(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
 }
 
 /// SIM221
-pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
@@ -696,7 +696,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     "True".to_string(),
                     expr.range(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -832,7 +832,7 @@ fn is_short_circuit(
 }
 
 /// SIM222
-pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {
     if checker.semantic().in_string_type_definition() {
         return;
     }
@@ -846,12 +846,12 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// SIM223
-pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {
     if checker.semantic().in_string_type_definition() {
         return;
     }
@@ -865,6 +865,6 @@ pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

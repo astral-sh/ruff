@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UselessReturn {
 
 /// PLR1711
 pub(crate) fn useless_return(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     returns: Option<&Expr>,
@@ -99,5 +99,5 @@ pub(crate) fn useless_return(
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_id(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

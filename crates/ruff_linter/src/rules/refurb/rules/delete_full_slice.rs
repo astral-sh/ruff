@@ -60,7 +60,7 @@ impl Violation for DeleteFullSlice {
 }
 
 /// FURB131
-pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete) {
+pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
     for target in &delete.targets {
         let Some(name) = match_full_slice(target, checker.semantic()) else {
             continue;
@@ -78,7 +78,7 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
             )));
         }
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

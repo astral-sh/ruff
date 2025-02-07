@@ -80,7 +80,7 @@ impl Violation for RuntimeStringUnion {
 }
 
 /// TC010
-pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     if !checker.semantic().in_type_definition() {
         return;
     }
@@ -138,7 +138,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
             );
             diagnostic.set_parent(parent);
             diagnostic.set_fix(fix.clone());
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         return;
     }
@@ -165,7 +165,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

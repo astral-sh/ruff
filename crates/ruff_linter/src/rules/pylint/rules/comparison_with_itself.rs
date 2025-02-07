@@ -48,7 +48,7 @@ impl Violation for ComparisonWithItself {
 
 /// PLR0124
 pub(crate) fn comparison_with_itself(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
@@ -67,7 +67,7 @@ pub(crate) fn comparison_with_itself(
                     op,
                     checker.locator().slice(right)
                 );
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     ComparisonWithItself {
                         actual: SourceCodeSnippet::new(actual),
                     },
@@ -115,7 +115,7 @@ pub(crate) fn comparison_with_itself(
                         op,
                         checker.locator().slice(right)
                     );
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         ComparisonWithItself {
                             actual: SourceCodeSnippet::new(actual),
                         },

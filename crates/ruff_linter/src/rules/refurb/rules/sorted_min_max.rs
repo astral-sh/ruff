@@ -79,7 +79,7 @@ impl Violation for SortedMinMax {
 }
 
 /// FURB192
-pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) {
     if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
@@ -201,7 +201,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -156,7 +156,7 @@ impl AlwaysFixableViolation for BlankLineBeforeClass {
 }
 
 /// D203, D204, D211
-pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring) {
     let Some(class) = docstring.definition.as_class_def() else {
         return;
     };
@@ -199,7 +199,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                     blank_lines_start,
                     docstring.start() - docstring.indentation.text_len(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
         if checker.enabled(Rule::IncorrectBlankLineBeforeClass) {
@@ -212,7 +212,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                     blank_lines_start,
                     docstring.start() - docstring.indentation.text_len(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -259,7 +259,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                     replacement_start,
                     first_line.end(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
                 return;
             } else if trailing.starts_with('#') {
                 // Keep the end-of-line comment, start counting empty lines after it
@@ -287,7 +287,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                 replacement_start,
                 blank_lines_end,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

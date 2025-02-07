@@ -39,7 +39,7 @@ pub fn derive_combine_options(input: TokenStream) -> TokenStream {
 /// Automatically derives a `red_knot_project::project::Combine` implementation for the attributed type
 /// that calls `red_knot_project::project::Combine::combine` for each field.
 ///
-/// The derive macro can only be used on structs with named fields.
+/// The derive macro can only be used on structs. Enums aren't yet supported.
 #[proc_macro_derive(Combine)]
 pub fn derive_combine(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

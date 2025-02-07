@@ -44,7 +44,7 @@ use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
 };
-use crate::semantic_index::expression::Expression;
+use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
@@ -61,6 +61,7 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
+use crate::types::statistics::TypeStatistics;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -199,7 +200,7 @@ pub(crate) fn infer_expression_types<'db>(
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
 #[salsa::tracked(return_ref)]
-fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
@@ -298,6 +299,14 @@ impl<'db> TypeInference<'db> {
         self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
+    }
+
+    pub(super) fn statistics(&self) -> TypeStatistics {
+        let mut statistics = TypeStatistics::default();
+        for ty in self.expressions.values() {
+            statistics.increment(*ty);
+        }
+        statistics
     }
 }
 
@@ -823,7 +832,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression_impl(expression.node_ref(self.db()));
+        match expression.kind(self.db()) {
+            ExpressionKind::Normal => {
+                self.infer_expression_impl(expression.node_ref(self.db()));
+            }
+            ExpressionKind::TypeExpression => {
+                self.infer_type_expression(expression.node_ref(self.db()));
+            }
+        }
     }
 
     /// Raise a diagnostic if the given type cannot be divided by zero.
@@ -1285,7 +1301,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        if let Some(annotation) = parameter.annotation.as_ref() {
+        if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
             // TODO `tuple[annotated_ty, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db());
@@ -1314,7 +1330,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        if let Some(annotation) = parameter.annotation.as_ref() {
+        if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
             // TODO `dict[str, annotated_ty]`
             let ty = KnownClass::Dict.to_instance(self.db());
@@ -2069,7 +2085,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                unpacked.get(name_ast_id).unwrap_or(Type::unknown())
+                unpacked.expression_type(name_ast_id)
             }
             TargetKind::Name => {
                 if self.in_stub() && value.is_ellipsis_literal_expr() {
@@ -2340,7 +2356,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.context.extend(unpacked);
                     }
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                    unpacked.get(name_ast_id).unwrap_or(Type::unknown())
+                    unpacked.expression_type(name_ast_id)
                 }
                 TargetKind::Name => iterable_ty
                     .iterate(self.db())
@@ -2496,19 +2512,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         let module = file_to_module(self.db(), self.file())
             .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
         let mut level = level.get();
+
         if module.kind().is_package() {
-            level -= 1;
+            level = level.saturating_sub(1);
         }
-        let mut module_name = module.name().clone();
-        for _ in 0..level {
-            module_name = module_name
-                .parent()
-                .ok_or(ModuleNameResolutionError::TooManyDots)?;
-        }
+
+        let mut module_name = module
+            .name()
+            .ancestors()
+            .nth(level as usize)
+            .ok_or(ModuleNameResolutionError::TooManyDots)?;
+
         if let Some(tail) = tail {
             let tail = ModuleName::new(tail).ok_or(ModuleNameResolutionError::InvalidSyntax)?;
             module_name.extend(&tail);
         }
+
         Ok(module_name)
     }
 
@@ -2522,6 +2541,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // - Absolute `*` imports (`from collections import *`)
         // - Relative `*` imports (`from ...foo import *`)
         let ast::StmtImportFrom { module, level, .. } = import_from;
+        // For diagnostics, we want to highlight the unresolvable
+        // module and not the entire `from ... import ...` statement.
+        let module_ref = module
+            .as_ref()
+            .map(AnyNodeRef::from)
+            .unwrap_or_else(|| AnyNodeRef::from(import_from));
         let module = module.as_deref();
 
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
@@ -2556,7 +2581,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                report_unresolved_module(&self.context, import_from, *level, module);
+                report_unresolved_module(&self.context, module_ref, *level, module);
                 self.add_unknown_declaration_with_binding(alias.into(), definition);
                 return;
             }
@@ -2566,14 +2591,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
-                report_unresolved_module(&self.context, import_from, *level, module);
+                report_unresolved_module(&self.context, module_ref, *level, module);
                 self.add_unknown_declaration_with_binding(alias.into(), definition);
                 return;
             }
         };
 
         let Some(module_ty) = self.module_type_from_name(&module_name) else {
-            report_unresolved_module(&self.context, import_from, *level, module);
+            report_unresolved_module(&self.context, module_ref, *level, module);
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -3274,8 +3299,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Look up a name reference that isn't bound in the local scope.
     fn lookup_name(&mut self, name_node: &ast::ExprName) -> Symbol<'db> {
+        let db = self.db();
         let ast::ExprName { id: name, .. } = name_node;
-        let file_scope_id = self.scope().file_scope_id(self.db());
+        let file_scope_id = self.scope().file_scope_id(db);
         let is_bound =
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_by_name(name) {
                 symbol.is_bound()
@@ -3290,16 +3316,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         // In function-like scopes, any local variable (symbol that is bound in this scope) can
         // only have a definition in this scope, or error; it never references another scope.
         // (At runtime, it would use the `LOAD_FAST` opcode.)
-        if !is_bound || !self.scope().is_function_like(self.db()) {
+        if !is_bound || !self.scope().is_function_like(db) {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
-                let enclosing_scope_id =
-                    enclosing_scope_file_id.to_scope_id(self.db(), self.file());
-                if !enclosing_scope_id.is_function_like(self.db()) {
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                if !enclosing_scope_id.is_function_like(db) {
                     continue;
                 }
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
@@ -3312,37 +3337,45 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(self.db(), enclosing_scope_id, name);
+                    return symbol(db, enclosing_scope_id, name);
                 }
             }
 
-            // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
-            // already is module globals.
-            let global_symbol = if file_scope_id.is_global() {
-                Symbol::Unbound
-            } else {
-                global_symbol(self.db(), self.file(), name)
-            };
-
-            // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if global_symbol.possibly_unbound()
-                && Some(self.scope()) != builtins_module_scope(self.db())
-            {
-                let mut builtins_symbol = builtins_symbol(self.db(), name);
-                if builtins_symbol.is_unbound() && name == "reveal_type" {
-                    self.context.report_lint(
-                        &UNDEFINED_REVEAL,
-                        name_node.into(),
-                        format_args!(
-                            "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
-                    );
-                    builtins_symbol = typing_extensions_symbol(self.db(), name);
-                }
-
-                global_symbol.or_fall_back_to(self.db(), &builtins_symbol)
-            } else {
-                global_symbol
-            }
+            Symbol::Unbound
+                // No nonlocal binding? Check the module's globals.
+                // Avoid infinite recursion if `self.scope` already is the module's global scope.
+                .or_fall_back_to(db, || {
+                    if file_scope_id.is_global() {
+                        Symbol::Unbound
+                    } else {
+                        global_symbol(db, self.file(), name)
+                    }
+                })
+                // Not found in globals? Fallback to builtins
+                // (without infinite recursion if we're already in builtins.)
+                .or_fall_back_to(db, || {
+                    if Some(self.scope()) == builtins_module_scope(db) {
+                        Symbol::Unbound
+                    } else {
+                        builtins_symbol(db, name)
+                    }
+                })
+                // Still not found? It might be `reveal_type`...
+                .or_fall_back_to(db, || {
+                    if name == "reveal_type" {
+                        self.context.report_lint(
+                            &UNDEFINED_REVEAL,
+                            name_node.into(),
+                            format_args!(
+                                "`reveal_type` used without importing it; \
+                            this is allowed for debugging convenience but will fail at runtime"
+                            ),
+                        );
+                        typing_extensions_symbol(db, name)
+                    } else {
+                        Symbol::Unbound
+                    }
+                })
         } else {
             Symbol::Unbound
         }
@@ -6010,7 +6043,7 @@ mod tests {
     use crate::types::check_types;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use super::*;
 
@@ -6335,6 +6368,86 @@ mod tests {
             first_public_binding(&db, a, "x"),
             &events,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
+            let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+            let ast = parsed_module(db, file_main);
+            // Get the second statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+
+            let index = semantic_index(db, file_main);
+            index.expression(x_rhs_node.as_ref())
+        }
+
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def f(self):
+                    self.attr: int | None = None
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from mod import C
+            x = C().attr
+            "#,
+        )?;
+
+        let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+        let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int | None");
+
+        // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def f(self):
+                    self.attr: str | None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+
+        // Add a comment; this should not trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def f(self):
+                    # a comment!
+                    self.attr: str | None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_types,
+            x_rhs_expression(&db),
+            &events,
+        );
+
         Ok(())
     }
 }

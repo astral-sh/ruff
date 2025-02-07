@@ -30,6 +30,7 @@ mod tests {
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_deferred.py"))]
     #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     #[test_case(
         Rule::FunctionCallInDataclassDefaultArgument,
@@ -39,8 +40,13 @@ mod tests {
         Rule::FunctionCallInDataclassDefaultArgument,
         Path::new("RUF009_attrs_auto_attribs.py")
     )]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_deferred.py")
+    )]
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
+    #[test_case(Rule::MutableClassDefault, Path::new("RUF012_deferred.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
@@ -429,6 +435,7 @@ mod tests {
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
+    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

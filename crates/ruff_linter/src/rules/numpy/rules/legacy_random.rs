@@ -59,7 +59,7 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -137,7 +137,7 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                 }
             })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },

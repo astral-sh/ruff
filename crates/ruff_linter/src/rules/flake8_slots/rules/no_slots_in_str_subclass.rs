@@ -49,7 +49,7 @@ impl Violation for NoSlotsInStrSubclass {
 }
 
 /// SLOT000
-pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
+pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &StmtClassDef) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -73,9 +73,7 @@ pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
+    checker.report_diagnostic(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
 }
 
 /// Return `true` if the class is a subclass of `str`.

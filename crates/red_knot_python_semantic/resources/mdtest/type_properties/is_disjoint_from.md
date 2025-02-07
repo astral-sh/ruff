@@ -151,7 +151,7 @@ static_assert(is_disjoint_from(Never, object))
 ### `None`
 
 ```py
-from typing_extensions import Literal
+from typing_extensions import Literal, LiteralString
 from knot_extensions import is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(None, Literal[True]))
@@ -245,6 +245,7 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 
 ```py
 from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_disjoint_from, static_assert
+from typing import Literal
 
 static_assert(is_disjoint_from(None, AlwaysTruthy))
 static_assert(not is_disjoint_from(None, AlwaysFalsy))

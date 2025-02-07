@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for AssertWithPrintMessage {
 ///
 /// Checks if the `msg` argument to an `assert` statement is a `print` call, and if so,
 /// replace the message with the arguments to the `print` call.
-pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtAssert) {
+pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAssert) {
     if let Some(Expr::Call(call)) = stmt.msg.as_deref() {
         // We have to check that the print call is a call to the built-in `print` function
         let semantic = checker.semantic();
@@ -74,7 +74,7 @@ pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtA
                 // will cease to exist.
                 stmt.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

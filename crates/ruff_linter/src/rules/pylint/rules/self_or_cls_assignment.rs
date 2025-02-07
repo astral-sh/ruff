@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -64,7 +64,7 @@ impl Violation for SelfOrClsAssignment {
 }
 
 /// PLW0127
-pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
+pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -82,10 +82,7 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
         return;
     };
 
-    let Some(ParameterWithDefault {
-        parameter: self_or_cls,
-        ..
-    }) = parameters
+    let Some(self_or_cls) = parameters
         .posonlyargs
         .first()
         .or_else(|| parameters.args.first())
@@ -102,7 +99,7 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
 
-    let method_type = match (function_type, self_or_cls.name.as_str()) {
+    let method_type = match (function_type, self_or_cls.name().as_str()) {
         (FunctionType::Method { .. }, "self") => MethodType::Instance,
         (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
         _ => return,
@@ -111,12 +108,12 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
     check_expr(checker, target, method_type);
 }
 
-fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
+fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
     match target {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {
                 if id.as_str() == method_type.arg_name() {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         SelfOrClsAssignment { method_type },
                         target.range(),
                     ));

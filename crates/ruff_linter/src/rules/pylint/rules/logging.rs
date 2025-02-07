@@ -85,7 +85,7 @@ impl Violation for LoggingTooManyArgs {
 
 /// PLE1205
 /// PLE1206
-pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     // If there are any starred arguments, abort.
     if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return;
@@ -154,17 +154,13 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
 
     if checker.enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(LoggingTooManyArgs, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(LoggingTooManyArgs, call.func.range()));
         }
     }
 
     if checker.enabled(Rule::LoggingTooFewArgs) {
         if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(LoggingTooFewArgs, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(LoggingTooFewArgs, call.func.range()));
         }
     }
 }

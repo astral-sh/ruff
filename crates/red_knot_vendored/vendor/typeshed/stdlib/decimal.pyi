@@ -65,7 +65,7 @@ class Underflow(Inexact, Rounded, Subnormal): ...
 class FloatOperation(DecimalException, TypeError): ...
 
 class Decimal:
-    def __new__(cls, value: _DecimalNew = ..., context: Context | None = ...) -> Self: ...
+    def __new__(cls, value: _DecimalNew = "0", context: Context | None = None) -> Self: ...
     @classmethod
     def from_float(cls, f: float, /) -> Self: ...
     def __bool__(self) -> bool: ...
@@ -163,12 +163,12 @@ class Decimal:
     def __reduce__(self) -> tuple[type[Self], tuple[str]]: ...
     def __copy__(self) -> Self: ...
     def __deepcopy__(self, memo: Any, /) -> Self: ...
-    def __format__(self, specifier: str, context: Context | None = ..., /) -> str: ...
+    def __format__(self, specifier: str, context: Context | None = None, /) -> str: ...
 
 class Context:
     # TODO: Context doesn't allow you to delete *any* attributes from instances of the class at runtime,
     # even settable attributes like `prec` and `rounding`,
-    # but that's inexpressable in the stub.
+    # but that's inexpressible in the stub.
     # Type checkers either ignore it or misinterpret it
     # if you add a `def __delattr__(self, name: str, /) -> NoReturn` method to the stub
     prec: int
@@ -181,14 +181,14 @@ class Context:
     flags: dict[_TrapType, bool]
     def __init__(
         self,
-        prec: int | None = ...,
-        rounding: str | None = ...,
-        Emin: int | None = ...,
-        Emax: int | None = ...,
-        capitals: int | None = ...,
-        clamp: int | None = ...,
-        flags: None | dict[_TrapType, bool] | Container[_TrapType] = ...,
-        traps: None | dict[_TrapType, bool] | Container[_TrapType] = ...,
+        prec: int | None = None,
+        rounding: str | None = None,
+        Emin: int | None = None,
+        Emax: int | None = None,
+        capitals: int | None = None,
+        clamp: int | None = None,
+        flags: dict[_TrapType, bool] | Container[_TrapType] | None = None,
+        traps: dict[_TrapType, bool] | Container[_TrapType] | None = None,
     ) -> None: ...
     def __reduce__(self) -> tuple[type[Self], tuple[Any, ...]]: ...
     def clear_flags(self) -> None: ...

@@ -67,7 +67,7 @@ impl AlwaysFixableViolation for CheckAndRemoveFromSet {
 }
 
 /// FURB132
-pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::StmtIf) {
+pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf) {
     // In order to fit the profile, we need if without else clauses and with only one statement in its body.
     if if_stmt.body.len() != 1 || !if_stmt.elif_else_clauses.is_empty() {
         return;
@@ -116,7 +116,7 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
         if_stmt.start(),
         if_stmt.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {

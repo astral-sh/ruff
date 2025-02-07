@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for UnnecessaryClassParentheses {
 }
 
 /// UP039
-pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
         return;
     };
@@ -53,5 +53,5 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
         arguments.start(),
         arguments.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

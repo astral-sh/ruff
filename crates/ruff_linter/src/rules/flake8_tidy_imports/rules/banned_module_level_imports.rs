@@ -56,7 +56,7 @@ impl Violation for BannedModuleLevelImports {
 }
 
 /// TID253
-pub(crate) fn banned_module_level_imports(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
     if !checker.semantic().at_top_level() {
         return;
     }
@@ -68,7 +68,7 @@ pub(crate) fn banned_module_level_imports(checker: &mut Checker, stmt: &Stmt) {
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BannedModuleLevelImports {
                     name: banned_module,
                 },

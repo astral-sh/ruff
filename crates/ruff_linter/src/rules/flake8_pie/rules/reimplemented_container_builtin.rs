@@ -58,7 +58,7 @@ impl Violation for ReimplementedContainerBuiltin {
 }
 
 /// PIE807
-pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &ExprLambda) {
+pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLambda) {
     let ExprLambda {
         parameters,
         body,
@@ -84,7 +84,7 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
         let binding_edit = Edit::range_replacement(binding, expr.range());
         Ok(Fix::safe_edits(binding_edit, import_edit))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

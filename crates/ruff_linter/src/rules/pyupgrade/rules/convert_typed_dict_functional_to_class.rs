@@ -67,7 +67,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 
 /// UP013
 pub(crate) fn convert_typed_dict_functional_to_class(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,
@@ -100,7 +100,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`

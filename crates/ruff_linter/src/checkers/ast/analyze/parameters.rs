@@ -5,7 +5,7 @@ use crate::codes::Rule;
 use crate::rules::{flake8_bugbear, flake8_pyi, ruff};
 
 /// Run lint rules over a [`Parameters`] syntax node.
-pub(crate) fn parameters(parameters: &Parameters, checker: &mut Checker) {
+pub(crate) fn parameters(parameters: &Parameters, checker: &Checker) {
     if checker.enabled(Rule::FunctionCallInDefaultArgument) {
         flake8_bugbear::rules::function_call_in_argument_default(checker, parameters);
     }

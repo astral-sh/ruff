@@ -168,7 +168,7 @@ impl Violation for SysVersionSlice1 {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
     if is_sys(value, "version", checker.semantic()) {
         match slice {
             Expr::Slice(ast::ExprSlice {
@@ -183,13 +183,9 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 }) = upper.as_ref()
                 {
                     if *i == 1 && checker.enabled(Rule::SysVersionSlice1) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice1, value.range()));
+                        checker.report_diagnostic(Diagnostic::new(SysVersionSlice1, value.range()));
                     } else if *i == 3 && checker.enabled(Rule::SysVersionSlice3) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice3, value.range()));
+                        checker.report_diagnostic(Diagnostic::new(SysVersionSlice3, value.range()));
                     }
                 }
             }
@@ -199,13 +195,9 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 ..
             }) => {
                 if *i == 2 && checker.enabled(Rule::SysVersion2) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersion2, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(SysVersion2, value.range()));
                 } else if *i == 0 && checker.enabled(Rule::SysVersion0) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersion0, value.range()));
+                    checker.report_diagnostic(Diagnostic::new(SysVersion0, value.range()));
                 }
             }
 

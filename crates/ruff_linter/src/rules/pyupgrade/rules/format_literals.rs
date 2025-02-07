@@ -59,11 +59,7 @@ impl Violation for FormatLiterals {
 }
 
 /// UP030
-pub(crate) fn format_literals(
-    checker: &mut Checker,
-    call: &ast::ExprCall,
-    summary: &FormatSummary,
-) {
+pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     // The format we expect is, e.g.: `"{0} {1}".format(...)`
     if summary.has_nested_parts {
         return;
@@ -117,7 +113,7 @@ pub(crate) fn format_literals(
         generate_call(call, arguments, checker.locator(), checker.stylist())
             .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns true if the indices are sequential.

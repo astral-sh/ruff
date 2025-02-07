@@ -3,7 +3,9 @@ use std::fmt::Formatter;
 
 use thiserror::Error;
 
+use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_parser::ParseError;
+use ruff_source_file::{OneIndexed, SourceCode};
 use ruff_text_size::TextRange;
 
 use crate::{
@@ -210,29 +212,94 @@ impl<'db> DisplayDiagnostic<'db> {
 
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.diagnostic.severity() {
-            Severity::Info => f.write_str("info")?,
-            Severity::Warning => f.write_str("warning")?,
-            Severity::Error => f.write_str("error")?,
-            Severity::Fatal => f.write_str("fatal")?,
+        let level = match self.diagnostic.severity() {
+            Severity::Info => Level::Info,
+            Severity::Warning => Level::Warning,
+            Severity::Error => Level::Error,
+            // NOTE: Should we really collapse this to "error"?
+            //
+            // After collapsing this, the snapshot tests seem to reveal that we
+            // don't currently have any *tests* with a `fatal` severity level.
+            // And maybe *rendering* this as just an `error` is fine. If we
+            // really do need different rendering, then I think we can add a
+            // `Level::Fatal`. ---AG
+            Severity::Fatal => Level::Error,
+        };
+
+        let render = |f: &mut std::fmt::Formatter, message| {
+            let renderer = if !cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize() {
+                Renderer::styled()
+            } else {
+                Renderer::plain()
+            }
+            .cut_indicator("…");
+            let rendered = renderer.render(message);
+            writeln!(f, "{rendered}")
+        };
+        match (self.diagnostic.file(), self.diagnostic.range()) {
+            (None, _) => {
+                // NOTE: This is pretty sub-optimal. It doesn't render well. We
+                // really want a snippet, but without a `File`, we can't really
+                // render anything. It looks like this case currently happens
+                // for configuration errors. It looks like we can probably
+                // produce a snippet for this if it comes from a file, but if
+                // it comes from the CLI, I'm not quite sure exactly what to
+                // do. ---AG
+                let msg = format!("{}: {}", self.diagnostic.id(), self.diagnostic.message());
+                render(f, level.title(&msg))
+            }
+            (Some(file), range) => {
+                let path = file.path(self.db).to_string();
+                let source = source_text(self.db, file);
+                let title = self.diagnostic.id().to_string();
+                let message = self.diagnostic.message();
+
+                let Some(range) = range else {
+                    let snippet = Snippet::source(source.as_str()).origin(&path).line_start(1);
+                    return render(f, level.title(&title).snippet(snippet));
+                };
+
+                // The bits below are a simplified copy from
+                // `crates/ruff_linter/src/message/text.rs`.
+                let index = line_index(self.db, file);
+                let source_code = SourceCode::new(source.as_str(), &index);
+
+                let content_start_index = source_code.line_index(range.start());
+                let mut start_index = content_start_index.saturating_sub(2);
+                // Trim leading empty lines.
+                while start_index < content_start_index {
+                    if !source_code.line_text(start_index).trim().is_empty() {
+                        break;
+                    }
+                    start_index = start_index.saturating_add(1);
+                }
+
+                let content_end_index = source_code.line_index(range.end());
+                let mut end_index = content_end_index
+                    .saturating_add(2)
+                    .min(OneIndexed::from_zero_indexed(index.line_count()));
+                // Trim trailing empty lines.
+                while end_index > content_end_index {
+                    if !source_code.line_text(end_index).trim().is_empty() {
+                        break;
+                    }
+                    end_index = end_index.saturating_sub(1);
+                }
+
+                // Slice up the code frame and adjust our range.
+                let start_offset = source_code.line_start(start_index);
+                let end_offset = source_code.line_end(end_index);
+                let frame = source_code.slice(TextRange::new(start_offset, end_offset));
+                let span = range - start_offset;
+
+                let annotation = level.span(span.into()).label(&message);
+                let snippet = Snippet::source(frame)
+                    .origin(&path)
+                    .line_start(start_index.get())
+                    .annotation(annotation);
+                render(f, level.title(&title).snippet(snippet))
+            }
         }
-
-        write!(f, "[{rule}]", rule = self.diagnostic.id())?;
-
-        if let Some(file) = self.diagnostic.file() {
-            write!(f, " {path}", path = file.path(self.db))?;
-        }
-
-        if let (Some(file), Some(range)) = (self.diagnostic.file(), self.diagnostic.range()) {
-            let index = line_index(self.db, file);
-            let source = source_text(self.db, file);
-
-            let start = index.source_location(range.start(), &source);
-
-            write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
-        }
-
-        write!(f, " {message}", message = self.diagnostic.message())
     }
 }
 
@@ -287,6 +354,50 @@ where
 }
 
 impl Diagnostic for Box<dyn Diagnostic> {
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
+    }
+
+    fn message(&self) -> Cow<str> {
+        (**self).message()
+    }
+
+    fn file(&self) -> Option<File> {
+        (**self).file()
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        (**self).range()
+    }
+
+    fn severity(&self) -> Severity {
+        (**self).severity()
+    }
+}
+
+impl Diagnostic for &'_ dyn Diagnostic {
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
+    }
+
+    fn message(&self) -> Cow<str> {
+        (**self).message()
+    }
+
+    fn file(&self) -> Option<File> {
+        (**self).file()
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        (**self).range()
+    }
+
+    fn severity(&self) -> Severity {
+        (**self).severity()
+    }
+}
+
+impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
     fn id(&self) -> DiagnosticId {
         (**self).id()
     }

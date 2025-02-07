@@ -82,7 +82,7 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     let Stmt::If(stmt_if) = stmt else { return };
     let ast::StmtIf {
         test: if_test,
@@ -306,7 +306,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

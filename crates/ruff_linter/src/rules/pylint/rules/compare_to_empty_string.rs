@@ -59,7 +59,7 @@ impl Violation for CompareToEmptyString {
 
 /// PLC1901
 pub(crate) fn compare_to_empty_string(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
@@ -89,7 +89,7 @@ pub(crate) fn compare_to_empty_string(
                         let expr = checker.generator().expr(rhs);
                         let existing = format!("{literal} {op} {expr}");
                         let replacement = format!("{}{expr}", op.into_unary());
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             CompareToEmptyString {
                                 existing,
                                 replacement,
@@ -107,7 +107,7 @@ pub(crate) fn compare_to_empty_string(
                     let literal = checker.generator().expr(rhs);
                     let existing = format!("{expr} {op} {literal}");
                     let replacement = format!("{}{expr}", op.into_unary());
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         CompareToEmptyString {
                             existing,
                             replacement,

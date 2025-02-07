@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
@@ -19,6 +18,8 @@ UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 6   |-x: typing.TypeAlias = int
   6 |+type x = int
 7 7 | x: TypeAlias = int
+8 8 | 
+9 9 | 
 
 UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
@@ -35,3 +36,56 @@ UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 6 6 | x: typing.TypeAlias = int
 7   |-x: TypeAlias = int
   7 |+type x = int
+8 8 | 
+9 9 | 
+10 10 | # comments in the value are preserved
+
+UP040.pyi:11:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+   |
+10 |   # comments in the value are preserved
+11 | / x: TypeAlias = tuple[
+12 | |     int,  # preserved
+13 | |     float,
+14 | | ]
+   | |_^ UP040
+15 |
+16 |   T: TypeAlias = ( # comment0
+   |
+   = help: Use the `type` keyword
+
+ℹ Safe fix
+8  8  | 
+9  9  | 
+10 10 | # comments in the value are preserved
+11    |-x: TypeAlias = tuple[
+   11 |+type x = tuple[
+12 12 |     int,  # preserved
+13 13 |     float,
+14 14 | ]
+
+UP040.pyi:16:1: UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
+   |
+14 |   ]
+15 |
+16 | / T: TypeAlias = ( # comment0
+17 | |     # comment1
+18 | |     int  # comment2
+19 | |     # comment3
+20 | |     | # comment4
+21 | |     # comment5
+22 | |     str  # comment6
+23 | |     # comment7
+24 | | ) # comment8
+   | |_^ UP040
+   |
+   = help: Use the `type` keyword
+
+ℹ Safe fix
+13 13 |     float,
+14 14 | ]
+15 15 | 
+16    |-T: TypeAlias = ( # comment0
+   16 |+type T = ( # comment0
+17 17 |     # comment1
+18 18 |     int  # comment2
+19 19 |     # comment3

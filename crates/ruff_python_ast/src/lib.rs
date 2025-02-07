@@ -69,7 +69,7 @@ pub enum TomlSourceType {
     Unrecognized,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PySourceType {
     /// The source is a Python file (`.py`).

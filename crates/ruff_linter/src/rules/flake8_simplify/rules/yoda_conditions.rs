@@ -203,7 +203,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
 
 /// SIM300
 pub(crate) fn yoda_conditions(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -235,9 +235,9 @@ pub(crate) fn yoda_conditions(
             pad(suggestion, expr.range(), checker.locator()),
             expr.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     } else {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             YodaConditions { suggestion: None },
             expr.range(),
         ));

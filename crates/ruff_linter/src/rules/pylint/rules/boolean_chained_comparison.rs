@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for BooleanChainedComparison {
 }
 
 /// PLR1716
-pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &ExprBoolOp) {
+pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprBoolOp) {
     // early exit for non `and` boolean operations
     if expr_bool_op.op != BoolOp::And {
         return;
@@ -158,7 +158,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             Some(diagnostic)
         });
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// Checks whether two compare expressions are simplifiable

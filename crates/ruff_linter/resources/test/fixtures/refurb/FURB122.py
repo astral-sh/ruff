@@ -76,6 +76,27 @@ def _():
             f.write(())
 
 
+def _():
+    # https://github.com/astral-sh/ruff/issues/15936
+    with open("file", "w") as f:
+        for char in "a", "b":
+            f.write(char)
+
+def _():
+    # https://github.com/astral-sh/ruff/issues/15936
+    with open("file", "w") as f:
+        for char in "a", "b":
+            f.write(f"{char}")
+
+def _():
+    with open("file", "w") as f:
+        for char in (
+            "a",  # Comment
+            "b"
+        ):
+            f.write(f"{char}")
+
+
 # OK
 
 def _():

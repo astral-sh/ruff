@@ -90,7 +90,7 @@ impl Violation for ReimplementedOperator {
 }
 
 /// FURB118
-pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
     // Ignore methods.
     // Methods can be defined via a `def` statement in a class scope,
     // or via a lambda appearing on the right-hand side of an assignment in a class scope.
@@ -120,7 +120,7 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         target.range(),
     );
     diagnostic.try_set_optional_fix(|| fix);
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Candidate for lambda expression or function definition consisting of a return statement.
@@ -456,11 +456,11 @@ fn match_arguments(
 /// Returns `true` if the given argument is the "same" as the given expression. For example, if
 /// the argument has a default, it is not considered the same as any expression; if both match the
 /// same name, they are considered the same.
-fn is_same_expression(arg: &ast::ParameterWithDefault, expr: &Expr) -> bool {
-    if arg.default.is_some() {
+fn is_same_expression(param: &ast::ParameterWithDefault, expr: &Expr) -> bool {
+    if param.default.is_some() {
         false
     } else if let Expr::Name(name) = expr {
-        name.id == arg.parameter.name.as_str()
+        name.id == param.name().as_str()
     } else {
         false
     }

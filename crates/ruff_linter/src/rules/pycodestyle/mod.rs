@@ -44,6 +44,7 @@ mod tests {
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_3.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_4.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]

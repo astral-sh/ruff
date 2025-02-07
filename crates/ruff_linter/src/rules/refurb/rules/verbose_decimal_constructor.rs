@@ -57,7 +57,7 @@ impl Violation for VerboseDecimalConstructor {
 }
 
 /// FURB157
-pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -199,7 +199,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
         }
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 // ```console
