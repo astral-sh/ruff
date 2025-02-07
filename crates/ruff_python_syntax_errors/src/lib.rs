@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn hello_world() {
+    fn match_before_py310() {
         assert_debug_snapshot!(test_snippet(
             r#"
 match var:
@@ -173,5 +173,17 @@ match var:
             },
         ]
         ");
+    }
+
+    #[test]
+    fn match_on_py310() {
+        assert_debug_snapshot!(test_snippet(
+            r#"
+match var:
+    case 1:
+        print("it's one")
+"#,
+            PythonVersion::PY310,
+        ), @"[]");
     }
 }
