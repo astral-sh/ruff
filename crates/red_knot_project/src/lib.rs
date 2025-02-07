@@ -320,8 +320,6 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         return diagnostics;
     }
 
-    let target_version = Program::get(db).python_version(db);
-
     let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
         let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
@@ -329,6 +327,10 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
     }));
 
     if parsed.errors().is_empty() {
+        // plain `Program::get` was panicking here with `called unwrap on None value`
+        let target_version = Program::try_get(db)
+            .map(|program| program.python_version(db))
+            .unwrap_or_default();
         diagnostics.extend(
             check_syntax(parsed, target_version.into())
                 .iter()
