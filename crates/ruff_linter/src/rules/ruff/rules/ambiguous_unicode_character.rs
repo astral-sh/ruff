@@ -196,25 +196,29 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
         match part {
             ast::StringLikePart::String(string_literal) => {
                 let text = checker.locator().slice(string_literal);
+                let mut diagnostics = Vec::new();
                 ambiguous_unicode_character(
-                    &mut checker.diagnostics,
+                    &mut diagnostics,
                     text,
                     string_literal.range(),
                     context,
                     checker.settings,
                 );
+                checker.report_diagnostics(diagnostics);
             }
             ast::StringLikePart::Bytes(_) => {}
             ast::StringLikePart::FString(f_string) => {
                 for literal in f_string.elements.literals() {
                     let text = checker.locator().slice(literal);
+                    let mut diagnostics = Vec::new();
                     ambiguous_unicode_character(
-                        &mut checker.diagnostics,
+                        &mut diagnostics,
                         text,
                         literal.range(),
                         context,
                         checker.settings,
                     );
+                    checker.report_diagnostics(diagnostics);
                 }
             }
         }
