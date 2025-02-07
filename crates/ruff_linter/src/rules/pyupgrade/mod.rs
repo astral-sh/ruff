@@ -106,11 +106,32 @@ mod tests {
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

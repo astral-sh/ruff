@@ -70,7 +70,7 @@ impl Violation for PrintEmptyString {
 }
 
 /// FURB105
-pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().match_builtin_expr(&call.func, "print") {
         return;
     }
@@ -96,7 +96,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 .into_fix(),
             );
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
 
         [arg] if arg.is_starred_expr() => {
@@ -124,7 +124,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     .into_fix(),
                 );
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -186,7 +186,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     .into_fix(),
             );
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

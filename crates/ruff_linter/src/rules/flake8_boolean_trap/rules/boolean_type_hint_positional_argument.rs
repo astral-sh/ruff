@@ -1,11 +1,11 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
@@ -110,7 +110,7 @@ impl Violation for BooleanTypeHintPositionalArgument {
 
 /// FBT001
 pub(crate) fn boolean_type_hint_positional_argument(
-    checker: &mut Checker,
+    checker: &Checker,
     name: &str,
     decorator_list: &[Decorator],
     parameters: &Parameters,
@@ -124,13 +124,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
         return;
     }
 
-    for ParameterWithDefault {
-        parameter,
-        default: _,
-        range: _,
-    } in parameters.posonlyargs.iter().chain(&parameters.args)
-    {
-        let Some(annotation) = parameter.annotation.as_ref() else {
+    for parameter in parameters.posonlyargs.iter().chain(&parameters.args) {
+        let Some(annotation) = parameter.annotation() else {
             continue;
         };
         if checker.settings.preview.is_enabled() {
@@ -162,9 +157,9 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BooleanTypeHintPositionalArgument,
-            parameter.name.range(),
+            parameter.identifier(),
         ));
     }
 }

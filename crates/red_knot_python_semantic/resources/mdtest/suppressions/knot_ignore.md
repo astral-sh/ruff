@@ -77,7 +77,8 @@ def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...
 ```py
 # error: [invalid-syntax]
 # error: [unused-ignore-comment]
-def test(  # knot: ignore
+def test($):  # knot: ignore
+    pass
 ```
 
 <!-- blacken-docs:on -->

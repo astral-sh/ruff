@@ -48,7 +48,7 @@ impl Violation for SslInsecureVersion {
 }
 
 /// S502
-pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
     let Some(keyword) = checker
         .semantic()
         .resolve_qualified_name(call.func.as_ref())
@@ -68,7 +68,7 @@ pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
     match &keyword.value {
         Expr::Name(ast::ExprName { id, .. }) => {
             if is_insecure_protocol(id) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     SslInsecureVersion {
                         protocol: id.to_string(),
                     },
@@ -78,7 +78,7 @@ pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
         }
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if is_insecure_protocol(attr) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     SslInsecureVersion {
                         protocol: attr.to_string(),
                     },

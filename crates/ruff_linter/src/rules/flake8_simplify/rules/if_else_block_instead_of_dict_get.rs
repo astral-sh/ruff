@@ -5,7 +5,9 @@ use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
-use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
+use ruff_python_semantic::analyze::typing::{
+    is_known_to_be_of_type_dict, is_sys_version_block, is_type_checking_block,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -69,7 +71,7 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 }
 
 /// SIM401
-pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
@@ -113,18 +115,27 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     let [orelse_var] = orelse_var.as_slice() else {
         return;
     };
+
     let Expr::Compare(ast::ExprCompare {
         left: test_key,
         ops,
         comparators: test_dict,
         range: _,
-    }) = test.as_ref()
+    }) = &**test
     else {
         return;
     };
     let [test_dict] = &**test_dict else {
         return;
     };
+
+    if !test_dict
+        .as_name_expr()
+        .is_some_and(|dict_name| is_known_to_be_of_type_dict(checker.semantic(), dict_name))
+    {
+        return;
+    }
+
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
         [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
         [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
@@ -218,12 +229,12 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
             stmt_if.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM401
 pub(crate) fn if_exp_instead_of_dict_get(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -307,5 +318,5 @@ pub(crate) fn if_exp_instead_of_dict_get(
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

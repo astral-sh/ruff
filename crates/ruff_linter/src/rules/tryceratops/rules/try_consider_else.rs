@@ -60,7 +60,7 @@ impl Violation for TryConsiderElse {
 
 /// TRY300
 pub(crate) fn try_consider_else(
-    checker: &mut Checker,
+    checker: &Checker,
     body: &[Stmt],
     orelse: &[Stmt],
     handler: &[ExceptHandler],
@@ -73,9 +73,7 @@ pub(crate) fn try_consider_else(
                         return;
                     }
                 }
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(TryConsiderElse, stmt.range()));
+                checker.report_diagnostic(Diagnostic::new(TryConsiderElse, stmt.range()));
             }
         }
     }

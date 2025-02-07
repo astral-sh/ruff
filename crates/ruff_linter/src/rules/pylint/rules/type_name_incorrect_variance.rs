@@ -64,7 +64,7 @@ impl Violation for TypeNameIncorrectVariance {
 }
 
 /// PLC0105
-pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
+pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -126,7 +126,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         VarVariance::Invariance => name_root.to_string(),
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         TypeNameIncorrectVariance {
             kind,
             param_name: param_name.to_string(),

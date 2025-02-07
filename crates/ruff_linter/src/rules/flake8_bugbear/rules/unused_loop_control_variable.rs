@@ -76,7 +76,7 @@ impl Violation for UnusedLoopControlVariable {
 }
 
 /// B007
-pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::StmtFor) {
     let control_names = {
         let mut finder = StoredNameFinder::default();
         finder.visit_expr(stmt_for.target.as_ref());
@@ -147,7 +147,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
                 }
             }
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

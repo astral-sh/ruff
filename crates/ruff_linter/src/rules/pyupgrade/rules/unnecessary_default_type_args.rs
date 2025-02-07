@@ -74,7 +74,7 @@ impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
 }
 
 /// UP043
-pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -136,7 +136,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
         ),
         applicability,
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Trim trailing `None` literals from the given elements.

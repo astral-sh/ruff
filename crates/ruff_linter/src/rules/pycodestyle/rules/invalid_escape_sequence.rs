@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for InvalidEscapeSequence {
 }
 
 /// W605
-pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike) {
     let locator = checker.locator();
 
     for part in string_like.parts() {
@@ -104,13 +104,7 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
                 escape_chars_state
             }
         };
-        check(
-            &mut checker.diagnostics,
-            locator,
-            part.start(),
-            part.flags(),
-            state,
-        );
+        check(checker, locator, part.start(), part.flags(), state);
     }
 }
 
@@ -242,7 +236,7 @@ fn analyze_escape_chars(
 /// a raw string. If we have seen valid escape characters,
 /// we manually add backslashes to each invalid escape character found.
 fn check(
-    diagnostics: &mut Vec<Diagnostic>,
+    checker: &Checker,
     locator: &Locator,
     // Start position of the expression that contains the source range. This is used to generate
     // the fix when the source range is part of the expression like in f-string which contains
@@ -269,7 +263,7 @@ fn check(
                 r"\".to_string(),
                 invalid_escape_char.start() + TextSize::from(1),
             )));
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     } else {
         // Turn into raw string.
@@ -302,7 +296,7 @@ fn check(
                 );
             }
 
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

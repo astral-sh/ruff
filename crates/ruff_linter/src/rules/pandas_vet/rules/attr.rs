@@ -44,7 +44,7 @@ impl Violation for PandasUseOfDotValues {
 }
 
 /// PD011
-pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
+pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
@@ -77,7 +77,5 @@ pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(PandasUseOfDotValues, attribute.range()));
+    checker.report_diagnostic(Diagnostic::new(PandasUseOfDotValues, attribute.range()));
 }

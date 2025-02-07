@@ -28,7 +28,9 @@ reveal_type(not b)  # revealed: Literal[False]
 reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 y = 1
 ```
 
@@ -123,6 +125,8 @@ classes without a `__bool__` method, with or without `__len__`, must be inferred
 truthiness.
 
 ```py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
@@ -136,15 +140,6 @@ class AlwaysFalse:
 
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
-
-# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
-class BoolIsBool:
-    # TODO: The `type[bool]` declaration here is a workaround to avoid running into
-    # https://github.com/astral-sh/ruff/issues/15672
-    __bool__: type[bool] = bool
-
-# revealed: bool
-reveal_type(not BoolIsBool())
 
 # At runtime, no `__bool__` and no `__len__` means truthy, but we can't rely on that, because
 # a subclass could add a `__bool__` method.

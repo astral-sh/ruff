@@ -265,13 +265,22 @@ impl<'a> SemanticModel<'a> {
         self.shadowed_bindings.get(&binding_id).copied()
     }
 
-    /// Return `true` if `member` is bound as a builtin.
+    /// Return `true` if `member` is bound as a builtin *in the scope we are currently visiting*.
     ///
     /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding(&self, member: &str) -> bool {
-        self.lookup_symbol(member)
+        self.has_builtin_binding_in_scope(member, self.scope_id)
+    }
+
+    /// Return `true` if `member` is bound as a builtin *in a given scope*.
+    ///
+    /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
+    /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
+    /// that are pre-populated in Python's global scope before any imports have taken place.
+    pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
+        self.lookup_symbol_in_scope(member, scope, false)
             .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
     }
@@ -2019,6 +2028,18 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::DEFERRED_CLASS_BASE)
     }
 
+    /// Return `true` if we should use the new semantics to recognize
+    /// type checking blocks. Previously we only recognized type checking
+    /// blocks if `TYPE_CHECKING` was imported from a typing module.
+    ///
+    /// With this feature flag enabled we recognize any symbol named
+    /// `TYPE_CHECKING`, regardless of where it comes from to mirror
+    /// what mypy and pyright do.
+    pub const fn use_new_type_checking_block_detection_semantics(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION)
+    }
+
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
     /// containing scope, and across scopes.
     pub fn shadowed_bindings(
@@ -2549,6 +2570,14 @@ bitflags! {
         /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
         /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
         const NO_TYPE_CHECK = 1 << 30;
+
+        /// The model special-cases any symbol named `TYPE_CHECKING`.
+        ///
+        /// Previously we only recognized `TYPE_CHECKING` if it was part of
+        /// one of the configured `typing` modules. This flag exists to
+        /// test out the semantic change only in preview. This flag will go
+        /// away once this change has been stabilized.
+        const NEW_TYPE_CHECKING_BLOCK_DETECTION = 1 << 31;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

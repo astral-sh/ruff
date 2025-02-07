@@ -1,15 +1,16 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Arguments, ExprSubscript, StmtClassDef};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{ExprSubscript, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
 use crate::settings::types::PythonVersion;
 
-use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
+use super::{
+    check_type_vars, find_generic, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor,
+};
 
 /// ## What it does
 ///
@@ -62,19 +63,27 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 ///
 /// This rule replaces standalone type variables in classes but doesn't remove
 /// the corresponding type variables even if they are unused after the fix. See
-/// [`unused-private-type-var`](unused-private-type-var.md) for a rule to clean up unused
+/// [`unused-private-type-var`][PYI018] for a rule to clean up unused
 /// private type variables.
+///
+/// This rule will not rename private type variables to remove leading underscores, even though the
+/// new type parameters are restricted in scope to their associated class. See
+/// [`private-type-parameter`][UP049] for a rule to update these names.
 ///
 /// This rule will correctly handle classes with multiple base classes, as long as the single
 /// `Generic` base class is at the end of the argument list, as checked by
-/// [`generic-not-last-base-class`](generic-not-last-base-class.md). If a `Generic` base class is
+/// [`generic-not-last-base-class`][PYI059]. If a `Generic` base class is
 /// found outside of the last position, a diagnostic is emitted without a suggested fix.
 ///
 /// This rule only applies to generic classes and does not include generic functions. See
-/// [`non-pep695-generic-function`](non-pep695-generic-function.md) for the function version.
+/// [`non-pep695-generic-function`][UP047] for the function version.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
+/// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
+/// [PYI059]: https://docs.astral.sh/ruff/rules/generic-not-last-base-class/
+/// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
+/// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
@@ -95,7 +104,7 @@ impl Violation for NonPEP695GenericClass {
 }
 
 /// UP046
-pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtClassDef) {
+pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassDef) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.settings.target_version < PythonVersion::Py312 {
         return;
@@ -145,7 +154,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
     if generic_idx != arguments.len() - 1 {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -201,20 +210,5 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         });
     }
 
-    checker.diagnostics.push(diagnostic);
-}
-
-/// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
-/// any), along with its index in the class's bases tuple.
-fn find_generic<'a>(
-    class_bases: &'a Arguments,
-    semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
-    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
-        expr.as_subscript_expr().and_then(|sub_expr| {
-            semantic
-                .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some((idx, sub_expr))
-        })
-    })
+    checker.report_diagnostic(diagnostic);
 }

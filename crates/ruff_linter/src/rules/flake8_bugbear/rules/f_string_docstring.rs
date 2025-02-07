@@ -41,7 +41,7 @@ impl Violation for FStringDocstring {
 }
 
 /// B021
-pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn f_string_docstring(checker: &Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };
@@ -51,7 +51,5 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     if !value.is_f_string_expr() {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(FStringDocstring, stmt.identifier()));
+    checker.report_diagnostic(Diagnostic::new(FStringDocstring, stmt.identifier()));
 }

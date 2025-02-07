@@ -52,12 +52,7 @@ impl Violation for NoSelfUse {
 }
 
 /// PLR6301
-pub(crate) fn no_self_use(
-    checker: &Checker,
-    scope_id: ScopeId,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let semantic = checker.semantic();
 
     let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
@@ -104,17 +99,11 @@ pub(crate) fn no_self_use(
     }
 
     // Identify the `self` parameter.
-    let Some(parameter) = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .next()
-        .map(|param| &param.parameter)
-    else {
+    let Some(parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next() else {
         return;
     };
 
-    if parameter.name.as_str() != "self" {
+    if parameter.name() != "self" {
         return;
     }
 
@@ -137,7 +126,7 @@ pub(crate) fn no_self_use(
         .map(|binding_id| semantic.binding(binding_id))
         .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NoSelfUse {
                 method_name: name.to_string(),
             },

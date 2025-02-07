@@ -44,7 +44,7 @@ impl Violation for VerboseLogMessage {
 }
 
 /// TRY401
-pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
 
@@ -78,9 +78,7 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(VerboseLogMessage, expr.range()));
+                        checker.report_diagnostic(Diagnostic::new(VerboseLogMessage, expr.range()));
                     }
                 }
             }

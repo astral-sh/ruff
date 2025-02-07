@@ -290,7 +290,7 @@ C401.py:26:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
    26 |+{2 * x for x in range(3)}
 27 27 | set((((2 * x for x in range(3)))))
 28 28 | 
-29 29 | # Not built-in set.
+29 29 | # Account for trailing comma in fix
 
 C401.py:27:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
@@ -299,7 +299,7 @@ C401.py:27:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
 27 | set((((2 * x for x in range(3)))))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
 28 |
-29 | # Not built-in set.
+29 | # Account for trailing comma in fix
    |
    = help: Rewrite as a set comprehension
 
@@ -310,5 +310,59 @@ C401.py:27:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
 27    |-set((((2 * x for x in range(3)))))
    27 |+{2 * x for x in range(3)}
 28 28 | 
-29 29 | # Not built-in set.
-30 30 | def set(*args, **kwargs):
+29 29 | # Account for trailing comma in fix
+30 30 | # See https://github.com/astral-sh/ruff/issues/15852
+
+C401.py:31:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+29 | # Account for trailing comma in fix
+30 | # See https://github.com/astral-sh/ruff/issues/15852
+31 | set((0 for _ in []),)
+   | ^^^^^^^^^^^^^^^^^^^^^ C401
+32 | set(
+33 |     (0 for _ in [])
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+28 28 | 
+29 29 | # Account for trailing comma in fix
+30 30 | # See https://github.com/astral-sh/ruff/issues/15852
+31    |-set((0 for _ in []),)
+   31 |+{0 for _ in []}
+32 32 | set(
+33 33 |     (0 for _ in [])
+34 34 |     # some comments
+
+C401.py:32:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+30 |   # See https://github.com/astral-sh/ruff/issues/15852
+31 |   set((0 for _ in []),)
+32 | / set(
+33 | |     (0 for _ in [])
+34 | |     # some comments
+35 | |     ,
+36 | |     # some more
+37 | | )
+   | |_^ C401
+38 |
+39 |   # Not built-in set.
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+29 29 | # Account for trailing comma in fix
+30 30 | # See https://github.com/astral-sh/ruff/issues/15852
+31 31 | set((0 for _ in []),)
+32    |-set(
+33    |-    (0 for _ in [])
+   32 |+{
+   33 |+    0 for _ in []
+34 34 |     # some comments
+35    |-    ,
+36    |-    # some more
+37    |-)
+   35 |+    }
+38 36 | 
+39 37 | # Not built-in set.
+40 38 | def set(*args, **kwargs):

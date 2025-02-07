@@ -68,7 +68,7 @@ impl Violation for MutableContextvarDefault {
 }
 
 /// B039
-pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::CONTEXTVARS) {
         return;
     }
@@ -102,8 +102,6 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MutableContextvarDefault, default.range()));
+        checker.report_diagnostic(Diagnostic::new(MutableContextvarDefault, default.range()));
     }
 }

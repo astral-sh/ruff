@@ -47,12 +47,7 @@ impl Violation for ManualFromImport {
 }
 
 /// PLR0402
-pub(crate) fn manual_from_import(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    alias: &Alias,
-    names: &[Alias],
-) {
+pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
     let Some(asname) = &alias.asname else {
         return;
     };
@@ -86,5 +81,5 @@ pub(crate) fn manual_from_import(
             stmt.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

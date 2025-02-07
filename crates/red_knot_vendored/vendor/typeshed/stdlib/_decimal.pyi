@@ -27,14 +27,14 @@ _TrapType: TypeAlias = type[DecimalException]
 __version__: Final[str]
 __libmpdec_version__: Final[str]
 
-ROUND_DOWN: Final[str]
-ROUND_HALF_UP: Final[str]
-ROUND_HALF_EVEN: Final[str]
-ROUND_CEILING: Final[str]
-ROUND_FLOOR: Final[str]
-ROUND_UP: Final[str]
-ROUND_HALF_DOWN: Final[str]
-ROUND_05UP: Final[str]
+ROUND_DOWN: Final = "ROUND_DOWN"
+ROUND_HALF_UP: Final = "ROUND_HALF_UP"
+ROUND_HALF_EVEN: Final = "ROUND_HALF_EVEN"
+ROUND_CEILING: Final = "ROUND_CEILING"
+ROUND_FLOOR: Final = "ROUND_FLOOR"
+ROUND_UP: Final = "ROUND_UP"
+ROUND_HALF_DOWN: Final = "ROUND_HALF_DOWN"
+ROUND_05UP: Final = "ROUND_05UP"
 HAVE_CONTEXTVAR: Final[bool]
 HAVE_THREADS: Final[bool]
 MAX_EMAX: Final[int]

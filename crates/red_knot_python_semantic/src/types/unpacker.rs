@@ -62,19 +62,22 @@ impl<'db> Unpacker<'db> {
                 .unwrap_with_diagnostic(&self.context, value.as_any_node_ref(self.db()));
         }
 
-        self.unpack_inner(target, value_ty);
+        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
     }
 
-    fn unpack_inner(&mut self, target: &ast::Expr, value_ty: Type<'db>) {
+    fn unpack_inner(
+        &mut self,
+        target: &ast::Expr,
+        value_expr: AnyNodeRef<'db>,
+        value_ty: Type<'db>,
+    ) {
         match target {
-            ast::Expr::Name(target_name) => {
-                self.targets.insert(
-                    target_name.scoped_expression_id(self.db(), self.scope),
-                    value_ty,
-                );
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                self.targets
+                    .insert(target.scoped_expression_id(self.db(), self.scope), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.unpack_inner(value, value_ty);
+                self.unpack_inner(value, value_expr, value_ty);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
@@ -153,7 +156,7 @@ impl<'db> Unpacker<'db> {
                             Type::LiteralString
                         } else {
                             ty.iterate(self.db())
-                                .unwrap_with_diagnostic(&self.context, AnyNodeRef::from(target))
+                                .unwrap_with_diagnostic(&self.context, value_expr)
                         };
                         for target_type in &mut target_types {
                             target_type.push(ty);
@@ -167,7 +170,7 @@ impl<'db> Unpacker<'db> {
                         [] => Type::unknown(),
                         types => UnionType::from_elements(self.db(), types),
                     };
-                    self.unpack_inner(element, element_ty);
+                    self.unpack_inner(element, value_expr, element_ty);
                 }
             }
             _ => {}
@@ -265,8 +268,14 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
-    pub(crate) fn get(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
-        self.targets.get(&expr_id).copied()
+    /// Returns the inferred type for a given sub-expression of the left-hand side target
+    /// of an unpacking assignment.
+    ///
+    /// Panics if a scoped expression ID is passed in that does not correspond to a sub-
+    /// expression of the target.
+    #[track_caller]
+    pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
+        self.targets[&expr_id]
     }
 }
 

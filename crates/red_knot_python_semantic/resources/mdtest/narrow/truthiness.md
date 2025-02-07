@@ -3,6 +3,8 @@
 ## Value Literals
 
 ```py
+from typing import Literal
+
 def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[()]:
     return 0
 
@@ -123,6 +125,8 @@ always returns a fixed value.
 These types can always be fully narrowed in boolean contexts, as shown below:
 
 ```py
+from typing import Literal
+
 class T:
     def __bool__(self) -> Literal[True]:
         return True
@@ -149,6 +153,8 @@ else:
 ## Narrowing Complex Intersection and Union
 
 ```py
+from typing import Literal
+
 class A: ...
 class B: ...
 
@@ -181,6 +187,8 @@ if isinstance(x, str) and not isinstance(x, B):
 ## Narrowing Multiple Variables
 
 ```py
+from typing import Literal
+
 def f(x: Literal[0, 1], y: Literal["", "hello"]):
     if x and y and not x and not y:
         reveal_type(x)  # revealed: Never
@@ -222,6 +230,8 @@ reveal_type(y)  # revealed: A
 ## Truthiness of classes
 
 ```py
+from typing import Literal
+
 class MetaAmbiguous(type):
     def __bool__(self) -> bool: ...
 

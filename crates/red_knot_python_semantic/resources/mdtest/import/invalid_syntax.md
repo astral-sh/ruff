@@ -23,9 +23,13 @@ reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(b.c)  # revealed: int
 ```
 
-```py path=a/__init__.py
+`a/__init__.py`:
+
+```py
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 c: int = 1
 ```

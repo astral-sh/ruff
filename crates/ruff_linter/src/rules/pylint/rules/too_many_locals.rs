@@ -37,7 +37,7 @@ impl Violation for TooManyLocals {
 }
 
 /// PLR0914
-pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope) {
     let num_locals = scope
         .binding_ids()
         .filter(|id| {
@@ -47,7 +47,7 @@ pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope, diagnostics: &mu
         .count();
     if num_locals > checker.settings.pylint.max_locals {
         if let ScopeKind::Function(func) = scope.kind {
-            diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 TooManyLocals {
                     current_amount: num_locals,
                     max_amount: checker.settings.pylint.max_locals,

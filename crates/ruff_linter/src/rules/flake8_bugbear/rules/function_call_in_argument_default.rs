@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Expr, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::Violation;
@@ -128,7 +128,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
@@ -139,22 +139,17 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
         .collect();
 
     let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);
-    for ParameterWithDefault {
-        default,
-        parameter,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        if let Some(expr) = &default {
-            if !parameter.annotation.as_ref().is_some_and(|expr| {
+    for parameter in parameters.iter_non_variadic_params() {
+        if let Some(default) = parameter.default() {
+            if !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), &extend_immutable_calls)
             }) {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(default);
             }
         }
     }
 
     for (check, range) in visitor.diagnostics {
-        checker.diagnostics.push(Diagnostic::new(check, range));
+        checker.report_diagnostic(Diagnostic::new(check, range));
     }
 }

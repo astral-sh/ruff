@@ -51,7 +51,7 @@ impl Violation for MixedCaseVariableInClassScope {
 
 /// N815
 pub(crate) fn mixed_case_variable_in_class_scope(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     name: &str,
     class_def: &ast::StmtClassDef,
@@ -72,7 +72,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         MixedCaseVariableInClassScope {
             name: name.to_string(),
         },

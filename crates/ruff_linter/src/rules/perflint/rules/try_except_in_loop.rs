@@ -88,7 +88,7 @@ impl Violation for TryExceptInLoop {
 }
 
 /// PERF203
-pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
     if checker.settings.target_version >= PythonVersion::Py311 {
         return;
     }
@@ -107,9 +107,7 @@ pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(TryExceptInLoop, handler.range()));
+    checker.report_diagnostic(Diagnostic::new(TryExceptInLoop, handler.range()));
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.

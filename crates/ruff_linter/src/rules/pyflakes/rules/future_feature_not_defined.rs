@@ -30,12 +30,12 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
-pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn future_feature_not_defined(checker: &Checker, alias: &Alias) {
     if is_feature_name(&alias.name) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         FutureFeatureNotDefined {
             name: alias.name.to_string(),
         },

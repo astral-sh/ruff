@@ -111,9 +111,9 @@ impl Violation for UnquotedTypeAlias {
 /// This rule only applies to type aliases in non-stub files. For removing quotes in other
 /// contexts or in stub files, see:
 ///
-/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+/// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
-/// - [`quoted-annotation`](quoted-annotation.md): A rule that removes unnecessary quotes
+/// - [`quoted-annotation`][UP037]: A rule that removes unnecessary quotes
 ///   from *annotations* in runtime files.
 ///
 /// ## References
@@ -124,6 +124,8 @@ impl Violation for UnquotedTypeAlias {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 613]: https://peps.python.org/pep-0613/
 /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+/// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
+/// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedTypeAlias;
 
@@ -263,7 +265,7 @@ fn collect_typing_references<'a>(
 
 /// TC008
 pub(crate) fn quoted_type_alias(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
@@ -293,5 +295,5 @@ pub(crate) fn quoted_type_alias(
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

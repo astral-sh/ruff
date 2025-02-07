@@ -58,7 +58,7 @@ impl Violation for ReimplementedBuiltin {
 }
 
 /// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
@@ -120,7 +120,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         // Replace with `all`.
         (false, true) => {
@@ -212,7 +212,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         _ => {}
     }

@@ -59,7 +59,7 @@ impl Violation for YieldOutsideFunction {
 }
 
 /// F704
-pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn yield_outside_function(checker: &Checker, expr: &Expr) {
     let scope = checker.semantic().current_scope();
     if scope.kind.is_module() || scope.kind.is_class() {
         let keyword = match expr {
@@ -78,7 +78,7 @@ pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             YieldOutsideFunction { keyword },
             expr.range(),
         ));

@@ -46,7 +46,7 @@ impl Violation for PandasUseOfDotReadTable {
 }
 
 /// PD012
-pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
@@ -63,8 +63,7 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
         {
             if value == "," {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
+                    .report_diagnostic(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
             }
         }
     }

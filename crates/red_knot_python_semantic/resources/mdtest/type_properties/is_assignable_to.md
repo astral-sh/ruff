@@ -41,7 +41,7 @@ static types can be assignable to gradual types):
 
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
-from typing import Any
+from typing import Any, Literal
 
 static_assert(is_assignable_to(Unknown, Literal[1]))
 static_assert(is_assignable_to(Any, Literal[1]))
@@ -333,7 +333,7 @@ assignable to any arbitrary type.
 
 ```py
 from knot_extensions import static_assert, is_assignable_to, Unknown
-from typing_extensions import Never, Any
+from typing_extensions import Never, Any, Literal
 
 static_assert(is_assignable_to(Never, str))
 static_assert(is_assignable_to(Never, Literal[1]))

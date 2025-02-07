@@ -31,7 +31,7 @@ impl Violation for UselessIfElse {
 }
 
 /// RUF034
-pub(crate) fn useless_if_else(checker: &mut Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ast::ExprIf) {
     let ast::ExprIf {
         body,
         orelse,
@@ -44,7 +44,5 @@ pub(crate) fn useless_if_else(checker: &mut Checker, if_expr: &ast::ExprIf) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UselessIfElse, *range));
+    checker.report_diagnostic(Diagnostic::new(UselessIfElse, *range));
 }

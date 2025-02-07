@@ -101,13 +101,13 @@ fn is_t_suffixed_type_alias(name: &str) -> bool {
 }
 
 /// PYI042
-pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
+pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
     if let Expr::Name(ast::ExprName { id, range, .. }) = target {
         if !is_snake_case_type_alias(id) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
@@ -117,13 +117,13 @@ pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
 }
 
 /// PYI043
-pub(crate) fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
+pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
     if let Expr::Name(ast::ExprName { id, range, .. }) = target {
         if !is_t_suffixed_type_alias(id) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },

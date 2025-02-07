@@ -41,10 +41,6 @@ codspeed-criterion-compat = { workspace = true, default-features = false, option
 criterion = { workspace = true, default-features = false }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-url = { workspace = true }
-ureq = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true }

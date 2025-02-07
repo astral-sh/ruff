@@ -232,4 +232,78 @@ FURB122.py:75:9: FURB122 [*] Use of `f.write` in a for loop
    75 |+        f.writelines(() for [([([a[b]],)],), [], (c[d],)] in e)
 77 76 | 
 78 77 | 
-79 78 | # OK
+79 78 | def _():
+
+FURB122.py:82:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+80 |       # https://github.com/astral-sh/ruff/issues/15936
+81 |       with open("file", "w") as f:
+82 | /         for char in "a", "b":
+83 | |             f.write(char)
+   | |_________________________^ FURB122
+84 |
+85 |   def _():
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+79 79 | def _():
+80 80 |     # https://github.com/astral-sh/ruff/issues/15936
+81 81 |     with open("file", "w") as f:
+82    |-        for char in "a", "b":
+83    |-            f.write(char)
+   82 |+        f.writelines(("a", "b"))
+84 83 | 
+85 84 | def _():
+86 85 |     # https://github.com/astral-sh/ruff/issues/15936
+
+FURB122.py:88:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+86 |       # https://github.com/astral-sh/ruff/issues/15936
+87 |       with open("file", "w") as f:
+88 | /         for char in "a", "b":
+89 | |             f.write(f"{char}")
+   | |______________________________^ FURB122
+90 |
+91 |   def _():
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+85 85 | def _():
+86 86 |     # https://github.com/astral-sh/ruff/issues/15936
+87 87 |     with open("file", "w") as f:
+88    |-        for char in "a", "b":
+89    |-            f.write(f"{char}")
+   88 |+        f.writelines(f"{char}" for char in ("a", "b"))
+90 89 | 
+91 90 | def _():
+92 91 |     with open("file", "w") as f:
+
+FURB122.py:93:9: FURB122 [*] Use of `f.write` in a for loop
+   |
+91 |   def _():
+92 |       with open("file", "w") as f:
+93 | /         for char in (
+94 | |             "a",  # Comment
+95 | |             "b"
+96 | |         ):
+97 | |             f.write(f"{char}")
+   | |______________________________^ FURB122
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Unsafe fix
+90 90 | 
+91 91 | def _():
+92 92 |     with open("file", "w") as f:
+93    |-        for char in (
+   93 |+        f.writelines(f"{char}" for char in (
+94 94 |             "a",  # Comment
+95 95 |             "b"
+96    |-        ):
+97    |-            f.write(f"{char}")
+   96 |+        ))
+98 97 | 
+99 98 | 
+100 99 | # OK

@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for FirstWordUncapitalized {
 }
 
 /// D403
-pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
     if docstring.definition.as_function_def().is_none() {
         return;
     }
@@ -103,5 +103,5 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
         TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

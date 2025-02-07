@@ -57,7 +57,7 @@ impl Violation for TooManyPositionalArguments {
 
 /// PLR0917
 pub(crate) fn too_many_positional_arguments(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535
@@ -72,12 +72,7 @@ pub(crate) fn too_many_positional_arguments(
         .posonlyargs
         .iter()
         .chain(&function_def.parameters.args)
-        .filter(|param| {
-            !checker
-                .settings
-                .dummy_variable_rgx
-                .is_match(&param.parameter.name)
-        })
+        .filter(|param| !checker.settings.dummy_variable_rgx.is_match(param.name()))
         .count();
 
     if num_positional_args <= checker.settings.pylint.max_positional_args {
@@ -115,7 +110,7 @@ pub(crate) fn too_many_positional_arguments(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         TooManyPositionalArguments {
             c_pos: num_positional_args,
             max_pos: checker.settings.pylint.max_positional_args,

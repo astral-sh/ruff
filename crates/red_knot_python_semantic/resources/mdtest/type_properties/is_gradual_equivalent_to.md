@@ -54,6 +54,7 @@ static_assert(not is_gradual_equivalent_to(str | int | bytes, int | str | dict))
 
 ```py
 from knot_extensions import Unknown, is_gradual_equivalent_to, static_assert
+from typing import Any
 
 static_assert(is_gradual_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
 

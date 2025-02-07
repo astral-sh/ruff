@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::borrow::Cow;
+use std::path::{Component, Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -7,8 +8,7 @@ use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
 
-use crate::package::PackageRoot;
-use crate::settings::types::PythonVersion;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for modules that use the same names as Python standard-library
@@ -58,37 +58,38 @@ impl Violation for StdlibModuleShadowing {
 
 /// A005
 pub(crate) fn stdlib_module_shadowing(
-    path: &Path,
-    package: Option<PackageRoot<'_>>,
-    allowed_modules: &[String],
-    target_version: PythonVersion,
+    mut path: &Path,
+    settings: &LinterSettings,
 ) -> Option<Diagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
     }
 
-    let package = package?;
+    // strip src and root prefixes before converting to a fully-qualified module path
+    let prefix = get_prefix(settings, path);
+    if let Some(Ok(new_path)) = prefix.map(|p| path.strip_prefix(p)) {
+        path = new_path;
+    }
 
-    let module_name = if is_module_file(path) {
-        package.path().file_name().unwrap().to_string_lossy()
+    // for modules like `modname/__init__.py`, use the parent directory name, otherwise just trim
+    // the `.py` extension
+    let path = if is_module_file(path) {
+        Cow::from(path.parent()?)
     } else {
-        path.file_stem().unwrap().to_string_lossy()
+        Cow::from(path.with_extension(""))
     };
 
-    if !is_known_standard_library(target_version.minor(), &module_name) {
-        return None;
-    }
+    // convert a filesystem path like `foobar/collections/abc` to a reversed sequence of modules
+    // like `["abc", "collections", "foobar"]`, stripping anything that's not a normal component
+    let mut components = path
+        .components()
+        .filter(|c| matches!(c, Component::Normal(_)))
+        .map(|c| c.as_os_str().to_string_lossy())
+        .rev();
 
-    // Shadowing private stdlib modules is okay.
-    // https://github.com/astral-sh/ruff/issues/12949
-    if module_name.starts_with('_') && !module_name.starts_with("__") {
-        return None;
-    }
+    let module_name = components.next()?;
 
-    if allowed_modules
-        .iter()
-        .any(|allowed_module| allowed_module == &module_name)
-    {
+    if is_allowed_module(settings, &module_name) {
         return None;
     }
 
@@ -98,4 +99,37 @@ pub(crate) fn stdlib_module_shadowing(
         },
         TextRange::default(),
     ))
+}
+
+/// Return the longest prefix of `path` between `settings.src` and `settings.project_root`.
+fn get_prefix<'a>(settings: &'a LinterSettings, path: &Path) -> Option<&'a PathBuf> {
+    let mut prefix = None;
+    for dir in settings.src.iter().chain([&settings.project_root]) {
+        if path.starts_with(dir)
+            // TODO `is_none_or` when MSRV >= 1.82
+            && (prefix.is_none() || prefix.is_some_and(|existing| existing < dir))
+        {
+            prefix = Some(dir);
+        }
+    }
+    prefix
+}
+
+fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
+    // Shadowing private stdlib modules is okay.
+    // https://github.com/astral-sh/ruff/issues/12949
+    if module.starts_with('_') && !module.starts_with("__") {
+        return true;
+    }
+
+    if settings
+        .flake8_builtins
+        .builtins_allowed_modules
+        .iter()
+        .any(|allowed_module| allowed_module == module)
+    {
+        return true;
+    }
+
+    !is_known_standard_library(settings.target_version.minor(), module)
 }

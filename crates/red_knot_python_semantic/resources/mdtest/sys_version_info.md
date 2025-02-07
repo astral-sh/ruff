@@ -86,14 +86,20 @@ reveal_type(bar >= (3, 9))  # revealed: Literal[True]
 
 Only comparisons with the symbol `version_info` from the `sys` module produce literal types:
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/sys.py
+`package/sys.py`:
+
+```py
 version_info: tuple[int, int] = (4, 2)
 ```
 
-```py path=package/script.py
+`package/script.py`:
+
+```py
 from .sys import version_info
 
 reveal_type(version_info >= (3, 9))  # revealed: bool
@@ -103,7 +109,7 @@ reveal_type(version_info >= (3, 9))  # revealed: bool
 
 The fields of `sys.version_info` can be accessed by name:
 
-```py path=a.py
+```py
 import sys
 
 reveal_type(sys.version_info.major >= 3)  # revealed: Literal[True]
@@ -114,9 +120,7 @@ reveal_type(sys.version_info.minor >= 10)  # revealed: Literal[False]
 But the `micro`, `releaselevel` and `serial` fields are inferred as `@Todo` until we support
 properties on instance types:
 
-```py path=b.py
-import sys
-
+```py
 reveal_type(sys.version_info.micro)  # revealed: @Todo(@property)
 reveal_type(sys.version_info.releaselevel)  # revealed: @Todo(@property)
 reveal_type(sys.version_info.serial)  # revealed: @Todo(@property)

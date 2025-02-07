@@ -70,7 +70,7 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 }
 
 /// F901
-pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
@@ -86,5 +86,5 @@ pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

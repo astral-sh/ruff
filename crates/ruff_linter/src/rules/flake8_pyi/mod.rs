@@ -136,8 +136,9 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.py"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.py"))]
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.pyi"))]
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_1.pyi"))]
     fn custom_classmethod_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -154,20 +155,27 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn custom_classmethod_rules_preview() -> Result<()> {
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.py"))]
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.pyi"))]
+    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_1.pyi"))]
+    fn custom_classmethod_rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview_{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
-            Path::new("flake8_pyi/PYI019.pyi"),
+            Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
                 pep8_naming: pep8_naming::settings::Settings {
                     classmethod_decorators: vec!["foo_classmethod".to_string()],
                     ..pep8_naming::settings::Settings::default()
                 },
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::CustomTypeVarReturnType)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -187,6 +195,8 @@ mod tests {
     }
 
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.py"))]
+    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

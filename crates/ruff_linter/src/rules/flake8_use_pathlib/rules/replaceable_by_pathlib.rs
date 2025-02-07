@@ -17,7 +17,7 @@ use crate::rules::flake8_use_pathlib::violations::{
 };
 use crate::settings::types::PythonVersion;
 
-pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     if let Some(diagnostic_kind) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -163,7 +163,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
         let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.func.range());
 
         if checker.enabled(diagnostic.kind.rule()) {
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

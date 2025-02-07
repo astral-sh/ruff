@@ -26,6 +26,16 @@ set((2 * x for x in range(3)))
 set(((2 * x for x in range(3))))
 set((((2 * x for x in range(3)))))
 
+# Account for trailing comma in fix
+# See https://github.com/astral-sh/ruff/issues/15852
+set((0 for _ in []),)
+set(
+    (0 for _ in [])
+    # some comments
+    ,
+    # some more
+)
+
 # Not built-in set.
 def set(*args, **kwargs):
     return None

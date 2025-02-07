@@ -56,7 +56,7 @@ impl Violation for LambdaAssignment {
 
 /// E731
 pub(crate) fn lambda_assignment(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     value: &Expr,
     annotation: Option<&Expr>,
@@ -130,7 +130,7 @@ pub(crate) fn lambda_assignment(
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Extract the argument types and return type from a `Callable` annotation.

@@ -130,7 +130,7 @@ impl Violation for NonPEP604AnnotationOptional {
 
 /// UP007, UP045
 pub(crate) fn non_pep604_annotation(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     slice: &Expr,
     operator: Pep604Operator,
@@ -186,7 +186,7 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         Pep604Operator::Union => {
             if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
@@ -228,7 +228,7 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

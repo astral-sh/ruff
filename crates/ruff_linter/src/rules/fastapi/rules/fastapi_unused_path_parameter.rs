@@ -105,7 +105,7 @@ impl Violation for FastApiUnusedPathParameter {
 
 /// FAST003
 pub(crate) fn fastapi_unused_path_parameter(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
@@ -163,7 +163,6 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     // Check if any of the path parameters are not in the function signature.
-    let mut diagnostics = vec![];
     for (path_param, range) in path_params {
         // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
         if !is_identifier(path_param) {
@@ -183,7 +182,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             .parameters
             .posonlyargs
             .iter()
-            .any(|arg| arg.parameter.name.as_str() == path_param);
+            .any(|param| param.name() == path_param);
 
         let mut diagnostic = Diagnostic::new(
             FastApiUnusedPathParameter {
@@ -203,10 +202,8 @@ pub(crate) fn fastapi_unused_path_parameter(
                 checker.locator().contents(),
             )));
         }
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
-
-    checker.diagnostics.extend(diagnostics);
 }
 
 /// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
@@ -258,25 +255,17 @@ impl<'a> Dependency<'a> {
     /// ): ...
     /// ```
     fn from_parameter(
-        parameter_with_default: &'a ParameterWithDefault,
+        parameter: &'a ParameterWithDefault,
         semantic: &SemanticModel<'a>,
     ) -> Option<Self> {
-        let ParameterWithDefault {
-            parameter, default, ..
-        } = parameter_with_default;
-
-        if let Some(dependency) = default
-            .as_deref()
+        if let Some(dependency) = parameter
+            .default()
             .and_then(|default| Self::from_default(default, semantic))
         {
             return Some(dependency);
         }
 
-        let Expr::Subscript(ExprSubscript { value, slice, .. }) =
-            &parameter.annotation.as_deref()?
-        else {
-            return None;
-        };
+        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
 
         if !semantic.match_typing_expr(value, "Annotated") {
             return None;
@@ -327,7 +316,7 @@ impl<'a> Dependency<'a> {
         };
 
         let parameter_names = non_posonly_non_variadic_parameters(function_def)
-            .map(|ParameterWithDefault { parameter, .. }| &*parameter.name)
+            .map(|param| param.name().as_str())
             .collect();
 
         Some(Self::Function(parameter_names))

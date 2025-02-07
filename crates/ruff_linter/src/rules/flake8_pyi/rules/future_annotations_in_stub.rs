@@ -34,7 +34,7 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
+pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
     let StmtImportFrom {
         range,
         module: Some(module_name),
@@ -72,5 +72,5 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

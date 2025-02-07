@@ -57,11 +57,7 @@ impl Violation for SingledispatchmethodFunction {
 }
 
 /// E1520
-pub(crate) fn singledispatchmethod_function(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };
@@ -111,7 +107,7 @@ pub(crate) fn singledispatchmethod_function(
                     [import_edit],
                 ))
             });
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

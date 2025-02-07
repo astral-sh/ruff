@@ -7,7 +7,10 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
+use ruff_python_stdlib::{builtins::is_python_builtin, keyword::is_keyword};
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
 
 pub(crate) struct Renamer;
 
@@ -367,5 +370,54 @@ impl Renamer {
                 Some(Edit::range_replacement(target.to_string(), binding.range()))
             }
         }
+    }
+}
+
+/// Enumeration of various ways in which a binding can shadow other variables
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum ShadowedKind {
+    /// The variable shadows a global, nonlocal or local symbol
+    Some,
+    /// The variable shadows a builtin symbol
+    BuiltIn,
+    /// The variable shadows a keyword
+    Keyword,
+    /// The variable does not shadow any other symbols
+    None,
+}
+
+impl ShadowedKind {
+    /// Determines the kind of shadowing or conflict for a given variable name.
+    ///
+    /// This function is useful for checking whether or not the `target` of a [`Rename::rename`]
+    /// will shadow another binding.
+    pub(crate) fn new(name: &str, checker: &Checker, scope_id: ScopeId) -> ShadowedKind {
+        // Check the kind in order of precedence
+        if is_keyword(name) {
+            return ShadowedKind::Keyword;
+        }
+
+        if is_python_builtin(
+            name,
+            checker.settings.target_version.minor(),
+            checker.source_type.is_ipynb(),
+        ) {
+            return ShadowedKind::BuiltIn;
+        }
+
+        if !checker.semantic().is_available_in_scope(name, scope_id) {
+            return ShadowedKind::Some;
+        }
+
+        // Default to no shadowing
+        ShadowedKind::None
+    }
+
+    /// Returns `true` if `self` shadows any global, nonlocal, or local symbol, keyword, or builtin.
+    pub(crate) const fn shadows_any(self) -> bool {
+        matches!(
+            self,
+            ShadowedKind::Some | ShadowedKind::BuiltIn | ShadowedKind::Keyword
+        )
     }
 }

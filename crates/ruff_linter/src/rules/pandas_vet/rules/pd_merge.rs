@@ -55,7 +55,7 @@ impl Violation for PandasUseOfPdMerge {
 }
 
 /// PD015
-pub(crate) fn use_of_pd_merge(checker: &mut Checker, func: &Expr) {
+pub(crate) fn use_of_pd_merge(checker: &Checker, func: &Expr) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
@@ -63,9 +63,7 @@ pub(crate) fn use_of_pd_merge(checker: &mut Checker, func: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func {
         if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
             if id == "pd" && attr == "merge" {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PandasUseOfPdMerge, func.range()));
+                checker.report_diagnostic(Diagnostic::new(PandasUseOfPdMerge, func.range()));
             }
         }
     }

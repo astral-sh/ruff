@@ -49,7 +49,7 @@ impl Violation for UnnecessaryMultilineDocstring {
 }
 
 /// D200
-pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
     let mut line_count = 0;
     let mut non_empty_line_count = 0;
     for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {
@@ -82,6 +82,6 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 )));
             }
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

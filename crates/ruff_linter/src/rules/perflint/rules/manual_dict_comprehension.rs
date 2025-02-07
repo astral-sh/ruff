@@ -52,7 +52,7 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+pub(crate) fn manual_dict_comprehension(checker: &Checker, target: &Expr, body: &[Stmt]) {
     let (stmt, if_test) = match body {
         // ```python
         // for idx, name in enumerate(names):
@@ -164,7 +164,5 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualDictComprehension, *range));
+    checker.report_diagnostic(Diagnostic::new(ManualDictComprehension, *range));
 }

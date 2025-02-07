@@ -391,7 +391,7 @@ impl FStringConversion {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     if summary.has_nested_parts {
         return;
     }
@@ -528,5 +528,5 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
             )));
         }
     };
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

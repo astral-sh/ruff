@@ -61,12 +61,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
 }
 
 /// B010
-pub(crate) fn setattr_with_constant(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let [obj, name, value] = args else {
         return;
     };
@@ -100,7 +95,7 @@ pub(crate) fn setattr_with_constant(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

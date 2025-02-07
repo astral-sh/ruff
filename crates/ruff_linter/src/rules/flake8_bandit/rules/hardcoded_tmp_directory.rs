@@ -56,7 +56,7 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike) {
+pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
     match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => {
             check(checker, value.to_str(), string.range());
@@ -79,7 +79,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike)
     }
 }
 
-fn check(checker: &mut Checker, value: &str, range: TextRange) {
+fn check(checker: &Checker, value: &str, range: TextRange) {
     if !checker
         .settings
         .flake8_bandit
@@ -102,7 +102,7 @@ fn check(checker: &mut Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         HardcodedTempFile {
             string: value.to_string(),
         },

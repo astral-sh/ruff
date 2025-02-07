@@ -74,11 +74,13 @@ env_logger = { version = "0.11.0" }
 etcetera = { version = "0.8.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
+getrandom = { version = "0.3.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
 hashbrown = { version = "0.15.0", default-features = false, features = [
     "raw-entry",
+    "equivalent",
     "inline-more",
 ] }
 ignore = { version = "0.4.22" }
@@ -116,7 +118,7 @@ proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
 quick-junit = { version = "0.5.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.8.5" }
+rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
@@ -134,7 +136,12 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2" }
-snapbox = { version = "0.6.0", features = ["diff", "term-svg", "cmd", "examples"] }
+snapbox = { version = "0.6.0", features = [
+    "diff",
+    "term-svg",
+    "cmd",
+    "examples",
+] }
 static_assertions = "1.1.0"
 strum = { version = "0.26.0", features = ["strum_macros"] }
 strum_macros = { version = "0.26.0" }
@@ -159,7 +166,6 @@ unicode-ident = { version = "1.0.12" }
 unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
-ureq = { version = "2.9.6" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = [
     "v4",
@@ -172,6 +178,10 @@ wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
+
+[workspace.metadata.cargo-shear]
+ignored = ["getrandom"]
+
 
 [workspace.lints.rust]
 unsafe_code = "warn"
@@ -305,7 +315,11 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker"]
 # Publish jobs to run in CI
 publish-jobs = ["./publish-pypi", "./publish-wasm"]
 # Post-announce jobs to run in CI
-post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground"]
+post-announce-jobs = [
+    "./notify-dependents",
+    "./publish-docs",
+    "./publish-playground",
+]
 # Custom permissions for GitHub Jobs
 github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
 # Whether to install an updater program

@@ -76,7 +76,7 @@ impl Violation for IfExprMinMax {
 }
 
 /// FURB136
-pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
+pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -146,7 +146,7 @@ pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

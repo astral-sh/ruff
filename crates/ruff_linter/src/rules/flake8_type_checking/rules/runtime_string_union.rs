@@ -80,7 +80,7 @@ impl Violation for RuntimeStringUnion {
 }
 
 /// TC010
-pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     if !checker.semantic().in_type_definition() {
         return;
     }
@@ -96,7 +96,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
     traverse_op(expr, &mut strings);
 
     for string in strings {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             RuntimeStringUnion { strategy: None },
             string.range(),
         ));
@@ -127,7 +127,7 @@ fn traverse_op<'a>(expr: &'a Expr, strings: &mut Vec<&'a Expr>) {
 
 /// TC010 (preview version with fix)
 pub(crate) fn runtime_string_union_preview(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
@@ -204,10 +204,10 @@ pub(crate) fn runtime_string_union_preview(
             );
             diagnostic.set_parent(extended_expr.range().start());
             diagnostic.set_fix(fix);
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         } else {
             // this is not fixable
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 RuntimeStringUnion { strategy: None },
                 annotation_expr.range(),
             ));
@@ -228,7 +228,7 @@ pub(crate) fn runtime_string_union_preview(
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Get the parent expression

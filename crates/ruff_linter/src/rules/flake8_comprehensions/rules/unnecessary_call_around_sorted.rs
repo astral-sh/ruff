@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryCallAroundSorted {
 
 /// C413
 pub(crate) fn unnecessary_call_around_sorted(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     outer_func: &Expr,
     args: &[Expr],
@@ -94,7 +94,7 @@ pub(crate) fn unnecessary_call_around_sorted(
         };
         Ok(Fix::applicable_edit(edit, applicability))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

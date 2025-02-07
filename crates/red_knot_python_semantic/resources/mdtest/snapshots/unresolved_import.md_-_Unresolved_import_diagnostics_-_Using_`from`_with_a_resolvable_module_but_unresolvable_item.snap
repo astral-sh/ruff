@@ -1,0 +1,35 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unresolved_import.md - Unresolved import diagnostics - Using `from` with a resolvable module but unresolvable item
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unresolved_import.md
+---
+
+# Python source files
+
+## a.py
+
+```
+1 | does_exist1 = 1
+2 | does_exist2 = 2
+```
+
+## mdtest_snippet.py
+
+```
+1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
+```
+
+# Diagnostics
+
+```
+error: lint:unresolved-import
+ --> /src/mdtest_snippet.py:1:28
+  |
+1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
+  |                            ^^^^^^^^^^^^^^ Module `a` has no member `does_not_exist`
+  |
+
+```

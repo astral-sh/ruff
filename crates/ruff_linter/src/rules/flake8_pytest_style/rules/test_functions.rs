@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::helpers::is_likely_pytest_test;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{ParameterWithDefault, StmtFunctionDef};
+use ruff_python_ast::StmtFunctionDef;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -50,33 +50,20 @@ impl Violation for PytestParameterWithDefaultArgument {
 }
 
 /// PT028
-pub(crate) fn parameter_with_default_argument(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &StmtFunctionDef) {
     if !is_likely_pytest_test(function_def, checker) {
         return;
     }
 
-    let parameters = function_def.parameters.as_ref();
-
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: pwd_range,
-    } in parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in function_def.parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
-
-        let parameter_name = parameter.name.to_string();
+        let parameter_name = parameter.name().to_string();
         let kind = PytestParameterWithDefaultArgument { parameter_name };
         let diagnostic = Diagnostic::new(kind, default.range());
-
-        let edit = Edit::deletion(parameter.end(), pwd_range.end());
+        let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
-
-        checker.diagnostics.push(diagnostic.with_fix(fix));
+        checker.report_diagnostic(diagnostic.with_fix(fix));
     }
 }

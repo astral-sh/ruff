@@ -3,9 +3,9 @@
 #![cfg(not(target_family = "wasm"))]
 
 use regex::escape;
-use std::fs;
 use std::process::Command;
 use std::str;
+use std::{fs, path::Path};
 
 use anyhow::Result;
 use assert_fs::fixture::{ChildPath, FileTouch, PathChild};
@@ -2173,4 +2173,177 @@ fn flake8_import_convention_unused_aliased_import() {
         .arg("--fix")
         .arg("-")
         .pass_stdin("1"));
+}
+
+#[test]
+fn flake8_import_convention_unused_aliased_import_no_conflict() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
+        .args(["--select", "I002,ICN001,F401"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--unsafe-fixes")
+        .arg("--fix")
+        .arg("-")
+        .pass_stdin("1"));
+}
+
+/// Test that private, old-style `TypeVar` generics
+/// 1. Get replaced with PEP 695 type parameters (UP046, UP047)
+/// 2. Get renamed to remove leading underscores (UP049)
+/// 3. Emit a warning that the standalone type variable is now unused (PYI018)
+/// 4. Remove the now-unused `Generic` import
+#[test]
+fn pep695_generic_rename() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "F401,PYI018,UP046,UP047,UP049"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--unsafe-fixes")
+        .arg("--fix")
+        .arg("--preview")
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(
+            r#"
+from typing import Generic, TypeVar
+_T = TypeVar("_T")
+
+class OldStyle(Generic[_T]):
+    var: _T
+
+def func(t: _T) -> _T:
+    x: _T
+    return x
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+
+    class OldStyle[T]:
+        var: T
+
+    def func[T](t: T) -> T:
+        x: T
+        return x
+
+    ----- stderr -----
+    Found 7 errors (7 fixed, 0 remaining).
+    "
+    );
+}
+
+#[test]
+fn a005_module_shadowing_strict() -> Result<()> {
+    fn create_module(path: &Path) -> Result<()> {
+        fs::create_dir(path)?;
+        fs::File::create(path.join("__init__.py"))?;
+        Ok(())
+    }
+    // construct a directory tree with this structure:
+    // .
+    // ├── abc
+    // │   └── __init__.py
+    // ├── collections
+    // │   ├── __init__.py
+    // │   ├── abc
+    // │   │   └── __init__.py
+    // │   └── foobar
+    // │       └── __init__.py
+    // ├── foobar
+    // │   ├── __init__.py
+    // │   ├── abc
+    // │   │   └── __init__.py
+    // │   └── collections
+    // │       ├── __init__.py
+    // │       ├── abc
+    // │       │   └── __init__.py
+    // │       └── foobar
+    // │           └── __init__.py
+    // ├── ruff.toml
+    // └── urlparse
+    //     └── __init__.py
+
+    let tempdir = TempDir::new()?;
+    let foobar = tempdir.path().join("foobar");
+    create_module(&foobar)?;
+    for base in [&tempdir.path().into(), &foobar] {
+        for dir in ["abc", "collections"] {
+            create_module(&base.join(dir))?;
+        }
+        create_module(&base.join("collections").join("abc"))?;
+        create_module(&base.join("collections").join("foobar"))?;
+    }
+    create_module(&tempdir.path().join("urlparse"))?;
+    // also create a ruff.toml to mark the project root
+    fs::File::create(tempdir.path().join("ruff.toml"))?;
+
+    insta::with_settings!({
+        filters => vec![(r"\\", "/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "A005"])
+            .current_dir(tempdir.path()),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        Found 6 errors.
+
+        ----- stderr -----
+        ");
+
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "A005"])
+            .current_dir(tempdir.path()),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        Found 6 errors.
+
+        ----- stderr -----
+        ");
+
+        // TODO(brent) Default should currently match the strict version, but after the next minor
+        // release it will match the non-strict version directly above
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "A005"])
+            .current_dir(tempdir.path()),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        Found 6 errors.
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
 }

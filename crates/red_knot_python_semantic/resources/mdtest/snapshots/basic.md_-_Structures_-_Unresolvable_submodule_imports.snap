@@ -1,0 +1,51 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - Unresolvable submodule imports
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | # Topmost component resolvable, submodule not resolvable:
+2 | import a.foo  # error: [unresolved-import] "Cannot resolve import `a.foo`"
+3 | 
+4 | # Topmost component unresolvable:
+5 | import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
+```
+
+## a/__init__.py
+
+```
+```
+
+# Diagnostics
+
+```
+error: lint:unresolved-import
+ --> /src/mdtest_snippet.py:2:8
+  |
+1 | # Topmost component resolvable, submodule not resolvable:
+2 | import a.foo  # error: [unresolved-import] "Cannot resolve import `a.foo`"
+  |        ^^^^^ Cannot resolve import `a.foo`
+3 |
+4 | # Topmost component unresolvable:
+  |
+
+```
+
+```
+error: lint:unresolved-import
+ --> /src/mdtest_snippet.py:5:8
+  |
+4 | # Topmost component unresolvable:
+5 | import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
+  |        ^^^^^ Cannot resolve import `b.foo`
+  |
+
+```

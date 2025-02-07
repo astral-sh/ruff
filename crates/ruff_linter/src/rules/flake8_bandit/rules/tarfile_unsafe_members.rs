@@ -48,7 +48,7 @@ impl Violation for TarfileUnsafeMembers {
 }
 
 /// S202
-pub(crate) fn tarfile_unsafe_members(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::TARFILE) {
         return;
     }
@@ -70,7 +70,5 @@ pub(crate) fn tarfile_unsafe_members(checker: &mut Checker, call: &ast::ExprCall
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(TarfileUnsafeMembers, call.func.range()));
+    checker.report_diagnostic(Diagnostic::new(TarfileUnsafeMembers, call.func.range()));
 }

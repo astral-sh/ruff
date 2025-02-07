@@ -1,13 +1,13 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
+use std::fmt::Write;
 use std::ops::Deref;
 
-use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
-    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Singleton, Stmt, StringFlags, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
-    TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
+    Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, FStringFlags, Identifier,
+    MatchCase, Operator, Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -146,20 +146,44 @@ impl<'a> Generator<'a> {
         self.p(s.as_str());
     }
 
-    fn p_bytes_repr(&mut self, s: &[u8], quote: Quote) {
-        let escape = AsciiEscape::with_preferred_quote(s, quote);
+    fn p_bytes_repr(&mut self, s: &[u8], flags: BytesLiteralFlags) {
+        // raw bytes are interpreted without escapes and should all be ascii (it's a python syntax
+        // error otherwise), but if this assumption is violated, a `Utf8Error` will be returned from
+        // `p_raw_bytes`, and we should fall back on the normal escaping behavior instead of
+        // panicking
+        if flags.prefix().is_raw() {
+            if let Ok(s) = std::str::from_utf8(s) {
+                write!(self.buffer, "{}", flags.display_contents(s))
+                    .expect("Writing to a String buffer should never fail");
+                return;
+            }
+        }
+        let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
-        escape.bytes_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
+        escape
+            .bytes_repr(flags.triple_quotes())
+            .write(&mut self.buffer)
+            .expect("Writing to a String buffer should never fail");
     }
 
-    fn p_str_repr(&mut self, s: &str, quote: Quote) {
-        let escape = UnicodeEscape::with_preferred_quote(s, quote);
+    fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
+        let flags = flags.into();
+        if flags.prefix().is_raw() {
+            write!(self.buffer, "{}", flags.display_contents(s))
+                .expect("Writing to a String buffer should never fail");
+            return;
+        }
+        self.p(flags.prefix().as_str());
+        let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
-        escape.str_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
+        escape
+            .str_repr(flags.triple_quotes())
+            .write(&mut self.buffer)
+            .expect("Writing to a String buffer should never fail");
     }
 
     fn p_if(&mut self, cond: bool, s: &str) {
@@ -1093,7 +1117,7 @@ impl<'a> Generator<'a> {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags.quote_style());
+                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags);
                 }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
@@ -1280,19 +1304,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         let ast::StringLiteral { value, flags, .. } = string_literal;
-        // for raw strings, we don't want to perform the UnicodeEscape in `p_str_repr`, so build the
-        // replacement here
-        if flags.prefix().is_raw() {
-            self.p(flags.prefix().as_str());
-            self.p(flags.quote_str());
-            self.p(value);
-            self.p(flags.quote_str());
-        } else {
-            if flags.prefix().is_unicode() {
-                self.p("u");
-            }
-            self.p_str_repr(value, flags.quote_style());
-        }
+        self.p_str_repr(value, *flags);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -1312,7 +1324,7 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(&f_string.elements, f_string.flags.quote_style());
+                    self.unparse_f_string(&f_string.elements, f_string.flags);
                 }
             }
         }
@@ -1396,12 +1408,11 @@ impl<'a> Generator<'a> {
 
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
     /// surrounding quote style.
-    fn unparse_f_string(&mut self, values: &[ast::FStringElement], quote: Quote) {
-        self.p("f");
+    fn unparse_f_string(&mut self, values: &[ast::FStringElement], flags: FStringFlags) {
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_f_string_body(values);
         let body = &generator.buffer;
-        self.p_str_repr(body, quote);
+        self.p_str_repr(body, flags);
     }
 
     fn unparse_alias(&mut self, alias: &Alias) {
@@ -1724,8 +1735,51 @@ class Foo:
         assert_round_trip!(r#"f"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
+        assert_eq!(round_trip(r#"b"he\"llo""#), r#"b'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_round_trip!(r#"f'abc{"def"}{1}'"#);
+    }
+
+    /// test all of the valid string literal prefix and quote combinations from
+    /// https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+    ///
+    /// Note that the numeric ids on the input/output and quote fields prevent name conflicts from
+    /// the test_matrix but are otherwise unnecessary
+    #[test_case::test_matrix(
+        [
+            ("r", "r", 0),
+            ("u", "u", 1),
+            ("R", "R", 2),
+            ("U", "u", 3), // case not tracked
+            ("f", "f", 4),
+            ("F", "f", 5),   // f case not tracked
+            ("fr", "rf", 6), // r before f
+            ("Fr", "rf", 7), // f case not tracked, r before f
+            ("fR", "Rf", 8), // r before f
+            ("FR", "Rf", 9), // f case not tracked, r before f
+            ("rf", "rf", 10),
+            ("rF", "rf", 11), // f case not tracked
+            ("Rf", "Rf", 12),
+            ("RF", "Rf", 13), // f case not tracked
+            // bytestrings
+            ("b", "b", 14),
+            ("B", "b", 15),   // b case
+            ("br", "rb", 16), // r before b
+            ("Br", "rb", 17), // b case, r before b
+            ("bR", "Rb", 18), // r before b
+            ("BR", "Rb", 19), // b case, r before b
+            ("rb", "rb", 20),
+            ("rB", "rb", 21), // b case
+            ("Rb", "Rb", 22),
+            ("RB", "Rb", 23), // b case
+        ],
+        [("\"", 0), ("'",1), ("\"\"\"", 2), ("'''", 3)],
+        ["hello", "{hello} {world}"]
+    )]
+    fn prefix_quotes((inp, out, _id): (&str, &str, u8), (quote, _id2): (&str, u8), base: &str) {
+        let input = format!("{inp}{quote}{base}{quote}");
+        let output = format!("{out}{quote}{base}{quote}");
+        assert_eq!(round_trip(&input), output);
     }
 
     #[test]
