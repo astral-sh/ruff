@@ -1437,6 +1437,9 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
 }
 
 /// Format the expressions as a `typing.Union`-style union.
+///
+/// Note: It is a syntax error to have `Union[]` so the caller
+/// should ensure that the `elts` argument is nonempty.
 pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
