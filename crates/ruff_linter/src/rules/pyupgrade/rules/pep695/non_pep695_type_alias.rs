@@ -3,9 +3,9 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{
-    visitor::Visitor, Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign,
-};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -183,8 +183,8 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
     };
 
     checker.report_diagnostic(create_diagnostic(
-        checker.source(),
-        stmt.range,
+        checker,
+        stmt.into(),
         &target_name.id,
         value,
         &vars,
@@ -243,8 +243,8 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
     }
 
     checker.report_diagnostic(create_diagnostic(
-        checker.source(),
-        stmt.range(),
+        checker,
+        stmt.into(),
         name,
         value,
         &vars,
@@ -261,26 +261,30 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
 
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
 fn create_diagnostic(
-    source: &str,
-    stmt_range: TextRange,
+    checker: &Checker,
+    stmt: StmtRef,
     name: &Name,
     value: &Expr,
     type_vars: &[TypeVar],
     applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
+    let source = checker.source();
+    let range_with_parentheses =
+        parenthesized_range(value.into(), stmt.into(), checker.comment_ranges(), source)
+            .unwrap_or(value.range());
     let content = format!(
         "type {name}{type_params} = {value}",
         type_params = DisplayTypeVars { type_vars, source },
-        value = &source[value.range()]
+        value = &source[range_with_parentheses]
     );
-    let edit = Edit::range_replacement(content, stmt_range);
+    let edit = Edit::range_replacement(content, stmt.range());
     Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
             type_alias_kind,
         },
-        stmt_range,
+        stmt.range(),
     )
     .with_fix(Fix::applicable_edit(edit, applicability))
 }
