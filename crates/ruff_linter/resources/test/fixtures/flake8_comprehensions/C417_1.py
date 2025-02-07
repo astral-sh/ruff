@@ -7,6 +7,61 @@ def overshadowed_list():
     list(map(lambda x: x, []))
 
 
+set(map(lambda x, y: x, nums, nums))
+
+list(map(lambda x: (a := x), foo))
+
+list(map(lambda x: (a for a in \
+                    range(x)), foo))
+
+dict(map(lambda k, v: (k, v), keys, values))
+
+dict(
+    map(
+        lambda k, v: (
+            (  # Foo
+                k
+            ),
+            v **2
+        ),
+        keys, values
+    )
+)
+
+list(map(lambda x: list[...], foo))
+
+
+def unfixable():
+    zip = []
+    map(lambda x, y: x + y + 1, a, b)
+
+
+dict(
+    map(
+        lambda x, y: (
+            a := 0,
+            b := 1
+        ),
+        foo, bar
+    )
+)
+
+
+dict(
+    map(
+        lambda x, y: (
+            list[...],
+        # Comment
+            (  # Comment
+                a for a \
+                in b
+            )
+        ),
+        foo, bar
+    )
+)
+
+
 ### No errors
 
 dict(map(lambda k: (k,), a))
