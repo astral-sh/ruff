@@ -200,7 +200,7 @@ pub(crate) fn infer_expression_types<'db>(
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
 #[salsa::tracked(return_ref)]
-pub(crate) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
