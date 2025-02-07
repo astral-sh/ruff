@@ -10,11 +10,11 @@ use red_knot_python_semantic::lint::RuleSelection;
 /// it's encouraged to use a similar structure.
 ///
 /// It's worth considering to adding a salsa query for specific settings to
-/// limite the blast radius when only some settings change. For example,
+/// limit the blast radius when only some settings change. For example,
 /// changing the terminal settings shouldn't invalidate any core type-checking queries.
 /// This can be achieved by adding a salsa query for the type checking specific settings.
 ///
-/// Settings that are part of [`ProgramSettings`] are not included here.
+/// Settings that are part of [`red_knot_python_semantic::ProgramSettings`] are not included here.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Settings {
     rules: Arc<RuleSelection>,
