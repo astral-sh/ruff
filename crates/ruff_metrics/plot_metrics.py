@@ -38,9 +38,7 @@ histogram_parser.add_argument("--bins", help="number of bins (default: auto)")
 args = parser.parse_args()
 
 with open(args.metrics) as f:
-    results = []
-    for line in f:
-        results.append(json.loads(line))
+    results = [json.loads(line) for line in f]
 all_data = pd.DataFrame(results)
 
 
