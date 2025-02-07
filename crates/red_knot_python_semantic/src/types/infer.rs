@@ -63,11 +63,11 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    todo_type, typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType,
-    DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
-    IterationOutcome, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate,
-    MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations, todo_type,
+    typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType,
+    FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
+    KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
+    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, SymbolLookup, Truthiness,
     TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
     TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
@@ -86,7 +86,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{ParameterExpectation, ParameterExpectations};
+use super::{global_symbol, ParameterExpectation, ParameterExpectations};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -735,7 +735,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_alias_definition(type_alias.node(), definition);
             }
             DefinitionKind::Import(import) => {
-                self.infer_import_definition(import.node(), definition);
+                self.infer_import_definition(import.alias(), definition);
             }
             DefinitionKind::ImportFrom(import_from) => {
                 self.infer_import_from_definition(
@@ -871,7 +871,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
-        let declared_ty = symbol_from_declarations(self.db(), declarations)
+        let declared_ty = symbol_from_declarations(self.db(), SymbolLookup::Internal, declarations)
             .map(|SymbolAndQualifiers(s, _)| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
@@ -906,7 +906,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = symbol_from_bindings(self.db(), prior_bindings)
+        let inferred_ty = symbol_from_bindings(self.db(), SymbolLookup::Internal, prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
@@ -3307,7 +3307,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let local_scope_symbol = if self.is_deferred() {
             if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
-                symbol_from_bindings(db, use_def.public_bindings(symbol_id))
+                symbol_from_bindings(
+                    db,
+                    SymbolLookup::Internal,
+                    use_def.public_bindings(symbol_id),
+                )
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -3317,7 +3321,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
-            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+            symbol_from_bindings(db, SymbolLookup::Internal, use_def.bindings_at_use(use_id))
         };
 
         let symbol = local_scope_symbol.or_fall_back_to(db, || {
@@ -3368,7 +3372,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(db, enclosing_scope_id, symbol_name);
+                    return symbol(db, SymbolLookup::Internal, enclosing_scope_id, symbol_name);
                 }
             }
 
@@ -3379,7 +3383,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if file_scope_id.is_global() {
                         Symbol::Unbound
                     } else {
-                        global_symbol(db, self.file(), symbol_name)
+                        global_symbol(db, SymbolLookup::Internal, self.file(), symbol_name)
                     }
                 })
                 // Not found in globals? Fallback to builtins
@@ -6051,7 +6055,7 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        symbol(db, scope, symbol_name)
+        symbol(db, SymbolLookup::Internal, scope, symbol_name)
     }
 
     #[track_caller]
@@ -6076,7 +6080,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, assert_type
 
             assert_type(not "{y}", bool)
             assert_type(not 10*"{y}", bool)
@@ -6098,7 +6102,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, LiteralString, assert_type
 
             assert_type(2 * "hello", Literal["hellohello"])
             assert_type("goodbye" * 3, Literal["goodbyegoodbyegoodbye"])
@@ -6123,7 +6127,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type(10*"{y}", LiteralString)
@@ -6145,7 +6149,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type("a" + "{z}", LiteralString)
@@ -6165,7 +6169,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type("{y}" + "a", LiteralString)
@@ -6267,7 +6271,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol(&db, a, "x").expect_type();
+        let x_ty = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -6276,7 +6280,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "bool");
 
@@ -6293,7 +6297,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol(&db, a, "x").expect_type();
+        let x_ty = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -6303,7 +6307,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
@@ -6329,7 +6333,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol(&db, a, "x").expect_type();
+        let x_ty = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -6339,7 +6343,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
@@ -6386,7 +6390,7 @@ mod tests {
         )?;
 
         let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-        let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+        let attr_ty = global_symbol(&db, SymbolLookup::Internal, file_main, "x").expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int | None");
 
         // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
@@ -6401,7 +6405,7 @@ mod tests {
 
         let events = {
             db.clear_salsa_events();
-            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            let attr_ty = global_symbol(&db, SymbolLookup::Internal, file_main, "x").expect_type();
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
@@ -6420,7 +6424,7 @@ mod tests {
 
         let events = {
             db.clear_salsa_events();
-            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            let attr_ty = global_symbol(&db, SymbolLookup::Internal, file_main, "x").expect_type();
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
