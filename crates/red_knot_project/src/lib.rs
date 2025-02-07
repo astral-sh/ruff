@@ -320,8 +320,15 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         return diagnostics;
     }
 
-    // TODO pass a real version from the user config
-    let target_version = PythonVersion::PY312;
+    let target_version: PythonVersion = db
+        .project()
+        .metadata(db)
+        .options
+        .environment
+        .as_ref()
+        .and_then(|env| env.python_version.as_ref())
+        .map(|ranged_value| ranged_value.clone().into_inner())
+        .unwrap_or_default();
 
     let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
