@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use std::cmp;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -170,25 +171,13 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     };
 
-    // it would be easier to check for comments in the whole `stmt.range`, but because
-    // `create_diagnostic` uses the full source text of `value`, comments within `value` are
-    // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
-    let pre_value = TextRange::new(stmt.start(), value.start());
-    let post_value = TextRange::new(value.end(), stmt.end());
-    let comment_ranges = checker.comment_ranges();
-    let safety = if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
     checker.report_diagnostic(create_diagnostic(
         checker,
         stmt.into(),
         &target_name.id,
         value,
         &vars,
-        safety,
+        Applicability::Safe,
         TypeAliasKind::TypeAliasType,
     ));
 }
@@ -266,19 +255,37 @@ fn create_diagnostic(
     name: &Name,
     value: &Expr,
     type_vars: &[TypeVar],
-    applicability: Applicability,
+    base_applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
     let source = checker.source();
+    let comment_ranges = checker.comment_ranges();
+
     let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), checker.comment_ranges(), source)
+        parenthesized_range(value.into(), stmt.into(), comment_ranges, source)
             .unwrap_or(value.range());
+
     let content = format!(
         "type {name}{type_params} = {value}",
         type_params = DisplayTypeVars { type_vars, source },
         value = &source[range_with_parentheses]
     );
     let edit = Edit::range_replacement(content, stmt.range());
+
+    // it would be easier to check for comments in the whole `stmt.range`, but because
+    // `create_diagnostic` uses the full source text of `value`, comments within `value` are
+    // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
+    let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
+    let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
+    let applicability =
+        if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+    let fix = Fix::applicable_edit(edit, cmp::min(applicability, base_applicability));
+
     Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
@@ -286,5 +293,5 @@ fn create_diagnostic(
         },
         stmt.range(),
     )
-    .with_fix(Fix::applicable_edit(edit, applicability))
+    .with_fix(fix)
 }
