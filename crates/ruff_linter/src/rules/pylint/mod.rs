@@ -441,6 +441,7 @@ mod tests {
         Path::new("repeated_equality_comparison.py")
     )]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
+    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
