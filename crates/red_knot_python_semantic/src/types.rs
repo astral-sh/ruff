@@ -40,6 +40,7 @@ use crate::types::call::{
 };
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
+use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -4229,6 +4230,33 @@ impl<'db> Class<'db> {
 
                     let inferred_ty = infer_expression_type(db, *value);
 
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::Iterable { iterable } => {
+                    // We found an attribute assignment like:
+                    //
+                    //     for self.name in <iterable>:
+
+                    // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+
+                    let iterable_ty = infer_expression_type(db, *iterable);
+                    let inferred_ty = iterable_ty.iterate(db).unwrap_without_diagnostic();
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::Unpack {
+                    attribute_expression_id,
+                    unpack,
+                } => {
+                    // We found an unpacking assignment like:
+                    //
+                    //     .., self.name, .. = <value>
+                    //     (.., self.name, ..) = <value>
+                    //     [.., self.name, ..] = <value>
+
+                    let inferred_ty = infer_unpack_types(db, *unpack)
+                        .get(*attribute_expression_id)
+                        .expect("Failed to look up type of attribute in unpack assignment");
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }

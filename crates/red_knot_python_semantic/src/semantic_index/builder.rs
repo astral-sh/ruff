@@ -6,9 +6,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::{self as ast, ExprContext};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
@@ -1231,6 +1231,20 @@ where
                         unpack: None,
                         first: false,
                     }),
+                    ast::Expr::Attribute(ast::ExprAttribute {
+                        value: object,
+                        attr,
+                        ..
+                    }) => {
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            AttributeAssignment::Iterable {
+                                iterable: iter_expr,
+                            },
+                        );
+                        None
+                    }
                     _ => None,
                 };
 
@@ -1459,7 +1473,7 @@ where
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        self.current_ast_ids().record_expression(expr);
+        let expression_id = self.current_ast_ids().record_expression(expr);
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
@@ -1717,6 +1731,35 @@ where
                 }
 
                 self.simplify_visibility_constraints(pre_op);
+            }
+            ast::Expr::Attribute(ast::ExprAttribute {
+                value: object,
+                attr,
+                ctx: ExprContext::Store,
+                range: _,
+            }) => {
+                if let Some(
+                    CurrentAssignment::Assign {
+                        unpack: Some(unpack),
+                        ..
+                    }
+                    | CurrentAssignment::For {
+                        unpack: Some(unpack),
+                        ..
+                    },
+                ) = self.current_assignment()
+                {
+                    self.register_attribute_assignment(
+                        object,
+                        attr,
+                        AttributeAssignment::Unpack {
+                            attribute_expression_id: expression_id,
+                            unpack,
+                        },
+                    );
+                }
+
+                walk_expr(self, expr);
             }
             _ => {
                 walk_expr(self, expr);

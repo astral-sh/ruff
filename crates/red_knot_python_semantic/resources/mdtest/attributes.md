@@ -232,6 +232,36 @@ reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
 
+#### Attributes defined in multi-target assignments
+
+```py
+class C:
+    def __init__(self) -> None:
+        self.a = self.b = 1
+
+c_instance = C()
+
+reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.b)  # revealed: Unknown | Literal[1]
+```
+
+#### Augmented assignments
+
+```py
+class Weird:
+    def __iadd__(self, other: None) -> str:
+        return "a"
+
+class C:
+    def __init__(self) -> None:
+        self.w = Weird()
+        self.w += None
+
+# TODO: Mypy and pyright do not support this, but it would be great if we could
+# infer `Unknown | str` or at least `Unknown | Weird | str` here.
+reveal_type(C().w)  # revealed: Unknown | Weird
+```
+
 #### Attributes defined in tuple unpackings
 
 ```py
@@ -253,19 +283,24 @@ reveal_type(c_instance.b1)  # revealed: Unknown | Literal["a"]
 reveal_type(c_instance.c1)  # revealed: Unknown | int
 reveal_type(c_instance.d1)  # revealed: Unknown | str
 
-# TODO: This should be supported (no error; type should be: `Unknown | Literal[1]`)
-# error: [unresolved-attribute]
-reveal_type(c_instance.a2)  # revealed: Unknown
+reveal_type(c_instance.a2)  # revealed: Unknown | Literal[1]
 
-# TODO: This should be supported (no error; type should be: `Unknown | Literal["a"]`)
-# error: [unresolved-attribute]
-reveal_type(c_instance.b2)  # revealed: Unknown
+reveal_type(c_instance.b2)  # revealed: Unknown | Literal["a"]
 
-# TODO: Similar for these two (should be `Unknown | int` and `Unknown | str`, respectively)
-# error: [unresolved-attribute]
-reveal_type(c_instance.c2)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(c_instance.d2)  # revealed: Unknown
+reveal_type(c_instance.c2)  # revealed: Unknown | int
+reveal_type(c_instance.d2)  # revealed: Unknown | str
+```
+
+#### Starred assignments
+
+```py
+class C:
+    def __init__(self) -> None:
+        self.a, *self.b = (1, 2, 3)
+
+c_instance = C()
+reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.b)  # revealed: Unknown | @Todo(starred unpacking)
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -287,6 +322,8 @@ class TupleIterable:
     def __iter__(self) -> TupleIterator:
         return TupleIterator()
 
+class NonIterable: ...
+
 class C:
     def __init__(self):
         for self.x in IntIterable():
@@ -295,14 +332,54 @@ class C:
         for _, self.y in TupleIterable():
             pass
 
-# TODO: Pyright fully supports these, mypy detects the presence of the attributes,
-# but infers type `Any` for both of them. We should infer `int` and `str` here:
+        # TODO: We should emit a diagnostic here
+        for self.z in NonIterable():
+            pass
 
-# error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
+reveal_type(C().x)  # revealed: Unknown | int
 
+reveal_type(C().y)  # revealed: Unknown | str
+```
+
+#### Attributes defined in `with` statements
+
+```py
+class ContextManager:
+    def __enter__(self) -> int | None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class C:
+    def __init__(self) -> None:
+        with ContextManager() as self.x:
+            pass
+
+c_instance = C()
+
+# TODO: Should be `Unknown | int | None`
 # error: [unresolved-attribute]
-reveal_type(C().y)  # revealed: Unknown
+reveal_type(c_instance.x)  # revealed: Unknown
+```
+
+#### Attributes defined in comprehensions
+
+```py
+class IntIterator:
+    def __next__(self) -> int:
+        return 1
+
+class IntIterable:
+    def __iter__(self) -> IntIterator:
+        return IntIterator()
+
+class C:
+    def __init__(self) -> None:
+        [... for self.a in IntIterable()]
+
+c_instance = C()
+
+# TODO: Should be `Unknown | int`
+# error: [unresolved-attribute]
+reveal_type(c_instance.a)  # revealed: Unknown
 ```
 
 #### Conditionally declared / bound attributes
@@ -441,6 +518,15 @@ class C:
 # do not support this either (for conditions that can only be resolved to `False` in type
 # inference), so it does not seem to be particularly important.
 reveal_type(C().x)  # revealed: str
+```
+
+#### Diagnostics are reported for the right-hand side of attribute assignments
+
+```py
+class C:
+    def __init__(self) -> None:
+        # error: [too-many-positional-arguments]
+        self.x: int = len(1, 2, 3)
 ```
 
 ### Pure class variables (`ClassVar`)
