@@ -56,17 +56,30 @@ impl PythonVersion {
 pub struct SyntaxError {
     pub kind: SyntaxErrorKind,
     pub range: TextRange,
+    pub target_version: PythonVersion,
 }
 
 impl SyntaxError {
-    pub fn into_diagnostic(self, target_version: PythonVersion) -> Diagnostic {
-        Diagnostic {
+    pub fn message(&self) -> String {
+        match self.kind {
+            SyntaxErrorKind::MatchBeforePy310 => format!(
+                "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
+                major = self.target_version.major,
+                minor = self.target_version.minor,
+            ),
+        }
+    }
+}
+
+impl From<SyntaxError> for Diagnostic {
+    fn from(value: SyntaxError) -> Self {
+        Self {
             kind: DiagnosticKind {
-                name: self.kind.as_str().to_string(),
-                body: self.kind.message(target_version),
+                name: value.kind.as_str().to_string(),
+                body: value.message(),
                 suggestion: None,
             },
-            range: self.range,
+            range: value.range,
             fix: None,
             parent: None,
         }
@@ -82,16 +95,6 @@ impl SyntaxErrorKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
-        }
-    }
-
-    pub fn message(self, target_version: PythonVersion) -> String {
-        match self {
-            SyntaxErrorKind::MatchBeforePy310 => format!(
-                "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
-                major = target_version.major,
-                minor = target_version.minor,
-            ),
         }
     }
 }
@@ -116,6 +119,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.errors.push(SyntaxError {
                         kind: SyntaxErrorKind::MatchBeforePy310,
                         range: *range,
+                        target_version: self.target_version,
                     });
                 }
             }

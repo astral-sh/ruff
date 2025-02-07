@@ -54,15 +54,10 @@ impl From<PythonVersion> for syntax::PythonVersion {
 }
 
 impl SyntaxDiagnostic {
-    pub fn from_syntax_error(
-        value: &SyntaxError,
-        target_version: PythonVersion,
-        file: File,
-    ) -> Self {
-        let version = syntax::PythonVersion::from(target_version);
+    pub fn from_syntax_error(value: &SyntaxError, file: File) -> Self {
         Self {
             id: DiagnosticId::invalid_syntax(Some(value.kind.as_str())),
-            message: value.kind.message(version),
+            message: value.message(),
             file,
             range: value.range,
         }

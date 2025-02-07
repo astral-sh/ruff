@@ -1133,6 +1133,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "014") => (RuleGroup::Preview, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
         (Flake8Logging, "015") => (RuleGroup::Preview, rules::flake8_logging::rules::RootLoggerCall),
 
+        // Syntax errors
+        (Syntax, "001") => (RuleGroup::Stable, rules::syntax::MatchBeforePython310),
+
         _ => return None,
     })
 }

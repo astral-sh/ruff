@@ -335,11 +335,8 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
             check_syntax(parsed, target_version.into())
                 .iter()
                 .map(|error| {
-                    let boxed: Box<dyn Diagnostic> = Box::new(SyntaxDiagnostic::from_syntax_error(
-                        error,
-                        target_version,
-                        file,
-                    ));
+                    let boxed: Box<dyn Diagnostic> =
+                        Box::new(SyntaxDiagnostic::from_syntax_error(error, file));
                     boxed
                 }),
         );
