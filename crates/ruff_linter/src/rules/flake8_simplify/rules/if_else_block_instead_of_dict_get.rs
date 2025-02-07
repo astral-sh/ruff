@@ -116,27 +116,26 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
         return;
     };
 
-    let Expr::Compare(comp) = test.as_ref() else {
-        return;
-    };
-    let [Expr::Name(test_dict)] = comp.comparators.as_ref() else {
-        return;
-    };
-    if !is_known_to_be_of_type_dict(checker.semantic(), test_dict) {
-        return;
-    }
     let Expr::Compare(ast::ExprCompare {
         left: test_key,
         ops,
         comparators: test_dict,
         range: _,
-    }) = test.as_ref()
+    }) = &**test
     else {
         return;
     };
     let [test_dict] = &**test_dict else {
         return;
     };
+
+    if !test_dict
+        .as_name_expr()
+        .is_some_and(|dict_name| is_known_to_be_of_type_dict(checker.semantic(), dict_name))
+    {
+        return;
+    }
+
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
         [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
         [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
