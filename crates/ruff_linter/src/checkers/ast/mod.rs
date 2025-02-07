@@ -221,7 +221,7 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
-    pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) diagnostics: RefCell<Vec<Diagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
     /// The end offset of the last visited statement.
@@ -271,7 +271,7 @@ impl<'a> Checker<'a> {
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
-            diagnostics: Vec::default(),
+            diagnostics: RefCell::new(Vec::default()),
             flake8_bugbear_seen: Vec::default(),
             cell_offsets,
             notebook_index,
@@ -360,6 +360,21 @@ impl<'a> Checker<'a> {
     /// Returns the [`CommentRanges`] for the parsed source code.
     pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
         self.indexer.comment_ranges()
+    }
+
+    /// Push a new [`Diagnostic`] to the collection in the [`Checker`]
+    pub(crate) fn report_diagnostic(&self, diagnostic: Diagnostic) {
+        let mut diagnostics = self.diagnostics.borrow_mut();
+        diagnostics.push(diagnostic);
+    }
+
+    /// Extend the collection of [`Diagnostic`] objects in the [`Checker`]
+    pub(crate) fn report_diagnostics<I>(&self, diagnostics: I)
+    where
+        I: IntoIterator<Item = Diagnostic>,
+    {
+        let mut checker_diagnostics = self.diagnostics.borrow_mut();
+        checker_diagnostics.extend(diagnostics);
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
