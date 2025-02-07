@@ -216,9 +216,9 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
-    pub(crate) diagnostics: RefCell<Vec<Diagnostic>>,
+    diagnostics: RefCell<Vec<Diagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
-    pub(crate) flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
+    flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
