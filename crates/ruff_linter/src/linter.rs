@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
+use ruff_python_syntax_errors::check_syntax;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -132,6 +133,12 @@ pub fn check_path(
 
     // Run the AST-based rules only if there are no syntax errors.
     if parsed.is_valid() {
+        let syntax_version = settings.target_version.into();
+        diagnostics.extend(
+            check_syntax(parsed, syntax_version)
+                .into_iter()
+                .map(|error| error.into_diagnostic(syntax_version)),
+        );
         let use_ast = settings
             .rules
             .iter_enabled()
