@@ -130,34 +130,6 @@ impl SectionKind {
             Self::Yields => "Yields",
         }
     }
-
-    /// Returns `true` if a section can contain subsections, as in:
-    /// ```python
-    /// Yields
-    /// ------
-    /// int
-    ///     Description of the anonymous integer return value.
-    /// ```
-    ///
-    /// For NumPy, see: <https://numpydoc.readthedocs.io/en/latest/format.html>
-    ///
-    /// For Google, see: <https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings>
-    pub(crate) fn has_subsections(self) -> bool {
-        matches!(
-            self,
-            Self::Args
-                | Self::Arguments
-                | Self::OtherArgs
-                | Self::OtherParameters
-                | Self::OtherParams
-                | Self::Parameters
-                | Self::Raises
-                | Self::Returns
-                | Self::SeeAlso
-                | Self::Warns
-                | Self::Yields
-        )
-    }
 }
 
 pub(crate) struct SectionContexts<'a> {
