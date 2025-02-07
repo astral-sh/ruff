@@ -266,6 +266,7 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct TerminalOptions {
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
