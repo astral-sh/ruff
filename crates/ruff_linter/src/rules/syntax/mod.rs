@@ -6,7 +6,7 @@ use ruff_python_syntax_errors::{SyntaxError, SyntaxErrorKind};
 macro_rules! syntax_errors {
     ($($error_type:ident$(,)*)*) => {
         $(#[derive(ViolationMetadata)]
-        pub struct $error_type(pub SyntaxError);
+        pub(crate) struct $error_type(SyntaxError);
 
         impl Violation for $error_type {
             #[derive_message_formats]
