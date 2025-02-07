@@ -6,11 +6,10 @@
 //! The implementation is heavily inspired by the `Checker` from the `ruff_linter` crate but with a
 //! sole focus of detecting syntax errors rather than being a more general diagnostic tool.
 
-use ruff_diagnostics::Diagnostic;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    ModModule, Stmt,
+    ModModule, Stmt, StmtMatch,
 };
 use ruff_python_parser::Parsed;
 use ruff_text_size::TextRange;
@@ -21,8 +20,8 @@ pub(crate) struct Checker<'a> {
     /// The target Python version for detecting backwards-incompatible syntax
     /// changes.
     target_version: PythonVersion,
-    /// The cumulative set of diagnostics computed across all lint rules.
-    diagnostics: Vec<Diagnostic>,
+    /// The cumulative set of syntax errors found when visiting the source AST.
+    errors: Vec<SyntaxError>,
 }
 
 impl<'a> Checker<'a> {
@@ -30,28 +29,20 @@ impl<'a> Checker<'a> {
         Self {
             parsed,
             target_version,
-            diagnostics: Vec::new(),
+            errors: Vec::new(),
         }
     }
 }
 
-mod rules {
-    pub(crate) use match_before_py310::*;
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SyntaxError {
+    kind: SyntaxErrorKind,
+    range: TextRange,
+}
 
-    mod match_before_py310 {
-        use ruff_diagnostics::Violation;
-        use ruff_macros::{derive_message_formats, ViolationMetadata};
-
-        #[derive(ViolationMetadata)]
-        pub(crate) struct MatchBeforePy310;
-
-        impl Violation for MatchBeforePy310 {
-            #[derive_message_formats]
-            fn message(&self) -> String {
-                "`match` can only be used on Python 3.10+".to_string()
-            }
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SyntaxErrorKind {
+    MatchBeforePy310,
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -69,12 +60,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Stmt::While(_) => {}
             Stmt::If(_) => {}
             Stmt::With(_) => {}
-            Stmt::Match(_) => {
-                if self.target_version.minor() < 10 {
-                    self.diagnostics.push(Diagnostic::new(
-                        rules::MatchBeforePy310,
-                        TextRange::default(),
-                    ));
+            Stmt::Match(StmtMatch { range, .. }) => {
+                if self.target_version < PythonVersion::Py310 {
+                    self.errors.push(SyntaxError {
+                        kind: SyntaxErrorKind::MatchBeforePy310,
+                        range: *range,
+                    });
                 }
             }
             Stmt::Raise(_) => {}
@@ -94,11 +85,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 }
 
-pub fn check_syntax(parsed: &Parsed<ModModule>, target_version: PythonVersion) -> Vec<Diagnostic> {
+pub fn check_syntax(parsed: &Parsed<ModModule>, target_version: PythonVersion) -> Vec<SyntaxError> {
+    debug_assert!(
+        parsed.errors().is_empty(),
+        "Should not call `check_syntax` on invalid AST"
+    );
     let mut checker = Checker::new(parsed, target_version);
     checker.visit_body(checker.parsed.suite());
-
-    checker.diagnostics
+    checker.errors
 }
 
 #[cfg(test)]
@@ -106,15 +100,14 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_debug_snapshot;
-    use ruff_diagnostics::Diagnostic;
     use ruff_linter::{settings::types::PythonVersion, source_kind::SourceKind};
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
 
-    use crate::check_syntax;
+    use crate::{check_syntax, SyntaxError};
 
     /// Run [`check_path`] on a snippet of Python code.
-    fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<Diagnostic> {
+    fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SyntaxError> {
         let path = Path::new("<filename>");
         let contents = SourceKind::Python(dedent(contents).into_owned());
         let source_type = PySourceType::from(path);
