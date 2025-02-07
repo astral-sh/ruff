@@ -509,57 +509,55 @@ fn is_docstring_section(
     // ```
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
     // continue to treat it as a section header.
-    if section_kind.has_subsections() {
-        if let Some(previous_section) = previous_section {
-            let verbatim = &line[TextRange::at(indent_size, section_name_size)];
+    if let Some(previous_section) = previous_section {
+        let verbatim = &line[TextRange::at(indent_size, section_name_size)];
 
-            // If the section is more deeply indented, assume it's a subsection, as in:
-            // ```python
-            // def func(args: tuple[int]):
-            //     """Toggle the gizmo.
-            //
-            //     Args:
-            //         args: The arguments to the function.
-            //     """
-            // ```
-            if previous_section.indent_size < indent_size {
-                if section_kind.as_str() != verbatim {
-                    return false;
-                }
+        // If the section is more deeply indented, assume it's a subsection, as in:
+        // ```python
+        // def func(args: tuple[int]):
+        //     """Toggle the gizmo.
+        //
+        //     Args:
+        //         args: The arguments to the function.
+        //     """
+        // ```
+        if previous_section.indent_size < indent_size {
+            if section_kind.as_str() != verbatim {
+                return false;
             }
+        }
 
-            // If the section has a preceding empty line, assume it's _not_ a subsection, as in:
-            // ```python
-            // def func(args: tuple[int]):
-            //     """Toggle the gizmo.
-            //
-            //     Args:
-            //         args: The arguments to the function.
-            //
-            //     returns:
-            //         The return value of the function.
-            //     """
-            // ```
-            if previous_line.is_some_and(|line| line.trim().is_empty()) {
-                return true;
-            }
+        // If the section has a preceding empty line, assume it's _not_ a subsection, as in:
+        // ```python
+        // def func(args: tuple[int]):
+        //     """Toggle the gizmo.
+        //
+        //     Args:
+        //         args: The arguments to the function.
+        //
+        //     returns:
+        //         The return value of the function.
+        //     """
+        // ```
+        if previous_line.is_some_and(|line| line.trim().is_empty()) {
+            return true;
+        }
 
-            // If the section isn't underlined, and isn't title-cased, assume it's a subsection,
-            // as in:
-            // ```python
-            // def func(parameters: tuple[int]):
-            //     """Toggle the gizmo.
-            //
-            //     Parameters:
-            //     -----
-            //     parameters:
-            //         The arguments to the function.
-            //     """
-            // ```
-            if !next_line_is_underline && verbatim.chars().next().is_some_and(char::is_lowercase) {
-                if section_kind.as_str() != verbatim {
-                    return false;
-                }
+        // If the section isn't underlined, and isn't title-cased, assume it's a subsection,
+        // as in:
+        // ```python
+        // def func(parameters: tuple[int]):
+        //     """Toggle the gizmo.
+        //
+        //     Parameters:
+        //     -----
+        //     parameters:
+        //         The arguments to the function.
+        //     """
+        // ```
+        if !next_line_is_underline && verbatim.chars().next().is_some_and(char::is_lowercase) {
+            if section_kind.as_str() != verbatim {
+                return false;
             }
         }
     }
