@@ -25,7 +25,6 @@ colored = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
-etcetera = { workspace = true, optional = true }
 filetime = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
@@ -44,14 +43,16 @@ zip = { workspace = true }
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }
 
+[target.'cfg(not(target_arch="wasm32"))'.dependencies]
+etcetera = { workspace = true, optional = true }
+
 [dev-dependencies]
 insta = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-default = ["os"]
 cache = ["ruff_cache"]
-os = ["ignore", "etcetera"]
+os = ["ignore", "dep:etcetera"]
 serde = ["dep:serde", "camino/serde1"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber", "tracing-tree"]

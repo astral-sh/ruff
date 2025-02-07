@@ -26,7 +26,7 @@ pub struct TestSystem {
 }
 
 impl TestSystem {
-    /// Returns the [`InMemorySystem`].
+    /// Returns the `InMemorySystem`.
     ///
     /// ## Panics
     /// If this test db isn't the in memory system.
@@ -35,7 +35,7 @@ impl TestSystem {
             .expect("The test db is not using a memory file system")
     }
 
-    /// Returns the [`InMemorySystem`] or `None` if the test system is using an other underlying system.
+    /// Returns the `InMemorySystem` or `None` if the test system is using an other underlying system.
     pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
         self.system().as_any().downcast_ref::<InMemorySystem>()
     }

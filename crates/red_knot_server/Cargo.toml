@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 red_knot_project = { workspace = true }
-ruff_db = { workspace = true }
+ruff_db = { workspace = true, features = ["os"] }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }

@@ -44,7 +44,7 @@ test-case = { workspace = true }
 memchr = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["os", "testing"] }
+ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_parser = { workspace = true }
 red_knot_test = { workspace = true }
 red_knot_vendored = { workspace = true }
