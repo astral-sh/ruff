@@ -163,7 +163,6 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     // Check if any of the path parameters are not in the function signature.
-    let mut diagnostics = vec![];
     for (path_param, range) in path_params {
         // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
         if !is_identifier(path_param) {
@@ -203,10 +202,8 @@ pub(crate) fn fastapi_unused_path_parameter(
                 checker.locator().contents(),
             )));
         }
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
-
-    checker.report_diagnostics(diagnostics);
 }
 
 /// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
