@@ -495,9 +495,9 @@ impl<'a> Checker<'a> {
     }
 
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
-    pub(crate) fn push_type_diagnostic(&mut self, diagnostic: Diagnostic) {
+    pub(crate) fn report_type_diagnostic(&self, diagnostic: Diagnostic) {
         if !self.semantic.in_no_type_check() {
-            self.diagnostics.get_mut().push(diagnostic);
+            self.report_diagnostic(diagnostic);
         }
     }
 }
@@ -2438,7 +2438,7 @@ impl<'a> Checker<'a> {
                         self.semantic.restore(snapshot);
 
                         if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                            self.push_type_diagnostic(Diagnostic::new(
+                            self.report_type_diagnostic(Diagnostic::new(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
                                     parse_error: parse_error.error.to_string(),
                                 },
