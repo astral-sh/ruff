@@ -80,3 +80,12 @@ D417.py:172:5: D417 Missing argument description in the docstring for `f`: `**kw
     |     ^ D417
 173 |     """Do something.
     |
+
+D417.py:199:5: D417 Missing argument description in the docstring for `should_fail`: `Args`
+    |
+198 | # undocumented argument with the same name as a section
+199 | def should_fail(payload, Args):
+    |     ^^^^^^^^^^^ D417
+200 |     """
+201 |     Send a message.
+    |
