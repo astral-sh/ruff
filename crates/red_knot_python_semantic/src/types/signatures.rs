@@ -4,7 +4,7 @@ use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// A typed callable signature.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct Signature<'db> {
     /// Parameters, in source order.
     ///
@@ -60,7 +60,7 @@ impl<'db> Signature<'db> {
 }
 
 // TODO: use SmallVec here once invariance bug is fixed
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct Parameters<'db>(Vec<Parameter<'db>>);
 
 impl<'db> Parameters<'db> {
@@ -218,7 +218,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct Parameter<'db> {
     /// Parameter name.
     ///
@@ -304,7 +304,7 @@ impl<'db> Parameter<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly { default_ty: Option<Type<'db>> },

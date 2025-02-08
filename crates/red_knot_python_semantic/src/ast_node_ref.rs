@@ -86,6 +86,20 @@ unsafe impl<T> Send for AstNodeRef<T> where T: Send {}
 #[allow(unsafe_code)]
 unsafe impl<T> Sync for AstNodeRef<T> where T: Sync {}
 
+#[allow(unsafe_code)]
+unsafe impl<T> salsa::Update for AstNodeRef<T> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_node: &mut AstNodeRef<T> = unsafe { &mut *old_pointer };
+
+        if old_node._parsed == new_value._parsed {
+            false
+        } else {
+            *old_node = new_value;
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ast_node_ref::AstNodeRef;

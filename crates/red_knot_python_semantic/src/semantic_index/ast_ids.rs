@@ -49,6 +49,15 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
+// Always consider AstIds as changed.
+#[allow(unsafe_code)]
+unsafe impl salsa::Update for AstIds {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        *old_pointer = new_value;
+        true
+    }
+}
+
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
 pub struct ScopedUseId;

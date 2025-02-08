@@ -61,7 +61,6 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
-use crate::types::statistics::TypeStatistics;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -237,7 +236,7 @@ impl<'db> InferenceRegion<'db> {
 }
 
 /// The inferred types for a single region.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
@@ -299,14 +298,6 @@ impl<'db> TypeInference<'db> {
         self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
-    }
-
-    pub(super) fn statistics(&self) -> TypeStatistics {
-        let mut statistics = TypeStatistics::default();
-        for ty in self.expressions.values() {
-            statistics.increment(*ty);
-        }
-        statistics
     }
 }
 

@@ -26,7 +26,7 @@ pub(crate) enum Boundness {
 /// possibly_unbound:  Symbol::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
 /// non_existent:      Symbol::Unbound,
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) enum Symbol<'db> {
     Type(Type<'db>, Boundness),
     Unbound,

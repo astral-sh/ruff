@@ -338,7 +338,7 @@ const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
 
 /// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
 /// maintain a separate set of visibility constraints for each scope in file.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct VisibilityConstraints<'db> {
     constraints: IndexVec<Atom, Constraint<'db>>,
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,

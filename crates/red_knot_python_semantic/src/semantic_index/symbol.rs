@@ -175,7 +175,7 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, salsa::Update)]
 pub struct Scope {
     pub(super) parent: Option<FileScopeId>,
     pub(super) node: NodeWithScopeKind,
@@ -214,7 +214,7 @@ impl ScopeKind {
 }
 
 /// Symbol table for a specific [`Scope`].
-#[derive(Debug, Default)]
+#[derive(Debug, Default, salsa::Update)]
 pub struct SymbolTable {
     /// The symbols in this scope.
     symbols: IndexVec<ScopedSymbolId, Symbol>,
@@ -422,7 +422,7 @@ impl NodeWithScopeRef<'_> {
 }
 
 /// Node that introduces a new scope.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, salsa::Update)]
 pub enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),
