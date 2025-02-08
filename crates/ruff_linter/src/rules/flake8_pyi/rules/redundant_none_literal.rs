@@ -1,14 +1,17 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator,
+    self as ast,
+    helpers::{pep_604_union, typing_union},
+    name::Name,
+    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
 
 use smallvec::SmallVec;
 
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::{checkers::ast::Checker, importer::ImportRequest, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for redundant `Literal[None]` annotations.
@@ -36,16 +39,16 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// ## Fix safety and availability
 /// This rule's fix is marked as safe unless the literal contains comments.
 ///
-/// There is currently no fix available if there are other elements in the `Literal` slice aside
-/// from `None` and [`target-version`] is set to Python 3.9 or lower, as the fix always uses the
-/// `|` syntax to create unions rather than `typing.Union`, and the `|` syntax for unions was added
-/// in Python 3.10.
+/// There is currently no fix available when applying the fix would lead to
+/// a `TypeError` from an expression of the form `None | None` or when we
+/// are unable to import the symbol `typing.Union` and the Python version
+/// is 3.9 or below.
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 #[derive(ViolationMetadata)]
 pub(crate) struct RedundantNoneLiteral {
-    other_literal_elements_seen: bool,
+    union_kind: UnionKind,
 }
 
 impl Violation for RedundantNoneLiteral {
@@ -53,18 +56,22 @@ impl Violation for RedundantNoneLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.other_literal_elements_seen {
-            "`Literal[None, ...]` can be replaced with `Literal[...] | None`".to_string()
-        } else {
-            "`Literal[None]` can be replaced with `None`".to_string()
+        match self.union_kind {
+            UnionKind::NoUnion => "`Literal[None]` can be replaced with `None`".to_string(),
+            UnionKind::TypingUnion => {
+                "`Literal[None, ...]` can be replaced with `Union[Literal[...], None]`".to_string()
+            }
+            UnionKind::BitOr => {
+                "`Literal[None, ...]` can be replaced with `Literal[...] | None`".to_string()
+            }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(if self.other_literal_elements_seen {
-            "Replace with `Literal[...] | None`".to_string()
-        } else {
-            "Replace with `None`".to_string()
+        Some(match self.union_kind {
+            UnionKind::NoUnion => "Replace with `None`".to_string(),
+            UnionKind::TypingUnion => "Replace with `Union[Literal[...], None]`".to_string(),
+            UnionKind::BitOr => "Replace with `Literal[...] | None`".to_string(),
         })
     }
 }
@@ -102,28 +109,28 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
         return;
     }
 
-    let other_literal_elements_seen = !literal_elements.is_empty();
+    let union_kind = if literal_elements.is_empty() {
+        UnionKind::NoUnion
+    } else if (checker.settings.target_version >= PythonVersion::Py310)
+        || checker.source_type.is_stub()
+    {
+        UnionKind::BitOr
+    } else {
+        UnionKind::TypingUnion
+    };
 
     // N.B. Applying the fix can leave an unused import to be fixed by the `unused-import` rule.
-    let fix =
-        create_fix_edit(checker, literal_expr, literal_subscript, literal_elements).map(|edit| {
-            Fix::applicable_edit(
-                edit,
-                if checker.comment_ranges().intersects(literal_expr.range()) {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
-            )
-        });
+    let fix = create_fix(
+        checker,
+        literal_expr,
+        literal_subscript,
+        literal_elements,
+        union_kind,
+    );
 
     for none_expr in none_exprs {
-        let mut diagnostic = Diagnostic::new(
-            RedundantNoneLiteral {
-                other_literal_elements_seen,
-            },
-            none_expr.range(),
-        );
+        let mut diagnostic =
+            Diagnostic::new(RedundantNoneLiteral { union_kind }, none_expr.range());
         if let Some(ref fix) = fix {
             diagnostic.set_fix(fix.clone());
         }
@@ -140,12 +147,13 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
 /// See <https://github.com/astral-sh/ruff/issues/14567>.
 ///
 /// [`typing.Union`]: https://docs.python.org/3/library/typing.html#typing.Union
-fn create_fix_edit(
+fn create_fix(
     checker: &Checker,
     literal_expr: &Expr,
     literal_subscript: &Expr,
     literal_elements: Vec<&Expr>,
-) -> Option<Edit> {
+    union_kind: UnionKind,
+) -> Option<Fix> {
     let semantic = checker.semantic();
 
     let enclosing_pep604_union = semantic
@@ -189,40 +197,73 @@ fn create_fix_edit(
         }
     }
 
-    if literal_elements.is_empty() {
-        return Some(Edit::range_replacement(
-            "None".to_string(),
-            literal_expr.range(),
+    let applicability = if checker.comment_ranges().intersects(literal_expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    if matches!(union_kind, UnionKind::NoUnion) {
+        return Some(Fix::applicable_edit(
+            Edit::range_replacement("None".to_string(), literal_expr.range()),
+            applicability,
         ));
     }
 
-    if checker.settings.target_version < PythonVersion::Py310 {
-        return None;
-    }
-
-    let bin_or = Expr::BinOp(ExprBinOp {
+    let lhs = Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(literal_subscript.clone()),
         range: TextRange::default(),
-        left: Box::new(Expr::Subscript(ast::ExprSubscript {
-            value: Box::new(literal_subscript.clone()),
-            range: TextRange::default(),
-            ctx: ExprContext::Load,
-            slice: Box::new(if literal_elements.len() > 1 {
-                Expr::Tuple(ast::ExprTuple {
-                    elts: literal_elements.into_iter().cloned().collect(),
-                    range: TextRange::default(),
-                    ctx: ExprContext::Load,
-                    parenthesized: true,
-                })
-            } else {
-                literal_elements[0].clone()
-            }),
-        })),
-        op: ruff_python_ast::Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ExprNoneLiteral {
-            range: TextRange::default(),
-        })),
+        ctx: ExprContext::Load,
+        slice: Box::new(if literal_elements.len() > 1 {
+            Expr::Tuple(ast::ExprTuple {
+                elts: literal_elements.into_iter().cloned().collect(),
+                range: TextRange::default(),
+                ctx: ExprContext::Load,
+                parenthesized: true,
+            })
+        } else {
+            literal_elements[0].clone()
+        }),
+    });
+    let rhs = Expr::NoneLiteral(ExprNoneLiteral {
+        range: TextRange::default(),
     });
 
-    let content = checker.generator().expr(&bin_or);
-    Some(Edit::range_replacement(content, literal_expr.range()))
+    match union_kind {
+        UnionKind::TypingUnion => {
+            let (import_edit, bound_name) = checker
+                .importer()
+                .get_or_import_symbol(
+                    &ImportRequest::import_from("typing", "Union"),
+                    literal_expr.start(),
+                    checker.semantic(),
+                )
+                .ok()?;
+            let union_expr = typing_union(&[lhs, rhs], Name::from(bound_name));
+            let content = checker.generator().expr(&union_expr);
+            let union_edit = Edit::range_replacement(content, literal_expr.range());
+            return Some(Fix::applicable_edits(
+                import_edit,
+                [union_edit],
+                applicability,
+            ));
+        }
+        UnionKind::BitOr => {
+            let union_expr = pep_604_union(&[lhs, rhs]);
+            let content = checker.generator().expr(&union_expr);
+            let union_edit = Edit::range_replacement(content, literal_expr.range());
+            return Some(Fix::applicable_edit(union_edit, applicability));
+        }
+        // We dealt with this case earlier to avoid allocating `lhs` and `rhs`
+        UnionKind::NoUnion => {
+            unreachable!()
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+enum UnionKind {
+    NoUnion,
+    TypingUnion,
+    BitOr,
 }
