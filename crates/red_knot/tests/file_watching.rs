@@ -3,7 +3,6 @@
 use std::io::Write;
 use std::time::{Duration, Instant};
 
-use crate::utils::EnvVarGuard;
 use anyhow::{anyhow, Context};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::pyproject::{PyProject, Tool};
@@ -13,10 +12,8 @@ use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform, PythonVersion};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, OsUserDirectoryOverride, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
-
-mod utils;
 
 struct TestCase {
     db: ProjectDatabase,
@@ -1495,7 +1492,7 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
 
 #[test]
 fn changes_to_user_configuration() -> anyhow::Result<()> {
-    let mut config_dir_var: Option<EnvVarGuard> = None;
+    let mut _config_dir_override: Option<OsUserDirectoryOverride> = None;
 
     let mut case = setup(|root: &SystemPath, project_root: &SystemPath| {
         std::fs::write(
@@ -1517,14 +1514,20 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
             "#,
         )?;
 
-        config_dir_var = Some(EnvVarGuard::mock_user_configuration_directory(
-            root.join("home/.config").as_str(),
-        ));
+        _config_dir_override = Some(OsUserDirectoryOverride::scoped(Some(
+            root.join("home/.config"),
+        )));
 
         Ok(())
     })?;
 
-    let diagnostics = case.db().check().context("Failed to check project.")?;
+    let foo = case
+        .system_file(case.project_path("foo.py"))
+        .expect("foo.py to exist");
+    let diagnostics = case
+        .db()
+        .check_file(foo)
+        .context("Failed to check project.")?;
 
     assert!(
         diagnostics.is_empty(),
@@ -1544,7 +1547,10 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
     case.apply_changes(changes);
 
-    let diagnostics = case.db().check().context("Failed to check project.")?;
+    let diagnostics = case
+        .db()
+        .check_file(foo)
+        .context("Failed to check project.")?;
 
     assert!(
         diagnostics.len() == 1,
