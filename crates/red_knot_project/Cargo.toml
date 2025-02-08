@@ -17,6 +17,7 @@ ruff_db = { workspace = true, features = ["os", "cache", "serde"] }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
+ruff_python_syntax_errors = { workspace = true }
 red_knot_python_semantic = { workspace = true, features = ["serde"] }
 red_knot_vendored = { workspace = true }
 

@@ -2436,6 +2436,7 @@ dependencies = [
  "ruff_db",
  "ruff_macros",
  "ruff_python_ast",
+ "ruff_python_syntax_errors",
  "ruff_text_size",
  "rustc-hash 2.1.0",
  "salsa",
@@ -2474,6 +2475,7 @@ dependencies = [
  "ruff_python_literal",
  "ruff_python_parser",
  "ruff_python_stdlib",
+ "ruff_python_syntax_errors",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
@@ -2915,6 +2917,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_semantic",
  "ruff_python_stdlib",
+ "ruff_python_syntax_errors",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
@@ -3117,6 +3120,17 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.8.0",
  "unicode-ident",
+]
+
+[[package]]
+name = "ruff_python_syntax_errors"
+version = "0.9.5"
+dependencies = [
+ "insta",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_text_size",
 ]
 
 [[package]]

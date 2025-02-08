@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
+use ruff_python_syntax_errors::check_syntax;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -32,6 +33,7 @@ use crate::package::PackageRoot;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
+use crate::rules::syntax::diagnostic_from_syntax_error;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -132,6 +134,11 @@ pub fn check_path(
 
     // Run the AST-based rules only if there are no syntax errors.
     if parsed.is_valid() {
+        diagnostics.extend(
+            check_syntax(parsed, settings.target_version.into())
+                .into_iter()
+                .map(diagnostic_from_syntax_error),
+        );
         let use_ast = settings
             .rules
             .iter_enabled()
