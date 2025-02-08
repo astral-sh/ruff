@@ -291,6 +291,16 @@
             }
           ]
         },
+        "implicit-reexport": {
+          "title": "detects imports of imported names that are not explicitly re-exported",
+          "description": "## What it does\nChecks for import statements that import names from a module which imports but does not explicitly\nre-export them.\n\n## Why is this bad?\nImports may only be intended for local use, not intended for re-export as part of the public API of a module.\nAllowing other modules to import names that weren't intended for re-export can create inconsistent import\nlocations for the same symbol across the codebase, cause breakages if an import is removed, and make\nfuture refactors more difficult.\n\n## Example\n\nConsider a file `other.py`:\n\n```python\nfrom typing import Literal\n```\n\nAnd, a file `main.py`:\n\n```python\nfrom other import Literal\n```\n\nUse instead:\n```python\nfrom typing import Literal\n```\n\nOr, explicitly re-export the name in `other.py`:\n```python\nfrom typing import Literal as Literal\n```\n\n## References\n- [Typing documentation: Import conventions](https://typing.readthedocs.io/en/latest/spec/distributing.html#import-conventions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "incompatible-slots": {
           "title": "detects class definitions whose MRO has conflicting `__slots__`",
           "description": "## What it does\nChecks for classes whose bases define incompatible `__slots__`.\n\n## Why is this bad?\nInheriting from bases with incompatible `__slots__`s\nwill lead to a `TypeError` at runtime.\n\nClasses with no or empty `__slots__` are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\nMultiple inheritance from more than one different class\ndefining non-empty `__slots__` is not allowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\n## Known problems\nDynamic (not tuple or string literal) `__slots__` are not checked.\nAdditionally, classes inheriting from built-in classes with implicit layouts\nlike `str` or `int` are also not checked.\n\n```pycon\n>>> hasattr(int, \"__slots__\")\nFalse\n>>> hasattr(str, \"__slots__\")\nFalse\n>>> class A(int, str): ...\nTraceback (most recent call last):\n  File \"<python-input-0>\", line 1, in <module>\n    class A(int, str): ...\nTypeError: multiple bases have instance lay-out conflict\n```",

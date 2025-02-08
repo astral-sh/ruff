@@ -50,6 +50,9 @@ containing module is first referenced. This allows the main module to see that `
 submodule `b`, even though `a.b` is never imported in the main module.
 
 ```py
+# TODO: Remove this once we have rule selection and this rule is disabled for
+# runtime files by default.
+# error: "Module `q` does not explicitly export attribute `b`"
 from q import a, b
 
 reveal_type(b)  # revealed: <module 'a.b'>

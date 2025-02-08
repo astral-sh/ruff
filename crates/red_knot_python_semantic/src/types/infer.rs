@@ -81,13 +81,13 @@ use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_non_subscriptable,
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
-    INVALID_METACLASS, SUBCLASS_OF_FINAL_CLASS,
+    IMPLICIT_REEXPORT, INVALID_METACLASS, SUBCLASS_OF_FINAL_CLASS,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{ParameterExpectation, ParameterExpectations};
+use super::{ParameterExpectation, ParameterExpectations, ReExport};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -939,11 +939,28 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
+        self.add_declaration_with_binding_and_reexport(
+            node,
+            definition,
+            declared_and_inferred_ty,
+            ReExport::Yes,
+        );
+    }
+
+    fn add_declaration_with_binding_and_reexport(
+        &mut self,
+        node: AnyNodeRef,
+        definition: Definition<'db>,
+        declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
+        re_export: ReExport,
+    ) {
         debug_assert!(definition.is_binding(self.db()));
         debug_assert!(definition.is_declaration(self.db()));
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
-            DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),
+            DeclaredAndInferredType::AreTheSame(ty) => {
+                (TypeAndQualifiers::from(ty).with_re_export(re_export), ty)
+            }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
@@ -1607,7 +1624,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::unknown()
             }
-            (Symbol::Type(enter_ty, enter_boundness), exit) => {
+            (Symbol::Type(enter_ty, _, enter_boundness), exit) => {
                 if enter_boundness == Boundness::PossiblyUnbound {
                     self.context.report_lint(
                         &INVALID_CONTEXT_MANAGER,
@@ -1644,7 +1661,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ),
                         );
                     }
-                    Symbol::Type(exit_ty, exit_boundness) => {
+                    Symbol::Type(exit_ty, _, exit_boundness) => {
                         // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
 
                         if exit_boundness == Boundness::PossiblyUnbound {
@@ -2205,7 +2222,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
             }
             Type::Instance(InstanceType { class }) => {
-                if let Symbol::Type(class_member, boundness) =
+                if let Symbol::Type(class_member, _, boundness) =
                     class.class_member(self.db(), op.in_place_dunder())
                 {
                     let call = class_member.call(
@@ -2410,10 +2427,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             return;
         };
 
-        let binding_ty = if asname.is_some() {
+        let (binding_ty, re_export) = if let Some(asname) = asname.as_ref() {
             // If we are renaming the imported module via an `as` clause, then we bind the resolved
             // module's type to that name, even if that module is nested.
-            full_module_ty
+            (
+                full_module_ty,
+                if asname.id() == name.id() {
+                    ReExport::Yes
+                } else {
+                    ReExport::No
+                },
+            )
         } else if full_module_name.contains('.') {
             // If there's no `as` clause and the imported module is nested, we're not going to bind
             // the resolved module itself into the current scope; we're going to bind the top-most
@@ -2424,17 +2448,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.add_unknown_declaration_with_binding(alias.into(), definition);
                 return;
             };
-            topmost_parent_ty
+            (topmost_parent_ty, ReExport::No)
         } else {
             // If there's no `as` clause and the imported module isn't nested, then the imported
             // module _is_ what we bind into the current scope.
-            full_module_ty
+            (full_module_ty, ReExport::No)
         };
 
-        self.add_declaration_with_binding(
+        self.add_declaration_with_binding_and_reexport(
             alias.into(),
             definition,
             &DeclaredAndInferredType::AreTheSame(binding_ty),
+            re_export,
         );
     }
 
@@ -2606,24 +2631,60 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::Alias {
             range: _,
             name,
-            asname: _,
+            asname,
         } = alias;
 
         // First try loading the requested attribute from the module.
-        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name) {
-            if boundness == Boundness::PossiblyUnbound {
-                // TODO: Consider loading _both_ the attribute and any submodule and unioning them
-                // together if the attribute exists but is possibly-unbound.
-                self.context.report_lint(
-                    &POSSIBLY_UNBOUND_IMPORT,
-                    AnyNodeRef::Alias(alias),
-                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
-                );
+        if let Symbol::Type(mut ty, re_export, boundness) = module_ty.member(self.db(), name) {
+            match (re_export, boundness) {
+                (ReExport::No, _) => {
+                    let import_defined_in_stub = module_ty
+                        .expect_module_literal()
+                        .module(self.db())
+                        .file()
+                        .is_stub(self.db().upcast());
+
+                    if import_defined_in_stub {
+                        self.context.report_lint(
+                            &UNRESOLVED_IMPORT,
+                            AnyNodeRef::Alias(alias),
+                            format_args!("Module `{module_name}` has no member `{name}`"),
+                        );
+                        ty = Type::unknown();
+                    } else {
+                        self.context.report_lint(
+                            &IMPLICIT_REEXPORT,
+                            AnyNodeRef::Alias(alias),
+                            format_args!(
+                                "Module `{module_name}` does not explicitly export attribute `{name}`"
+                            ),
+                        );
+                    }
+                }
+                (ReExport::Maybe, _) | (_, Boundness::PossiblyUnbound) => {
+                    self.context.report_lint(
+                        &POSSIBLY_UNBOUND_IMPORT,
+                        AnyNodeRef::Alias(alias),
+                        format_args!(
+                            "Member `{name}` of module `{module_name}` is possibly unbound",
+                        ),
+                    );
+                }
+                _ => {}
             }
-            self.add_declaration_with_binding(
+            let re_export = if asname
+                .as_ref()
+                .is_some_and(|asname| asname.id() == name.id())
+            {
+                ReExport::Yes
+            } else {
+                ReExport::No
+            };
+            self.add_declaration_with_binding_and_reexport(
                 alias.into(),
                 definition,
                 &DeclaredAndInferredType::AreTheSame(ty),
+                re_export,
             );
             return;
         };
@@ -2647,10 +2708,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             let mut full_submodule_name = module_name.clone();
             full_submodule_name.extend(&submodule_name);
             if let Some(submodule_ty) = self.module_type_from_name(&full_submodule_name) {
-                self.add_declaration_with_binding(
+                let re_export = if asname
+                    .as_ref()
+                    .is_some_and(|asname| asname.id() == name.id())
+                {
+                    ReExport::Yes
+                } else {
+                    ReExport::No
+                };
+                self.add_declaration_with_binding_and_reexport(
                     alias.into(),
                     definition,
                     &DeclaredAndInferredType::AreTheSame(submodule_ty),
+                    re_export,
                 );
                 return;
             }
@@ -3341,9 +3411,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            Symbol::Unbound
-                // No nonlocal binding? Check the module's globals.
-                // Avoid infinite recursion if `self.scope` already is the module's global scope.
+            // No nonlocal binding? Check the module's globals.
+            // Avoid infinite recursion if `self.scope` already is the module's global scope.
+            let symbol = if file_scope_id.is_global() {
+                Symbol::Unbound
+            } else {
+                global_symbol(db, self.file(), name)
+            };
+
+            symbol
                 .or_fall_back_to(db, || {
                     if file_scope_id.is_global() {
                         Symbol::Unbound
@@ -3357,7 +3433,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if Some(self.scope()) == builtins_module_scope(db) {
                         Symbol::Unbound
                     } else {
-                        builtins_symbol(db, name)
+                        let builtins = builtins_symbol(db, name);
+                        if matches!(builtins, Symbol::Type(_, ReExport::No, _)) {
+                            Symbol::Unbound
+                        } else {
+                            builtins
+                        }
                     }
                 })
                 // Still not found? It might be `reveal_type`...
@@ -3408,11 +3489,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             symbol_from_bindings(self.db(), use_def.bindings_at_use(use_id))
         };
 
-        if let Symbol::Type(ty, Boundness::Bound) = inferred {
+        if let Symbol::Type(ty, _, Boundness::Bound) = inferred {
             ty
         } else {
             match self.lookup_name(name) {
-                Symbol::Type(looked_up_ty, looked_up_boundness) => {
+                Symbol::Type(looked_up_ty, _, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
                         report_possibly_unresolved_reference(&self.context, name);
                     }
@@ -3423,7 +3504,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         .unwrap_or(looked_up_ty)
                 }
                 Symbol::Unbound => match inferred {
-                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
+                    Symbol::Type(ty, _, Boundness::PossiblyUnbound) => {
                         report_possibly_unresolved_reference(&self.context, name);
                         ty
                     }
@@ -3431,7 +3512,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         report_unresolved_reference(&self.context, name);
                         Type::unknown()
                     }
-                    Symbol::Type(_, Boundness::Bound) => unreachable!("Handled above"),
+                    Symbol::Type(_, _, Boundness::Bound) => unreachable!("Handled above"),
                 },
             }
         }
@@ -3456,7 +3537,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let value_ty = self.infer_expression(value);
         match value_ty.member(self.db(), &attr.id) {
-            Symbol::Type(member_ty, boundness) => {
+            Symbol::Type(member_ty, _, boundness) => {
                 if boundness == Boundness::PossiblyUnbound {
                     self.context.report_lint(
                         &POSSIBLY_UNBOUND_ATTRIBUTE,
@@ -3863,7 +3944,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                let call_on_left_instance = if let Symbol::Type(class_member, _) =
+                let call_on_left_instance = if let Symbol::Type(class_member, _, _) =
                     left_class.member(self.db(), op.dunder())
                 {
                     class_member
@@ -3877,7 +3958,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if left_ty == right_ty {
                         None
                     } else {
-                        if let Symbol::Type(class_member, _) =
+                        if let Symbol::Type(class_member, _, _) =
                             right_class.member(self.db(), op.reflected_dunder())
                         {
                             class_member
@@ -4649,7 +4730,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
                 match value_meta_ty.member(self.db(), "__getitem__") {
                     Symbol::Unbound => {}
-                    Symbol::Type(dunder_getitem_method, boundness) => {
+                    Symbol::Type(dunder_getitem_method, _, boundness) => {
                         if boundness == Boundness::PossiblyUnbound {
                             self.context.report_lint(
                                 &CALL_POSSIBLY_UNBOUND_METHOD,
@@ -4694,7 +4775,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     match dunder_class_getitem_method {
                         Symbol::Unbound => {}
-                        Symbol::Type(ty, boundness) => {
+                        Symbol::Type(ty, _, boundness) => {
                             if boundness == Boundness::PossiblyUnbound {
                                 self.context.report_lint(
                                     &CALL_POSSIBLY_UNBOUND_METHOD,
@@ -4879,12 +4960,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::ExprContext::Load => {
                     let name_expr_ty = self.infer_name_expression(name);
                     match name_expr_ty {
-                        Type::KnownInstance(KnownInstanceType::ClassVar) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
-                        }
-                        Type::KnownInstance(KnownInstanceType::Final) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
-                        }
+                        Type::KnownInstance(KnownInstanceType::ClassVar) => TypeAndQualifiers::new(
+                            Type::unknown(),
+                            TypeQualifiers::CLASS_VAR,
+                            ReExport::Yes,
+                        ),
+                        Type::KnownInstance(KnownInstanceType::Final) => TypeAndQualifiers::new(
+                            Type::unknown(),
+                            TypeQualifiers::FINAL,
+                            ReExport::Yes,
+                        ),
                         _ => name_expr_ty
                             .in_type_expression(self.db())
                             .unwrap_or_else(|error| {
@@ -5952,7 +6037,7 @@ fn perform_rich_comparison<'db>(
                        left: InstanceType<'db>,
                        right: InstanceType<'db>| {
         match left.class.class_member(db, op.dunder()) {
-            Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+            Symbol::Type(class_member_dunder, _, Boundness::Bound) => class_member_dunder
                 .call(
                     db,
                     &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
@@ -5997,7 +6082,7 @@ fn perform_membership_test_comparison<'db>(
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
     let contains_dunder = right.class.class_member(db, "__contains__");
     let compare_result_opt = match contains_dunder {
-        Symbol::Type(contains_dunder, Boundness::Bound) => {
+        Symbol::Type(contains_dunder, _, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.
             contains_dunder
                 .call(
@@ -6093,7 +6178,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, assert_type
 
             assert_type(not "{y}", bool)
             assert_type(not 10*"{y}", bool)
@@ -6115,7 +6200,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, LiteralString, assert_type
 
             assert_type(2 * "hello", Literal["hellohello"])
             assert_type("goodbye" * 3, Literal["goodbyegoodbyegoodbye"])
@@ -6140,7 +6225,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type(10*"{y}", LiteralString)
@@ -6162,7 +6247,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type("a" + "{z}", LiteralString)
@@ -6182,7 +6267,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type("{y}" + "a", LiteralString)
