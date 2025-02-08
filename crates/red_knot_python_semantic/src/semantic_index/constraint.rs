@@ -28,10 +28,8 @@ pub(crate) enum PatternConstraintKind<'db> {
 
 #[salsa::tracked]
 pub(crate) struct PatternConstraint<'db> {
-    #[id]
     pub(crate) file: File,
 
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     #[no_eq]
