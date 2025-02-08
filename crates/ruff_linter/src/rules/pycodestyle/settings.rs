@@ -11,6 +11,7 @@ pub struct Settings {
     pub max_line_length: LineLength,
     pub max_doc_length: Option<LineLength>,
     pub ignore_overlong_task_comments: bool,
+    pub hang_closing: bool,
 }
 
 impl fmt::Display for Settings {
