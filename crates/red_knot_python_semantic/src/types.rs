@@ -882,6 +882,15 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
 
+            (Type::Instance(InstanceType { class }), _) if class.is_known(db, KnownClass::Bool) => {
+                Type::BooleanLiteral(true).is_subtype_of(db, target)
+                    && Type::BooleanLiteral(false).is_subtype_of(db, target)
+            }
+            (_, Type::Instance(InstanceType { class })) if class.is_known(db, KnownClass::Bool) => {
+                self.is_subtype_of(db, Type::BooleanLiteral(true))
+                    || self.is_subtype_of(db, Type::BooleanLiteral(false))
+            }
+
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
@@ -962,7 +971,7 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).is_subtype_of(db, target)
             }
             (Type::BooleanLiteral(_), _) => {
-                KnownClass::Bool.to_instance(db).is_subtype_of(db, target)
+                KnownClass::Int.to_instance(db).is_subtype_of(db, target)
             }
             (Type::IntLiteral(_), _) => KnownClass::Int.to_instance(db).is_subtype_of(db, target),
             (Type::BytesLiteral(_), _) => {
@@ -1078,6 +1087,7 @@ impl<'db> Type<'db> {
         if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
+
         match (self, target) {
             // Never can be assigned to any type.
             (Type::Never, _) => true,
@@ -1092,6 +1102,15 @@ impl<'db> Type<'db> {
                 if class.is_known(db, KnownClass::Object) =>
             {
                 true
+            }
+
+            (Type::Instance(InstanceType { class }), _) if class.is_known(db, KnownClass::Bool) => {
+                Type::BooleanLiteral(true).is_assignable_to(db, target)
+                    && Type::BooleanLiteral(false).is_assignable_to(db, target)
+            }
+            (_, Type::Instance(InstanceType { class })) if class.is_known(db, KnownClass::Bool) => {
+                self.is_assignable_to(db, Type::BooleanLiteral(false))
+                    || self.is_assignable_to(db, Type::BooleanLiteral(true))
             }
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
