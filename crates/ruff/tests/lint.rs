@@ -2237,6 +2237,41 @@ def func(t: _T) -> _T:
     );
 }
 
+/// Test that we do not rename two different type parameters to the same name
+/// in one execution of Ruff (autofixing this to `class Foo[T, T]: ...` would
+/// introduce invalid syntax)
+#[test]
+fn type_parameter_rename_isolation() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "UP049"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--unsafe-fixes")
+        .arg("--fix")
+        .arg("--preview")
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(
+            r#"
+class Foo[_T, __T]:
+    pass
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    class Foo[T, __T]:
+        pass
+
+    ----- stderr -----
+    test.py:2:14: UP049 Generic class uses private type parameters
+    Found 2 errors (1 fixed, 1 remaining).
+    "
+    );
+}
+
 #[test]
 fn a005_module_shadowing_strict() -> Result<()> {
     fn create_module(path: &Path) -> Result<()> {
