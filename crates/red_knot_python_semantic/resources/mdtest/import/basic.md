@@ -6,7 +6,7 @@
 from b import C as D
 
 E = D
-reveal_type(E)  # revealed: Literal[C]
+reveal_type(E)  # revealed: type[C]
 ```
 
 `b.py`:
@@ -21,7 +21,7 @@ class C: ...
 import b
 
 D = b.C
-reveal_type(D)  # revealed: Literal[C]
+reveal_type(D)  # revealed: type[C]
 ```
 
 `b.py`:
@@ -35,7 +35,7 @@ class C: ...
 ```py
 import a.b
 
-reveal_type(a.b.C)  # revealed: Literal[C]
+reveal_type(a.b.C)  # revealed: type[C]
 ```
 
 `a/__init__.py`:
@@ -54,7 +54,7 @@ class C: ...
 ```py
 import a.b.c
 
-reveal_type(a.b.c.C)  # revealed: Literal[C]
+reveal_type(a.b.c.C)  # revealed: type[C]
 ```
 
 `a/__init__.py`:
@@ -78,7 +78,7 @@ class C: ...
 ```py
 import a.b as b
 
-reveal_type(b.C)  # revealed: Literal[C]
+reveal_type(b.C)  # revealed: type[C]
 ```
 
 `a/__init__.py`:
@@ -97,7 +97,7 @@ class C: ...
 ```py
 import a.b.c as c
 
-reveal_type(c.C)  # revealed: Literal[C]
+reveal_type(c.C)  # revealed: type[C]
 ```
 
 `a/__init__.py`:

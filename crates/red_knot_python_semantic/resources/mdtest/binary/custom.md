@@ -307,11 +307,11 @@ class Yes:
 class Sub(Yes): ...
 class No: ...
 
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[Yes]` and `Literal[Yes]`"
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[Yes]` and `type[Yes]`"
 reveal_type(Yes + Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[Sub]` and `Literal[Sub]`"
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[Sub]` and `type[Sub]`"
 reveal_type(Sub + Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[No]` and `Literal[No]`"
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[No]` and `type[No]`"
 reveal_type(No + No)  # revealed: Unknown
 ```
 

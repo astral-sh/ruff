@@ -149,8 +149,8 @@ _: type[A, B]
 # error: [invalid-base] "Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(type[int]): ...
 
-# TODO: should be `tuple[Literal[Foo], Literal[type], Literal[object]]
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+# TODO: should be `tuple[type[Foo], type[type], type[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 ```
 
 ## `@final` classes
@@ -171,6 +171,6 @@ from typing import final
 class Foo: ...
 
 def _(x: type[Foo], y: type[EllipsisType]):
-    reveal_type(x)  # revealed: Literal[Foo]
-    reveal_type(y)  # revealed: Literal[EllipsisType]
+    reveal_type(x)  # revealed: type[Foo]
+    reveal_type(y)  # revealed: type[EllipsisType]
 ```

@@ -22,6 +22,6 @@ reveal_type(A | B)  # revealed: UnionType
 class A: ...
 class B: ...
 
-# error: "Operator `|` is unsupported between objects of type `Literal[A]` and `Literal[B]`"
+# error: "Operator `|` is unsupported between objects of type `type[A]` and `type[B]`"
 reveal_type(A | B)  # revealed: Unknown
 ```

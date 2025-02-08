@@ -569,12 +569,12 @@ except:
         reveal_type(x)  # revealed: range
 
     x = Bar
-    reveal_type(x)  # revealed: Literal[Bar]
+    reveal_type(x)  # revealed: type[Bar]
 finally:
-    # TODO: should be `Literal[1] | Literal[foo] | Literal[Bar]`
-    reveal_type(x)  # revealed: Literal[foo] | Literal[Bar]
+    # TODO: should be `Literal[1] | Literal[foo] | type[Bar]`
+    reveal_type(x)  # revealed: Literal[foo] | type[Bar]
 
-reveal_type(x)  # revealed: Literal[foo] | Literal[Bar]
+reveal_type(x)  # revealed: Literal[foo] | type[Bar]
 ```
 
 [1]: https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d

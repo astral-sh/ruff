@@ -26,9 +26,9 @@ def _(flag: bool):
 
     reveal_type(A.union_declared)  # revealed: int | str
 
-    # error: [possibly-unbound-attribute] "Attribute `possibly_unbound` on type `Literal[A]` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `possibly_unbound` on type `type[A]` is possibly unbound"
     reveal_type(A.possibly_unbound)  # revealed: str
 
-    # error: [unresolved-attribute] "Type `Literal[A]` has no attribute `non_existent`"
+    # error: [unresolved-attribute] "Type `type[A]` has no attribute `non_existent`"
     reveal_type(A.non_existent)  # revealed: Unknown
 ```

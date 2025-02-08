@@ -52,25 +52,25 @@ class Yes:
 class Sub(Yes): ...
 class No: ...
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[Yes]`"
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[Yes]`"
 reveal_type(+Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[Yes]`"
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[Yes]`"
 reveal_type(-Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[Yes]`"
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[Yes]`"
 reveal_type(~Yes)  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[Sub]`"
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[Sub]`"
 reveal_type(+Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[Sub]`"
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[Sub]`"
 reveal_type(-Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[Sub]`"
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[Sub]`"
 reveal_type(~Sub)  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[No]`"
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[No]`"
 reveal_type(+No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[No]`"
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[No]`"
 reveal_type(-No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[No]`"
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[No]`"
 reveal_type(~No)  # revealed: Unknown
 ```
 
@@ -160,10 +160,10 @@ reveal_type(+Sub)  # revealed: bool
 reveal_type(-Sub)  # revealed: str
 reveal_type(~Sub)  # revealed: int
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[No]`"
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[No]`"
 reveal_type(+No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[No]`"
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[No]`"
 reveal_type(-No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[No]`"
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[No]`"
 reveal_type(~No)  # revealed: Unknown
 ```

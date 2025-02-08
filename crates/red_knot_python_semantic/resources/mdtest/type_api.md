@@ -91,7 +91,7 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
 ```py
 class C(Unknown): ...
 
-# revealed: tuple[Literal[C], Unknown, Literal[object]]
+# revealed: tuple[type[C], Unknown, type[object]]
 reveal_type(C.__mro__)
 
 # error: "Special form `knot_extensions.Unknown` expected no type parameter"

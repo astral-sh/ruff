@@ -87,7 +87,7 @@ class A(tuple[int, str]): ...
 
 # Runtime value: `(A, tuple, object)`
 # TODO: Generics
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Unknown, Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[type[A], Unknown, type[object]]
 ```
 
 ## `typing.Tuple`
@@ -119,5 +119,5 @@ class C(Tuple): ...
 
 # Runtime value: `(C, tuple, typing.Generic, object)`
 # TODO: Add `Generic` to the MRO
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[tuple], Unknown, Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[type[C], type[tuple], Unknown, type[object]]
 ```

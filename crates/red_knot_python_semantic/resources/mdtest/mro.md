@@ -16,13 +16,13 @@ For documentation on method resolution orders, see:
 ```py
 class C: ...
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[type[C], type[object]]
 ```
 
 ## The special case: `object` itself
 
 ```py
-reveal_type(object.__mro__)  # revealed: tuple[Literal[object]]
+reveal_type(object.__mro__)  # revealed: tuple[type[object]]
 ```
 
 ## Explicit inheritance from `object`
@@ -30,7 +30,7 @@ reveal_type(object.__mro__)  # revealed: tuple[Literal[object]]
 ```py
 class C(object): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[type[C], type[object]]
 ```
 
 ## Explicit inheritance from non-`object` single base
@@ -39,7 +39,7 @@ reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[object]]
 class A: ...
 class B(A): ...
 
-reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[A], Literal[object]]
+reveal_type(B.__mro__)  # revealed: tuple[type[B], type[A], type[object]]
 ```
 
 ## Linearization of multiple bases
@@ -49,7 +49,7 @@ class A: ...
 class B: ...
 class C(A, B): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[A], Literal[B], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[type[C], type[A], type[B], type[object]]
 ```
 
 ## Complex diamond inheritance (1)
@@ -63,8 +63,8 @@ class Y(O): ...
 class A(X, Y): ...
 class B(Y, X): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
-reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[type[A], type[X], type[Y], type[O], type[object]]
+reveal_type(B.__mro__)  # revealed: tuple[type[B], type[Y], type[X], type[O], type[object]]
 ```
 
 ## Complex diamond inheritance (2)
@@ -80,11 +80,11 @@ class C(D, F): ...
 class B(D, E): ...
 class A(B, C): ...
 
-# revealed: tuple[Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
+# revealed: tuple[type[C], type[D], type[F], type[O], type[object]]
 reveal_type(C.__mro__)
-# revealed: tuple[Literal[B], Literal[D], Literal[E], Literal[O], Literal[object]]
+# revealed: tuple[type[B], type[D], type[E], type[O], type[object]]
 reveal_type(B.__mro__)
-# revealed: tuple[Literal[A], Literal[B], Literal[C], Literal[D], Literal[E], Literal[F], Literal[O], Literal[object]]
+# revealed: tuple[type[A], type[B], type[C], type[D], type[E], type[F], type[O], type[object]]
 reveal_type(A.__mro__)
 ```
 
@@ -101,11 +101,11 @@ class C(D, F): ...
 class B(E, D): ...
 class A(B, C): ...
 
-# revealed: tuple[Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
+# revealed: tuple[type[C], type[D], type[F], type[O], type[object]]
 reveal_type(C.__mro__)
-# revealed: tuple[Literal[B], Literal[E], Literal[D], Literal[O], Literal[object]]
+# revealed: tuple[type[B], type[E], type[D], type[O], type[object]]
 reveal_type(B.__mro__)
-# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
+# revealed: tuple[type[A], type[B], type[E], type[C], type[D], type[F], type[O], type[object]]
 reveal_type(A.__mro__)
 ```
 
@@ -125,13 +125,13 @@ class K2(D, B, E): ...
 class K3(D, A): ...
 class Z(K1, K2, K3): ...
 
-# revealed: tuple[Literal[K1], Literal[A], Literal[B], Literal[C], Literal[O], Literal[object]]
+# revealed: tuple[type[K1], type[A], type[B], type[C], type[O], type[object]]
 reveal_type(K1.__mro__)
-# revealed: tuple[Literal[K2], Literal[D], Literal[B], Literal[E], Literal[O], Literal[object]]
+# revealed: tuple[type[K2], type[D], type[B], type[E], type[O], type[object]]
 reveal_type(K2.__mro__)
-# revealed: tuple[Literal[K3], Literal[D], Literal[A], Literal[O], Literal[object]]
+# revealed: tuple[type[K3], type[D], type[A], type[O], type[object]]
 reveal_type(K3.__mro__)
-# revealed: tuple[Literal[Z], Literal[K1], Literal[K2], Literal[K3], Literal[D], Literal[A], Literal[B], Literal[C], Literal[E], Literal[O], Literal[object]]
+# revealed: tuple[type[Z], type[K1], type[K2], type[K3], type[D], type[A], type[B], type[C], type[E], type[O], type[object]]
 reveal_type(Z.__mro__)
 ```
 
@@ -147,10 +147,10 @@ class D(A, B, C): ...
 class E(B, C): ...
 class F(E, A): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Unknown, Literal[object]]
-reveal_type(D.__mro__)  # revealed: tuple[Literal[D], Literal[A], Unknown, Literal[B], Literal[C], Literal[object]]
-reveal_type(E.__mro__)  # revealed: tuple[Literal[E], Literal[B], Literal[C], Literal[object]]
-reveal_type(F.__mro__)  # revealed: tuple[Literal[F], Literal[E], Literal[B], Literal[C], Literal[A], Unknown, Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[type[A], Unknown, type[object]]
+reveal_type(D.__mro__)  # revealed: tuple[type[D], type[A], Unknown, type[B], type[C], type[object]]
+reveal_type(E.__mro__)  # revealed: tuple[type[E], type[B], type[C], type[object]]
+reveal_type(F.__mro__)  # revealed: tuple[type[F], type[E], type[B], type[C], type[A], Unknown, type[object]]
 ```
 
 ## `__bases__` lists that cause errors at runtime
@@ -162,11 +162,11 @@ creation to fail, we infer the class's `__mro__` as being `[<class>, Unknown, ob
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[<class 'object'>, <class 'int'>]`"
 class Foo(object, int): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 
 class Bar(Foo): ...
 
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[type[Bar], type[Foo], Unknown, type[object]]
 
 # This is the `TypeError` at the bottom of "ex_2"
 # in the examples at <https://docs.python.org/3/howto/mro.html#the-end>
@@ -176,17 +176,17 @@ class Y(O): ...
 class A(X, Y): ...
 class B(Y, X): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
-reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[type[A], type[X], type[Y], type[O], type[object]]
+reveal_type(B.__mro__)  # revealed: tuple[type[B], type[Y], type[X], type[O], type[object]]
 
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Z` with bases list `[<class 'A'>, <class 'B'>]`"
 class Z(A, B): ...
 
-reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
+reveal_type(Z.__mro__)  # revealed: tuple[type[Z], Unknown, type[object]]
 
 class AA(Z): ...
 
-reveal_type(AA.__mro__)  # revealed: tuple[Literal[AA], Literal[Z], Unknown, Literal[object]]
+reveal_type(AA.__mro__)  # revealed: tuple[type[AA], type[Z], Unknown, type[object]]
 ```
 
 ## `__bases__` includes a `Union`
@@ -207,12 +207,12 @@ if returns_bool():
 else:
     x = B
 
-reveal_type(x)  # revealed: Literal[A, B]
+reveal_type(x)  # revealed: types.UnionType[A, B]
 
-# error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [invalid-base] "Invalid class base with type `types.UnionType[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 ```
 
 ## `__bases__` includes multiple `Union`s
@@ -236,14 +236,14 @@ if returns_bool():
 else:
     y = D
 
-reveal_type(x)  # revealed: Literal[A, B]
-reveal_type(y)  # revealed: Literal[C, D]
+reveal_type(x)  # revealed: types.UnionType[A, B]
+reveal_type(y)  # revealed: types.UnionType[C, D]
 
-# error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
-# error: 14 [invalid-base] "Invalid class base with type `Literal[C, D]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [invalid-base] "Invalid class base with type `types.UnionType[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 14 [invalid-base] "Invalid class base with type `types.UnionType[C, D]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x, y): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 ```
 
 ## `__bases__` lists that cause errors... now with `Union`s
@@ -261,14 +261,14 @@ if returns_bool():
 else:
     foo = object
 
-# error: 21 [invalid-base] "Invalid class base with type `Literal[Y, object]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 21 [invalid-base] "Invalid class base with type `types.UnionType[Y, object]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class PossibleError(foo, X): ...
 
-reveal_type(PossibleError.__mro__)  # revealed: tuple[Literal[PossibleError], Unknown, Literal[object]]
+reveal_type(PossibleError.__mro__)  # revealed: tuple[type[PossibleError], Unknown, type[object]]
 
 class A(X, Y): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[type[A], type[X], type[Y], type[O], type[object]]
 
 if returns_bool():
     class B(X, Y): ...
@@ -276,13 +276,13 @@ if returns_bool():
 else:
     class B(Y, X): ...
 
-# revealed: tuple[Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
+# revealed: tuple[type[B], type[X], type[Y], type[O], type[object]] | tuple[type[B], type[Y], type[X], type[O], type[object]]
 reveal_type(B.__mro__)
 
-# error: 12 [invalid-base] "Invalid class base with type `Literal[B, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 12 [invalid-base] "Invalid class base with type `types.UnionType[B, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Z(A, B): ...
 
-reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
+reveal_type(Z.__mro__)  # revealed: tuple[type[Z], Unknown, type[object]]
 ```
 
 ## `__bases__` lists with duplicate bases
@@ -290,7 +290,7 @@ reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
 ```py
 class Foo(str, str): ...  # error: 16 [duplicate-base] "Duplicate base class `str`"
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 
 class Spam: ...
 class Eggs: ...
@@ -301,12 +301,12 @@ class Ham(
     Eggs,  # error: [duplicate-base] "Duplicate base class `Eggs`"
 ): ...
 
-reveal_type(Ham.__mro__)  # revealed: tuple[Literal[Ham], Unknown, Literal[object]]
+reveal_type(Ham.__mro__)  # revealed: tuple[type[Ham], Unknown, type[object]]
 
 class Mushrooms: ...
 class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 
-reveal_type(Omelette.__mro__)  # revealed: tuple[Literal[Omelette], Unknown, Literal[object]]
+reveal_type(Omelette.__mro__)  # revealed: tuple[type[Omelette], Unknown, type[object]]
 ```
 
 ## `__bases__` lists with duplicate `Unknown` bases
@@ -331,7 +331,7 @@ reveal_type(unknown_object_2)  # revealed: Unknown
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[Unknown, Unknown]`"
 class Foo(unknown_object_1, unknown_object_2): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 ```
 
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
@@ -350,15 +350,15 @@ These are invalid, but we need to be able to handle them gracefully without pani
 ```pyi
 class Foo(Foo): ...  # error: [cyclic-class-definition]
 
-reveal_type(Foo)  # revealed: Literal[Foo]
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo)  # revealed: type[Foo]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
 
 class Bar: ...
 class Baz: ...
 class Boz(Bar, Baz, Boz): ...  # error: [cyclic-class-definition]
 
-reveal_type(Boz)  # revealed: Literal[Boz]
-reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[object]]
+reveal_type(Boz)  # revealed: type[Boz]
+reveal_type(Boz.__mro__)  # revealed: tuple[type[Boz], Unknown, type[object]]
 ```
 
 ## Classes with indirect cycles in their MROs
@@ -370,9 +370,9 @@ class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
 class Baz(Foo): ...  # error: [cyclic-class-definition]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
-reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[type[Bar], Unknown, type[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[type[Baz], Unknown, type[object]]
 ```
 
 ## Classes with cycles in their MROs, and multiple inheritance
@@ -383,9 +383,9 @@ class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
 class Baz(Foo, Spam): ...  # error: [cyclic-class-definition]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
-reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[type[Foo], Unknown, type[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[type[Bar], Unknown, type[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[type[Baz], Unknown, type[object]]
 ```
 
 ## Classes with cycles in their MRO, and a sub-graph
@@ -401,8 +401,8 @@ class Bar(Foo): ...
 class Baz(Bar, BarCycle): ...
 class Spam(Baz): ...
 
-reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Unknown, Literal[object]]
-reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Unknown, Literal[object]]
-reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
-reveal_type(Spam.__mro__)  # revealed: tuple[Literal[Spam], Unknown, Literal[object]]
+reveal_type(FooCycle.__mro__)  # revealed: tuple[type[FooCycle], Unknown, type[object]]
+reveal_type(BarCycle.__mro__)  # revealed: tuple[type[BarCycle], Unknown, type[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[type[Baz], Unknown, type[object]]
+reveal_type(Spam.__mro__)  # revealed: tuple[type[Spam], Unknown, type[object]]
 ```

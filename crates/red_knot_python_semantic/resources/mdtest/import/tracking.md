@@ -27,7 +27,7 @@ has been imported.
 import a
 
 # Would be an error with flow-sensitive tracking
-reveal_type(a.b.C)  # revealed: Literal[C]
+reveal_type(a.b.C)  # revealed: type[C]
 
 import a.b
 ```
@@ -53,10 +53,10 @@ submodule `b`, even though `a.b` is never imported in the main module.
 from q import a, b
 
 reveal_type(b)  # revealed: <module 'a.b'>
-reveal_type(b.C)  # revealed: Literal[C]
+reveal_type(b.C)  # revealed: type[C]
 
 reveal_type(a.b)  # revealed: <module 'a.b'>
-reveal_type(a.b.C)  # revealed: Literal[C]
+reveal_type(a.b.C)  # revealed: type[C]
 ```
 
 `a/__init__.py`:

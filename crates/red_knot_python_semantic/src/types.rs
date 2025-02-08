@@ -4140,8 +4140,18 @@ impl<'db> Class<'db> {
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
+        let body_scope = self.body_scope(db);
+        let table = symbol_table(db, body_scope);
+
+        if let Some(sym) = table.symbol_by_name(name) {
+            if !sym.is_bound() {
+                return Symbol::Unbound;
+            }
+
+            symbol(db, body_scope, name)
+        } else {
+            Symbol::Unbound
+        }
     }
 
     /// Returns the `name` attribute of an instance of this class.

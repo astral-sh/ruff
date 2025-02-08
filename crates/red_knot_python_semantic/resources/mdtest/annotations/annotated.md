@@ -77,8 +77,8 @@ from typing_extensions import Annotated
 # error: [invalid-base]
 class C(Annotated[int, "foo"]): ...
 
-# TODO: Should be `tuple[Literal[C], Literal[int], Literal[object]]`
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Unknown, Literal[object]]
+# TODO: Should be `tuple[type[C], type[int], type[object]]`
+reveal_type(C.__mro__)  # revealed: tuple[type[C], Unknown, type[object]]
 ```
 
 ### Not parameterized
@@ -90,5 +90,5 @@ from typing_extensions import Annotated
 # error: [invalid-base]
 class C(Annotated): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Unknown, Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[type[C], Unknown, type[object]]
 ```

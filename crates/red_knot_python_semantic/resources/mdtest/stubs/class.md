@@ -12,6 +12,6 @@ class Foo[T]: ...
 # error: [non-subscriptable]
 class Bar(Foo[Bar]): ...
 
-reveal_type(Bar)  # revealed: Literal[Bar]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
+reveal_type(Bar)  # revealed: type[Bar]
+reveal_type(Bar.__mro__)  # revealed: tuple[type[Bar], Unknown, type[object]]
 ```

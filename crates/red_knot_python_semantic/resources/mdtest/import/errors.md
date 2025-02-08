@@ -69,12 +69,12 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 ```py
 class A: ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[type[A], type[object]]
 import b
 
 class C(b.B): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Literal[A], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[type[C], type[B], type[A], type[object]]
 ```
 
 `b.py`:
@@ -84,5 +84,5 @@ from a import A
 
 class B(A): ...
 
-reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[A], Literal[object]]
+reveal_type(B.__mro__)  # revealed: tuple[type[B], type[A], type[object]]
 ```

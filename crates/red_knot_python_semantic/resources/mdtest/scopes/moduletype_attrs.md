@@ -59,7 +59,7 @@ reveal_type(typing.__init__)  # revealed: @Todo(bound method)
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: @Todo(bound method)
 
-reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
+reveal_type(typing.__class__)  # revealed: type[ModuleType]
 
 # TODO: needs support for attribute access on instances, properties and generics;
 # should be `dict[str, Any]`

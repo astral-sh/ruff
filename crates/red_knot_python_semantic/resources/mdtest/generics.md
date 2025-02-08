@@ -57,7 +57,7 @@ class Seq[T]: ...
 # TODO not error on the subscripting
 class S[T](Seq[S]): ...  # error: [non-subscriptable]
 
-reveal_type(S)  # revealed: Literal[S]
+reveal_type(S)  # revealed: type[S]
 ```
 
 ## Type params

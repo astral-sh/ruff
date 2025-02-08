@@ -60,7 +60,7 @@ from typing import Any
 
 class Subclass(Any): ...
 
-reveal_type(Subclass.__mro__)  # revealed: tuple[Literal[Subclass], Any, Literal[object]]
+reveal_type(Subclass.__mro__)  # revealed: tuple[type[Subclass], Any, type[object]]
 
 x: Subclass = 1  # error: [invalid-assignment]
 # TODO: no diagnostic

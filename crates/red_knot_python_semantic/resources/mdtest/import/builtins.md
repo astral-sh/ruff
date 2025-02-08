@@ -16,7 +16,7 @@ Or used implicitly:
 
 ```py
 reveal_type(chr)  # revealed: Literal[chr]
-reveal_type(str)  # revealed: Literal[str]
+reveal_type(str)  # revealed: type[str]
 ```
 
 ## Builtin symbol from custom typeshed

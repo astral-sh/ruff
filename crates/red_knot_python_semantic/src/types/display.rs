@@ -32,18 +32,18 @@ pub struct DisplayType<'db> {
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
-        if matches!(
-            self.ty,
+        match self.ty {
             Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-        ) {
-            write!(f, "Literal[{representation}]")
-        } else {
-            representation.fmt(f)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::FunctionLiteral(_) => {
+                write!(f, "Literal[{representation}]")
+            }
+            Type::ClassLiteral(_) => {
+                write!(f, "type[{representation}]")
+            }
+            _ => representation.fmt(f),
         }
     }
 }
@@ -173,6 +173,7 @@ impl Display for DisplayUnionType<'_> {
                     continue;
                 };
                 join.entry(&DisplayLiteralGroup {
+                    group_kind: kind,
                     literals: condensed_kind,
                     db: self.db,
                 });
@@ -196,13 +197,26 @@ impl fmt::Debug for DisplayUnionType<'_> {
 }
 
 struct DisplayLiteralGroup<'db> {
+    group_kind: CondensedDisplayTypeKind,
     literals: Vec<Type<'db>>,
     db: &'db dyn Db,
 }
 
 impl Display for DisplayLiteralGroup<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("Literal[")?;
+        match self.group_kind {
+            CondensedDisplayTypeKind::Class => {
+                if self.literals.len() > 1 {
+                    f.write_str("types.UnionType[")?;
+                } else {
+                    f.write_str("type[")?;
+                }
+            }
+            CondensedDisplayTypeKind::Function | CondensedDisplayTypeKind::LiteralExpression => {
+                f.write_str("Literal[")?;
+            }
+        };
+
         f.join(", ")
             .entries(self.literals.iter().map(|ty| ty.representation(self.db)))
             .finish()?;

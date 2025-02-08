@@ -429,7 +429,7 @@ def _(
     reveal_type(i07)  # revealed: Never
     reveal_type(i08)  # revealed: Never
 
-# `bool` is final and can not be subclassed, so `type[bool]` is equivalent to `Literal[bool]`, which
+# `bool` is final and can not be subclassed, so `type[bool]` is equivalent to `type[bool]`, which
 # is disjoint from `type[str]`:
 def example_type_bool_type_str(
     i: Intersection[type[bool], type[str]],

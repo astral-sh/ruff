@@ -3,19 +3,19 @@
 ```py
 class M(type): ...
 
-reveal_type(M.__class__)  # revealed: Literal[type]
+reveal_type(M.__class__)  # revealed: type[type]
 ```
 
 ## `object`
 
 ```py
-reveal_type(object.__class__)  # revealed: Literal[type]
+reveal_type(object.__class__)  # revealed: type[type]
 ```
 
 ## `type`
 
 ```py
-reveal_type(type.__class__)  # revealed: Literal[type]
+reveal_type(type.__class__)  # revealed: type[type]
 ```
 
 ## Basic
@@ -24,7 +24,7 @@ reveal_type(type.__class__)  # revealed: Literal[type]
 class M(type): ...
 class B(metaclass=M): ...
 
-reveal_type(B.__class__)  # revealed: Literal[M]
+reveal_type(B.__class__)  # revealed: type[M]
 ```
 
 ## Invalid metaclass
@@ -37,7 +37,7 @@ class M: ...
 class A(metaclass=M): ...
 
 # TODO: emit a diagnostic for the invalid metaclass
-reveal_type(A.__class__)  # revealed: Literal[M]
+reveal_type(A.__class__)  # revealed: type[M]
 ```
 
 ## Linear inheritance
@@ -50,7 +50,7 @@ class M(type): ...
 class A(metaclass=M): ...
 class B(A): ...
 
-reveal_type(B.__class__)  # revealed: Literal[M]
+reveal_type(B.__class__)  # revealed: type[M]
 ```
 
 ## Conflict (1)
@@ -98,7 +98,7 @@ class A(metaclass=M): ...
 class B(metaclass=M): ...
 class C(A, B): ...
 
-reveal_type(C.__class__)  # revealed: Literal[M]
+reveal_type(C.__class__)  # revealed: type[M]
 ```
 
 ## Metaclass metaclass
@@ -112,7 +112,7 @@ class M3(M2): ...
 class A(metaclass=M3): ...
 class B(A): ...
 
-reveal_type(A.__class__)  # revealed: Literal[M3]
+reveal_type(A.__class__)  # revealed: type[M3]
 ```
 
 ## Diamond inheritance
@@ -140,14 +140,14 @@ from nonexistent_module import UnknownClass  # error: [unresolved-import]
 class C(UnknownClass): ...
 
 # TODO: should be `type[type] & Unknown`
-reveal_type(C.__class__)  # revealed: Literal[type]
+reveal_type(C.__class__)  # revealed: type[type]
 
 class M(type): ...
 class A(metaclass=M): ...
 class B(A, UnknownClass): ...
 
 # TODO: should be `type[M] & Unknown`
-reveal_type(B.__class__)  # revealed: Literal[M]
+reveal_type(B.__class__)  # revealed: type[M]
 ```
 
 ## Duplicate
@@ -157,7 +157,7 @@ class M(type): ...
 class A(metaclass=M): ...
 class B(A, A): ...  # error: [duplicate-base] "Duplicate base class `A`"
 
-reveal_type(B.__class__)  # revealed: Literal[M]
+reveal_type(B.__class__)  # revealed: type[M]
 ```
 
 ## Non-class
@@ -171,14 +171,14 @@ def f(*args, **kwargs) -> int: ...
 class A(metaclass=f): ...
 
 # TODO: Should be `int`
-reveal_type(A)  # revealed: Literal[A]
+reveal_type(A)  # revealed: type[A]
 reveal_type(A.__class__)  # revealed: type[int]
 
 def _(n: int):
     # error: [invalid-metaclass]
     class B(metaclass=n): ...
     # TODO: Should be `Unknown`
-    reveal_type(B)  # revealed: Literal[B]
+    reveal_type(B)  # revealed: type[B]
     reveal_type(B.__class__)  # revealed: type[Unknown]
 
 def _(flag: bool):
@@ -187,7 +187,7 @@ def _(flag: bool):
     # error: [invalid-metaclass]
     class C(metaclass=m): ...
     # TODO: Should be `int | Unknown`
-    reveal_type(C)  # revealed: Literal[C]
+    reveal_type(C)  # revealed: type[C]
     reveal_type(C.__class__)  # revealed: type[Unknown]
 
 class SignatureMismatch: ...
@@ -196,9 +196,9 @@ class SignatureMismatch: ...
 class D(metaclass=SignatureMismatch): ...
 
 # TODO: Should be `Unknown`
-reveal_type(D)  # revealed: Literal[D]
+reveal_type(D)  # revealed: type[D]
 # TODO: Should be `type[Unknown]`
-reveal_type(D.__class__)  # revealed: Literal[SignatureMismatch]
+reveal_type(D.__class__)  # revealed: type[SignatureMismatch]
 ```
 
 ## Cyclic
@@ -219,7 +219,7 @@ reveal_type(A.__class__)  # revealed: type[Unknown]
 class M(type): ...
 class A[T: str](metaclass=M): ...
 
-reveal_type(A.__class__)  # revealed: Literal[M]
+reveal_type(A.__class__)  # revealed: type[M]
 ```
 
 ## Metaclasses of metaclasses
@@ -230,9 +230,9 @@ class Bar(type, metaclass=Foo): ...
 class Baz(type, metaclass=Bar): ...
 class Spam(metaclass=Baz): ...
 
-reveal_type(Spam.__class__)  # revealed: Literal[Baz]
-reveal_type(Spam.__class__.__class__)  # revealed: Literal[Bar]
-reveal_type(Spam.__class__.__class__.__class__)  # revealed: Literal[Foo]
+reveal_type(Spam.__class__)  # revealed: type[Baz]
+reveal_type(Spam.__class__.__class__)  # revealed: type[Bar]
+reveal_type(Spam.__class__.__class__.__class__)  # revealed: type[Foo]
 
 def test(x: Spam):
     reveal_type(x.__class__)  # revealed: type[Spam]

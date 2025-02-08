@@ -5,7 +5,7 @@
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable[0]  # error: "Cannot subscript object of type `Literal[NotSubscriptable]` with no `__class_getitem__` method"
+a = NotSubscriptable[0]  # error: "Cannot subscript object of type `type[NotSubscriptable]` with no `__class_getitem__` method"
 ```
 
 ## Class getitem
@@ -47,7 +47,7 @@ def _(flag: bool):
 
     x = A if flag else B
 
-    reveal_type(x)  # revealed: Literal[A, B]
+    reveal_type(x)  # revealed: types.UnionType[A, B]
     reveal_type(x[0])  # revealed: str | int
 ```
 
@@ -62,7 +62,7 @@ def _(flag: bool):
 
     else:
         class Spam: ...
-    # error: [call-possibly-unbound-method] "Method `__class_getitem__` of type `Literal[Spam, Spam]` is possibly unbound"
+    # error: [call-possibly-unbound-method] "Method `__class_getitem__` of type `types.UnionType[Spam, Spam]` is possibly unbound"
     # revealed: str
     reveal_type(Spam[42])
 ```
@@ -79,7 +79,7 @@ def _(flag: bool):
     else:
         Eggs = 1
 
-    a = Eggs[42]  # error: "Cannot subscript object of type `Literal[Eggs] | Literal[1]` with no `__getitem__` method"
+    a = Eggs[42]  # error: "Cannot subscript object of type `type[Eggs] | Literal[1]` with no `__getitem__` method"
 
     # TODO: should _probably_ emit `str | Unknown`
     reveal_type(a)  # revealed: Unknown
