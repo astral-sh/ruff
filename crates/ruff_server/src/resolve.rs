@@ -59,6 +59,7 @@ fn is_document_excluded(
 ) -> bool {
     if let Some(exclusion) = match_any_exclusion(
         path,
+        &resolver_settings.project_root,
         &resolver_settings.exclude,
         &resolver_settings.extend_exclude,
         linter_settings.map(|s| &*s.exclude),

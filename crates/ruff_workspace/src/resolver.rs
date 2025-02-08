@@ -778,6 +778,7 @@ impl std::fmt::Display for ExclusionKind {
 /// any of the exclusion criteria.
 pub fn match_any_exclusion(
     path: &Path,
+    project_root: &Path,
     exclude: &GlobSet,
     extend_exclude: &GlobSet,
     lint_exclude: Option<&GlobSet>,
@@ -803,6 +804,11 @@ pub fn match_any_exclusion(
                     return Some(ExclusionKind::FormatExclude);
                 }
             }
+        }
+        if path == project_root {
+            // Bail out; we'd end up past the project root on the next iteration
+            // (excludes etc. are thus "rooted" to the project).
+            break;
         }
     }
     None
