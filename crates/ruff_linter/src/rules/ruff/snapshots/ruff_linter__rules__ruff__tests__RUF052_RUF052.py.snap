@@ -365,3 +365,39 @@ RUF052.py:160:5: RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
 163 163 | 
 164 164 | # Do not emit diagnostic if parameter is private
 165 165 | # even if it is later shadowed in the body of the function
+
+RUF052.py:182:5: RUF052 [*] Local dummy variable `_dummy_var` is accessed
+    |
+181 | def foo():
+182 |     _dummy_var = 42
+    |     ^^^^^^^^^^ RUF052
+183 |
+184 |     def bar():
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+ℹ Unsafe fix
+179 179 | 
+180 180 | 
+181 181 | def foo():
+182     |-    _dummy_var = 42
+    182 |+    dummy_var_ = 42
+183 183 | 
+184 184 |     def bar():
+185 185 |         dummy_var = 43
+186     |-        print(_dummy_var)
+    186 |+        print(dummy_var_)
+187 187 | 
+188 188 | 
+189 189 | def foo():
+
+RUF052.py:192:5: RUF052 Local dummy variable `_dummy_var` is accessed
+    |
+190 |     # Unfixable because both possible candidates for the new name are shadowed
+191 |     # in the scope of one of the references to the variable
+192 |     _dummy_var = 42
+    |     ^^^^^^^^^^ RUF052
+193 |
+194 |     def bar():
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable

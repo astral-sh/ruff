@@ -1,7 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_text_size::Ranged;
 
 use crate::{
     checkers::ast::Checker,
@@ -93,7 +95,7 @@ impl Violation for PrivateTypeParameter {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove the leading underscores".to_string())
+        Some("Rename type parameter to remove leading underscores".to_string())
     }
 }
 
@@ -129,20 +131,35 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
     // a suggested fix
-    if ShadowedKind::new(new_name, checker, binding.scope).shadows_any() {
+    if ShadowedKind::new(binding, new_name, checker).shadows_any() {
         return Some(diagnostic);
     }
+
+    if !is_identifier(new_name) {
+        return Some(diagnostic);
+    }
+
+    let source = checker.source();
 
     diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
             old_name,
             new_name,
             &semantic.scopes[binding.scope],
-            checker.semantic(),
+            semantic,
             checker.stylist(),
         )?;
 
-        Ok(Fix::safe_edits(first, rest))
+        let applicability = if binding
+            .references()
+            .any(|id| &source[semantic.reference(id).range()] != old_name)
+        {
+            Applicability::DisplayOnly
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Fix::applicable_edits(first, rest, applicability))
     });
 
     Some(diagnostic)

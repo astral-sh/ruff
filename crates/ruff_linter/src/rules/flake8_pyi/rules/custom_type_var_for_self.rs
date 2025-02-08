@@ -570,7 +570,7 @@ fn replace_typevar_usages_with_self<'a>(
         let reference_range = reference.range();
         if &source[reference_range] != tvar_name {
             bail!(
-                "Cannot autofix: feference in the source code (`{}`) is not equal to the typevar name (`{}`)",
+                "Cannot autofix: reference in the source code (`{}`) is not equal to the typevar name (`{}`)",
                 &source[reference_range],
                 tvar_name
             );
