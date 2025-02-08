@@ -212,3 +212,4 @@ TC006.py:89:9: TC006 [*] Add quotes to type expression in `typing.cast()`
    89 |+        "int"  # TC006
 90 90 |         , 6.0
 91 91 |     )
+92 92 |
