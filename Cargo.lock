@@ -3123,8 +3123,6 @@ name = "ruff_python_syntax_errors"
 version = "0.9.5"
 dependencies = [
  "insta",
- "ruff_diagnostics",
- "ruff_macros",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",

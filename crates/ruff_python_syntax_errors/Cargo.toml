@@ -13,8 +13,6 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_diagnostics = { workspace = true }
-ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
