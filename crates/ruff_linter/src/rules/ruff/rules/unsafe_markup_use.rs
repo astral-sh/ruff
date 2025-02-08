@@ -66,10 +66,10 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// - `lint.flake8-bandit.allowed-markup-calls`
 ///
 /// ## References
-/// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
-/// - [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
+/// - [MarkupSafe on PyPI](https://pypi.org/project/MarkupSafe/)
+/// - [`markupsafe.Markup` API documentation](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
 ///
-/// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+/// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
 pub(crate) struct RuffUnsafeMarkupUse {
