@@ -89,3 +89,10 @@ def f():
         int  # TC006
         , 6.0
     )
+
+
+# Ok with f-strings
+def f():
+    from typing import cast
+    a = "int"
+    cast(f"{a}","11")
