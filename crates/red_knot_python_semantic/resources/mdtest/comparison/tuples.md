@@ -58,7 +58,22 @@ reveal_type(c >= d)  # revealed: Literal[True]
 #### Results with Ambiguity
 
 ```py
-def _(x: bool, y: int):
+class P:
+    def __lt__(self, other: "P") -> bool:
+        return True
+
+    def __le__(self, other: "P") -> bool:
+        return True
+
+    def __gt__(self, other: "P") -> bool:
+        return True
+
+    def __ge__(self, other: "P") -> bool:
+        return True
+
+class Q(P): ...
+
+def _(x: P, y: Q):
     a = (x,)
     b = (y,)
 
