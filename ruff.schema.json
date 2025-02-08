@@ -1024,6 +1024,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "builtins-strict-checking": {
+          "description": "Compare module names instead of full module paths.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

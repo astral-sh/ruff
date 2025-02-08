@@ -93,6 +93,11 @@ pub(crate) fn stdlib_module_shadowing(
         return None;
     }
 
+    // not allowed generally, but check for a parent in non-strict mode
+    if !settings.flake8_builtins.builtins_strict_checking && components.next().is_some() {
+        return None;
+    }
+
     Some(Diagnostic::new(
         StdlibModuleShadowing {
             name: module_name.to_string(),
