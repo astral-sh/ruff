@@ -30,6 +30,7 @@ countme = { workspace = true }
 drop_bomb = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
+metrics = { workspace = true }
 ordermap = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }

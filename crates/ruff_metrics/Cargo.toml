@@ -1,0 +1,19 @@
+[package]
+name = "ruff_metrics"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+metrics = { workspace = true }
+metrics-util = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

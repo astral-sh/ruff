@@ -22,6 +22,7 @@ ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
+ruff_metrics = { path = "crates/ruff_metrics" }
 ruff_notebook = { path = "crates/ruff_notebook" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
@@ -105,6 +106,8 @@ lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f
 ] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
+metrics = { version = "0.24.1" }
+metrics-util = { version = "0.19.0" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }

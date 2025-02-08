@@ -63,6 +63,13 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) verbosity: Verbosity,
 
+    /// Whether to output metrics about type-checking performance. If you provide a path, metrics
+    /// will be written to that file. If you provide this option but don't provide a path, metrics
+    /// will be written to a file called `metrics.json` in the current directory. We will _append_
+    /// metrics to the file if it already exists.
+    #[arg(long, value_name = "PATH", default_missing_value="metrics.json", num_args=0..=1)]
+    pub(crate) metrics: Option<SystemPathBuf>,
+
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
