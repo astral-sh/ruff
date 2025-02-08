@@ -12,7 +12,7 @@ use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform, PythonVersion};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, OsUserDirectoryOverride, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
 
 struct TestCase {
@@ -315,7 +315,9 @@ where
         .context("Failed to write configuration")?;
     }
 
-    let project = ProjectMetadata::discover(&project_path, &system)?;
+    let mut project = ProjectMetadata::discover(&project_path, &system)?;
+    project.apply_configuration_files(&system)?;
+
     let program_settings = project.to_program_settings(&system);
 
     for path in program_settings
@@ -1484,6 +1486,76 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
 
     // It should now pick up the outer project.
     assert_eq!(case.db().project().root(case.db()), case.root_path());
+
+    Ok(())
+}
+
+#[test]
+fn changes_to_user_configuration() -> anyhow::Result<()> {
+    let mut _config_dir_override: Option<OsUserDirectoryOverride> = None;
+
+    let mut case = setup(|root: &SystemPath, project_root: &SystemPath| {
+        std::fs::write(
+            project_root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "test"
+            "#,
+        )?;
+
+        std::fs::write(project_root.join("foo.py").as_std_path(), "a = 10 / 0")?;
+
+        std::fs::create_dir_all(root.join("home/.config/knot").as_std_path())?;
+        std::fs::write(
+            root.join("home/.config/knot/knot.toml").as_std_path(),
+            r#"
+            [rules]
+            division-by-zero = "ignore"
+            "#,
+        )?;
+
+        _config_dir_override = Some(OsUserDirectoryOverride::scoped(Some(
+            root.join("home/.config"),
+        )));
+
+        Ok(())
+    })?;
+
+    let foo = case
+        .system_file(case.project_path("foo.py"))
+        .expect("foo.py to exist");
+    let diagnostics = case
+        .db()
+        .check_file(foo)
+        .context("Failed to check project.")?;
+
+    assert!(
+        diagnostics.is_empty(),
+        "Expected no diagnostics but got: {diagnostics:#?}"
+    );
+
+    // Enable division-by-zero in the user configuration with warning severity
+    update_file(
+        case.root_path().join("home/.config/knot/knot.toml"),
+        r#"
+        [rules]
+        division-by-zero = "warn"
+        "#,
+    )?;
+
+    let changes = case.stop_watch(event_for_file("knot.toml"));
+
+    case.apply_changes(changes);
+
+    let diagnostics = case
+        .db()
+        .check_file(foo)
+        .context("Failed to check project.")?;
+
+    assert!(
+        diagnostics.len() == 1,
+        "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    );
 
     Ok(())
 }
