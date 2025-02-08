@@ -159,7 +159,8 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
             Applicability::Safe
         };
 
-        Ok(Fix::applicable_edits(first, rest, applicability))
+        let fix_isolation = Checker::isolation(binding.source);
+        Ok(Fix::applicable_edits(first, rest, applicability).isolate(fix_isolation))
     });
 
     Some(diagnostic)
