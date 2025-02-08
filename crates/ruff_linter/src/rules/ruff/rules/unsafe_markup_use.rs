@@ -70,9 +70,8 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 ///
 /// ## References
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
-/// - [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
 ///
-/// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+/// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
 pub(crate) struct UnsafeMarkupUse {
@@ -87,9 +86,7 @@ impl Violation for UnsafeMarkupUse {
     }
 }
 
-/// Checks for unsafe calls to `[markupsafe.Markup]`.
-///
-/// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+/// RUF035
 pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
     if checker.settings.ruff.extend_markup_names.is_empty()
         && !(checker.semantic().seen_module(Modules::MARKUPSAFE)

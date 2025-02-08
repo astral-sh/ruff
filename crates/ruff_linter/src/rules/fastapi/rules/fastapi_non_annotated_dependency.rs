@@ -61,8 +61,8 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
-/// [typing.Annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
-/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/stable/
+/// [`typing.Annotated`]: https://docs.python.org/3/library/typing.html#typing.Annotated
+/// [`typing_extensions`]: https://typing-extensions.readthedocs.io/en/stable/
 #[derive(ViolationMetadata)]
 pub(crate) struct FastApiNonAnnotatedDependency {
     py_version: PythonVersion,

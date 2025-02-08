@@ -59,9 +59,9 @@ use crate::{
 /// the transition to [PEP 695] generics.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
-/// [non-pep695-generic-function]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
-/// [non-pep695-generic-class]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
-/// [unused-private-type-var]: https://docs.astral.sh/ruff/rules/unused-private-type-var
+/// [`non-pep695-generic-function`]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
+/// [`non-pep695-generic-class`]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
+/// [`unused-private-type-var`]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
