@@ -2,10 +2,11 @@ use crate::{
     checkers::ast::Checker,
     renamer::{Renamer, ShadowedKind},
 };
+use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
-use ruff_python_semantic::{Binding, ResolvedReferenceId, TypingOnlyBindingsStatus};
+use ruff_python_semantic::Binding;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
@@ -134,33 +135,21 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return Some(diagnostic);
     }
 
-    diagnostic.try_set_optional_fix(|| {
+    if !is_identifier(new_name) {
+        return Some(diagnostic);
+    }
+
+    if binding
+        .references()
+        .map(|reference_id| semantic.reference(reference_id).scope_id())
+        .dedup()
+        .any(|scope| !semantic.is_available_in_scope(new_name, scope))
+    {
+        return Some(diagnostic);
+    }
+
+    diagnostic.try_set_fix(|| {
         let source = checker.source();
-
-        // Copied from PYI019
-        let reference_is_complex = |id: ResolvedReferenceId| -> bool {
-            let reference = semantic.reference(id);
-            let in_source = &source[reference.range()];
-
-            in_source != old_name
-        };
-
-        if !is_identifier(new_name) {
-            return Ok(None);
-        }
-
-        let existing_binding_for_new_name = semantic.simulate_runtime_load_at_location_in_scope(
-            new_name,
-            binding.range,
-            binding.scope,
-            TypingOnlyBindingsStatus::Disallowed,
-        );
-
-        if let Some(binding) = existing_binding_for_new_name.map(|id| semantic.binding(id)) {
-            if binding.kind.is_type_param() {
-                return Ok(None);
-            }
-        }
 
         let (first, rest) = Renamer::rename(
             old_name,
@@ -170,13 +159,16 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
             checker.stylist(),
         )?;
 
-        let applicability = if binding.references().any(reference_is_complex) {
+        let applicability = if binding
+            .references()
+            .any(|id| &source[semantic.reference(id).range()] != old_name)
+        {
             Applicability::DisplayOnly
         } else {
             Applicability::Safe
         };
 
-        Ok(Some(Fix::applicable_edits(first, rest, applicability)))
+        Ok(Fix::applicable_edits(first, rest, applicability))
     });
 
     Some(diagnostic)

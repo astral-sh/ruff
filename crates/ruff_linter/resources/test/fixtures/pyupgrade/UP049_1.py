@@ -90,7 +90,7 @@ class C[T]:
         v2 = cast('_T', ...)
 
 
-# Should have no fix, but currently does
+# Unfixable as the new name collides with a variable visible from one of the inner scopes
 class C[_T]:
     T = 42
 
@@ -98,6 +98,7 @@ class C[_T]:
     v2 = cast('_T', ...)
 
 
+# Unfixable as the new name collides with a variable visible from one of the inner scopes
 class C[_T]:
     def f[T](self):
         v1 = cast(_T, ...)

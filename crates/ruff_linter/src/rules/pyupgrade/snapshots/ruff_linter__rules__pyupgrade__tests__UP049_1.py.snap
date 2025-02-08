@@ -331,48 +331,21 @@ UP049_1.py:88:11: UP049 Generic function uses private type parameters
    |
    = help: Rename type parameter to remove leading underscores
 
-UP049_1.py:94:9: UP049 [*] Generic class uses private type parameters
+UP049_1.py:94:9: UP049 Generic class uses private type parameters
    |
-93 | # Should have no fix, but currently does
+93 | # Unfixable as the new name collides with a variable visible from one of the inner scopes
 94 | class C[_T]:
    |         ^^ UP049
 95 |     T = 42
    |
    = help: Rename type parameter to remove leading underscores
 
-ℹ Safe fix
-91 91 | 
-92 92 | 
-93 93 | # Should have no fix, but currently does
-94    |-class C[_T]:
-   94 |+class C[T]:
-95 95 |     T = 42
-96 96 | 
-97    |-    v1 = cast(_T, ...)
-98    |-    v2 = cast('_T', ...)
-   97 |+    v1 = cast(T, ...)
-   98 |+    v2 = cast('T', ...)
-99 99 | 
-100 100 | 
-101 101 | class C[_T]:
-
-UP049_1.py:101:9: UP049 [*] Generic class uses private type parameters
+UP049_1.py:102:9: UP049 Generic class uses private type parameters
     |
-101 | class C[_T]:
+101 | # Unfixable as the new name collides with a variable visible from one of the inner scopes
+102 | class C[_T]:
     |         ^^ UP049
-102 |     def f[T](self):
-103 |         v1 = cast(_T, ...)
+103 |     def f[T](self):
+104 |         v1 = cast(_T, ...)
     |
     = help: Rename type parameter to remove leading underscores
-
-ℹ Safe fix
-98  98  |     v2 = cast('_T', ...)
-99  99  | 
-100 100 | 
-101     |-class C[_T]:
-    101 |+class C[T]:
-102 102 |     def f[T](self):
-103     |-        v1 = cast(_T, ...)
-104     |-        v2 = cast('_T', ...)
-    103 |+        v1 = cast(T, ...)
-    104 |+        v2 = cast('T', ...)
