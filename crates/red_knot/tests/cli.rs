@@ -1,12 +1,9 @@
-use crate::utils::EnvVarGuard;
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-
-mod utils;
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration.
@@ -743,42 +740,47 @@ fn user_configuration() -> anyhow::Result<()> {
         ),
     ])?;
 
-    let _config_dir_var = EnvVarGuard::mock_user_configuration_directory(
-        case.root().join("home/.config").to_str().unwrap(),
-    );
+    let config_directory = case.root().join("home/.config");
+    let config_env_var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        warning: lint:division-by-zero
-         --> <temp_dir>/project/main.py:2:5
-          |
-        2 | y = 4 / 0
-          |     ----- Cannot divide object of type `Literal[4]` by zero
-        3 |
-        4 | for a in range(0, y):
-          |
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
 
-        warning: lint:possibly-unresolved-reference
-         --> <temp_dir>/project/main.py:7:7
-          |
-        5 |     x = a
-        6 |
-        7 | print(x)
-          |       - Name `x` used when possibly not defined
-          |
+    warning: lint:possibly-unresolved-reference
+     --> <temp_dir>/project/main.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)
+      |       - Name `x` used when possibly not defined
+      |
 
 
-        ----- stderr -----
-        "
+    ----- stderr -----
+    "###
     );
 
     // The user-level configuration promotes `possibly-unresolved-reference` to an error.
     // Changing the level for `division-by-zero` has no effect, because the project-level configuration
     // has higher precedence.
     case.write_file(
-        "home/.config/knot/knot.toml",
+        config_directory.join("knot/knot.toml"),
         r#"
         [rules]
         division-by-zero = "error"
@@ -786,31 +788,33 @@ fn user_configuration() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        warning: lint:division-by-zero
-         --> <temp_dir>/project/main.py:2:5
-          |
-        2 | y = 4 / 0
-          |     ----- Cannot divide object of type `Literal[4]` by zero
-        3 |
-        4 | for a in range(0, y):
-          |
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
 
-        error: lint:possibly-unresolved-reference
-         --> <temp_dir>/project/main.py:7:7
-          |
-        5 |     x = a
-        6 |
-        7 | print(x)
-          |       ^ Name `x` used when possibly not defined
-          |
+    error: lint:possibly-unresolved-reference
+     --> <temp_dir>/project/main.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)
+      |       ^ Name `x` used when possibly not defined
+      |
 
 
-        ----- stderr -----
-        "
+    ----- stderr -----
+    "###
     );
 
     Ok(())

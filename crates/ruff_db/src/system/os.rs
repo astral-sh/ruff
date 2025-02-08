@@ -100,6 +100,15 @@ impl System for OsSystem {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        // In testing, we allow overriding the user configuration directory by using a
+        // thread local because overriding the environment variables breaks test isolatios
+        // (tests run concurrently) and mutating environment variable in a multithreaded
+        // application is inherently unsafe.
+        #[cfg(feature = "testing")]
+        if let Ok(directory_override) = testing::OsUserDirectoryOverride::try_get() {
+            return directory_override;
+        }
+
         use etcetera::BaseStrategy as _;
 
         let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
@@ -110,6 +119,11 @@ impl System for OsSystem {
     //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
     #[cfg(target_arch = "wasm32")]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        #[cfg(feature = "testing")]
+        if let Ok(directory_override) = testing::user_configuration_directory_override() {
+            return directory_override;
+        }
+
         None
     }
 
@@ -334,6 +348,70 @@ impl From<WalkState> for ignore::WalkState {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(feature = "testing")]
+pub(super) mod testing {
+    use std::cell::RefCell;
+
+    use crate::system::SystemPathBuf;
+
+    thread_local! {
+        /// Overrides the user's configuration directory for testing.
+        /// This is an `Option<Option<..>>` to allow setting an override of `None`.
+        static USER_CONFIGURATION_DIRECTORY: RefCell<Option<Option<SystemPathBuf>>> = const {RefCell::new(None)};
+    }
+
+    /// A scoped override of the [user's configuration directory](super::OsSystem::user_config_directory) for the current thread.
+    ///
+    /// When possible, prefer overriding the user's configuration directory for the entire process
+    /// by setting the `APPDATA` (windows) or `XDG_CONFIG_HOME` (unix and other platforms) environment variables.
+    /// For example, by setting the environment variables when invoking the CLI with insta.
+    ///
+    /// Only use this override in tests where spawning a new process is impractical.
+    ///
+    /// Requires the `testing` feature.
+    #[must_use]
+    pub struct OsUserDirectoryOverride {
+        previous: Option<Option<SystemPathBuf>>,
+    }
+
+    impl OsUserDirectoryOverride {
+        /// Overrides the user configuration directory for the current scope
+        /// (for as long as the returned override is not dropped).
+        pub fn scoped(configuration_directory: Option<SystemPathBuf>) -> Self {
+            let previous_directory =
+                USER_CONFIGURATION_DIRECTORY.replace(Some(configuration_directory));
+            Self {
+                previous: previous_directory,
+            }
+        }
+
+        /// Overrides the user's configuration directory for the duration of the closure.
+        pub fn with<F, R>(configuration_directory: Option<SystemPathBuf>, f: F) -> R
+        where
+            F: FnOnce() -> R,
+        {
+            let _guard = Self::scoped(configuration_directory);
+            f()
+        }
+
+        /// Returns [`Ok`] if any override is set and [`Err`] otherwise.
+        pub(super) fn try_get() -> Result<Option<SystemPathBuf>, ()> {
+            USER_CONFIGURATION_DIRECTORY.with_borrow(
+                |directory_override| match directory_override {
+                    Some(directory_override) => Ok(directory_override.clone()),
+                    None => Err(()),
+                },
+            )
+        }
+    }
+
+    impl Drop for OsUserDirectoryOverride {
+        fn drop(&mut self) {
+            USER_CONFIGURATION_DIRECTORY.set(self.previous.take());
+        }
+    }
 }
 
 #[cfg(test)]
