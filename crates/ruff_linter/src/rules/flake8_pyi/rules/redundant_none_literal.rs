@@ -242,17 +242,17 @@ fn create_fix(
             let union_expr = typing_union(&[lhs, rhs], Name::from(bound_name));
             let content = checker.generator().expr(&union_expr);
             let union_edit = Edit::range_replacement(content, literal_expr.range());
-            return Some(Fix::applicable_edits(
+            Some(Fix::applicable_edits(
                 import_edit,
                 [union_edit],
                 applicability,
-            ));
+            ))
         }
         UnionKind::BitOr => {
             let union_expr = pep_604_union(&[lhs, rhs]);
             let content = checker.generator().expr(&union_expr);
             let union_edit = Edit::range_replacement(content, literal_expr.range());
-            return Some(Fix::applicable_edit(union_edit, applicability));
+            Some(Fix::applicable_edit(union_edit, applicability))
         }
         // We dealt with this case earlier to avoid allocating `lhs` and `rhs`
         UnionKind::NoUnion => {
