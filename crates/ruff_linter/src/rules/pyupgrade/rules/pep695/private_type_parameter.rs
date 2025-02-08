@@ -1,12 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Stmt;
-use ruff_python_semantic::Binding;
-
 use crate::{
     checkers::ast::Checker,
     renamer::{Renamer, ShadowedKind},
 };
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::Stmt;
+use ruff_python_semantic::{Binding, ResolvedReferenceId, TypingOnlyBindingsStatus};
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 ///
@@ -93,7 +94,7 @@ impl Violation for PrivateTypeParameter {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove the leading underscores".to_string())
+        Some("Rename type parameter to remove leading underscores".to_string())
     }
 }
 
@@ -133,7 +134,34 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return Some(diagnostic);
     }
 
-    diagnostic.try_set_fix(|| {
+    diagnostic.try_set_optional_fix(|| {
+        let source = checker.source();
+
+        // Copied from PYI019
+        let reference_is_complex = |id: ResolvedReferenceId| -> bool {
+            let reference = semantic.reference(id);
+            let in_source = &source[reference.range()];
+
+            in_source != old_name
+        };
+
+        if !is_identifier(new_name) {
+            return Ok(None);
+        }
+
+        let existing_binding_for_new_name = semantic.simulate_runtime_load_at_location_in_scope(
+            new_name,
+            binding.range,
+            binding.scope,
+            TypingOnlyBindingsStatus::Disallowed,
+        );
+
+        if let Some(binding) = existing_binding_for_new_name.map(|id| semantic.binding(id)) {
+            if binding.kind.is_type_param() {
+                return Ok(None);
+            }
+        }
+
         let (first, rest) = Renamer::rename(
             old_name,
             new_name,
@@ -142,7 +170,13 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
             checker.stylist(),
         )?;
 
-        Ok(Fix::safe_edits(first, rest))
+        let applicability = if binding.references().any(reference_is_complex) {
+            Applicability::DisplayOnly
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Some(Fix::applicable_edits(first, rest, applicability)))
     });
 
     Some(diagnostic)
