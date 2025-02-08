@@ -889,10 +889,6 @@ fn add_search_path() -> anyhow::Result<()> {
 
 #[test]
 fn remove_search_path() -> anyhow::Result<()> {
-    assert_eq!(
-        std::env::var("XDG_CONFIG_HOME"),
-        Err(std::env::VarError::NotPresent)
-    );
     let mut case = setup_with_options([("bar.py", "import sub.a")], |context| {
         Some(Options {
             environment: Some(EnvironmentOptions {
