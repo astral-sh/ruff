@@ -138,9 +138,9 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
         return Some(diagnostic);
     }
 
-    diagnostic.try_set_fix(|| {
-        let source = checker.source();
+    let source = checker.source();
 
+    diagnostic.try_set_fix(|| {
         let (first, rest) = Renamer::rename(
             old_name,
             new_name,
