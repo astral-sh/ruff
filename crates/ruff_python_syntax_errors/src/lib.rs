@@ -144,7 +144,7 @@ mod tests {
 
     use crate::{check_syntax, PythonVersion, SyntaxError};
 
-    /// Run [`check_path`] on a snippet of Python code.
+    /// Run [`check_syntax`] on a snippet of Python code.
     fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SyntaxError> {
         let path = Path::new("<filename>");
         let source_type = PySourceType::from(path);
