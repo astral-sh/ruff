@@ -66,7 +66,7 @@ impl Project {
 
         tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
 
-        let ranges = release_specifiers_to_ranges((&**requires_python).clone());
+        let ranges = release_specifiers_to_ranges((**requires_python).clone());
         let Some((lower, _)) = ranges.bounding_range() else {
             return Ok(None);
         };

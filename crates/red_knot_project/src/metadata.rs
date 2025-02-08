@@ -735,6 +735,31 @@ expected `.`, `]`
         Ok(())
     }
 
+    #[test]
+    fn requires_python_too_large_major_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=999.0"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!("Expected project discovery to fail because of the requires-python major version that is larger than 255."));
+        };
+
+        assert_error_eq(&error, "the `requires-python` constraint in `/app/pyproject.toml` is invalid: The major version `999` is larger than the maximum supported value 255");
+
+        Ok(())
+    }
+
     #[track_caller]
     fn assert_error_eq(error: &ProjectDiscoveryError, message: &str) {
         assert_eq!(error.to_string().replace('\\', "/"), message);

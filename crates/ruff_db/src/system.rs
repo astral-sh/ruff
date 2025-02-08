@@ -1,7 +1,7 @@
 pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
 
-#[cfg(all(feature = "testing", feature="os"))]
+#[cfg(all(feature = "testing", feature = "os"))]
 pub use os::testing::UserConfigDirectoryOverrideGuard;
 
 #[cfg(feature = "os")]
