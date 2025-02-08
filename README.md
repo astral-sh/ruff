@@ -452,6 +452,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [ivy](https://github.com/unifyai/ivy)
+- [JAX](https://github.com/jax-ml/jax)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [Kraken Tech](https://kraken.tech/)
 - [LangChain](https://github.com/hwchase17/langchain)
