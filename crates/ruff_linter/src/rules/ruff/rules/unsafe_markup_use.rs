@@ -9,12 +9,12 @@ use ruff_text_size::Ranged;
 use crate::{checkers::ast::Checker, settings::LinterSettings};
 
 /// ## What it does
-/// Checks for non-literal strings being passed to [`markupsafe.Markup`].
+/// Checks for non-literal strings being passed to [`markupsafe.Markup`][markupsafe-markup].
 ///
 /// ## Why is this bad?
-/// [`markupsafe.Markup`] does not perform any escaping, so passing dynamic
-/// content, like f-strings, variables or interpolated strings will potentially
-/// lead to XSS vulnerabilities.
+/// [`markupsafe.Markup`][markupsafe-markup] does not perform any escaping,
+/// so passing dynamic content, like f-strings, variables or interpolated strings
+/// will potentially lead to XSS vulnerabilities.
 ///
 /// Instead you should interpolate the `Markup` object.
 ///
@@ -72,7 +72,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
 /// - [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
 ///
-/// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+/// [markupsafe-markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
 pub(crate) struct UnsafeMarkupUse {

@@ -194,10 +194,10 @@ impl Violation for StartProcessWithAShell {
 /// This rule specifically flags functions in the `os` module that spawn
 /// subprocesses *without* the use of a shell. Note that these typically pose a
 /// much smaller security risk than subprocesses that are started *with* a
-/// shell, which are flagged by [`start-process-with-a-shell`] (`S605`). This
-/// gives you the option of enabling one rule while disabling the other if you
-/// decide that the security risk from these functions is acceptable for your
-/// use case.
+/// shell, which are flagged by [`start-process-with-a-shell`][S605] (`S605`).
+/// This gives you the option of enabling one rule while disabling the other
+/// if you decide that the security risk from these functions is acceptable
+/// for your use case.
 ///
 /// ## Example
 /// ```python
@@ -208,7 +208,7 @@ impl Violation for StartProcessWithAShell {
 ///     os.spawnlp(os.P_NOWAIT, "/bin/mycmd", "mycmd", arbitrary_user_input)
 /// ```
 ///
-/// [`start-process-with-a-shell`]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell/#start-process-with-a-shell-s605
+/// [S605]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell
 #[derive(ViolationMetadata)]
 pub(crate) struct StartProcessWithNoShell;
 

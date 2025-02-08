@@ -53,15 +53,16 @@ use crate::{
 /// ## See also
 ///
 /// This rule renames private [PEP 695] type parameters but doesn't convert pre-[PEP 695] generics
-/// to the new format. See [`non-pep695-generic-function`] and [`non-pep695-generic-class`] for
-/// rules that will make this transformation. Those rules do not remove unused type variables after
-/// their changes, so you may also want to consider enabling [`unused-private-type-var`] to complete
+/// to the new format. See [`non-pep695-generic-function`][UP047] and
+/// [`non-pep695-generic-class`][UP046] for rules that will make this transformation.
+/// Those rules do not remove unused type variables after their changes,
+/// so you may also want to consider enabling [`unused-private-type-var`][PYI018] to complete
 /// the transition to [PEP 695] generics.
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
-/// [`non-pep695-generic-function`]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
-/// [`non-pep695-generic-class`]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
-/// [`unused-private-type-var`]: https://docs.astral.sh/ruff/rules/unused-private-type-var
+/// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function
+/// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
+/// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
