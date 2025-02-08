@@ -145,7 +145,7 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
             old_name,
             new_name,
             &semantic.scopes[binding.scope],
-            checker.semantic(),
+            semantic,
             checker.stylist(),
         )?;
 
