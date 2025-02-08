@@ -60,7 +60,7 @@ use crate::settings::types::PythonVersion;
 ///     return commons
 /// ```
 ///
-/// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
+/// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [`typing.Annotated`]: https://docs.python.org/3/library/typing.html#typing.Annotated
 /// [`typing_extensions`]: https://typing-extensions.readthedocs.io/en/stable/
 #[derive(ViolationMetadata)]

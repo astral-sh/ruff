@@ -54,7 +54,7 @@ use crate::Locator;
 ///
 /// [`logging`]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [`gettext`]: https://docs.python.org/3/library/gettext.html
-/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
+/// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingFStringSyntax;
 
