@@ -362,7 +362,7 @@ pub(super) mod testing {
         static USER_CONFIGURATION_DIRECTORY: RefCell<Option<Option<SystemPathBuf>>> = const {RefCell::new(None)};
     }
 
-    /// A scoped override of the [user's configuration directory](super::OsSystem::user_config_directory) for the current thread.
+    /// A scoped override of the [user's configuration directory](crate::System::user_config_directory) for the [`OsSystem`](super::OsSystem) in the current thread.
     ///
     /// When possible, prefer overriding the user's configuration directory for the entire process
     /// by setting the `APPDATA` (windows) or `XDG_CONFIG_HOME` (unix and other platforms) environment variables.
