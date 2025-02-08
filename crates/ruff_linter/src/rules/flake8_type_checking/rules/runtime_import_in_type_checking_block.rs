@@ -12,8 +12,11 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};
+use crate::rules::flake8_type_checking::helpers::{
+    filter_contained, parent_type_alias_has_runtime_references, quote_annotation,
+};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
+use crate::rules::flake8_type_checking::settings::QuoteTypeExpressions;
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
@@ -22,9 +25,9 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// The type-checking block is not executed at runtime, so the import will not
 /// be available at runtime.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
-/// corresponding import to remain in the type-checking block.
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
+/// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// ## Example
 /// ```python
@@ -48,7 +51,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -132,6 +135,14 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 parent_range: binding.parent_range(checker.semantic()),
             };
 
+            // TODO: We should consider giving TC007 precedence, when it is
+            //       enabled in order to better match what the original plugin
+            //       does, i.e. if all runtime uses occur in annotated type aliases
+            //       values, then TC004 could be avoided by fixing TC007 instead
+            //       this is less broad than `quote-annotated-type-alias-values`
+            //       so should generally be safer. We would need to be careful
+            //       with ignored TC007 violations however, since that is a
+            //       signal that the user actually wants TC004 to trigger.
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.start())
                 || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(
@@ -147,18 +158,21 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
             } else {
                 // Determine whether the member should be fixed by moving the import out of the
                 // type-checking block, or by quoting its references.
-                // TODO: We should check `reference.in_annotated_type_alias()`
-                //       as well to match the behavior of the flake8 plugin
-                //       although maybe the best way forward is to add an
-                //       additional setting to configure whether quoting
-                //       or moving the import is preferred for type aliases
-                //       since some people will consistently use their
-                //       type aliases at runtimes, while others won't, so
-                //       the best solution is unclear.
-                if checker.settings.flake8_type_checking.quote_annotations
+                let settings = &checker.settings.flake8_type_checking;
+                if settings.quote_type_expressions > QuoteTypeExpressions::None
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
-                        reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
+                        reference.in_typing_context()
+                            || (settings.quote_type_expressions >= QuoteTypeExpressions::Safe
+                                && reference.in_cast_type_expression())
+                            || (settings.quote_type_expressions >= QuoteTypeExpressions::Balanced
+                                && reference.in_runtime_evaluated_annotation())
+                            || (settings.quote_type_expressions >= QuoteTypeExpressions::Eager
+                                && reference.in_annotated_type_alias_value()
+                                && !parent_type_alias_has_runtime_references(
+                                    checker.semantic(),
+                                    reference,
+                                ))
                     })
                 {
                     actions
