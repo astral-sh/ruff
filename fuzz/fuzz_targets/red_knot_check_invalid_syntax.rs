@@ -3,7 +3,7 @@
 
 #![no_main]
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use libfuzzer_sys::{fuzz_target, Corpus};
 
@@ -29,8 +29,8 @@ struct TestDb {
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
-    events: std::sync::Arc<Mutex<Vec<salsa::Event>>>,
-    rule_selection: std::sync::Arc<RuleSelection>,
+    events: Arc<Mutex<Vec<salsa::Event>>>,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl TestDb {
@@ -39,7 +39,7 @@ impl TestDb {
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
-            events: std::sync::Arc::default(),
+            events: Arc::default(),
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
         }
@@ -86,8 +86,8 @@ impl SemanticDb for TestDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
     }
 
     fn lint_registry(&self) -> &LintRegistry {

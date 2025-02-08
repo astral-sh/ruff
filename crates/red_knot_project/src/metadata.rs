@@ -12,6 +12,7 @@ use options::Options;
 
 pub mod options;
 pub mod pyproject;
+pub mod settings;
 pub mod value;
 
 #[derive(Debug, PartialEq, Eq)]

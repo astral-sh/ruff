@@ -576,6 +576,37 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
 }
 
 #[test]
+fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "knot.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+        "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       - Name `x` used when not defined
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
 fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     let case = TestCase::with_file(
         "test.py",
