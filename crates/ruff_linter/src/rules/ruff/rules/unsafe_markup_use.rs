@@ -16,10 +16,10 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// content, like f-strings, variables or interpolated strings will potentially
 /// lead to XSS vulnerabilities.
 ///
-/// Instead you should interpolate the [`markupsafe.Markup`] object.
+/// Instead you should interpolate the `Markup` object.
 ///
 /// Using [`lint.ruff.extend-markup-names`] additional objects can be
-/// treated like [`markupsafe.Markup`].
+/// treated like `Markup`.
 ///
 /// This rule was originally inspired by [flake8-markupsafe] but doesn't carve
 /// out any exceptions for i18n related calls by default.
@@ -70,6 +70,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 ///
 /// ## References
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
+/// - [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
 ///
 /// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
