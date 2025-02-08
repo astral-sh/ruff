@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for RuntimeCastValue {
 
 /// TC006
 pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
-    if type_expr.is_string_literal_expr() {
+    if type_expr.is_string_literal_expr() || type_expr.is_f_string_expr() {
         return;
     }
 
