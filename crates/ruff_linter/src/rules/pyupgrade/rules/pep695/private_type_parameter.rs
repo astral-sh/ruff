@@ -2,7 +2,6 @@ use crate::{
     checkers::ast::Checker,
     renamer::{Renamer, ShadowedKind},
 };
-use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
@@ -131,20 +130,11 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) -> Op
 
     // if the new name would shadow another variable, keyword, or builtin, emit a diagnostic without
     // a suggested fix
-    if ShadowedKind::new(new_name, checker, binding.scope).shadows_any() {
+    if ShadowedKind::new(binding, new_name, checker).shadows_any() {
         return Some(diagnostic);
     }
 
     if !is_identifier(new_name) {
-        return Some(diagnostic);
-    }
-
-    if binding
-        .references()
-        .map(|reference_id| semantic.reference(reference_id).scope_id())
-        .dedup()
-        .any(|scope| !semantic.is_available_in_scope(new_name, scope))
-    {
         return Some(diagnostic);
     }
 
