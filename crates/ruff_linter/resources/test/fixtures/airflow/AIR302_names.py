@@ -45,8 +45,6 @@ from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
 from airflow.operators import dummy_operator
-from airflow.operators.bash import BashOperator
-from airflow.operators.bash_operator import BashOperator as LegacyBashOperator
 from airflow.operators.branch_operator import BaseBranchOperator
 from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
 from airflow.operators.dummy import DummyOperator, EmptyOperator
@@ -165,10 +163,6 @@ AllowListValidator(), BlockListValidator()
 # airflow.operators.dummy_operator
 dummy_operator.EmptyOperator()
 dummy_operator.DummyOperator()
-
-# airflow.operators.bash / airflow.operators.bash_operator
-BashOperator()
-LegacyBashOperator()
 
 # airflow.operators.branch_operator
 BaseBranchOperator()
