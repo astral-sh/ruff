@@ -73,6 +73,11 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLiteral) {
     let semantic = checker.semantic();
 
+    // fstrings are never correct as type definitions
+    if semantic.in_type_definition() {
+        return;
+    }
+
     // we want to avoid statement expressions that are just a string literal.
     // there's no reason to have standalone f-strings and this lets us avoid docstrings too
     if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
