@@ -179,5 +179,5 @@ bad_str_strip_call.py:81:10: PLE1310 String `strip` call contains duplicate char
 81 | ''.strip('\\\x5C')
    |          ^^^^^^^^ PLE1310
 82 |
-83 | # OK: Different types
+83 | # Errors: Type inference
    |

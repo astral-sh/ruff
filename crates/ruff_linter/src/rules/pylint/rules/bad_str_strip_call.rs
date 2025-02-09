@@ -82,10 +82,12 @@ impl ValueKind {
                 let binding_id = semantic.only_binding(name)?;
                 let binding = semantic.binding(binding_id);
 
-                match () {
-                    () if typing::is_string(binding, semantic) => Some(Self::String),
-                    () if typing::is_bytes(binding, semantic) => Some(Self::Bytes),
-                    () => None,
+                if typing::is_string(binding, semantic) {
+                    Some(Self::String)
+                } else if typing::is_bytes(binding, semantic) {
+                    Some(Self::Bytes)
+                } else {
+                    None
                 }
             }
             _ => None,
@@ -183,7 +185,7 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let value = value.as_ref();
+    let value = &**value;
 
     if checker.settings.preview.is_disabled()
         && !matches!(value, Expr::StringLiteral(_) | Expr::BytesLiteral(_))

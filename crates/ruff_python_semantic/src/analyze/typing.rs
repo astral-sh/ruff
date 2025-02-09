@@ -754,7 +754,7 @@ struct BytesChecker;
 impl BuiltinTypeChecker for BytesChecker {
     const BUILTIN_TYPE_NAME: &'static str = "bytes";
     const TYPING_NAME: Option<&'static str> = None;
-    const EXPR_TYPE: PythonType = PythonType::String;
+    const EXPR_TYPE: PythonType = PythonType::Bytes;
 }
 
 struct TupleChecker;
