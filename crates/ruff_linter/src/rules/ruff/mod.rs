@@ -10,18 +10,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use itertools::Itertools;
     use regex::Regex;
-    use ruff_python_codegen::Stylist;
-    use ruff_python_index::Indexer;
-    use ruff_python_parser::parse_module;
-    use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::SourceFileBuilder;
-    use ruff_text_size::{Ranged, TextSize};
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::checkers::physical_lines::check_physical_lines;
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::types::{
@@ -29,7 +22,7 @@ mod tests {
     };
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_messages, settings, Locator};
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
@@ -442,6 +435,7 @@ mod tests {
     #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
+    #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -531,60 +525,6 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn ruf054_indented_form_feed() -> Result<()> {
-        let source_and_expected = [
-            ("\x0c", vec![]),
-            ("\x0c\x20\x20", vec![]),
-            ("\x20\x0c", vec![TextSize::new(1)]),
-            ("\t\t\x0c", vec![TextSize::new(2)]),
-            (
-                "
-                def _():
-                \t\x0c\tpass
-                ",
-                vec![TextSize::new(11)],
-            ),
-            (
-                "
-                def _():\x0c
-                    pass
-                ",
-                vec![],
-            ),
-            (
-                "
-                if False:
-                    print('F')
-                    \x0cprint('T')
-                ",
-                vec![TextSize::new(30)],
-            ),
-        ];
-
-        for (source, expected) in source_and_expected {
-            let dedented = &*dedent(source);
-
-            let locator = Locator::new(dedented);
-            let parsed = parse_module(dedented)?;
-            let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
-            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
-
-            let diagnostics = check_physical_lines(
-                &locator,
-                &stylist,
-                &indexer,
-                &[],
-                &LinterSettings::for_rule(Rule::IndentedFormFeed),
-            );
-            let indices = diagnostics.iter().map(Ranged::start).collect_vec();
-
-            assert_eq!(indices, expected);
-        }
-
         Ok(())
     }
 }
