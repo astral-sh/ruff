@@ -2,7 +2,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     self as ast,
-    helpers::{pep_604_union, typing_union},
+    helpers::{pep_604_union, typing_optional},
     name::Name,
     Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator,
 };
@@ -41,7 +41,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest, settings::types::Py
 ///
 /// There is currently no fix available when applying the fix would lead to
 /// a `TypeError` from an expression of the form `None | None` or when we
-/// are unable to import the symbol `typing.Union` and the Python version
+/// are unable to import the symbol `typing.Optional` and the Python version
 /// is 3.9 or below.
 ///
 /// ## References
@@ -58,8 +58,8 @@ impl Violation for RedundantNoneLiteral {
     fn message(&self) -> String {
         match self.union_kind {
             UnionKind::NoUnion => "`Literal[None]` can be replaced with `None`".to_string(),
-            UnionKind::TypingUnion => {
-                "`Literal[None, ...]` can be replaced with `Union[Literal[...], None]`".to_string()
+            UnionKind::TypingOptional => {
+                "`Literal[None, ...]` can be replaced with `Optional[Literal[...]]`".to_string()
             }
             UnionKind::BitOr => {
                 "`Literal[None, ...]` can be replaced with `Literal[...] | None`".to_string()
@@ -70,7 +70,7 @@ impl Violation for RedundantNoneLiteral {
     fn fix_title(&self) -> Option<String> {
         Some(match self.union_kind {
             UnionKind::NoUnion => "Replace with `None`".to_string(),
-            UnionKind::TypingUnion => "Replace with `Union[Literal[...], None]`".to_string(),
+            UnionKind::TypingOptional => "Replace with `Optional[Literal[...]]`".to_string(),
             UnionKind::BitOr => "Replace with `Literal[...] | None`".to_string(),
         })
     }
@@ -116,7 +116,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     {
         UnionKind::BitOr
     } else {
-        UnionKind::TypingUnion
+        UnionKind::TypingOptional
     };
 
     // N.B. Applying the fix can leave an unused import to be fixed by the `unused-import` rule.
@@ -210,7 +210,7 @@ fn create_fix(
         ));
     }
 
-    let lhs = Expr::Subscript(ast::ExprSubscript {
+    let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
         value: Box::new(literal_subscript.clone()),
         range: TextRange::default(),
         ctx: ExprContext::Load,
@@ -225,31 +225,31 @@ fn create_fix(
             literal_elements[0].clone()
         }),
     });
-    let rhs = Expr::NoneLiteral(ExprNoneLiteral {
-        range: TextRange::default(),
-    });
 
     match union_kind {
-        UnionKind::TypingUnion => {
+        UnionKind::TypingOptional => {
             let (import_edit, bound_name) = checker
                 .importer()
                 .get_or_import_symbol(
-                    &ImportRequest::import_from("typing", "Union"),
+                    &ImportRequest::import_from("typing", "Optional"),
                     literal_expr.start(),
                     checker.semantic(),
                 )
                 .ok()?;
-            let union_expr = typing_union(&[lhs, rhs], Name::from(bound_name));
-            let content = checker.generator().expr(&union_expr);
-            let union_edit = Edit::range_replacement(content, literal_expr.range());
+            let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
+            let content = checker.generator().expr(&optional_expr);
+            let optional_edit = Edit::range_replacement(content, literal_expr.range());
             Some(Fix::applicable_edits(
                 import_edit,
-                [union_edit],
+                [optional_edit],
                 applicability,
             ))
         }
         UnionKind::BitOr => {
-            let union_expr = pep_604_union(&[lhs, rhs]);
+            let none_expr = Expr::NoneLiteral(ExprNoneLiteral {
+                range: TextRange::default(),
+            });
+            let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
             let content = checker.generator().expr(&union_expr);
             let union_edit = Edit::range_replacement(content, literal_expr.range());
             Some(Fix::applicable_edit(union_edit, applicability))
@@ -264,6 +264,6 @@ fn create_fix(
 #[derive(Copy, Clone)]
 enum UnionKind {
     NoUnion,
-    TypingUnion,
+    TypingOptional,
     BitOr,
 }
