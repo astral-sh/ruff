@@ -485,7 +485,16 @@ fn is_docstring_section(
     //     """
     // ```
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
-    // continue to treat it as a section header.
+    // continue to treat it as a section header, unless the enclosing `Definition` is a function
+    // definition and contains a parameter with the same name, like `Args` in:
+    // ```python
+    // def func(Args: tuple[int]):
+    //     """Toggle the gizmo.
+    //
+    //     Args:
+    //         Args: The arguments to the function.
+    //     """
+    // ```
     if let Some(previous_section) = previous_section {
         let verbatim = &line[TextRange::at(indent_size, section_name_size)];
 
