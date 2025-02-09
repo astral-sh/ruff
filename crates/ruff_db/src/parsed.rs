@@ -81,13 +81,6 @@ impl PartialEq for ParsedModule {
 
 impl Eq for ParsedModule {}
 
-unsafe impl salsa::Update for ParsedModule {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        *old_pointer = new_value;
-        true
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file};

@@ -6424,6 +6424,7 @@ mod tests {
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
+
         assert_function_query_was_not_run(
             &db,
             infer_expression_types,

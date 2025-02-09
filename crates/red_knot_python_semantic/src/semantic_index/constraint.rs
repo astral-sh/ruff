@@ -40,7 +40,6 @@ pub(crate) struct PatternConstraint<'db> {
     #[return_ref]
     pub(crate) kind: PatternConstraintKind<'db>,
 
-    #[no_eq]
     count: countme::Count<PatternConstraint<'static>>,
 }
 

@@ -44,10 +44,8 @@ pub(crate) struct Expression<'db> {
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
     /// Should this expression be inferred as a normal expression or a type expression?
-    #[id]
     pub(crate) kind: ExpressionKind,
 
-    #[no_eq]
     count: countme::Count<Expression<'static>>,
 }
 

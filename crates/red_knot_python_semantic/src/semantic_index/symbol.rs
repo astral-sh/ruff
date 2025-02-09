@@ -96,6 +96,7 @@ impl From<FileSymbolId> for ScopedSymbolId {
 
 /// Symbol ID that uniquely identifies a symbol inside a [`Scope`].
 #[newtype_index]
+#[derive(salsa::Update)]
 pub struct ScopedSymbolId;
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -105,7 +106,6 @@ pub struct ScopeId<'db> {
 
     pub file_scope_id: FileScopeId,
 
-    #[no_eq]
     count: countme::Count<ScopeId<'static>>,
 }
 
@@ -157,6 +157,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
+#[derive(salsa::Update)]
 pub struct FileScopeId;
 
 impl FileScopeId {

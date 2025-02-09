@@ -43,7 +43,6 @@ pub(crate) struct Unpack<'db> {
     #[no_eq]
     pub(crate) value: UnpackValue<'db>,
 
-    #[no_eq]
     count: countme::Count<Unpack<'static>>,
 }
 
