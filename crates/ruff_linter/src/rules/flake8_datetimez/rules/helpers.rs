@@ -12,7 +12,7 @@ pub(super) enum DatetimeModuleAntipattern {
 /// a chain of `.replace()` calls followed by `.astimezone`.
 ///
 /// This assumes that the current expression is a `datetime.datetime` object.
-pub(super) fn parent_expr_is_astimezone(checker: &Checker) -> bool {
+pub(super) fn followed_by_astimezone(checker: &Checker) -> bool {
     let semantic = checker.semantic();
     let mut last = None;
 
