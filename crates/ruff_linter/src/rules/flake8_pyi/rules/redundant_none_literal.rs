@@ -225,7 +225,7 @@ fn create_fix(
         }),
     });
 
-    match union_kind {
+    let fix = match union_kind {
         UnionKind::TypingOptional => {
             let (import_edit, bound_name) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("typing", "Optional"),
@@ -235,11 +235,7 @@ fn create_fix(
             let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
             let content = checker.generator().expr(&optional_expr);
             let optional_edit = Edit::range_replacement(content, literal_expr.range());
-            Ok(Some(Fix::applicable_edits(
-                import_edit,
-                [optional_edit],
-                applicability,
-            )))
+            Fix::applicable_edits(import_edit, [optional_edit], applicability)
         }
         UnionKind::BitOr => {
             let none_expr = Expr::NoneLiteral(ExprNoneLiteral {
@@ -248,16 +244,17 @@ fn create_fix(
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
             let content = checker.generator().expr(&union_expr);
             let union_edit = Edit::range_replacement(content, literal_expr.range());
-            Ok(Some(Fix::applicable_edit(union_edit, applicability)))
+            Fix::applicable_edit(union_edit, applicability)
         }
         // We dealt with this case earlier to avoid allocating `lhs` and `rhs`
         UnionKind::NoUnion => {
             unreachable!()
         }
-    }
+    };
+    Ok(Some(fix))
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum UnionKind {
     NoUnion,
     TypingOptional,
