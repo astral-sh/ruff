@@ -4,7 +4,6 @@ use std::iter::FusedIterator;
 use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_python_semantic::Definition;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use rustc_hash::FxHashSet;
 use strum_macros::EnumIter;
 
 use ruff_source_file::{Line, NewlineWithTrailingNewline, UniversalNewlines};
@@ -431,16 +430,6 @@ fn is_docstring_section(
     definition: &Definition<'_>,
 ) -> bool {
     // for function definitions, track the known argument names for more accurate section detection.
-    let known_args: FxHashSet<_> = definition
-        .as_function_def()
-        .map(|func| {
-            func.parameters
-                .iter()
-                .map(|param| param.name().as_str())
-                .collect()
-        })
-        .unwrap_or_default();
-
     // Determine whether the current line looks like a section header, e.g., "Args:".
     let section_name_suffix = line[usize::from(indent_size + section_name_size)..].trim();
     let this_looks_like_a_section_name =
@@ -511,7 +500,7 @@ fn is_docstring_section(
         // ```
         if previous_section.indent_size < indent_size {
             let section_name = section_kind.as_str();
-            if section_name != verbatim || known_args.contains(section_name) {
+            if section_name != verbatim || has_parameter(definition, section_name) {
                 return false;
             }
         }
@@ -552,4 +541,14 @@ fn is_docstring_section(
     }
 
     true
+}
+
+/// Returns whether or not `definition` is a function definition and contains a parameter with the
+/// same name as `section_name`.
+fn has_parameter(definition: &Definition, section_name: &str) -> bool {
+    definition.as_function_def().is_some_and(|func| {
+        func.parameters
+            .iter()
+            .any(|param| param.name() == section_name)
+    })
 }
