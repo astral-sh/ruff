@@ -91,8 +91,18 @@ def f():
     )
 
 
-# Ok with f-strings
+# Ok with f-strings, printf strings, and formatted strings
 def f():
     from typing import cast
     a = "int"
     cast(f"{a}","11")
+    
+def f():
+    from typing import cast
+    a = "int"
+    cast("%s"%a,"11")
+
+def f():
+    from typing import cast
+    a = "int"
+    cast("{}".format(a),"11")
