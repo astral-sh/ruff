@@ -31,7 +31,7 @@ datetime.now()().astimezone()
 datetime.now().replace(datetime.now()).astimezone()
 
 datetime.now().replace(0).replace(
-    datetime.now().replace()
+    datetime.now().replace
 ).astimezone
 
 ## No errors
