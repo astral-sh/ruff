@@ -58,12 +58,12 @@ impl Violation for RedundantNoneLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.union_kind {
-            UnionKind::NoUnion => "`Literal[None]` can be replaced with `None`".to_string(),
+            UnionKind::NoUnion => "Use `None` rather than `Literal[None]`".to_string(),
             UnionKind::TypingOptional => {
-                "`Literal[None, ...]` can be replaced with `Optional[Literal[...]]`".to_string()
+                "Use `Optional[Literal[...]]` rather than `Literal[None, ...]` ".to_string()
             }
             UnionKind::BitOr => {
-                "`Literal[None, ...]` can be replaced with `Literal[...] | None`".to_string()
+                "Use `Literal[...] | None` rather than `Literal[None, ...]` ".to_string()
             }
         }
     }
