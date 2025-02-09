@@ -257,7 +257,8 @@ impl Rule {
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
             | Rule::MixedSpacesAndTabs
-            | Rule::TrailingWhitespace => LintSource::PhysicalLines,
+            | Rule::TrailingWhitespace
+            | Rule::IndentedFormFeed => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::BlanketTypeIgnore
             | Rule::BlankLineAfterDecorator
