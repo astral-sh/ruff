@@ -9,7 +9,7 @@ use ruff_text_size::{TextRange, TextSize};
 /// Checks for form feed characters preceded by either a space or a tab.
 ///
 /// ## Why is this bad?
-/// The language reference states:
+/// [The language reference][lexical-analysis-indentation] states:
 ///
 /// > A formfeed character may be present at the start of the line;
 /// > it will be ignored for the indentation calculations above.
@@ -27,6 +27,8 @@ use ruff_text_size::{TextRange, TextSize};
 /// ```python
 /// if foo():\n    bar()
 /// ```
+///
+/// [lexical-analysis-indentation]: https://docs.python.org/3/reference/lexical_analysis.html#indentation
 #[derive(ViolationMetadata)]
 pub(crate) struct IndentedFormFeed;
 
