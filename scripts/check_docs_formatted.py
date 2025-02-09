@@ -97,6 +97,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
 KNOWN_PARSE_ERRORS = [
     "blank-line-with-whitespace",
     "indentation-with-invalid-multiple-comment",
+    "indented-form-feed",
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
@@ -110,7 +111,6 @@ KNOWN_PARSE_ERRORS = [
     "too-many-newlines-at-end-of-file",
     "trailing-whitespace",
     "unexpected-indentation",
-    "indented-form-feed",
 ]
 
 
