@@ -580,7 +580,7 @@ mod tests {
                 &[],
                 &LinterSettings::for_rule(Rule::IndentedFormFeed),
             );
-            let indices = diagnostics.iter().map(|it| it.start()).collect_vec();
+            let indices = diagnostics.iter().map(Ranged::start).collect_vec();
 
             assert_eq!(indices, expected);
         }

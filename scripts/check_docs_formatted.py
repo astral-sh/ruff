@@ -110,6 +110,7 @@ KNOWN_PARSE_ERRORS = [
     "too-many-newlines-at-end-of-file",
     "trailing-whitespace",
     "unexpected-indentation",
+    "indented-form-feed",
 ]
 
 
