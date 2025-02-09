@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprAttribute, ExprBinOp, ExprCall};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -58,7 +58,11 @@ impl AlwaysFixableViolation for RuntimeCastValue {
 
 /// TC006
 pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
-    if type_expr.is_string_literal_expr() || type_expr.is_f_string_expr() {
+    if type_expr.is_string_literal_expr()
+        || type_expr.is_f_string_expr()
+        || is_printf_string(type_expr)
+        || is_formatted_string(type_expr)
+    {
         return;
     }
 
@@ -76,4 +80,38 @@ pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
     checker.report_diagnostic(diagnostic);
+}
+
+fn is_printf_string(expr: &Expr) -> bool {
+    let Expr::BinOp(ExprBinOp {
+        range: _,
+        left,
+        op,
+        right: _,
+    }) = expr
+    else {
+        return false;
+    };
+    op.is_mod() && left.is_string_literal_expr()
+}
+
+fn is_formatted_string(expr: &Expr) -> bool {
+    let Expr::Call(ExprCall {
+        range: _,
+        func,
+        arguments: _,
+    }) = expr
+    else {
+        return false;
+    };
+    let Expr::Attribute(ExprAttribute {
+        range: _,
+        value,
+        attr,
+        ctx: _,
+    }) = func.as_ref()
+    else {
+        return false;
+    };
+    value.is_string_literal_expr() && (attr.as_str() == "format")
 }
