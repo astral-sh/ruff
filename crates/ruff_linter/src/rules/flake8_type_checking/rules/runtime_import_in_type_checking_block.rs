@@ -16,11 +16,12 @@ use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annota
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 
 /// ## What it does
-/// Checks for runtime imports defined in a type-checking block.
+/// Checks for imports that are required at runtime but are only defined in
+/// type-checking blocks.
 ///
 /// ## Why is this bad?
-/// The type-checking block is not executed at runtime, so the import will not
-/// be available at runtime.
+/// The type-checking block is not executed at runtime, so if the only definition
+/// of a symbol is in a type-checking block, it will not be available at runtime.
 ///
 /// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
