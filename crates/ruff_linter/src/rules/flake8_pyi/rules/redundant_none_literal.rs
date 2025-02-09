@@ -1,3 +1,4 @@
+use anyhow::Result;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
@@ -120,20 +121,18 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     };
 
     // N.B. Applying the fix can leave an unused import to be fixed by the `unused-import` rule.
-    let fix = create_fix(
-        checker,
-        literal_expr,
-        literal_subscript,
-        literal_elements,
-        union_kind,
-    );
-
     for none_expr in none_exprs {
         let mut diagnostic =
             Diagnostic::new(RedundantNoneLiteral { union_kind }, none_expr.range());
-        if let Some(ref fix) = fix {
-            diagnostic.set_fix(fix.clone());
-        }
+        diagnostic.try_set_optional_fix(|| {
+            create_fix(
+                checker,
+                literal_expr,
+                literal_subscript,
+                literal_elements.clone(),
+                union_kind,
+            )
+        });
         checker.report_diagnostic(diagnostic);
     }
 }
@@ -153,7 +152,7 @@ fn create_fix(
     literal_subscript: &Expr,
     literal_elements: Vec<&Expr>,
     union_kind: UnionKind,
-) -> Option<Fix> {
+) -> Result<Option<Fix>> {
     let semantic = checker.semantic();
 
     let enclosing_pep604_union = semantic
@@ -193,7 +192,7 @@ fn create_fix(
         );
 
         if !is_fixable {
-            return None;
+            return Ok(None);
         }
     }
 
@@ -204,10 +203,10 @@ fn create_fix(
     };
 
     if matches!(union_kind, UnionKind::NoUnion) {
-        return Some(Fix::applicable_edit(
+        return Ok(Some(Fix::applicable_edit(
             Edit::range_replacement("None".to_string(), literal_expr.range()),
             applicability,
-        ));
+        )));
     }
 
     let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
@@ -228,22 +227,19 @@ fn create_fix(
 
     match union_kind {
         UnionKind::TypingOptional => {
-            let (import_edit, bound_name) = checker
-                .importer()
-                .get_or_import_symbol(
-                    &ImportRequest::import_from("typing", "Optional"),
-                    literal_expr.start(),
-                    checker.semantic(),
-                )
-                .ok()?;
+            let (import_edit, bound_name) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from("typing", "Optional"),
+                literal_expr.start(),
+                checker.semantic(),
+            )?;
             let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
             let content = checker.generator().expr(&optional_expr);
             let optional_edit = Edit::range_replacement(content, literal_expr.range());
-            Some(Fix::applicable_edits(
+            Ok(Some(Fix::applicable_edits(
                 import_edit,
                 [optional_edit],
                 applicability,
-            ))
+            )))
         }
         UnionKind::BitOr => {
             let none_expr = Expr::NoneLiteral(ExprNoneLiteral {
@@ -252,7 +248,7 @@ fn create_fix(
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
             let content = checker.generator().expr(&union_expr);
             let union_edit = Edit::range_replacement(content, literal_expr.range());
-            Some(Fix::applicable_edit(union_edit, applicability))
+            Ok(Some(Fix::applicable_edit(union_edit, applicability)))
         }
         // We dealt with this case earlier to avoid allocating `lhs` and `rhs`
         UnionKind::NoUnion => {
