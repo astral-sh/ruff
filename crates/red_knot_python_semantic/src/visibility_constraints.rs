@@ -627,7 +627,7 @@ impl<'db> VisibilityConstraints<'db> {
             ConstraintNode::Pattern(inner) => match inner.kind(db) {
                 PatternConstraintKind::Value(value, guard) => {
                     let subject_expression = inner.subject(db);
-                    let inference = infer_expression_types(db, *subject_expression);
+                    let inference = infer_expression_types(db, subject_expression);
                     let scope = subject_expression.scope(db);
                     let subject_ty = inference.expression_type(
                         subject_expression

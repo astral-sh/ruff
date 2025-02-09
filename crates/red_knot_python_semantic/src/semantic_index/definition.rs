@@ -35,9 +35,9 @@ pub struct Definition<'db> {
 
     #[no_eq]
     #[return_ref]
+    #[tracked]
     pub(crate) kind: DefinitionKind<'db>,
 
-    #[no_eq]
     count: countme::Count<Definition<'static>>,
 }
 
