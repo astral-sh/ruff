@@ -45,10 +45,10 @@ def _(flag: bool):
     C = A if flag else B
 
     if C != A:
-        reveal_type(C)  # revealed: type[B]
+        reveal_type(C)  # revealed: Literal[B]
     else:
-        # TODO should be type[A]
-        reveal_type(C)  # revealed: types.UnionType[A, B]
+        # TODO should be Literal[A]
+        reveal_type(C)  # revealed: Literal[A, B]
 ```
 
 ## `x != y` where `y` has multiple single-valued options

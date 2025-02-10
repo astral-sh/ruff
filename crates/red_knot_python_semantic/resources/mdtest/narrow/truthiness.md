@@ -108,12 +108,12 @@ def flag() -> bool:
     return True
 
 x = int if flag() else str
-reveal_type(x)  # revealed: types.UnionType[int, str]
+reveal_type(x)  # revealed: Literal[int, str]
 
 if x:
-    reveal_type(x)  # revealed: type[int] & ~AlwaysFalsy | type[str] & ~AlwaysFalsy
+    reveal_type(x)  # revealed: Literal[int] & ~AlwaysFalsy | Literal[str] & ~AlwaysFalsy
 else:
-    reveal_type(x)  # revealed: type[int] & ~AlwaysTruthy | type[str] & ~AlwaysTruthy
+    reveal_type(x)  # revealed: Literal[int] & ~AlwaysTruthy | Literal[str] & ~AlwaysTruthy
 ```
 
 ## Determined Truthiness
@@ -272,12 +272,12 @@ def _(
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
 
     tf = TruthyClass if flag else FalsyClass
-    reveal_type(tf)  # revealed: types.UnionType[TruthyClass, FalsyClass]
+    reveal_type(tf)  # revealed: Literal[TruthyClass, FalsyClass]
 
     if tf:
-        reveal_type(tf)  # revealed: type[TruthyClass]
+        reveal_type(tf)  # revealed: Literal[TruthyClass]
     else:
-        reveal_type(tf)  # revealed: type[FalsyClass]
+        reveal_type(tf)  # revealed: Literal[FalsyClass]
 ```
 
 ## Narrowing in chained boolean expressions

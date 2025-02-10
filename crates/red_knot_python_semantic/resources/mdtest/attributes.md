@@ -52,7 +52,7 @@ c_instance.inferred_from_param = "incompatible"
 
 # TODO: we already show an error here but the message might be improved?
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [unresolved-attribute] "Type `type[C]` has no attribute `inferred_from_value`"
+# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `inferred_from_value`"
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # TODO: this should be an error (pure instance variables cannot be accessed on the class)
@@ -86,7 +86,7 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
-# error: [unresolved-attribute] "Type `type[C]` has no attribute `declared_and_bound`"
+# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `declared_and_bound`"
 reveal_type(C.declared_and_bound)  # revealed: Unknown
 
 # TODO: same as above. We plan to emit a diagnostic here, even if both mypy
@@ -110,7 +110,7 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
-# error: [unresolved-attribute] "Type `type[C]` has no attribute `only_declared`"
+# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `only_declared`"
 reveal_type(C.only_declared)  # revealed: Unknown
 
 # TODO: mypy and pyright do not show an error here, but we plan to emit one.
@@ -749,7 +749,7 @@ class C(D, F): ...
 class B(E, D): ...
 class A(B, C): ...
 
-# revealed: tuple[type[A], type[B], type[E], type[C], type[D], type[F], type[O], type[object]]
+# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
 reveal_type(A.__mro__)
 
 # `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
@@ -774,7 +774,7 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `types.UnionType[C1, C2, C3]` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 ```
 
@@ -797,7 +797,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `types.UnionType[C1, C2, C3]` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 ```
 
@@ -811,7 +811,7 @@ def _(flag: bool):
     class C2: ...
     C = C1 if flag else C2
 
-    # error: [unresolved-attribute] "Type `types.UnionType[C1, C2]` has no attribute `x`"
+    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 ```
 
@@ -820,39 +820,39 @@ def _(flag: bool):
 ```py
 import typing_extensions
 
-reveal_type(typing_extensions.__class__)  # revealed: type[ModuleType]
+reveal_type(typing_extensions.__class__)  # revealed: Literal[ModuleType]
 
 a = 42
-reveal_type(a.__class__)  # revealed: type[int]
+reveal_type(a.__class__)  # revealed: Literal[int]
 
 b = "42"
-reveal_type(b.__class__)  # revealed: type[str]
+reveal_type(b.__class__)  # revealed: Literal[str]
 
 c = b"42"
-reveal_type(c.__class__)  # revealed: type[bytes]
+reveal_type(c.__class__)  # revealed: Literal[bytes]
 
 d = True
-reveal_type(d.__class__)  # revealed: type[bool]
+reveal_type(d.__class__)  # revealed: Literal[bool]
 
 e = (42, 42)
-reveal_type(e.__class__)  # revealed: type[tuple]
+reveal_type(e.__class__)  # revealed: Literal[tuple]
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
-    reveal_type(b.__class__)  # revealed: type[str]
+    reveal_type(b.__class__)  # revealed: Literal[str]
     reveal_type(c.__class__)  # revealed: type[int] | type[str]
 
     # `type[type]`, a.k.a., either the class `type` or some subclass of `type`.
-    # It would be incorrect to infer `type[type]` here,
+    # It would be incorrect to infer `Literal[type]` here,
     # as `c` could be some subclass of `str` with a custom metaclass.
     # All we know is that the metaclass must be a (non-strict) subclass of `type`.
     reveal_type(d.__class__)  # revealed: type[type]
 
-reveal_type(f.__class__)  # revealed: type[FunctionType]
+reveal_type(f.__class__)  # revealed: Literal[FunctionType]
 
 class Foo: ...
 
-reveal_type(Foo.__class__)  # revealed: type[type]
+reveal_type(Foo.__class__)  # revealed: Literal[type]
 ```
 
 ## Module attributes
