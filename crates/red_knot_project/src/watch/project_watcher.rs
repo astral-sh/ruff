@@ -73,6 +73,13 @@ impl ProjectWatcher {
             .canonicalize_path(&project_path)
             .unwrap_or(project_path);
 
+        let config_paths = db
+            .project()
+            .metadata(db)
+            .extra_configuration_paths()
+            .iter()
+            .cloned();
+
         // Find the non-overlapping module search paths and filter out paths that are already covered by the project.
         // Module search paths are already canonicalized.
         let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
@@ -83,8 +90,11 @@ impl ProjectWatcher {
         .map(SystemPath::to_path_buf);
 
         // Now add the new paths, first starting with the project path and then
-        // adding the library search paths.
-        for path in std::iter::once(project_path).chain(unique_module_paths) {
+        // adding the library search paths, and finally the paths for configurations.
+        for path in std::iter::once(project_path)
+            .chain(unique_module_paths)
+            .chain(config_paths)
+        {
             // Log a warning. It's not worth aborting if registering a single folder fails because
             // Ruff otherwise stills works as expected.
             if let Err(error) = self.watcher.watch(&path) {

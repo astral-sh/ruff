@@ -1,7 +1,12 @@
 pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
+
+#[cfg(all(feature = "testing", feature = "os"))]
+pub use os::testing::UserConfigDirectoryOverrideGuard;
+
 #[cfg(feature = "os")]
 pub use os::OsSystem;
+
 use ruff_notebook::{Notebook, NotebookError};
 use std::error::Error;
 use std::fmt::Debug;
