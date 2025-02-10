@@ -16,9 +16,10 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType};
+use crate::{Mode, ParseErrorType, SyntaxError, SyntaxErrorType};
 
 use super::expression::ExpressionContext;
+use super::version::PythonVersion;
 use super::Parenthesized;
 
 /// Tokens that represent compound statements.
@@ -2262,10 +2263,19 @@ impl<'src> Parser<'src> {
 
         let cases = self.parse_match_body();
 
+        let range = self.node_range(start);
+
+        if self.python_version < PythonVersion::PY310 {
+            self.syntax_errors.push(SyntaxError {
+                error: SyntaxErrorType::MatchBeforePy310,
+                location: range,
+            });
+        }
+
         ast::StmtMatch {
             subject: Box::new(subject),
             cases,
-            range: self.node_range(start),
+            range,
         }
     }
 
