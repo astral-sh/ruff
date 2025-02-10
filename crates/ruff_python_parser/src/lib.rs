@@ -68,7 +68,7 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 pub use crate::error::{
-    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, SyntaxError, SyntaxErrorType,
+    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, SyntaxError, SyntaxErrorKind,
 };
 pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
@@ -89,6 +89,7 @@ mod token;
 mod token_set;
 mod token_source;
 pub mod typing;
+pub mod version;
 
 /// Parse a full Python module usually consisting of multiple lines.
 ///
@@ -324,6 +325,10 @@ impl<T> Parsed<T> {
     /// Returns a list of syntax errors found during parsing.
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
+    }
+
+    pub fn syntax_errors(&self) -> &[SyntaxError] {
+        &self.syntax_errors
     }
 
     /// Consumes the [`Parsed`] output and returns the contained syntax node.

@@ -8,10 +8,10 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::error::SyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
-use crate::parser::version::PythonVersion;
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
+use crate::version::PythonVersion;
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
 
@@ -24,8 +24,6 @@ mod pattern;
 mod progress;
 mod recovery;
 mod statement;
-mod version;
-
 #[cfg(test)]
 mod tests;
 
