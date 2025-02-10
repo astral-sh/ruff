@@ -68,8 +68,12 @@ pub enum DiagnosticId {
     /// Some I/O operation failed
     Io,
 
-    /// Some code contains a syntax error
-    InvalidSyntax,
+    /// Some code contains a syntax error.
+    ///
+    /// Contains `Some` for syntax errors that are individually documented (as opposed to those
+    /// emitted by the parser). An example of an individually documented syntax error might be use of
+    /// the `match` statement on a Python version before 3.10.
+    InvalidSyntax(Option<LintName>),
 
     /// A lint violation.
     ///
@@ -87,6 +91,14 @@ impl DiagnosticId {
     /// Creates a new `DiagnosticId` for a lint with the given name.
     pub const fn lint(name: &'static str) -> Self {
         Self::Lint(LintName::of(name))
+    }
+
+    /// Creates a new `DiagnosticId` for a syntax error with an optional name.
+    pub const fn invalid_syntax(name: Option<&'static str>) -> Self {
+        Self::InvalidSyntax(match name {
+            Some(name) => Some(LintName::of(name)),
+            None => None,
+        })
     }
 
     /// Returns `true` if this `DiagnosticId` represents a lint.
@@ -126,8 +138,8 @@ impl DiagnosticId {
     pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
         Ok(match self {
             DiagnosticId::Io => "io",
-            DiagnosticId::InvalidSyntax => "invalid-syntax",
-            DiagnosticId::Lint(name) => {
+            DiagnosticId::InvalidSyntax(None) => "invalid-syntax",
+            DiagnosticId::InvalidSyntax(Some(name)) | DiagnosticId::Lint(name) => {
                 return Err(DiagnosticAsStrError::Category {
                     category: "lint",
                     name: name.as_str(),
@@ -591,7 +603,7 @@ impl ParseDiagnostic {
 
 impl Diagnostic for ParseDiagnostic {
     fn id(&self) -> DiagnosticId {
-        DiagnosticId::InvalidSyntax
+        DiagnosticId::InvalidSyntax(None)
     }
 
     fn message(&self) -> Cow<str> {
