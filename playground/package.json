@@ -25,12 +25,12 @@
     "smol-toml": "^1.3.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-react-swc": "^3.0.0",
-    "autoprefixer": "^10.4.13",
     "eslint": "^8.30.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-import": "^2.29.1",
