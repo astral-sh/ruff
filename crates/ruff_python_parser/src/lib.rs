@@ -79,6 +79,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use version::PythonVersion;
 
 mod error;
 pub mod lexer;
@@ -322,8 +323,14 @@ impl<T> Parsed<T> {
         &self.errors
     }
 
-    pub fn syntax_errors(&self) -> &[SyntaxError] {
-        &self.syntax_errors
+    /// Returns the syntax errors for `target_version`.
+    pub fn syntax_errors(
+        &self,
+        target_version: PythonVersion,
+    ) -> impl Iterator<Item = &SyntaxError> {
+        self.syntax_errors
+            .iter()
+            .filter(move |error| target_version < error.version())
     }
 
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
