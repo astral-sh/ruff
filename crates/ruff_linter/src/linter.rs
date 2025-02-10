@@ -13,7 +13,7 @@ use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, Parsed};
+use ruff_python_parser::{ParseError, Parsed, SyntaxError};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -426,6 +426,7 @@ pub fn lint_only(
         messages: diagnostics_to_messages(
             diagnostics,
             parsed.errors(),
+            parsed.syntax_errors(),
             path,
             &locator,
             &directives,
@@ -438,6 +439,7 @@ pub fn lint_only(
 fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
+    syntax_errors: &[SyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,
@@ -456,6 +458,11 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
+        .chain(
+            syntax_errors
+                .iter()
+                .map(|syntax_error| Message::from_syntax_error(syntax_error, file.deref().clone())),
+        )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -573,6 +580,7 @@ pub fn lint_fix<'a>(
                 messages: diagnostics_to_messages(
                     diagnostics,
                     parsed.errors(),
+                    parsed.syntax_errors(),
                     path,
                     &locator,
                     &directives,
