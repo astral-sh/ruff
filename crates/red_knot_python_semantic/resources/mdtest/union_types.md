@@ -145,8 +145,8 @@ Simplifications still apply when `Unknown` is present.
 ```py
 from knot_extensions import Unknown
 
-def _(u1: str | Unknown | int | object):
-    reveal_type(u1)  # revealed: object
+def _(u1: int | Unknown | bool) -> None:
+    reveal_type(u1)  # revealed: int | Unknown
 ```
 
 ## Union of intersections
