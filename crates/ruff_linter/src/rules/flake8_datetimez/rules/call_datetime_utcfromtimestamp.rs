@@ -78,7 +78,7 @@ pub(crate) fn call_datetime_utcfromtimestamp(checker: &Checker, func: &Expr, loc
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 

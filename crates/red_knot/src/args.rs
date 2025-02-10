@@ -1,7 +1,7 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
 use clap::{ArgAction, ArgMatches, Error, Parser};
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_python_semantic::lint;
 use ruff_db::system::SystemPathBuf;
@@ -67,8 +67,8 @@ pub(crate) struct CheckCommand {
     pub(crate) rules: RulesArg,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
-    #[arg(long, conflicts_with = "exit_zero")]
-    pub(crate) error_on_warning: bool,
+    #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
+    pub(crate) error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
     #[arg(long)]
@@ -106,6 +106,9 @@ impl CheckCommand {
                         .collect()
                 }),
                 ..EnvironmentOptions::default()
+            }),
+            terminal: Some(TerminalOptions {
+                error_on_warning: self.error_on_warning,
             }),
             rules,
             ..Default::default()

@@ -1044,6 +1044,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "builtins-strict-checking": {
+          "description": "Compare module names instead of full module paths.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -3969,6 +3976,7 @@
         "RUF051",
         "RUF052",
         "RUF053",
+        "RUF054",
         "RUF055",
         "RUF056",
         "RUF057",

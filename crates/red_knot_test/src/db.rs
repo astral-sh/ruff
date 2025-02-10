@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
     default_lint_registry, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
@@ -16,7 +18,7 @@ pub(crate) struct Db {
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
-    rule_selection: RuleSelection,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl Db {
@@ -29,7 +31,7 @@ impl Db {
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
             files: Files::default(),
-            rule_selection,
+            rule_selection: Arc::new(rule_selection),
         };
 
         db.memory_file_system()
@@ -94,8 +96,8 @@ impl SemanticDb for Db {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
     }
 
     fn lint_registry(&self) -> &LintRegistry {

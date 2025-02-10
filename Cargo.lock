@@ -354,9 +354,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.27"
+version = "4.5.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "769b0145982b4b48713e01ec42d61614425f27b7058bda7180a3a41f30104796"
+checksum = "3e77c3243bd94243c03672cb5154667347c457ca271254724f9f393aee1c05ff"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -407,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.24"
+version = "4.5.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b755194d6389280185988721fffba69495eed5ee9feeee9a599b53db80318c"
+checksum = "bf4ced95c6f4a675af3da73304b9ac4ed991640c36374e4b46795c49e17cf1ed"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -471,7 +471,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -480,7 +480,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -897,7 +897,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1031,10 +1031,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1475,7 +1473,7 @@ checksum = "e19b23d53f35ce9f56aebc7d1bb4e6ac1e9c0db7ac85c8d1760c04379edced37"
 dependencies = [
  "hermit-abi 0.4.0",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2049,7 +2047,7 @@ dependencies = [
  "once_cell",
  "pep440_rs",
  "regex",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "serde",
  "smallvec",
  "thiserror 1.0.69",
@@ -2437,7 +2435,7 @@ dependencies = [
  "ruff_macros",
  "ruff_python_ast",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "salsa",
  "schemars",
  "serde",
@@ -2477,7 +2475,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "salsa",
  "schemars",
  "serde",
@@ -2505,7 +2503,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2531,7 +2529,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "salsa",
  "serde",
  "smallvec",
@@ -2642,7 +2640,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.9.5"
+version = "0.9.6"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2682,7 +2680,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2728,7 +2726,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_parser",
  "ruff_python_trivia",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "tikv-jemallocator",
 ]
 
@@ -2754,6 +2752,7 @@ dependencies = [
  "countme",
  "dashmap 6.1.0",
  "dunce",
+ "etcetera",
  "filetime",
  "glob",
  "ignore",
@@ -2768,7 +2767,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "salsa",
  "schemars",
  "serde",
@@ -2839,7 +2838,7 @@ dependencies = [
  "ruff_cache",
  "ruff_macros",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "schemars",
  "serde",
  "static_assertions",
@@ -2876,7 +2875,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.9.5"
+version = "0.9.6"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2918,7 +2917,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "schemars",
  "serde",
  "serde_json",
@@ -2980,7 +2979,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "schemars",
  "serde",
 ]
@@ -3027,7 +3026,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "schemars",
  "serde",
  "serde_json",
@@ -3074,7 +3073,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "static_assertions",
  "unicode-ident",
  "unicode-normalization",
@@ -3105,7 +3104,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_text_size",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "schemars",
  "serde",
  "smallvec",
@@ -3164,7 +3163,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "serde",
  "serde_json",
  "shellexpand",
@@ -3194,7 +3193,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.9.5"
+version = "0.9.6"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3246,7 +3245,7 @@ dependencies = [
  "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_source_file",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "schemars",
  "serde",
  "shellexpand",
@@ -3273,9 +3272,9 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustc-hash"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7fb8039b3032c191086b10f11f319a6e99e1e82889c5cc6046f515c9db1d497"
+checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustix"
@@ -3287,7 +3286,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3315,7 +3314,7 @@ dependencies = [
  "indexmap",
  "parking_lot",
  "rayon",
- "rustc-hash 2.1.0",
+ "rustc-hash 2.1.1",
  "salsa-macro-rules",
  "salsa-macros",
  "smallvec",
@@ -3601,18 +3600,18 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.26.3"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
+checksum = "ce1475c515a4f03a8a7129bb5228b81a781a86cb0b3fbbc19e1c556d491a401f"
 dependencies = [
  "strum_macros",
 ]
 
 [[package]]
 name = "strum_macros"
-version = "0.26.4"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+checksum = "9688894b43459159c82bfa5a5fa0435c19cbe3c9b427fa1dd7b1ce0c279b18a7"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3665,7 +3664,7 @@ dependencies = [
  "getrandom 0.3.1",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3854,9 +3853,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toml"
-version = "0.8.19"
+version = "0.8.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1ed1f98e3fdc28d6d910e6737ae6ab1a93bf1985935a1193e68f93eeb68d24e"
+checksum = "cd87a5cdd6ffab733b2f74bc4fd7ee5fff6634124999ac278c35fc78c6120148"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -4153,21 +4152,22 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.12.1"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3758f5e68192bb96cc8f9b7e2c2cfdabb435499a28499a42f8f984092adad4b"
+checksum = "ced87ca4be083373936a67f8de945faa23b6b42384bd5b64434850802c6dccd0"
 dependencies = [
- "getrandom 0.2.15",
- "rand 0.8.5",
+ "getrandom 0.3.1",
+ "js-sys",
+ "rand 0.9.0",
  "uuid-macro-internal",
  "wasm-bindgen",
 ]
 
 [[package]]
 name = "uuid-macro-internal"
-version = "1.12.1"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8a86d88347b61a0e17b9908a67efcc594130830bf1045653784358dd023e294"
+checksum = "d28dd23acb5f2fa7bd2155ab70b960e770596b3bb6395119b40476c3655dfba4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4429,7 +4429,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

@@ -28,7 +28,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -1206,13 +1206,27 @@ pub struct Flake8BuiltinsOptions {
     )]
     /// List of builtin module names to allow.
     pub builtins_allowed_modules: Option<Vec<String>>,
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = "builtins-strict-checking = false"
+    )]
+    /// Compare module names instead of full module paths.
+    pub builtins_strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+    pub fn into_settings(
+        self,
+        preview: PreviewMode,
+    ) -> ruff_linter::rules::flake8_builtins::settings::Settings {
         ruff_linter::rules::flake8_builtins::settings::Settings {
             builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
             builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
+            builtins_strict_checking: self
+                .builtins_strict_checking
+                // use the old default of true on non-preview
+                .unwrap_or(preview.is_disabled()),
         }
     }
 }
@@ -3302,7 +3316,7 @@ pub struct RuffOptions {
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
     #[deprecated(
-        since = "0.9.5",
+        since = "0.9.6",
         note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub extend_markup_names: Option<Vec<String>>,
@@ -3338,7 +3352,7 @@ pub struct RuffOptions {
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
     #[deprecated(
-        since = "0.9.5",
+        since = "0.9.6",
         note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub allowed_markup_calls: Option<Vec<String>>,

@@ -3297,38 +3297,76 @@ impl<'db> TypeInferenceBuilder<'db> {
         todo_type!("generic `typing.Awaitable` type")
     }
 
-    /// Look up a name reference that isn't bound in the local scope.
-    fn lookup_name(&mut self, name_node: &ast::ExprName) -> Symbol<'db> {
+    /// Infer the type of a [`ast::ExprName`] expression, assuming a load context.
+    fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
+        let ast::ExprName {
+            range: _,
+            id: symbol_name,
+            ctx: _,
+        } = name_node;
+
         let db = self.db();
-        let ast::ExprName { id: name, .. } = name_node;
-        let file_scope_id = self.scope().file_scope_id(db);
-        let is_bound =
-            if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_by_name(name) {
-                symbol.is_bound()
+        let scope = self.scope();
+        let file_scope_id = scope.file_scope_id(db);
+        let symbol_table = self.index.symbol_table(file_scope_id);
+        let use_def = self.index.use_def_map(file_scope_id);
+
+        // If we're inferring types of deferred expressions, always treat them as public symbols
+        let local_scope_symbol = if self.is_deferred() {
+            if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
+                symbol_from_bindings(db, use_def.public_bindings(symbol_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
                     "Expected the symbol table to create a symbol for every Name node"
                 );
-                false
+                Symbol::Unbound
+            }
+        } else {
+            let use_id = name_node.scoped_use_id(db, scope);
+            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+        };
+
+        let symbol = local_scope_symbol.or_fall_back_to(db, || {
+            let has_bindings_in_this_scope = match symbol_table.symbol_by_name(symbol_name) {
+                Some(symbol) => symbol.is_bound(),
+                None => {
+                    assert!(
+                        self.deferred_state.in_string_annotation(),
+                        "Expected the symbol table to create a symbol for every Name node"
+                    );
+                    false
+                }
             };
 
-        // In function-like scopes, any local variable (symbol that is bound in this scope) can
-        // only have a definition in this scope, or error; it never references another scope.
-        // (At runtime, it would use the `LOAD_FAST` opcode.)
-        if !is_bound || !self.scope().is_function_like(db) {
+            // If it's a function-like scope and there is one or more binding in this scope (but
+            // none of those bindings are visible from where we are in the control flow), we cannot
+            // fallback to any bindings in enclosing scopes. As such, we can immediately short-circuit
+            // here and return `Symbol::Unbound`.
+            //
+            // This is because Python is very strict in its categorisation of whether a variable is
+            // a local variable or not in function-like scopes. If a variable has any bindings in a
+            // function-like scope, it is considered a local variable; it never references another
+            // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
+            if has_bindings_in_this_scope && scope.is_function_like(db) {
+                return Symbol::Unbound;
+            }
+
+            let current_file = self.file();
+
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
                 if !enclosing_scope_id.is_function_like(db) {
                     continue;
                 }
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(name) else {
+                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(symbol_name)
+                else {
                     continue;
                 };
                 if enclosing_symbol.is_bound() {
@@ -3337,7 +3375,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(db, enclosing_scope_id, name);
+                    return symbol(db, enclosing_scope_id, symbol_name);
                 }
             }
 
@@ -3348,7 +3386,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if file_scope_id.is_global() {
                         Symbol::Unbound
                     } else {
-                        global_symbol(db, self.file(), name)
+                        global_symbol(db, self.file(), symbol_name)
                     }
                 })
                 // Not found in globals? Fallback to builtins
@@ -3357,12 +3395,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if Some(self.scope()) == builtins_module_scope(db) {
                         Symbol::Unbound
                     } else {
-                        builtins_symbol(db, name)
+                        builtins_symbol(db, symbol_name)
                     }
                 })
                 // Still not found? It might be `reveal_type`...
                 .or_fall_back_to(db, || {
-                    if name == "reveal_type" {
+                    if symbol_name == "reveal_type" {
                         self.context.report_lint(
                             &UNDEFINED_REVEAL,
                             name_node.into(),
@@ -3371,68 +3409,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                             this is allowed for debugging convenience but will fail at runtime"
                             ),
                         );
-                        typing_extensions_symbol(db, name)
+                        typing_extensions_symbol(db, symbol_name)
                     } else {
                         Symbol::Unbound
                     }
                 })
-        } else {
-            Symbol::Unbound
-        }
-    }
+        });
 
-    /// Infer the type of a [`ast::ExprName`] expression, assuming a load context.
-    fn infer_name_load(&mut self, name: &ast::ExprName) -> Type<'db> {
-        let ast::ExprName {
-            range: _,
-            id,
-            ctx: _,
-        } = name;
-
-        let file_scope_id = self.scope().file_scope_id(self.db());
-        let use_def = self.index.use_def_map(file_scope_id);
-
-        // If we're inferring types of deferred expressions, always treat them as public symbols
-        let inferred = if self.is_deferred() {
-            if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
-                symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
-            } else {
-                assert!(
-                    self.deferred_state.in_string_annotation(),
-                    "Expected the symbol table to create a symbol for every Name node"
-                );
-                Symbol::Unbound
+        match symbol {
+            Symbol::Type(ty, Boundness::Bound) => ty,
+            Symbol::Type(ty, Boundness::PossiblyUnbound) => {
+                report_possibly_unresolved_reference(&self.context, name_node);
+                ty
             }
-        } else {
-            let use_id = name.scoped_use_id(self.db(), self.scope());
-            symbol_from_bindings(self.db(), use_def.bindings_at_use(use_id))
-        };
-
-        if let Symbol::Type(ty, Boundness::Bound) = inferred {
-            ty
-        } else {
-            match self.lookup_name(name) {
-                Symbol::Type(looked_up_ty, looked_up_boundness) => {
-                    if looked_up_boundness == Boundness::PossiblyUnbound {
-                        report_possibly_unresolved_reference(&self.context, name);
-                    }
-
-                    inferred
-                        .ignore_possibly_unbound()
-                        .map(|ty| UnionType::from_elements(self.db(), [ty, looked_up_ty]))
-                        .unwrap_or(looked_up_ty)
-                }
-                Symbol::Unbound => match inferred {
-                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
-                        report_possibly_unresolved_reference(&self.context, name);
-                        ty
-                    }
-                    Symbol::Unbound => {
-                        report_unresolved_reference(&self.context, name);
-                        Type::unknown()
-                    }
-                    Symbol::Type(_, Boundness::Bound) => unreachable!("Handled above"),
-                },
+            Symbol::Unbound => {
+                report_unresolved_reference(&self.context, name_node);
+                Type::unknown()
             }
         }
     }

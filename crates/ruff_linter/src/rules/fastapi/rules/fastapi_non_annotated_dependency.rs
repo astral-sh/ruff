@@ -14,15 +14,15 @@ use crate::settings::types::PythonVersion;
 /// Identifies FastAPI routes with deprecated uses of `Depends` or similar.
 ///
 /// ## Why is this bad?
-/// The [FastAPI documentation] recommends the use of [`typing.Annotated`] for
-/// defining route dependencies and parameters, rather than using `Depends`,
+/// The [FastAPI documentation] recommends the use of [`typing.Annotated`][typing-annotated]
+/// for defining route dependencies and parameters, rather than using `Depends`,
 /// `Query` or similar as a default value for a parameter. Using this approach
 /// everywhere helps ensure consistency and clarity in defining dependencies
 /// and parameters.
 ///
 /// `Annotated` was added to the `typing` module in Python 3.9; however,
-/// the third-party [`typing_extensions`] package provides a backport that can be
-/// used on older versions of Python.
+/// the third-party [`typing_extensions`][typing-extensions] package
+/// provides a backport that can be used on older versions of Python.
 ///
 /// ## Example
 ///
@@ -60,9 +60,9 @@ use crate::settings::types::PythonVersion;
 ///     return commons
 /// ```
 ///
-/// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
-/// [typing.Annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
-/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/stable/
+/// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
+/// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
+/// [typing-extensions]: https://typing-extensions.readthedocs.io/en/stable/
 #[derive(ViolationMetadata)]
 pub(crate) struct FastApiNonAnnotatedDependency {
     py_version: PythonVersion,

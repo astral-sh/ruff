@@ -54,3 +54,52 @@ def f[_](x: _) -> _: ...
 def g[__](x: __) -> __: ...
 def h[_T_](x: _T_) -> _T_: ...
 def i[__T__](x: __T__) -> __T__: ...
+
+
+# https://github.com/astral-sh/ruff/issues/16024
+
+from typing import cast, Literal
+
+
+class C[_0]: ...
+
+
+class C[T, _T]: ...
+class C[_T, T]: ...
+
+
+class C[_T]:
+    v1 = cast(_T, ...)
+    v2 = cast('_T', ...)
+    v3 = cast("\u005fT", ...)
+
+    def _(self):
+        v1 = cast(_T, ...)
+        v2 = cast('_T', ...)
+        v3 = cast("\u005fT", ...)
+
+
+class C[_T]:
+    v = cast('Literal[\'foo\'] | _T', ...)
+
+
+## Name collision
+class C[T]:
+    def f[_T](self):  # No fix, collides with `T` from outer scope
+        v1 = cast(_T, ...)
+        v2 = cast('_T', ...)
+
+
+# Unfixable as the new name collides with a variable visible from one of the inner scopes
+class C[_T]:
+    T = 42
+
+    v1 = cast(_T, ...)
+    v2 = cast('_T', ...)
+
+
+# Unfixable as the new name collides with a variable visible from one of the inner scopes
+class C[_T]:
+    def f[T](self):
+        v1 = cast(_T, ...)
+        v2 = cast('_T', ...)

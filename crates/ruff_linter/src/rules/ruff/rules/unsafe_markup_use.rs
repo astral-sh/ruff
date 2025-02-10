@@ -6,17 +6,17 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// [S704](unsafe-markup-use.md)
 ///
 /// ## What it does
-/// Checks for non-literal strings being passed to [`markupsafe.Markup`].
+/// Checks for non-literal strings being passed to [`markupsafe.Markup`][markupsafe-markup].
 ///
 /// ## Why is this bad?
-/// [`markupsafe.Markup`] does not perform any escaping, so passing dynamic
-/// content, like f-strings, variables or interpolated strings will potentially
-/// lead to XSS vulnerabilities.
+/// [`markupsafe.Markup`][markupsafe-markup] does not perform any escaping,
+/// so passing dynamic content, like f-strings, variables or interpolated strings
+/// will potentially lead to XSS vulnerabilities.
 ///
-/// Instead you should interpolate the [`markupsafe.Markup`] object.
+/// Instead you should interpolate the `Markup` object.
 ///
 /// Using [`lint.flake8-bandit.extend-markup-names`] additional objects can be
-/// treated like [`markupsafe.Markup`].
+/// treated like `Markup`.
 ///
 /// This rule was originally inspired by [flake8-markupsafe] but doesn't carve
 /// out any exceptions for i18n related calls by default.
@@ -69,7 +69,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// - [MarkupSafe on PyPI](https://pypi.org/project/MarkupSafe/)
 /// - [`markupsafe.Markup` API documentation](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
 ///
-/// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+/// [markupsafe-markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
 pub(crate) struct RuffUnsafeMarkupUse {

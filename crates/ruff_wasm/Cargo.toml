@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.9.5"
+version = "0.9.6"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }

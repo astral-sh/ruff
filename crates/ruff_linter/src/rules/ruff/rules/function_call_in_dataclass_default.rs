@@ -3,7 +3,9 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_semantic::analyze::typing::{is_immutable_func, is_immutable_newtype_call};
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
+};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -134,6 +136,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         }
 
         if is_field
+            || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
             || is_class_var_annotation(annotation, checker.semantic())
             || is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
             || is_descriptor_class(func, checker.semantic())
