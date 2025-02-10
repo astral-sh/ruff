@@ -16,7 +16,6 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::version::PythonVersion;
 use crate::{Mode, ParseErrorType, SyntaxError, SyntaxErrorKind};
 
 use super::expression::ExpressionContext;
@@ -2265,13 +2264,10 @@ impl<'src> Parser<'src> {
 
         let range = self.node_range(start);
 
-        if self.python_version < PythonVersion::PY310 {
-            self.syntax_errors.push(SyntaxError {
-                kind: SyntaxErrorKind::MatchBeforePy310,
-                range,
-                target_version: self.python_version,
-            });
-        }
+        self.syntax_errors.push(SyntaxError {
+            kind: SyntaxErrorKind::MatchBeforePy310,
+            range,
+        });
 
         ast::StmtMatch {
             subject: Box::new(subject),

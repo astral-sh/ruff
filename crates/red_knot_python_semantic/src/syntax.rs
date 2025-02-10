@@ -47,10 +47,14 @@ impl From<PythonVersion> for ruff_python_parser::version::PythonVersion {
 }
 
 impl SyntaxDiagnostic {
-    pub fn from_syntax_error(value: &SyntaxError, file: File) -> Self {
+    pub fn from_syntax_error(
+        value: &SyntaxError,
+        file: File,
+        target_version: PythonVersion,
+    ) -> Self {
         Self {
             id: DiagnosticId::invalid_syntax(Some(value.kind.as_str())),
-            message: value.message(),
+            message: value.message(target_version.into()),
             file,
             range: value.range,
         }
