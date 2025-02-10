@@ -341,7 +341,11 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
     }));
 
     if parsed.is_valid() {
-        let version = Program::get(db).python_version(db);
+        // TODO should just be `get` but panics in
+        // tests::check_file_skips_type_checking_when_file_cant_be_read
+        let version = Program::try_get(db)
+            .map(|p| p.python_version(db))
+            .unwrap_or_default();
         diagnostics.extend(parsed.syntax_errors(version.into()).map(|error| {
             let diagnostic: Box<dyn Diagnostic> =
                 Box::new(SyntaxDiagnostic::from_syntax_error(error, file, version));
