@@ -106,47 +106,47 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let [op] = &**ops else {
         return;
     };
-
     let [right] = &**comparators else {
         return;
     };
 
-    let left_cmp = ComparableExpr::from(left);
-    let body_target_cmp = ComparableExpr::from(body_target);
-    let right_cmp = ComparableExpr::from(right);
-    let body_value_cmp = ComparableExpr::from(body_value);
+    // extract helpful info from expression of the form
+    // `if cmp_left op cmp_right: body_left = body_right`
+    let cmp_left = ComparableExpr::from(left);
+    let cmp_right = ComparableExpr::from(right);
+    let body_left = ComparableExpr::from(body_target);
+    let body_right = ComparableExpr::from(body_value);
 
-    let left_is_target = left_cmp == body_target_cmp;
-    let right_is_target = right_cmp == body_target_cmp;
-    let left_is_value = left_cmp == body_value_cmp;
-    let right_is_value = right_cmp == body_value_cmp;
+    // these booleans are used to understand in which case we are.
+    // there are two possible cases:
+    // - `if cmp_left op cmp_right: cmp_left = cmp_right`
+    // - `if cmp_left op cmp_right: cmp_right = cmp_left `
+    let cmp_left_is_body_left = cmp_left == body_left;
+    let cmp_right_is_body_right = cmp_right == body_right;
+    let cmp_left_is_body_right = cmp_left == body_right;
+    let cmp_right_is_body_left = cmp_right == body_left;
 
-    let min_max = match (
-        left_is_target,
-        right_is_target,
-        left_is_value,
-        right_is_value,
+    let (min_max, arg1, arg2) = match (
+        cmp_left_is_body_left,
+        cmp_right_is_body_right,
+        cmp_left_is_body_right,
+        cmp_right_is_body_left,
     ) {
-        (true, false, false, true) => match op {
-            CmpOp::Lt | CmpOp::LtE => MinMax::Max,
-            CmpOp::Gt | CmpOp::GtE => MinMax::Min,
+        (true, true, false, false) => match op {
+            CmpOp::LtE => (MinMax::Max, right, &**left),
+            CmpOp::GtE => (MinMax::Min, right, &**left),
+            CmpOp::Gt => (MinMax::Min, &**left, right),
+            CmpOp::Lt => (MinMax::Max, &**left, right),
             _ => return,
         },
-        (false, true, true, false) => match op {
-            CmpOp::Lt | CmpOp::LtE => MinMax::Min,
-            CmpOp::Gt | CmpOp::GtE => MinMax::Max,
+        (false, false, true, true) => match op {
+            CmpOp::LtE => (MinMax::Min, right, &**left),
+            CmpOp::GtE => (MinMax::Max, &**left, right),
+            CmpOp::Gt => (MinMax::Max, right, &**left),
+            CmpOp::Lt => (MinMax::Min, right, &**left),
             _ => return,
         },
         _ => return,
-    };
-
-    // Determine whether to use `min()` or `max()`, and make sure that the first
-    // arg of the `min()` or `max()` method is equal to the target of the comparison.
-    // This is to be consistent with the Python implementation of the methods `min()` and `max()`.
-    let (arg1, arg2) = if left_is_target {
-        (&**left, right)
-    } else {
-        (right, &**left)
     };
 
     let replacement = format!(
