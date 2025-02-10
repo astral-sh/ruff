@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF054.py:8:2: RUF054 Indented form feed
+  |
+6 | # Errors
+7 |
+8 |  
+  |  ^ RUF054
+  |
+  = help: Remove form feed
+
+RUF054.py:10:3: RUF054 Indented form feed
+   |
+10 |         
+   |         ^ RUF054
+11 |
+12 | def _():
+   |
+   = help: Remove form feed
+
+RUF054.py:13:2: RUF054 Indented form feed
+   |
+12 | def _():
+13 |        pass
+   |     ^ RUF054
+14 |
+15 | if False:
+   |
+   = help: Remove form feed
+
+RUF054.py:17:5: RUF054 Indented form feed
+   |
+15 | if False:
+16 |     print('F')
+17 |     print('T')
+   |     ^ RUF054
+   |
+   = help: Remove form feed
