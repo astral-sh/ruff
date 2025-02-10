@@ -411,7 +411,7 @@ mod tests {
                 },
                 Parameter {
                     name: Some(Name::new_static("args")),
-                    annotated_ty: Some(KnownClass::Object.to_instance(&db)),
+                    annotated_ty: Some(Type::object(&db)),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {

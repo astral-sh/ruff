@@ -631,12 +631,21 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
+    pub fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object.to_instance(db)
+    }
+
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Type::Dynamic(DynamicType::Unknown))
     }
 
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    pub fn is_object(&self, db: &'db dyn Db) -> bool {
+        self.into_instance()
+            .is_some_and(|instance| instance.class.is_object(db))
     }
 
     pub const fn is_todo(&self) -> bool {
@@ -895,7 +904,7 @@ impl<'db> Type<'db> {
             // `object` is the only type that can be known to be a supertype of any intersection,
             // even an intersection with no positive elements
             (Type::Intersection(_), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Object) =>
+                if class.is_object(db) =>
             {
                 true
             }
@@ -949,7 +958,7 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => left.bool(db).is_always_true(),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.is_equivalent_to(db, KnownClass::Object.to_instance(db))
+                target.is_equivalent_to(db, Type::object(db))
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
@@ -1088,11 +1097,7 @@ impl<'db> Type<'db> {
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
-            (_, Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Object) =>
-            {
-                true
-            }
+            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
@@ -1801,7 +1806,7 @@ impl<'db> Type<'db> {
                     // TODO should be `Callable[[], Literal[True/False]]`
                     todo_type!("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants").into()
                 }
-                _ => KnownClass::Object.to_instance(db).member(db, name),
+                _ => Type::object(db).member(db, name),
             },
         }
     }
@@ -3851,6 +3856,11 @@ impl<'db> Class<'db> {
     /// Return `true` if this class represents `known_class`
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
+    }
+
+    /// Return `true` if this class represents the builtin class `object`
+    pub fn is_object(self, db: &'db dyn Db) -> bool {
+        self.is_known(db, KnownClass::Object)
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
