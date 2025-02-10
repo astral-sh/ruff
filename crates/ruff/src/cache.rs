@@ -586,6 +586,8 @@ mod tests {
     use anyhow::Result;
     use filetime::{set_file_mtime, FileTime};
     use itertools::Itertools;
+    use ruff_linter::settings::types::PythonVersion;
+    use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
@@ -611,6 +613,10 @@ mod tests {
 
         let settings = Settings {
             cache_dir,
+            linter: LinterSettings {
+                target_version: PythonVersion::Py310,
+                ..Default::default()
+            },
             ..Settings::default()
         };
 
