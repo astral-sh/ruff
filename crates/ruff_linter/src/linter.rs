@@ -14,7 +14,7 @@ use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, Parsed, SyntaxError};
+use ruff_python_parser::{ParseError, Parsed, SyntaxError, SyntaxErrorKind};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -33,6 +33,7 @@ use crate::package::PackageRoot;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
+use crate::settings::rule_table::RuleTable;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -295,7 +296,7 @@ pub fn check_path(
         diagnostics.extend(
             parsed
                 .syntax_errors(settings.target_version.into())
-                .flat_map(try_diagnostic_from_syntax_error),
+                .flat_map(|error| try_diagnostic_from_syntax_error(error, &settings.rules)),
         );
 
         // Remove fixes for any rules marked as unfixable.
@@ -326,12 +327,17 @@ pub fn check_path(
     diagnostics
 }
 
-fn try_diagnostic_from_syntax_error(syntax_error: &SyntaxError) -> Option<Diagnostic> {
+fn try_diagnostic_from_syntax_error(
+    syntax_error: &SyntaxError,
+    rules: &RuleTable,
+) -> Option<Diagnostic> {
     match syntax_error.kind {
-        ruff_python_parser::SyntaxErrorKind::LateFutureImport => Some(Diagnostic::new(
-            crate::rules::pyflakes::rules::LateFutureImport,
-            syntax_error.range,
-        )),
+        SyntaxErrorKind::LateFutureImport if rules.enabled(Rule::LateFutureImport) => {
+            Some(Diagnostic::new(
+                crate::rules::pyflakes::rules::LateFutureImport,
+                syntax_error.range,
+            ))
+        }
         _ => None,
     }
 }
