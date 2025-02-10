@@ -433,7 +433,9 @@ pub struct SyntaxError {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum SyntaxErrorType {}
+pub enum SyntaxErrorType {
+    MatchBeforePy310,
+}
 
 #[cfg(target_pointer_width = "64")]
 mod sizes {
