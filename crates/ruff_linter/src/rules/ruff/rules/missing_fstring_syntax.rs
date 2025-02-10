@@ -35,7 +35,8 @@ use crate::Locator;
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
 /// 7. The string is part of a function call that is known to expect a template string rather than an
-///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [fastAPI path].
+///    evaluated f-string: for example, a [`logging`][logging] call, a [`gettext`][gettext] call,
+///    or a [FastAPI path].
 ///
 /// ## Example
 ///
@@ -54,7 +55,7 @@ use crate::Locator;
 ///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
-/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
+/// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingFStringSyntax;
 
