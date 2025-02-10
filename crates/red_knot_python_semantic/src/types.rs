@@ -144,7 +144,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                     }
                     // Symbol is possibly undeclared and (possibly) bound
                     Symbol::Type(inferred_ty, boundness) => Symbol::Type(
-                        UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
+                        UnionType::from_elements(db, [inferred_ty, declared_ty]),
                         boundness,
                     ),
                 }
@@ -160,7 +160,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
             Err((declared_ty, _)) => {
                 // Intentionally ignore conflicting declared types; that's not our problem,
                 // it's the problem of the module we are importing from.
-                declared_ty.inner_type().into()
+                Symbol::bound(declared_ty.inner_type())
             }
         }
 
@@ -188,7 +188,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         && file_to_module(db, scope.file(db))
             .is_some_and(|module| module.is_known(KnownModule::Typing))
     {
-        return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
+        return Symbol::bound(Type::BooleanLiteral(true));
     }
     if name == "platform"
         && file_to_module(db, scope.file(db))
@@ -196,10 +196,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
-                return Symbol::Type(
-                    Type::StringLiteral(StringLiteralType::new(db, platform.as_str())),
-                    Boundness::Bound,
-                );
+                return Symbol::bound(Type::string_literal(db, platform.as_str()));
             }
             crate::PythonPlatform::All => {
                 // Fall through to the looked up type
@@ -402,9 +399,16 @@ fn symbol_from_bindings<'db>(
 /// If we look up the declared type of `variable` in the scope of class `C`, we will get
 /// the type `int`, a "declaredness" of [`Boundness::PossiblyUnbound`], and the information
 /// that this comes with a [`TypeQualifiers::CLASS_VAR`] type qualifier.
+#[derive(Debug)]
 pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
 impl SymbolAndQualifiers<'_> {
+    /// Smart constructor to create a [`SymbolAndQualifiers`] instance with a [`TodoType`] type
+    /// and no qualifiers.
+    fn todo(message: &'static str) -> Self {
+        Self(Symbol::todo(message), TypeQualifiers::empty())
+    }
+
     fn is_class_var(&self) -> bool {
         self.1.contains(TypeQualifiers::CLASS_VAR)
     }
@@ -417,12 +421,6 @@ impl SymbolAndQualifiers<'_> {
 impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
     fn from(symbol: Symbol<'db>) -> Self {
         SymbolAndQualifiers(symbol, TypeQualifiers::empty())
-    }
-}
-
-impl<'db> From<Type<'db>> for SymbolAndQualifiers<'db> {
-    fn from(ty: Type<'db>) -> Self {
-        SymbolAndQualifiers(ty.into(), TypeQualifiers::empty())
     }
 }
 
@@ -561,6 +559,11 @@ macro_rules! todo_type {
             $crate::types::TodoType::Message($message),
         ))
     };
+    ($message:ident) => {
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
+            $crate::types::TodoType::Message($message),
+        ))
+    };
 }
 
 #[cfg(not(debug_assertions))]
@@ -569,6 +572,9 @@ macro_rules! todo_type {
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(crate::types::TodoType))
     };
     ($message:literal) => {
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(crate::types::TodoType))
+    };
+    ($message:ident) => {
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(crate::types::TodoType))
     };
 }
@@ -1684,17 +1690,17 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__class__" {
-            return self.to_meta_type(db).into();
+            return Symbol::bound(self.to_meta_type(db));
         }
 
         match self {
-            Type::Dynamic(_) => self.into(),
+            Type::Dynamic(_) => Symbol::bound(self),
 
-            Type::Never => todo_type!("attribute lookup on Never").into(),
+            Type::Never => Symbol::todo("attribute lookup on Never"),
 
             Type::FunctionLiteral(_) => match name {
-                "__get__" => todo_type!("`__get__` method on functions").into(),
-                "__call__" => todo_type!("`__call__` method on functions").into(),
+                "__get__" => Symbol::todo("`__get__` method on functions"),
+                "__call__" => Symbol::todo("`__call__` method on functions"),
                 _ => KnownClass::FunctionType.to_instance(db).member(db, name),
             },
 
@@ -1707,12 +1713,12 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.member(db, name),
 
             Type::Instance(InstanceType { class }) => match (class.known(db), name) {
-                (Some(KnownClass::VersionInfo), "major") => {
-                    Type::IntLiteral(Program::get(db).python_version(db).major.into()).into()
-                }
-                (Some(KnownClass::VersionInfo), "minor") => {
-                    Type::IntLiteral(Program::get(db).python_version(db).minor.into()).into()
-                }
+                (Some(KnownClass::VersionInfo), "major") => Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).major.into(),
+                )),
+                (Some(KnownClass::VersionInfo), "minor") => Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).minor.into(),
+                )),
                 _ => {
                     let SymbolAndQualifiers(symbol, _) = class.instance_member(db, name);
                     symbol
@@ -1758,30 +1764,30 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                todo_type!("Attribute access on `Intersection` types").into()
+                Symbol::todo("Attribute access on `Intersection` types")
             }
 
             Type::IntLiteral(_) => match name {
-                "real" | "numerator" => self.into(),
+                "real" | "numerator" => Symbol::bound(self),
                 // TODO more attributes could probably be usefully special-cased
                 _ => KnownClass::Int.to_instance(db).member(db, name),
             },
 
             Type::BooleanLiteral(bool_value) => match name {
-                "real" | "numerator" => Type::IntLiteral(i64::from(*bool_value)).into(),
+                "real" | "numerator" => Symbol::bound(Type::IntLiteral(i64::from(*bool_value))),
                 _ => KnownClass::Bool.to_instance(db).member(db, name),
             },
 
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                todo_type!("Attribute access on `StringLiteral` types").into()
+                Symbol::todo("Attribute access on `StringLiteral` types")
             }
 
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                todo_type!("Attribute access on `LiteralString` types").into()
+                Symbol::todo("Attribute access on `LiteralString` types")
             }
 
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).member(db, name),
@@ -1793,13 +1799,13 @@ impl<'db> Type<'db> {
 
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                todo_type!("Attribute access on heterogeneous tuple types").into()
+                Symbol::todo("Attribute access on heterogeneous tuple types")
             }
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
                 "__bool__" => {
                     // TODO should be `Callable[[], Literal[True/False]]`
-                    todo_type!("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants").into()
+                    Symbol::todo("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants")
                 }
                 _ => KnownClass::Object.to_instance(db).member(db, name),
             },
@@ -2524,18 +2530,6 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     }
 }
 
-impl<'db> From<Type<'db>> for Symbol<'db> {
-    fn from(value: Type<'db>) -> Self {
-        Symbol::Type(value, Boundness::Bound)
-    }
-}
-
-impl<'db> From<&Type<'db>> for Symbol<'db> {
-    fn from(value: &Type<'db>) -> Self {
-        Self::from(*value)
-    }
-}
-
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DynamicType {
     // An explicitly annotated `typing.Any`
@@ -2568,7 +2562,7 @@ impl std::fmt::Display for DynamicType {
 
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
     pub(crate) struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
@@ -2593,6 +2587,14 @@ pub(crate) struct TypeAndQualifiers<'db> {
 impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn new(inner: Type<'db>, qualifiers: TypeQualifiers) -> Self {
         Self { inner, qualifiers }
+    }
+
+    /// Smart constructor to create a [`TypeAndQualifiers`] instance with type `Unknown` and no qualifiers.
+    pub(crate) fn unknown() -> Self {
+        Self {
+            inner: Type::unknown(),
+            qualifiers: TypeQualifiers::empty(),
+        }
     }
 
     /// Forget about type qualifiers and only return the inner type.
@@ -3326,7 +3328,7 @@ impl<'db> KnownInstanceType<'db> {
             (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
             _ => return self.instance_fallback(db).member(db, name),
         };
-        ty.into()
+        Symbol::bound(ty)
     }
 }
 
@@ -3784,8 +3786,7 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    let submodule_ty = Type::module_literal(db, importing_file, submodule);
-                    return Symbol::Type(submodule_ty, Boundness::Bound);
+                    return Symbol::bound(Type::module_literal(db, importing_file, submodule));
                 }
             }
         }
@@ -4114,7 +4115,7 @@ impl<'db> Class<'db> {
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db).map(Type::from);
-            return TupleType::from_elements(db, tuple_elements).into();
+            return Symbol::bound(TupleType::from_elements(db, tuple_elements));
         }
 
         for superclass in self.iter_mro(db) {
@@ -4154,7 +4155,9 @@ impl<'db> Class<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
-                    return todo_type!("instance attribute on class with dynamic base").into();
+                    return SymbolAndQualifiers::todo(
+                        "instance attribute on class with dynamic base",
+                    );
                 }
                 ClassBase::Class(class) => {
                     if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
@@ -4204,7 +4207,7 @@ impl<'db> Class<'db> {
             .and_then(|assignments| assignments.get(name))
         else {
             if inferred_type_from_class_body.is_some() {
-                return union_of_inferred_types.build().into();
+                return Symbol::bound(union_of_inferred_types.build());
             }
             return Symbol::Unbound;
         };
@@ -4221,7 +4224,7 @@ impl<'db> Class<'db> {
                     let annotation_ty = infer_expression_type(db, *annotation);
 
                     // TODO: check if there are conflicting declarations
-                    return annotation_ty.into();
+                    return Symbol::bound(annotation_ty);
                 }
                 AttributeAssignment::Unannotated { value } => {
                     // We found an un-annotated attribute assignment of the form:
@@ -4261,7 +4264,7 @@ impl<'db> Class<'db> {
             }
         }
 
-        union_of_inferred_types.build().into()
+        Symbol::bound(union_of_inferred_types.build())
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -4290,12 +4293,12 @@ impl<'db> Class<'db> {
                         // just a temporary heuristic to provide a broad categorization into properties
                         // and non-property methods.
                         if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
-                            todo_type!("@property").into()
+                            SymbolAndQualifiers::todo("@property")
                         } else {
-                            todo_type!("bound method").into()
+                            SymbolAndQualifiers::todo("bound method")
                         }
                     } else {
-                        SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::Bound), qualifiers)
+                        SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
                     }
                 }
                 Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
@@ -4310,7 +4313,10 @@ impl<'db> Class<'db> {
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
-                    SymbolAndQualifiers(declared_ty.inner_type().into(), declared_ty.qualifiers())
+                    SymbolAndQualifiers(
+                        Symbol::bound(declared_ty.inner_type()),
+                        declared_ty.qualifiers(),
+                    )
                 }
             }
         } else {
