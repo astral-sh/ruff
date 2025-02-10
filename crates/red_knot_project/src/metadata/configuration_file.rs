@@ -16,8 +16,8 @@ pub(crate) struct ConfigurationFile {
 impl ConfigurationFile {
     /// Loads the user-level configuration file if it exists.
     ///
-    /// Returns `None` if the file does not exist or the concept of user-level configurations
-    /// don't exist on `system`.
+    /// Returns `None` if the file does not exist or if the concept of user-level configurations
+    /// doesn't exist on `system`.
     pub(crate) fn user(system: &dyn System) -> Result<Option<Self>, ConfigurationFileError> {
         let Some(configuration_directory) = system.user_config_directory() else {
             return Ok(None);

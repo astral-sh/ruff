@@ -101,7 +101,7 @@ impl System for OsSystem {
     #[cfg(not(target_arch = "wasm32"))]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
         // In testing, we allow overriding the user configuration directory by using a
-        // thread local because overriding the environment variables breaks test isolatios
+        // thread local because overriding the environment variables breaks test isolation
         // (tests run concurrently) and mutating environment variable in a multithreaded
         // application is inherently unsafe.
         #[cfg(feature = "testing")]
