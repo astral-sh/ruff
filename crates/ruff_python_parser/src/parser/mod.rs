@@ -30,6 +30,7 @@ mod tests;
 struct SyntaxErrorState {
     /// Whether or not the [`Parser`] has traversed past the "top-of-file" import boundary.
     seen_futures_boundary: bool,
+    seen_docstring_boundary: bool,
 }
 
 #[derive(Debug)]

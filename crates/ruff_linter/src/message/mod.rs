@@ -127,12 +127,23 @@ impl Message {
         syntax_error: &SyntaxError,
         file: SourceFile,
         target_version: PythonVersion,
+        noqa_offset: TextSize,
     ) -> Message {
-        Message::SyntaxError(SyntaxErrorMessage {
-            message: format!("SyntaxError: {}", syntax_error.message(target_version)),
-            range: syntax_error.range,
-            file,
-        })
+        match syntax_error.kind {
+            ruff_python_parser::SyntaxErrorKind::LateFutureImport => Message::from_diagnostic(
+                Diagnostic::new(
+                    crate::rules::pyflakes::rules::LateFutureImport,
+                    syntax_error.range,
+                ),
+                file,
+                noqa_offset,
+            ),
+            _ => Message::SyntaxError(SyntaxErrorMessage {
+                message: format!("SyntaxError: {}", syntax_error.message(target_version)),
+                range: syntax_error.range,
+                file,
+            }),
+        }
     }
 
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {

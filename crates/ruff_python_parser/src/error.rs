@@ -450,7 +450,10 @@ impl SyntaxError {
     pub const fn version(&self) -> PythonVersion {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
-            SyntaxErrorKind::LateFutureImport => PythonVersion { major: 0, minor: 0 },
+            SyntaxErrorKind::LateFutureImport => PythonVersion {
+                major: std::u8::MAX,
+                minor: std::u8::MAX,
+            },
         }
     }
 }
