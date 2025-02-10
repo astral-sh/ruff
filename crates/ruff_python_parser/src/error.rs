@@ -426,6 +426,15 @@ impl std::fmt::Display for LexicalErrorType {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct SyntaxError {
+    pub error: SyntaxErrorType,
+    pub location: TextRange,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SyntaxErrorType {}
+
 #[cfg(target_pointer_width = "64")]
 mod sizes {
     use crate::error::{LexicalError, LexicalErrorType};

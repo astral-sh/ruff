@@ -5,6 +5,7 @@ use bitflags::bitflags;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::error::SyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
@@ -34,6 +35,10 @@ pub(crate) struct Parser<'src> {
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
+
+    /// Stores non-fatal syntax errors found during parsing, such as version-related errors and
+    /// errors detected by the Python compiler.
+    syntax_errors: Vec<SyntaxError>,
 
     /// Options for how the code will be parsed.
     options: ParseOptions,
@@ -70,6 +75,7 @@ impl<'src> Parser<'src> {
             options,
             source,
             errors: Vec::new(),
+            syntax_errors: Vec::new(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
@@ -166,6 +172,7 @@ impl<'src> Parser<'src> {
                 syntax,
                 tokens: Tokens::new(tokens),
                 errors: parse_errors,
+                syntax_errors: self.syntax_errors,
             };
         }
 
@@ -197,6 +204,7 @@ impl<'src> Parser<'src> {
             syntax,
             tokens: Tokens::new(tokens),
             errors: merged,
+            syntax_errors: self.syntax_errors,
         }
     }
 
