@@ -17,3 +17,4 @@ of these types and their properties is consistent with the specification.
 - [`Any`](any.md)
 - Class literal types, `type[C]`, `type[object]`, `type[Any]`
 - [`AlwaysTruthy`, `AlwaysFalsy`](always_truthy_falsy.md)
+- [`Not[T]`](not_t.md)
