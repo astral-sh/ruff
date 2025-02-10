@@ -144,7 +144,7 @@ snapbox = { version = "0.6.0", features = [
 ] }
 static_assertions = "1.1.0"
 strum = { version = "0.27.0", features = ["strum_macros"] }
-strum_macros = { version = "0.26.0" }
+strum_macros = { version = "0.27.0" }
 syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
