@@ -11,7 +11,6 @@ use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::version::PythonVersion;
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
 
@@ -40,9 +39,6 @@ pub(crate) struct Parser<'src> {
     /// Stores non-fatal syntax errors found during parsing, such as version-related errors and
     /// errors detected by the Python compiler.
     syntax_errors: Vec<SyntaxError>,
-
-    /// The Python version to use for checking version-related syntax errors.
-    python_version: PythonVersion,
 
     /// Options for how the code will be parsed.
     options: ParseOptions,
@@ -80,7 +76,6 @@ impl<'src> Parser<'src> {
             source,
             errors: Vec::new(),
             syntax_errors: Vec::new(),
-            python_version: PythonVersion::PY38, // TODO this needs to be passed from outside
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
