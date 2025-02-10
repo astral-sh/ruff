@@ -510,6 +510,8 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
 
+        self.syntax_error_state.seen_futures_boundary = true;
+
         ast::StmtImport {
             range: self.node_range(start),
             names,
@@ -619,11 +621,26 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
+        let range = self.node_range(start);
+
+        // Allow __future__ imports until we see a non-__future__ import.
+        match module.as_deref() {
+            Some("__future__") => {
+                if self.syntax_error_state.seen_futures_boundary {
+                    self.syntax_errors.push(SyntaxError {
+                        kind: SyntaxErrorKind::LateFutureImport,
+                        range,
+                    });
+                }
+            }
+            _ => self.syntax_error_state.seen_futures_boundary = true,
+        }
+
         ast::StmtImportFrom {
             module,
             names,
             level: leading_dots,
-            range: self.node_range(start),
+            range,
         }
     }
 

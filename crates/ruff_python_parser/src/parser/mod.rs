@@ -26,6 +26,12 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug, Default)]
+struct SyntaxErrorState {
+    /// Whether or not the [`Parser`] has traversed past the "top-of-file" import boundary.
+    seen_futures_boundary: bool,
+}
+
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
@@ -39,6 +45,8 @@ pub(crate) struct Parser<'src> {
     /// Stores non-fatal syntax errors found during parsing, such as version-related errors and
     /// errors detected by the Python compiler.
     syntax_errors: Vec<SyntaxError>,
+
+    syntax_error_state: SyntaxErrorState,
 
     /// Options for how the code will be parsed.
     options: ParseOptions,
@@ -76,6 +84,7 @@ impl<'src> Parser<'src> {
             source,
             errors: Vec::new(),
             syntax_errors: Vec::new(),
+            syntax_error_state: SyntaxErrorState::default(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
