@@ -6,9 +6,9 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::syntax::SyntaxDiagnostic;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::{register_lints, Program};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
@@ -341,9 +341,10 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
     }));
 
     if parsed.is_valid() {
-        diagnostics.extend(parsed.syntax_errors().iter().map(|error| {
+        let version = Program::get(db).python_version(db);
+        diagnostics.extend(parsed.syntax_errors(version.into()).map(|error| {
             let diagnostic: Box<dyn Diagnostic> =
-                Box::new(SyntaxDiagnostic::from_syntax_error(error, file));
+                Box::new(SyntaxDiagnostic::from_syntax_error(error, file, version));
             diagnostic
         }));
     }
