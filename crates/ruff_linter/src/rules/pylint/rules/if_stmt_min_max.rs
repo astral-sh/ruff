@@ -118,7 +118,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let body_right = ComparableExpr::from(body_value);
 
     // these booleans are used to understand in which case we are.
-    // there are two possible cases:
+    // The two possible cases that the rule addresses are:
     // - `if cmp_left op cmp_right: cmp_left = cmp_right`
     // - `if cmp_left op cmp_right: cmp_right = cmp_left `
     let cmp_left_is_body_left = cmp_left == body_left;
