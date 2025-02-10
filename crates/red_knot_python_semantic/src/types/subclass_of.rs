@@ -26,7 +26,7 @@ impl<'db> SubclassOfType<'db> {
             ClassBase::Class(class) => {
                 if class.is_final(db) {
                     Type::ClassLiteral(ClassLiteralType { class })
-                } else if class.is_known(db, KnownClass::Object) {
+                } else if class.is_object(db) {
                     KnownClass::Type.to_instance(db)
                 } else {
                     Type::SubclassOf(Self { subclass_of })

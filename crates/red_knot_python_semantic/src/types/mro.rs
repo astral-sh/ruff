@@ -4,7 +4,7 @@ use std::ops::Deref;
 use rustc_hash::FxHashSet;
 
 use crate::types::class_base::ClassBase;
-use crate::types::{Class, KnownClass, Type};
+use crate::types::{Class, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
@@ -52,9 +52,7 @@ impl<'db> Mro<'db> {
         match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
-            [] if class.is_known(db, KnownClass::Object) => {
-                Ok(Self::from([ClassBase::Class(class)]))
-            }
+            [] if class.is_object(db) => Ok(Self::from([ClassBase::Class(class)])),
 
             // All other classes in Python have an MRO with length >=2.
             // Even if a class has no explicit base classes,
