@@ -451,8 +451,8 @@ impl SyntaxError {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
             SyntaxErrorKind::LateFutureImport => PythonVersion {
-                major: std::u8::MAX,
-                minor: std::u8::MAX,
+                major: u8::MAX,
+                minor: u8::MAX,
             },
         }
     }
