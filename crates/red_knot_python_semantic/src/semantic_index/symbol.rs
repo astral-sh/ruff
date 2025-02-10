@@ -146,7 +146,9 @@ impl<'db> ScopeId<'db> {
             | NodeWithScopeKind::Function(_)
             | NodeWithScopeKind::FunctionTypeParameters(_)
             | NodeWithScopeKind::Lambda(_)
-            | NodeWithScopeKind::Module => false,
+            | NodeWithScopeKind::Module
+            | NodeWithScopeKind::TypeAlias(_)
+            | NodeWithScopeKind::TypeAliasTypeParameters(_) => false,
         }
     }
 
@@ -175,7 +177,9 @@ impl<'db> ScopeId<'db> {
             | NodeWithScopeKind::Function(_)
             | NodeWithScopeKind::FunctionTypeParameters(_)
             | NodeWithScopeKind::Lambda(_)
-            | NodeWithScopeKind::Module => None,
+            | NodeWithScopeKind::Module
+            | NodeWithScopeKind::TypeAlias(_)
+            | NodeWithScopeKind::TypeAliasTypeParameters(_) => None,
         }
     }
 
@@ -545,7 +549,9 @@ impl NodeWithScopeKind {
             | Self::Module
             | Self::Function(_)
             | Self::FunctionTypeParameters(_)
-            | Self::ClassTypeParameters(_) => None,
+            | Self::ClassTypeParameters(_)
+            | Self::TypeAlias(_)
+            | Self::TypeAliasTypeParameters(_) => None,
         }
     }
 

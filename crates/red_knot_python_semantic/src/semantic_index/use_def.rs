@@ -544,6 +544,7 @@ impl Default for UseDefMapBuilder<'_> {
             all_constraints: IndexVec::new(),
             visibility_constraints: VisibilityConstraintsBuilder::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            bindings_by_eager_nested_scope: EagerNestedScopeBindingsMap::default(),
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -757,33 +758,22 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
     }
 
-    pub(super) fn finish(self) -> UseDefMap<'db> {
-        let UseDefMapBuilder {
-            mut all_definitions,
-            mut all_constraints,
-            visibility_constraints,
-            mut bindings_by_eager_nested_scope,
-            mut bindings_by_use,
-            mut definitions_by_definition,
-            mut symbol_states,
-        } = self;
-
-        all_definitions.shrink_to_fit();
-        all_constraints.shrink_to_fit();
-        let visibility_constraints = visibility_constraints.build();
-        symbol_states.shrink_to_fit();
-        bindings_by_eager_nested_scope.shrink_to_fit();
-        bindings_by_use.shrink_to_fit();
-        definitions_by_definition.shrink_to_fit();
+    pub(super) fn finish(mut self) -> UseDefMap<'db> {
+        self.all_definitions.shrink_to_fit();
+        self.all_constraints.shrink_to_fit();
+        self.symbol_states.shrink_to_fit();
+        self.bindings_by_eager_nested_scope.shrink_to_fit();
+        self.bindings_by_use.shrink_to_fit();
+        self.definitions_by_definition.shrink_to_fit();
 
         UseDefMap {
-            all_definitions,
-            all_constraints,
-            visibility_constraints,
-            bindings_by_use,
-            bindings_by_eager_nested_scope,
-            public_symbols: symbol_states,
-            definitions_by_definition,
+            all_definitions: self.all_definitions,
+            all_constraints: self.all_constraints,
+            visibility_constraints: self.visibility_constraints.build(),
+            bindings_by_use: self.bindings_by_use,
+            bindings_by_eager_nested_scope: self.bindings_by_eager_nested_scope,
+            public_symbols: self.symbol_states,
+            definitions_by_definition: self.definitions_by_definition,
         }
     }
 }
