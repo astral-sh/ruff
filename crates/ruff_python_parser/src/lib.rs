@@ -67,7 +67,9 @@
 use std::iter::FusedIterator;
 use std::ops::Deref;
 
-pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::error::{
+    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, SyntaxError, SyntaxErrorType,
+};
 pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
 
@@ -305,6 +307,7 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
+    syntax_errors: Vec<SyntaxError>,
 }
 
 impl<T> Parsed<T> {
@@ -373,6 +376,7 @@ impl Parsed<Mod> {
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
+                syntax_errors: self.syntax_errors,
             }),
             Mod::Expression(_) => None,
         }
@@ -392,6 +396,7 @@ impl Parsed<Mod> {
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
+                syntax_errors: self.syntax_errors,
             }),
         }
     }
