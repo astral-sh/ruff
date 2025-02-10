@@ -26,16 +26,16 @@ pub struct TestSystem {
 }
 
 impl TestSystem {
-    /// Returns the `InMemorySystem`.
+    /// Returns the [`InMemorySystem`].
     ///
     /// ## Panics
-    /// If this test db isn't the in memory system.
+    /// If the underlying test system isn't the [`InMemorySystem`].
     pub fn in_memory(&self) -> &InMemorySystem {
         self.as_in_memory()
             .expect("The test db is not using a memory file system")
     }
 
-    /// Returns the `InMemorySystem` or `None` if the test system is using an other underlying system.
+    /// Returns the `InMemorySystem` or `None` if the underlying test system isn't the [`InMemorySystem`].
     pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
         self.system().as_any().downcast_ref::<InMemorySystem>()
     }
@@ -43,7 +43,7 @@ impl TestSystem {
     /// Returns the memory file system.
     ///
     /// ## Panics
-    /// If this test db isn't using a memory file system.
+    /// If the underlying test system isn't the [`InMemorySystem`].
     pub fn memory_file_system(&self) -> &MemoryFileSystem {
         self.in_memory().fs()
     }
@@ -144,8 +144,8 @@ pub trait DbWithTestSystem: Db + Sized {
 
     /// Writes the content of the given file and notifies the Db about the change.
     ///
-    /// # Panics
-    /// If the system isn't using the memory file system.
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
         let path = path.as_ref();
 
@@ -172,6 +172,9 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 
     /// Writes the content of the given virtual file.
+    ///
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
         let path = path.as_ref();
         self.test_system()
@@ -180,6 +183,9 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 
     /// Writes auto-dedented text to a file.
+    ///
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_dedented(&mut self, path: &str, content: &str) -> crate::system::Result<()> {
         self.write_file(path, textwrap::dedent(content))?;
         Ok(())
@@ -187,8 +193,8 @@ pub trait DbWithTestSystem: Db + Sized {
 
     /// Writes the content of the given files and notifies the Db about the change.
     ///
-    /// # Panics
-    /// If the system isn't using the memory file system for testing.
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_files<P, C, I>(&mut self, files: I) -> crate::system::Result<()>
     where
         I: IntoIterator<Item = (P, C)>,
@@ -217,7 +223,7 @@ pub trait DbWithTestSystem: Db + Sized {
     /// Returns the memory file system.
     ///
     /// ## Panics
-    /// If this system isn't using a memory file system.
+    /// If the underlying test system isn't the [`InMemorySystem`].
     fn memory_file_system(&self) -> &MemoryFileSystem {
         self.test_system().memory_file_system()
     }

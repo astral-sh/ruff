@@ -7,7 +7,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::{fmt, io};
-pub use test::{DbWithTestSystem, TestSystem};
+pub use test::{DbWithTestSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
