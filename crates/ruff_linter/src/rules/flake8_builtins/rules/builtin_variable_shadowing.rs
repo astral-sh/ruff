@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -44,8 +44,8 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 ///
 /// ## References
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
-#[violation]
-pub struct BuiltinVariableShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinVariableShadowing {
     name: String,
 }
 
@@ -58,14 +58,14 @@ impl Violation for BuiltinVariableShadowing {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
+pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: TextRange) {
     if shadows_builtin(
         name,
         checker.source_type,
         &checker.settings.flake8_builtins.builtins_ignorelist,
         checker.settings.target_version,
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },

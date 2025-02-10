@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
-C410.py:1:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+C410.py:1:6: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
   |
 1 | l1 = list([1, 2])
   |      ^^^^^^^^^^^^ C410
 2 | l2 = list((1, 2))
 3 | l3 = list([])
   |
-  = help: Remove outer `list` call
+  = help: Remove outer `list()` call
 
 ℹ Unsafe fix
 1   |-l1 = list([1, 2])
@@ -18,7 +17,7 @@ C410.py:1:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
 3 3 | l3 = list([])
 4 4 | l4 = list(())
 
-C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+C410.py:2:6: C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
   |
 1 | l1 = list([1, 2])
 2 | l2 = list((1, 2))
@@ -26,7 +25,7 @@ C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
 3 | l3 = list([])
 4 | l4 = list(())
   |
-  = help: Rewrite as a `list` literal
+  = help: Rewrite as a single list literal
 
 ℹ Unsafe fix
 1 1 | l1 = list([1, 2])
@@ -36,7 +35,7 @@ C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
 4 4 | l4 = list(())
 5 5 | 
 
-C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+C410.py:3:6: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
   |
 1 | l1 = list([1, 2])
 2 | l2 = list((1, 2))
@@ -44,7 +43,7 @@ C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
   |      ^^^^^^^^ C410
 4 | l4 = list(())
   |
-  = help: Remove outer `list` call
+  = help: Remove outer `list()` call
 
 ℹ Unsafe fix
 1 1 | l1 = list([1, 2])
@@ -55,14 +54,14 @@ C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
 5 5 | 
 6 6 | 
 
-C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+C410.py:4:6: C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
   |
 2 | l2 = list((1, 2))
 3 | l3 = list([])
 4 | l4 = list(())
   |      ^^^^^^^^ C410
   |
-  = help: Rewrite as a `list` literal
+  = help: Rewrite as a single list literal
 
 ℹ Unsafe fix
 1 1 | l1 = list([1, 2])
@@ -74,16 +73,16 @@ C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
 6 6 | 
 7 7 | list(  # comment
 
-C410.py:7:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+C410.py:7:1: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
    |
  7 | / list(  # comment
  8 | |     [1, 2]
  9 | | )
    | |_^ C410
-10 |   
+10 |
 11 |   list([  # comment
    |
-   = help: Remove outer `list` call
+   = help: Remove outer `list()` call
 
 ℹ Unsafe fix
 4  4  | l4 = list(())
@@ -97,16 +96,18 @@ C410.py:7:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
 11 9  | list([  # comment
 12 10 |     1, 2
 
-C410.py:11:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+C410.py:11:1: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
    |
  9 |   )
-10 |   
+10 |
 11 | / list([  # comment
 12 | |     1, 2
 13 | | ])
    | |__^ C410
+14 |
+15 |   # Skip when too many positional arguments
    |
-   = help: Remove outer `list` call
+   = help: Remove outer `list()` call
 
 ℹ Unsafe fix
 8  8  |     [1, 2]
@@ -117,3 +118,6 @@ C410.py:11:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the
 12 12 |     1, 2
 13    |-])
    13 |+]
+14 14 | 
+15 15 | # Skip when too many positional arguments
+16 16 | # See https://github.com/astral-sh/ruff/issues/15810

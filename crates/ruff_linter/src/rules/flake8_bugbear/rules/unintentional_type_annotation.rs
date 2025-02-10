@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -22,8 +22,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// a["b"] = 1
 /// ```
-#[violation]
-pub struct UnintentionalTypeAnnotation;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnintentionalTypeAnnotation;
 
 impl Violation for UnintentionalTypeAnnotation {
     #[derive_message_formats]
@@ -35,7 +35,7 @@ impl Violation for UnintentionalTypeAnnotation {
 
 /// B032
 pub(crate) fn unintentional_type_annotation(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     value: Option<&Expr>,
     stmt: &Stmt,
@@ -47,16 +47,16 @@ pub(crate) fn unintentional_type_annotation(
         Expr::Subscript(ast::ExprSubscript { value, .. }) => {
             if value.is_name_expr() {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
+                    .report_diagnostic(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
             }
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                 if id != "self" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        UnintentionalTypeAnnotation,
+                        stmt.range(),
+                    ));
                 }
             }
         }

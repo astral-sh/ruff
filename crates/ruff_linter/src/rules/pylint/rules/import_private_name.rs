@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
@@ -49,8 +49,8 @@ use crate::package::PackageRoot;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 /// [PEP 420]: https://peps.python.org/pep-0420/
-#[violation]
-pub struct ImportPrivateName {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportPrivateName {
     name: String,
     module: Option<String>,
 }
@@ -69,11 +69,7 @@ impl Violation for ImportPrivateName {
 }
 
 /// PLC2701
-pub(crate) fn import_private_name(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
         let Some(import) = binding.as_any_import() else {
@@ -140,7 +136,7 @@ pub(crate) fn import_private_name(
         } else {
             None
         };
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             ImportPrivateName { name, module },
             binding.range(),
         ));

@@ -10,10 +10,10 @@ def returns_bool() -> bool:
     return True
 
 if returns_bool():
-    copyright = 1
+    chr: int = 1
 
 def f():
-    reveal_type(copyright)  # revealed: Literal[copyright] | Literal[1]
+    reveal_type(chr)  # revealed: int | Literal[chr]
 ```
 
 ## Conditionally global or builtin, with annotation
@@ -25,8 +25,8 @@ def returns_bool() -> bool:
     return True
 
 if returns_bool():
-    copyright: int = 1
+    chr: int = 1
 
 def f():
-    reveal_type(copyright)  # revealed: Literal[copyright] | int
+    reveal_type(chr)  # revealed: int | Literal[chr]
 ```

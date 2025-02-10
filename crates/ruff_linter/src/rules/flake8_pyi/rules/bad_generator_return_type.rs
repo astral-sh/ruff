@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
@@ -58,8 +58,8 @@ use crate::importer::ImportRequest;
 /// applied to runtime Python (`.py` files). As such, the fix is marked as
 /// unsafe for any `__iter__` or `__aiter__` method in a `.py` file that has
 /// more than two statements (including docstrings) in its body.
-#[violation]
-pub struct GeneratorReturnFromIterMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct GeneratorReturnFromIterMethod {
     return_type: Iterator,
     method: Method,
 }
@@ -88,10 +88,7 @@ impl Violation for GeneratorReturnFromIterMethod {
 }
 
 /// PYI058
-pub(crate) fn bad_generator_return_type(
-    function_def: &ast::StmtFunctionDef,
-    checker: &mut Checker,
-) {
+pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, checker: &Checker) {
     if function_def.is_async {
         return;
     }
@@ -220,17 +217,19 @@ pub(crate) fn bad_generator_return_type(
         },
         function_def.identifier(),
     );
-    if let Some(fix) = generate_fix(
-        function_def,
-        returns,
-        yield_type_info,
-        module,
-        member,
-        checker,
-    ) {
-        diagnostic.set_fix(fix);
-    };
-    checker.diagnostics.push(diagnostic);
+
+    diagnostic.try_set_fix(|| {
+        generate_fix(
+            function_def,
+            returns,
+            yield_type_info,
+            module,
+            member,
+            checker,
+        )
+    });
+
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the [`ast::Expr`] is a `None` literal or a `typing.Any` expression.
@@ -246,17 +245,14 @@ fn generate_fix(
     module: Module,
     member: Generator,
     checker: &Checker,
-) -> Option<Fix> {
+) -> anyhow::Result<Fix> {
     let expr = map_subscript(returns);
 
-    let (import_edit, binding) = checker
-        .importer()
-        .get_or_import_symbol(
-            &ImportRequest::import_from(&module.to_string(), &member.to_iter().to_string()),
-            expr.start(),
-            checker.semantic(),
-        )
-        .ok()?;
+    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import_from(&module.to_string(), &member.to_iter().to_string()),
+        expr.start(),
+        checker.semantic(),
+    )?;
     let binding_edit = Edit::range_replacement(binding, expr.range());
     let yield_edit = yield_type_info.map(|yield_type_info| {
         Edit::range_replacement(
@@ -272,7 +268,7 @@ fn generate_fix(
         Applicability::Unsafe
     };
 
-    Some(Fix::applicable_edits(
+    Ok(Fix::applicable_edits(
         import_edit,
         std::iter::once(binding_edit).chain(yield_edit),
         applicability,

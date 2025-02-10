@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/yield_from/unparenthesized.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -137,7 +136,7 @@ Module(
 1 | # Unparenthesized named expression
 2 | yield from x := 1
   |              ^^ Syntax Error: Expected a statement
-3 | 
+3 |
 4 | # Unparenthesized tuple expression
   |
 
@@ -146,7 +145,7 @@ Module(
 4 | # Unparenthesized tuple expression
 5 | yield from x, y
   |            ^^^^ Syntax Error: Unparenthesized tuple expression cannot be used here
-6 | 
+6 |
 7 | # This is a tuple expression parsing
   |
 

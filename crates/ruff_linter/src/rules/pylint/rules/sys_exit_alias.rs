@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
@@ -35,8 +35,8 @@ use crate::importer::ImportRequest;
 ///
 /// ## References
 /// - [Python documentation: Constants added by the `site` module](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
-#[violation]
-pub struct SysExitAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct SysExitAlias {
     name: String,
 }
 
@@ -56,7 +56,7 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
+pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr) {
     let Some(builtin) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };
@@ -78,5 +78,5 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         let reference_edit = Edit::range_replacement(binding, func.range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

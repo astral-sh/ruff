@@ -1,19 +1,23 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unnecessary default type arguments.
+/// Checks for unnecessary default type arguments for `Generator` and
+/// `AsyncGenerator` on Python 3.13+.
 ///
 /// ## Why is this bad?
 /// Python 3.13 introduced the ability for type parameters to specify default
-/// values. As such, the default type arguments for some types in the standard
-/// library (e.g., Generator, AsyncGenerator) are now optional.
+/// values. Following this change, several standard-library classes were
+/// updated to add default values for some of their type parameters. For
+/// example, `Generator[int]` is now equivalent to
+/// `Generator[int, None, None]`, as the second and third type parameters of
+/// `Generator` now default to `None`.
 ///
-/// Omitting type parameters that match the default values can make the code
+/// Omitting type arguments that match the default values can make the code
 /// more concise and easier to read.
 ///
 /// ## Examples
@@ -44,13 +48,19 @@ use crate::checkers::ast::Checker;
 ///     yield 42
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
+///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
 /// - [Annotating generators and coroutines](https://docs.python.org/3/library/typing.html#annotating-generators-and-coroutines)
 /// - [Python documentation: `typing.Generator`](https://docs.python.org/3/library/typing.html#typing.Generator)
 /// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
-#[violation]
-pub struct UnnecessaryDefaultTypeArgs;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDefaultTypeArgs;
 
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
     #[derive_message_formats]
@@ -64,7 +74,7 @@ impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
 }
 
 /// UP043
-pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -93,27 +103,40 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
     }
 
     let mut diagnostic = Diagnostic::new(UnnecessaryDefaultTypeArgs, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker
-            .generator()
-            .expr(&Expr::Subscript(ast::ExprSubscript {
-                value: value.clone(),
-                slice: Box::new(if let [elt] = valid_elts.as_slice() {
-                    elt.clone()
-                } else {
-                    Expr::Tuple(ast::ExprTuple {
-                        elts: valid_elts,
-                        ctx: ast::ExprContext::Load,
-                        range: TextRange::default(),
-                        parenthesized: true,
-                    })
-                }),
-                ctx: ast::ExprContext::Load,
-                range: TextRange::default(),
-            })),
-        expr.range(),
-    )));
-    checker.diagnostics.push(diagnostic);
+
+    let applicability = if checker
+        .comment_ranges()
+        .has_comments(expr, checker.source())
+    {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            checker
+                .generator()
+                .expr(&Expr::Subscript(ast::ExprSubscript {
+                    value: value.clone(),
+                    slice: Box::new(if let [elt] = valid_elts.as_slice() {
+                        elt.clone()
+                    } else {
+                        Expr::Tuple(ast::ExprTuple {
+                            elts: valid_elts,
+                            ctx: ast::ExprContext::Load,
+                            range: TextRange::default(),
+                            parenthesized: true,
+                        })
+                    }),
+                    ctx: ast::ExprContext::Load,
+                    range: TextRange::default(),
+                })),
+            expr.range(),
+        ),
+        applicability,
+    ));
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Trim trailing `None` literals from the given elements.

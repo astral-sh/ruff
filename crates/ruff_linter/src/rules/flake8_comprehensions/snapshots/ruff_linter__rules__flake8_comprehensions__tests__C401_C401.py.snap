@@ -1,28 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
-C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a set comprehension)
   |
-1 | # Cannot conbime with C416. Should use set comprehension here.
+1 | # Cannot combine with C416. Should use set comprehension here.
 2 | even_nums = set(2 * x for x in range(3))
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
 3 | odd_nums = set(
 4 |     2 * x + 1 for x in range(3)
   |
-  = help: Rewrite as a `set` comprehension
+  = help: Rewrite as a set comprehension
 
 ℹ Unsafe fix
-1 1 | # Cannot conbime with C416. Should use set comprehension here.
+1 1 | # Cannot combine with C416. Should use set comprehension here.
 2   |-even_nums = set(2 * x for x in range(3))
   2 |+even_nums = {2 * x for x in range(3)}
 3 3 | odd_nums = set(
 4 4 |     2 * x + 1 for x in range(3)
 5 5 | )
 
-C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a set comprehension)
   |
-1 |   # Cannot conbime with C416. Should use set comprehension here.
+1 |   # Cannot combine with C416. Should use set comprehension here.
 2 |   even_nums = set(2 * x for x in range(3))
 3 |   odd_nums = set(
   |  ____________^
@@ -31,10 +30,10 @@ C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   | |_^ C401
 6 |   small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
   |
-  = help: Rewrite as a `set` comprehension
+  = help: Rewrite as a set comprehension
 
 ℹ Unsafe fix
-1 1 | # Cannot conbime with C416. Should use set comprehension here.
+1 1 | # Cannot combine with C416. Should use set comprehension here.
 2 2 | even_nums = set(2 * x for x in range(3))
 3   |-odd_nums = set(
   3 |+odd_nums = {
@@ -45,16 +44,16 @@ C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 7 7 | 
 8 8 | def f(x):
 
-C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
   |
 4 |     2 * x + 1 for x in range(3)
 5 | )
 6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
-7 | 
+7 |
 8 | def f(x):
   |
-  = help: Rewrite as a `set` comprehension
+  = help: Rewrite as a set comprehension
 
 ℹ Unsafe fix
 3 3 | odd_nums = set(
@@ -66,15 +65,15 @@ C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 8 8 | def f(x):
 9 9 |     return x
 
-C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
  9 |     return x
-10 | 
+10 |
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
    |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite as a set comprehension
 
 ℹ Unsafe fix
 8  8  | def f(x):
@@ -86,13 +85,13 @@ C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 13 13 | 
 14 14 | 
 
-C401.py:12:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:12:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^ C401
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite as a set comprehension
 
 ℹ Unsafe fix
 9  9  |     return x
@@ -189,7 +188,7 @@ C401.py:21:10: C401 [*] Unnecessary generator (rewrite using `set()`)
    21 |+print(f"{set('abc') - set(a for a in 'ab')}")
 22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 23 23 | 
-24 24 | 
+24 24 | # Strip parentheses from inner generators.
 
 C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
@@ -209,7 +208,7 @@ C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`)
    21 |+print(f"{set(a for a in 'abc') - set('ab')}")
 22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 23 23 | 
-24 24 | 
+24 24 | # Strip parentheses from inner generators.
 
 C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
@@ -217,6 +216,8 @@ C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`)
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |           ^^^^^^^^^^^^^^^^^^^^^ C401
+23 |
+24 | # Strip parentheses from inner generators.
    |
    = help: Rewrite using `set()`
 
@@ -227,8 +228,8 @@ C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`)
 22    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    22 |+print(f"{ set('abc') - set(a for a in 'ab') }")
 23 23 | 
-24 24 | 
-25 25 | # Not built-in set.
+24 24 | # Strip parentheses from inner generators.
+25 25 | set((2 * x for x in range(3)))
 
 C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
@@ -236,6 +237,8 @@ C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`)
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |                                   ^^^^^^^^^^^^^^^^^^^^ C401
+23 |
+24 | # Strip parentheses from inner generators.
    |
    = help: Rewrite using `set()`
 
@@ -246,5 +249,120 @@ C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`)
 22    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    22 |+print(f"{ set(a for a in 'abc') - set('ab') }")
 23 23 | 
-24 24 | 
-25 25 | # Not built-in set.
+24 24 | # Strip parentheses from inner generators.
+25 25 | set((2 * x for x in range(3)))
+
+C401.py:25:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+24 | # Strip parentheses from inner generators.
+25 | set((2 * x for x in range(3)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+26 | set(((2 * x for x in range(3))))
+27 | set((((2 * x for x in range(3)))))
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+23 23 | 
+24 24 | # Strip parentheses from inner generators.
+25    |-set((2 * x for x in range(3)))
+   25 |+{2 * x for x in range(3)}
+26 26 | set(((2 * x for x in range(3))))
+27 27 | set((((2 * x for x in range(3)))))
+28 28 | 
+
+C401.py:26:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+24 | # Strip parentheses from inner generators.
+25 | set((2 * x for x in range(3)))
+26 | set(((2 * x for x in range(3))))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+27 | set((((2 * x for x in range(3)))))
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+23 23 | 
+24 24 | # Strip parentheses from inner generators.
+25 25 | set((2 * x for x in range(3)))
+26    |-set(((2 * x for x in range(3))))
+   26 |+{2 * x for x in range(3)}
+27 27 | set((((2 * x for x in range(3)))))
+28 28 | 
+29 29 | # Account for trailing comma in fix
+
+C401.py:27:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+25 | set((2 * x for x in range(3)))
+26 | set(((2 * x for x in range(3))))
+27 | set((((2 * x for x in range(3)))))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+28 |
+29 | # Account for trailing comma in fix
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+24 24 | # Strip parentheses from inner generators.
+25 25 | set((2 * x for x in range(3)))
+26 26 | set(((2 * x for x in range(3))))
+27    |-set((((2 * x for x in range(3)))))
+   27 |+{2 * x for x in range(3)}
+28 28 | 
+29 29 | # Account for trailing comma in fix
+30 30 | # See https://github.com/astral-sh/ruff/issues/15852
+
+C401.py:31:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+29 | # Account for trailing comma in fix
+30 | # See https://github.com/astral-sh/ruff/issues/15852
+31 | set((0 for _ in []),)
+   | ^^^^^^^^^^^^^^^^^^^^^ C401
+32 | set(
+33 |     (0 for _ in [])
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+28 28 | 
+29 29 | # Account for trailing comma in fix
+30 30 | # See https://github.com/astral-sh/ruff/issues/15852
+31    |-set((0 for _ in []),)
+   31 |+{0 for _ in []}
+32 32 | set(
+33 33 |     (0 for _ in [])
+34 34 |     # some comments
+
+C401.py:32:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+30 |   # See https://github.com/astral-sh/ruff/issues/15852
+31 |   set((0 for _ in []),)
+32 | / set(
+33 | |     (0 for _ in [])
+34 | |     # some comments
+35 | |     ,
+36 | |     # some more
+37 | | )
+   | |_^ C401
+38 |
+39 |   # Not built-in set.
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+29 29 | # Account for trailing comma in fix
+30 30 | # See https://github.com/astral-sh/ruff/issues/15852
+31 31 | set((0 for _ in []),)
+32    |-set(
+33    |-    (0 for _ in [])
+   32 |+{
+   33 |+    0 for _ in []
+34 34 |     # some comments
+35    |-    ,
+36    |-    # some more
+37    |-)
+   35 |+    }
+38 36 | 
+39 37 | # Not built-in set.
+40 38 | def set(*args, **kwargs):

@@ -23,6 +23,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 env:
   PACKAGE_NAME: ruff
   MODULE_NAME: ruff
@@ -40,6 +42,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -52,9 +55,9 @@ jobs:
           args: --out dist
       - name: "Test sdist"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-          ${{ env.MODULE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
+          pip install dist/"${PACKAGE_NAME}"-*.tar.gz --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
       - name: "Upload sdist"
         uses: actions/upload-artifact@v4
         with:
@@ -68,6 +71,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -109,6 +113,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -122,7 +127,7 @@ jobs:
           args: --release --locked --out dist
       - name: "Test wheel - aarch64"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
@@ -164,6 +169,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -182,9 +188,9 @@ jobs:
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         run: |
-          python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ${{ env.MODULE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
+          python -m pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -216,6 +222,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -231,9 +238,9 @@ jobs:
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ${{ env.MODULE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
+          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -290,6 +297,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -354,6 +362,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -419,6 +428,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}

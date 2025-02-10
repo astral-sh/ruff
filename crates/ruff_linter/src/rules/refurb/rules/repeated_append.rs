@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use ast::traversal;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
@@ -44,8 +44,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
-#[violation]
-pub struct RepeatedAppend {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedAppend {
     name: String,
     replacement: SourceCodeSnippet,
 }
@@ -76,7 +76,7 @@ impl Violation for RepeatedAppend {
 }
 
 /// FURB113
-pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
     let Some(appends) = match_consecutive_appends(stmt, checker.semantic()) else {
         return;
     };
@@ -127,7 +127,7 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
         })
         .collect();
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Debug, Clone)]

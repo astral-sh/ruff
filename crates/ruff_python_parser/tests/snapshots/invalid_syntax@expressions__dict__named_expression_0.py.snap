@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/named_expression_0.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -123,19 +122,19 @@ Module(
 
   |
 1 | # Unparenthesized named expression not allowed in key
-2 | 
+2 |
 3 | {x := 1: y, z := 2: a}
   |  ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
-4 | 
+4 |
 5 | x + y
   |
 
 
   |
 1 | # Unparenthesized named expression not allowed in key
-2 | 
+2 |
 3 | {x := 1: y, z := 2: a}
   |               ^^ Syntax Error: Expected ':', found ':='
-4 | 
+4 |
 5 | x + y
   |

@@ -1,5 +1,5 @@
-use ruff_python_ast::helpers::{map_callable, map_subscript};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::helpers::{map_callable, map_subscript, Truthiness};
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -49,7 +49,7 @@ pub(super) fn is_dataclass_field(
     dataclass_kind: DataclassKind,
 ) -> bool {
     match dataclass_kind {
-        DataclassKind::Attrs => is_attrs_field(func, semantic),
+        DataclassKind::Attrs(..) => is_attrs_field(func, semantic),
         DataclassKind::Stdlib => is_stdlib_dataclass_field(func, semantic),
     }
 }
@@ -76,30 +76,37 @@ pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -
     semantic.match_typing_expr(map_subscript(annotation), "Final")
 }
 
+/// Values that [`attrs`'s `auto_attribs`][1] accept.
+///
+/// [1]: https://www.attrs.org/en/stable/api.html#attrs.define
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum AttrsAutoAttribs {
+    /// `a: str = ...` are automatically converted to fields.
+    True,
+    /// Only `attrs.field()`/`attr.ib()` calls are considered fields.
+    False,
+    /// `True` if any attributes are annotated (and no unannotated `attrs.field`s are found).
+    /// `False` otherwise.
+    None,
+    /// The provided value is not a literal.
+    Unknown,
+}
+
 /// Enumeration of various kinds of dataclasses recognised by Ruff
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum DataclassKind {
     /// dataclasses created by the stdlib `dataclasses` module
     Stdlib,
     /// dataclasses created by the third-party `attrs` library
-    Attrs,
+    Attrs(AttrsAutoAttribs),
 }
 
-impl DataclassKind {
-    pub(super) const fn is_stdlib(self) -> bool {
-        matches!(self, DataclassKind::Stdlib)
-    }
-
-    pub(super) const fn is_attrs(self) -> bool {
-        matches!(self, DataclassKind::Attrs)
-    }
-}
-
-/// Return the kind of dataclass this class definition is (stdlib or `attrs`), or `None` if the class is not a dataclass.
-pub(super) fn dataclass_kind(
-    class_def: &ast::StmtClassDef,
+/// Return the kind of dataclass this class definition is (stdlib or `attrs`),
+/// or `None` if the class is not a dataclass.
+pub(super) fn dataclass_kind<'a>(
+    class_def: &'a ast::StmtClassDef,
     semantic: &SemanticModel,
-) -> Option<DataclassKind> {
+) -> Option<(DataclassKind, &'a ast::Decorator)> {
     if !(semantic.seen_module(Modules::DATACLASSES) || semantic.seen_module(Modules::ATTRS)) {
         return None;
     }
@@ -112,8 +119,43 @@ pub(super) fn dataclass_kind(
         };
 
         match qualified_name.segments() {
-            ["attrs", "define" | "frozen"] | ["attr", "s"] => return Some(DataclassKind::Attrs),
-            ["dataclasses", "dataclass"] => return Some(DataclassKind::Stdlib),
+            ["attrs", func @ ("define" | "frozen" | "mutable")] | ["attr", func @ "s"] => {
+                // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
+                // whereas `@attr.s` implicitly sets `auto_attribs=False`.
+                // https://www.attrs.org/en/stable/api.html#attrs.define
+                // https://www.attrs.org/en/stable/api-attr.html#attr.s
+                let Expr::Call(ExprCall { arguments, .. }) = &decorator.expression else {
+                    let auto_attribs = if *func == "s" {
+                        AttrsAutoAttribs::False
+                    } else {
+                        AttrsAutoAttribs::None
+                    };
+
+                    return Some((DataclassKind::Attrs(auto_attribs), decorator));
+                };
+
+                let Some(auto_attribs) = arguments.find_keyword("auto_attribs") else {
+                    return Some((DataclassKind::Attrs(AttrsAutoAttribs::None), decorator));
+                };
+
+                let auto_attribs = match Truthiness::from_expr(&auto_attribs.value, |id| {
+                    semantic.has_builtin_binding(id)
+                }) {
+                    // `auto_attribs` requires an exact `True` to be true
+                    Truthiness::True => AttrsAutoAttribs::True,
+                    // Or an exact `None` to auto-detect.
+                    Truthiness::None => AttrsAutoAttribs::None,
+                    // Otherwise, anything else (even a truthy value, like `1`) is considered `False`.
+                    Truthiness::Truthy | Truthiness::False | Truthiness::Falsey => {
+                        AttrsAutoAttribs::False
+                    }
+                    // Unless, of course, we can't determine the value.
+                    Truthiness::Unknown => AttrsAutoAttribs::Unknown,
+                };
+
+                return Some((DataclassKind::Attrs(auto_attribs), decorator));
+            }
+            ["dataclasses", "dataclass"] => return Some((DataclassKind::Stdlib, decorator)),
             _ => continue,
         }
     }
@@ -135,6 +177,7 @@ pub(super) fn has_default_copy_semantics(
             ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
                 | ["pydantic_settings", "BaseSettings"]
                 | ["msgspec", "Struct"]
+                | ["sqlmodel", "SQLModel"]
         )
     })
 }

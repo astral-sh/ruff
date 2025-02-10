@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
@@ -68,8 +68,8 @@ use crate::checkers::ast::Checker;
 /// class Klass:
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
-#[violation]
-pub struct IterMethodReturnIterable {
+#[derive(ViolationMetadata)]
+pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }
 
@@ -86,7 +86,7 @@ impl Violation for IterMethodReturnIterable {
 }
 
 /// PYI045
-pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
+pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Definition) {
     let Definition::Member(Member {
         kind: MemberKind::Method(function),
         ..
@@ -125,7 +125,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
             }
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             IterMethodReturnIterable { is_async },
             returns.range(),
         ));

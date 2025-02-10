@@ -1,28 +1,21 @@
 use memchr::memchr2;
-
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
+use ruff_python_ast::StringLikePart;
 use ruff_python_ast::{
     self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
     AnyStringFlags, StringFlags,
 };
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::expression::expr_f_string::f_string_quoting;
 use crate::prelude::*;
 use crate::QuoteStyle;
 
 pub(crate) mod docstring;
 pub(crate) mod implicit;
 mod normalize;
-
-#[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum Quoting {
-    #[default]
-    CanChange,
-    Preserve,
-}
 
 impl Format<PyFormatContext<'_>> for AnyStringPrefix {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
@@ -88,28 +81,62 @@ impl From<Quote> for QuoteStyle {
 
 // Extension trait that adds formatter specific helper methods to `StringLike`.
 pub(crate) trait StringLikeExtensions {
-    fn quoting(&self, source: &str) -> Quoting;
-
-    fn is_multiline(&self, source: &str) -> bool;
+    fn is_multiline(&self, context: &PyFormatContext) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
-    fn quoting(&self, source: &str) -> Quoting {
-        match self {
-            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
-            Self::FString(f_string) => f_string_quoting(f_string, source),
-        }
-    }
-
-    fn is_multiline(&self, source: &str) -> bool {
-        match self {
-            Self::String(_) | Self::Bytes(_) => self.parts().any(|part| {
+    fn is_multiline(&self, context: &PyFormatContext) -> bool {
+        self.parts().any(|part| match part {
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                 part.flags().is_triple_quoted()
-                    && memchr2(b'\n', b'\r', source[self.range()].as_bytes()).is_some()
-            }),
-            Self::FString(fstring) => {
-                memchr2(b'\n', b'\r', source[fstring.range].as_bytes()).is_some()
+                    && context.source().contains_line_break(part.range())
             }
-        }
+            StringLikePart::FString(f_string) => {
+                fn contains_line_break_or_comments(
+                    elements: &ast::FStringElements,
+                    context: &PyFormatContext,
+                    triple_quotes: TripleQuotes,
+                ) -> bool {
+                    elements.iter().any(|element| match element {
+                        ast::FStringElement::Literal(literal) => {
+                            triple_quotes.is_yes()
+                                && context.source().contains_line_break(literal.range())
+                        }
+                        ast::FStringElement::Expression(expression) => {
+                            // Expressions containing comments can't be joined.
+                            //
+                            // Format specifiers needs to be checked as well. For example, the
+                            // following should be considered multiline because the literal
+                            // part of the format specifier contains a newline at the end
+                            // (`.3f\n`):
+                            //
+                            // ```py
+                            // x = f"hello {a + b + c + d:.3f
+                            // } world"
+                            // ```
+                            context.comments().contains_comments(expression.into())
+                                || expression.format_spec.as_deref().is_some_and(|spec| {
+                                    contains_line_break_or_comments(
+                                        &spec.elements,
+                                        context,
+                                        triple_quotes,
+                                    )
+                                })
+                                || expression.debug_text.as_ref().is_some_and(|debug_text| {
+                                    memchr2(b'\n', b'\r', debug_text.leading.as_bytes()).is_some()
+                                        || memchr2(b'\n', b'\r', debug_text.trailing.as_bytes())
+                                            .is_some()
+                                })
+                        }
+                    })
+                }
+
+                contains_line_break_or_comments(
+                    &f_string.elements,
+                    context,
+                    f_string.flags.triple_quotes(),
+                )
+            }
+        })
     }
 }

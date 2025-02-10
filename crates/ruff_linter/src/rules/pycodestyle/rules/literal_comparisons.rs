@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -57,8 +57,8 @@ impl EqCmpOp {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
-#[violation]
-pub struct NoneComparison(EqCmpOp);
+#[derive(ViolationMetadata)]
+pub(crate) struct NoneComparison(EqCmpOp);
 
 impl AlwaysFixableViolation for NoneComparison {
     #[derive_message_formats]
@@ -119,8 +119,8 @@ impl AlwaysFixableViolation for NoneComparison {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
-#[violation]
-pub struct TrueFalseComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct TrueFalseComparison {
     value: bool,
     op: EqCmpOp,
     cond: Option<SourceCodeSnippet>,
@@ -171,7 +171,7 @@ impl AlwaysFixableViolation for TrueFalseComparison {
 }
 
 /// E711, E712
-pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare) {
     // Mapping from (bad operator index) to (replacement operator). As we iterate
     // through the list of operators, we apply "dummy" fixes for each error,
     // then replace the entire expression at the end with one "real" fix, to
@@ -347,5 +347,5 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

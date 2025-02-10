@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S312.py:3:1: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+  |
+1 | from telnetlib import Telnet
+2 |
+3 | Telnet("localhost", 23)
+  | ^^^^^^^^^^^^^^^^^^^^^^^ S312
+  |
+
+S312.py:7:5: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+  |
+6 | # https://github.com/astral-sh/ruff/issues/15522
+7 | map(Telnet, [])
+  |     ^^^^^^ S312
+8 | foo = Telnet
+  |
+
+S312.py:8:7: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+   |
+ 6 | # https://github.com/astral-sh/ruff/issues/15522
+ 7 | map(Telnet, [])
+ 8 | foo = Telnet
+   |       ^^^^^^ S312
+ 9 |
+10 | import telnetlib
+   |
+
+S312.py:11:5: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+   |
+10 | import telnetlib
+11 | _ = telnetlib.Telnet
+   |     ^^^^^^^^^^^^^^^^ S312
+12 |
+13 | from typing import Annotated
+   |
+
+S312.py:14:24: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+   |
+13 | from typing import Annotated
+14 | foo: Annotated[Telnet, telnetlib.Telnet()]
+   |                        ^^^^^^^^^^^^^^^^^^ S312
+15 |
+16 | def _() -> Telnet: ...
+   |

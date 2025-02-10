@@ -1,0 +1,839 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    while False:
+        return "unreachable"
+    return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 1\n"]
+  block1[["Loop continue"]]
+  block2["return #quot;unreachable#quot;\n"]
+  block3["while False:
+        return #quot;unreachable#quot;\n"]
+
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    while False:
+        return "unreachable"
+    else:
+        return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2[["Loop continue"]]
+  block3["return #quot;unreachable#quot;\n"]
+  block4["while False:
+        return #quot;unreachable#quot;
+    else:
+        return 1\n"]
+
+  start --> block4
+  block4 -- "False" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func():
+    while False:
+        return "unreachable"
+    else:
+        return 1
+    return "also unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;also unreachable#quot;\n"]
+  block1["return 1\n"]
+  block2[["Loop continue"]]
+  block3["return #quot;unreachable#quot;\n"]
+  block4["while False:
+        return #quot;unreachable#quot;
+    else:
+        return 1\n"]
+
+  start --> block4
+  block4 -- "False" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func():
+    while True:
+        return 1
+    return "unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable#quot;\n"]
+  block1[["Loop continue"]]
+  block2["return 1\n"]
+  block3["while True:
+        return 1\n"]
+
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func():
+    while True:
+        return 1
+    else:
+        return "unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return #quot;unreachable#quot;\n"]
+  block2[["Loop continue"]]
+  block3["return 1\n"]
+  block4["while True:
+        return 1
+    else:
+        return #quot;unreachable#quot;\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func():
+    while True:
+        return 1
+    else:
+        return "unreachable"
+    return "also unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;also unreachable#quot;\n"]
+  block1["return #quot;unreachable#quot;\n"]
+  block2[["Loop continue"]]
+  block3["return 1\n"]
+  block4["while True:
+        return 1
+    else:
+        return #quot;unreachable#quot;\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func():
+    i = 0
+    while False:
+        i += 1
+    return i
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return i\n"]
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["i = 0\nwhile False:
+        i += 1\n"]
+
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func():
+    i = 0
+    while True:
+        i += 1
+    return i
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return i\n"]
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["i = 0\nwhile True:
+        i += 1\n"]
+
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func():
+    while True:
+        pass
+    return 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 1\n"]
+  block1[["Loop continue"]]
+  block2["pass\n"]
+  block3["while True:
+        pass\n"]
+
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 9
+### Source
+```python
+def func():
+    i = 0
+    while True:
+        if True:
+            print("ok")
+        i += 1
+    return i
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return i\n"]
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["print(#quot;ok#quot;)\n"]
+  block4["if True:
+            print(#quot;ok#quot;)\n"]
+  block5["i = 0\nwhile True:
+        if True:
+            print(#quot;ok#quot;)
+        i += 1\n"]
+
+  start --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block0
+  block4 -- "True" --> block3
+  block4 -- "else" --> block2
+  block3 --> block2
+  block2 --> block1
+  block1 --> block5
+  block0 --> return
+```
+
+## Function 10
+### Source
+```python
+def func():
+    i = 0
+    while True:
+        if False:
+            print("ok")
+        i += 1
+    return i
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return i\n"]
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["print(#quot;ok#quot;)\n"]
+  block4["if False:
+            print(#quot;ok#quot;)\n"]
+  block5["i = 0\nwhile True:
+        if False:
+            print(#quot;ok#quot;)
+        i += 1\n"]
+
+  start --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block0
+  block4 -- "False" --> block3
+  block4 -- "else" --> block2
+  block3 --> block2
+  block2 --> block1
+  block1 --> block5
+  block0 --> return
+```
+
+## Function 11
+### Source
+```python
+def func():
+    while True:
+        if True:
+            return 1
+    return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1[["Loop continue"]]
+  block2["return 1\n"]
+  block3["if True:
+            return 1\n"]
+  block4["while True:
+        if True:
+            return 1\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 12
+### Source
+```python
+def func():
+    while True:
+        continue
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["while True:
+        continue\n"]
+
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block3
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 13
+### Source
+```python
+def func():
+    while False:
+        continue
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["while False:
+        continue\n"]
+
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> block3
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 14
+### Source
+```python
+def func():
+    while True:
+        break
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["while True:
+        break\n"]
+
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 15
+### Source
+```python
+def func():
+    while False:
+        break
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["while False:
+        break\n"]
+
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
+  block0 --> return
+```
+
+## Function 16
+### Source
+```python
+def func():
+    while True:
+        if True:
+            continue
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["if True:
+            continue\n"]
+  block4["while True:
+        if True:
+            continue\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> block4
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 17
+### Source
+```python
+def func():
+    while True:
+        if True:
+            break
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["if True:
+            break\n"]
+  block4["while True:
+        if True:
+            break\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 18
+### Source
+```python
+def func():
+    while True:
+        x = 0
+        x = 1
+        break
+        x = 2
+    x = 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 3\n"]
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\nbreak\n"]
+  block4["while True:
+        x = 0
+        x = 1
+        break
+        x = 2\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> block0
+  block2 --> block1
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 19
+### Source
+```python
+def func():
+    while True:
+        x = 0
+        x = 1
+        continue
+        x = 2
+    x = 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 3\n"]
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\ncontinue\n"]
+  block4["while True:
+        x = 0
+        x = 1
+        continue
+        x = 2\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> block4
+  block2 --> block1
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 20
+### Source
+```python
+def func():
+    while True:
+        x = 0
+        x = 1
+        return
+        x = 2
+    x = 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 3\n"]
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\nreturn\n"]
+  block4["while True:
+        x = 0
+        x = 1
+        return
+        x = 2\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> return
+  block2 --> block1
+  block1 --> block4
+  block0 --> return
+```
+
+## Function 21
+### Source
+```python
+def func():
+    while True:
+        x = 0
+        x = 1
+        raise Exception
+        x = 2
+    x = 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 3\n"]
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3[["Exception raised"]]
+  block4["x = 0\nx = 1\nraise Exception\n"]
+  block5["while True:
+        x = 0
+        x = 1
+        raise Exception
+        x = 2\n"]
+
+  start --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block0
+  block4 --> block3
+  block3 --> return
+  block2 --> block1
+  block1 --> block5
+  block0 --> return
+```
+
+## Function 22
+### Source
+```python
+def bokeh2(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+    self.stop_serving = False
+    while True:
+        try:
+            self.server = HTTPServer((host, port), HtmlOnlyHandler)
+            self.host = host
+            self.port = port
+            break
+        except OSError:
+            log.debug(f"port {port} is in use, trying to next one")
+            port += 1
+
+    self.thread = threading.Thread(target=self._run_web_server)
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["self.thread = threading.Thread(target=self._run_web_server)\n"]
+  block1[["Loop continue"]]
+  block2["self.server = HTTPServer((host, port), HtmlOnlyHandler)\nself.host = host\nself.port = port\nbreak\n"]
+  block3[["Exception raised"]]
+  block4["log.debug(f#quot;port {port} is in use, trying to next one#quot;)\nport += 1\n"]
+  block5["try:
+            self.server = HTTPServer((host, port), HtmlOnlyHandler)
+            self.host = host
+            self.port = port
+            break
+        except OSError:
+            log.debug(f#quot;port {port} is in use, trying to next one#quot;)
+            port += 1\n"]
+  block6["try:
+            self.server = HTTPServer((host, port), HtmlOnlyHandler)
+            self.host = host
+            self.port = port
+            break
+        except OSError:
+            log.debug(f#quot;port {port} is in use, trying to next one#quot;)
+            port += 1\n"]
+  block7["self.stop_serving = False\nwhile True:
+        try:
+            self.server = HTTPServer((host, port), HtmlOnlyHandler)
+            self.host = host
+            self.port = port
+            break
+        except OSError:
+            log.debug(f#quot;port {port} is in use, trying to next one#quot;)
+            port += 1\n"]
+
+  start --> block7
+  block7 -- "True" --> block6
+  block7 -- "else" --> block0
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block2
+  block5 -- "OSError" --> block4
+  block5 -- "else" --> block3
+  block4 --> block1
+  block3 --> return
+  block2 --> block0
+  block1 --> block7
+  block0 --> return
+```
+
+## Function 23
+### Source
+```python
+def func():
+    while T:
+        try:
+            while():
+                if 3:
+                    break
+        finally:
+            return
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["return\n"]
+  block3[["Loop continue"]]
+  block4["break\n"]
+  block5["if 3:
+                    break\n"]
+  block6["while():
+                if 3:
+                    break\n"]
+  block7[["Exception raised"]]
+  block8["try:
+            while():
+                if 3:
+                    break
+        finally:
+            return\n"]
+  block9["while T:
+        try:
+            while():
+                if 3:
+                    break
+        finally:
+            return\n"]
+
+  start --> block9
+  block9 -- "T" --> block8
+  block9 -- "else" --> block0
+  block8 -- "Exception raised" --> block7
+  block8 -- "else" --> block6
+  block7 --> block2
+  block6 -- "()" --> block5
+  block6 -- "else" --> block2
+  block5 -- "3" --> block4
+  block5 -- "else" --> block3
+  block4 --> block2
+  block3 --> block6
+  block2 --> return
+  block1 --> block9
+  block0 --> return
+```

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::function_type;
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct BadStaticmethodArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadStaticmethodArgument {
     argument_name: String,
 }
 
@@ -48,11 +48,7 @@ impl Violation for BadStaticmethodArgument {
 }
 
 /// PLW0211
-pub(crate) fn bad_staticmethod_argument(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };
@@ -99,7 +95,7 @@ pub(crate) fn bad_staticmethod_argument(
         _ => return,
     }
 
-    diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },

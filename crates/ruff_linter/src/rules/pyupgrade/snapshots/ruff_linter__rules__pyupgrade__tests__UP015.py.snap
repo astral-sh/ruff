@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:1:1: UP015 [*] Unnecessary mode argument
   |
 1 | open("foo", "U")
   | ^^^^^^^^^^^^^^^^ UP015
 2 | open("foo", "Ur")
 3 | open("foo", "Ub")
   |
-  = help: Remove open mode parameters
+  = help: Remove mode argument
 
 ℹ Safe fix
 1   |-open("foo", "U")
@@ -18,7 +17,7 @@ UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
 3 3 | open("foo", "Ub")
 4 4 | open("foo", "rUb")
 
-UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:2:1: UP015 [*] Unnecessary mode argument
   |
 1 | open("foo", "U")
 2 | open("foo", "Ur")
@@ -26,7 +25,7 @@ UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
 3 | open("foo", "Ub")
 4 | open("foo", "rUb")
   |
-  = help: Remove open mode parameters
+  = help: Remove mode argument
 
 ℹ Safe fix
 1 1 | open("foo", "U")
@@ -36,7 +35,7 @@ UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
 4 4 | open("foo", "rUb")
 5 5 | open("foo", "r")
 
-UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:3:1: UP015 [*] Unnecessary modes, use `rb`
   |
 1 | open("foo", "U")
 2 | open("foo", "Ur")
@@ -45,7 +44,7 @@ UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 4 | open("foo", "rUb")
 5 | open("foo", "r")
   |
-  = help: Replace with "rb"
+  = help: Replace with `rb`
 
 ℹ Safe fix
 1 1 | open("foo", "U")
@@ -56,7 +55,7 @@ UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 5 5 | open("foo", "r")
 6 6 | open("foo", "rt")
 
-UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:4:1: UP015 [*] Unnecessary modes, use `rb`
   |
 2 | open("foo", "Ur")
 3 | open("foo", "Ub")
@@ -65,7 +64,7 @@ UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 5 | open("foo", "r")
 6 | open("foo", "rt")
   |
-  = help: Replace with "rb"
+  = help: Replace with `rb`
 
 ℹ Safe fix
 1 1 | open("foo", "U")
@@ -77,7 +76,7 @@ UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 6 6 | open("foo", "rt")
 7 7 | open("f", "r", encoding="UTF-8")
 
-UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:5:1: UP015 [*] Unnecessary mode argument
   |
 3 | open("foo", "Ub")
 4 | open("foo", "rUb")
@@ -86,7 +85,7 @@ UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
 6 | open("foo", "rt")
 7 | open("f", "r", encoding="UTF-8")
   |
-  = help: Remove open mode parameters
+  = help: Remove mode argument
 
 ℹ Safe fix
 2 2 | open("foo", "Ur")
@@ -98,7 +97,7 @@ UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
 7 7 | open("f", "r", encoding="UTF-8")
 8 8 | open("f", "wt")
 
-UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:6:1: UP015 [*] Unnecessary mode argument
   |
 4 | open("foo", "rUb")
 5 | open("foo", "r")
@@ -107,7 +106,7 @@ UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
 7 | open("f", "r", encoding="UTF-8")
 8 | open("f", "wt")
   |
-  = help: Remove open mode parameters
+  = help: Remove mode argument
 
 ℹ Safe fix
 3 3 | open("foo", "Ub")
@@ -119,7 +118,7 @@ UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
 8 8 | open("f", "wt")
 9 9 | open("f", "tw")
 
-UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:7:1: UP015 [*] Unnecessary mode argument
   |
 5 | open("foo", "r")
 6 | open("foo", "rt")
@@ -128,7 +127,7 @@ UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
 8 | open("f", "wt")
 9 | open("f", "tw")
   |
-  = help: Remove open mode parameters
+  = help: Remove mode argument
 
 ℹ Safe fix
 4 4 | open("foo", "rUb")
@@ -140,7 +139,7 @@ UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
 9 9 | open("f", "tw")
 10 10 | 
 
-UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use "w"
+UP015.py:8:1: UP015 [*] Unnecessary modes, use `w`
   |
 6 | open("foo", "rt")
 7 | open("f", "r", encoding="UTF-8")
@@ -148,7 +147,7 @@ UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use "w"
   | ^^^^^^^^^^^^^^^ UP015
 9 | open("f", "tw")
   |
-  = help: Replace with "w"
+  = help: Replace with `w`
 
 ℹ Safe fix
 5 5 | open("foo", "r")
@@ -160,16 +159,16 @@ UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use "w"
 10 10 | 
 11 11 | with open("foo", "U") as f:
 
-UP015.py:9:1: UP015 [*] Unnecessary open mode parameters, use "w"
+UP015.py:9:1: UP015 [*] Unnecessary modes, use `w`
    |
  7 | open("f", "r", encoding="UTF-8")
  8 | open("f", "wt")
  9 | open("f", "tw")
    | ^^^^^^^^^^^^^^^ UP015
-10 | 
+10 |
 11 | with open("foo", "U") as f:
    |
-   = help: Replace with "w"
+   = help: Replace with `w`
 
 ℹ Safe fix
 6  6  | open("foo", "rt")
@@ -181,16 +180,16 @@ UP015.py:9:1: UP015 [*] Unnecessary open mode parameters, use "w"
 11 11 | with open("foo", "U") as f:
 12 12 |     pass
 
-UP015.py:11:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:11:6: UP015 [*] Unnecessary mode argument
    |
  9 | open("f", "tw")
-10 | 
+10 |
 11 | with open("foo", "U") as f:
    |      ^^^^^^^^^^^^^^^^ UP015
 12 |     pass
 13 | with open("foo", "Ur") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 8  8  | open("f", "wt")
@@ -202,7 +201,7 @@ UP015.py:11:6: UP015 [*] Unnecessary open mode parameters
 13 13 | with open("foo", "Ur") as f:
 14 14 |     pass
 
-UP015.py:13:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:13:6: UP015 [*] Unnecessary mode argument
    |
 11 | with open("foo", "U") as f:
 12 |     pass
@@ -211,7 +210,7 @@ UP015.py:13:6: UP015 [*] Unnecessary open mode parameters
 14 |     pass
 15 | with open("foo", "Ub") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 10 10 | 
@@ -223,7 +222,7 @@ UP015.py:13:6: UP015 [*] Unnecessary open mode parameters
 15 15 | with open("foo", "Ub") as f:
 16 16 |     pass
 
-UP015.py:15:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:15:6: UP015 [*] Unnecessary modes, use `rb`
    |
 13 | with open("foo", "Ur") as f:
 14 |     pass
@@ -232,7 +231,7 @@ UP015.py:15:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 16 |     pass
 17 | with open("foo", "rUb") as f:
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 12 12 |     pass
@@ -244,7 +243,7 @@ UP015.py:15:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 17 17 | with open("foo", "rUb") as f:
 18 18 |     pass
 
-UP015.py:17:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:17:6: UP015 [*] Unnecessary modes, use `rb`
    |
 15 | with open("foo", "Ub") as f:
 16 |     pass
@@ -253,7 +252,7 @@ UP015.py:17:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 18 |     pass
 19 | with open("foo", "r") as f:
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 14 14 |     pass
@@ -265,7 +264,7 @@ UP015.py:17:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 19 19 | with open("foo", "r") as f:
 20 20 |     pass
 
-UP015.py:19:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:19:6: UP015 [*] Unnecessary mode argument
    |
 17 | with open("foo", "rUb") as f:
 18 |     pass
@@ -274,7 +273,7 @@ UP015.py:19:6: UP015 [*] Unnecessary open mode parameters
 20 |     pass
 21 | with open("foo", "rt") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 16 16 |     pass
@@ -286,7 +285,7 @@ UP015.py:19:6: UP015 [*] Unnecessary open mode parameters
 21 21 | with open("foo", "rt") as f:
 22 22 |     pass
 
-UP015.py:21:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:21:6: UP015 [*] Unnecessary mode argument
    |
 19 | with open("foo", "r") as f:
 20 |     pass
@@ -295,7 +294,7 @@ UP015.py:21:6: UP015 [*] Unnecessary open mode parameters
 22 |     pass
 23 | with open("foo", "r", encoding="UTF-8") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 18 18 |     pass
@@ -307,7 +306,7 @@ UP015.py:21:6: UP015 [*] Unnecessary open mode parameters
 23 23 | with open("foo", "r", encoding="UTF-8") as f:
 24 24 |     pass
 
-UP015.py:23:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:23:6: UP015 [*] Unnecessary mode argument
    |
 21 | with open("foo", "rt") as f:
 22 |     pass
@@ -316,7 +315,7 @@ UP015.py:23:6: UP015 [*] Unnecessary open mode parameters
 24 |     pass
 25 | with open("foo", "wt") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 20 20 |     pass
@@ -328,7 +327,7 @@ UP015.py:23:6: UP015 [*] Unnecessary open mode parameters
 25 25 | with open("foo", "wt") as f:
 26 26 |     pass
 
-UP015.py:25:6: UP015 [*] Unnecessary open mode parameters, use "w"
+UP015.py:25:6: UP015 [*] Unnecessary modes, use `w`
    |
 23 | with open("foo", "r", encoding="UTF-8") as f:
 24 |     pass
@@ -336,7 +335,7 @@ UP015.py:25:6: UP015 [*] Unnecessary open mode parameters, use "w"
    |      ^^^^^^^^^^^^^^^^^ UP015
 26 |     pass
    |
-   = help: Replace with "w"
+   = help: Replace with `w`
 
 ℹ Safe fix
 22 22 |     pass
@@ -348,15 +347,15 @@ UP015.py:25:6: UP015 [*] Unnecessary open mode parameters, use "w"
 27 27 | 
 28 28 | open(f("a", "b", "c"), "U")
 
-UP015.py:28:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:28:1: UP015 [*] Unnecessary mode argument
    |
 26 |     pass
-27 | 
+27 |
 28 | open(f("a", "b", "c"), "U")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 29 | open(f("a", "b", "c"), "Ub")
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 25 25 | with open("foo", "wt") as f:
@@ -368,15 +367,15 @@ UP015.py:28:1: UP015 [*] Unnecessary open mode parameters
 30 30 | 
 31 31 | with open(f("a", "b", "c"), "U") as f:
 
-UP015.py:29:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:29:1: UP015 [*] Unnecessary modes, use `rb`
    |
 28 | open(f("a", "b", "c"), "U")
 29 | open(f("a", "b", "c"), "Ub")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-30 | 
+30 |
 31 | with open(f("a", "b", "c"), "U") as f:
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 26 26 |     pass
@@ -388,16 +387,16 @@ UP015.py:29:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 31 31 | with open(f("a", "b", "c"), "U") as f:
 32 32 |     pass
 
-UP015.py:31:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:31:6: UP015 [*] Unnecessary mode argument
    |
 29 | open(f("a", "b", "c"), "Ub")
-30 | 
+30 |
 31 | with open(f("a", "b", "c"), "U") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 32 |     pass
 33 | with open(f("a", "b", "c"), "Ub") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 28 28 | open(f("a", "b", "c"), "U")
@@ -409,7 +408,7 @@ UP015.py:31:6: UP015 [*] Unnecessary open mode parameters
 33 33 | with open(f("a", "b", "c"), "Ub") as f:
 34 34 |     pass
 
-UP015.py:33:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:33:6: UP015 [*] Unnecessary modes, use `rb`
    |
 31 | with open(f("a", "b", "c"), "U") as f:
 32 |     pass
@@ -417,7 +416,7 @@ UP015.py:33:6: UP015 [*] Unnecessary open mode parameters, use "rb"
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 34 |     pass
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 30 30 | 
@@ -429,16 +428,16 @@ UP015.py:33:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 35 35 | 
 36 36 | with open("foo", "U") as fa, open("bar", "U") as fb:
 
-UP015.py:36:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:36:6: UP015 [*] Unnecessary mode argument
    |
 34 |     pass
-35 | 
+35 |
 36 | with open("foo", "U") as fa, open("bar", "U") as fb:
    |      ^^^^^^^^^^^^^^^^ UP015
 37 |     pass
 38 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 33 33 | with open(f("a", "b", "c"), "Ub") as f:
@@ -450,16 +449,16 @@ UP015.py:36:6: UP015 [*] Unnecessary open mode parameters
 38 38 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 39 39 |     pass
 
-UP015.py:36:30: UP015 [*] Unnecessary open mode parameters
+UP015.py:36:30: UP015 [*] Unnecessary mode argument
    |
 34 |     pass
-35 | 
+35 |
 36 | with open("foo", "U") as fa, open("bar", "U") as fb:
    |                              ^^^^^^^^^^^^^^^^ UP015
 37 |     pass
 38 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 33 33 | with open(f("a", "b", "c"), "Ub") as f:
@@ -471,7 +470,7 @@ UP015.py:36:30: UP015 [*] Unnecessary open mode parameters
 38 38 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 39 39 |     pass
 
-UP015.py:38:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:38:6: UP015 [*] Unnecessary modes, use `rb`
    |
 36 | with open("foo", "U") as fa, open("bar", "U") as fb:
 37 |     pass
@@ -479,7 +478,7 @@ UP015.py:38:6: UP015 [*] Unnecessary open mode parameters, use "rb"
    |      ^^^^^^^^^^^^^^^^^ UP015
 39 |     pass
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 35 35 | 
@@ -491,7 +490,7 @@ UP015.py:38:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 40 40 | 
 41 41 | open("foo", mode="U")
 
-UP015.py:38:31: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:38:31: UP015 [*] Unnecessary modes, use `rb`
    |
 36 | with open("foo", "U") as fa, open("bar", "U") as fb:
 37 |     pass
@@ -499,7 +498,7 @@ UP015.py:38:31: UP015 [*] Unnecessary open mode parameters, use "rb"
    |                               ^^^^^^^^^^^^^^^^^ UP015
 39 |     pass
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 35 35 | 
@@ -511,16 +510,16 @@ UP015.py:38:31: UP015 [*] Unnecessary open mode parameters, use "rb"
 40 40 | 
 41 41 | open("foo", mode="U")
 
-UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:41:1: UP015 [*] Unnecessary mode argument
    |
 39 |     pass
-40 | 
+40 |
 41 | open("foo", mode="U")
    | ^^^^^^^^^^^^^^^^^^^^^ UP015
 42 | open(name="foo", mode="U")
 43 | open(mode="U", name="foo")
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 38 38 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
@@ -532,14 +531,14 @@ UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
 43 43 | open(mode="U", name="foo")
 44 44 | 
 
-UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:42:1: UP015 [*] Unnecessary mode argument
    |
 41 | open("foo", mode="U")
 42 | open(name="foo", mode="U")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 43 | open(mode="U", name="foo")
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 39 39 |     pass
@@ -551,16 +550,16 @@ UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
 44 44 | 
 45 45 | with open("foo", mode="U") as f:
 
-UP015.py:43:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:43:1: UP015 [*] Unnecessary mode argument
    |
 41 | open("foo", mode="U")
 42 | open(name="foo", mode="U")
 43 | open(mode="U", name="foo")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-44 | 
+44 |
 45 | with open("foo", mode="U") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 40 40 | 
@@ -572,16 +571,16 @@ UP015.py:43:1: UP015 [*] Unnecessary open mode parameters
 45 45 | with open("foo", mode="U") as f:
 46 46 |     pass
 
-UP015.py:45:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:45:6: UP015 [*] Unnecessary mode argument
    |
 43 | open(mode="U", name="foo")
-44 | 
+44 |
 45 | with open("foo", mode="U") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^ UP015
 46 |     pass
 47 | with open(name="foo", mode="U") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 42 42 | open(name="foo", mode="U")
@@ -593,7 +592,7 @@ UP015.py:45:6: UP015 [*] Unnecessary open mode parameters
 47 47 | with open(name="foo", mode="U") as f:
 48 48 |     pass
 
-UP015.py:47:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:47:6: UP015 [*] Unnecessary mode argument
    |
 45 | with open("foo", mode="U") as f:
 46 |     pass
@@ -602,7 +601,7 @@ UP015.py:47:6: UP015 [*] Unnecessary open mode parameters
 48 |     pass
 49 | with open(mode="U", name="foo") as f:
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 44 44 | 
@@ -614,7 +613,7 @@ UP015.py:47:6: UP015 [*] Unnecessary open mode parameters
 49 49 | with open(mode="U", name="foo") as f:
 50 50 |     pass
 
-UP015.py:49:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:49:6: UP015 [*] Unnecessary mode argument
    |
 47 | with open(name="foo", mode="U") as f:
 48 |     pass
@@ -622,7 +621,7 @@ UP015.py:49:6: UP015 [*] Unnecessary open mode parameters
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 50 |     pass
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 46 46 |     pass
@@ -634,16 +633,16 @@ UP015.py:49:6: UP015 [*] Unnecessary open mode parameters
 51 51 | 
 52 52 | open("foo", mode="Ub")
 
-UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:52:1: UP015 [*] Unnecessary modes, use `rb`
    |
 50 |     pass
-51 | 
+51 |
 52 | open("foo", mode="Ub")
    | ^^^^^^^^^^^^^^^^^^^^^^ UP015
 53 | open(name="foo", mode="Ub")
 54 | open(mode="Ub", name="foo")
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 49 49 | with open(mode="U", name="foo") as f:
@@ -655,14 +654,14 @@ UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 54 54 | open(mode="Ub", name="foo")
 55 55 | 
 
-UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:53:1: UP015 [*] Unnecessary modes, use `rb`
    |
 52 | open("foo", mode="Ub")
 53 | open(name="foo", mode="Ub")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 54 | open(mode="Ub", name="foo")
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 50 50 |     pass
@@ -674,16 +673,16 @@ UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 55 55 | 
 56 56 | with open("foo", mode="Ub") as f:
 
-UP015.py:54:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:54:1: UP015 [*] Unnecessary modes, use `rb`
    |
 52 | open("foo", mode="Ub")
 53 | open(name="foo", mode="Ub")
 54 | open(mode="Ub", name="foo")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-55 | 
+55 |
 56 | with open("foo", mode="Ub") as f:
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 51 51 | 
@@ -695,16 +694,16 @@ UP015.py:54:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 56 56 | with open("foo", mode="Ub") as f:
 57 57 |     pass
 
-UP015.py:56:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:56:6: UP015 [*] Unnecessary modes, use `rb`
    |
 54 | open(mode="Ub", name="foo")
-55 | 
+55 |
 56 | with open("foo", mode="Ub") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^ UP015
 57 |     pass
 58 | with open(name="foo", mode="Ub") as f:
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 53 53 | open(name="foo", mode="Ub")
@@ -716,7 +715,7 @@ UP015.py:56:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 58 58 | with open(name="foo", mode="Ub") as f:
 59 59 |     pass
 
-UP015.py:58:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:58:6: UP015 [*] Unnecessary modes, use `rb`
    |
 56 | with open("foo", mode="Ub") as f:
 57 |     pass
@@ -725,7 +724,7 @@ UP015.py:58:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 59 |     pass
 60 | with open(mode="Ub", name="foo") as f:
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 55 55 | 
@@ -737,7 +736,7 @@ UP015.py:58:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 60 60 | with open(mode="Ub", name="foo") as f:
 61 61 |     pass
 
-UP015.py:60:6: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:60:6: UP015 [*] Unnecessary modes, use `rb`
    |
 58 | with open(name="foo", mode="Ub") as f:
 59 |     pass
@@ -745,7 +744,7 @@ UP015.py:60:6: UP015 [*] Unnecessary open mode parameters, use "rb"
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 61 |     pass
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 57 57 |     pass
@@ -757,16 +756,16 @@ UP015.py:60:6: UP015 [*] Unnecessary open mode parameters, use "rb"
 62 62 | 
 63 63 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:63:1: UP015 [*] Unnecessary mode argument
    |
 61 |     pass
-62 | 
+62 |
 63 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 64 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
 65 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 60 60 | with open(mode="Ub", name="foo") as f:
@@ -778,7 +777,7 @@ UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
 65 65 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 66 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:64:1: UP015 [*] Unnecessary mode argument
    |
 63 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 64 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
@@ -786,7 +785,7 @@ UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
 65 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 61 61 |     pass
@@ -798,7 +797,7 @@ UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
 66 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 67 67 | 
 
-UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:65:1: UP015 [*] Unnecessary mode argument
    |
 63 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 64 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
@@ -806,7 +805,7 @@ UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 62 62 | 
@@ -818,16 +817,16 @@ UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
 67 67 | 
 68 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-UP015.py:66:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:66:1: UP015 [*] Unnecessary mode argument
    |
 64 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
 65 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-67 | 
+67 |
 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 63 63 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
@@ -839,16 +838,16 @@ UP015.py:66:1: UP015 [*] Unnecessary open mode parameters
 68 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 
-UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:68:1: UP015 [*] Unnecessary modes, use `rb`
    |
 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-67 | 
+67 |
 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 69 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 70 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 65 65 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
@@ -860,7 +859,7 @@ UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 70 70 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 71 71 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:69:1: UP015 [*] Unnecessary modes, use `rb`
    |
 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 69 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
@@ -868,7 +867,7 @@ UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 70 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 71 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 66 66 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
@@ -880,7 +879,7 @@ UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 71 71 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 72 72 | 
 
-UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:70:1: UP015 [*] Unnecessary modes, use `rb`
    |
 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 69 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
@@ -888,7 +887,7 @@ UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use "rb"
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 71 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 67 67 | 
@@ -900,16 +899,16 @@ UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 72 72 | 
 73 73 | import aiofiles
 
-UP015.py:71:1: UP015 [*] Unnecessary open mode parameters, use "rb"
+UP015.py:71:1: UP015 [*] Unnecessary modes, use `rb`
    |
 69 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 70 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 71 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-72 | 
+72 |
 73 | import aiofiles
    |
-   = help: Replace with "rb"
+   = help: Replace with `rb`
 
 ℹ Safe fix
 68 68 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
@@ -921,16 +920,16 @@ UP015.py:71:1: UP015 [*] Unnecessary open mode parameters, use "rb"
 73 73 | import aiofiles
 74 74 | 
 
-UP015.py:75:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:75:1: UP015 [*] Unnecessary mode argument
    |
 73 | import aiofiles
-74 | 
+74 |
 75 | aiofiles.open("foo", "U")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 76 | aiofiles.open("foo", "r")
 77 | aiofiles.open("foo", mode="r")
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 72 72 | 
@@ -942,14 +941,14 @@ UP015.py:75:1: UP015 [*] Unnecessary open mode parameters
 77 77 | aiofiles.open("foo", mode="r")
 78 78 | 
 
-UP015.py:76:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:76:1: UP015 [*] Unnecessary mode argument
    |
 75 | aiofiles.open("foo", "U")
 76 | aiofiles.open("foo", "r")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
 77 | aiofiles.open("foo", mode="r")
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 73 73 | import aiofiles
@@ -961,16 +960,16 @@ UP015.py:76:1: UP015 [*] Unnecessary open mode parameters
 78 78 | 
 79 79 | open("foo", "r+")
 
-UP015.py:77:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:77:1: UP015 [*] Unnecessary mode argument
    |
 75 | aiofiles.open("foo", "U")
 76 | aiofiles.open("foo", "r")
 77 | aiofiles.open("foo", mode="r")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
-78 | 
+78 |
 79 | open("foo", "r+")
    |
-   = help: Remove open mode parameters
+   = help: Remove mode argument
 
 ℹ Safe fix
 74 74 | 

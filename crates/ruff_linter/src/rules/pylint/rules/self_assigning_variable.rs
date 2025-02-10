@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -23,8 +23,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// country = "Poland"
 /// ```
-#[violation]
-pub struct SelfAssigningVariable {
+#[derive(ViolationMetadata)]
+pub(crate) struct SelfAssigningVariable {
     name: String,
 }
 
@@ -37,12 +37,13 @@ impl Violation for SelfAssigningVariable {
 }
 
 /// PLW0127
-pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
+pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
     if checker.semantic().current_scope().kind.is_class() {
         return;
     }
+    let mut diagnostics = Vec::new();
 
     for (left, right) in assign
         .targets
@@ -50,12 +51,13 @@ pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
         .chain(std::iter::once(assign.value.as_ref()))
         .tuple_combinations()
     {
-        visit_assignments(left, right, &mut checker.diagnostics);
+        visit_assignments(left, right, &mut diagnostics);
     }
+    checker.report_diagnostics(diagnostics);
 }
 
 /// PLW0127
-pub(crate) fn self_annotated_assignment(checker: &mut Checker, assign: &ast::StmtAnnAssign) {
+pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnnAssign) {
     let Some(value) = assign.value.as_ref() else {
         return;
     };
@@ -65,8 +67,10 @@ pub(crate) fn self_annotated_assignment(checker: &mut Checker, assign: &ast::Stm
     if checker.semantic().current_scope().kind.is_class() {
         return;
     }
+    let mut diagnostics = Vec::new();
 
-    visit_assignments(&assign.target, value, &mut checker.diagnostics);
+    visit_assignments(&assign.target, value, &mut diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {

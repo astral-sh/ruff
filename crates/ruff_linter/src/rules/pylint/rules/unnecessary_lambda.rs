@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, ExprLambda, Parameter, ParameterWithDefault};
 use ruff_text_size::Ranged;
@@ -43,8 +43,8 @@ use crate::checkers::ast::Checker;
 /// breaking change for callers that execute the lambda by passing arguments by
 /// name, as in: `foo(x=1, y=2)`. Since `func` does not define the arguments
 /// `x` and `y`, unlike the lambda, the call would raise a `TypeError`.
-#[violation]
-pub struct UnnecessaryLambda;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryLambda;
 
 impl AlwaysFixableViolation for UnnecessaryLambda {
     #[derive_message_formats]
@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryLambda {
 }
 
 /// PLW0108
-pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
+pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     let ExprLambda {
         parameters,
         body,
@@ -215,7 +215,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
         ),
         Applicability::Unsafe,
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Identify all `Expr::Name` nodes in an AST.

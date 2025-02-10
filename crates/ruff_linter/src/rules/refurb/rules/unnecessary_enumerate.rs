@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{Arguments, Expr, Int};
@@ -57,8 +57,8 @@ use crate::fix::edits::pad;
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 /// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
-#[violation]
-pub struct UnnecessaryEnumerate {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
 }
 
@@ -87,7 +87,7 @@ impl Violation for UnnecessaryEnumerate {
 }
 
 /// FURB148
-pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) {
     // Check the for statement is of the form `for x, y in func(...)`.
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;
@@ -144,7 +144,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         (false, true) => {
             // Ensure the sequence object works with `len`. If it doesn't, the
@@ -178,7 +178,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
-                let start = arguments.find_argument("start", 1);
+                let start = arguments.find_argument_value("start", 1);
                 if start.map_or(true, |start| {
                     matches!(
                         start,
@@ -205,7 +205,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

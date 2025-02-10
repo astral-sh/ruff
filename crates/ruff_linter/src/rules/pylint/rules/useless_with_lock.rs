@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -47,8 +47,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `Lock Objects`](https://docs.python.org/3/library/threading.html#lock-objects)
-#[violation]
-pub struct UselessWithLock;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessWithLock;
 
 impl Violation for UselessWithLock {
     #[derive_message_formats]
@@ -58,7 +58,7 @@ impl Violation for UselessWithLock {
 }
 
 /// PLW2101
-pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
+pub(crate) fn useless_with_lock(checker: &Checker, with: &ast::StmtWith) {
     for item in &with.items {
         let Some(call) = item.context_expr.as_call_expr() else {
             continue;
@@ -80,8 +80,6 @@ pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
             return;
         }
 
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UselessWithLock, call.range()));
+        checker.report_diagnostic(Diagnostic::new(UselessWithLock, call.range()));
     }
 }

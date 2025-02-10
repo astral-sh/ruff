@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
-#[violation]
-pub struct UnnecessaryFromFloat {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,
 }
@@ -59,7 +59,7 @@ impl Violation for UnnecessaryFromFloat {
 }
 
 /// FURB164
-pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &*call.func else {
         return;
     };
@@ -115,8 +115,8 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
         };
 
         let Some(value) = (match method_name {
-            MethodName::FromFloat => call.arguments.find_argument("f", 0),
-            MethodName::FromDecimal => call.arguments.find_argument("dec", 0),
+            MethodName::FromFloat => call.arguments.find_argument_value("f", 0),
+            MethodName::FromDecimal => call.arguments.find_argument_value("dec", 0),
         }) else {
             return;
         };
@@ -157,13 +157,13 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
             edit,
             [Edit::range_replacement(replacement, call.range())],
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
 
         return;
     }
 
     diagnostic.set_fix(Fix::safe_edit(edit));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

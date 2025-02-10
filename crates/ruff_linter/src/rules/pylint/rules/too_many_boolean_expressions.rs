@@ -1,6 +1,6 @@
 use ast::{Expr, StmtIf};
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -25,8 +25,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-bool-expr`
-#[violation]
-pub struct TooManyBooleanExpressions {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyBooleanExpressions {
     expressions: usize,
     max_expressions: usize,
 }
@@ -43,11 +43,11 @@ impl Violation for TooManyBooleanExpressions {
 }
 
 /// PLR0916
-pub(crate) fn too_many_boolean_expressions(checker: &mut Checker, stmt: &StmtIf) {
+pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
     if let Some(bool_op) = stmt.test.as_bool_op_expr() {
         let expressions = count_bools(bool_op);
         if expressions > checker.settings.pylint.max_bool_expr {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 TooManyBooleanExpressions {
                     expressions,
                     max_expressions: checker.settings.pylint.max_bool_expr,
@@ -61,7 +61,7 @@ pub(crate) fn too_many_boolean_expressions(checker: &mut Checker, stmt: &StmtIf)
         if let Some(bool_op) = elif.test.as_ref().and_then(Expr::as_bool_op_expr) {
             let expressions = count_bools(bool_op);
             if expressions > checker.settings.pylint.max_bool_expr {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     TooManyBooleanExpressions {
                         expressions,
                         max_expressions: checker.settings.pylint.max_bool_expr,

@@ -38,7 +38,7 @@ pub(crate) fn fix_file(
             diagnostic
                 .fix
                 .as_ref()
-                .map_or(false, |fix| fix.applies(required_applicability))
+                .is_some_and(|fix| fix.applies(required_applicability))
         })
         .peekable();
 
@@ -134,6 +134,7 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
     // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
     match (rule1, rule2) {
+        (Rule::RedefinedWhileUnused, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Equal,
         (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
         (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
         _ => std::cmp::Ordering::Equal,
@@ -142,9 +143,11 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
     // Break ties in the event of overlapping rules, for some specific combinations.
     .then_with(|| match (&rule1, &rule2) {
-        // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-        (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
-        (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+        // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+        (Rule::MissingTrailingPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+        (Rule::NewLineAfterLastParagraph, Rule::MissingTrailingPeriod) => {
+            std::cmp::Ordering::Greater
+        }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
         (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
             std::cmp::Ordering::Less

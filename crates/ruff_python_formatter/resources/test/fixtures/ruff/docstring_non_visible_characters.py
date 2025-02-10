@@ -1,4 +1,4 @@
-# Regresssion test for https://github.com/astral-sh/ruff/issues/11724
+# Regression test for https://github.com/astral-sh/ruff/issues/11724
 
 '''
 

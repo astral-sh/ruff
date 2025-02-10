@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, UnaryOp};
 use ruff_text_size::Ranged;
 
@@ -26,8 +26,8 @@ use crate::checkers::ast::Checker;
 /// set(iterable)
 /// iterable
 /// ```
-#[violation]
-pub struct UnnecessarySubscriptReversal {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessarySubscriptReversal {
     func: String,
 }
 
@@ -40,7 +40,7 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::ExprCall) {
     let Some(first_arg) = call.arguments.args.first() else {
         return;
     };
@@ -86,7 +86,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::
     if !matches!(function_name, "reversed" | "set" | "sorted") {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnnecessarySubscriptReversal {
             func: function_name.to_string(),
         },

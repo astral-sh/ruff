@@ -18,10 +18,6 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::preview::{
-    is_docstring_code_block_in_docstring_indent_enabled,
-    is_join_implicit_concatenated_string_enabled,
-};
 use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
@@ -171,7 +167,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
+        if needs_chaperone_space(normalized.flags(), trim_end)
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -211,7 +207,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
+    if needs_chaperone_space(normalized.flags(), trim_end) {
         space().fmt(f)?;
     }
 
@@ -267,7 +263,7 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     code_example: CodeExample<'src>,
 }
 
-impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
+impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
     /// Print all of the lines in the given iterator to this
     /// printer's formatter.
     ///
@@ -508,17 +504,15 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                     .to_ascii_spaces(indent_width)
                     .saturating_add(kind.extra_indent_ascii_spaces());
 
-                if is_docstring_code_block_in_docstring_indent_enabled(self.f.context()) {
-                    // Add the in-docstring indentation
-                    current_indent = current_indent.saturating_add(
-                        u16::try_from(
-                            kind.indent()
-                                .columns()
-                                .saturating_sub(self.stripped_indentation.columns()),
-                        )
-                        .unwrap_or(u16::MAX),
-                    );
-                }
+                // Add the in-docstring indentation
+                current_indent = current_indent.saturating_add(
+                    u16::try_from(
+                        kind.indent()
+                            .columns()
+                            .saturating_sub(self.stripped_indentation.columns()),
+                    )
+                    .unwrap_or(u16::MAX),
+                );
 
                 let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
                 LineWidth::try_from(width).expect("width should be capped at a minimum of 1")
@@ -665,7 +659,7 @@ struct OutputDocstringLine<'src> {
     is_last: bool,
 }
 
-impl<'src> OutputDocstringLine<'src> {
+impl OutputDocstringLine<'_> {
     /// Return this reformatted line, but with the given function applied to
     /// the text of the line.
     fn map(self, mut map: impl FnMut(&str) -> String) -> OutputDocstringLine<'static> {
@@ -1026,7 +1020,7 @@ impl<'src> CodeExampleRst<'src> {
     ///
     /// [literal block]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
     /// [code block directive]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
-    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleRst> {
+    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleRst<'src>> {
         let (opening_indent, rest) = indent_with_suffix(original.line);
         if rest.starts_with(".. ") {
             if let Some(litblock) = CodeExampleRst::new_code_block(original) {
@@ -1061,7 +1055,7 @@ impl<'src> CodeExampleRst<'src> {
     /// Attempts to create a new reStructuredText code example from a
     /// `code-block` or `sourcecode` directive. If one couldn't be found, then
     /// `None` is returned.
-    fn new_code_block(original: InputDocstringLine<'src>) -> Option<CodeExampleRst> {
+    fn new_code_block(original: InputDocstringLine<'src>) -> Option<CodeExampleRst<'src>> {
         // This regex attempts to parse the start of a reStructuredText code
         // block [directive]. From the reStructuredText spec:
         //
@@ -1607,17 +1601,11 @@ fn docstring_format_source(
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-pub(super) fn needs_chaperone_space(
-    flags: AnyStringFlags,
-    trim_end: &str,
-    context: &PyFormatContext,
-) -> bool {
+pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
     if trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
         true
-    } else if is_join_implicit_concatenated_string_enabled(context) {
-        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     } else {
-        trim_end.ends_with(flags.quote_style().as_char())
+        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
 }
 

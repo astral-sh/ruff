@@ -1,7 +1,7 @@
 use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// async def fetch():
 ///     await asyncio.sleep(1)
 /// ```
-#[violation]
-pub struct BlockingSleepInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlockingSleepInAsyncFunction;
 
 impl Violation for BlockingSleepInAsyncFunction {
     #[derive_message_formats]
@@ -43,7 +43,7 @@ fn is_blocking_sleep(qualified_name: &QualifiedName) -> bool {
 }
 
 /// ASYNC251
-pub(crate) fn blocking_sleep(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn blocking_sleep(checker: &Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
         if checker
             .semantic()
@@ -51,7 +51,7 @@ pub(crate) fn blocking_sleep(checker: &mut Checker, call: &ExprCall) {
             .as_ref()
             .is_some_and(is_blocking_sleep)
         {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BlockingSleepInAsyncFunction,
                 call.func.range(),
             ));

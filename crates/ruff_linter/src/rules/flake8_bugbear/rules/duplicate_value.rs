@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::HashableExpr;
 use ruff_python_ast::Expr;
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// {1, 2, 3}
 /// ```
-#[violation]
-pub struct DuplicateValue {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateValue {
     value: String,
     existing: String,
 }
@@ -55,7 +55,7 @@ impl Violation for DuplicateValue {
 }
 
 /// B033
-pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
+pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
     let mut seen_values: FxHashMap<HashableExpr, &Expr> = FxHashMap::default();
     for (index, value) in set.iter().enumerate() {
         if value.is_literal_expr() {
@@ -72,7 +72,7 @@ pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
                     remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
                 });
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         };
     }

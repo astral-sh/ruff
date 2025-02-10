@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 ///
 /// for city, population in data.items():
 ///     print(f"{city} has population {population}.")
+/// ```
 ///
 /// ## Known problems
 /// If the dictionary key is a tuple, e.g.:
@@ -49,8 +50,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 /// Due to the known problem with tuple keys, this fix is unsafe.
-#[violation]
-pub struct DictIterMissingItems;
+#[derive(ViolationMetadata)]
+pub(crate) struct DictIterMissingItems;
 
 impl AlwaysFixableViolation for DictIterMissingItems {
     #[derive_message_formats]
@@ -64,7 +65,7 @@ impl AlwaysFixableViolation for DictIterMissingItems {
 }
 
 /// PLE1141
-pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &Expr) {
     let Expr::Tuple(tuple) = target else {
         return;
     };
@@ -98,7 +99,7 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
         format!("{}.items()", name.id),
         iter.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns true if the binding is a dictionary where each key is a tuple with two elements.

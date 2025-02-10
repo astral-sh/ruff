@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
-#[violation]
-pub struct NonEmptyStubBody;
+#[derive(ViolationMetadata)]
+pub(crate) struct NonEmptyStubBody;
 
 impl AlwaysFixableViolation for NonEmptyStubBody {
     #[derive_message_formats]
@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for NonEmptyStubBody {
 }
 
 /// PYI010
-pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
     // Ignore multi-statement bodies (covered by PYI048).
     let [stmt] = body else {
         return;
@@ -70,5 +70,5 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
         "...".to_string(),
         stmt.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

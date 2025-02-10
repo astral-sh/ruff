@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
@@ -48,7 +47,7 @@ UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 | run(["foo"], universal_newlines=True, check=False)
   |              ^^^^^^^^^^^^^^^^^^ UP021
-8 | 
+8 |
 9 | # OK
   |
   = help: Replace with `text` keyword argument

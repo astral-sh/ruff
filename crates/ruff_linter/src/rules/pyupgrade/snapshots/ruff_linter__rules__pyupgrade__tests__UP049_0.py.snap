@@ -1,0 +1,109 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP049_0.py:2:15: UP049 [*] Generic class uses private type parameters
+  |
+1 | # simple case, replace _T in signature and body
+2 | class Generic[_T]:
+  |               ^^ UP049
+3 |     buf: list[_T]
+  |
+  = help: Rename type parameter to remove leading underscores
+
+ℹ Safe fix
+1 1 | # simple case, replace _T in signature and body
+2   |-class Generic[_T]:
+3   |-    buf: list[_T]
+  2 |+class Generic[T]:
+  3 |+    buf: list[T]
+4 4 | 
+5   |-    def append(self, t: _T):
+  5 |+    def append(self, t: T):
+6 6 |         self.buf.append(t)
+7 7 | 
+8 8 | 
+
+UP049_0.py:10:12: UP049 [*] Generic function uses private type parameters
+   |
+ 9 | # simple case, replace _T in signature and body
+10 | def second[_T](var: tuple[_T]) -> _T:
+   |            ^^ UP049
+11 |     y: _T = var[1]
+12 |     return y
+   |
+   = help: Rename type parameter to remove leading underscores
+
+ℹ Safe fix
+7  7  | 
+8  8  | 
+9  9  | # simple case, replace _T in signature and body
+10    |-def second[_T](var: tuple[_T]) -> _T:
+11    |-    y: _T = var[1]
+   10 |+def second[T](var: tuple[T]) -> T:
+   11 |+    y: T = var[1]
+12 12 |     return y
+13 13 | 
+14 14 | 
+
+UP049_0.py:17:5: UP049 [*] Generic function uses private type parameters
+   |
+15 | # one diagnostic for each variable, comments are preserved
+16 | def many_generics[
+17 |     _T,  # first generic
+   |     ^^ UP049
+18 |     _U,  # second generic
+19 | ](args):
+   |
+   = help: Rename type parameter to remove leading underscores
+
+ℹ Safe fix
+14 14 | 
+15 15 | # one diagnostic for each variable, comments are preserved
+16 16 | def many_generics[
+17    |-    _T,  # first generic
+   17 |+    T,  # first generic
+18 18 |     _U,  # second generic
+19 19 | ](args):
+20 20 |     return args
+
+UP049_0.py:18:5: UP049 [*] Generic function uses private type parameters
+   |
+16 | def many_generics[
+17 |     _T,  # first generic
+18 |     _U,  # second generic
+   |     ^^ UP049
+19 | ](args):
+20 |     return args
+   |
+   = help: Rename type parameter to remove leading underscores
+
+ℹ Safe fix
+15 15 | # one diagnostic for each variable, comments are preserved
+16 16 | def many_generics[
+17 17 |     _T,  # first generic
+18    |-    _U,  # second generic
+   18 |+    U,  # second generic
+19 19 | ](args):
+20 20 |     return args
+21 21 | 
+
+UP049_0.py:27:7: UP049 [*] Generic function uses private type parameters
+   |
+27 | def f[_T](v):
+   |       ^^ UP049
+28 |     cast("_T", v)
+29 |     cast("Literal['_T']")
+   |
+   = help: Rename type parameter to remove leading underscores
+
+ℹ Safe fix
+24 24 | from typing import Literal, cast
+25 25 | 
+26 26 | 
+27    |-def f[_T](v):
+28    |-    cast("_T", v)
+   27 |+def f[T](v):
+   28 |+    cast("T", v)
+29 29 |     cast("Literal['_T']")
+30    |-    cast("list[_T]", v)
+   30 |+    cast("list[T]", v)

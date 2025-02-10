@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -29,8 +29,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.Text`](https://docs.python.org/3/library/typing.html#typing.Text)
-#[violation]
-pub struct TypingTextStrAlias;
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingTextStrAlias;
 
 impl Violation for TypingTextStrAlias {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -46,7 +46,7 @@ impl Violation for TypingTextStrAlias {
 }
 
 /// UP019
-pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::TYPING) {
         return;
     }
@@ -68,6 +68,6 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
                 import_edit,
             ))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

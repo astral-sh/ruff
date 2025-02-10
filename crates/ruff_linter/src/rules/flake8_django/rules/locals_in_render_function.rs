@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///     context = {"posts": posts}
 ///     return render(request, "app/index.html", context)
 /// ```
-#[violation]
-pub struct DjangoLocalsInRenderFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoLocalsInRenderFunction;
 
 impl Violation for DjangoLocalsInRenderFunction {
     #[derive_message_formats]
@@ -44,7 +44,7 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -59,9 +59,9 @@ pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprC
         return;
     }
 
-    if let Some(argument) = call.arguments.find_argument("context", 2) {
+    if let Some(argument) = call.arguments.find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 DjangoLocalsInRenderFunction,
                 argument.range(),
             ));

@@ -3,7 +3,7 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -46,8 +46,8 @@ use crate::Locator;
 /// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct AmbiguousUnicodeCharacterString {
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousUnicodeCharacterString {
     confusable: char,
     representant: char,
 }
@@ -99,8 +99,8 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct AmbiguousUnicodeCharacterDocstring {
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
     representant: char,
 }
@@ -152,8 +152,8 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct AmbiguousUnicodeCharacterComment {
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousUnicodeCharacterComment {
     confusable: char,
     representant: char,
 }
@@ -185,7 +185,7 @@ pub(crate) fn ambiguous_unicode_character_comment(
 }
 
 /// RUF001, RUF002
-pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like: StringLike) {
     let context = if checker.semantic().in_pep_257_docstring() {
         Context::Docstring
     } else {
@@ -196,25 +196,29 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
         match part {
             ast::StringLikePart::String(string_literal) => {
                 let text = checker.locator().slice(string_literal);
+                let mut diagnostics = Vec::new();
                 ambiguous_unicode_character(
-                    &mut checker.diagnostics,
+                    &mut diagnostics,
                     text,
                     string_literal.range(),
                     context,
                     checker.settings,
                 );
+                checker.report_diagnostics(diagnostics);
             }
             ast::StringLikePart::Bytes(_) => {}
             ast::StringLikePart::FString(f_string) => {
                 for literal in f_string.elements.literals() {
                     let text = checker.locator().slice(literal);
+                    let mut diagnostics = Vec::new();
                     ambiguous_unicode_character(
-                        &mut checker.diagnostics,
+                        &mut diagnostics,
                         text,
                         literal.range(),
                         context,
                         checker.settings,
                     );
+                    checker.report_diagnostics(diagnostics);
                 }
             }
         }

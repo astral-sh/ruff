@@ -26,8 +26,8 @@ mod tests {
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.py"))]
-    // E741 has different behaviour for `.pyi` files in preview mode;
-    // this test case checks it still has the old behaviour in stable mode
+    // E741 is disapplied for `.pyi` files (see #13119 for rationale);
+    // this fixture tests that we emit no errors there
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
@@ -43,6 +43,8 @@ mod tests {
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_3.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_4.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]
@@ -78,8 +80,7 @@ mod tests {
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_3.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_4.py"))]
-    // E741 has different behaviour for `.pyi` files in preview mode
-    #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391.ipynb"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

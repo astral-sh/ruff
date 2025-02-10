@@ -1,21 +1,25 @@
 doc-valid-idents = [
-  "..",
-  "CodeQL",
-  "FastAPI",
-  "IPython",
-  "LangChain",
-  "LibCST",
-  "McCabe",
-  "NumPy",
-  "SCREAMING_SNAKE_CASE",
-  "SQLAlchemy",
-  "StackOverflow",
-  "PyCharm",
+    "..",
+    "CodeQL",
+    "FastAPI",
+    "IPython",
+    "LangChain",
+    "LibCST",
+    "McCabe",
+    "NumPy",
+    "SCREAMING_SNAKE_CASE",
+    "SQLAlchemy",
+    "StackOverflow",
+    "PyCharm",
+    "SNMPv1",
+    "SNMPv2",
+    "SNMPv3",
+    "PyFlakes"
 ]
 
 ignore-interior-mutability = [
-  # Interned is read-only. The wrapped `Rc` never gets updated.
-  "ruff_formatter::format_element::Interned",
-  # The expression is read-only.
-  "ruff_python_ast::hashable::HashableExpr",
+    # Interned is read-only. The wrapped `Rc` never gets updated.
+    "ruff_formatter::format_element::Interned",
+    # The expression is read-only.
+    "ruff_python_ast::hashable::HashableExpr",
 ]

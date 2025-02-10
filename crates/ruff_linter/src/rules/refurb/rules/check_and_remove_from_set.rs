@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
@@ -39,8 +39,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## References
 /// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
-#[violation]
-pub struct CheckAndRemoveFromSet {
+#[derive(ViolationMetadata)]
+pub(crate) struct CheckAndRemoveFromSet {
     element: SourceCodeSnippet,
     set: String,
 }
@@ -67,7 +67,7 @@ impl AlwaysFixableViolation for CheckAndRemoveFromSet {
 }
 
 /// FURB132
-pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::StmtIf) {
+pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf) {
     // In order to fit the profile, we need if without else clauses and with only one statement in its body.
     if if_stmt.body.len() != 1 || !if_stmt.elif_else_clauses.is_empty() {
         return;
@@ -116,7 +116,7 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
         if_stmt.start(),
         if_stmt.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {

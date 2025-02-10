@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
-#[violation]
-pub struct AssertTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssertTuple;
 
 impl Violation for AssertTuple {
     #[derive_message_formats]
@@ -38,12 +38,10 @@ impl Violation for AssertTuple {
 }
 
 /// F631
-pub(crate) fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_tuple(checker: &Checker, stmt: &Stmt, test: &Expr) {
     if let Expr::Tuple(tuple) = &test {
         if !tuple.is_empty() {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(AssertTuple, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(AssertTuple, stmt.range()));
         }
     }
 }

@@ -1,8 +1,7 @@
 use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
@@ -10,10 +9,10 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for redundant `open` mode parameters.
+/// Checks for redundant `open` mode arguments.
 ///
 /// ## Why is this bad?
-/// Redundant `open` mode parameters are unnecessary and should be removed to
+/// Redundant `open` mode arguments are unnecessary and should be removed to
 /// avoid confusion.
 ///
 /// ## Example
@@ -30,8 +29,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-#[violation]
-pub struct RedundantOpenModes {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantOpenModes {
     replacement: String,
 }
 
@@ -40,24 +39,24 @@ impl AlwaysFixableViolation for RedundantOpenModes {
     fn message(&self) -> String {
         let RedundantOpenModes { replacement } = self;
         if replacement.is_empty() {
-            "Unnecessary open mode parameters".to_string()
+            "Unnecessary mode argument".to_string()
         } else {
-            format!("Unnecessary open mode parameters, use \"{replacement}\"")
+            format!("Unnecessary modes, use `{replacement}`")
         }
     }
 
     fn fix_title(&self) -> String {
         let RedundantOpenModes { replacement } = self;
         if replacement.is_empty() {
-            "Remove open mode parameters".to_string()
+            "Remove mode argument".to_string()
         } else {
-            format!("Replace with \"{replacement}\"")
+            format!("Replace with `{replacement}`")
         }
     }
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_open_modes(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -71,91 +70,69 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    match call.arguments.find_argument("mode", 1) {
-        None => {
-            if !call.arguments.is_empty() {
-                if let Some(keyword) = call.arguments.find_keyword("mode") {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: mode_param_value,
-                        ..
-                    }) = &keyword.value
-                    {
-                        if let Ok(mode) = OpenMode::from_chars(mode_param_value.chars()) {
-                            let reduced = mode.reduce();
-                            if reduced != mode {
-                                checker.diagnostics.push(create_diagnostic(
-                                    call,
-                                    &keyword.value,
-                                    reduced,
-                                    checker.tokens(),
-                                    checker.stylist(),
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Some(mode_param) => {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
-                if let Ok(mode) = OpenMode::from_chars(value.chars()) {
-                    let reduced = mode.reduce();
-                    if reduced != mode {
-                        checker.diagnostics.push(create_diagnostic(
-                            call,
-                            mode_param,
-                            reduced,
-                            checker.tokens(),
-                            checker.stylist(),
-                        ));
-                    }
-                }
-            }
-        }
+    let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) else {
+        return;
+    };
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_arg else {
+        return;
+    };
+    let Ok(mode) = OpenMode::from_chars(value.chars()) else {
+        return;
+    };
+    let reduced = mode.reduce();
+    if reduced != mode {
+        checker.report_diagnostic(create_diagnostic(call, mode_arg, reduced, checker));
     }
 }
 
 fn create_diagnostic(
     call: &ast::ExprCall,
-    mode_param: &Expr,
+    mode_arg: &Expr,
     mode: OpenMode,
-    tokens: &Tokens,
-    stylist: &Stylist,
+    checker: &Checker,
 ) -> Diagnostic {
+    let range = if checker.settings.preview.is_enabled() {
+        mode_arg.range()
+    } else {
+        call.range
+    };
+
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
             replacement: mode.to_string(),
         },
-        call.range(),
+        range,
     );
 
     if mode.is_empty() {
-        diagnostic
-            .try_set_fix(|| create_remove_param_fix(call, mode_param, tokens).map(Fix::safe_edit));
+        diagnostic.try_set_fix(|| {
+            create_remove_argument_fix(call, mode_arg, checker.tokens()).map(Fix::safe_edit)
+        });
     } else {
+        let stylist = checker.stylist();
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             format!("{}{mode}{}", stylist.quote(), stylist.quote()),
-            mode_param.range(),
+            mode_arg.range(),
         )));
     }
 
     diagnostic
 }
 
-fn create_remove_param_fix(
+fn create_remove_argument_fix(
     call: &ast::ExprCall,
-    mode_param: &Expr,
+    mode_arg: &Expr,
     tokens: &Tokens,
 ) -> Result<Edit> {
-    // Find the last comma before mode_param and create a deletion fix
-    // starting from the comma and ending after mode_param.
+    // Find the last comma before mode_arg and create a deletion fix
+    // starting from the comma and ending after mode_arg.
     let mut fix_start: Option<TextSize> = None;
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
 
     for token in tokens.in_range(call.range()) {
-        if token.start() == mode_param.start() {
+        if token.start() == mode_arg.start() {
             if is_first_arg {
                 delete_first_arg = true;
                 continue;

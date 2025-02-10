@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_source_file::{Line, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextSize};
@@ -10,6 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 
+#[allow(clippy::tabs_in_doc_comments)]
 /// ## What it does
 /// Checks for docstrings that are indented with tabs.
 ///
@@ -50,10 +51,10 @@ use crate::registry::Rule;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct IndentWithSpaces;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringTabIndentation;
 
-impl Violation for IndentWithSpaces {
+impl Violation for DocstringTabIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Docstring should be indented with spaces, not tabs".to_string()
@@ -98,8 +99,8 @@ impl Violation for IndentWithSpaces {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct UnderIndentation;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnderIndentation;
 
 impl AlwaysFixableViolation for UnderIndentation {
     #[derive_message_formats]
@@ -150,8 +151,8 @@ impl AlwaysFixableViolation for UnderIndentation {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct OverIndentation;
+#[derive(ViolationMetadata)]
+pub(crate) struct OverIndentation;
 
 impl AlwaysFixableViolation for OverIndentation {
     #[derive_message_formats]
@@ -165,7 +166,7 @@ impl AlwaysFixableViolation for OverIndentation {
 }
 
 /// D206, D207, D208
-pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     // Split the docstring into lines.
@@ -228,7 +229,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     clean_space(docstring.indentation),
                     TextRange::at(line.start(), line_indent.text_len()),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -263,11 +264,9 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
         current = lines.next();
     }
 
-    if checker.enabled(Rule::IndentWithSpaces) {
+    if checker.enabled(Rule::DocstringTabIndentation) {
         if has_seen_tab {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(IndentWithSpaces, docstring.range()));
+            checker.report_diagnostic(Diagnostic::new(DocstringTabIndentation, docstring.range()));
         }
     }
 
@@ -311,7 +310,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -333,7 +332,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

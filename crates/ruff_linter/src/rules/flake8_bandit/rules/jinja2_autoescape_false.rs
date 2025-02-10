@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
 /// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
-#[violation]
-pub struct Jinja2AutoescapeFalse {
+#[derive(ViolationMetadata)]
+pub(crate) struct Jinja2AutoescapeFalse {
     value: bool,
 }
 
@@ -56,7 +56,7 @@ impl Violation for Jinja2AutoescapeFalse {
 }
 
 /// S701
-pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn jinja2_autoescape_false(checker: &Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -70,20 +70,20 @@ pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCal
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         if id != "select_autoescape" {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
                                 keyword.range(),
                             ));
                         }
                     }
                 }
-                _ => checker.diagnostics.push(Diagnostic::new(
+                _ => checker.report_diagnostic(Diagnostic::new(
                     Jinja2AutoescapeFalse { value: true },
                     keyword.range(),
                 )),
             }
         } else {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Jinja2AutoescapeFalse { value: false },
                 call.func.range(),
             ));

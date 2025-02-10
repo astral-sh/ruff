@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_trivia::indentation_at_offset;
@@ -32,8 +32,8 @@ use crate::fix;
 ///     @classmethod
 ///     def bar(cls): ...
 /// ```
-#[violation]
-pub struct NoClassmethodDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoClassmethodDecorator;
 
 impl AlwaysFixableViolation for NoClassmethodDecorator {
     #[derive_message_formats]
@@ -68,8 +68,8 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     @staticmethod
 ///     def bar(arg1, arg2): ...
 /// ```
-#[violation]
-pub struct NoStaticmethodDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoStaticmethodDecorator;
 
 impl AlwaysFixableViolation for NoStaticmethodDecorator {
     #[derive_message_formats]
@@ -88,16 +88,16 @@ enum MethodType {
 }
 
 /// PLR0202
-pub(crate) fn no_classmethod_decorator(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn no_classmethod_decorator(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Classmethod);
 }
 
 /// PLR0203
-pub(crate) fn no_staticmethod_decorator(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn no_staticmethod_decorator(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Staticmethod);
 }
 
-fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type: &MethodType) {
+fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &MethodType) {
     let Stmt::ClassDef(class_def) = class_stmt else {
         return;
     };
@@ -191,7 +191,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                             checker.indexer(),
                         )],
                     ));
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
                 None => {
                     continue;

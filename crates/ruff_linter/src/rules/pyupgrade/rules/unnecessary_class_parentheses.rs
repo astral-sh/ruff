@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -24,8 +24,8 @@ use crate::checkers::ast::Checker;
 /// class Foo:
 ///     ...
 /// ```
-#[violation]
-pub struct UnnecessaryClassParentheses;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryClassParentheses;
 
 impl AlwaysFixableViolation for UnnecessaryClassParentheses {
     #[derive_message_formats]
@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for UnnecessaryClassParentheses {
 }
 
 /// UP039
-pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
         return;
     };
@@ -53,5 +53,5 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
         arguments.start(),
         arguments.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

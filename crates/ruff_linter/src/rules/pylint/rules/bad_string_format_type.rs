@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// print("%d" % 1)
 /// ```
-#[violation]
-pub struct BadStringFormatType;
+#[derive(ViolationMetadata)]
+pub(crate) struct BadStringFormatType;
 
 impl Violation for BadStringFormatType {
     #[derive_message_formats]
@@ -211,7 +211,7 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
 
 /// PLE1307
 pub(crate) fn bad_string_format_type(
-    checker: &mut Checker,
+    checker: &Checker,
     bin_op: &ast::ExprBinOp,
     format_string: &ast::ExprStringLiteral,
 ) {
@@ -240,8 +240,6 @@ pub(crate) fn bad_string_format_type(
         _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(BadStringFormatType, bin_op.range()));
+        checker.report_diagnostic(Diagnostic::new(BadStringFormatType, bin_op.range()));
     }
 }

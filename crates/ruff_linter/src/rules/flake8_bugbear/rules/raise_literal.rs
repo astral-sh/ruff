@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -26,8 +26,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
-#[violation]
-pub struct RaiseLiteral;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseLiteral;
 
 impl Violation for RaiseLiteral {
     #[derive_message_formats]
@@ -37,10 +37,8 @@ impl Violation for RaiseLiteral {
 }
 
 /// B016
-pub(crate) fn raise_literal(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_literal(checker: &Checker, expr: &Expr) {
     if expr.is_literal_expr() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RaiseLiteral, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(RaiseLiteral, expr.range()));
     }
 }

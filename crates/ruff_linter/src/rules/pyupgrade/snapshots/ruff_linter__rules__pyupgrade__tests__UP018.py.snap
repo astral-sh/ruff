@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
@@ -285,7 +284,7 @@ UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 51 | bool(True)
 52 | bool(False)
    | ^^^^^^^^^^^ UP018
-53 | 
+53 |
 54 | # These become a literal but retain parentheses
    |
    = help: Replace with boolean literal
@@ -305,7 +304,7 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 54 | # These become a literal but retain parentheses
 55 | int(1).denominator
    | ^^^^^^ UP018
-56 | 
+56 |
 57 | # These too are literals in spirit
    |
    = help: Replace with integer literal

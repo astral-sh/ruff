@@ -1,7 +1,8 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use serde::de::{self};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
@@ -24,16 +25,17 @@ use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
+use ruff_python_stdlib::identifiers::is_identifier;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -322,8 +324,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py38""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
+        default = r#""py39""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -436,7 +438,11 @@ pub struct Options {
 /// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[serde(
+    from = "LintOptionsWire",
+    deny_unknown_fields,
+    rename_all = "kebab-case"
+)]
 pub struct LintOptions {
     #[serde(flatten)]
     pub common: LintCommonOptions,
@@ -462,6 +468,10 @@ pub struct LintOptions {
         "#
     )]
     pub exclude: Option<Vec<String>>,
+
+    /// Options for the `pydoclint` plugin.
+    #[option_group]
+    pub pydoclint: Option<PydoclintOptions>,
 
     /// Options for the `ruff` plugin
     #[option_group]
@@ -646,7 +656,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the same
+    /// prefix appears in both.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -732,7 +743,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the
+    /// same prefix appears in both.
     #[option(
         default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
@@ -932,6 +944,7 @@ pub struct LintCommonOptions {
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
+/// Options for the `flake8-annotations` plugin.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
@@ -1001,13 +1014,14 @@ impl Flake8AnnotationsOptions {
     }
 }
 
+/// Options for the `flake8-bandit` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BanditOptions {
-    /// A list of directories to consider temporary.
+    /// A list of directories to consider temporary (see `S108`).
     #[option(
         default = "[\"/tmp\", \"/var/tmp\", \"/dev/shm\"]",
         value_type = "list[str]",
@@ -1016,7 +1030,7 @@ pub struct Flake8BanditOptions {
     pub hardcoded_tmp_directory: Option<Vec<String>>,
 
     /// A list of directories to consider temporary, in addition to those
-    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory).
+    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -1049,6 +1063,7 @@ impl Flake8BanditOptions {
     }
 }
 
+/// Options for the `flake8-boolean-trap` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1075,6 +1090,7 @@ impl Flake8BooleanTrapOptions {
     }
 }
 
+/// Options for the `flake8-bugbear` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1105,6 +1121,8 @@ impl Flake8BugbearOptions {
         }
     }
 }
+
+/// Options for the `flake8-builtins` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1121,20 +1139,36 @@ pub struct Flake8BuiltinsOptions {
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = "builtins-allowed-modules = [\"id\"]"
+        example = "builtins-allowed-modules = [\"secrets\"]"
     )]
     /// List of builtin module names to allow.
     pub builtins_allowed_modules: Option<Vec<String>>,
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = "builtins-strict-checking = false"
+    )]
+    /// Compare module names instead of full module paths.
+    pub builtins_strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+    pub fn into_settings(
+        self,
+        preview: PreviewMode,
+    ) -> ruff_linter::rules::flake8_builtins::settings::Settings {
         ruff_linter::rules::flake8_builtins::settings::Settings {
             builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
             builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
+            builtins_strict_checking: self
+                .builtins_strict_checking
+                // use the old default of true on non-preview
+                .unwrap_or(preview.is_disabled()),
         }
     }
 }
+
+/// Options for the `flake8-comprehensions` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1160,6 +1194,7 @@ impl Flake8ComprehensionsOptions {
     }
 }
 
+/// Options for the `flake8-copyright` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1215,6 +1250,7 @@ impl Flake8CopyrightOptions {
     }
 }
 
+/// Options for the `flake8-errmsg` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1234,6 +1270,7 @@ impl Flake8ErrMsgOptions {
     }
 }
 
+/// Options for the `flake8-gettext` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1271,6 +1308,7 @@ impl Flake8GetTextOptions {
     }
 }
 
+/// Options for the `flake8-implicit-str-concat` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1305,6 +1343,7 @@ impl Flake8ImplicitStrConcatOptions {
     }
 }
 
+/// Options for the `flake8-import-conventions` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1327,7 +1366,7 @@ pub struct Flake8ImportConventionsOptions {
             scipy = "sp"
         "#
     )]
-    pub aliases: Option<FxHashMap<String, String>>,
+    pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
     /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
@@ -1340,7 +1379,7 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<String, String>>,
+    pub extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to its banned import aliases.
     #[option(
@@ -1370,14 +1409,84 @@ pub struct Flake8ImportConventionsOptions {
     pub banned_from: Option<FxHashSet<String>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ModuleName(String);
+
+impl ModuleName {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ModuleName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        if name.is_empty() || name.split('.').any(|part| !is_identifier(part)) {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"a sequence of Python identifiers delimited by periods",
+            ))
+        } else {
+            Ok(Self(name))
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Alias(String);
+
+impl Alias {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Alias {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        // Assigning to "__debug__" is a SyntaxError
+        // see the note here:
+        // https://docs.python.org/3/library/constants.html#debug__
+        if &*name == "__debug__" {
+            return Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"an assignable Python identifier",
+            ));
+        }
+        if is_identifier(&name) {
+            Ok(Self(name))
+        } else {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"a Python identifier",
+            ))
+        }
+    }
+}
+
 impl Flake8ImportConventionsOptions {
     pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
-        let mut aliases = match self.aliases {
-            Some(options_aliases) => options_aliases,
+        let mut aliases: FxHashMap<String, String> = match self.aliases {
+            Some(options_aliases) => options_aliases
+                .into_iter()
+                .map(|(module, alias)| (module.into_string(), alias.into_string()))
+                .collect(),
             None => flake8_import_conventions::settings::default_aliases(),
         };
         if let Some(extend_aliases) = self.extend_aliases {
-            aliases.extend(extend_aliases);
+            aliases.extend(
+                extend_aliases
+                    .into_iter()
+                    .map(|(module, alias)| (module.into_string(), alias.into_string())),
+            );
         }
 
         flake8_import_conventions::settings::Settings {
@@ -1388,6 +1497,7 @@ impl Flake8ImportConventionsOptions {
     }
 }
 
+/// Options for the `flake8-pytest-style` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1488,6 +1598,38 @@ pub struct Flake8PytestStyleOptions {
         example = "mark-parentheses = true"
     )]
     pub mark_parentheses: Option<bool>,
+
+    /// List of warning names that require a match= parameter in a
+    /// `pytest.warns()` call.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"["Warning", "UserWarning", "DeprecationWarning"]"#,
+        value_type = "list[str]",
+        example = "warns-require-match-for = [\"requests.RequestsWarning\"]"
+    )]
+    pub warns_require_match_for: Option<Vec<String>>,
+
+    /// List of additional warning names that require a match= parameter in a
+    /// `pytest.warns()` call. This extends the default list of warnings that
+    /// require a match= parameter.
+    ///
+    /// This option is useful if you want to extend the default list of warnings
+    /// that require a match= parameter without having to specify the entire
+    /// list.
+    ///
+    /// Note that this option does not remove any warnings from the default
+    /// list.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "warns-extend-require-match-for = [\"requests.RequestsWarning\"]"
+    )]
+    pub warns_extend_require_match_for: Option<Vec<String>>,
 }
 
 impl Flake8PytestStyleOptions {
@@ -1520,10 +1662,33 @@ impl Flake8PytestStyleOptions {
                 .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
             mark_parentheses: self.mark_parentheses.unwrap_or_default(),
+            warns_require_match_for: self
+                .warns_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidWarnsRequireMatchFor)?
+                .unwrap_or_else(flake8_pytest_style::settings::default_broad_warnings),
+            warns_extend_require_match_for: self
+                .warns_extend_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidWarnsExtendRequireMatchFor)?
+                .unwrap_or_default(),
         })
     }
 }
 
+/// Options for the `flake8-quotes` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1596,6 +1761,7 @@ impl Flake8QuotesOptions {
     }
 }
 
+/// Options for the `flake8_self` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1636,6 +1802,7 @@ impl Flake8SelfOptions {
     }
 }
 
+/// Options for the `flake8-tidy-imports` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1693,6 +1860,7 @@ impl Flake8TidyImportsOptions {
     }
 }
 
+/// Options for the `flake8-type-checking` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1747,6 +1915,21 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Common examples include Pydantic's `@pydantic.validate_call` decorator
     /// (for functions) and attrs' `@attrs.define` decorator (for classes).
+    ///
+    /// This also supports framework decorators like FastAPI's `fastapi.FastAPI.get`
+    /// which will work across assignments in the same module.
+    ///
+    /// For example:
+    /// ```python
+    /// import fastapi
+    ///
+    /// app = FastAPI("app")
+    ///
+    /// @app.get("/home")
+    /// def home() -> str: ...
+    /// ```
+    ///
+    /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -1822,6 +2005,7 @@ impl Flake8TypeCheckingOptions {
     }
 }
 
+/// Options for the `flake8-unused-arguments` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1845,6 +2029,7 @@ impl Flake8UnusedArgumentsOptions {
     }
 }
 
+/// Options for the `isort` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2099,7 +2284,7 @@ pub struct IsortOptions {
     /// Use `-1` for automatic determination.
     ///
     /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
-    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).
+    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).
     ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
@@ -2492,6 +2677,7 @@ impl IsortOptions {
     }
 }
 
+/// Options for the `mccabe` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2520,6 +2706,7 @@ impl McCabeOptions {
     }
 }
 
+/// Options for the `pep8-naming` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2612,6 +2799,7 @@ impl Pep8NamingOptions {
     }
 }
 
+/// Options for the `pycodestyle` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2686,6 +2874,7 @@ impl PycodestyleOptions {
     }
 }
 
+/// Options for the `pydocstyle` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2764,6 +2953,16 @@ pub struct PydocstyleOptions {
         "#
     )]
     pub property_decorators: Option<Vec<String>>,
+
+    /// If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            ignore_var_parameters = true
+        "#
+    )]
+    pub ignore_var_parameters: Option<bool>,
 }
 
 impl PydocstyleOptions {
@@ -2772,15 +2971,48 @@ impl PydocstyleOptions {
             convention,
             ignore_decorators,
             property_decorators,
+            ignore_var_parameters: ignore_variadics,
         } = self;
-        pydocstyle::settings::Settings::new(
+        pydocstyle::settings::Settings {
             convention,
-            ignore_decorators.unwrap_or_default(),
-            property_decorators.unwrap_or_default(),
-        )
+            ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
+            ignore_var_parameters: ignore_variadics.unwrap_or_default(),
+        }
     }
 }
 
+/// Options for the `pydoclint` plugin.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PydoclintOptions {
+    /// Skip docstrings which fit on a single line.
+    ///
+    /// Note: The corresponding setting in `pydoclint`
+    /// is named `skip-checking-short-docstrings`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            # Skip docstrings which fit on a single line.
+            ignore-one-line-docstrings = true
+        "#
+    )]
+    pub ignore_one_line_docstrings: Option<bool>,
+}
+
+impl PydoclintOptions {
+    pub fn into_settings(self) -> pydoclint::settings::Settings {
+        pydoclint::settings::Settings {
+            ignore_one_line_docstrings: self.ignore_one_line_docstrings.unwrap_or_default(),
+        }
+    }
+}
+
+/// Options for the `pyflakes` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2825,6 +3057,7 @@ impl PyflakesOptions {
     }
 }
 
+/// Options for the `pylint` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2934,6 +3167,7 @@ impl PylintOptions {
     }
 }
 
+/// Options for the `pyupgrade` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2989,6 +3223,7 @@ impl PyUpgradeOptions {
     }
 }
 
+/// Options for the `ruff` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3007,18 +3242,49 @@ pub struct RuffOptions {
     )]
     pub parenthesize_tuple_in_subscript: Option<bool>,
 
-    /// A list of additional callable names that behave like [`markupsafe.Markup`].
+    /// A list of additional callable names that behave like
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
     /// `literal`).
-    ///
-    /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
     #[option(
         default = "[]",
         value_type = "list[str]",
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
     pub extend_markup_names: Option<Vec<String>>,
+
+    /// A list of callable names, whose result may be safely passed into
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).
+    ///
+    /// This setting helps you avoid false positives in code like:
+    ///
+    /// ```python
+    /// from bleach import clean
+    /// from markupsafe import Markup
+    ///
+    /// cleaned_markup = Markup(clean(some_user_input))
+    /// ```
+    ///
+    /// Where the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html)
+    /// usually ensures that there's no XSS vulnerability.
+    ///
+    /// Although it is not recommended, you may also use this setting to whitelist other
+    /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
+    /// will depend on the implementation and how well the translations are audited.
+    ///
+    /// Another common use-case is to wrap the output of functions that generate markup
+    /// like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring)
+    /// or template rendering engines where sanitization of potential user input is either
+    /// already baked in or has to happen before rendering.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+    )]
+    pub allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl RuffOptions {
@@ -3028,6 +3294,7 @@ impl RuffOptions {
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
             extend_markup_names: self.extend_markup_names.unwrap_or_default(),
+            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
         }
     }
 }
@@ -3390,25 +3657,196 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub detect_string_imports: Option<bool>,
-    /// A map from file path to the list of file paths or globs that should be considered
-    /// dependencies of that file, regardless of whether relevant imports are detected.
+    /// A map from file path to the list of Python or non-Python file paths or globs that should be
+    /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
         default = "{}",
+        scope = "include-dependencies",
         value_type = "dict[str, list[str]]",
         example = r#"
-            include-dependencies = {
-                "foo/bar.py": ["foo/baz/*.py"],
-            }
+            "foo/bar.py" = ["foo/baz/*.py"]
+            "foo/baz/reader.py" = ["configs/bar.json"]
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+}
+
+/// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
+/// far better error messages when deserializing.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct LintOptionsWire {
+    // common: LintCommonOptions
+    allowed_confusables: Option<Vec<char>>,
+    dummy_variable_rgx: Option<String>,
+    extend_ignore: Option<Vec<RuleSelector>>,
+    extend_select: Option<Vec<RuleSelector>>,
+    extend_fixable: Option<Vec<RuleSelector>>,
+    extend_unfixable: Option<Vec<RuleSelector>>,
+    external: Option<Vec<String>>,
+    fixable: Option<Vec<RuleSelector>>,
+    ignore: Option<Vec<RuleSelector>>,
+    extend_safe_fixes: Option<Vec<RuleSelector>>,
+    extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    ignore_init_module_imports: Option<bool>,
+    logger_objects: Option<Vec<String>>,
+    select: Option<Vec<RuleSelector>>,
+    explicit_preview_rules: Option<bool>,
+    task_tags: Option<Vec<String>>,
+    typing_modules: Option<Vec<String>>,
+    unfixable: Option<Vec<RuleSelector>>,
+    flake8_annotations: Option<Flake8AnnotationsOptions>,
+    flake8_bandit: Option<Flake8BanditOptions>,
+    flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
+    flake8_bugbear: Option<Flake8BugbearOptions>,
+    flake8_builtins: Option<Flake8BuiltinsOptions>,
+    flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
+    flake8_copyright: Option<Flake8CopyrightOptions>,
+    flake8_errmsg: Option<Flake8ErrMsgOptions>,
+    flake8_quotes: Option<Flake8QuotesOptions>,
+    flake8_self: Option<Flake8SelfOptions>,
+    flake8_tidy_imports: Option<Flake8TidyImportsOptions>,
+    flake8_type_checking: Option<Flake8TypeCheckingOptions>,
+    flake8_gettext: Option<Flake8GetTextOptions>,
+    flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
+    flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
+    flake8_pytest_style: Option<Flake8PytestStyleOptions>,
+    flake8_unused_arguments: Option<Flake8UnusedArgumentsOptions>,
+    isort: Option<IsortOptions>,
+    mccabe: Option<McCabeOptions>,
+    pep8_naming: Option<Pep8NamingOptions>,
+    pycodestyle: Option<PycodestyleOptions>,
+    pydocstyle: Option<PydocstyleOptions>,
+    pyflakes: Option<PyflakesOptions>,
+    pylint: Option<PylintOptions>,
+    pyupgrade: Option<PyUpgradeOptions>,
+    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+
+    exclude: Option<Vec<String>>,
+    pydoclint: Option<PydoclintOptions>,
+    ruff: Option<RuffOptions>,
+    preview: Option<bool>,
+}
+
+impl From<LintOptionsWire> for LintOptions {
+    fn from(value: LintOptionsWire) -> LintOptions {
+        let LintOptionsWire {
+            allowed_confusables,
+            dummy_variable_rgx,
+            extend_ignore,
+            extend_select,
+            extend_fixable,
+            extend_unfixable,
+            external,
+            fixable,
+            ignore,
+            extend_safe_fixes,
+            extend_unsafe_fixes,
+            ignore_init_module_imports,
+            logger_objects,
+            select,
+            explicit_preview_rules,
+            task_tags,
+            typing_modules,
+            unfixable,
+            flake8_annotations,
+            flake8_bandit,
+            flake8_boolean_trap,
+            flake8_bugbear,
+            flake8_builtins,
+            flake8_comprehensions,
+            flake8_copyright,
+            flake8_errmsg,
+            flake8_quotes,
+            flake8_self,
+            flake8_tidy_imports,
+            flake8_type_checking,
+            flake8_gettext,
+            flake8_implicit_str_concat,
+            flake8_import_conventions,
+            flake8_pytest_style,
+            flake8_unused_arguments,
+            isort,
+            mccabe,
+            pep8_naming,
+            pycodestyle,
+            pydocstyle,
+            pyflakes,
+            pylint,
+            pyupgrade,
+            per_file_ignores,
+            extend_per_file_ignores,
+            exclude,
+            pydoclint,
+            ruff,
+            preview,
+        } = value;
+
+        LintOptions {
+            #[allow(deprecated)]
+            common: LintCommonOptions {
+                allowed_confusables,
+                dummy_variable_rgx,
+                extend_ignore,
+                extend_select,
+                extend_fixable,
+                extend_unfixable,
+                external,
+                fixable,
+                ignore,
+                extend_safe_fixes,
+                extend_unsafe_fixes,
+                ignore_init_module_imports,
+                logger_objects,
+                select,
+                explicit_preview_rules,
+                task_tags,
+                typing_modules,
+                unfixable,
+                flake8_annotations,
+                flake8_bandit,
+                flake8_boolean_trap,
+                flake8_bugbear,
+                flake8_builtins,
+                flake8_comprehensions,
+                flake8_copyright,
+                flake8_errmsg,
+                flake8_quotes,
+                flake8_self,
+                flake8_tidy_imports,
+                flake8_type_checking,
+                flake8_gettext,
+                flake8_implicit_str_concat,
+                flake8_import_conventions,
+                flake8_pytest_style,
+                flake8_unused_arguments,
+                isort,
+                mccabe,
+                pep8_naming,
+                pycodestyle,
+                pydocstyle,
+                pyflakes,
+                pylint,
+                pyupgrade,
+                per_file_ignores,
+                extend_per_file_ignores,
+            },
+            exclude,
+            pydoclint,
+            ruff,
+            preview,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
+    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
+    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
@@ -3454,6 +3892,30 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_default() {
+        assert_eq!(
+            FormatterPythonVersion::default().as_tuple(),
+            LinterPythonVersion::default().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_latest() {
+        assert_eq!(
+            FormatterPythonVersion::latest().as_tuple(),
+            LinterPythonVersion::latest().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_minimal_supported() {
+        assert_eq!(
+            FormatterPythonVersion::minimal_supported().as_tuple(),
+            LinterPythonVersion::minimal_supported().as_tuple()
         );
     }
 }

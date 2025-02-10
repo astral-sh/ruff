@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -7,10 +8,10 @@ use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
 use ruff_linter::{
-    display_settings, fs::normalize_path_to, settings::types::FilePattern,
-    settings::types::PreviewMode,
+    fs::normalize_path_to, settings::types::FilePattern, settings::types::PreviewMode,
 };
 use ruff_workspace::resolver::match_exclusion;
+use ruff_workspace::Settings;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -23,12 +24,16 @@ pub struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
     path: Option<PathBuf>,
-    /// Settings used to manage file inclusion and exclusion.
-    file_resolver: ruff_workspace::FileResolverSettings,
-    /// Settings to pass into the Ruff linter.
-    linter: ruff_linter::settings::LinterSettings,
-    /// Settings to pass into the Ruff formatter.
-    formatter: ruff_workspace::FormatterSettings,
+    /// The resolved settings.
+    settings: Settings,
+}
+
+impl Deref for RuffSettings {
+    type Target = Settings;
+
+    fn deref(&self) -> &Settings {
+        &self.settings
+    }
 }
 
 pub(super) struct RuffSettingsIndex {
@@ -39,15 +44,7 @@ pub(super) struct RuffSettingsIndex {
 
 impl std::fmt::Display for RuffSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            fields = [
-                self.file_resolver,
-                self.linter,
-                self.formatter
-            ]
-        }
-        Ok(())
+        std::fmt::Display::fmt(&self.settings, f)
     }
 }
 
@@ -77,25 +74,8 @@ impl RuffSettings {
 
         RuffSettings {
             path,
-            file_resolver: fallback.file_resolver,
-            formatter: fallback.formatter,
-            linter: fallback.linter,
+            settings: fallback,
         }
-    }
-
-    /// Return the [`ruff_workspace::FileResolverSettings`] for this [`RuffSettings`].
-    pub(crate) fn file_resolver(&self) -> &ruff_workspace::FileResolverSettings {
-        &self.file_resolver
-    }
-
-    /// Return the [`ruff_linter::settings::LinterSettings`] for this [`RuffSettings`].
-    pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
-        &self.linter
-    }
-
-    /// Return the [`ruff_workspace::FormatterSettings`] for this [`RuffSettings`].
-    pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
-        &self.formatter
     }
 }
 
@@ -115,6 +95,8 @@ impl RuffSettingsIndex {
         editor_settings: &ResolvedEditorSettings,
         is_default_workspace: bool,
     ) -> Self {
+        tracing::debug!("Indexing settings for workspace: {}", root.display());
+
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
@@ -141,9 +123,7 @@ impl RuffSettingsIndex {
                                 directory.to_path_buf(),
                                 Arc::new(RuffSettings {
                                     path: Some(pyproject),
-                                    file_resolver: settings.file_resolver,
-                                    linter: settings.linter,
-                                    formatter: settings.formatter,
+                                    settings,
                                 }),
                             );
                             break;
@@ -186,10 +166,9 @@ impl RuffSettingsIndex {
         // means for different editors.
         if is_default_workspace {
             if has_error {
-                let root = root.display();
                 show_err_msg!(
-                    "Error while resolving settings from workspace {root}. \
-                    Please refer to the logs for more details.",
+                    "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
+                    root.display()
                 );
             }
 
@@ -199,7 +178,7 @@ impl RuffSettingsIndex {
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
         builder.standard_filters(
-            respect_gitignore.unwrap_or_else(|| fallback.file_resolver().respect_gitignore),
+            respect_gitignore.unwrap_or_else(|| fallback.file_resolver.respect_gitignore),
         );
         builder.hidden(false);
         builder.threads(
@@ -266,9 +245,7 @@ impl RuffSettingsIndex {
                                     directory,
                                     Arc::new(RuffSettings {
                                         path: Some(pyproject),
-                                        file_resolver: settings.file_resolver,
-                                        linter: settings.linter,
-                                        formatter: settings.formatter,
+                                        settings,
                                     }),
                                 );
                             }
@@ -300,9 +277,9 @@ impl RuffSettingsIndex {
         });
 
         if has_error.load(Ordering::Relaxed) {
-            let root = root.display();
             show_err_msg!(
-                "Error while resolving settings from workspace {root}. Please refer to the logs for more details.",
+                "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
+                root.display()
             );
         }
 
@@ -334,7 +311,7 @@ impl RuffSettingsIndex {
 
 struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 
-impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
+impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let ResolvedEditorSettings {
             configuration,
@@ -386,8 +363,12 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             );
             match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                Err(err) => {
-                    tracing::error!("Unable to find editor-specified configuration file: {err}");
+                err => {
+                    tracing::error!(
+                        "{:?}",
+                        err.context("Unable to load editor-specified configuration file")
+                            .unwrap_err()
+                    );
                     editor_configuration
                 }
             }

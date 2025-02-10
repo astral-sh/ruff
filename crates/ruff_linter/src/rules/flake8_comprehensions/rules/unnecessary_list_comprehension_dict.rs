@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
@@ -13,7 +13,7 @@ use super::helpers;
 /// Checks for unnecessary list comprehensions.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a list comprehension inside a call to `dict`,
+/// It's unnecessary to use a list comprehension inside a call to `dict()`,
 /// since there is an equivalent comprehension for this type.
 ///
 /// ## Examples
@@ -29,23 +29,23 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryListComprehensionDict;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryListComprehensionDict;
 
 impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)".to_string()
+        "Unnecessary list comprehension (rewrite as a dict comprehension)".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Rewrite as a `dict` comprehension".to_string()
+        "Rewrite as a dict comprehension".to_string()
     }
 }
 
 /// C404 (`dict([...])`)
 pub(crate) fn unnecessary_list_comprehension_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -56,9 +56,6 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     else {
         return;
     };
-    if !checker.semantic().has_builtin_binding("dict") {
-        return;
-    }
     let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
         return;
     };
@@ -68,9 +65,12 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     if tuple.len() != 2 {
         return;
     }
+    if !checker.semantic().has_builtin_binding("dict") {
+        return;
+    }
     let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use crate::rules::pylint::helpers::in_dunder_method;
 ///     if obj is None:
 ///         raise ValueError("`obj` cannot be `None`")
 /// ```
-#[violation]
-pub struct MisplacedBareRaise;
+#[derive(ViolationMetadata)]
+pub(crate) struct MisplacedBareRaise;
 
 impl Violation for MisplacedBareRaise {
     #[derive_message_formats]
@@ -51,7 +51,7 @@ impl Violation for MisplacedBareRaise {
 }
 
 /// PLE0704
-pub(crate) fn misplaced_bare_raise(checker: &mut Checker, raise: &ast::StmtRaise) {
+pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
     if raise.exc.is_some() {
         return;
     }
@@ -64,7 +64,5 @@ pub(crate) fn misplaced_bare_raise(checker: &mut Checker, raise: &ast::StmtRaise
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(MisplacedBareRaise, raise.range()));
+    checker.report_diagnostic(Diagnostic::new(MisplacedBareRaise, raise.range()));
 }

@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
+---
+__init__.py:8:35: F401 [*] `F401_33.other.Ham` imported but unused
+  |
+6 | class Spam:
+7 |     def __init__(self) -> None:
+8 |         from F401_33.other import Ham
+  |                                   ^^^ F401
+  |
+  = help: Remove unused import: `F401_33.other.Ham`
+
+ℹ Unsafe fix
+5 5 | 
+6 6 | class Spam:
+7 7 |     def __init__(self) -> None:
+8   |-        from F401_33.other import Ham
+  8 |+        pass

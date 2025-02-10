@@ -256,7 +256,7 @@ class O: ...
 class X(O): ...
 class Y(O): ...
 
-if bool():
+if returns_bool():
     foo = Y
 else:
     foo = object
@@ -347,15 +347,15 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
-```py path=a.pyi
-class Foo(Foo): ...  # error: [cyclic-class-def]
+```pyi
+class Foo(Foo): ...  # error: [cyclic-class-definition]
 
 reveal_type(Foo)  # revealed: Literal[Foo]
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 
 class Bar: ...
 class Baz: ...
-class Boz(Bar, Baz, Boz): ...  # error: [cyclic-class-def]
+class Boz(Bar, Baz, Boz): ...  # error: [cyclic-class-definition]
 
 reveal_type(Boz)  # revealed: Literal[Boz]
 reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[object]]
@@ -365,10 +365,10 @@ reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[objec
 
 These are similarly unlikely, but we still shouldn't crash:
 
-```py path=a.pyi
-class Foo(Bar): ...  # error: [cyclic-class-def]
-class Bar(Baz): ...  # error: [cyclic-class-def]
-class Baz(Foo): ...  # error: [cyclic-class-def]
+```pyi
+class Foo(Bar): ...  # error: [cyclic-class-definition]
+class Bar(Baz): ...  # error: [cyclic-class-definition]
+class Baz(Foo): ...  # error: [cyclic-class-definition]
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
@@ -377,11 +377,11 @@ reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[objec
 
 ## Classes with cycles in their MROs, and multiple inheritance
 
-```py path=a.pyi
+```pyi
 class Spam: ...
-class Foo(Bar): ...  # error: [cyclic-class-def]
-class Bar(Baz): ...  # error: [cyclic-class-def]
-class Baz(Foo, Spam): ...  # error: [cyclic-class-def]
+class Foo(Bar): ...  # error: [cyclic-class-definition]
+class Bar(Baz): ...  # error: [cyclic-class-definition]
+class Baz(Foo, Spam): ...  # error: [cyclic-class-definition]
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
@@ -390,17 +390,16 @@ reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[objec
 
 ## Classes with cycles in their MRO, and a sub-graph
 
-```py path=a.pyi
-class FooCycle(BarCycle): ...  # error: [cyclic-class-def]
+```pyi
+class FooCycle(BarCycle): ...  # error: [cyclic-class-definition]
 class Foo: ...
-class BarCycle(FooCycle): ...  # error: [cyclic-class-def]
+class BarCycle(FooCycle): ...  # error: [cyclic-class-definition]
 class Bar(Foo): ...
 
-# TODO: can we avoid emitting the errors for these?
-# The classes have cyclic superclasses,
+# Avoid emitting the errors for these. The classes have cyclic superclasses,
 # but are not themselves cyclic...
-class Baz(Bar, BarCycle): ...  # error: [cyclic-class-def]
-class Spam(Baz): ...  # error: [cyclic-class-def]
+class Baz(Bar, BarCycle): ...
+class Spam(Baz): ...
 
 reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Unknown, Literal[object]]
 reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Unknown, Literal[object]]

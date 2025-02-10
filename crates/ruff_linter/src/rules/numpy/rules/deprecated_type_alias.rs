@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// int
 /// ```
-#[violation]
-pub struct NumpyDeprecatedTypeAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct NumpyDeprecatedTypeAlias {
     type_name: String,
 }
 
@@ -51,7 +51,7 @@ impl Violation for NumpyDeprecatedTypeAlias {
 }
 
 /// NPY001
-pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -93,6 +93,6 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             let binding_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

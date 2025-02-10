@@ -11,13 +11,19 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::IdentifierPattern;
+    use crate::settings::types::{IdentifierPattern, PreviewMode};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     use super::settings::Settings;
     use super::types;
 
+    #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("is_pytest_test.py"),
+        Settings::default(),
+        "is_pytest_test"
+    )]
     #[test_case(
         Rule::PytestFixtureIncorrectParenthesesStyle,
         Path::new("PT001.py"),
@@ -44,18 +50,6 @@ mod tests {
         Path::new("PT003.py"),
         Settings::default(),
         "PT003"
-    )]
-    #[test_case(
-        Rule::PytestMissingFixtureNameUnderscore,
-        Path::new("PT004.py"),
-        Settings::default(),
-        "PT004"
-    )]
-    #[test_case(
-        Rule::PytestIncorrectFixtureNameUnderscore,
-        Path::new("PT005.py"),
-        Settings::default(),
-        "PT005"
     )]
     #[test_case(
         Rule::PytestParametrizeNamesWrongType,
@@ -287,6 +281,66 @@ mod tests {
         Settings::default(),
         "PT027_1"
     )]
+    #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("PT028.py"),
+        Settings::default(),
+        "PT028"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithoutWarning,
+        Path::new("PT029.py"),
+        Settings::default(),
+        "PT029"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings::default(),
+        "PT030_default"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_extend_require_match_for: vec![IdentifierPattern::new("EncodingWarning").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_extend_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("EncodingWarning").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_replace_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("*").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_glob_all"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("foo.*").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_glob_prefix"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithMultipleStatements,
+        Path::new("PT031.py"),
+        Settings::default(),
+        "PT031"
+    )]
     fn test_pytest_style(
         rule_code: Rule,
         path: &Path,
@@ -301,6 +355,55 @@ mod tests {
             },
         )?;
         assert_messages!(name, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::PytestRaisesWithMultipleStatements,
+        Path::new("PT012.py"),
+        Settings::default(),
+        "PT012_preview"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithMultipleStatements,
+        Path::new("PT031.py"),
+        Settings::default(),
+        "PT031_preview"
+    )]
+    fn test_pytest_style_preview(
+        rule_code: Rule,
+        path: &Path,
+        plugin_settings: Settings,
+        name: &str,
+    ) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pytest_style").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                flake8_pytest_style: plugin_settings,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(name, diagnostics);
+        Ok(())
+    }
+
+    /// This test ensure that PT006 and PT007 don't conflict when both of them suggest a fix that
+    /// edits `argvalues` for `pytest.mark.parametrize`.
+    #[test]
+    fn test_pytest_style_pt006_and_pt007() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pytest_style")
+                .join(Path::new("PT006_and_PT007.py"))
+                .as_path(),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                ])
+            },
+        )?;
+        assert_messages!("PT006_and_PT007", diagnostics);
         Ok(())
     }
 }

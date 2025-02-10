@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::Definition;
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineIterator};
@@ -58,8 +58,8 @@ use crate::registry::Rule;
 ///
 /// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
 /// [PEP 257]: https://peps.python.org/pep-0257
-#[violation]
-pub struct MultiLineSummaryFirstLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiLineSummaryFirstLine;
 
 impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
@@ -121,8 +121,8 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 ///
 /// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
 /// [PEP 257]: https://peps.python.org/pep-0257
-#[violation]
-pub struct MultiLineSummarySecondLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiLineSummarySecondLine;
 
 impl AlwaysFixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
@@ -136,7 +136,7 @@ impl AlwaysFixableViolation for MultiLineSummarySecondLine {
 }
 
 /// D212, D213
-pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 
@@ -165,7 +165,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     break;
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     } else if first_line.as_str().ends_with('\\') {
         // Ignore the edge case whether a single quoted string is multiple lines through an
@@ -218,7 +218,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     first_line.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

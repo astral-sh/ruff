@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 W291.py:1:23: W291 [*] Trailing whitespace
   |
@@ -20,7 +19,7 @@ W291.py:1:23: W291 [*] Trailing whitespace
 W291.py:4:24: W291 [*] Trailing whitespace
   |
 2 | inside a multiline string'''
-3 | 
+3 |
 4 | f'''trailing whitespace 
   |                        ^ W291
 5 | inside a multiline f-string'''

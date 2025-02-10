@@ -5,6 +5,7 @@ from typing_extensions import TypeIs
 
 from .events import AbstractEventLoop
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 __all__ = ("Future", "wrap_future", "isfuture")
 
 _T = TypeVar("_T")

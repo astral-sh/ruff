@@ -1,6 +1,7 @@
 import sys
-from _typeshed import ReadOnlyBuffer, SupportsRead
-from typing import IO, Any, NamedTuple, final, overload
+from _typeshed import ReadOnlyBuffer, SupportsRead, SupportsWrite
+from curses import _ncurses_version
+from typing import Any, final, overload
 from typing_extensions import TypeAlias
 
 # NOTE: This module is ordinarily only available on Unix, but the windows-curses
@@ -516,7 +517,7 @@ class window:  # undocumented
     def overwrite(
         self, destwin: window, sminrow: int, smincol: int, dminrow: int, dmincol: int, dmaxrow: int, dmaxcol: int
     ) -> None: ...
-    def putwin(self, file: IO[Any], /) -> None: ...
+    def putwin(self, file: SupportsWrite[bytes], /) -> None: ...
     def redrawln(self, beg: int, num: int, /) -> None: ...
     def redrawwin(self) -> None: ...
     @overload
@@ -548,10 +549,5 @@ class window:  # undocumented
     def vline(self, ch: _ChType, n: int) -> None: ...
     @overload
     def vline(self, y: int, x: int, ch: _ChType, n: int) -> None: ...
-
-class _ncurses_version(NamedTuple):
-    major: int
-    minor: int
-    patch: int
 
 ncurses_version: _ncurses_version

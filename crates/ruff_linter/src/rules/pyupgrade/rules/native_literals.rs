@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -33,10 +33,20 @@ impl FromStr for LiteralType {
 }
 
 impl LiteralType {
-    fn as_zero_value_expr(self) -> Expr {
+    fn as_zero_value_expr(self, checker: &Checker) -> Expr {
         match self {
-            LiteralType::Str => ast::ExprStringLiteral::default().into(),
-            LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
+            LiteralType::Str => ast::StringLiteral {
+                value: Box::default(),
+                range: TextRange::default(),
+                flags: checker.default_string_flags(),
+            }
+            .into(),
+            LiteralType::Bytes => ast::BytesLiteral {
+                value: Box::default(),
+                range: TextRange::default(),
+                flags: checker.default_bytes_flags(),
+            }
+            .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
@@ -109,8 +119,8 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `int`](https://docs.python.org/3/library/functions.html#int)
 /// - [Python documentation: `float`](https://docs.python.org/3/library/functions.html#float)
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
-#[violation]
-pub struct NativeLiterals {
+#[derive(ViolationMetadata)]
+pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }
 
@@ -135,7 +145,7 @@ impl AlwaysFixableViolation for NativeLiterals {
 
 /// UP018
 pub(crate) fn native_literals(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     parent_expr: Option<&ast::Expr>,
 ) {
@@ -186,13 +196,13 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            let expr = literal_type.as_zero_value_expr();
+            let expr = literal_type.as_zero_value_expr(checker);
             let content = checker.generator().expr(&expr);
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         Some(arg) => {
             let literal_expr = if let Some(literal_expr) = arg.as_literal_expr() {
@@ -244,7 +254,7 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

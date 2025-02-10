@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
-#[violation]
-pub struct FormatInGetTextFuncCall;
+#[derive(ViolationMetadata)]
+pub(crate) struct FormatInGetTextFuncCall;
 
 impl Violation for FormatInGetTextFuncCall {
     #[derive_message_formats]
@@ -51,14 +51,15 @@ impl Violation for FormatInGetTextFuncCall {
 }
 
 /// INT002
-pub(crate) fn format_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
+pub(crate) fn format_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::Call(ast::ExprCall { func, .. }) = &first {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                 if attr == "format" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(FormatInGetTextFuncCall {}, first.range()));
+                    checker.report_diagnostic(Diagnostic::new(
+                        FormatInGetTextFuncCall {},
+                        first.range(),
+                    ));
                 }
             }
         }

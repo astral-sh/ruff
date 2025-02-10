@@ -50,3 +50,10 @@ def func() -> Generator[str, None, None]:
 
 async def func() -> AsyncGenerator[str, None]:
     yield "hello"
+
+
+async def func() -> AsyncGenerator[  # type: ignore
+    str,
+    None
+]:
+    yield "hello"

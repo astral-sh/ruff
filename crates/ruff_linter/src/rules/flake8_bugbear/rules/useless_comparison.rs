@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -33,8 +33,8 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 ///
 /// ## References
 /// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
-#[violation]
-pub struct UselessComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessComparison {
     at: ComparisonLocationAt,
 }
 
@@ -57,7 +57,7 @@ impl Violation for UselessComparison {
 }
 
 /// B015
-pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
     if expr.is_compare_expr() {
         let semantic = checker.semantic();
 
@@ -78,7 +78,7 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
                 .and_then(Stmt::as_expr_stmt)
                 .is_some_and(|last_stmt| &*last_stmt.value == expr)
             {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UselessComparison {
                         at: ComparisonLocationAt::EndOfFunction,
                     },
@@ -88,7 +88,7 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
             }
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UselessComparison {
                 at: ComparisonLocationAt::MiddleBody,
             },

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-#[violation]
-pub struct ModifiedIteratingSet {
+#[derive(ViolationMetadata)]
+pub(crate) struct ModifiedIteratingSet {
     name: Name,
 }
 
@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
 }
 
 /// PLE4703
-pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     let Some(name) = for_stmt.iter.as_name_expr() else {
         return;
     };
@@ -102,7 +102,7 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
             format!("{}.copy()", checker.locator().slice(name)),
             name.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

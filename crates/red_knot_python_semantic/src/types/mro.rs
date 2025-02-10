@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 use std::ops::Deref;
 
-use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, Type};
+use crate::types::class_base::ClassBase;
+use crate::types::{Class, KnownClass, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
@@ -34,7 +34,7 @@ impl<'db> Mro<'db> {
     pub(super) fn from_error(db: &'db dyn Db, class: Class<'db>) -> Self {
         Self::from([
             ClassBase::Class(class),
-            ClassBase::Unknown,
+            ClassBase::unknown(),
             ClassBase::object(db),
         ])
     }
@@ -42,7 +42,7 @@ impl<'db> Mro<'db> {
     fn of_class_impl(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
 
-        if !class_bases.is_empty() && class.is_cyclically_defined(db) {
+        if !class_bases.is_empty() && class.inheritance_cycle(db).is_some() {
             // We emit errors for cyclically defined classes elsewhere.
             // It's important that we don't even try to infer the MRO for a cyclically defined class,
             // or we'll end up in an infinite loop.
@@ -76,21 +76,14 @@ impl<'db> Mro<'db> {
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base] => {
-                let single_base = ClassBase::try_from_ty(*single_base).ok_or(*single_base);
-                single_base.map_or_else(
-                    |invalid_base_ty| {
-                        let bases_info = Box::from([(0, invalid_base_ty)]);
-                        Err(MroErrorKind::InvalidBases(bases_info))
-                    },
-                    |single_base| {
-                        let mro = std::iter::once(ClassBase::Class(class))
-                            .chain(single_base.mro(db))
-                            .collect();
-                        Ok(mro)
-                    },
-                )
-            }
+            [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
+                || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
+                |single_base| {
+                    Ok(std::iter::once(ClassBase::Class(class))
+                        .chain(single_base.mro(db))
+                        .collect())
+                },
+            ),
 
             // The class has multiple explicit bases.
             //
@@ -102,9 +95,9 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(*base).ok_or(*base) {
-                        Ok(valid_base) => valid_bases.push(valid_base),
-                        Err(invalid_base) => invalid_bases.push((i, invalid_base)),
+                    match ClassBase::try_from_type(db, *base) {
+                        Some(valid_base) => valid_bases.push(valid_base),
+                        None => invalid_bases.push((i, *base)),
                     }
                 }
 
@@ -124,7 +117,7 @@ impl<'db> Mro<'db> {
                     for (index, base) in valid_bases
                         .iter()
                         .enumerate()
-                        .filter_map(|(index, base)| Some((index, base.into_class_literal_type()?)))
+                        .filter_map(|(index, base)| Some((index, base.into_class()?)))
                     {
                         if !seen_bases.insert(base) {
                             duplicate_bases.push((index, base));
@@ -292,123 +285,6 @@ pub(super) enum MroErrorKind<'db> {
     ///
     /// See [`c3_merge`] for more details.
     UnresolvableMro { bases_list: Box<[ClassBase<'db>]> },
-}
-
-/// Enumeration of the possible kinds of types we allow in class bases.
-///
-/// This is much more limited than the [`Type`] enum:
-/// all types that would be invalid to have as a class base are
-/// transformed into [`ClassBase::Unknown`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum ClassBase<'db> {
-    Any,
-    Unknown,
-    Todo,
-    Class(Class<'db>),
-}
-
-impl<'db> ClassBase<'db> {
-    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        struct Display<'db> {
-            base: ClassBase<'db>,
-            db: &'db dyn Db,
-        }
-
-        impl std::fmt::Display for Display<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.base {
-                    ClassBase::Any => f.write_str("Any"),
-                    ClassBase::Todo => f.write_str("Todo"),
-                    ClassBase::Unknown => f.write_str("Unknown"),
-                    ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
-                }
-            }
-        }
-
-        Display { base: self, db }
-    }
-
-    #[cfg(test)]
-    #[track_caller]
-    pub(super) fn expect_class_base(self) -> Class<'db> {
-        match self {
-            ClassBase::Class(class) => class,
-            _ => panic!("Expected a `ClassBase::Class()` variant"),
-        }
-    }
-
-    /// Return a `ClassBase` representing the class `builtins.object`
-    fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .into_class_literal()
-            .map_or(Self::Unknown, |ClassLiteralType { class }| {
-                Self::Class(class)
-            })
-    }
-
-    /// Attempt to resolve `ty` into a `ClassBase`.
-    ///
-    /// Return `None` if `ty` is not an acceptable type for a class base.
-    fn try_from_ty(ty: Type<'db>) -> Option<Self> {
-        match ty {
-            Type::Any => Some(Self::Any),
-            Type::Unknown => Some(Self::Unknown),
-            Type::Todo => Some(Self::Todo),
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
-            Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
-            Type::Intersection(_) => None, // TODO -- probably incorrect?
-            Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
-            Type::Never
-            | Type::BooleanLiteral(_)
-            | Type::FunctionLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::Tuple(_)
-            | Type::SliceLiteral(_)
-            | Type::ModuleLiteral(_)
-            | Type::SubclassOf(_) => None,
-            Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::Literal => None,
-                KnownInstanceType::TypeVar(_) => None,
-            },
-        }
-    }
-
-    fn into_class_literal_type(self) -> Option<Class<'db>> {
-        match self {
-            Self::Class(class) => Some(class),
-            _ => None,
-        }
-    }
-
-    /// Iterate over the MRO of this base
-    fn mro(
-        self,
-        db: &'db dyn Db,
-    ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
-        match self {
-            ClassBase::Any => Either::Left([ClassBase::Any, ClassBase::object(db)].into_iter()),
-            ClassBase::Unknown => {
-                Either::Left([ClassBase::Unknown, ClassBase::object(db)].into_iter())
-            }
-            ClassBase::Todo => Either::Left([ClassBase::Todo, ClassBase::object(db)].into_iter()),
-            ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
-        }
-    }
-}
-
-impl<'db> From<ClassBase<'db>> for Type<'db> {
-    fn from(value: ClassBase<'db>) -> Self {
-        match value {
-            ClassBase::Any => Type::Any,
-            ClassBase::Todo => Type::Todo,
-            ClassBase::Unknown => Type::Unknown,
-            ClassBase::Class(class) => Type::class_literal(class),
-        }
-    }
 }
 
 /// Implementation of the [C3-merge algorithm] for calculating a Python class's

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 non_augmented_assignment.py:16:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 14 | mat1, mat2 = None, None
-15 | 
+15 |
 16 | some_string = some_string + "a very long end of string"
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
 17 | index = index - 1
@@ -269,7 +268,7 @@ non_augmented_assignment.py:29:1: PLR6104 [*] Use `&=` to perform an augmented a
 27 27 | to_cube = to_cube**to_cube
 28 28 | timeDiffSeconds = timeDiffSeconds % 60
 29    |-flags = flags & 0x1
-   29 |+flags &= 1
+   29 |+flags &= 0x1
 30 30 | flags = flags | 0x1
 31 31 | flags = flags ^ 0x1
 32 32 | flags = flags << 1
@@ -290,7 +289,7 @@ non_augmented_assignment.py:30:1: PLR6104 [*] Use `|=` to perform an augmented a
 28 28 | timeDiffSeconds = timeDiffSeconds % 60
 29 29 | flags = flags & 0x1
 30    |-flags = flags | 0x1
-   30 |+flags |= 1
+   30 |+flags |= 0x1
 31 31 | flags = flags ^ 0x1
 32 32 | flags = flags << 1
 33 33 | flags = flags >> 1
@@ -311,7 +310,7 @@ non_augmented_assignment.py:31:1: PLR6104 [*] Use `^=` to perform an augmented a
 29 29 | flags = flags & 0x1
 30 30 | flags = flags | 0x1
 31    |-flags = flags ^ 0x1
-   31 |+flags ^= 1
+   31 |+flags ^= 0x1
 32 32 | flags = flags << 1
 33 33 | flags = flags >> 1
 34 34 | mat1 = mat1 @ mat2
@@ -384,7 +383,7 @@ non_augmented_assignment.py:35:1: PLR6104 [*] Use `+=` to perform an augmented a
 34 | mat1 = mat1 @ mat2
 35 | a_list[1] = a_list[1] + 1
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-36 | 
+36 |
 37 | a_list[0:2] = a_list[0:2] * 3
    |
    = help: Replace with augmented assignment
@@ -402,7 +401,7 @@ non_augmented_assignment.py:35:1: PLR6104 [*] Use `+=` to perform an augmented a
 non_augmented_assignment.py:37:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 35 | a_list[1] = a_list[1] + 1
-36 | 
+36 |
 37 | a_list[0:2] = a_list[0:2] * 3
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
 38 | a_list[:2] = a_list[:2] * 3
@@ -466,7 +465,7 @@ non_augmented_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augmented a
 39 | a_list[1:] = a_list[1:] * 3
 40 | a_list[:] = a_list[:] * 3
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-41 | 
+41 |
 42 | index = index * (index + 10)
    |
    = help: Replace with augmented assignment
@@ -484,7 +483,7 @@ non_augmented_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augmented a
 non_augmented_assignment.py:42:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 40 | a_list[:] = a_list[:] * 3
-41 | 
+41 |
 42 | index = index * (index + 10)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
    |
@@ -495,7 +494,7 @@ non_augmented_assignment.py:42:1: PLR6104 [*] Use `*=` to perform an augmented a
 40 40 | a_list[:] = a_list[:] * 3
 41 41 | 
 42    |-index = index * (index + 10)
-   42 |+index *= index + 10
+   42 |+index *= (index + 10)
 43 43 | 
 44 44 | 
 45 45 | class T:
@@ -524,8 +523,6 @@ non_augmented_assignment.py:51:1: PLR6104 [*] Use `+=` to perform an augmented a
 50 | obj = T()
 51 | obj.a = obj.a + 1
    | ^^^^^^^^^^^^^^^^^ PLR6104
-52 | 
-53 | # OK
    |
    = help: Replace with augmented assignment
 
@@ -536,5 +533,213 @@ non_augmented_assignment.py:51:1: PLR6104 [*] Use `+=` to perform an augmented a
 51    |-obj.a = obj.a + 1
    51 |+obj.a += 1
 52 52 | 
-53 53 | # OK
-54 54 | a_list[0] = a_list[:] * 3
+53 53 | 
+54 54 | a = a+-1
+
+non_augmented_assignment.py:54:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+54 | a = a+-1
+   | ^^^^^^^^ PLR6104
+55 |
+56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+51 51 | obj.a = obj.a + 1
+52 52 | 
+53 53 | 
+54    |-a = a+-1
+   54 |+a += -1
+55 55 | 
+56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+57 57 | test = 0x5
+
+non_augmented_assignment.py:58:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+57 | test = 0x5
+58 | test = test + 0xBA
+   | ^^^^^^^^^^^^^^^^^^ PLR6104
+59 |
+60 | test2 = b""
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+55 55 | 
+56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+57 57 | test = 0x5
+58    |-test = test + 0xBA
+   58 |+test += 0xBA
+59 59 | 
+60 60 | test2 = b""
+61 61 | test2 = test2 + b"\000"
+
+non_augmented_assignment.py:61:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+60 | test2 = b""
+61 | test2 = test2 + b"\000"
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+62 |
+63 | test3 = ""
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+58 58 | test = test + 0xBA
+59 59 | 
+60 60 | test2 = b""
+61    |-test2 = test2 + b"\000"
+   61 |+test2 += b"\000"
+62 62 | 
+63 63 | test3 = ""
+64 64 | test3 = test3 + (   a := R""
+
+non_augmented_assignment.py:64:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+63 |   test3 = ""
+64 | / test3 = test3 + (   a := R""
+65 | |                          f"oo"   )
+   | |__________________________________^ PLR6104
+66 |
+67 |   test4 = []
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+61 61 | test2 = test2 + b"\000"
+62 62 | 
+63 63 | test3 = ""
+64    |-test3 = test3 + (   a := R""
+   64 |+test3 += (   a := R""
+65 65 |                          f"oo"   )
+66 66 | 
+67 67 | test4 = []
+
+non_augmented_assignment.py:68:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+67 |   test4 = []
+68 | / test4 = test4 + ( e
+69 | |                   for e in
+70 | |                   range(10)
+71 | |                   )
+   | |___________________^ PLR6104
+72 |
+73 |   test5 = test5 + (
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+65 65 |                          f"oo"   )
+66 66 | 
+67 67 | test4 = []
+68    |-test4 = test4 + ( e
+   68 |+test4 += ( e
+69 69 |                   for e in
+70 70 |                   range(10)
+71 71 |                   )
+
+non_augmented_assignment.py:73:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+71 |                     )
+72 |
+73 | / test5 = test5 + (
+74 | |     4
+75 | |     *
+76 | |     10
+77 | | )
+   | |_^ PLR6104
+78 |
+79 |   test6 = test6 + \
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+70 70 |                   range(10)
+71 71 |                   )
+72 72 | 
+73    |-test5 = test5 + (
+   73 |+test5 += (
+74 74 |     4
+75 75 |     *
+76 76 |     10
+
+non_augmented_assignment.py:79:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+77 |   )
+78 |
+79 | / test6 = test6 + \
+80 | |         (
+81 | |             4
+82 | |             *
+83 | |             10
+84 | |         )
+   | |_________^ PLR6104
+85 |
+86 |   test7 = \
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+76 76 |     10
+77 77 | )
+78 78 | 
+79    |-test6 = test6 + \
+80    |-        (
+   79 |+test6 += (
+81 80 |             4
+82 81 |             *
+83 82 |             10
+
+non_augmented_assignment.py:86:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+84 |           )
+85 |
+86 | / test7 = \
+87 | |         100 \
+88 | |     + test7
+   | |___________^ PLR6104
+89 |
+90 |   test8 = \
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+83 83 |             10
+84 84 |         )
+85 85 | 
+86    |-test7 = \
+87    |-        100 \
+88    |-    + test7
+   86 |+test7 += 100
+89 87 | 
+90 88 | test8 = \
+91 89 |     886 \
+
+non_augmented_assignment.py:90:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+88 |       + test7
+89 |
+90 | / test8 = \
+91 | |     886 \
+92 | |     + \
+93 | |  \
+94 | |     test8
+   | |_________^ PLR6104
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+87 87 |         100 \
+88 88 |     + test7
+89 89 | 
+90    |-test8 = \
+91    |-    886 \
+92    |-    + \
+93    |- \
+94    |-    test8
+   90 |+test8 += 886
+95 91 | 
+96 92 | 
+97 93 | # OK

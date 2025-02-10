@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_source_file::LineRanges;
@@ -31,8 +31,8 @@ use crate::fix::edits::pad;
 ///
 /// ## References
 /// - [Python documentation: `getattr`](https://docs.python.org/3/library/functions.html#getattr)
-#[violation]
-pub struct GetAttrWithConstant;
+#[derive(ViolationMetadata)]
+pub(crate) struct GetAttrWithConstant;
 
 impl AlwaysFixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
@@ -48,12 +48,7 @@ impl AlwaysFixableViolation for GetAttrWithConstant {
 }
 
 /// B009
-pub(crate) fn getattr_with_constant(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let [obj, arg] = args else {
         return;
     };
@@ -93,5 +88,5 @@ pub(crate) fn getattr_with_constant(
         ),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

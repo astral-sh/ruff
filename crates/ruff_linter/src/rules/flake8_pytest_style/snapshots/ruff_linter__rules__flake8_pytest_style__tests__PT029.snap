@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT029.py:5:10: PT029 Set the expected warning in `pytest.warns()`
+  |
+4 | def test_ok():
+5 |     with pytest.warns():
+  |          ^^^^^^^^^^^^ PT029
+6 |         pass
+  |

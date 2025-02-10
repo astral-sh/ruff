@@ -1,11 +1,11 @@
-# Class defenitions in stubs
+# Class definitions in stubs
 
 ## Cyclical class definition
 
 In type stubs, classes can reference themselves in their base class definitions. For example, in
 `typeshed`, we have `class str(Sequence[str]): ...`.
 
-```py path=a.pyi
+```pyi
 class Foo[T]: ...
 
 # TODO: actually is subscriptable

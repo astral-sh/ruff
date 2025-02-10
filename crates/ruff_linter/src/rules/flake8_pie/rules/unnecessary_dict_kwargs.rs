@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -39,8 +39,8 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
-#[violation]
-pub struct UnnecessaryDictKwargs;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDictKwargs;
 
 impl Violation for UnnecessaryDictKwargs {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -56,7 +56,7 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 /// PIE804
-pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
     let mut duplicate_keywords = None;
     for keyword in &*call.arguments.keywords {
         // keyword is a spread operator (indicated by None).
@@ -75,9 +75,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
             );
-            checker
-                .diagnostics
-                .push(diagnostic.with_fix(Fix::safe_edit(edit)));
+            checker.report_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)));
             continue;
         }
 
@@ -141,7 +139,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             }
         }
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

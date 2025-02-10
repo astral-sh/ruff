@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
 1 | from typing import Never, NoReturn, Union
-2 | 
+2 |
 3 | Union[Never, int]
   |       ^^^^^ RUF020
 4 | Union[NoReturn, int]
@@ -82,6 +81,7 @@ RUF020.py:6:1: RUF020 [*] `NoReturn | T` is equivalent to `T`
   6 |+int
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
+9 9 | 
 
 RUF020.py:7:13: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
@@ -100,6 +100,8 @@ RUF020.py:7:13: RUF020 [*] `Union[Never, T]` is equivalent to `T`
 7   |-Union[Union[Never, int], Union[NoReturn, int]]
   7 |+Union[int, Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
+9 9 | 
+10 10 | 
 
 RUF020.py:7:32: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
@@ -118,6 +120,8 @@ RUF020.py:7:32: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
 7   |-Union[Union[Never, int], Union[NoReturn, int]]
   7 |+Union[Union[Never, int], int]
 8 8 | Union[NoReturn, int, float]
+9 9 | 
+10 10 | 
 
 RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
@@ -134,3 +138,63 @@ RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8   |-Union[NoReturn, int, float]
   8 |+Union[int, float]
+9 9 | 
+10 10 | 
+11 11 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+
+RUF020.py:12:11: RUF020 `Never | T` is equivalent to `T`
+   |
+11 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+12 | x: None | Never | None
+   |           ^^^^^ RUF020
+13 | y: (None | Never) | None
+14 | z: None | (Never | None)
+   |
+   = help: Remove `Never`
+
+RUF020.py:13:12: RUF020 `Never | T` is equivalent to `T`
+   |
+11 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+12 | x: None | Never | None
+13 | y: (None | Never) | None
+   |            ^^^^^ RUF020
+14 | z: None | (Never | None)
+   |
+   = help: Remove `Never`
+
+RUF020.py:14:12: RUF020 `Never | T` is equivalent to `T`
+   |
+12 | x: None | Never | None
+13 | y: (None | Never) | None
+14 | z: None | (Never | None)
+   |            ^^^^^ RUF020
+15 |
+16 | a: int | Never | None
+   |
+   = help: Remove `Never`
+
+RUF020.py:16:10: RUF020 `Never | T` is equivalent to `T`
+   |
+14 | z: None | (Never | None)
+15 |
+16 | a: int | Never | None
+   |          ^^^^^ RUF020
+17 | b: Never | Never | None
+   |
+   = help: Remove `Never`
+
+RUF020.py:17:4: RUF020 `Never | T` is equivalent to `T`
+   |
+16 | a: int | Never | None
+17 | b: Never | Never | None
+   |    ^^^^^ RUF020
+   |
+   = help: Remove `Never`
+
+RUF020.py:17:12: RUF020 `Never | T` is equivalent to `T`
+   |
+16 | a: int | Never | None
+17 | b: Never | Never | None
+   |            ^^^^^ RUF020
+   |
+   = help: Remove `Never`

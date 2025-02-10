@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// print(a)  # 3
 /// ```
 ///
-#[violation]
-pub struct RedeclaredAssignedName {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedeclaredAssignedName {
     name: String,
 }
 
@@ -42,7 +42,7 @@ impl Violation for RedeclaredAssignedName {
 }
 
 /// PLW0128
-pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr>) {
+pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &Vec<Expr>) {
     let mut names: Vec<Name> = Vec::new();
 
     for target in targets {
@@ -50,7 +50,7 @@ pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr
     }
 }
 
-fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
+fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
     match expr {
         Expr::Tuple(tuple) => {
             for target in tuple {
@@ -63,7 +63,7 @@ fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
                 return;
             }
             if names.contains(id) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RedeclaredAssignedName {
                         name: id.to_string(),
                     },

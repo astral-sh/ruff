@@ -1,7 +1,7 @@
 use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import numpy
 /// ```
-#[violation]
-pub struct UselessImportAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }
 
@@ -55,7 +55,7 @@ impl Violation for UselessImportAlias {
 }
 
 /// PLC0414
-pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     let Some(asname) = &alias.asname else {
         return;
     };
@@ -81,12 +81,12 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// PLC0414
 pub(crate) fn useless_import_from_alias(
-    checker: &mut Checker,
+    checker: &Checker,
     alias: &Alias,
     module: Option<&str>,
     level: u32,
@@ -119,5 +119,5 @@ pub(crate) fn useless_import_from_alias(
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

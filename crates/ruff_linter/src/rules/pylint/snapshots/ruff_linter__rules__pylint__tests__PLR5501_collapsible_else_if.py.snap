@@ -1,13 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
    |
 35 |       if 1:
 36 |           pass
-37 |       else:
-   |  _____^
+37 | /     else:
 38 | |         if 2:
    | |________^ PLR5501
 39 |               pass
@@ -31,8 +29,7 @@ collapsible_else_if.py:45:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 43 |       if 1:
 44 |           pass
-45 |       else:
-   |  _____^
+45 | /     else:
 46 | |         if 2:
    | |________^ PLR5501
 47 |               pass
@@ -60,8 +57,7 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 53 |       if 1:
 54 |           pass
-55 |       else:
-   |  _____^
+55 | /     else:
 56 | |         # inner comment
 57 | |         if 2:
    | |________^ PLR5501
@@ -92,8 +88,7 @@ collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 67 |       elif True:
 68 |           print(2)
-69 |       else:
-   |  _____^
+69 | /     else:
 70 | |         if True:
    | |________^ PLR5501
 71 |               print(3)
@@ -121,8 +116,7 @@ collapsible_else_if.py:79:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 77 |       if 1:
 78 |           pass
-79 |       else:
-   |  _____^
+79 | /     else:
 80 | |         if 2: pass
    | |________^ PLR5501
 81 |           else: pass
@@ -146,8 +140,7 @@ collapsible_else_if.py:87:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 85 |       if 1:
 86 |           pass
-87 |       else:
-   |  _____^
+87 | /     else:
 88 | |         if 2: pass
    | |________^ PLR5501
 89 |           else:
@@ -173,8 +166,7 @@ collapsible_else_if.py:96:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 94 |       if 1:
 95 |           pass
-96 |       else:
-   |  _____^
+96 | /     else:
 97 | |         if 2:
    | |________^ PLR5501
 98 |               pass
@@ -201,8 +193,7 @@ collapsible_else_if.py:105:5: PLR5501 [*] Use `elif` instead of `else` then `if`
     |
 103 |       if 1:
 104 |           pass
-105 |       else:
-    |  _____^
+105 | /     else:
 106 | |         # inner comment which happens
 107 | |         # to be longer than one line
 108 | |         if 2:
@@ -236,8 +227,7 @@ collapsible_else_if.py:117:5: PLR5501 [*] Use `elif` instead of `else` then `if`
     |
 115 |       if 1:
 116 |           pass
-117 |       else:
-    |  _____^
+117 | /     else:
 118 | |             # inner comment which happens to be overly indented
 119 | |         if 2:
     | |________^ PLR5501
@@ -268,8 +258,7 @@ collapsible_else_if.py:128:5: PLR5501 [*] Use `elif` instead of `else` then `if`
     |
 126 |       if 1:
 127 |           pass
-128 |       else:
-    |  _____^
+128 | /     else:
 129 | |     # inner comment which happens to be under indented
 130 | |         if 2:
     | |________^ PLR5501
@@ -300,8 +289,7 @@ collapsible_else_if.py:139:5: PLR5501 [*] Use `elif` instead of `else` then `if`
     |
 137 |       if 1:
 138 |           pass
-139 |       else:
-    |  _____^
+139 | /     else:
 140 | |             # inner comment which has mixed
 141 | |         # indentation levels
 142 | |                 # which is pretty weird

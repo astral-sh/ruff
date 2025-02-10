@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::Definition;
 use ruff_python_stdlib::typing::simple_magic_return_type;
@@ -33,8 +33,11 @@ use crate::rules::ruff::typing::type_hint_resolves_to_any;
 /// ```python
 /// def foo(x: int): ...
 /// ```
-#[violation]
-pub struct MissingTypeFunctionArgument {
+///
+/// ## Options
+/// - `lint.flake8-annotations.suppress-dummy-args`
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTypeFunctionArgument {
     name: String,
 }
 
@@ -65,8 +68,11 @@ impl Violation for MissingTypeFunctionArgument {
 /// ```python
 /// def foo(*args: int): ...
 /// ```
-#[violation]
-pub struct MissingTypeArgs {
+///
+/// ## Options
+/// - `lint.flake8-annotations.suppress-dummy-args`
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTypeArgs {
     name: String,
 }
 
@@ -97,8 +103,11 @@ impl Violation for MissingTypeArgs {
 /// ```python
 /// def foo(**kwargs: int): ...
 /// ```
-#[violation]
-pub struct MissingTypeKwargs {
+///
+/// ## Options
+/// - `lint.flake8-annotations.suppress-dummy-args`
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTypeKwargs {
     name: String,
 }
 
@@ -110,9 +119,8 @@ impl Violation for MissingTypeKwargs {
     }
 }
 
-/// ## Deprecation
-/// This rule is commonly disabled because type checkers can infer this type without annotation.
-/// It will be removed in a future release.
+/// ## Removed
+/// This rule has been removed because type checkers can infer this type without annotation.
 ///
 /// ## What it does
 /// Checks that instance method `self` arguments have type annotations.
@@ -138,22 +146,23 @@ impl Violation for MissingTypeKwargs {
 /// class Foo:
 ///     def bar(self: "Foo"): ...
 /// ```
-#[violation]
-pub struct MissingTypeSelf {
-    name: String,
-}
+#[derive(ViolationMetadata)]
+#[deprecated(note = "ANN101 has been removed")]
+pub(crate) struct MissingTypeSelf;
 
+#[allow(deprecated)]
 impl Violation for MissingTypeSelf {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { name } = self;
-        format!("Missing type annotation for `{name}` in method")
+        unreachable!("ANN101 has been removed");
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Missing type annotation for `{name}` in method"]
     }
 }
 
-/// ## Deprecation
-/// This rule is commonly disabled because type checkers can infer this type without annotation.
-/// It will be removed in a future release.
+/// ## Removed
+/// This rule has been removed because type checkers can infer this type without annotation.
 ///
 /// ## What it does
 /// Checks that class method `cls` arguments have type annotations.
@@ -181,16 +190,18 @@ impl Violation for MissingTypeSelf {
 ///     @classmethod
 ///     def bar(cls: Type["Foo"]): ...
 /// ```
-#[violation]
-pub struct MissingTypeCls {
-    name: String,
-}
+#[derive(ViolationMetadata)]
+#[deprecated(note = "ANN102 has been removed")]
+pub(crate) struct MissingTypeCls;
 
+#[allow(deprecated)]
 impl Violation for MissingTypeCls {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { name } = self;
-        format!("Missing type annotation for `{name}` in classmethod")
+        unreachable!("ANN102 has been removed")
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Missing type annotation for `{name}` in classmethod"]
     }
 }
 
@@ -213,8 +224,8 @@ impl Violation for MissingTypeCls {
 /// def add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
-#[violation]
-pub struct MissingReturnTypeUndocumentedPublicFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
     annotation: Option<String>,
 }
@@ -256,8 +267,8 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 /// def _add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
-#[violation]
-pub struct MissingReturnTypePrivateFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
     annotation: Option<String>,
 }
@@ -312,8 +323,8 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///     def __init__(self, x: int) -> None:
 ///         self.x = x
 /// ```
-#[violation]
-pub struct MissingReturnTypeSpecialMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingReturnTypeSpecialMethod {
     name: String,
     annotation: Option<String>,
 }
@@ -359,8 +370,8 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///     def bar() -> int:
 ///         return 1
 /// ```
-#[violation]
-pub struct MissingReturnTypeStaticMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingReturnTypeStaticMethod {
     name: String,
     annotation: Option<String>,
 }
@@ -406,8 +417,8 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///     def bar(cls) -> int:
 ///         return 1
 /// ```
-#[violation]
-pub struct MissingReturnTypeClassMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingReturnTypeClassMethod {
     name: String,
     annotation: Option<String>,
 }
@@ -472,8 +483,8 @@ impl Violation for MissingReturnTypeClassMethod {
 /// - [Typing spec: `Any`](https://typing.readthedocs.io/en/latest/spec/special-types.html#any)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
-#[violation]
-pub struct AnyType {
+#[derive(ViolationMetadata)]
+pub(crate) struct AnyType {
     name: String,
 }
 
@@ -508,7 +519,7 @@ fn check_dynamically_typed<F>(
 {
     if let Expr::StringLiteral(string_expr) = annotation {
         // Quoted annotations
-        if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
+        if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
             if type_hint_resolves_to_any(
                 parsed_annotation.expression(),
                 checker,
@@ -594,7 +605,6 @@ pub(crate) fn definition(
     // Keep track of whether we've seen any typed arguments or return values.
     let mut has_any_typed_arg = false; // Any argument has been typed?
     let mut has_typed_return = false; // Return value has been typed?
-    let mut has_typed_self_or_cls = false; // Has a typed `self` or `cls` argument?
 
     // Temporary storage for diagnostics; we emit them at the end
     // unless configured to suppress ANN* for declarations that are fully untyped.
@@ -603,21 +613,17 @@ pub(crate) fn definition(
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
     // If this is a non-static method, skip `cls` or `self`.
-    for ParameterWithDefault {
-        parameter,
-        default: _,
-        range: _,
-    } in parameters.iter_non_variadic_params().skip(usize::from(
+    for parameter in parameters.iter_non_variadic_params().skip(usize::from(
         is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
     )) {
         // ANN401 for dynamically typed parameters
-        if let Some(annotation) = &parameter.annotation {
+        if let Some(annotation) = parameter.annotation() {
             has_any_typed_arg = true;
             if checker.enabled(Rule::AnyType) && !is_overridden {
                 check_dynamically_typed(
                     checker,
                     annotation,
-                    || parameter.name.to_string(),
+                    || parameter.name().to_string(),
                     &mut diagnostics,
                 );
             }
@@ -626,14 +632,14 @@ pub(crate) fn definition(
                 && checker
                     .settings
                     .dummy_variable_rgx
-                    .is_match(&parameter.name))
+                    .is_match(parameter.name()))
             {
                 if checker.enabled(Rule::MissingTypeFunctionArgument) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeFunctionArgument {
-                            name: parameter.name.to_string(),
+                            name: parameter.name().to_string(),
                         },
-                        parameter.range(),
+                        parameter.parameter.range(),
                     ));
                 }
             }
@@ -693,43 +699,6 @@ pub(crate) fn definition(
                         arg.range(),
                     ));
                 }
-            }
-        }
-    }
-
-    // ANN101, ANN102
-    if is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()) {
-        if let Some(ParameterWithDefault {
-            parameter,
-            default: _,
-            range: _,
-        }) = parameters
-            .posonlyargs
-            .first()
-            .or_else(|| parameters.args.first())
-        {
-            if parameter.annotation.is_none() {
-                if visibility::is_classmethod(decorator_list, checker.semantic()) {
-                    if checker.enabled(Rule::MissingTypeCls) {
-                        diagnostics.push(Diagnostic::new(
-                            MissingTypeCls {
-                                name: parameter.name.to_string(),
-                            },
-                            parameter.range(),
-                        ));
-                    }
-                } else {
-                    if checker.enabled(Rule::MissingTypeSelf) {
-                        diagnostics.push(Diagnostic::new(
-                            MissingTypeSelf {
-                                name: parameter.name.to_string(),
-                            },
-                            parameter.range(),
-                        ));
-                    }
-                }
-            } else {
-                has_typed_self_or_cls = true;
             }
         }
     }
@@ -927,13 +896,25 @@ pub(crate) fn definition(
             }
         }
     }
+
+    if !checker.settings.flake8_annotations.ignore_fully_untyped {
+        return diagnostics;
+    }
+
     // If settings say so, don't report any of the
     // diagnostics gathered here if there were no type annotations at all.
-    if checker.settings.flake8_annotations.ignore_fully_untyped
-        && !(has_any_typed_arg || has_typed_self_or_cls || has_typed_return)
+    if has_any_typed_arg
+        || has_typed_return
+        || (is_method
+            && !visibility::is_staticmethod(decorator_list, checker.semantic())
+            && parameters
+                .posonlyargs
+                .first()
+                .or_else(|| parameters.args.first())
+                .is_some_and(|first_param| first_param.annotation().is_some()))
     {
-        vec![]
-    } else {
         diagnostics
+    } else {
+        vec![]
     }
 }

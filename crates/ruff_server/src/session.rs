@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use lsp_types::{ClientCapabilities, NotebookDocumentCellChange, Url};
+use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::Workspaces;
@@ -131,9 +131,9 @@ impl Session {
         Ok(())
     }
 
-    /// Reloads the settings index
-    pub(crate) fn reload_settings(&mut self, changed_url: &Url) {
-        self.index.reload_settings(changed_url);
+    /// Reloads the settings index based on the provided changes.
+    pub(crate) fn reload_settings(&mut self, changes: &[FileEvent]) {
+        self.index.reload_settings(changes);
     }
 
     /// Open a workspace folder at the given `url`.

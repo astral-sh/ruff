@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -31,8 +31,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Typing documentation: Version and platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
-#[violation]
-pub struct ComplexIfStatementInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct ComplexIfStatementInStub;
 
 impl Violation for ComplexIfStatementInStub {
     #[derive_message_formats]
@@ -43,21 +43,17 @@ impl Violation for ComplexIfStatementInStub {
 }
 
 /// PYI002
-pub(crate) fn complex_if_statement_in_stub(checker: &mut Checker, test: &Expr) {
+pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
     let Expr::Compare(ast::ExprCompare {
         left, comparators, ..
     }) = test
     else {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
         return;
     };
 
     if comparators.len() != 1 {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
         return;
     }
 
@@ -78,7 +74,5 @@ pub(crate) fn complex_if_statement_in_stub(checker: &mut Checker, test: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+    checker.report_diagnostic(Diagnostic::new(ComplexIfStatementInStub, test.range()));
 }

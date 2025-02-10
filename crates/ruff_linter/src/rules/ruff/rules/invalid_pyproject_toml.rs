@@ -1,5 +1,5 @@
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for any pyproject.toml that does not conform to the schema from the relevant PEPs.
@@ -21,8 +21,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// name = "crab"
 /// version = "1.0.0"
 /// authors = [
-///   { email = "ferris@example.org" },
-///   { name = "Ferris the Crab"}
+///   { name = "Ferris the Crab", email = "ferris@example.org" }
 /// ]
 /// ```
 ///
@@ -30,8 +29,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Specification of `[project]` in pyproject.toml](https://packaging.python.org/en/latest/specifications/declaring-project-metadata/)
 /// - [Specification of `[build-system]` in pyproject.toml](https://peps.python.org/pep-0518/)
 /// - [Draft but implemented license declaration extensions](https://peps.python.org/pep-0639)
-#[violation]
-pub struct InvalidPyprojectToml {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidPyprojectToml {
     pub message: String,
 }
 

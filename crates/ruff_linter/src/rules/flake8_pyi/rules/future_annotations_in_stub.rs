@@ -1,7 +1,7 @@
 use ruff_python_ast::StmtImportFrom;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::{checkers::ast::Checker, fix};
 
@@ -17,8 +17,8 @@ use crate::{checkers::ast::Checker, fix};
 ///
 /// ## References
 /// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
-#[violation]
-pub struct FutureAnnotationsInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureAnnotationsInStub;
 
 impl Violation for FutureAnnotationsInStub {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -34,7 +34,7 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
+pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
     let StmtImportFrom {
         range,
         module: Some(module_name),
@@ -72,5 +72,5 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -53,8 +53,8 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [Python documentation: `typing` — Support for type hints](https://docs.python.org/3/library/typing.html)
 /// - [PEP 483 – The Theory of Type Hints: Covariance and Contravariance](https://peps.python.org/pep-0483/#covariance-and-contravariance)
 /// - [PEP 484 – Type Hints: Covariance and contravariance](https://peps.python.org/pep-0484/#covariance-and-contravariance)
-#[violation]
-pub struct TypeBivariance {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeBivariance {
     kind: VarKind,
     param_name: Option<String>,
 }
@@ -73,7 +73,7 @@ impl Violation for TypeBivariance {
 }
 
 /// PLC0131
-pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
+pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -124,7 +124,7 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
             return;
         };
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             TypeBivariance {
                 kind,
                 param_name: type_param_name(arguments).map(ToString::to_string),

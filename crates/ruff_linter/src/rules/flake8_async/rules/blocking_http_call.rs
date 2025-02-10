@@ -1,7 +1,7 @@
 use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use crate::checkers::ast::Checker;
 ///         async with session.get("https://example.com/foo/bar") as resp:
 ///             ...
 /// ```
-#[violation]
-pub struct BlockingHttpCallInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlockingHttpCallInAsyncFunction;
 
 impl Violation for BlockingHttpCallInAsyncFunction {
     #[derive_message_formats]
@@ -62,7 +62,7 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
 }
 
 /// ASYNC210
-pub(crate) fn blocking_http_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn blocking_http_call(checker: &Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
         if checker
             .semantic()
@@ -70,7 +70,7 @@ pub(crate) fn blocking_http_call(checker: &mut Checker, call: &ExprCall) {
             .as_ref()
             .is_some_and(is_blocking_http_call)
         {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BlockingHttpCallInAsyncFunction,
                 call.func.range(),
             ));

@@ -145,7 +145,7 @@ impl<'a, 'print> FitsQueue<'a, 'print> {
     }
 }
 
-impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
+impl<'a> Queue<'a> for FitsQueue<'a, '_> {
     fn pop(&mut self) -> Option<&'a FormatElement> {
         self.queue.pop().or_else(
             #[cold]

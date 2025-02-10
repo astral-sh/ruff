@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     comparable::ComparableExpr,
     helpers::{self, map_callable},
@@ -49,8 +49,8 @@ use crate::checkers::ast::Checker;
 ///     except ValueError:
 ///         raise
 /// ```
-#[violation]
-pub struct RaiseWithinTry;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseWithinTry;
 
 impl Violation for RaiseWithinTry {
     #[derive_message_formats]
@@ -75,7 +75,7 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
 }
 
 /// TRY301
-pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
+pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
     if handlers.is_empty() {
         return;
     }
@@ -115,9 +115,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(RaiseWithinTry, stmt.range()));
         }
     }
 }

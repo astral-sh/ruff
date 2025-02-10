@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{analyze, SemanticModel};
 use ruff_text_size::Ranged;
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///     async with await anyio.open_file("bar.txt") as f:
 ///         contents = await f.read()
 /// ```
-#[violation]
-pub struct BlockingOpenCallInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlockingOpenCallInAsyncFunction;
 
 impl Violation for BlockingOpenCallInAsyncFunction {
     #[derive_message_formats]
@@ -44,7 +44,7 @@ impl Violation for BlockingOpenCallInAsyncFunction {
 }
 
 /// ASYNC230
-pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;
     }
@@ -52,7 +52,7 @@ pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_open_call(&call.func, checker.semantic())
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BlockingOpenCallInAsyncFunction,
             call.func.range(),
         ));

@@ -1,0 +1,783 @@
+---
+source: crates/ruff_linter/src/rules/pylint/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    try:
+        print("try")
+    except Exception:
+        print("Exception")
+    except OtherException as e:
+        print("OtherException")
+    else:
+        print("else")
+    finally:
+        print("finally")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;finally#quot;)\n"]
+  block2["print(#quot;else#quot;)\n"]
+  block3["print(#quot;try#quot;)\n"]
+  block4[["Exception raised"]]
+  block5["print(#quot;OtherException#quot;)\n"]
+  block6["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)
+    else:
+        print(#quot;else#quot;)
+    finally:
+        print(#quot;finally#quot;)\n"]
+  block7["print(#quot;Exception#quot;)\n"]
+  block8["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)
+    else:
+        print(#quot;else#quot;)
+    finally:
+        print(#quot;finally#quot;)\n"]
+  block9["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)
+    else:
+        print(#quot;else#quot;)
+    finally:
+        print(#quot;finally#quot;)\n"]
+
+  start --> block9
+  block9 -- "Exception raised" --> block8
+  block9 -- "else" --> block3
+  block8 -- "Exception" --> block7
+  block8 -- "else" --> block6
+  block7 --> block1
+  block6 -- "OtherException" --> block5
+  block6 -- "else" --> block4
+  block5 --> block1
+  block4 --> block1
+  block3 --> block2
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func():
+    try:
+        print("try")
+    except:
+        print("Exception")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;try#quot;)\n"]
+  block2[["Exception raised"]]
+  block3["print(#quot;Exception#quot;)\n"]
+  block4["try:
+        print(#quot;try#quot;)
+    except:
+        print(#quot;Exception#quot;)\n"]
+
+  start --> block4
+  block4 -- "Exception raised" --> block3
+  block4 -- "else" --> block1
+  block3 --> block0
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func():
+    try:
+        print("try")
+    except:
+        print("Exception")
+    except OtherException as e:
+        print("OtherException")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;try#quot;)\n"]
+  block2[["Exception raised"]]
+  block3["print(#quot;OtherException#quot;)\n"]
+  block4["try:
+        print(#quot;try#quot;)
+    except:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)\n"]
+  block5["print(#quot;Exception#quot;)\n"]
+  block6["try:
+        print(#quot;try#quot;)
+    except:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)\n"]
+
+  start --> block6
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block1
+  block5 --> block0
+  block4 -- "OtherException" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func():
+    try:
+        print("try")
+    except Exception:
+        print("Exception")
+    except OtherException as e:
+        print("OtherException")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;try#quot;)\n"]
+  block2[["Exception raised"]]
+  block3["print(#quot;OtherException#quot;)\n"]
+  block4["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)\n"]
+  block5["print(#quot;Exception#quot;)\n"]
+  block6["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)\n"]
+  block7["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)\n"]
+
+  start --> block7
+  block7 -- "Exception raised" --> block6
+  block7 -- "else" --> block1
+  block6 -- "Exception" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "OtherException" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func():
+    try:
+        print("try")
+    except Exception:
+        print("Exception")
+    except OtherException as e:
+        print("OtherException")
+    else:
+        print("else")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;else#quot;)\n"]
+  block2["print(#quot;try#quot;)\n"]
+  block3[["Exception raised"]]
+  block4["print(#quot;OtherException#quot;)\n"]
+  block5["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)
+    else:
+        print(#quot;else#quot;)\n"]
+  block6["print(#quot;Exception#quot;)\n"]
+  block7["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)
+    else:
+        print(#quot;else#quot;)\n"]
+  block8["try:
+        print(#quot;try#quot;)
+    except Exception:
+        print(#quot;Exception#quot;)
+    except OtherException as e:
+        print(#quot;OtherException#quot;)
+    else:
+        print(#quot;else#quot;)\n"]
+
+  start --> block8
+  block8 -- "Exception raised" --> block7
+  block8 -- "else" --> block2
+  block7 -- "Exception" --> block6
+  block7 -- "else" --> block5
+  block6 --> block0
+  block5 -- "OtherException" --> block4
+  block5 -- "else" --> block3
+  block4 --> block0
+  block3 --> return
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func():
+    try:
+        print("try")
+    finally:
+        print("finally")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;finally#quot;)\n"]
+  block2["print(#quot;try#quot;)\n"]
+  block3[["Exception raised"]]
+  block4["try:
+        print(#quot;try#quot;)
+    finally:
+        print(#quot;finally#quot;)\n"]
+
+  start --> block4
+  block4 -- "Exception raised" --> block3
+  block4 -- "else" --> block2
+  block3 --> block1
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func():
+    try:
+        return 0
+    except:
+        return 1
+    finally:
+        return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 2\n"]
+  block2["return 0\n"]
+  block3[["Exception raised"]]
+  block4["return 1\n"]
+  block5["try:
+        return 0
+    except:
+        return 1
+    finally:
+        return 2\n"]
+
+  start --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block2
+  block4 --> block1
+  block3 --> block1
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func():
+    try:
+        raise Exception()
+    except:
+        print("reached")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["raise Exception()\n"]
+  block3[["Exception raised"]]
+  block4["print(#quot;reached#quot;)\n"]
+  block5["try:
+        raise Exception()
+    except:
+        print(#quot;reached#quot;)\n"]
+
+  start --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block2
+  block4 --> block0
+  block3 --> return
+  block2 --> block4
+  block1 --> return
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func():
+    try:
+        assert False
+        print("unreachable")
+    except:
+        print("reached")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;unreachable#quot;)\n"]
+  block2[["Exception raised"]]
+  block3["assert False\n"]
+  block4[["Exception raised"]]
+  block5["print(#quot;reached#quot;)\n"]
+  block6["try:
+        assert False
+        print(#quot;unreachable#quot;)
+    except:
+        print(#quot;reached#quot;)\n"]
+
+  start --> block6
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block3
+  block5 --> block0
+  block4 --> return
+  block3 -- "False" --> block1
+  block3 -- "else" --> block5
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 9
+### Source
+```python
+def func():
+    try:
+        raise Exception()
+    finally:
+        print('reached')
+        return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print('reached')\nreturn 2\n"]
+  block2[["Exception raised"]]
+  block3["raise Exception()\n"]
+  block4[["Exception raised"]]
+  block5["try:
+        raise Exception()
+    finally:
+        print('reached')
+        return 2\n"]
+
+  start --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block3
+  block4 --> block1
+  block3 --> block1
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
+
+## Function 10
+### Source
+```python
+def func():
+    try:
+        assert False
+        print("unreachable")
+    finally:
+        print("reached")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;reached#quot;)\n"]
+  block2["print(#quot;unreachable#quot;)\n"]
+  block3[["Exception raised"]]
+  block4["assert False\n"]
+  block5[["Exception raised"]]
+  block6["try:
+        assert False
+        print(#quot;unreachable#quot;)
+    finally:
+        print(#quot;reached#quot;)\n"]
+
+  start --> block6
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block4
+  block5 --> block1
+  block4 -- "False" --> block2
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 11
+### Source
+```python
+def func():
+    try:
+        if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1
+        try:
+            x = 2
+        except PySparkParseException:
+            x = 3
+        x = 8
+    finally:
+        if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5
+        try:
+            x = 6
+        except PySparkParseException:
+            x = 7
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["x = 6\n"]
+  block2[["Exception raised"]]
+  block3["x = 7\n"]
+  block4["try:
+            x = 6
+        except PySparkParseException:
+            x = 7\n"]
+  block5["try:
+            x = 6
+        except PySparkParseException:
+            x = 7\n"]
+  block6["x = 4\n"]
+  block7[["Exception raised"]]
+  block8["x = 5\n"]
+  block9["try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block10["try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block11["if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block12["x = 8\n"]
+  block13["x = 2\n"]
+  block14[["Exception raised"]]
+  block15["x = 3\n"]
+  block16["try:
+            x = 2
+        except PySparkParseException:
+            x = 3\n"]
+  block17["try:
+            x = 2
+        except PySparkParseException:
+            x = 3\n"]
+  block18["x = 0\n"]
+  block19[["Exception raised"]]
+  block20["x = 1\n"]
+  block21["try:
+                x = 0
+            except PySparkParseException:
+                x = 1\n"]
+  block22["try:
+                x = 0
+            except PySparkParseException:
+                x = 1\n"]
+  block23["if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1\n"]
+  block24[["Exception raised"]]
+  block25["try:
+        if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1
+        try:
+            x = 2
+        except PySparkParseException:
+            x = 3
+        x = 8
+    finally:
+        if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5
+        try:
+            x = 6
+        except PySparkParseException:
+            x = 7\n"]
+
+  start --> block25
+  block25 -- "Exception raised" --> block24
+  block25 -- "else" --> block23
+  block24 --> block11
+  block23 -- "catalog is not None" --> block22
+  block23 -- "else" --> block17
+  block22 -- "Exception raised" --> block21
+  block22 -- "else" --> block18
+  block21 -- "PySparkParseException" --> block20
+  block21 -- "else" --> block19
+  block20 --> block17
+  block19 --> block11
+  block18 --> block17
+  block17 -- "Exception raised" --> block16
+  block17 -- "else" --> block13
+  block16 -- "PySparkParseException" --> block15
+  block16 -- "else" --> block14
+  block15 --> block12
+  block14 --> block11
+  block13 --> block12
+  block12 --> block11
+  block11 -- "catalog is not None" --> block10
+  block11 -- "else" --> block5
+  block10 -- "Exception raised" --> block9
+  block10 -- "else" --> block6
+  block9 -- "PySparkParseException" --> block8
+  block9 -- "else" --> block7
+  block8 --> block5
+  block7 --> return
+  block6 --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block1
+  block4 -- "PySparkParseException" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 12
+### Source
+```python
+def func():
+    try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception("other")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["raise Exception(#quot;other#quot;)\n"]
+  block3[["Exception raised"]]
+  block4["assert False\n"]
+  block5[["Exception raised"]]
+  block6[["Exception raised"]]
+  block7["raise ex\n"]
+  block8["try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception(#quot;other#quot;)\n"]
+  block9["try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception(#quot;other#quot;)\n"]
+
+  start --> block9
+  block9 -- "Exception raised" --> block8
+  block9 -- "else" --> block4
+  block8 -- "ex" --> block7
+  block8 -- "else" --> block5
+  block7 --> block2
+  block6 --> return
+  block5 --> block2
+  block4 -- "False" --> block2
+  block4 -- "else" --> block8
+  block3 --> return
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 13
+### Source
+```python
+def func():
+ for i in():
+    try:
+        try:
+         while r:
+          if t:break
+        finally:()
+        return
+    except:l
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Loop continue"]]
+  block2["return\n"]
+  block3["()\n"]
+  block4[["Loop continue"]]
+  block5["break\n"]
+  block6["if t:break\n"]
+  block7["while r:
+          if t:break\n"]
+  block8[["Exception raised"]]
+  block9["try:
+         while r:
+          if t:break
+        finally:()\n"]
+  block10[["Exception raised"]]
+  block11["l\n"]
+  block12["try:
+        try:
+         while r:
+          if t:break
+        finally:()
+        return
+    except:l\n"]
+  block13["for i in():
+    try:
+        try:
+         while r:
+          if t:break
+        finally:()
+        return
+    except:l\n"]
+
+  start --> block13
+  block13 -- "()" --> block12
+  block13 -- "else" --> block0
+  block12 -- "Exception raised" --> block11
+  block12 -- "else" --> block9
+  block11 --> block1
+  block10 --> return
+  block9 -- "Exception raised" --> block8
+  block9 -- "else" --> block7
+  block8 --> block3
+  block7 -- "r" --> block6
+  block7 -- "else" --> block3
+  block6 -- "t" --> block5
+  block6 -- "else" --> block4
+  block5 --> block3
+  block4 --> block7
+  block3 --> block2
+  block2 --> return
+  block1 --> block13
+  block0 --> return
+```

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 redefined_loop_name.py:6:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
   |
@@ -90,7 +89,7 @@ redefined_loop_name.py:67:5: PLW2901 `for` loop variable `i` overwritten by assi
 66 |     i = typing.cast(int, i)
 67 |     i = 5  # error
    |     ^ PLW2901
-68 | 
+68 |
 69 | # For -> augmented assignment
    |
 
@@ -100,7 +99,7 @@ redefined_loop_name.py:71:5: PLW2901 `for` loop variable `i` overwritten by assi
 70 | for i in []:
 71 |     i += 5  # error
    |     ^ PLW2901
-72 | 
+72 |
 73 | # For -> annotated assignment
    |
 
@@ -110,7 +109,7 @@ redefined_loop_name.py:75:5: PLW2901 `for` loop variable `i` overwritten by assi
 74 | for i in []:
 75 |     i: int = 5  # error
    |     ^ PLW2901
-76 | 
+76 |
 77 | # For -> annotated assignment without value
    |
 
@@ -183,7 +182,7 @@ redefined_loop_name.py:137:13: PLW2901 `for` loop variable `i` overwritten by as
 136 |         for i in []:  # no error
 137 |             i = 2  # error
     |             ^ PLW2901
-138 | 
+138 |
 139 | # For -> class definition -> for -> for
     |
 

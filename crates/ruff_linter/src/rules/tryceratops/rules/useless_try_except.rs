@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, ExceptHandlerExceptHandler, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// def foo():
 ///     bar()
 /// ```
-#[violation]
-pub struct UselessTryExcept;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessTryExcept;
 
 impl Violation for UselessTryExcept {
     #[derive_message_formats]
@@ -39,7 +39,7 @@ impl Violation for UselessTryExcept {
 }
 
 /// TRY203 (previously TRY302)
-pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) {
     if let Some(diagnostics) = handlers
         .iter()
         .map(|handler| {
@@ -67,6 +67,6 @@ pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[ExceptHandle
         .collect::<Option<Vec<_>>>()
     {
         // Require that all handlers are useless, but create one diagnostic per handler.
-        checker.diagnostics.extend(diagnostics);
+        checker.report_diagnostics(diagnostics);
     }
 }

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -42,8 +42,8 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 484 – Type Hints: Covariance and contravariance](https://peps.python.org/pep-0484/#covariance-and-contravariance)
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/
-#[violation]
-pub struct TypeNameIncorrectVariance {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeNameIncorrectVariance {
     kind: VarKind,
     param_name: String,
     variance: VarVariance,
@@ -64,7 +64,7 @@ impl Violation for TypeNameIncorrectVariance {
 }
 
 /// PLC0105
-pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
+pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -126,7 +126,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         VarVariance::Invariance => name_root.to_string(),
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         TypeNameIncorrectVariance {
             kind,
             param_name: param_name.to_string(),

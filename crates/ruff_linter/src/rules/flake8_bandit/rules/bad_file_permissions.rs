@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `os.chmod`](https://docs.python.org/3/library/os.html#os.chmod)
 /// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
-#[violation]
-pub struct BadFilePermissions {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadFilePermissions {
     reason: Reason,
 }
 
@@ -61,7 +61,7 @@ enum Reason {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -71,14 +71,14 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
     {
-        if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
+        if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
             match parse_mask(mode_arg, checker.semantic()) {
                 // The mask couldn't be determined (e.g., it's dynamic).
                 Ok(None) => {}
                 // The mask is a valid integer value -- check for overly permissive permissions.
                 Ok(Some(mask)) => {
                     if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             BadFilePermissions {
                                 reason: Reason::Permissive(mask),
                             },
@@ -88,7 +88,7 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
                 }
                 // The mask is an invalid integer value (i.e., it's out of range).
                 Err(_) => {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         BadFilePermissions {
                             reason: Reason::Invalid,
                         },

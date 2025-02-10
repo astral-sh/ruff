@@ -249,13 +249,13 @@ pub enum SimpleTokenKind {
     /// `;`
     Semi,
 
-    /// '/'
+    /// `/`
     Slash,
 
-    /// '*'
+    /// `*`
     Star,
 
-    /// `.`.
+    /// `.`
     Dot,
 
     /// `+`

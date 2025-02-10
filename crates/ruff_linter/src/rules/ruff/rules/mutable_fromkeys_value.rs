@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_mutable_expr;
@@ -48,8 +48,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
-#[violation]
-pub struct MutableFromkeysValue;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableFromkeysValue;
 
 impl Violation for MutableFromkeysValue {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -65,7 +65,7 @@ impl Violation for MutableFromkeysValue {
 }
 
 /// RUF024
-pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -92,7 +92,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -42,8 +42,18 @@ use crate::checkers::ast::Checker;
 /// if any(part in blocklist for part in Path("my/file/path").parts):
 ///     ...
 /// ```
-#[violation]
-pub struct OsSepSplit;
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than working directly with strings,
+/// especially on older versions of Python.
+///
+/// ## References
+/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
+/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
+#[derive(ViolationMetadata)]
+pub(crate) struct OsSepSplit;
 
 impl Violation for OsSepSplit {
     #[derive_message_formats]
@@ -53,7 +63,7 @@ impl Violation for OsSepSplit {
 }
 
 /// PTH206
-pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -72,7 +82,7 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Some(sep) = call.arguments.find_argument("sep", 0) else {
+    let Some(sep) = call.arguments.find_argument_value("sep", 0) else {
         return;
     };
 
@@ -84,7 +94,5 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OsSepSplit, attr.range()));
+    checker.report_diagnostic(Diagnostic::new(OsSepSplit, attr.range()));
 }

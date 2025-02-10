@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -35,8 +35,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 ///
 /// [#15373]: https://bugs.python.org/issue15373
-#[violation]
-pub struct ShallowCopyEnviron;
+#[derive(ViolationMetadata)]
+pub(crate) struct ShallowCopyEnviron;
 
 impl AlwaysFixableViolation for ShallowCopyEnviron {
     #[derive_message_formats]
@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for ShallowCopyEnviron {
 }
 
 /// PLW1507
-pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
     if !(checker.semantic().seen_module(Modules::OS)
         && checker.semantic().seen_module(Modules::COPY))
     {
@@ -86,5 +86,5 @@ pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) 
         format!("{}.copy()", checker.locator().slice(arg)),
         call.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

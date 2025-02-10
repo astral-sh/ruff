@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{PySourceType, Stmt};
 use ruff_text_size::Ranged;
 
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 /// For Jupyter notebooks, this rule checks for imports that are not at the top of a *cell*.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct ModuleImportNotAtTopOfFile {
+#[derive(ViolationMetadata)]
+pub(crate) struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,
 }
 
@@ -56,9 +56,9 @@ impl Violation for ModuleImportNotAtTopOfFile {
 }
 
 /// E402
-pub(crate) fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             ModuleImportNotAtTopOfFile {
                 source_type: checker.source_type,
             },

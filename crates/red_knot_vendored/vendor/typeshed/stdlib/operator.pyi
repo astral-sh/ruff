@@ -54,7 +54,7 @@ from _operator import (
 )
 from _typeshed import SupportsGetItem
 from typing import Any, Generic, TypeVar, final, overload
-from typing_extensions import TypeVarTuple, Unpack
+from typing_extensions import Self, TypeVarTuple, Unpack
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
@@ -211,5 +211,5 @@ class itemgetter(Generic[_T_co]):
 
 @final
 class methodcaller:
-    def __init__(self, name: str, /, *args: Any, **kwargs: Any) -> None: ...
+    def __new__(cls, name: str, /, *args: Any, **kwargs: Any) -> Self: ...
     def __call__(self, obj: Any) -> Any: ...

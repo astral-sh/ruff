@@ -101,3 +101,12 @@ def f():
 
     def test_annotated_non_typing_reference(user: Annotated[str, Depends(get_foo)]):
         pass
+
+
+def f():
+    from typing import TypeAlias, TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from pandas import DataFrame
+
+    x: TypeAlias = DataFrame | None

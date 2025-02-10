@@ -2,10 +2,9 @@ use std::borrow::Cow;
 
 use anyhow::{bail, Result};
 use libcst_native::ParenthesizedNode;
-use log::error;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, whitespace, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
@@ -46,8 +45,8 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
-#[violation]
-pub struct CollapsibleIf;
+#[derive(ViolationMetadata)]
+pub(crate) struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -64,7 +63,7 @@ impl Violation for CollapsibleIf {
 
 /// SIM102
 pub(crate) fn nested_if_statements(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &ast::StmtIf,
     parent: Option<&Stmt>,
 ) {
@@ -118,24 +117,28 @@ pub(crate) fn nested_if_statements(
         nested_if.start(),
         nested_if.body()[0].start(),
     )) {
-        match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
-            Ok(edit) => {
-                if edit.content().map_or(true, |content| {
-                    fits(
-                        content,
-                        (&nested_if).into(),
-                        checker.locator(),
-                        checker.settings.pycodestyle.max_line_length,
-                        checker.settings.tab_size,
-                    )
-                }) {
-                    diagnostic.set_fix(Fix::unsafe_edit(edit));
+        diagnostic.try_set_optional_fix(|| {
+            match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
+                Ok(edit) => {
+                    if edit.content().map_or(true, |content| {
+                        fits(
+                            content,
+                            (&nested_if).into(),
+                            checker.locator(),
+                            checker.settings.pycodestyle.max_line_length,
+                            checker.settings.tab_size,
+                        )
+                    }) {
+                        Ok(Some(Fix::unsafe_edit(edit)))
+                    } else {
+                        Ok(None)
+                    }
                 }
+                Err(err) => bail!("Failed to collapse `if`: {err}"),
             }
-            Err(err) => error!("Failed to fix nested if: {err}"),
-        }
+        });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
-#[violation]
-pub struct JumpStatementInFinally {
+#[derive(ViolationMetadata)]
+pub(crate) struct JumpStatementInFinally {
     name: String,
 }
 
@@ -53,10 +53,10 @@ impl Violation for JumpStatementInFinally {
     }
 }
 
-fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
+fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 JumpStatementInFinally {
                     name: match stmt {
                         Stmt::Break(_) => "break",
@@ -89,7 +89,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 }
 
 /// B012
-pub(crate) fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
+pub(crate) fn jump_statement_in_finally(checker: &Checker, finalbody: &[Stmt]) {
     walk_stmt(checker, finalbody, |stmt| {
         matches!(stmt, Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return(_))
     });

@@ -8,7 +8,7 @@ use crate::rules::{
 };
 
 /// Run lint rules over an [`ExceptHandler`] syntax node.
-pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Checker) {
+pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) {
     match except_handler {
         ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_,
@@ -23,7 +23,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
                     except_handler,
                     checker.locator,
                 ) {
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             if checker.enabled(Rule::RaiseWithoutFromInsideExcept) {

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -24,8 +24,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```python
 /// print(f"{1337:b}")
 /// ```
-#[violation]
-pub struct FStringNumberFormat {
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringNumberFormat {
     replacement: Option<SourceCodeSnippet>,
     base: Base,
 }
@@ -62,7 +62,7 @@ impl Violation for FStringNumberFormat {
 }
 
 /// FURB116
-pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscript) {
     // The slice must be exactly `[2:]`.
     let Expr::Slice(ast::ExprSlice {
         lower: Some(lower),
@@ -140,7 +140,7 @@ pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::Expr
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

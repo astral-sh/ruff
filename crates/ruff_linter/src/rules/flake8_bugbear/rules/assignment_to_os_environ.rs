@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 /// - [Python documentation: `subprocess.Popen`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
-#[violation]
-pub struct AssignmentToOsEnviron;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssignmentToOsEnviron;
 
 impl Violation for AssignmentToOsEnviron {
     #[derive_message_formats]
@@ -50,7 +50,7 @@ impl Violation for AssignmentToOsEnviron {
 }
 
 /// B003
-pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
+pub(crate) fn assignment_to_os_environ(checker: &Checker, targets: &[Expr]) {
     let [target] = targets else {
         return;
     };
@@ -66,7 +66,5 @@ pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) 
     if id != "os" {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(AssignmentToOsEnviron, target.range()));
+    checker.report_diagnostic(Diagnostic::new(AssignmentToOsEnviron, target.range()));
 }

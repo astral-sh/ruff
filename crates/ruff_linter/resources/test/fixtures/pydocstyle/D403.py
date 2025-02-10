@@ -31,3 +31,59 @@ def single_word():
 
 def single_word_no_dot():
     """singleword"""
+
+def first_word_lots_of_whitespace():
+    """
+
+
+
+    here is the start of my docstring!
+
+    What do you think?    
+    """
+
+def single_word_newline():
+    """singleword
+
+    """
+
+def single_word_dot_newline():
+    """singleword.
+
+    """
+
+def single_word_second_line():
+    """
+    singleword
+    """
+
+def single_word_dot_second_line():
+    """
+    singleword.
+    """
+
+def single_word_then_more_text():
+    """singleword
+
+    This is more text.
+    """
+
+def single_word_dot_then_more_text():
+    """singleword.
+
+    This is more text.
+    """
+
+def single_word_second_line_then_more_text():
+    """
+    singleword
+
+    This is more text.
+    """
+
+def single_word_dot_second_line_then_more_text():
+    """
+    singleword.
+
+    This is more text.
+    """

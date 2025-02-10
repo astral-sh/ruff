@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check code snippets in docs are formatted by black."""
+"""Check code snippets in docs are formatted by Ruff."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ SNIPPED_RE = re.compile(
     re.DOTALL | re.MULTILINE,
 )
 
-# For some rules, we don't want black to fix the formatting as this would "fix" the
+# For some rules, we don't want Ruff to fix the formatting as this would "fix" the
 # example.
 KNOWN_FORMATTING_VIOLATIONS = [
     "avoidable-escaped-quote",
@@ -31,13 +31,16 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "bad-quotes-multiline-string",
     "blank-line-after-decorator",
     "blank-line-before-class",
+    "blank-line-before-function",
     "blank-line-between-methods",
     "blank-lines-after-function-or-class",
     "blank-lines-before-nested-definition",
     "blank-lines-top-level",
+    "docstring-tab-indentation",
     "explicit-string-concatenation",
     "f-string-missing-placeholders",
-    "indent-with-spaces",
+    "incorrect-blank-line-after-class",
+    "incorrect-blank-line-before-class",
     "indentation-with-invalid-multiple",
     "line-too-long",
     "missing-trailing-comma",
@@ -58,20 +61,18 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "multiple-spaces-before-operator",
     "multiple-statements-on-one-line-colon",
     "multiple-statements-on-one-line-semicolon",
-    "no-blank-line-before-function",
     "no-indented-block-comment",
     "no-return-argument-annotation-in-stub",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
     "non-empty-stub-body",
-    "one-blank-line-after-class",
-    "one-blank-line-before-class",
     "over-indentation",
     "over-indented",
     "pass-statement-stub-body",
     "prohibited-trailing-comma",
     "redundant-backslash",
     "shebang-leading-whitespace",
+    "single-line-implicit-string-concatenation",
     "surrounding-whitespace",
     "too-few-spaces-before-inline-comment",
     "too-many-blank-lines",
@@ -92,10 +93,11 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "whitespace-before-punctuation",
 ]
 
-# For some docs, black is unable to parse the example code.
+# For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
     "blank-line-with-whitespace",
     "indentation-with-invalid-multiple-comment",
+    "indented-form-feed",
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
@@ -159,7 +161,7 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             case _:
                 # We are only interested in checking the formatting of py or pyi code
                 # blocks so we can return early if the language is not one of these.
-                return f'{match["before"]}{match["code"]}{match["after"]}'
+                return f"{match['before']}{match['code']}{match['after']}"
 
         code = textwrap.dedent(match["code"])
         try:
@@ -170,7 +172,7 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             raise e
 
         code = textwrap.indent(code, match["indent"])
-        return f'{match["before"]}{code}{match["after"]}'
+        return f"{match['before']}{code}{match['after']}"
 
     src = SNIPPED_RE.sub(_snipped_match, src)
     return src, errors
@@ -237,9 +239,9 @@ def format_file(file: Path, error_known: bool, args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Check code snippets in docs are formatted by black."""
+    """Check code snippets in docs are formatted by Ruff."""
     parser = argparse.ArgumentParser(
-        description="Check code snippets in docs are formatted by black.",
+        description="Check code snippets in docs are formatted by Ruff.",
     )
     parser.add_argument("--skip-errors", action="store_true")
     parser.add_argument("--generate-docs", action="store_true")

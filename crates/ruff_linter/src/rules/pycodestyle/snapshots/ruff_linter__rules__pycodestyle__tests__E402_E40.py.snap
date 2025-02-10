@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E40.py:56:1: E402 Module level import not at top of file
    |
 54 | VERSION = '1.2.3'
-55 | 
+55 |
 56 | import foo
    | ^^^^^^^^^^ E402
 57 | #: E402
@@ -18,17 +17,17 @@ E40.py:58:1: E402 Module level import not at top of file
 57 | #: E402
 58 | import foo
    | ^^^^^^^^^^ E402
-59 | 
+59 |
 60 | a = 1
    |
 
 E40.py:62:1: E402 Module level import not at top of file
    |
 60 | a = 1
-61 | 
+61 |
 62 | import bar
    | ^^^^^^^^^^ E402
-63 | 
+63 |
 64 | #: E401
    |
 
@@ -46,14 +45,14 @@ E40.py:66:1: E402 Module level import not at top of file
 65 | import re as regex, string  # also with a comment!
 66 | import re as regex, string; x = 1
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
-67 | 
+67 |
 68 | x = 1; import re as regex, string
    |
 
 E40.py:68:8: E402 Module level import not at top of file
    |
 66 | import re as regex, string; x = 1
-67 | 
+67 |
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
    |

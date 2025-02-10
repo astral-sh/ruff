@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/yield_from/starred_expression.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -80,7 +79,7 @@ Module(
 
   |
 1 | # Yield from doesn't allow top-level starred expression unlike yield
-2 | 
+2 |
 3 | yield from *x
   |            ^^ Syntax Error: Starred expression cannot be used here
 4 | yield from *x, y

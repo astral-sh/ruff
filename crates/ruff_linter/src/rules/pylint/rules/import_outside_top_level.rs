@@ -1,9 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
+use crate::{
+    checkers::ast::Checker, codes::Rule, rules::flake8_tidy_imports::matchers::NameMatchPolicy,
+};
 
 /// ## What it does
 /// Checks for `import` statements outside of a module's top-level scope, such
@@ -42,8 +45,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct ImportOutsideTopLevel;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportOutsideTopLevel;
 
 impl Violation for ImportOutsideTopLevel {
     #[derive_message_formats]
@@ -53,10 +56,44 @@ impl Violation for ImportOutsideTopLevel {
 }
 
 /// C0415
-pub(crate) fn import_outside_top_level(checker: &mut Checker, stmt: &Stmt) {
-    if !checker.semantic().current_scope().kind.is_module() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));
+pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
+    if checker.semantic().current_scope().kind.is_module() {
+        // "Top-level" imports are allowed
+        return;
     }
+
+    // Check if any of the non-top-level imports are banned by TID253
+    // before emitting the diagnostic to avoid conflicts.
+    if checker.enabled(Rule::BannedModuleLevelImports) {
+        let mut all_aliases_banned = true;
+        let mut has_alias = false;
+        for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
+            if node.is_alias() {
+                has_alias = true;
+                all_aliases_banned &= is_banned_module_level_import(&policy, checker);
+            }
+            // If the entire import is banned
+            else if is_banned_module_level_import(&policy, checker) {
+                return;
+            }
+        }
+
+        if has_alias && all_aliases_banned {
+            return;
+        }
+    }
+
+    // Emit the diagnostic
+    checker.report_diagnostic(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));
+}
+
+fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) -> bool {
+    policy
+        .find(
+            checker
+                .settings
+                .flake8_tidy_imports
+                .banned_module_level_imports(),
+        )
+        .is_some()
 }

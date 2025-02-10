@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB161.py:6:9: FURB161 [*] Use of `bin(x).count('1')`
   |
 4 |     return 10
-5 | 
+5 |
 6 | count = bin(x).count("1")  # FURB161
   |         ^^^^^^^^^^^^^^^^^ FURB161
 7 | count = bin(10).count("1")  # FURB161
@@ -174,7 +173,7 @@ FURB161.py:14:9: FURB161 [*] Use of `bin("10" "15").count('1')`
 13 | count = bin((10)).count("1")  # FURB161
 14 | count = bin("10" "15").count("1")  # FURB161
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB161
-15 | 
+15 |
 16 | count = x.bit_count()  # OK
    |
    = help: Replace with `("10" "15").bit_count()`

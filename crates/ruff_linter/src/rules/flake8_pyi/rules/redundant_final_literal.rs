@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, comparable::ComparableExpr};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -11,23 +11,30 @@ use crate::Locator;
 /// Checks for redundant `Final[Literal[...]]` annotations.
 ///
 /// ## Why is this bad?
-/// A `Final[Literal[...]]` annotation can be replaced with `Final`; the literal
-/// use is unnecessary.
+/// All constant variables annotated as `Final` are understood as implicitly
+/// having `Literal` types by a type checker. As such, a `Final[Literal[...]]`
+/// annotation can often be replaced with a bare `Final`, annotation, which
+/// will have the same meaning to the type checker while being more concise and
+/// more readable.
 ///
 /// ## Example
 ///
 /// ```pyi
+/// from typing import Final, Literal
+///
 /// x: Final[Literal[42]]
 /// y: Final[Literal[42]] = 42
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// from typing import Final, Literal
+///
 /// x: Final = 42
 /// y: Final = 42
 /// ```
-#[violation]
-pub struct RedundantFinalLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantFinalLiteral {
     literal: SourceCodeSnippet,
 }
 
@@ -49,7 +56,7 @@ impl Violation for RedundantFinalLiteral {
 }
 
 /// PYI064
-pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::StmtAnnAssign) {
+pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtAnnAssign) {
     if !checker.semantic().seen_typing() {
         return;
     }
@@ -107,7 +114,7 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         diagnostic.set_fix(generate_fix(annotation, Some(literal), checker.locator()));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a fix to convert a `Final[Literal[...]]` annotation to a `Final` annotation.

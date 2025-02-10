@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -45,8 +45,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [Disallow iterable argument unpacking after a keyword argument?](https://github.com/python/cpython/issues/82741)
-#[violation]
-pub struct StarArgUnpackingAfterKeywordArg;
+#[derive(ViolationMetadata)]
+pub(crate) struct StarArgUnpackingAfterKeywordArg;
 
 impl Violation for StarArgUnpackingAfterKeywordArg {
     #[derive_message_formats]
@@ -57,7 +57,7 @@ impl Violation for StarArgUnpackingAfterKeywordArg {
 
 /// B026
 pub(crate) fn star_arg_unpacking_after_keyword_arg(
-    checker: &mut Checker,
+    checker: &Checker,
     args: &[Expr],
     keywords: &[Keyword],
 ) {
@@ -71,7 +71,7 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StarArgUnpackingAfterKeywordArg,
             arg.range(),
         ));

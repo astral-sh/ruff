@@ -1,5 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
-snapshot_kind: text
 ---
-xml.py:1:1: A005 Module `xml` is shadowing a Python builtin module
+xml.py:1:1: A005 Module `xml` shadows a Python standard-library module

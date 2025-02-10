@@ -1,7 +1,7 @@
 use std::slice::Iter;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -23,8 +23,8 @@ use crate::Locator;
 /// ```python
 /// print("Hello, world")
 /// ```
-#[violation]
-pub struct ExtraneousParentheses;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExtraneousParentheses;
 
 impl AlwaysFixableViolation for ExtraneousParentheses {
     #[derive_message_formats]

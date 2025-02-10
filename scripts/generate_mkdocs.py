@@ -8,13 +8,12 @@ import re
 import shutil
 import subprocess
 from collections.abc import Sequence
+from itertools import chain
 from pathlib import Path
 from typing import NamedTuple
 
 import mdformat
 import yaml
-
-from _mdformat_utils import add_no_escape_text_plugin
 
 
 class Section(NamedTuple):
@@ -110,7 +109,7 @@ def generate_rule_metadata(rule_doc: Path) -> None:
     For example:
     ```yaml
     ---
-    description: Checks for abstract classes without abstract methods.
+    description: Checks for abstract classes without abstract methods or properties.
     tags:
     - B024
     ---
@@ -157,7 +156,8 @@ def generate_rule_metadata(rule_doc: Path) -> None:
             "\n".join(
                 [
                     "---",
-                    f"description: {description}",
+                    "description: |-",
+                    f"  {description}",
                     "tags:",
                     f"- {rule_code}",
                     "---",
@@ -228,12 +228,11 @@ def main() -> None:
 
             f.write(clean_file_content(file_content, title))
 
-    add_no_escape_text_plugin()
     for rule_doc in Path("docs/rules").glob("*.md"):
         # Format rules docs. This has to be completed before adding the meta description
         # otherwise the meta description will be formatted in a way that mkdocs does not
         # support.
-        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
+        mdformat.file(rule_doc, extensions=["mkdocs"])
 
         generate_rule_metadata(rule_doc)
 
@@ -259,10 +258,18 @@ def main() -> None:
     config["plugins"].append(
         {
             "redirects": {
-                "redirect_maps": {
-                    f'rules/{rule["code"]}.md': f'rules/{rule["name"]}.md'
-                    for rule in rules
-                },
+                "redirect_maps": dict(
+                    chain.from_iterable(
+                        [
+                            (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
+                            (
+                                f"rules/{rule['code'].lower()}.md",
+                                f"rules/{rule['name']}.md",
+                            ),
+                        ]
+                        for rule in rules
+                    )
+                ),
             },
         },
     )

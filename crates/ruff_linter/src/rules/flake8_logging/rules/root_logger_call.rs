@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 
@@ -24,11 +24,11 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import logging
 ///
-/// logger = logging.getLogger(__file__)
+/// logger = logging.getLogger(__name__)
 /// logger.info("Foobar")
 /// ```
-#[violation]
-pub struct RootLoggerCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct RootLoggerCall {
     attr: String,
 }
 
@@ -44,7 +44,7 @@ impl Violation for RootLoggerCall {
 }
 
 /// LOG015
-pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::LOGGING) {
@@ -65,7 +65,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
     };
     let diagnostic = Diagnostic::new(kind, call.range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[inline]

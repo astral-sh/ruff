@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
@@ -43,8 +43,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
-#[violation]
-pub struct CallDateToday;
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDateToday;
 
 impl Violation for CallDateToday {
     #[derive_message_formats]
@@ -57,7 +57,7 @@ impl Violation for CallDateToday {
     }
 }
 
-pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: TextRange) {
+pub(crate) fn call_date_today(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -69,8 +69,6 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
             matches!(qualified_name.segments(), ["datetime", "date", "today"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDateToday, location));
+        checker.report_diagnostic(Diagnostic::new(CallDateToday, location));
     }
 }

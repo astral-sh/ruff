@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,8 +36,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
-#[violation]
-pub struct CollectionLiteralConcatenation {
+#[derive(ViolationMetadata)]
+pub(crate) struct CollectionLiteralConcatenation {
     expression: SourceCodeSnippet,
 }
 
@@ -169,7 +169,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
 }
 
 /// RUF005
-pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
     // If the expression is already a child of an addition, we'll have analyzed it already.
     if matches!(
         checker.semantic().current_expression_parent(),
@@ -207,5 +207,5 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

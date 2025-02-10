@@ -11,6 +11,7 @@ use log::{debug, error, warn};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
+use ruff_db::panic::catch_unwind;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
@@ -27,7 +28,6 @@ use ruff_workspace::resolver::{
 use crate::args::ConfigArguments;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
-use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
 #[allow(clippy::too_many_arguments)]

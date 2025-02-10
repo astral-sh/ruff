@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins;
@@ -33,8 +33,8 @@ use crate::settings::types::PythonVersion;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as converting a useless exception
 /// statement to a `raise` statement will change the program's behavior.
-#[violation]
-pub struct UselessExceptionStatement;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessExceptionStatement;
 
 impl Violation for UselessExceptionStatement {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -50,7 +50,7 @@ impl Violation for UselessExceptionStatement {
 }
 
 /// PLW0133
-pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::StmtExpr) {
+pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExpr) {
     let Expr::Call(ast::ExprCall { func, .. }) = expr.value.as_ref() else {
         return;
     };
@@ -61,7 +61,7 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
             "raise ".to_string(),
             expr.start(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

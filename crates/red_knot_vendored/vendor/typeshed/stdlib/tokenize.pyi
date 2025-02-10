@@ -4,7 +4,7 @@ from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
 from token import EXACT_TOKEN_TYPES as EXACT_TOKEN_TYPES
-from typing import Any, NamedTuple, TextIO
+from typing import Any, NamedTuple, TextIO, type_check_only
 from typing_extensions import TypeAlias
 
 __all__ = [
@@ -88,7 +88,7 @@ if sys.version_info >= (3, 10):
     __all__ += ["SOFT_KEYWORD"]
 
 if sys.version_info >= (3, 12):
-    __all__ += ["EXCLAMATION", "FSTRING_END", "FSTRING_MIDDLE", "FSTRING_START"]
+    __all__ += ["EXCLAMATION", "FSTRING_END", "FSTRING_MIDDLE", "FSTRING_START", "EXACT_TOKEN_TYPES"]
 
 if sys.version_info >= (3, 13):
     __all__ += ["TokenError", "open"]
@@ -98,6 +98,8 @@ blank_re: Pattern[bytes]
 
 _Position: TypeAlias = tuple[int, int]
 
+# This class is not exposed. It calls itself tokenize.TokenInfo.
+@type_check_only
 class _TokenInfo(NamedTuple):
     type: int
     string: str
@@ -128,9 +130,8 @@ class Untokenizer:
     if sys.version_info >= (3, 12):
         def escape_brackets(self, token: str) -> str: ...
 
-# the docstring says "returns bytes" but is incorrect --
-# if the ENCODING token is missing, it skips the encode
-def untokenize(iterable: Iterable[_Token]) -> Any: ...
+# Returns str, unless the ENCODING token is present, in which case it returns bytes.
+def untokenize(iterable: Iterable[_Token]) -> str | Any: ...
 def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Sequence[bytes]]: ...
 def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]: ...
 def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo, None, None]: ...

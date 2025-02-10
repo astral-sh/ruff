@@ -43,7 +43,7 @@ impl NameImports {
 
 impl NameImport {
     /// Returns the name under which the member is bound (e.g., given `from foo import bar as baz`, returns `baz`).
-    fn bound_name(&self) -> &str {
+    pub fn bound_name(&self) -> &str {
         match self {
             NameImport::Import(import) => {
                 import.name.as_name.as_deref().unwrap_or(&import.name.name)
@@ -56,8 +56,8 @@ impl NameImport {
         }
     }
 
-    /// Returns the [`QualifiedName`] of the imported name (e.g., given `import foo import bar as baz`, returns `["foo", "bar"]`).
-    fn qualified_name(&self) -> QualifiedName {
+    /// Returns the [`QualifiedName`] of the imported name (e.g., given `from foo import bar as baz`, returns `["foo", "bar"]`).
+    pub fn qualified_name(&self) -> QualifiedName {
         match self {
             NameImport::Import(import) => QualifiedName::user_defined(&import.name.name),
             NameImport::ImportFrom(import_from) => collect_import_from_member(
@@ -209,7 +209,7 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
 
         struct AnyNameImportsVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for AnyNameImportsVisitor {
+        impl serde::de::Visitor<'_> for AnyNameImportsVisitor {
             type Value = NameImports;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

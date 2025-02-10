@@ -21,3 +21,11 @@ MD014: false
 MD024:
   # Allow when nested under different parents e.g. CHANGELOG.md
   siblings_only: true
+
+# MD046/code-block-style
+#
+# Ignore this because it conflicts with the code block style used in content
+# tabs of mkdocs-material which is to add a blank line after the content title.
+#
+# Ref: https://github.com/astral-sh/ruff/pull/15011#issuecomment-2544790854
+MD046: false

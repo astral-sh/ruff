@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
@@ -24,8 +24,8 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 ///
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-api`
-#[violation]
-pub struct BannedApi {
+#[derive(ViolationMetadata)]
+pub(crate) struct BannedApi {
     name: String,
     message: String,
 }
@@ -39,11 +39,11 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPolicy, node: &T) {
+pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy, node: &T) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if let Some(banned_module) = policy.find(banned_api.keys().map(AsRef::as_ref)) {
         if let Some(reason) = banned_api.get(&banned_module) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 BannedApi {
                     name: banned_module,
                     message: reason.msg.to_string(),
@@ -55,7 +55,7 @@ pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPol
 }
 
 /// TID251
-pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if banned_api.is_empty() {
         return;
@@ -71,7 +71,7 @@ pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
                 })
             })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BannedApi {
                 name: banned_path.to_string(),
                 message: ban.msg.to_string(),

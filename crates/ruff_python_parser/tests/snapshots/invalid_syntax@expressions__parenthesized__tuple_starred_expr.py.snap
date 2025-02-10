@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/tuple_starred_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -1119,7 +1118,7 @@ Module(
 
   |
 2 | # Test the first and any other element as the there are two separate calls.
-3 | 
+3 |
 4 | (*x in y, z, *x in y)
   |   ^^^^^^ Syntax Error: Comparison expression cannot be used here
 5 | (*not x, z, *not x)
@@ -1129,7 +1128,7 @@ Module(
 
   |
 2 | # Test the first and any other element as the there are two separate calls.
-3 | 
+3 |
 4 | (*x in y, z, *x in y)
   |               ^^^^^^ Syntax Error: Comparison expression cannot be used here
 5 | (*not x, z, *not x)

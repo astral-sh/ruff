@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::Ranged;
 
@@ -72,8 +72,8 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyFirstPartyImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
 }
 
@@ -147,8 +147,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyThirdPartyImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
 }
 
@@ -222,8 +222,8 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyStandardLibraryImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
 }
 
@@ -243,12 +243,11 @@ impl Violation for TypingOnlyStandardLibraryImport {
     }
 }
 
-/// TCH001, TCH002, TCH003
+/// TC001, TC002, TC003
 pub(crate) fn typing_only_runtime_import(
     checker: &Checker,
     scope: &Scope,
     runtime_imports: &[&Binding],
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all typing-only imports by statement and import type.
     let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
@@ -381,7 +380,7 @@ pub(crate) fn typing_only_runtime_import(
             if let Some(fix) = fix.as_ref() {
                 diagnostic.set_fix(fix.clone());
             }
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -402,7 +401,7 @@ pub(crate) fn typing_only_runtime_import(
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -509,13 +508,15 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                             reference.expression_id()?,
                             checker.semantic(),
                             checker.stylist(),
+                            checker.locator(),
+                            checker.default_string_flags(),
                         ))
                     } else {
                         None
                     }
                 })
             })
-            .collect::<Result<Vec<_>>>()?,
+            .collect::<Vec<_>>(),
     );
 
     Ok(Fix::unsafe_edits(

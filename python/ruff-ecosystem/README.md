@@ -4,10 +4,10 @@ Compare lint and format results for two different ruff versions (e.g. main and a
 
 ## Installation
 
-From the Ruff project root, install with `pip`:
+From the Ruff project root, install with [uv](https://docs.astral.sh/uv/):
 
 ```shell
-pip install -e ./python/ruff-ecosystem
+uv tool install -e ./python/ruff-ecosystem
 ```
 
 ## Usage

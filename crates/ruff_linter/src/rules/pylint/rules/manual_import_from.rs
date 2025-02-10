@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Alias, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -25,8 +25,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Submodules](https://docs.python.org/3/reference/import.html#submodules)
-#[violation]
-pub struct ManualFromImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct ManualFromImport {
     module: String,
     name: String,
 }
@@ -47,12 +47,7 @@ impl Violation for ManualFromImport {
 }
 
 /// PLR0402
-pub(crate) fn manual_from_import(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    alias: &Alias,
-    names: &[Alias],
-) {
+pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
     let Some(asname) = &alias.asname else {
         return;
     };
@@ -86,5 +81,5 @@ pub(crate) fn manual_from_import(
             stmt.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

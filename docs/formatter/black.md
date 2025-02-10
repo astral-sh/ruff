@@ -197,69 +197,94 @@ if x:
 
 Currently, we are concerned that allowing blank lines at the start of a block leads [to unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744). However, we will consider adopting Black's formatting at a later point with an improved heuristic. The style change is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
 
-### Hex codes and Unicode sequences
 
-Ruff normalizes hex codes and Unicode sequences in strings ([#9280](https://github.com/astral-sh/ruff/pull/9280)). Black intended to ship this change as part of the 2024 style but accidentally didn't.
+### F-strings
 
-```python
-# Black
-a = "\x1B"
-b = "\u200B"
-c = "\U0001F977"
-d = "\N{CYRILLIC small LETTER BYELORUSSIAN-UKRAINIAN I}"
-
-# Ruff
-a = "\x1b"
-b = "\u200b"
-c = "\U0001f977"
-d = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
-```
-
-### Module docstrings
-
-Ruff formats module docstrings similar to class or function docstrings, whereas Black does not.
+Ruff formats expression parts in f-strings whereas Black does not:
 
 ```python
 # Input
-"""Module docstring
-
-"""
+f'test{inner   + "nested_string"} including math {5 ** 3 + 10}'
 
 # Black
-"""Module docstring
-
-"""
+f'test{inner   + "nested_string"} including math {5 ** 3 + 10}'
 
 # Ruff
-"""Module docstring"""
-
+f"test{inner + 'nested_string'} including math {5**3 + 10}"
 ```
 
+For more details on the formatting style, refer to the [f-string
+formatting](../formatter.md#f-string-formatting) section.
 
-### Walruses in slice expressions
+### Implicit concatenated strings
 
-Black avoids inserting space around `:=` operators within slices. For example, the following adheres
-to Black stable style:
+Ruff merges implicitly concatenated strings if the entire string fits on a single line:
 
 ```python
 # Input
-x[y:=1]
+def test(max_history):
+    raise argparse.ArgumentTypeError(
+        f"The value of `--max-history {max_history}` " f"is not a positive integer."
+    )
 
 # Black
-x[y:=1]
+def test(max_history):
+    raise argparse.ArgumentTypeError(
+        f"The value of `--max-history {max_history}` " f"is not a positive integer."
+    )
+
+# Ruff
+def test(max_history):
+    raise argparse.ArgumentTypeError(
+        f"The value of `--max-history {max_history}` is not a positive integer."
+    )
 ```
 
-Ruff will instead add space around the `:=` operator:
+Black's unstable style applies the same formatting.
+
+There are few rare cases where Ruff can't merge the implicitly concatenated strings automatically.
+In those cases, Ruff preserves if the implicit concatenated strings are formatted over multiple lines:
 
 ```python
 # Input
-x[y:=1]
+a = (
+    r"aaaaaaa"
+    "bbbbbbbbbbbb"
+)
+
+# Black
+a = r"aaaaaaa" "bbbbbbbbbbbb"
 
 # Ruff
-x[y := 1]
+a = (
+    r"aaaaaaa"
+    "bbbbbbbbbbbb"
+)
 ```
 
-This will likely be incorporated into Black's preview style ([#3823](https://github.com/psf/black/pull/3823)).
+This ensures compatibility with `ISC001` ([#8272](https://github.com/astral-sh/ruff/issues/8272)).
+
+### `assert` statements
+
+Unlike Black, Ruff prefers breaking the message over breaking the assertion, similar to how both Ruff and Black prefer breaking the assignment value over breaking the assignment target:
+
+```python
+# Input
+assert (
+    len(policy_types) >= priority + num_duplicates
+), f"This tests needs at least {priority+num_duplicates} many types."
+
+
+# Black
+assert (
+    len(policy_types) >= priority + num_duplicates
+), f"This tests needs at least {priority+num_duplicates} many types."
+
+# Ruff
+assert len(policy_types) >= priority + num_duplicates, (
+    f"This tests needs at least {priority + num_duplicates} many types."
+)
+```
 
 ### `global` and `nonlocal` names are broken across multiple lines by continuations
 
@@ -277,36 +302,6 @@ global \
     analyze_latencies_post, \
     analyze_motions_layer, \
     analyze_size_model
-```
-
-### Newlines are inserted after all class docstrings
-
-Black typically enforces a single newline after a class docstring. However, it does not apply such
-formatting if the docstring is single-quoted rather than triple-quoted, while Ruff enforces a
-single newline in both cases:
-
-```python
-# Input
-class IntFromGeom(GEOSFuncFactory):
-    "Argument is a geometry, return type is an integer."
-    argtypes = [GEOM_PTR]
-    restype = c_int
-    errcheck = staticmethod(check_minus_one)
-
-# Black
-class IntFromGeom(GEOSFuncFactory):
-    "Argument is a geometry, return type is an integer."
-    argtypes = [GEOM_PTR]
-    restype = c_int
-    errcheck = staticmethod(check_minus_one)
-
-# Ruff
-class IntFromGeom(GEOSFuncFactory):
-    "Argument is a geometry, return type is an integer."
-
-    argtypes = [GEOM_PTR]
-    restype = c_int
-    errcheck = staticmethod(check_minus_one)
 ```
 
 ### Trailing own-line comments on imports are not moved to the next line
@@ -385,9 +380,7 @@ would instead format the above as:
 
 ```python
 print(
-    "aaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaa".format(
-        bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb
-    )
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".format(bbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbb)
 )
 ```
 
@@ -495,38 +488,6 @@ cases:
 Adding parentheses around single-element tuples adds visual distinction and helps avoid "accidental"
 tuples created by extraneous trailing commas (see, e.g., [#17181](https://github.com/django/django/pull/17181)).
 
-### Trailing commas are inserted when expanding a function definition with a single argument
-
-When a function definition with a single argument is expanded over multiple lines, Black
-will add a trailing comma in some cases, depending on whether the argument includes a type
-annotation and/or a default value.
-
-For example, Black will add a trailing comma to the first and second function definitions below,
-but not the third:
-
-```python
-def func(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-) -> None:
-    ...
-
-
-def func(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=1,
-) -> None:
-    ...
-
-
-def func(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: Argument(
-        "network_messages.pickle",
-        help="The path of the pickle file that will contain the network messages",
-    ) = 1
-) -> None:
-    ...
-```
-
-Ruff will instead insert a trailing comma in all such cases for consistency.
 
 ### Parentheses around call-chain assignment values are not preserved
 
@@ -651,6 +612,65 @@ assert AAAAAAAAAAAAAAAAAAAAAA.bbbbbb.fooo(
 ) * foooooo * len(list(foo(bar(4, foo), foo)))
 ```
 
+### Single `with` item targeting Python 3.8 or older
+
+Unlike Black, Ruff uses the same layout for `with` statements with a single context manager as it does for `while`, `if` and other compound statements:
+
+```python
+# Input
+def run(data_path, model_uri):
+    with pyspark.sql.SparkSession.builder.config(
+        key="spark.python.worker.reuse", value=True
+    ).config(key="spark.ui.enabled", value=False).master(
+        "local-cluster[2, 1, 1024]"
+    ).getOrCreate():
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+
+# Black
+def run(data_path, model_uri):
+    with pyspark.sql.SparkSession.builder.config(
+        key="spark.python.worker.reuse", value=True
+    ).config(key="spark.ui.enabled", value=False).master(
+        "local-cluster[2, 1, 1024]"
+    ).getOrCreate():
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+
+# Ruff
+def run(data_path, model_uri):
+    with (
+        pyspark.sql.SparkSession.builder.config(
+            key="spark.python.worker.reuse", value=True
+        )
+        .config(key="spark.ui.enabled", value=False)
+        .master("local-cluster[2, 1, 1024]")
+        .getOrCreate()
+    ):
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+```
+
+Ruff's formatting matches the formatting of other compound statements:
+
+```python
+def test():
+    if (
+        pyspark.sql.SparkSession.builder.config(
+            key="spark.python.worker.reuse", value=True
+        )
+        .config(key="spark.ui.enabled", value=False)
+        .master("local-cluster[2, 1, 1024]")
+        .getOrCreate()
+    ):
+        # ignore spark log output
+        spark.sparkContext.setLogLevel("OFF")
+        print(score_model(spark, data_path, model_uri))
+```
+
 ### The last context manager in a `with` statement may be collapsed onto a single line
 
 When using a `with` statement with multiple unparenthesized context managers, Ruff may collapse the
@@ -698,4 +718,27 @@ with tempfile.TemporaryDirectory() as d1:
         tempfile.NamedTemporaryFile(dir=d3) as lock_file,
     ):
         pass
+```
+
+### Preserving parentheses around single-element lists
+
+Ruff preserves at least one parentheses around list elements, even if the list only contains a single element. The Black 2025 or newer, on the other hand, removes the parentheses 
+for single-element lists if they aren't multiline and doing so does not change semantics:
+
+```python
+# Input
+items = [(True)]
+items = [(((((True)))))]
+items = {(123)}
+
+# Black
+items = [True]
+items = [True]
+items = {123}
+
+# Ruff
+items = [(True)]
+items = [(True)]
+items = {(123)}
+
 ```

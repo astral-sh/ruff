@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -30,8 +30,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// data = ["some", "Data"]
 /// {value: value.upper() for value in data}
 /// ```
-#[violation]
-pub struct StaticKeyDictComprehension {
+#[derive(ViolationMetadata)]
+pub(crate) struct StaticKeyDictComprehension {
     key: SourceCodeSnippet,
 }
 
@@ -47,7 +47,7 @@ impl Violation for StaticKeyDictComprehension {
 }
 
 /// RUF011
-pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, dict_comp: &ast::ExprDictComp) {
+pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::ExprDictComp) {
     // Collect the bound names in the comprehension's generators.
     let names = {
         let mut visitor = StoredNameFinder::default();
@@ -58,7 +58,7 @@ pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, dict_comp: &a
     };
 
     if is_constant(&dict_comp.key, &names) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StaticKeyDictComprehension {
                 key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
             },

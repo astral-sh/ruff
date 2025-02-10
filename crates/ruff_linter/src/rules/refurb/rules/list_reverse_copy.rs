@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSlice, ExprSubscript, ExprUnaryOp, Int, StmtAssign, UnaryOp,
 };
@@ -46,8 +46,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
-#[violation]
-pub struct ListReverseCopy {
+#[derive(ViolationMetadata)]
+pub(crate) struct ListReverseCopy {
     name: String,
 }
 
@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for ListReverseCopy {
 }
 
 /// FURB187
-pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
+pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
     let [Expr::Name(target_expr)] = assign.targets.as_slice() else {
         return;
     };
@@ -89,7 +89,7 @@ pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
         return;
     }
 
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(
             ListReverseCopy {
                 name: target_expr.id.to_string(),

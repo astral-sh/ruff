@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
@@ -58,8 +58,8 @@ use crate::fix::edits::fits;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 /// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
-#[violation]
-pub struct IfElseBlockInsteadOfIfExp {
+#[derive(ViolationMetadata)]
+pub(crate) struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
     contents: String,
     /// Whether to use a binary or ternary assignment.
@@ -89,7 +89,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
@@ -241,7 +241,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
             stmt_if.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

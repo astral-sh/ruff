@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
@@ -29,18 +29,7 @@ use crate::importer::ImportRequest;
 ///
 /// ## Example
 /// ```python
-/// scores = [85, 100, 60]
-/// passing_scores = [60, 80, 70]
-///
-///
-/// def passed_test(score: int, passing_score: int) -> bool:
-///     return score >= passing_score
-///
-///
-/// passed_all_tests = all(
-///     passed_test(score, passing_score)
-///     for score, passing_score in zip(scores, passing_scores)
-/// )
+/// all(predicate(a, b) for a, b in some_iterable)
 /// ```
 ///
 /// Use instead:
@@ -48,15 +37,7 @@ use crate::importer::ImportRequest;
 /// from itertools import starmap
 ///
 ///
-/// scores = [85, 100, 60]
-/// passing_scores = [60, 80, 70]
-///
-///
-/// def passed_test(score: int, passing_score: int) -> bool:
-///     return score >= passing_score
-///
-///
-/// passed_all_tests = all(starmap(passed_test, zip(scores, passing_scores)))
+/// all(starmap(predicate, some_iterable))
 /// ```
 ///
 /// ## References
@@ -64,8 +45,8 @@ use crate::importer::ImportRequest;
 ///
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
-#[violation]
-pub struct ReimplementedStarmap;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -81,9 +62,9 @@ impl Violation for ReimplementedStarmap {
 }
 
 /// FURB140
-pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandidate) {
+pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
-    let [comprehension @ ast::Comprehension { .. }] = target.generators() else {
+    let [comprehension] = target.generators() else {
         return;
     };
 
@@ -175,7 +156,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         );
         Ok(Fix::safe_edits(import_edit, [main_edit]))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.

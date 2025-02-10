@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
@@ -41,8 +41,8 @@ use crate::importer::ImportRequest;
 /// - [Python documentation: `math.log2`](https://docs.python.org/3/library/math.html#math.log2)
 /// - [Python documentation: `math.log10`](https://docs.python.org/3/library/math.html#math.log10)
 /// - [Python documentation: `math.e`](https://docs.python.org/3/library/math.html#math.e)
-#[violation]
-pub struct RedundantLogBase {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantLogBase {
     base: Base,
     arg: String,
 }
@@ -65,7 +65,7 @@ impl Violation for RedundantLogBase {
 }
 
 /// FURB163
-pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -104,7 +104,7 @@ pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
         call.range(),
     );
     diagnostic.try_set_fix(|| generate_fix(checker, call, base, arg));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -7,45 +7,43 @@ Narrowing for `issubclass(class, classinfo)` expressions.
 ### Basic example
 
 ```py
-def flag() -> bool: ...
+def _(flag: bool):
+    t = int if flag else str
 
-t = int if flag() else str
-
-if issubclass(t, bytes):
-    reveal_type(t)  # revealed: Never
-
-if issubclass(t, object):
-    reveal_type(t)  # revealed: Literal[int, str]
-
-if issubclass(t, int):
-    reveal_type(t)  # revealed: Literal[int]
-else:
-    reveal_type(t)  # revealed: Literal[str]
-
-if issubclass(t, str):
-    reveal_type(t)  # revealed: Literal[str]
-    if issubclass(t, int):
+    if issubclass(t, bytes):
         reveal_type(t)  # revealed: Never
+
+    if issubclass(t, object):
+        reveal_type(t)  # revealed: Literal[int, str]
+
+    if issubclass(t, int):
+        reveal_type(t)  # revealed: Literal[int]
+    else:
+        reveal_type(t)  # revealed: Literal[str]
+
+    if issubclass(t, str):
+        reveal_type(t)  # revealed: Literal[str]
+        if issubclass(t, int):
+            reveal_type(t)  # revealed: Never
 ```
 
 ### Proper narrowing in `elif` and `else` branches
 
 ```py
-def flag() -> bool: ...
+def _(flag1: bool, flag2: bool):
+    t = int if flag1 else str if flag2 else bytes
 
-t = int if flag() else str if flag() else bytes
+    if issubclass(t, int):
+        reveal_type(t)  # revealed: Literal[int]
+    else:
+        reveal_type(t)  # revealed: Literal[str, bytes]
 
-if issubclass(t, int):
-    reveal_type(t)  # revealed: Literal[int]
-else:
-    reveal_type(t)  # revealed: Literal[str, bytes]
-
-if issubclass(t, int):
-    reveal_type(t)  # revealed: Literal[int]
-elif issubclass(t, str):
-    reveal_type(t)  # revealed: Literal[str]
-else:
-    reveal_type(t)  # revealed: Literal[bytes]
+    if issubclass(t, int):
+        reveal_type(t)  # revealed: Literal[int]
+    elif issubclass(t, str):
+        reveal_type(t)  # revealed: Literal[str]
+    else:
+        reveal_type(t)  # revealed: Literal[bytes]
 ```
 
 ### Multiple derived classes
@@ -56,29 +54,28 @@ class Derived1(Base): ...
 class Derived2(Base): ...
 class Unrelated: ...
 
-def flag() -> bool: ...
+def _(flag1: bool, flag2: bool, flag3: bool):
+    t1 = Derived1 if flag1 else Derived2
 
-t1 = Derived1 if flag() else Derived2
+    if issubclass(t1, Base):
+        reveal_type(t1)  # revealed: Literal[Derived1, Derived2]
 
-if issubclass(t1, Base):
-    reveal_type(t1)  # revealed: Literal[Derived1, Derived2]
+    if issubclass(t1, Derived1):
+        reveal_type(t1)  # revealed: Literal[Derived1]
+    else:
+        reveal_type(t1)  # revealed: Literal[Derived2]
 
-if issubclass(t1, Derived1):
-    reveal_type(t1)  # revealed: Literal[Derived1]
-else:
-    reveal_type(t1)  # revealed: Literal[Derived2]
+    t2 = Derived1 if flag2 else Base
 
-t2 = Derived1 if flag() else Base
+    if issubclass(t2, Base):
+        reveal_type(t2)  # revealed: Literal[Derived1, Base]
 
-if issubclass(t2, Base):
-    reveal_type(t2)  # revealed: Literal[Derived1, Base]
+    t3 = Derived1 if flag3 else Unrelated
 
-t3 = Derived1 if flag() else Unrelated
-
-if issubclass(t3, Base):
-    reveal_type(t3)  # revealed: Literal[Derived1]
-else:
-    reveal_type(t3)  # revealed: Literal[Unrelated]
+    if issubclass(t3, Base):
+        reveal_type(t3)  # revealed: Literal[Derived1]
+    else:
+        reveal_type(t3)  # revealed: Literal[Unrelated]
 ```
 
 ### Narrowing for non-literals
@@ -87,36 +84,36 @@ else:
 class A: ...
 class B: ...
 
-def get_class() -> type[object]: ...
-
-t = get_class()
-
-if issubclass(t, A):
-    reveal_type(t)  # revealed: type[A]
-    if issubclass(t, B):
-        reveal_type(t)  # revealed: type[A] & type[B]
-else:
-    reveal_type(t)  # revealed: type[object] & ~type[A]
+def _(t: type[object]):
+    if issubclass(t, A):
+        reveal_type(t)  # revealed: type[A]
+        if issubclass(t, B):
+            reveal_type(t)  # revealed: type[A] & type[B]
+    else:
+        reveal_type(t)  # revealed: type & ~type[A]
 ```
 
 ### Handling of `None`
 
+`types.NoneType` is only available in Python 3.10 and later:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ```py
-# TODO: this error should ideally go away once we (1) understand `sys.version_info` branches,
-# and (2) set the target Python version for this test to 3.10.
-# error: [possibly-unbound-import] "Member `NoneType` of module `types` is possibly unbound"
 from types import NoneType
 
-def flag() -> bool: ...
+def _(flag: bool):
+    t = int if flag else NoneType
 
-t = int if flag() else NoneType
+    if issubclass(t, NoneType):
+        reveal_type(t)  # revealed: Literal[NoneType]
 
-if issubclass(t, NoneType):
-    reveal_type(t)  # revealed: Literal[NoneType]
-
-if issubclass(t, type(None)):
-    # TODO: this should be just `Literal[NoneType]`
-    reveal_type(t)  # revealed: Literal[int, NoneType]
+    if issubclass(t, type(None)):
+        # TODO: this should be just `Literal[NoneType]`
+        reveal_type(t)  # revealed: Literal[int, NoneType]
 ```
 
 ## `classinfo` contains multiple types
@@ -126,14 +123,13 @@ if issubclass(t, type(None)):
 ```py
 class Unrelated: ...
 
-def flag() -> bool: ...
+def _(flag1: bool, flag2: bool):
+    t = int if flag1 else str if flag2 else bytes
 
-t = int if flag() else str if flag() else bytes
-
-if issubclass(t, (int, (Unrelated, (bytes,)))):
-    reveal_type(t)  # revealed: Literal[int, bytes]
-else:
-    reveal_type(t)  # revealed: Literal[str]
+    if issubclass(t, (int, (Unrelated, (bytes,)))):
+        reveal_type(t)  # revealed: Literal[int, bytes]
+    else:
+        reveal_type(t)  # revealed: Literal[str]
 ```
 
 ## Special cases
@@ -148,11 +144,9 @@ to `issubclass`:
 ```py
 class A: ...
 
-def get_object() -> object: ...
+t = object()
 
-t = get_object()
-
-# TODO: we should emit a diagnostic here
+# error: [invalid-argument-type]
 if issubclass(t, A):
     reveal_type(t)  # revealed: type[A]
 ```
@@ -166,7 +160,7 @@ branch:
 ```py
 t = 1
 
-# TODO: we should emit a diagnostic here
+# error: [invalid-argument-type]
 if issubclass(t, int):
     reveal_type(t)  # revealed: Never
 ```
@@ -240,8 +234,43 @@ def flag() -> bool: ...
 
 t = int if flag() else str
 
-# TODO: this should cause us to emit a diagnostic
-# (`issubclass` has no `foo` parameter)
+# error: [unknown-argument]
 if issubclass(t, int, foo="bar"):
     reveal_type(t)  # revealed: Literal[int, str]
+```
+
+### `type[]` types are narrowed as well as class-literal types
+
+```py
+def _(x: type, y: type[int]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[int]
+```
+
+### Disjoint `type[]` types are narrowed to `Never`
+
+Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
+and `UsesMeta2` could only exist if a common subclass of their metaclasses could exist. This is
+known to be impossible due to the fact that `Meta1` is marked as `@final`.
+
+```py
+from typing import final
+
+@final
+class Meta1(type): ...
+
+class Meta2(type): ...
+class UsesMeta1(metaclass=Meta1): ...
+class UsesMeta2(metaclass=Meta2): ...
+
+def _(x: type[UsesMeta1], y: type[UsesMeta2]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: type[UsesMeta1]
+
+    if issubclass(y, x):
+        reveal_type(y)  # revealed: Never
+    else:
+        reveal_type(y)  # revealed: type[UsesMeta2]
 ```

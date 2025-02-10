@@ -1,7 +1,7 @@
 use ruff_python_ast::Keyword;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -34,8 +34,8 @@ use super::super::helpers::{matches_password_name, string_literal};
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
-#[violation]
-pub struct HardcodedPasswordFuncArg {
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedPasswordFuncArg {
     name: String,
 }
 
@@ -51,20 +51,18 @@ impl Violation for HardcodedPasswordFuncArg {
 }
 
 /// S106
-pub(crate) fn hardcoded_password_func_arg(checker: &mut Checker, keywords: &[Keyword]) {
-    checker
-        .diagnostics
-        .extend(keywords.iter().filter_map(|keyword| {
-            string_literal(&keyword.value).filter(|string| !string.is_empty())?;
-            let arg = keyword.arg.as_ref()?;
-            if !matches_password_name(arg) {
-                return None;
-            }
-            Some(Diagnostic::new(
-                HardcodedPasswordFuncArg {
-                    name: arg.to_string(),
-                },
-                keyword.range(),
-            ))
-        }));
+pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword]) {
+    checker.report_diagnostics(keywords.iter().filter_map(|keyword| {
+        string_literal(&keyword.value).filter(|string| !string.is_empty())?;
+        let arg = keyword.arg.as_ref()?;
+        if !matches_password_name(arg) {
+            return None;
+        }
+        Some(Diagnostic::new(
+            HardcodedPasswordFuncArg {
+                name: arg.to_string(),
+            },
+            keyword.range(),
+        ))
+    }));
 }

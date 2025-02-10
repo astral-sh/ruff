@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprCall, Identifier};
 use ruff_text_size::Ranged;
 
@@ -47,8 +47,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `int`](https://docs.python.org/3/library/functions.html#int)
-#[violation]
-pub struct IntOnSlicedStr {
+#[derive(ViolationMetadata)]
+pub(crate) struct IntOnSlicedStr {
     base: u8,
 }
 
@@ -64,7 +64,7 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
     }
 }
 
-pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     // Verify that the function is `int`.
     if !checker.semantic().match_builtin_expr(&call.func, "int") {
         return;
@@ -124,5 +124,5 @@ pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
         ),
         [Edit::range_replacement("0".to_string(), base.range())],
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

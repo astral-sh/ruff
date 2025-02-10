@@ -26,7 +26,7 @@ pub(crate) struct Requester<'s> {
     response_handlers: FxHashMap<lsp_server::RequestId, ResponseBuilder<'s>>,
 }
 
-impl<'s> Client<'s> {
+impl Client<'_> {
     pub(super) fn new(sender: ClientSender) -> Self {
         Self {
             notifier: Notifier(sender.clone()),

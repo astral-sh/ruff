@@ -4,7 +4,7 @@ use anyhow::Result;
 use libcst_native::CompOp;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
@@ -47,8 +47,8 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
-#[violation]
-pub struct YodaConditions {
+#[derive(ViolationMetadata)]
+pub(crate) struct YodaConditions {
     suggestion: Option<SourceCodeSnippet>,
 }
 
@@ -101,13 +101,13 @@ impl From<&Expr> for ConstantLikelihood {
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::Dict(dict) => {
-                if dict.is_empty() {
-                    ConstantLikelihood::Definitely
-                } else {
-                    ConstantLikelihood::Probably
-                }
-            }
+            Expr::Dict(dict) => dict
+                .items
+                .iter()
+                .flat_map(|item| std::iter::once(&item.value).chain(item.key.as_ref()))
+                .map(ConstantLikelihood::from)
+                .min()
+                .unwrap_or(ConstantLikelihood::Definitely),
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
                 ConstantLikelihood::from(&**left),
                 ConstantLikelihood::from(&**right),
@@ -203,7 +203,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
 
 /// SIM300
 pub(crate) fn yoda_conditions(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -235,9 +235,9 @@ pub(crate) fn yoda_conditions(
             pad(suggestion, expr.range(), checker.locator()),
             expr.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     } else {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             YodaConditions { suggestion: None },
             expr.range(),
         ));

@@ -2,7 +2,7 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -25,8 +25,8 @@ use crate::registry::AsRule;
 /// ## References
 /// - [Python documentation: `telnetlib` - Telnet client](https://docs.python.org/3.12/library/telnetlib.html#module-telnetlib)
 /// - [PEP 594: `telnetlib`](https://peps.python.org/pep-0594/#telnetlib)
-#[violation]
-pub struct SuspiciousTelnetlibImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousTelnetlibImport;
 
 impl Violation for SuspiciousTelnetlibImport {
     #[derive_message_formats]
@@ -49,8 +49,8 @@ impl Violation for SuspiciousTelnetlibImport {
 ///
 /// ## References
 /// - [Python documentation: `ftplib` - FTP protocol client](https://docs.python.org/3/library/ftplib.html)
-#[violation]
-pub struct SuspiciousFtplibImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousFtplibImport;
 
 impl Violation for SuspiciousFtplibImport {
     #[derive_message_formats]
@@ -74,8 +74,8 @@ impl Violation for SuspiciousFtplibImport {
 ///
 /// ## References
 /// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
-#[violation]
-pub struct SuspiciousPickleImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPickleImport;
 
 impl Violation for SuspiciousPickleImport {
     #[derive_message_formats]
@@ -95,8 +95,8 @@ impl Violation for SuspiciousPickleImport {
 /// ```python
 /// import subprocess
 /// ```
-#[violation]
-pub struct SuspiciousSubprocessImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousSubprocessImport;
 
 impl Violation for SuspiciousSubprocessImport {
     #[derive_message_formats]
@@ -118,8 +118,8 @@ impl Violation for SuspiciousSubprocessImport {
 /// ```python
 /// import xml.etree.cElementTree
 /// ```
-#[violation]
-pub struct SuspiciousXmlEtreeImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlEtreeImport;
 
 impl Violation for SuspiciousXmlEtreeImport {
     #[derive_message_formats]
@@ -141,8 +141,8 @@ impl Violation for SuspiciousXmlEtreeImport {
 /// ```python
 /// import xml.sax
 /// ```
-#[violation]
-pub struct SuspiciousXmlSaxImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlSaxImport;
 
 impl Violation for SuspiciousXmlSaxImport {
     #[derive_message_formats]
@@ -164,8 +164,8 @@ impl Violation for SuspiciousXmlSaxImport {
 /// ```python
 /// import xml.dom.expatbuilder
 /// ```
-#[violation]
-pub struct SuspiciousXmlExpatImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlExpatImport;
 
 impl Violation for SuspiciousXmlExpatImport {
     #[derive_message_formats]
@@ -187,8 +187,8 @@ impl Violation for SuspiciousXmlExpatImport {
 /// ```python
 /// import xml.dom.minidom
 /// ```
-#[violation]
-pub struct SuspiciousXmlMinidomImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlMinidomImport;
 
 impl Violation for SuspiciousXmlMinidomImport {
     #[derive_message_formats]
@@ -210,8 +210,8 @@ impl Violation for SuspiciousXmlMinidomImport {
 /// ```python
 /// import xml.dom.pulldom
 /// ```
-#[violation]
-pub struct SuspiciousXmlPulldomImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlPulldomImport;
 
 impl Violation for SuspiciousXmlPulldomImport {
     #[derive_message_formats]
@@ -240,8 +240,8 @@ impl Violation for SuspiciousXmlPulldomImport {
 /// ```
 ///
 /// [deprecated]: https://github.com/tiran/defusedxml/blob/c7445887f5e1bcea470a16f61369d29870cfcfe1/README.md#defusedxmllxml
-#[violation]
-pub struct SuspiciousLxmlImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousLxmlImport;
 
 impl Violation for SuspiciousLxmlImport {
     #[derive_message_formats]
@@ -263,8 +263,8 @@ impl Violation for SuspiciousLxmlImport {
 /// ```python
 /// import xmlrpc
 /// ```
-#[violation]
-pub struct SuspiciousXmlrpcImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlrpcImport;
 
 impl Violation for SuspiciousXmlrpcImport {
     #[derive_message_formats]
@@ -289,8 +289,8 @@ impl Violation for SuspiciousXmlrpcImport {
 ///
 /// ## References
 /// - [httpoxy website](https://httpoxy.org/)
-#[violation]
-pub struct SuspiciousHttpoxyImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousHttpoxyImport;
 
 impl Violation for SuspiciousHttpoxyImport {
     #[derive_message_formats]
@@ -314,8 +314,8 @@ impl Violation for SuspiciousHttpoxyImport {
 ///
 /// ## References
 /// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
-#[violation]
-pub struct SuspiciousPycryptoImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPycryptoImport;
 
 impl Violation for SuspiciousPycryptoImport {
     #[derive_message_formats]
@@ -339,8 +339,8 @@ impl Violation for SuspiciousPycryptoImport {
 ///
 /// ## References
 /// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
-#[violation]
-pub struct SuspiciousPyghmiImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPyghmiImport;
 
 impl Violation for SuspiciousPyghmiImport {
     #[derive_message_formats]
@@ -351,7 +351,12 @@ impl Violation for SuspiciousPyghmiImport {
 }
 
 /// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413, S415
-pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
+    // Skip stub files.
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => {
             for name in names {
@@ -597,13 +602,9 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
     };
 }
 
-fn check_and_push_diagnostic(
-    checker: &mut Checker,
-    diagnostic_kind: DiagnosticKind,
-    range: TextRange,
-) {
+fn check_and_push_diagnostic(checker: &Checker, diagnostic_kind: DiagnosticKind, range: TextRange) {
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

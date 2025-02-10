@@ -1,9 +1,28 @@
 # Installing Ruff
 
-Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
+
+Ruff can be invoked directly with [`uvx`](https://docs.astral.sh/uv/):
+
+```shell
+uvx ruff check   # Lint all files in the current directory.
+uvx ruff format  # Format all files in the current directory.
+```
+
+Or installed with `uv` (recommended), `pip`, or `pipx`:
 
 ```console
+$ # Install Ruff globally.
+$ uv tool install ruff@latest
+
+$ # Or add Ruff to your project.
+$ uv add --dev ruff
+
+$ # With pip.
 $ pip install ruff
+
+$ # With pipx.
+$ pipx install ruff
 ```
 
 Once installed, you can run Ruff from the command line:
@@ -13,7 +32,7 @@ $ ruff check   # Lint all files in the current directory.
 $ ruff format  # Format all files in the current directory.
 ```
 
-Starting with version `0.5.0`, Ruff can be installed with our standalone installers:
+Starting with version `0.5.0`, Ruff can also be installed with our standalone installers:
 
 ```console
 $ # On macOS and Linux.

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -32,8 +32,8 @@ enum Reason {
 /// ```python
 /// my_mock.assert_called()
 /// ```
-#[violation]
-pub struct InvalidMockAccess {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidMockAccess {
     reason: Reason,
 }
 
@@ -49,7 +49,7 @@ impl Violation for InvalidMockAccess {
 }
 
 /// PGH005
-pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr {
         if matches!(
             attr.as_str(),
@@ -61,7 +61,7 @@ pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
                 | "assert_has_calls"
                 | "assert_not_called"
         ) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 InvalidMockAccess {
                     reason: Reason::UncalledMethod(attr.to_string()),
                 },
@@ -72,7 +72,7 @@ pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PGH005
-pub(crate) fn non_existent_mock_method(checker: &mut Checker, test: &Expr) {
+pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
     let attr = match test {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
         Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
@@ -90,7 +90,7 @@ pub(crate) fn non_existent_mock_method(checker: &mut Checker, test: &Expr) {
             | "has_calls"
             | "not_called"
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             InvalidMockAccess {
                 reason: Reason::NonExistentMethod(attr.to_string()),
             },

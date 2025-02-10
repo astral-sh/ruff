@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -38,8 +38,8 @@ use crate::checkers::ast::Checker;
 /// var = foo()
 /// print(var)
 /// ```
-#[violation]
-pub struct GlobalStatement {
+#[derive(ViolationMetadata)]
+pub(crate) struct GlobalStatement {
     name: String,
 }
 
@@ -52,9 +52,9 @@ impl Violation for GlobalStatement {
 }
 
 /// PLW0603
-pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
+pub(crate) fn global_statement(checker: &Checker, name: &str) {
     if let Some(range) = checker.semantic().global(name) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             GlobalStatement {
                 name: name.to_string(),
             },

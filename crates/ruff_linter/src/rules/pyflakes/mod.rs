@@ -55,6 +55,8 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
@@ -95,6 +97,7 @@ mod tests {
     #[test_case(Rule::ReturnOutsideFunction, Path::new("F706.py"))]
     #[test_case(Rule::DefaultExceptNotLast, Path::new("F707.py"))]
     #[test_case(Rule::ForwardAnnotationSyntaxError, Path::new("F722.py"))]
+    #[test_case(Rule::ForwardAnnotationSyntaxError, Path::new("F722_1.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_0.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_1.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_2.py"))]
@@ -127,6 +130,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_29.pyi"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -159,6 +163,9 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_26.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_27.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_28.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -282,6 +289,35 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
     }
 
+    // Regression test for https://github.com/astral-sh/ruff/issues/12897
+    #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
+    fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let settings = LinterSettings {
+            preview: PreviewMode::Enabled,
+            isort: isort::settings::Settings {
+                // Like `f401_preview_first_party_submodule`, this test requires the input module to
+                // be first-party
+                known_modules: isort::categorize::KnownModules::new(
+                    vec!["F401_*".parse()?],
+                    vec![],
+                    vec![],
+                    vec![],
+                    FxHashMap::default(),
+                ),
+                ..isort::settings::Settings::default()
+            },
+            ..LinterSettings::for_rule(rule_code)
+        };
+        let diagnostics = test_path(Path::new("pyflakes").join(path).as_path(), &settings)?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
@@ -325,6 +361,7 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
     #[test_case(Rule::UnusedImport, Path::new("F401_31.py"))]
     fn f401_allowed_unused_imports_option(rule_code: Rule, path: &Path) -> Result<()> {
         let diagnostics = test_path(

@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -38,8 +38,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python 3.11 documentation: Deprecated aliases](https://docs.python.org/3.11/library/unittest.html#deprecated-aliases)
-#[violation]
-pub struct DeprecatedUnittestAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedUnittestAlias {
     alias: String,
     target: String,
 }
@@ -78,7 +78,7 @@ static DEPRECATED_ALIASES: LazyLock<FxHashMap<&'static str, &'static str>> = Laz
 });
 
 /// UP005
-pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };
@@ -102,5 +102,5 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         format!("self.{target}"),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

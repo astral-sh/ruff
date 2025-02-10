@@ -3,7 +3,7 @@ use std::fmt;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
@@ -36,8 +36,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// x: Literal[b"B"] | str
 /// ```
-#[violation]
-pub struct RedundantLiteralUnion {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,
 }
@@ -58,7 +58,7 @@ impl Violation for RedundantLiteralUnion {
 }
 
 /// PYI051
-pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr) {
+pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut typing_literal_exprs = Vec::new();
     let mut builtin_types_in_union = FxHashSet::default();
 
@@ -90,7 +90,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),

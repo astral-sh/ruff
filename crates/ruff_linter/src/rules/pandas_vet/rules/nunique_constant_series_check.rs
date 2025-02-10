@@ -1,7 +1,8 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -50,8 +51,8 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// ## References
 /// - [Pandas Cookbook: "Constant Series"](https://pandas.pydata.org/docs/user_guide/cookbook.html#constant-series)
 /// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html)
-#[violation]
-pub struct PandasNuniqueConstantSeriesCheck;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasNuniqueConstantSeriesCheck;
 
 impl Violation for PandasNuniqueConstantSeriesCheck {
     #[derive_message_formats]
@@ -62,12 +63,16 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
 
 /// PD101
 pub(crate) fn nunique_constant_series_check(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
 ) {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
+        return;
+    }
+
     let ([op], [right]) = (ops, comparators) else {
         return;
     };
@@ -109,7 +114,7 @@ pub(crate) fn nunique_constant_series_check(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         PandasNuniqueConstantSeriesCheck,
         expr.range(),
     ));

@@ -10,6 +10,7 @@ pub mod diagnostic;
 pub mod display;
 pub mod file_revision;
 pub mod files;
+pub mod panic;
 pub mod parsed;
 pub mod source;
 pub mod system;
@@ -48,13 +49,13 @@ mod tests {
     ///
     /// Uses an in memory filesystem and it stubs out the vendored files by default.
     #[salsa::db]
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        events: Arc<std::sync::Mutex<Vec<salsa::Event>>>,
     }
 
     impl TestDb {

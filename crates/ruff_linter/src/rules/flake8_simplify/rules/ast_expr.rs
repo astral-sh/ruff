@@ -1,11 +1,9 @@
-use ruff_python_ast::{
-    self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr, StringLiteralFlags,
-};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::Modules;
 
@@ -36,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
-#[violation]
-pub struct UncapitalizedEnvironmentVariables {
+#[derive(ViolationMetadata)]
+pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }
@@ -86,8 +84,8 @@ impl Violation for UncapitalizedEnvironmentVariables {
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
-#[violation]
-pub struct DictGetWithNoneDefault {
+#[derive(ViolationMetadata)]
+pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }
@@ -123,7 +121,7 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 }
 
 /// SIM112
-pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -171,7 +169,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -180,7 +178,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     ));
 }
 
-fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
+fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -220,25 +218,25 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     );
     let node = ast::StringLiteral {
         value: capital_env_var.into_boxed_str(),
-        flags: StringLiteralFlags::default().with_prefix({
+        flags: checker.default_string_flags().with_prefix({
             if env_var.is_unicode() {
                 StringLiteralPrefix::Unicode
             } else {
                 StringLiteralPrefix::Empty
             }
         }),
-        ..ast::StringLiteral::default()
+        range: TextRange::default(),
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&new_env_var),
         slice.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM910
-pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
@@ -305,5 +303,5 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

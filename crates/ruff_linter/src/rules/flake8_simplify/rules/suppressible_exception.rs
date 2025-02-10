@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
@@ -42,8 +42,8 @@ use crate::importer::ImportRequest;
 /// - [Python documentation: `contextlib.suppress`](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
-#[violation]
-pub struct SuppressibleException {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuppressibleException {
     exception: String,
 }
 
@@ -72,7 +72,7 @@ fn is_empty(body: &[Stmt]) -> bool {
 
 /// SIM105
 pub(crate) fn suppressible_exception(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     try_body: &[Stmt],
     handlers: &[ExceptHandler],
@@ -147,5 +147,5 @@ pub(crate) fn suppressible_exception(
             ))
         });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

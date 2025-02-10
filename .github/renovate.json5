@@ -45,7 +45,7 @@
       groupName: "Artifact GitHub Actions dependencies",
       matchManagers: ["github-actions"],
       matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackagePatterns: ["actions/.*-artifact"],
+      matchPackageNames: ["actions/.*-artifact"],
       description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
@@ -59,9 +59,15 @@
       enabled: false,
     },
     {
+      // TODO: Remove this once the codebase is upgrade to v4 (https://github.com/astral-sh/ruff/pull/16069)
+      matchPackageNames: ["tailwindcss"],
+      matchManagers: ["npm"],
+      enabled: false,
+    },
+    {
       // Disable updates of `zip-rs`; intentionally pinned for now due to ownership change
       // See: https://github.com/astral-sh/uv/issues/3642
-      matchPackagePatterns: ["zip"],
+      matchPackageNames: ["zip"],
       matchManagers: ["cargo"],
       enabled: false,
     },
@@ -70,7 +76,7 @@
       // with `mkdocs-material-insider`.
       // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
       matchManagers: ["pip_requirements"],
-      matchPackagePatterns: ["mkdocs-material"],
+      matchPackageNames: ["mkdocs-material"],
       enabled: false,
     },
     {
@@ -87,13 +93,13 @@
     {
       groupName: "Monaco",
       matchManagers: ["npm"],
-      matchPackagePatterns: ["monaco"],
+      matchPackageNames: ["monaco"],
       description: "Weekly update of the Monaco editor",
     },
     {
       groupName: "strum",
       matchManagers: ["cargo"],
-      matchPackagePatterns: ["strum"],
+      matchPackageNames: ["strum"],
       description: "Weekly update of strum dependencies",
     },
     {

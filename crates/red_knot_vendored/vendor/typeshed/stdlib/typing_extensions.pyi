@@ -1,3 +1,5 @@
+# Since this module defines "Self" it is not recognized by Ruff as typing_extensions.Self
+# ruff: noqa: PYI034
 import abc
 import sys
 import typing
@@ -48,16 +50,11 @@ from typing import (  # noqa: Y022,Y037,Y038,Y039
     Sequence as Sequence,
     Set as Set,
     Sized as Sized,
-    SupportsAbs as SupportsAbs,
-    SupportsBytes as SupportsBytes,
-    SupportsComplex as SupportsComplex,
-    SupportsFloat as SupportsFloat,
-    SupportsInt as SupportsInt,
-    SupportsRound as SupportsRound,
     Text as Text,
     TextIO as TextIO,
     Tuple as Tuple,
     Type as Type,
+    TypedDict as TypedDict,
     Union as Union,
     ValuesView as ValuesView,
     _Alias,
@@ -189,9 +186,12 @@ __all__ = [
 _T = typing.TypeVar("_T")
 _F = typing.TypeVar("_F", bound=Callable[..., Any])
 _TC = typing.TypeVar("_TC", bound=type[object])
+_T_co = typing.TypeVar("_T_co", covariant=True)  # Any type covariant containers.
+
+class _Final: ...  # This should be imported from typing but that breaks pytype
 
 # unfortunately we have to duplicate this class definition from typing.pyi or we break pytype
-class _SpecialForm:
+class _SpecialForm(_Final):
     def __getitem__(self, parameters: Any) -> object: ...
     if sys.version_info >= (3, 10):
         def __or__(self, other: Any) -> _SpecialForm: ...
@@ -253,9 +253,6 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
         # supposedly incompatible definitions of `__ior__` and `__or__`:
         def __ior__(self, value: Self, /) -> Self: ...  # type: ignore[misc]
 
-# TypedDict is a (non-subscriptable) special form.
-TypedDict: object
-
 OrderedDict = _Alias()
 
 def get_type_hints(
@@ -281,11 +278,6 @@ def get_origin(tp: Any) -> Any | None: ...
 
 Annotated: _SpecialForm
 _AnnotatedAlias: Any  # undocumented
-
-@runtime_checkable
-class SupportsIndex(Protocol, metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def __index__(self) -> int: ...
 
 # New and changed things in 3.10
 if sys.version_info >= (3, 10):
@@ -383,7 +375,17 @@ else:
 if sys.version_info >= (3, 12):
     from collections.abc import Buffer as Buffer
     from types import get_original_bases as get_original_bases
-    from typing import TypeAliasType as TypeAliasType, override as override
+    from typing import (
+        SupportsAbs as SupportsAbs,
+        SupportsBytes as SupportsBytes,
+        SupportsComplex as SupportsComplex,
+        SupportsFloat as SupportsFloat,
+        SupportsIndex as SupportsIndex,
+        SupportsInt as SupportsInt,
+        SupportsRound as SupportsRound,
+        TypeAliasType as TypeAliasType,
+        override as override,
+    )
 else:
     def override(arg: _F, /) -> _F: ...
     def get_original_bases(cls: type, /) -> tuple[Any, ...]: ...
@@ -409,11 +411,53 @@ else:
             def __or__(self, right: Any) -> _SpecialForm: ...
             def __ror__(self, left: Any) -> _SpecialForm: ...
 
+    # mypy and pyright object to this being both ABC and Protocol.
+    # At runtime it inherits from ABC and is not a Protocol, but it is on the
+    # allowlist for use as a Protocol.
     @runtime_checkable
-    class Buffer(Protocol):
+    class Buffer(Protocol, abc.ABC):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
         # Not actually a Protocol at runtime; see
         # https://github.com/python/typeshed/issues/10224 for why we're defining it this way
         def __buffer__(self, flags: int, /) -> memoryview: ...
+
+    @runtime_checkable
+    class SupportsInt(Protocol, metaclass=abc.ABCMeta):
+        @abc.abstractmethod
+        def __int__(self) -> int: ...
+
+    @runtime_checkable
+    class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
+        @abc.abstractmethod
+        def __float__(self) -> float: ...
+
+    @runtime_checkable
+    class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
+        @abc.abstractmethod
+        def __complex__(self) -> complex: ...
+
+    @runtime_checkable
+    class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
+        @abc.abstractmethod
+        def __bytes__(self) -> bytes: ...
+
+    @runtime_checkable
+    class SupportsIndex(Protocol, metaclass=abc.ABCMeta):
+        @abc.abstractmethod
+        def __index__(self) -> int: ...
+
+    @runtime_checkable
+    class SupportsAbs(Protocol[_T_co]):
+        @abc.abstractmethod
+        def __abs__(self) -> _T_co: ...
+
+    @runtime_checkable
+    class SupportsRound(Protocol[_T_co]):
+        @overload
+        @abc.abstractmethod
+        def __round__(self) -> int: ...
+        @overload
+        @abc.abstractmethod
+        def __round__(self, ndigits: int, /) -> _T_co: ...
 
 if sys.version_info >= (3, 13):
     from types import CapsuleType as CapsuleType

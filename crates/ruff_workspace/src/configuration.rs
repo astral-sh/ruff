@@ -25,7 +25,7 @@ use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
-use ruff_linter::rules::pycodestyle;
+use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
@@ -49,7 +49,7 @@ use crate::options::{
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -232,6 +232,28 @@ impl Configuration {
 
         let line_length = self.line_length.unwrap_or_default();
 
+        let rules = lint.as_rule_table(lint_preview)?;
+
+        let flake8_builtins = lint
+            .flake8_builtins
+            .map(|builtins| builtins.into_settings(lint_preview))
+            .unwrap_or_else(|| {
+                ruff_linter::rules::flake8_builtins::settings::Settings::new(lint_preview)
+            });
+
+        // LinterSettings validation
+        let isort = lint
+            .isort
+            .map(IsortOptions::try_into_settings)
+            .transpose()?
+            .unwrap_or_default();
+        let flake8_import_conventions = lint
+            .flake8_import_conventions
+            .map(Flake8ImportConventionsOptions::into_settings)
+            .unwrap_or_default();
+
+        conflicting_import_settings(&isort, &flake8_import_conventions)?;
+
         Ok(Settings {
             cache_dir: self
                 .cache_dir
@@ -259,7 +281,7 @@ impl Configuration {
 
             #[allow(deprecated)]
             linter: LinterSettings {
-                rules: lint.as_rule_table(lint_preview)?,
+                rules,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
@@ -320,10 +342,7 @@ impl Configuration {
                     .flake8_bugbear
                     .map(Flake8BugbearOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_builtins: lint
-                    .flake8_builtins
-                    .map(Flake8BuiltinsOptions::into_settings)
-                    .unwrap_or_default(),
+                flake8_builtins,
                 flake8_comprehensions: lint
                     .flake8_comprehensions
                     .map(Flake8ComprehensionsOptions::into_settings)
@@ -341,10 +360,7 @@ impl Configuration {
                     .flake8_implicit_str_concat
                     .map(Flake8ImplicitStrConcatOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_import_conventions: lint
-                    .flake8_import_conventions
-                    .map(Flake8ImportConventionsOptions::into_settings)
-                    .unwrap_or_default(),
+                flake8_import_conventions,
                 flake8_pytest_style: lint
                     .flake8_pytest_style
                     .map(Flake8PytestStyleOptions::try_into_settings)
@@ -374,11 +390,7 @@ impl Configuration {
                     .flake8_gettext
                     .map(Flake8GetTextOptions::into_settings)
                     .unwrap_or_default(),
-                isort: lint
-                    .isort
-                    .map(IsortOptions::try_into_settings)
-                    .transpose()?
-                    .unwrap_or_default(),
+                isort,
                 mccabe: lint
                     .mccabe
                     .map(McCabeOptions::into_settings)
@@ -396,6 +408,10 @@ impl Configuration {
                         ..pycodestyle::settings::Settings::default()
                     }
                 },
+                pydoclint: lint
+                    .pydoclint
+                    .map(PydoclintOptions::into_settings)
+                    .unwrap_or_default(),
                 pydocstyle: lint
                     .pydocstyle
                     .map(PydocstyleOptions::into_settings)
@@ -627,6 +643,7 @@ pub struct LintConfiguration {
     pub mccabe: Option<McCabeOptions>,
     pub pep8_naming: Option<Pep8NamingOptions>,
     pub pycodestyle: Option<PycodestyleOptions>,
+    pub pydoclint: Option<PydoclintOptions>,
     pub pydocstyle: Option<PydocstyleOptions>,
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
@@ -739,6 +756,7 @@ impl LintConfiguration {
             mccabe: options.common.mccabe,
             pep8_naming: options.common.pep8_naming,
             pycodestyle: options.common.pycodestyle,
+            pydoclint: options.pydoclint,
             pydocstyle: options.common.pydocstyle,
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
@@ -775,6 +793,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
+        let mut removed_ignored_rules = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
         // Track which docstring rules are specifically enabled
@@ -926,7 +945,11 @@ impl LintConfiguration {
                 // Removed rules
                 if selector.is_exact() {
                     if selector.all_rules().all(|rule| rule.is_removed()) {
-                        removed_selectors.insert(selector);
+                        if kind.is_disable() {
+                            removed_ignored_rules.insert(selector);
+                        } else {
+                            removed_selectors.insert(selector);
+                        }
                     }
                 }
 
@@ -968,6 +991,20 @@ impl LintConfiguration {
             }
         }
 
+        if !removed_ignored_rules.is_empty() {
+            let mut rules = String::new();
+            for selection in removed_ignored_rules.iter().sorted() {
+                let (prefix, code) = selection.prefix_and_code();
+                rules.push_str("\n    - ");
+                rules.push_str(prefix);
+                rules.push_str(code);
+            }
+            rules.push('\n');
+            warn_user_once_by_message!(
+                "The following rules have been removed and ignoring them has no effect:{rules}"
+            );
+        }
+
         for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
             // TODO(martin): This belongs into the ruff crate.
             warn_user_once_by_id!(
@@ -981,13 +1018,9 @@ impl LintConfiguration {
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                let rule = format!("{prefix}{code}");
-                let mut message =
-                    format!("Rule `{rule}` is deprecated and will be removed in a future release.");
-                if matches!(rule.as_str(), "E999") {
-                    message.push_str(" Syntax errors will always be shown regardless of whether this rule is selected or not.");
-                }
-                warn_user_once_by_message!("{message}");
+                warn_user_once_by_message!(
+                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release."
+                );
             }
         } else {
             let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
@@ -1118,6 +1151,7 @@ impl LintConfiguration {
             mccabe: self.mccabe.combine(config.mccabe),
             pep8_naming: self.pep8_naming.combine(config.pep8_naming),
             pycodestyle: self.pycodestyle.combine(config.pycodestyle),
+            pydoclint: self.pydoclint.combine(config.pydoclint),
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
@@ -1538,6 +1572,45 @@ fn warn_about_deprecated_top_level_lint_options(
     );
 }
 
+/// Detect conflicts between I002 (missing-required-import) and ICN001 (unconventional-import-alias)
+fn conflicting_import_settings(
+    isort: &isort::settings::Settings,
+    flake8_import_conventions: &flake8_import_conventions::settings::Settings,
+) -> Result<()> {
+    use std::fmt::Write;
+    let mut err_body = String::new();
+    for required_import in &isort.required_imports {
+        // Ex: `from foo import bar as baz` OR `import foo.bar as baz`
+        // - qualified name: `foo.bar`
+        // - bound name: `baz`
+        // - conflicts with: `{"foo.bar":"buzz"}`
+        // - does not conflict with either of
+        //   - `{"bar":"buzz"}`
+        //   - `{"foo.bar":"baz"}`
+        let qualified_name = required_import.qualified_name().to_string();
+        let bound_name = required_import.bound_name();
+        let Some(alias) = flake8_import_conventions.aliases.get(&qualified_name) else {
+            continue;
+        };
+        if alias != bound_name {
+            writeln!(err_body, "    - `{qualified_name}` -> `{alias}`").unwrap();
+        }
+    }
+
+    if !err_body.is_empty() {
+        return Err(anyhow!(
+            "Required import specified in `lint.isort.required-imports` (I002) \
+            conflicts with the required import alias specified in either \
+            `lint.flake8-import-conventions.aliases` or \
+            `lint.flake8-import-conventions.extend-aliases` (ICN001):\
+                \n{err_body}\n\
+            Help: Remove the required import or alias from your configuration."
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -1556,7 +1629,7 @@ mod tests {
     const PREVIEW_RULES: &[Rule] = &[
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
-        Rule::TooManyPublicMethods,
+        Rule::ClassAsDataStructure,
         Rule::TooManyPublicMethods,
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
@@ -1613,7 +1686,6 @@ mod tests {
             Rule::AmbiguousClassName,
             Rule::AmbiguousFunctionName,
             Rule::IOError,
-            Rule::SyntaxError,
             Rule::TabIndentation,
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
@@ -26,8 +26,8 @@ use crate::fix;
 /// class Foo:
 ///     value: int
 /// ```
-#[violation]
-pub struct EllipsisInNonEmptyClassBody;
+#[derive(ViolationMetadata)]
+pub(crate) struct EllipsisInNonEmptyClassBody;
 
 impl Violation for EllipsisInNonEmptyClassBody {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -43,7 +43,7 @@ impl Violation for EllipsisInNonEmptyClassBody {
 }
 
 /// PYI013
-pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn ellipsis_in_non_empty_class_body(checker: &Checker, body: &[Stmt]) {
     // If the class body contains a single statement, then it's fine for it to be an ellipsis.
     if body.len() == 1 {
         return;
@@ -61,7 +61,7 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &mut Checker, body: &[St
             diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
                 checker.semantic().current_statement_id(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

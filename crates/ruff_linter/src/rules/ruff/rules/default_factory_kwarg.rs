@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use ast::Keyword;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_constant;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -49,8 +49,8 @@ use crate::Locator;
 /// defaultdict(int)
 /// defaultdict(list)
 /// ```
-#[violation]
-pub struct DefaultFactoryKwarg {
+#[derive(ViolationMetadata)]
+pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }
 
@@ -73,7 +73,7 @@ impl Violation for DefaultFactoryKwarg {
 }
 
 /// RUF026
-pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
     // If the call isn't a `defaultdict` constructor, return.
     if !checker
         .semantic()
@@ -107,7 +107,7 @@ pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall)
         call.range(),
     );
     diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).

@@ -39,9 +39,54 @@ async def f4(**kwargs: int | int | float) -> None:
     ...
 
 
+def f5(arg1: int, *args: Union[int, int, float]) -> None: 
+    ...
+
+
+def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: 
+    ...
+
+
+def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: 
+    ...
+
+
+def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: 
+    ...
+
+
+def f9(
+    arg: Union[  # comment 
+        float, # another
+        complex, int]
+    ) -> None: 
+    ...
+
+def f10(
+    arg: (
+        int | # comment
+        float |  # another
+        complex
+    )    
+    ) -> None: 
+    ...
+
+
 class Foo:
     def good(self, arg: int) -> None:
         ...
 
     def bad(self, arg: int | float | complex) -> None:
+        ...
+
+    def bad2(self, arg: int | Union[float, complex]) -> None: 
+        ...
+
+    def bad3(self, arg: Union[Union[float, complex], int]) -> None: 
+        ...
+
+    def bad4(self, arg: Union[float | complex, int]) -> None: 
+        ...
+
+    def bad5(self, arg: int | (float | complex)) -> None: 
         ...

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
@@ -35,8 +35,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Pandas documentation: `read_csv`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)
 /// - [Pandas documentation: `read_table`](https://pandas.pydata.org/docs/reference/api/pandas.read_table.html#pandas.read_table)
-#[violation]
-pub struct PandasUseOfDotReadTable;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotReadTable;
 
 impl Violation for PandasUseOfDotReadTable {
     #[derive_message_formats]
@@ -46,7 +46,7 @@ impl Violation for PandasUseOfDotReadTable {
 }
 
 /// PD012
-pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
@@ -63,8 +63,7 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
         {
             if value == "," {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
+                    .report_diagnostic(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
             }
         }
     }

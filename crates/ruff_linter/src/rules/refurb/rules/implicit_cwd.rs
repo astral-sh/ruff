@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -25,8 +25,8 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
 
-#[violation]
-pub struct ImplicitCwd;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitCwd;
 
 impl Violation for ImplicitCwd {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -42,7 +42,7 @@ impl Violation for ImplicitCwd {
 }
 
 /// FURB177
-pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
     if !call.arguments.is_empty() {
         return;
     }
@@ -102,5 +102,5 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         ))
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

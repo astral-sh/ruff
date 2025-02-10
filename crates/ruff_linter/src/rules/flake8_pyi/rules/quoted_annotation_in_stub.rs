@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
-#[violation]
-pub struct QuotedAnnotationInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct QuotedAnnotationInStub;
 
 impl AlwaysFixableViolation for QuotedAnnotationInStub {
     #[derive_message_formats]
@@ -43,11 +43,11 @@ impl AlwaysFixableViolation for QuotedAnnotationInStub {
 }
 
 /// PYI020
-pub(crate) fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
+pub(crate) fn quoted_annotation_in_stub(checker: &Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         annotation.to_string(),
         range,
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

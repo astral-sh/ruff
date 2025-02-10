@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Comprehension, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_text_size::Ranged;
 
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///     for _ in range(5):
 ///         do_something_with_the_group(values)
 /// ```
-#[violation]
-pub struct ReuseOfGroupbyGenerator;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {
     #[derive_message_formats]
@@ -307,7 +307,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
 
 /// B031
 pub(crate) fn reuse_of_groupby_generator(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     body: &[Stmt],
     iter: &Expr,
@@ -339,8 +339,6 @@ pub(crate) fn reuse_of_groupby_generator(
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
     }
 }

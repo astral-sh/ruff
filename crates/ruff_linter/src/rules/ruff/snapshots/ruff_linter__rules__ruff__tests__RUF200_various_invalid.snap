@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+pyproject.toml:10:16: RUF200 Failed to parse pyproject.toml: URL requirement must be preceded by a package name. Add the name of the package before the URL (e.g., `package_name @ /path/to/file`).
+...
+^^^
+   |
+ 8 | requires-python = ">=3.8"
+ 9 | requires-dist = [ "maturin>=0.14", "...",]
+10 | dependencies = [ "packaging", "...",]
+   |                ^^^^^^^^^^^^^^^^^^^^^^ RUF200
+11 | zip-safe = false
+12 | version = "..."
+   |

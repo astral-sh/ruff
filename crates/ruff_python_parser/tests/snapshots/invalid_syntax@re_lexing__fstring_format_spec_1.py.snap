@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lexing/fstring_format_spec_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -301,7 +300,7 @@ Module(
 5 | f'middle {'string':\
 6 |         'format spec'}
   |         ^ Syntax Error: f-string: expecting '}'
-7 | 
+7 |
 8 | f'middle {'string':\\
   |
 
@@ -310,7 +309,7 @@ Module(
 5 | f'middle {'string':\
 6 |         'format spec'}
   |          ^^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-7 | 
+7 |
 8 | f'middle {'string':\\
   |
 
@@ -319,7 +318,7 @@ Module(
 5 | f'middle {'string':\
 6 |         'format spec'}
   |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-7 | 
+7 |
 8 | f'middle {'string':\\
   |
 
@@ -328,7 +327,7 @@ Module(
 5 | f'middle {'string':\
 6 |         'format spec'}
   |                     ^^ Syntax Error: missing closing quote in string literal
-7 | 
+7 |
 8 | f'middle {'string':\\
   |
 
@@ -337,7 +336,7 @@ Module(
 5 | f'middle {'string':\
 6 |         'format spec'}
   |                       ^ Syntax Error: Expected a statement
-7 | 
+7 |
 8 | f'middle {'string':\\
 9 |         'format spec'}
   |
@@ -345,9 +344,9 @@ Module(
 
   |
 6 |         'format spec'}
-7 | 
+7 |
 8 | f'middle {'string':\\
-  |                       Syntax Error: f-string: unterminated string
+  |                      ^ Syntax Error: f-string: unterminated string
 9 |         'format spec'}
   |
 
@@ -356,7 +355,7 @@ Module(
  8 | f'middle {'string':\\
  9 |         'format spec'}
    | ^^^^^^^^ Syntax Error: Unexpected indentation
-10 | 
+10 |
 11 | f'middle {'string':\\\
    |
 
@@ -365,7 +364,7 @@ Module(
  8 | f'middle {'string':\\
  9 |         'format spec'}
    |                      ^ Syntax Error: Expected a statement
-10 | 
+10 |
 11 | f'middle {'string':\\\
    |
 
@@ -374,7 +373,7 @@ Module(
  8 | f'middle {'string':\\
  9 |         'format spec'}
    |                       ^ Syntax Error: Expected a statement
-10 | 
+10 |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |
@@ -382,9 +381,9 @@ Module(
 
    |
  9 |         'format spec'}
-10 | 
+10 |
+   | ^ Syntax Error: Expected a statement
 11 | f'middle {'string':\\\
-   |  Syntax Error: Expected a statement
 12 |         'format spec'}
    |
 
@@ -420,5 +419,5 @@ Module(
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
-   |                        Syntax Error: Expected a statement
+   |                       ^ Syntax Error: Expected a statement
    |

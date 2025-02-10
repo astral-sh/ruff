@@ -147,6 +147,17 @@ pub(crate) enum FStringState {
     Outside,
 }
 
+impl FStringState {
+    pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
+        match self {
+            FStringState::InsideExpressionElement(context) => {
+                Some(context.can_contain_line_breaks())
+            }
+            FStringState::Outside => None,
+        }
+    }
+}
+
 /// The position of a top-level statement in the module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub(crate) enum TopLevelStatementPosition {
@@ -221,7 +232,7 @@ where
     }
 }
 
-impl<'ast, 'buf, B> Deref for WithNodeLevel<'ast, 'buf, B>
+impl<'ast, B> Deref for WithNodeLevel<'ast, '_, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
 {
@@ -232,7 +243,7 @@ where
     }
 }
 
-impl<'ast, 'buf, B> DerefMut for WithNodeLevel<'ast, 'buf, B>
+impl<'ast, B> DerefMut for WithNodeLevel<'ast, '_, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
 {

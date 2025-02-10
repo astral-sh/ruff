@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -53,8 +53,8 @@ use crate::Locator;
 ///
 /// ## References
 /// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
-#[violation]
-pub struct FStringMissingPlaceholders;
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringMissingPlaceholders;
 
 impl AlwaysFixableViolation for FStringMissingPlaceholders {
     #[derive_message_formats]
@@ -68,7 +68,7 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::ExprFString) {
+pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprFString) {
     if expr.value.f_strings().any(|f_string| {
         f_string
             .elements
@@ -97,7 +97,7 @@ pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::E
             f_string.range(),
             checker.locator(),
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

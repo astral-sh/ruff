@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::{Scope, ScopeKind};
 
@@ -19,8 +19,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-locals`
-#[violation]
-pub struct TooManyLocals {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyLocals {
     current_amount: usize,
     max_amount: usize,
 }
@@ -37,7 +37,7 @@ impl Violation for TooManyLocals {
 }
 
 /// PLR0914
-pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope) {
     let num_locals = scope
         .binding_ids()
         .filter(|id| {
@@ -47,7 +47,7 @@ pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope, diagnostics: &mu
         .count();
     if num_locals > checker.settings.pylint.max_locals {
         if let ScopeKind::Function(func) = scope.kind {
-            diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 TooManyLocals {
                     current_amount: num_locals,
                     max_amount: checker.settings.pylint.max_locals,

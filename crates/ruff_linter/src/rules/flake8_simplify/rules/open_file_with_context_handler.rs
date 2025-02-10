@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-#[violation]
-pub struct OpenFileWithContextHandler;
+#[derive(ViolationMetadata)]
+pub(crate) struct OpenFileWithContextHandler;
 
 impl Violation for OpenFileWithContextHandler {
     #[derive_message_formats]
@@ -197,7 +197,7 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     if !is_open_call(semantic, call) {
@@ -238,7 +238,7 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         OpenFileWithContextHandler,
         call.func.range(),
     ));

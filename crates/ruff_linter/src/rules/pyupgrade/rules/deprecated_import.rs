@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Alias, StmtImportFrom};
 use ruff_python_codegen::Stylist;
@@ -60,8 +60,8 @@ enum Deprecation {
 /// ```python
 /// from collections.abc import Sequence
 /// ```
-#[violation]
-pub struct DeprecatedImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedImport {
     deprecation: Deprecation,
 }
 
@@ -308,7 +308,9 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "TypeGuard",
     "get_args",
     "get_origin",
-    "is_typeddict",
+    // Introduced in Python 3.10, but `typing_extensions` equivalent
+    // also checks for `typing_extensions.TypedDict` in addition to `typing.TypedDict`.
+    // "is_typeddict",
 ];
 
 // Python 3.11+
@@ -382,13 +384,14 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
     // Introduced in Python 3.8, but typing_extensions
     // backports features and bugfixes from py313:
     "Protocol",
-    "TypedDict",
     "runtime_checkable",
     // Introduced in earlier Python versions,
     // but typing_extensions backports PEP-696:
     "ParamSpec",
     "TypeVar",
     "TypeVarTuple",
+    // `typing_extensions` backports PEP 728 (TypedDict with Typed Extra Items)
+    // "TypedDict",
 ];
 
 // Members of `typing_extensions` that were moved to `types`.
@@ -693,7 +696,7 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtImportFrom) {
+pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImportFrom) {
     // Avoid relative and star imports.
     if import_from_stmt.level > 0 {
         return;
@@ -735,7 +738,7 @@ pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtIm
                 import_from_stmt.range(),
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 
     for operation in fixer.with_renames() {
@@ -745,6 +748,6 @@ pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtIm
             },
             import_from_stmt.range(),
         );
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

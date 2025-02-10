@@ -399,27 +399,9 @@ c = (
     "dddddddddddddddddddddddddd" % aaaaaaaaaaaa + x
 )
 
-"a" "b" "c" + "d" "e" + "f" "g" + "h" "i" "j"
+"abc" + "de" + "fg" + "hij"
 
 
 class EC2REPATH:
-    f.write("Pathway name" + "\t" "Database Identifier" + "\t" "Source database" + "\n")
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -197,8 +197,8 @@
-     "dddddddddddddddddddddddddd" % aaaaaaaaaaaa + x
- )
- 
--"a" "b" "c" + "d" "e" + "f" "g" + "h" "i" "j"
-+"abc" + "de" + "fg" + "hij"
- 
- 
- class EC2REPATH:
--    f.write("Pathway name" + "\t" "Database Identifier" + "\t" "Source database" + "\n")
-+    f.write("Pathway name" + "\tDatabase Identifier" + "\tSource database" + "\n")
+    f.write("Pathway name" + "\tDatabase Identifier" + "\tSource database" + "\n")
 ```

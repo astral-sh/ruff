@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -31,8 +31,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
-#[violation]
-pub struct LiteralMembership;
+#[derive(ViolationMetadata)]
+pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {
     #[derive_message_formats]
@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for LiteralMembership {
 }
 
 /// PLR6201
-pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
     let [op] = &*compare.ops else {
         return;
     };
@@ -64,6 +64,11 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
         _ => return,
     };
+
+    // Skip empty collections (#15729).
+    if elts.is_empty() {
+        return;
+    }
 
     // If `left`, or any of the elements in `right`, are known to _not_ be hashable, return.
     if std::iter::once(compare.left.as_ref())
@@ -105,5 +110,5 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         right.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -24,8 +24,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// a = 42
 /// ```
-#[violation]
-pub struct NamedExprWithoutContext;
+#[derive(ViolationMetadata)]
+pub(crate) struct NamedExprWithoutContext;
 
 impl Violation for NamedExprWithoutContext {
     #[derive_message_formats]
@@ -35,10 +35,8 @@ impl Violation for NamedExprWithoutContext {
 }
 
 /// PLW0131
-pub(crate) fn named_expr_without_context(checker: &mut Checker, value: &Expr) {
+pub(crate) fn named_expr_without_context(checker: &Checker, value: &Expr) {
     if let Expr::Named(ast::ExprNamed { range, .. }) = value {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NamedExprWithoutContext, *range));
+        checker.report_diagnostic(Diagnostic::new(NamedExprWithoutContext, *range));
     }
 }

@@ -32,10 +32,6 @@ impl<const B: usize> BitSet<B> {
         bitset
     }
 
-    pub(super) fn is_empty(&self) -> bool {
-        self.blocks().iter().all(|&b| b == 0)
-    }
-
     /// Convert from Inline to Heap, if needed, and resize the Heap vector, if needed.
     fn resize(&mut self, value: u32) {
         let num_blocks_needed = (value / 64) + 1;
@@ -298,12 +294,5 @@ mod tests {
         b.insert(45);
         assert!(matches!(b, BitSet::Inline(_)));
         assert_bitset(&b, &[45, 120]);
-    }
-
-    #[test]
-    fn empty() {
-        let b = BitSet::<1>::default();
-
-        assert!(b.is_empty());
     }
 }

@@ -154,7 +154,7 @@ def foo(x: int) -> int | None:
     Parameters
     ----------
     x : int
-        An interger.
+        An integer.
     """
     if x < 0:
         return None
@@ -169,7 +169,7 @@ def foo(x):
     Parameters
     ----------
     x : int
-        An interger.
+        An integer.
     """
     if x < 0:
         return None

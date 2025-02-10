@@ -1,7 +1,7 @@
 use ruff_text_size::{TextLen, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::clean_space;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -43,8 +43,8 @@ use crate::docstrings::Docstring;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct NewLineAfterLastParagraph;
+#[derive(ViolationMetadata)]
+pub(crate) struct NewLineAfterLastParagraph;
 
 impl AlwaysFixableViolation for NewLineAfterLastParagraph {
     #[derive_message_formats]
@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for NewLineAfterLastParagraph {
 }
 
 /// D209
-pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 
@@ -99,7 +99,7 @@ pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Do
                         docstring.end() - num_trailing_quotes - num_trailing_spaces,
                         docstring.end() - num_trailing_quotes,
                     )));
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             return;

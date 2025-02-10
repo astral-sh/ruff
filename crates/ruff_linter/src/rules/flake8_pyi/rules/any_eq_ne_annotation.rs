@@ -1,7 +1,7 @@
 use ruff_python_ast::Parameters;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,8 +41,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
-#[violation]
-pub struct AnyEqNeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct AnyEqNeAnnotation {
     method_name: String,
 }
 
@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for AnyEqNeAnnotation {
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters: &Parameters) {
+pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &Parameters) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }
@@ -68,7 +68,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         return;
     }
 
-    let Some(annotation) = &parameters.args[1].parameter.annotation else {
+    let Some(annotation) = &parameters.args[1].annotation() else {
         return;
     };
 
@@ -100,5 +100,5 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         let binding_edit = Edit::range_replacement(binding, annotation.range());
         Ok(Fix::safe_edits(binding_edit, import_edit))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

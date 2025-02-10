@@ -5,7 +5,6 @@ use std::fmt;
 /// Unlike the `TargetVersion` enums in the CLI crates,
 /// this does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -32,6 +31,20 @@ impl PythonVersion {
         minor: 13,
     };
 
+    pub fn iter() -> impl Iterator<Item = PythonVersion> {
+        [
+            PythonVersion::PY37,
+            PythonVersion::PY38,
+            PythonVersion::PY39,
+            PythonVersion::PY310,
+            PythonVersion::PY311,
+            PythonVersion::PY312,
+            PythonVersion::PY313,
+        ]
+        .iter()
+        .copied()
+    }
+
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
     }
@@ -39,7 +52,7 @@ impl PythonVersion {
 
 impl Default for PythonVersion {
     fn default() -> Self {
-        Self::PY38
+        Self::PY39
     }
 }
 
@@ -66,5 +79,90 @@ impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let PythonVersion { major, minor } = self;
         write!(f, "{major}.{minor}")
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use crate::PythonVersion;
+
+    impl<'de> serde::Deserialize<'de> for PythonVersion {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let as_str = String::deserialize(deserializer)?;
+
+            if let Some((major, minor)) = as_str.split_once('.') {
+                let major = major.parse().map_err(|err| {
+                    serde::de::Error::custom(format!("invalid major version: {err}"))
+                })?;
+                let minor = minor.parse().map_err(|err| {
+                    serde::de::Error::custom(format!("invalid minor version: {err}"))
+                })?;
+
+                Ok((major, minor).into())
+            } else {
+                let major = as_str.parse().map_err(|err| {
+                    serde::de::Error::custom(format!(
+                        "invalid python-version: {err}, expected: `major.minor`"
+                    ))
+                })?;
+
+                Ok((major, 0).into())
+            }
+        }
+    }
+
+    impl serde::Serialize for PythonVersion {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_str(&self.to_string())
+        }
+    }
+}
+
+#[cfg(feature = "schemars")]
+mod schemars {
+    use super::PythonVersion;
+    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
+    use schemars::JsonSchema;
+    use schemars::_serde_json::Value;
+
+    impl JsonSchema for PythonVersion {
+        fn schema_name() -> String {
+            "PythonVersion".to_string()
+        }
+
+        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+            let sub_schemas = std::iter::once(Schema::Object(SchemaObject {
+                instance_type: Some(schemars::schema::InstanceType::String.into()),
+                string: Some(Box::new(schemars::schema::StringValidation {
+                    pattern: Some(r"^\d+\.\d+$".to_string()),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }))
+            .chain(Self::iter().map(|v| {
+                Schema::Object(SchemaObject {
+                    const_value: Some(Value::String(v.to_string())),
+                    metadata: Some(Box::new(Metadata {
+                        description: Some(format!("Python {v}")),
+                        ..Metadata::default()
+                    })),
+                    ..SchemaObject::default()
+                })
+            }));
+
+            Schema::Object(SchemaObject {
+                subschemas: Some(Box::new(SubschemaValidation {
+                    any_of: Some(sub_schemas.collect()),
+                    ..Default::default()
+                })),
+                ..SchemaObject::default()
+            })
+        }
     }
 }

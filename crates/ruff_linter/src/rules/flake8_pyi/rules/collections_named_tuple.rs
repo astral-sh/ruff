@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -35,8 +35,8 @@ use crate::checkers::ast::Checker;
 ///     name: str
 ///     age: int
 /// ```
-#[violation]
-pub struct CollectionsNamedTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct CollectionsNamedTuple;
 
 impl Violation for CollectionsNamedTuple {
     #[derive_message_formats]
@@ -50,7 +50,7 @@ impl Violation for CollectionsNamedTuple {
 }
 
 /// PYI024
-pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::COLLECTIONS) {
         return;
     }
@@ -62,8 +62,6 @@ pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
             matches!(qualified_name.segments(), ["collections", "namedtuple"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CollectionsNamedTuple, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(CollectionsNamedTuple, expr.range()));
     }
 }

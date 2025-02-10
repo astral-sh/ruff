@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
@@ -37,8 +37,8 @@ use crate::line_width::LineWidthBuilder;
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
-#[violation]
-pub struct ReimplementedBuiltin {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }
 
@@ -58,7 +58,7 @@ impl Violation for ReimplementedBuiltin {
 }
 
 /// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
@@ -120,7 +120,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         // Replace with `all`.
         (false, true) => {
@@ -212,7 +212,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         _ => {}
     }

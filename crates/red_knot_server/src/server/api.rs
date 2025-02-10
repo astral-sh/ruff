@@ -52,9 +52,6 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidCloseNotebookHandler::METHOD => {
             local_notification_task::<notification::DidCloseNotebookHandler>(notif)
         }
-        notification::SetTraceHandler::METHOD => {
-            local_notification_task::<notification::SetTraceHandler>(notif)
-        }
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
@@ -89,13 +86,11 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
             return Box::new(|_, _| {});
         };
         let db = match path {
-            AnySystemPath::System(path) => {
-                match session.workspace_db_for_path(path.as_std_path()) {
-                    Some(db) => db.snapshot(),
-                    None => session.default_workspace_db().snapshot(),
-                }
-            }
-            AnySystemPath::SystemVirtual(_) => session.default_workspace_db().snapshot(),
+            AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
+                Some(db) => db.clone(),
+                None => session.default_project_db().clone(),
+            },
+            AnySystemPath::SystemVirtual(_) => session.default_project_db().clone(),
         };
 
         let Some(snapshot) = session.take_snapshot(url) else {

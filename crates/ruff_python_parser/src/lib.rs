@@ -72,7 +72,9 @@ pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
-use ruff_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
+use ruff_python_ast::{
+    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -164,6 +166,65 @@ pub fn parse_expression_range(
         .try_into_expression()
         .unwrap()
         .into_result()
+}
+
+/// Parses a Python expression as if it is parenthesized.
+///
+/// It behaves similarly to [`parse_expression_range`] but allows what would be valid within parenthesis
+///
+/// # Example
+///
+/// Parsing an expression that would be valid within parenthesis:
+///
+/// ```
+/// use ruff_python_parser::parse_parenthesized_expression_range;
+/// # use ruff_text_size::{TextRange, TextSize};
+///
+/// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(14)));
+/// assert!(parsed.is_ok());
+pub fn parse_parenthesized_expression_range(
+    source: &str,
+    range: TextRange,
+) -> Result<Parsed<ModExpression>, ParseError> {
+    let source = &source[..range.end().to_usize()];
+    let parsed =
+        Parser::new_starts_at(source, Mode::ParenthesizedExpression, range.start()).parse();
+    parsed.try_into_expression().unwrap().into_result()
+}
+
+/// Parses a Python expression from a string annotation.
+///
+/// # Example
+///
+/// Parsing a string annotation:
+///
+/// ```
+/// use ruff_python_parser::parse_string_annotation;
+/// use ruff_python_ast::{StringLiteral, StringLiteralFlags};
+/// use ruff_text_size::{TextRange, TextSize};
+///
+/// let string = StringLiteral {
+///     value: "'''\n int | str'''".to_string().into_boxed_str(),
+///     flags: StringLiteralFlags::empty(),
+///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
+/// };
+/// let parsed = parse_string_annotation("'''\n int | str'''", &string);
+/// assert!(!parsed.is_ok());
+/// ```
+pub fn parse_string_annotation(
+    source: &str,
+    string: &StringLiteral,
+) -> Result<Parsed<ModExpression>, ParseError> {
+    let range = string
+        .range()
+        .add_start(string.flags.opener_len())
+        .sub_end(string.flags.closer_len());
+    let source = &source[..range.end().to_usize()];
+    if string.flags.is_triple_quoted() {
+        parse_parenthesized_expression_range(source, range)
+    } else {
+        parse_expression_range(source, range)
+    }
 }
 
 /// Parse the given Python source code using the specified [`Mode`].
@@ -581,6 +642,11 @@ pub enum Mode {
 
     /// The code consists of a single expression.
     Expression,
+
+    /// The code consists of a single expression and is parsed as if it is parenthesized. The parentheses themselves aren't required.
+    /// This allows for having valid multiline expression without the need of parentheses
+    /// and is specifically useful for parsing string annotations.
+    ParenthesizedExpression,
 
     /// The code consists of a sequence of statements which can include the
     /// escape commands that are part of IPython syntax.

@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -28,8 +28,8 @@ use crate::rules::pylint::helpers::in_dunder_method;
 ///
 /// ## References
 /// - [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
-#[violation]
-pub struct YieldInInit;
+#[derive(ViolationMetadata)]
+pub(crate) struct YieldInInit;
 
 impl Violation for YieldInInit {
     #[derive_message_formats]
@@ -39,10 +39,8 @@ impl Violation for YieldInInit {
 }
 
 /// PLE0100
-pub(crate) fn yield_in_init(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn yield_in_init(checker: &Checker, expr: &Expr) {
     if in_dunder_method("__init__", checker.semantic(), checker.settings) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(YieldInInit, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(YieldInInit, expr.range()));
     }
 }

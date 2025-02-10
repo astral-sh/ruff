@@ -9,7 +9,9 @@ E = D
 reveal_type(E)  # revealed: Literal[C]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 class C: ...
 ```
 
@@ -22,6 +24,119 @@ D = b.C
 reveal_type(D)  # revealed: Literal[C]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 class C: ...
+```
+
+## Nested
+
+```py
+import a.b
+
+reveal_type(a.b.C)  # revealed: Literal[C]
+```
+
+`a/__init__.py`:
+
+```py
+```
+
+`a/b.py`:
+
+```py
+class C: ...
+```
+
+## Deeply nested
+
+```py
+import a.b.c
+
+reveal_type(a.b.c.C)  # revealed: Literal[C]
+```
+
+`a/__init__.py`:
+
+```py
+```
+
+`a/b/__init__.py`:
+
+```py
+```
+
+`a/b/c.py`:
+
+```py
+class C: ...
+```
+
+## Nested with rename
+
+```py
+import a.b as b
+
+reveal_type(b.C)  # revealed: Literal[C]
+```
+
+`a/__init__.py`:
+
+```py
+```
+
+`a/b.py`:
+
+```py
+class C: ...
+```
+
+## Deeply nested with rename
+
+```py
+import a.b.c as c
+
+reveal_type(c.C)  # revealed: Literal[C]
+```
+
+`a/__init__.py`:
+
+```py
+```
+
+`a/b/__init__.py`:
+
+```py
+```
+
+`a/b/c.py`:
+
+```py
+class C: ...
+```
+
+## Unresolvable module import
+
+<!-- snapshot-diagnostics -->
+
+```py
+import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+```
+
+## Unresolvable submodule imports
+
+<!-- snapshot-diagnostics -->
+
+```py
+# Topmost component resolvable, submodule not resolvable:
+import a.foo  # error: [unresolved-import] "Cannot resolve import `a.foo`"
+
+# Topmost component unresolvable:
+import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
+```
+
+`a/__init__.py`:
+
+```py
 ```

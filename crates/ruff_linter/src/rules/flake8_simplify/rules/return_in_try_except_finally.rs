@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Defining Clean-up Actions](https://docs.python.org/3/tutorial/errors.html#defining-clean-up-actions)
-#[violation]
-pub struct ReturnInTryExceptFinally;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReturnInTryExceptFinally;
 
 impl Violation for ReturnInTryExceptFinally {
     #[derive_message_formats]
@@ -56,7 +56,7 @@ fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
 
 /// SIM107
 pub(crate) fn return_in_try_except_finally(
-    checker: &mut Checker,
+    checker: &Checker,
     body: &[Stmt],
     handlers: &[ExceptHandler],
     finalbody: &[Stmt],
@@ -69,7 +69,7 @@ pub(crate) fn return_in_try_except_finally(
 
     if try_has_return || except_has_return {
         if let Some(finally_return) = find_return(finalbody) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 ReturnInTryExceptFinally,
                 finally_return.range(),
             ));

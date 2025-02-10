@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{NameFinder, StoredNameFinder};
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
-#[violation]
-pub struct UnusedLoopControlVariable {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
     name: String,
     /// The name to which the variable should be renamed, if it can be
@@ -76,7 +76,7 @@ impl Violation for UnusedLoopControlVariable {
 }
 
 /// B007
-pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::StmtFor) {
     let control_names = {
         let mut finder = StoredNameFinder::default();
         finder.visit_expr(stmt_for.target.as_ref());
@@ -147,7 +147,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
                 }
             }
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

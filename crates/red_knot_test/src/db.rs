@@ -1,5 +1,9 @@
+use std::sync::Arc;
+
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+    default_lint_registry, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
+    PythonVersion, SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
@@ -7,33 +11,39 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
 #[salsa::db]
+#[derive(Clone)]
 pub(crate) struct Db {
-    workspace_root: SystemPathBuf,
+    project_root: SystemPathBuf,
     storage: salsa::Storage<Self>,
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl Db {
-    pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
+    pub(crate) fn setup(project_root: SystemPathBuf) -> Self {
+        let rule_selection = RuleSelection::from_registry(default_lint_registry());
+
         let db = Self {
-            workspace_root,
+            project_root,
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
             files: Files::default(),
+            rule_selection: Arc::new(rule_selection),
         };
 
         db.memory_file_system()
-            .create_directory_all(&db.workspace_root)
+            .create_directory_all(&db.project_root)
             .unwrap();
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(db.workspace_root.clone()),
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings::new(vec![db.project_root.clone()]),
             },
         )
         .expect("Invalid search path settings");
@@ -41,8 +51,8 @@ impl Db {
         db
     }
 
-    pub(crate) fn workspace_root(&self) -> &SystemPath {
-        &self.workspace_root
+    pub(crate) fn project_root(&self) -> &SystemPath {
+        &self.project_root
     }
 }
 
@@ -84,6 +94,14 @@ impl Upcast<dyn SourceDb> for Db {
 impl SemanticDb for Db {
     fn is_file_open(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
     }
 }
 

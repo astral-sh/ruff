@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::importer::ImportRequest;
 ///
 /// np.all([True, False])
 /// ```
-#[violation]
-pub struct NumpyDeprecatedFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct NumpyDeprecatedFunction {
     existing: String,
     replacement: String,
 }
@@ -55,7 +55,7 @@ impl Violation for NumpyDeprecatedFunction {
 }
 
 /// NPY003
-pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -89,6 +89,6 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
             let replacement_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

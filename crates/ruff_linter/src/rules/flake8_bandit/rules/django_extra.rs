@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
-#[violation]
-pub struct DjangoExtra;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoExtra;
 
 impl Violation for DjangoExtra {
     #[derive_message_formats]
@@ -44,7 +44,7 @@ impl Violation for DjangoExtra {
 }
 
 /// S610
-pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -54,15 +54,13 @@ pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     if is_call_insecure(call) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(DjangoExtra, call.arguments.range()));
+        checker.report_diagnostic(Diagnostic::new(DjangoExtra, call.arguments.range()));
     }
 }
 
 fn is_call_insecure(call: &ast::ExprCall) -> bool {
     for (argument_name, position) in [("select", 0), ("where", 1), ("tables", 3)] {
-        if let Some(argument) = call.arguments.find_argument(argument_name, position) {
+        if let Some(argument) = call.arguments.find_argument_value(argument_name, position) {
             match argument_name {
                 "select" => match argument {
                     Expr::Dict(dict) => {

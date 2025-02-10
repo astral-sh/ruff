@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, identifier::Identifier, Arguments, Expr, Stmt, StmtClassDef};
 use ruff_python_semantic::SemanticModel;
 
@@ -46,8 +46,8 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 ///
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-#[violation]
-pub struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 
 impl Violation for NoSlotsInNamedtupleSubclass {
     #[derive_message_formats]
@@ -74,17 +74,21 @@ impl fmt::Display for NamedTupleKind {
 
 /// SLOT002
 pub(crate) fn no_slots_in_namedtuple_subclass(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     class: &StmtClassDef,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
 
     if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
         if !has_slots(&class.body) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass(namedtuple_kind),
                 stmt.identifier(),
             ));

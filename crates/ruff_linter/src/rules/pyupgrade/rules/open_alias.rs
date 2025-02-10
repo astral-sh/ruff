@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -29,8 +29,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `io.open`](https://docs.python.org/3/library/io.html#io.open)
-#[violation]
-pub struct OpenAlias;
+#[derive(ViolationMetadata)]
+pub(crate) struct OpenAlias;
 
 impl Violation for OpenAlias {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -46,7 +46,7 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(func)
@@ -64,6 +64,6 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 import_edit,
             ))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

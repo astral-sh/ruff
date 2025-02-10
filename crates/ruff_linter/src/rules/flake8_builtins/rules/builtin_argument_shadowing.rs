@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Parameter};
 use ruff_python_semantic::analyze::visibility::{is_overload, is_override};
 use ruff_text_size::Ranged;
@@ -49,8 +49,8 @@ use super::super::helpers::shadows_builtin;
 /// ## References
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
-#[violation]
-pub struct BuiltinArgumentShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinArgumentShadowing {
     name: String,
 }
 
@@ -63,9 +63,9 @@ impl Violation for BuiltinArgumentShadowing {
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
+pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Parameter) {
     if shadows_builtin(
-        parameter.name.as_str(),
+        parameter.name(),
         checker.source_type,
         &checker.settings.flake8_builtins.builtins_ignorelist,
         checker.settings.target_version,
@@ -92,7 +92,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },

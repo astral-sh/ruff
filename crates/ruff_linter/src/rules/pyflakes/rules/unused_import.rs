@@ -5,11 +5,12 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel, SubmoduleImport,
+    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
+    SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -94,8 +95,8 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
 /// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
-#[violation]
-pub struct UnusedImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,
     /// Unqualified name of the import
@@ -272,7 +273,7 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
 /// ¬__init__.py ∧ stdlib → safe,   remove
 /// ¬__init__.py ∧ 3rdpty → safe,   remove
 ///
-pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     // Collect all unused imports by statement.
     let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
@@ -329,6 +330,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
+            scope: binding.scope,
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.start())
@@ -366,7 +368,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .map(|binding| {
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
-                } else if in_init && is_first_party(&binding.import, checker) {
+                } else if in_init
+                    && binding.scope.is_global()
+                    && is_first_party(&binding.import, checker)
+                {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
                         submodule_import: binding.import.is_submodule_import(),
@@ -424,7 +429,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     diagnostic.set_fix(fix.clone());
                 }
             }
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -445,7 +450,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());
         }
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -460,9 +465,11 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
+    /// The [`ScopeId`] of the scope in which the [`ImportBinding`] was defined.
+    scope: ScopeId,
 }
 
-impl<'a> ImportBinding<'a> {
+impl ImportBinding<'_> {
     /// The symbol that is stored in the outer scope as a result of this import.
     ///
     /// For example:

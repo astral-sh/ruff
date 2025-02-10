@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -38,8 +38,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `@functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Let lru_cache be used as a decorator with no arguments](https://github.com/python/cpython/issues/80953)
-#[violation]
-pub struct LRUCacheWithoutParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct LRUCacheWithoutParameters;
 
 impl AlwaysFixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for LRUCacheWithoutParameters {
 }
 
 /// UP011
-pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
@@ -79,7 +79,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

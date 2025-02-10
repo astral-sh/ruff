@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/implicitly_concatenated_unterminated_string.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -174,6 +173,6 @@ Module(
 1 | 'hello' 'world
 2 | 1 + 1
 3 | 'hello' f'world {x}
-  |                     Syntax Error: f-string: unterminated string
+  |                    ^ Syntax Error: f-string: unterminated string
 4 | 2 + 2
   |

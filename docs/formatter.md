@@ -3,8 +3,6 @@
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
 [Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
 
-The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-ruff-formatter).
-
 ## `ruff format`
 
 `ruff format` is the primary entrypoint to the formatter. It accepts a list of files or
@@ -22,10 +20,6 @@ and instead exit with a non-zero status code upon detecting any unformatted file
 
 For the full list of supported options, run `ruff format --help`.
 
-!!! note
-    As of Ruff v0.1.7 the `ruff format` command uses the current working directory (`.`) as the default path to format.
-    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
-
 ## Philosophy
 
 The initial goal of the Ruff formatter is _not_ to innovate on code style, but rather, to innovate
@@ -39,7 +33,7 @@ adoption is minimally disruptive for the vast majority of projects.
 
 Specifically, the formatter is intended to emit near-identical output when run over existing
 Black-formatted code. When run over extensive Black-formatted projects like Django and Zulip, > 99.9%
-of lines are formatted identically. (See: [_Black compatibility_](#black-compatibility).)
+of lines are formatted identically. (See: [_Style Guide](#style-guide).)
 
 Given this focus on Black compatibility, the formatter thus adheres to [Black's (stable) code style](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html),
 which aims for "consistency, generality, readability and reducing git diffs". To give you a sense
@@ -328,7 +322,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
 - [`indentation-with-invalid-multiple-comment`](rules/indentation-with-invalid-multiple-comment.md) (`E114`)
 - [`over-indented`](rules/over-indented.md) (`E117`)
-- [`indent-with-spaces`](rules/indent-with-spaces.md) (`D206`)
+- [`docstring-tab-indentation`](rules/docstring-tab-indentation.md) (`D206`)
 - [`triple-single-quotes`](rules/triple-single-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)
 - [`bad-quotes-multiline-string`](rules/bad-quotes-multiline-string.md) (`Q001`)
@@ -336,8 +330,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`avoidable-escaped-quote`](rules/avoidable-escaped-quote.md) (`Q003`)
 - [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`)
 - [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
-- [`single-line-implicit-string-concatenation`](rules/single-line-implicit-string-concatenation.md) (`ISC001`)
-- [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`)
+- [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`) if used without `ISC001` and `flake8-implicit-str-concat.allow-multiline = false`
 
 While the [`line-too-long`](rules/line-too-long.md) (`E501`) rule _can_ be used alongside the
 formatter, the formatter only makes a best-effort attempt to wrap lines at the configured
@@ -380,21 +373,10 @@ Meanwhile, `ruff format --check` exits with the following status codes:
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
 
-## Black compatibility
+## Style Guide <span id="black-compatibility"></span>
 
 The formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black).
-
-Specifically, the formatter is intended to emit near-identical output when run over Black-formatted
-code. When run over extensive Black-formatted projects like Django and Zulip, > 99.9% of lines
-are formatted identically. When migrating an existing project from Black to Ruff, you should expect
-to see a few differences on the margins, but the vast majority of your code should be unchanged.
-
-When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
-and so more deviations should be expected, especially around the treatment of end-of-line comments.
-
-If you identify deviations in your project, spot-check them against the [known deviations](formatter/black.md),
-as well as the [unintentional deviations](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter)
-filed in the issue tracker. If you've identified a new deviation, please [file an issue](https://github.com/astral-sh/ruff/issues/new).
+This section documents the areas where the Ruff formatter goes beyond Black in terms of code style.
 
 ### Intentional deviations
 
@@ -405,17 +387,119 @@ Black's code style, while others fall out of differences in the underlying imple
 For a complete enumeration of these intentional deviations, see [_Known deviations_](formatter/black.md).
 
 Unintentional deviations from Black are tracked in the [issue tracker](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3Aformatter).
+If you've identified a new deviation, please [file an issue](https://github.com/astral-sh/ruff/issues/new).
 
 ### Preview style
 
-Black gates formatting changes behind a [`preview`](https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style)
-flag. The formatter does not yet support Black's preview style, though the intention is to support
-it within the coming months behind Ruff's own [`preview`](https://docs.astral.sh/ruff/settings/#preview)
-flag.
+Similar to [Black](https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style), Ruff implements formatting changes
+under the [`preview`](https://docs.astral.sh/ruff/settings/#format_preview) flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
 
-Black promotes some of its preview styling to stable at the end of each year. Ruff will similarly
-implement formatting changes under the [`preview`](https://docs.astral.sh/ruff/settings/#preview)
-flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
+### F-string formatting
+
+_Stabilized in Ruff 0.9.0_
+
+Unlike Black, Ruff formats the expression parts of f-strings which are the parts inside the curly
+braces `{...}`. This is a [known deviation](formatter/black.md#f-strings) from Black.
+
+Ruff employs several heuristics to determine how an f-string should be formatted which are detailed
+below.
+
+#### Quotes
+
+Ruff will use the [configured quote style] for the f-string expression unless doing so would result in
+invalid syntax for the target Python version or requires more backslash escapes than the original
+expression. Specifically, Ruff will preserve the original quote style for the following cases:
+
+When the target Python version is < 3.12 and a [self-documenting f-string] contains a string
+literal with the [configured quote style]:
+
+```python
+# format.quote-style = "double"
+
+f'{10 + len("hello")=}'
+# This f-string cannot be formatted as follows when targeting Python < 3.12
+f"{10 + len("hello")=}"
+```
+
+When the target Python version is < 3.12 and an f-string contains any triple-quoted string, byte
+or f-string literal that contains the [configured quote style]:
+
+```python
+# format.quote-style = "double"
+
+f'{"""nested " """}'
+# This f-string cannot be formatted as follows when targeting Python < 3.12
+f"{'''nested " '''}"
+```
+
+For all target Python versions, when a [self-documenting f-string] contains an expression between
+the curly braces (`{...}`) with a format specifier containing the [configured quote style]:
+
+```python
+# format.quote-style = "double"
+
+f'{1=:"foo}'
+# This f-string cannot be formatted as follows for all target Python versions
+f"{1=:"foo}"
+```
+
+For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
+outermost f-string. For example, consider the following f-string:
+
+```python
+# format.quote-style = "double"
+
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
+```
+
+Ruff formats it as:
+
+```python
+f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+#### Line breaks
+
+Starting with Python 3.12 ([PEP 701](https://peps.python.org/pep-0701/)), the expression parts of an f-string can
+span multiple lines. Ruff needs to decide when to introduce a line break in an f-string expression.
+This depends on the semantic content of the expression parts of an f-string - for example,
+introducing a line break in the middle of a natural-language sentence is undesirable. Since Ruff
+doesn't have enough information to make that decision, it adopts a heuristic similar to [Prettier](https://prettier.io/docs/en/next/rationale.html#template-literals):
+it will only split the expression parts of an f-string across multiple lines if there was already a line break
+within any of the expression parts.
+
+For example, the following code:
+
+```python
+f"this f-string has a multiline expression {
+  ['red', 'green', 'blue', 'yellow',]} and does not fit within the line length"
+```
+
+... is formatted as:
+
+```python
+# The list expression is split across multiple lines because of the trailing comma
+f"this f-string has a multiline expression {
+    [
+        'red',
+        'green',
+        'blue',
+        'yellow',
+    ]
+} and does not fit within the line length"
+```
+
+But, the following will not be split across multiple lines even though it exceeds the line length:
+
+```python
+f"this f-string has a multiline expression {['red', 'green', 'blue', 'yellow']} and does not fit within the line length"
+```
+
+If you want Ruff to split an f-string across multiple lines, ensure there's a linebreak somewhere within the
+`{...}` parts of an f-string.
+
+[self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
+[configured quote style]: settings.md/#format_quote-style
 
 ## Sorting imports
 

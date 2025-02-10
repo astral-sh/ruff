@@ -1,7 +1,8 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -61,8 +62,8 @@ use super::helpers;
 /// ```
 ///
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
-#[violation]
-pub struct DjangoUnorderedBodyContentInModel {
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoUnorderedBodyContentInModel {
     element_type: ContentType,
     prev_element_type: ContentType,
 }
@@ -79,10 +80,7 @@ impl Violation for DjangoUnorderedBodyContentInModel {
 }
 
 /// DJ012
-pub(crate) fn unordered_body_content_in_model(
-    checker: &mut Checker,
-    class_def: &ast::StmtClassDef,
-) {
+pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -119,7 +117,7 @@ pub(crate) fn unordered_body_content_in_model(
                 },
                 element.range(),
             );
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         } else {
             element_types.push(element_type);
         }
@@ -131,7 +129,7 @@ enum ContentType {
     FieldDeclaration,
     ManagerDeclaration,
     MetaClass,
-    StrMethod,
+    MagicMethod,
     SaveMethod,
     GetAbsoluteUrlMethod,
     CustomMethod,
@@ -143,7 +141,7 @@ impl fmt::Display for ContentType {
             ContentType::FieldDeclaration => f.write_str("field declaration"),
             ContentType::ManagerDeclaration => f.write_str("manager declaration"),
             ContentType::MetaClass => f.write_str("`Meta` class"),
-            ContentType::StrMethod => f.write_str("`__str__` method"),
+            ContentType::MagicMethod => f.write_str("Magic method"),
             ContentType::SaveMethod => f.write_str("`save` method"),
             ContentType::GetAbsoluteUrlMethod => f.write_str("`get_absolute_url` method"),
             ContentType::CustomMethod => f.write_str("custom method"),
@@ -177,7 +175,7 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
             }
         }
         Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
-            "__str__" => Some(ContentType::StrMethod),
+            name if is_dunder(name) => Some(ContentType::MagicMethod),
             "save" => Some(ContentType::SaveMethod),
             "get_absolute_url" => Some(ContentType::GetAbsoluteUrlMethod),
             _ => Some(ContentType::CustomMethod),

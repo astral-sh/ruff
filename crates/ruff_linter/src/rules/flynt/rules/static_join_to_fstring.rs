@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -30,8 +30,8 @@ use crate::rules::flynt::helpers;
 ///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
-#[violation]
-pub struct StaticJoinToFString {
+#[derive(ViolationMetadata)]
+pub(crate) struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }
 
@@ -60,14 +60,20 @@ fn is_static_length(elts: &[Expr]) -> bool {
     elts.iter().all(|e| !e.is_starred_expr())
 }
 
-fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
+/// Build an f-string consisting of `joinees` joined by `joiner` with `flags`.
+fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
+        let mut flags = None;
         let node = ast::StringLiteral {
             value: joinees
                 .iter()
                 .filter_map(|expr| {
                     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                        if flags.is_none() {
+                            // take the flags from the first Expr
+                            flags = Some(value.flags());
+                        }
                         Some(value.to_str())
                     } else {
                         None
@@ -75,7 +81,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                 })
                 .join(joiner)
                 .into_boxed_str(),
-            ..ast::StringLiteral::default()
+            flags: flags?,
+            range: TextRange::default(),
         };
         return Some(node.into());
     }
@@ -98,13 +105,13 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
-        flags: FStringFlags::default(),
+        flags,
     };
     Some(node.into())
 }
 
 /// FLY002
-pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
+pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &str) {
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
         ..
@@ -131,7 +138,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string elements).
-    let Some(new_expr) = build_fstring(joiner, joinees) else {
+    let Some(new_expr) = build_fstring(joiner, joinees, checker.default_fstring_flags()) else {
         return;
     };
 
@@ -147,5 +154,5 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         pad(contents, expr.range(), checker.locator()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

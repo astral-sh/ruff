@@ -1,8 +1,8 @@
 import sys
 from abc import abstractmethod
 from time import struct_time
-from typing import ClassVar, Final, NamedTuple, NoReturn, SupportsIndex, final, overload
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import ClassVar, Final, NoReturn, SupportsIndex, final, overload, type_check_only
+from typing_extensions import CapsuleType, Self, TypeAlias, deprecated
 
 if sys.version_info >= (3, 11):
     __all__ = ("date", "datetime", "time", "timedelta", "timezone", "tzinfo", "MINYEAR", "MAXYEAR", "UTC")
@@ -29,7 +29,7 @@ class timezone(tzinfo):
     utc: ClassVar[timezone]
     min: ClassVar[timezone]
     max: ClassVar[timezone]
-    def __init__(self, offset: timedelta, name: str = ...) -> None: ...
+    def __new__(cls, offset: timedelta, name: str = ...) -> Self: ...
     def tzname(self, dt: datetime | None, /) -> str: ...
     def utcoffset(self, dt: datetime | None, /) -> timedelta: ...
     def dst(self, dt: datetime | None, /) -> None: ...
@@ -40,10 +40,17 @@ if sys.version_info >= (3, 11):
     UTC: timezone
 
 if sys.version_info >= (3, 9):
-    class _IsoCalendarDate(NamedTuple):
-        year: int
-        week: int
-        weekday: int
+    # This class calls itself datetime.IsoCalendarDate. It's neither
+    # NamedTuple nor structseq.
+    @final
+    @type_check_only
+    class _IsoCalendarDate(tuple[int, int, int]):
+        @property
+        def year(self) -> int: ...
+        @property
+        def week(self) -> int: ...
+        @property
+        def weekday(self) -> int: ...
 
 class date:
     min: ClassVar[date]
@@ -325,3 +332,5 @@ class datetime(date):
     def __sub__(self, value: Self, /) -> timedelta: ...
     @overload
     def __sub__(self, value: timedelta, /) -> Self: ...
+
+datetime_CAPI: CapsuleType

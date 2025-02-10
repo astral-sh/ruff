@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Paramiko documentation: set_missing_host_key_policy](https://docs.paramiko.org/en/latest/api/client.html#paramiko.client.SSHClient.set_missing_host_key_policy)
-#[violation]
-pub struct SSHNoHostKeyVerification;
+#[derive(ViolationMetadata)]
+pub(crate) struct SSHNoHostKeyVerification;
 
 impl Violation for SSHNoHostKeyVerification {
     #[derive_message_formats]
@@ -44,7 +44,7 @@ impl Violation for SSHNoHostKeyVerification {
 }
 
 /// S507
-pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };
@@ -53,7 +53,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    let Some(policy_argument) = call.arguments.find_argument("policy", 0) else {
+    let Some(policy_argument) = call.arguments.find_argument_value("policy", 0) else {
         return;
     };
 
@@ -78,7 +78,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             SSHNoHostKeyVerification,
             policy_argument.range(),
         ));

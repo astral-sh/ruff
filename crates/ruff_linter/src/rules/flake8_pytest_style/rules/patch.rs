@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -39,8 +39,8 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
 /// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
-#[violation]
-pub struct PytestPatchWithLambda;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestPatchWithLambda;
 
 impl Violation for PytestPatchWithLambda {
     #[derive_message_formats]
@@ -84,7 +84,7 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
         range: _,
     } = call
         .arguments
-        .find_argument("new", index)?
+        .find_argument_value("new", index)?
         .as_lambda_expr()?;
 
     // Walk the lambda body. If the lambda uses the arguments, then it's valid.

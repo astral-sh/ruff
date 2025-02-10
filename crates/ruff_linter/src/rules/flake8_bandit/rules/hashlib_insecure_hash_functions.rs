@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_ast::{self as ast, Arguments};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,8 +49,8 @@ use super::super::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
-#[violation]
-pub struct HashlibInsecureHashFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct HashlibInsecureHashFunction {
     library: String,
     string: String,
 }
@@ -63,7 +64,14 @@ impl Violation for HashlibInsecureHashFunction {
 }
 
 /// S324
-pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: &ast::ExprCall) {
+    if !checker
+        .semantic()
+        .seen_module(Modules::HASHLIB | Modules::CRYPT)
+    {
+        return;
+    }
+
     if let Some(weak_hash_call) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -97,7 +105,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
 }
 
 fn detect_insecure_hashlib_calls(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     hashlib_call: HashlibCall,
 ) {
@@ -107,7 +115,7 @@ fn detect_insecure_hashlib_calls(
 
     match hashlib_call {
         HashlibCall::New => {
-            let Some(name_arg) = call.arguments.find_argument("name", 0) else {
+            let Some(name_arg) = call.arguments.find_argument_value("name", 0) else {
                 return;
             };
             let Some(hash_func_name) = string_literal(name_arg) else {
@@ -120,7 +128,7 @@ fn detect_insecure_hashlib_calls(
                 hash_func_name,
                 "md4" | "md5" | "sha" | "sha1" | "MD4" | "MD5" | "SHA" | "SHA1"
             ) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     HashlibInsecureHashFunction {
                         library: "hashlib".to_string(),
                         string: hash_func_name.to_string(),
@@ -130,7 +138,7 @@ fn detect_insecure_hashlib_calls(
             }
         }
         HashlibCall::WeakHash(func_name) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 HashlibInsecureHashFunction {
                     library: "hashlib".to_string(),
                     string: (*func_name).to_string(),
@@ -141,7 +149,7 @@ fn detect_insecure_hashlib_calls(
     }
 }
 
-fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
+fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
     let Some(method) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -151,7 +159,7 @@ fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
             _ => None,
         })
         .and_then(|(argument_name, position)| {
-            call.arguments.find_argument(argument_name, position)
+            call.arguments.find_argument_value(argument_name, position)
         })
     else {
         return;
@@ -165,7 +173,7 @@ fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
         qualified_name.segments(),
         ["crypt", "METHOD_CRYPT" | "METHOD_MD5" | "METHOD_BLOWFISH"]
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             HashlibInsecureHashFunction {
                 library: "crypt".to_string(),
                 string: qualified_name.to_string(),

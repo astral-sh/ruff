@@ -5,7 +5,7 @@ use std::path::Path;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
@@ -27,7 +27,8 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// #!/usr/bin/env python
 /// ```
 ///
-/// Otherwise, remove the executable bit from the file (e.g., `chmod -x __main__.py`).
+/// Otherwise, remove the executable bit from the file
+/// (e.g., `chmod -x __main__.py` or `git update-index --chmod=-x __main__.py`).
 ///
 /// A file is considered executable if it has the executable bit set (i.e., its
 /// permissions mode intersects with `0o111`). As such, _this rule is only
@@ -35,8 +36,9 @@ use crate::rules::flake8_executable::helpers::is_executable;
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
-#[violation]
-pub struct ShebangMissingExecutableFile;
+/// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
+#[derive(ViolationMetadata)]
+pub(crate) struct ShebangMissingExecutableFile;
 
 impl Violation for ShebangMissingExecutableFile {
     #[derive_message_formats]

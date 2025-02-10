@@ -1,7 +1,7 @@
 import bz2
 import io
 import sys
-from _typeshed import StrOrBytesPath, StrPath, SupportsRead
+from _typeshed import ReadableBuffer, StrOrBytesPath, StrPath, SupportsRead, WriteableBuffer
 from builtins import list as _list  # aliases to avoid name clashes with fields named "type" or "list"
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from gzip import _ReadableFileobj as _GzipReadableFileobj, _WritableFileobj as _GzipWritableFileobj
@@ -123,7 +123,7 @@ def open(
 @overload
 def open(
     name: StrOrBytesPath | None,
-    mode: Literal["x", "x:", "a", "a:", "w", "w:"],
+    mode: Literal["x", "x:", "a", "a:", "w", "w:", "w:tar"],
     fileobj: _Fileobj | None = None,
     bufsize: int = 10240,
     *,
@@ -141,7 +141,7 @@ def open(
 def open(
     name: StrOrBytesPath | None = None,
     *,
-    mode: Literal["x", "x:", "a", "a:", "w", "w:"],
+    mode: Literal["x", "x:", "a", "a:", "w", "w:", "w:tar"],
     fileobj: _Fileobj | None = None,
     bufsize: int = 10240,
     format: int | None = ...,
@@ -226,15 +226,29 @@ def open(
     errorlevel: int | None = ...,
     preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
 ) -> TarFile: ...
-
-# TODO: Temporary fallback for modes containing pipe characters. These don't
-# work with mypy 1.10, but this should be fixed with mypy 1.11.
-# https://github.com/python/typeshed/issues/12182
 @overload
 def open(
-    name: StrOrBytesPath | None = None,
+    name: StrOrBytesPath | ReadableBuffer | None = None,
     *,
-    mode: str,
+    mode: Literal["r|*", "r|", "r|gz", "r|bz2", "r|xz"],
+    fileobj: IO[bytes] | None = None,
+    bufsize: int = 10240,
+    format: int | None = ...,
+    tarinfo: type[TarInfo] | None = ...,
+    dereference: bool | None = ...,
+    ignore_zeros: bool | None = ...,
+    encoding: str | None = ...,
+    errors: str = ...,
+    pax_headers: Mapping[str, str] | None = ...,
+    debug: int | None = ...,
+    errorlevel: int | None = ...,
+    preset: int | None = ...,
+) -> TarFile: ...
+@overload
+def open(
+    name: StrOrBytesPath | WriteableBuffer | None = None,
+    *,
+    mode: Literal["w|", "w|gz", "w|bz2", "w|xz"],
     fileobj: IO[bytes] | None = None,
     bufsize: int = 10240,
     format: int | None = ...,
@@ -557,7 +571,7 @@ class TarInfo:
         self,
         *,
         name: str = ...,
-        mtime: int = ...,
+        mtime: float = ...,
         mode: int = ...,
         linkname: str = ...,
         uid: int = ...,

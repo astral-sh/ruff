@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S602.py:4:1: S602 `subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`
   |
@@ -46,7 +45,7 @@ S602.py:8:1: S602 `subprocess` call with `shell=True` seems safe, but may be cha
  7 | check_output("true", shell=True)
  8 | run("true", shell=True)
    | ^^^ S602
- 9 | 
+ 9 |
 10 | # Check values that truthy values are treated as true.
    |
 
@@ -84,7 +83,7 @@ S602.py:14:1: S602 `subprocess` call with truthy `shell` seems safe, but may be 
 13 | Popen("true", shell={1: 1})
 14 | Popen("true", shell=(1,))
    | ^^^^^ S602
-15 | 
+15 |
 16 | # Check command argument looks unsafe.
    |
 

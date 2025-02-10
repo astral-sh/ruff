@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
@@ -46,8 +46,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct OutdatedVersionBlock {
+#[derive(ViolationMetadata)]
+pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
 }
 
@@ -82,7 +82,7 @@ enum Reason {
 }
 
 /// UP036
-pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
         let Expr::Compare(ast::ExprCompare {
             left,
@@ -142,10 +142,10 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                             } {
                                 diagnostic.set_fix(fix);
                             }
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                         Err(_) => {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 OutdatedVersionBlock {
                                     reason: Reason::Invalid,
                                 },
@@ -183,7 +183,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     Reason::AlwaysFalse => {
                         let mut diagnostic =
@@ -191,10 +191,10 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     Reason::Invalid => {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             OutdatedVersionBlock {
                                 reason: Reason::Invalid,
                             },
@@ -366,7 +366,7 @@ fn fix_always_false_branch(
 /// if sys.version_info >= (3, 8): ...
 /// ```
 fn fix_always_true_branch(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &StmtIf,
     branch: &IfElifBranch,
 ) -> Option<Fix> {

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 sections.py:292:9: D417 Missing argument description in the docstring for `bar`: `y`
     |
 290 |     x = 1
-291 | 
+291 |
 292 |     def bar(y=2):  # noqa: D207, D213, D406, D407
     |         ^^^ D417
 293 |         """Nested function test for docstrings.

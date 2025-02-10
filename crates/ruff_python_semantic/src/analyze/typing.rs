@@ -1,15 +1,21 @@
 //! Analysis rules for the `typing` module.
 
 use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt};
+use ruff_python_ast::{
+    self as ast, Expr, ExprCall, ExprName, Int, Operator, ParameterWithDefault, Parameters, Stmt,
+    StmtAssign,
+};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
     is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
     is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
+    is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
+use smallvec::{smallvec, SmallVec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -24,6 +30,7 @@ pub enum Callable {
     NamedTuple,
     TypedDict,
     MypyExtension,
+    TypeAliasType,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -34,6 +41,18 @@ pub enum SubscriptKind {
     Generic,
     /// A subscript of the form `typing.Annotated[int, "foo"]`, i.e., a PEP 593 annotation.
     PEP593Annotation,
+    /// A subscript of the form `typing.TypedDict[{"key": Type}]`, i.e., a [PEP 764] annotation.
+    ///
+    /// [PEP 764]: https://github.com/python/peps/pull/4082
+    TypedDict,
+}
+
+pub fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) -> bool {
+    let Some(binding) = semantic.only_binding(expr).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    is_dict(binding, semantic)
 }
 
 pub fn match_annotated_subscript<'a>(
@@ -62,6 +81,10 @@ pub fn match_annotated_subscript<'a>(
                 return Some(SubscriptKind::PEP593Annotation);
             }
 
+            if is_typed_dict(qualified_name.segments()) {
+                return Some(SubscriptKind::TypedDict);
+            }
+
             for module in typing_modules {
                 let module_qualified_name = QualifiedName::user_defined(module);
                 if qualified_name.starts_with(&module_qualified_name) {
@@ -74,6 +97,9 @@ pub fn match_annotated_subscript<'a>(
                         }
                         if is_pep_593_generic_member(member) {
                             return Some(SubscriptKind::PEP593Annotation);
+                        }
+                        if is_typed_dict_member(member) {
+                            return Some(SubscriptKind::TypedDict);
                         }
                     }
                 }
@@ -279,13 +305,63 @@ pub fn is_immutable_func(
     extend_immutable_calls: &[QualifiedName],
 ) -> bool {
     semantic
-        .resolve_qualified_name(func)
+        .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
                 || extend_immutable_calls
                     .iter()
                     .any(|target| qualified_name == *target)
         })
+}
+
+/// Return `true` if `name` is bound to the `typing.NewType` call where the original type is
+/// immutable.
+///
+/// For example:
+/// ```python
+/// from typing import NewType
+///
+/// UserId = NewType("UserId", int)
+/// ```
+///
+/// Here, `name` would be `UserId`.
+pub fn is_immutable_newtype_call(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+) -> bool {
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    if !binding.kind.is_assignment() {
+        return false;
+    }
+
+    let Some(Stmt::Assign(StmtAssign { value, .. })) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return false;
+    };
+
+    if !semantic.match_typing_expr(func, "NewType") {
+        return false;
+    }
+
+    if arguments.len() != 2 {
+        return false;
+    }
+
+    let Some(original_type) = arguments.find_argument_value("tp", 1) else {
+        return false;
+    };
+
+    is_immutable_annotation(original_type, semantic, extend_immutable_calls)
 }
 
 /// Return `true` if `func` is a function that returns a mutable value.
@@ -306,7 +382,7 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         | Expr::ListComp(_)
         | Expr::DictComp(_)
         | Expr::SetComp(_) => true,
-        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
+        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(map_subscript(func), semantic),
         _ => false,
     }
 }
@@ -314,6 +390,22 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// Return `true` if [`ast::StmtIf`] is a guard for a type-checking block.
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
+
+    if semantic.use_new_type_checking_block_detection_semantics() {
+        return match test.as_ref() {
+            // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
+            // for this specific check even if it's defined somewhere else, like the current module.
+            // Ex) `if TYPE_CHECKING:`
+            Expr::Name(ast::ExprName { id, .. }) => {
+                id == "TYPE_CHECKING"
+                // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
+                || semantic.match_typing_expr(test, "TYPE_CHECKING")
+            }
+            // Ex) `if typing.TYPE_CHECKING:`
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
+            _ => false,
+        };
+    }
 
     // Ex) `if False:`
     if is_const_false(test) {
@@ -373,7 +465,7 @@ where
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
-        // Ex) x | y
+        // Ex) `x | y`
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,
             left,
@@ -396,17 +488,21 @@ where
             return;
         }
 
-        // Ex) Union[x, y]
+        // Ex) `Union[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Union") {
                 if let Expr::Tuple(tuple) = &**slice {
                     // Traverse each element of the tuple within the union recursively to handle cases
-                    // such as `Union[..., Union[...]]
+                    // such as `Union[..., Union[...]]`
                     tuple
                         .iter()
                         .for_each(|elem| inner(func, semantic, elem, Some(expr)));
                     return;
                 }
+
+                // Ex) `Union[Union[a, b]]` and `Union[a | b | c]`
+                inner(func, semantic, slice, Some(expr));
+                return;
             }
         }
 
@@ -435,18 +531,19 @@ where
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
-        // Ex) Literal[x, y]
+        // Ex) `Literal[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Literal") {
                 match &**slice {
                     Expr::Tuple(tuple) => {
                         // Traverse each element of the tuple within the literal recursively to handle cases
-                        // such as `Literal[..., Literal[...]]
+                        // such as `Literal[..., Literal[...]]`
                         for element in tuple {
                             inner(func, semantic, element, Some(expr));
                         }
                     }
                     other => {
+                        // Ex) `Literal[Literal[...]]`
                         inner(func, semantic, other, Some(expr));
                     }
                 }
@@ -546,7 +643,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
                 let Some(parameter) = find_parameter(parameters, binding) else {
                     return false;
                 };
-                let Some(ref annotation) = parameter.parameter.annotation else {
+                let Some(annotation) = parameter.annotation() else {
                     return false;
                 };
                 T::match_annotation(annotation, semantic)
@@ -644,6 +741,22 @@ impl BuiltinTypeChecker for SetChecker {
     const EXPR_TYPE: PythonType = PythonType::Set;
 }
 
+struct StringChecker;
+
+impl BuiltinTypeChecker for StringChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "str";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::String;
+}
+
+struct BytesChecker;
+
+impl BuiltinTypeChecker for BytesChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "bytes";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Bytes;
+}
+
 struct TupleChecker;
 
 impl BuiltinTypeChecker for TupleChecker {
@@ -658,6 +771,14 @@ impl BuiltinTypeChecker for IntChecker {
     const BUILTIN_TYPE_NAME: &'static str = "int";
     const TYPING_NAME: Option<&'static str> = None;
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Integer);
+}
+
+struct FloatChecker;
+
+impl BuiltinTypeChecker for FloatChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "float";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Float);
 }
 
 pub struct IoBaseChecker;
@@ -736,6 +857,106 @@ impl TypeChecker for IoBaseChecker {
     }
 }
 
+pub struct PathlibPathChecker;
+
+impl PathlibPathChecker {
+    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "pathlib",
+                "Path"
+                    | "PosixPath"
+                    | "PurePath"
+                    | "PurePosixPath"
+                    | "PureWindowsPath"
+                    | "WindowsPath"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for PathlibPathChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_pathlib_path_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_pathlib_path_constructor(semantic, func)
+    }
+}
+
+pub struct FastApiRouteChecker;
+
+impl FastApiRouteChecker {
+    fn is_fastapi_route_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            ["fastapi", "FastAPI" | "APIRouter"]
+        )
+    }
+}
+
+impl TypeChecker for FastApiRouteChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_fastapi_route_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_fastapi_route_constructor(semantic, func)
+    }
+}
+
+pub struct TypeVarLikeChecker;
+
+impl TypeVarLikeChecker {
+    /// Returns `true` if an [`Expr`] is a `TypeVar`, `TypeVarTuple`, or `ParamSpec` call.
+    ///
+    /// See also [`ruff_linter::rules::flake8_pyi::rules::simple_defaults::is_type_var_like_call`].
+    fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+            return false;
+        };
+        let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "TypeVarTuple" | "ParamSpec"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for TypeVarLikeChecker {
+    fn match_annotation(_annotation: &Expr, _semantic: &SemanticModel) -> bool {
+        false
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_type_var_like_call(initializer, semantic)
+    }
+}
+
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -772,6 +993,21 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Test whether the given binding can be considered an integer.
 pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<IntChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `float`.
+pub fn is_float(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<FloatChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `str`.
+pub fn is_string(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<StringChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `bytes`.
+pub fn is_bytes(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<BytesChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.
@@ -819,6 +1055,21 @@ pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     IoBaseChecker::match_initializer(expr, semantic)
 }
 
+/// Test whether the given binding can be considered a `pathlib.PurePath`
+/// or an instance of a subclass thereof.
+pub fn is_pathlib_path(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<PathlibPathChecker>(binding, semantic)
+}
+
+pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<FastApiRouteChecker>(binding, semantic)
+}
+
+/// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
+pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<TypeVarLikeChecker>(binding, semantic)
+}
+
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
 fn find_parameter<'a>(
@@ -827,7 +1078,7 @@ fn find_parameter<'a>(
 ) -> Option<&'a ParameterWithDefault> {
     parameters
         .iter_non_variadic_params()
-        .find(|arg| arg.parameter.name.range() == binding.range())
+        .find(|param| param.identifier() == binding.range())
 }
 
 /// Return the [`QualifiedName`] of the value to which the given [`Expr`] is assigned, if any.
@@ -841,23 +1092,43 @@ fn find_parameter<'a>(
 /// ```
 ///
 /// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+///
+/// This function will also automatically expand attribute accesses, so given:
+/// ```python
+/// from module import AppContainer
+///
+/// container = AppContainer()
+/// container.app.get(...)
+/// ```
+///
+/// This function will return `["module", "AppContainer", "app", "get"]` for the
+/// attribute access `container.app.get`.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
-    let name = expr.as_name_expr()?;
+    // Resolve any attribute chain.
+    let mut head_expr = expr;
+    let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
+    while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = head_expr {
+        head_expr = value;
+        reversed_tail.push(attr.as_str());
+    }
+
+    // Resolve the left-most name, e.g. `foo` in `foo.bar.baz` to a qualified name,
+    // then append the attributes.
+    let name = head_expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
     match statement {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
-        }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
+        Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
         }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
+
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
         }
         _ => None,
     }

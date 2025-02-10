@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{GeneratorKind, ScopeKind};
 use ruff_text_size::Ranged;
 
@@ -38,8 +38,8 @@ use crate::checkers::ast::Checker;
 /// - [PEP 492: Await Expression](https://peps.python.org/pep-0492/#await-expression)
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
-#[violation]
-pub struct AwaitOutsideAsync;
+#[derive(ViolationMetadata)]
+pub(crate) struct AwaitOutsideAsync;
 
 impl Violation for AwaitOutsideAsync {
     #[derive_message_formats]
@@ -49,7 +49,7 @@ impl Violation for AwaitOutsideAsync {
 }
 
 /// PLE1142
-pub(crate) fn await_outside_async<T: Ranged>(checker: &mut Checker, node: T) {
+pub(crate) fn await_outside_async<T: Ranged>(checker: &Checker, node: T) {
     // If we're in an `async` function, we're good.
     if checker.semantic().in_async_context() {
         return;
@@ -78,7 +78,5 @@ pub(crate) fn await_outside_async<T: Ranged>(checker: &mut Checker, node: T) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(AwaitOutsideAsync, node.range()));
+    checker.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, node.range()));
 }

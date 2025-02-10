@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
@@ -45,8 +45,8 @@ impl fmt::Display for DeferralKeyword {
 /// - [Python documentation: `yield`](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
-#[violation]
-pub struct YieldOutsideFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct YieldOutsideFunction {
     keyword: DeferralKeyword,
 }
 
@@ -59,7 +59,7 @@ impl Violation for YieldOutsideFunction {
 }
 
 /// F704
-pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn yield_outside_function(checker: &Checker, expr: &Expr) {
     let scope = checker.semantic().current_scope();
     if scope.kind.is_module() || scope.kind.is_class() {
         let keyword = match expr {
@@ -78,7 +78,7 @@ pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             YieldOutsideFunction { keyword },
             expr.range(),
         ));

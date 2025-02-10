@@ -2,7 +2,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -37,15 +37,15 @@ use crate::registry::Rule;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct NoBlankLineBeforeFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineBeforeFunction {
     num_lines: usize,
 }
 
-impl AlwaysFixableViolation for NoBlankLineBeforeFunction {
+impl AlwaysFixableViolation for BlankLineBeforeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLineBeforeFunction { num_lines } = self;
+        let BlankLineBeforeFunction { num_lines } = self;
         format!("No blank lines allowed before function docstring (found {num_lines})")
     }
 
@@ -81,15 +81,15 @@ impl AlwaysFixableViolation for NoBlankLineBeforeFunction {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct NoBlankLineAfterFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineAfterFunction {
     num_lines: usize,
 }
 
-impl AlwaysFixableViolation for NoBlankLineAfterFunction {
+impl AlwaysFixableViolation for BlankLineAfterFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLineAfterFunction { num_lines } = self;
+        let BlankLineAfterFunction { num_lines } = self;
         format!("No blank lines allowed after function docstring (found {num_lines})")
     }
 
@@ -102,12 +102,12 @@ static INNER_FUNCTION_OR_CLASS_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
 
 /// D201, D202
-pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 
-    if checker.enabled(Rule::NoBlankLineBeforeFunction) {
+    if checker.enabled(Rule::BlankLineBeforeFunction) {
         let before = checker
             .locator()
             .slice(TextRange::new(function.start(), docstring.start()));
@@ -127,7 +127,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
         if blank_lines_before != 0 {
             let mut diagnostic = Diagnostic::new(
-                NoBlankLineBeforeFunction {
+                BlankLineBeforeFunction {
                     num_lines: blank_lines_before,
                 },
                 docstring.range(),
@@ -137,11 +137,11 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 blank_lines_start,
                 docstring.start() - docstring.indentation.text_len(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
-    if checker.enabled(Rule::NoBlankLineAfterFunction) {
+    if checker.enabled(Rule::BlankLineAfterFunction) {
         let after = checker
             .locator()
             .slice(TextRange::new(docstring.end(), function.end()));
@@ -181,7 +181,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
         if blank_lines_after != 0 {
             let mut diagnostic = Diagnostic::new(
-                NoBlankLineAfterFunction {
+                BlankLineAfterFunction {
                     num_lines: blank_lines_after,
                 },
                 docstring.range(),
@@ -191,7 +191,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 first_line_end,
                 blank_lines_end,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

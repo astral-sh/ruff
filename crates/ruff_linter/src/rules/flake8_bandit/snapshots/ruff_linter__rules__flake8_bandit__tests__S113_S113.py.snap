@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S113.py:46:1: S113 Probable use of `requests` call without timeout
    |
@@ -136,14 +135,14 @@ S113.py:59:36: S113 Probable use of `requests` call with timeout set to `None`
 58 | requests.head('https://gmail.com')
 59 | requests.head('https://gmail.com', timeout=None)
    |                                    ^^^^^^^^^^^^ S113
-60 | 
+60 |
 61 | httpx.get('https://gmail.com', timeout=None)
    |
 
 S113.py:61:32: S113 Probable use of `httpx` call with timeout set to `None`
    |
 59 | requests.head('https://gmail.com', timeout=None)
-60 | 
+60 |
 61 | httpx.get('https://gmail.com', timeout=None)
    |                                ^^^^^^^^^^^^ S113
 62 | httpx.post('https://gmail.com', timeout=None)
@@ -224,14 +223,14 @@ S113.py:69:19: S113 Probable use of `httpx` call with timeout set to `None`
 68 | httpx.Client(timeout=None)
 69 | httpx.AsyncClient(timeout=None)
    |                   ^^^^^^^^^^^^ S113
-70 | 
+70 |
 71 | with httpx.Client(timeout=None) as client:
    |
 
 S113.py:71:19: S113 Probable use of `httpx` call with timeout set to `None`
    |
 69 | httpx.AsyncClient(timeout=None)
-70 | 
+70 |
 71 | with httpx.Client(timeout=None) as client:
    |                   ^^^^^^^^^^^^ S113
 72 |     client.get('https://gmail.com')

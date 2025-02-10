@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `hasattr`](https://docs.python.org/3/library/functions.html#hasattr)
 /// - [Python documentation: `__getattr__`](https://docs.python.org/3/reference/datamodel.html#object.__getattr__)
 /// - [Python documentation: `__call__`](https://docs.python.org/3/reference/datamodel.html#object.__call__)
-#[violation]
-pub struct UnreliableCallableCheck;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnreliableCallableCheck;
 
 impl Violation for UnreliableCallableCheck {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -51,7 +51,7 @@ impl Violation for UnreliableCallableCheck {
 
 /// B004
 pub(crate) fn unreliable_callable_check(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -87,5 +87,5 @@ pub(crate) fn unreliable_callable_check(
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

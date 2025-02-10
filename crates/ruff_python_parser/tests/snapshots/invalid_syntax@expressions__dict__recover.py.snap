@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/recover.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -422,30 +421,30 @@ Module(
 
   |
 1 | # Test cases for dictionary expressions where the parser recovers from a syntax error.
-2 | 
+2 |
 3 | {,}
   |  ^ Syntax Error: Expected an expression
-4 | 
+4 |
 5 | {1: 2,,3: 4}
   |
 
 
   |
 3 | {,}
-4 | 
+4 |
 5 | {1: 2,,3: 4}
   |       ^ Syntax Error: Expected an expression or a '}'
-6 | 
+6 |
 7 | {1: 2,,}
   |
 
 
   |
 5 | {1: 2,,3: 4}
-6 | 
+6 |
 7 | {1: 2,,}
   |       ^ Syntax Error: Expected an expression or a '}'
-8 | 
+8 |
 9 | # Missing comma
   |
 
@@ -454,7 +453,7 @@ Module(
  9 | # Missing comma
 10 | {1: 2 3: 4}
    |       ^ Syntax Error: Expected ',', found int
-11 | 
+11 |
 12 | # No value
    |
 
@@ -463,7 +462,7 @@ Module(
 12 | # No value
 13 | {1: }
    |     ^ Syntax Error: Expected an expression
-14 | 
+14 |
 15 | # No value for double star unpacking
    |
 
@@ -481,7 +480,7 @@ Module(
 16 | {**}
 17 | {x: y, **, a: b}
    |          ^ Syntax Error: Expected an expression
-18 | 
+18 |
 19 | # This is not a double star unpacking
    |
 

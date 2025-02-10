@@ -497,12 +497,7 @@ impl<'a> Printer<'a> {
             dest: self.state.buffer.text_len(),
         };
 
-        if self
-            .state
-            .source_markers
-            .last()
-            .map_or(true, |last| last != &marker)
-        {
+        if self.state.source_markers.last() != Some(&marker) {
             self.state.source_markers.push(marker);
         }
     }
@@ -905,7 +900,7 @@ struct PrinterState<'a> {
     fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,
 }
 
-impl<'a> PrinterState<'a> {
+impl PrinterState<'_> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: String::with_capacity(capacity),
@@ -1048,8 +1043,6 @@ struct FitsMeasurer<'a, 'print> {
     /// Bomb that enforces that finish is explicitly called to restore the `fits_stack` and `fits_queue` vectors.
     bomb: DebugDropBomb,
 }
-
-impl<'a, 'print> FitsMeasurer<'a, 'print> {}
 
 impl<'a, 'print> FitsMeasurer<'a, 'print> {
     fn new_flat(

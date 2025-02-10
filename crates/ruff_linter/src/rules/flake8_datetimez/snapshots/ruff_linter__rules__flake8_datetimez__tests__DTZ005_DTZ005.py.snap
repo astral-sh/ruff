@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
-snapshot_kind: text
 ---
 DTZ005.py:4:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
   |
 3 | # no args
 4 | datetime.datetime.now()
   | ^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-5 | 
+5 |
 6 | # wrong keywords
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
@@ -17,7 +16,7 @@ DTZ005.py:7:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
 6 | # wrong keywords
 7 | datetime.datetime.now(bad=datetime.timezone.utc)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-8 | 
+8 |
 9 | # none args
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
@@ -27,7 +26,7 @@ DTZ005.py:10:1: DTZ005 `tz=None` passed to `datetime.datetime.now()`
  9 | # none args
 10 | datetime.datetime.now(None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-11 | 
+11 |
 12 | # none keywords
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
@@ -37,7 +36,7 @@ DTZ005.py:13:1: DTZ005 `tz=None` passed to `datetime.datetime.now()`
 12 | # none keywords
 13 | datetime.datetime.now(tz=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-14 | 
+14 |
 15 | from datetime import datetime
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
@@ -47,7 +46,60 @@ DTZ005.py:18:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
 17 | # no args unqualified
 18 | datetime.now()
    | ^^^^^^^^^^^^^^ DTZ005
-19 | 
+19 |
 20 | # uses `astimezone` method
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:28:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+27 | ## Errors
+28 | datetime.now().replace.astimezone()
+   | ^^^^^^^^^^^^^^ DTZ005
+29 | datetime.now().replace[0].astimezone()
+30 | datetime.now()().astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:29:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+27 | ## Errors
+28 | datetime.now().replace.astimezone()
+29 | datetime.now().replace[0].astimezone()
+   | ^^^^^^^^^^^^^^ DTZ005
+30 | datetime.now()().astimezone()
+31 | datetime.now().replace(datetime.now()).astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:30:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+28 | datetime.now().replace.astimezone()
+29 | datetime.now().replace[0].astimezone()
+30 | datetime.now()().astimezone()
+   | ^^^^^^^^^^^^^^ DTZ005
+31 | datetime.now().replace(datetime.now()).astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:31:24: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+29 | datetime.now().replace[0].astimezone()
+30 | datetime.now()().astimezone()
+31 | datetime.now().replace(datetime.now()).astimezone()
+   |                        ^^^^^^^^^^^^^^ DTZ005
+32 |
+33 | foo.replace(datetime.now().replace).astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:33:13: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+31 | datetime.now().replace(datetime.now()).astimezone()
+32 |
+33 | foo.replace(datetime.now().replace).astimezone()
+   |             ^^^^^^^^^^^^^^ DTZ005
+34 |
+35 | ## No errors
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter

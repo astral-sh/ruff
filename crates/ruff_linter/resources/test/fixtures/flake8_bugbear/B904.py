@@ -1,6 +1,6 @@
 """
 Should emit:
-B904 - on lines 10, 11, 16, 62, and 64
+B904 - on lines 10, 11, 16, 62, 64, 79, 81, 87, 88, 93 and 97
 """
 
 try:
@@ -71,3 +71,29 @@ except Exception as e:
     match 0:
         case 0:
             raise RuntimeError("boom!")
+
+try:
+    ...
+except* Exception as e:
+    if ...:
+        raise RuntimeError("boom!")
+    else:
+        raise RuntimeError("bang!")
+
+try:
+    raise ValueError
+except* ValueError:
+    if "abc":
+        raise TypeError
+    raise UserWarning
+except* AssertionError:
+    raise  # Bare `raise` should not be an error
+except* Exception as err:
+    assert err
+    raise Exception("No cause here...")
+except* BaseException as err:
+    raise err
+except* BaseException as err:
+    raise some_other_err
+finally:
+    raise Exception("Nothing to chain from, so no warning here")

@@ -118,14 +118,12 @@ impl<'db> ScopeId<'db> {
         // Type parameter scopes behave like function scopes in terms of name resolution; CPython
         // symbol table also uses the term "function-like" for these scopes.
         matches!(
-            self.node(db),
-            NodeWithScopeKind::ClassTypeParameters(_)
-                | NodeWithScopeKind::FunctionTypeParameters(_)
-                | NodeWithScopeKind::Function(_)
-                | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_)
-                | NodeWithScopeKind::DictComprehension(_)
-                | NodeWithScopeKind::GeneratorExpression(_)
+            self.node(db).scope_kind(),
+            ScopeKind::Annotation
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias
+                | ScopeKind::Comprehension
         )
     }
 
@@ -190,6 +188,12 @@ impl<'db> ScopeId<'db> {
             }
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
+            NodeWithScopeKind::TypeAlias(type_alias)
+            | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => type_alias
+                .name
+                .as_name_expr()
+                .map(|name| name.id.as_str())
+                .unwrap_or("<type alias>"),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
             NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
             NodeWithScopeKind::SetComprehension(_) => "<setcomp>",
@@ -266,7 +270,9 @@ pub enum ScopeKind {
     Annotation,
     Class,
     Function,
+    Lambda,
     Comprehension,
+    TypeAlias,
 }
 
 /// Symbol table for a specific [`Scope`].
@@ -394,6 +400,8 @@ pub(crate) enum NodeWithScopeRef<'a> {
     Lambda(&'a ast::ExprLambda),
     FunctionTypeParameters(&'a ast::StmtFunctionDef),
     ClassTypeParameters(&'a ast::StmtClassDef),
+    TypeAlias(&'a ast::StmtTypeAlias),
+    TypeAliasTypeParameters(&'a ast::StmtTypeAlias),
     ListComprehension(&'a ast::ExprListComp),
     SetComprehension(&'a ast::ExprSetComp),
     DictComprehension(&'a ast::ExprDictComp),
@@ -414,6 +422,12 @@ impl<'a> NodeWithScopeRef<'a> {
             }
             NodeWithScopeRef::Function(function) => {
                 NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::TypeAlias(type_alias) => {
+                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+            }
+            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
             }
             NodeWithScopeRef::Lambda(lambda) => {
                 NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
@@ -455,6 +469,12 @@ impl<'a> NodeWithScopeRef<'a> {
             NodeWithScopeRef::ClassTypeParameters(class) => {
                 NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
             }
+            NodeWithScopeRef::TypeAlias(type_alias) => {
+                NodeWithScopeKey::TypeAlias(NodeKey::from_node(type_alias))
+            }
+            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                NodeWithScopeKey::TypeAliasTypeParameters(NodeKey::from_node(type_alias))
+            }
             NodeWithScopeRef::ListComprehension(comprehension) => {
                 NodeWithScopeKey::ListComprehension(NodeKey::from_node(comprehension))
             }
@@ -479,6 +499,8 @@ pub enum NodeWithScopeKind {
     ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
+    TypeAliasTypeParameters(AstNodeRef<ast::StmtTypeAlias>),
+    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     Lambda(AstNodeRef<ast::ExprLambda>),
     ListComprehension(AstNodeRef<ast::ExprListComp>),
     SetComprehension(AstNodeRef<ast::ExprSetComp>),
@@ -492,8 +514,11 @@ impl NodeWithScopeKind {
             Self::Module => ScopeKind::Module,
             Self::Class(_) => ScopeKind::Class,
             Self::Function(_) => ScopeKind::Function,
-            Self::Lambda(_) => ScopeKind::Function,
-            Self::FunctionTypeParameters(_) | Self::ClassTypeParameters(_) => ScopeKind::Annotation,
+            Self::Lambda(_) => ScopeKind::Lambda,
+            Self::FunctionTypeParameters(_)
+            | Self::ClassTypeParameters(_)
+            | Self::TypeAliasTypeParameters(_) => ScopeKind::Annotation,
+            Self::TypeAlias(_) => ScopeKind::TypeAlias,
             Self::ListComprehension(_)
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
@@ -532,9 +557,20 @@ impl NodeWithScopeKind {
     }
 
     pub fn expect_function(&self) -> &ast::StmtFunctionDef {
+        self.as_function().expect("expected function")
+    }
+
+    pub fn expect_type_alias(&self) -> &ast::StmtTypeAlias {
         match self {
-            Self::Function(function) => function.node(),
-            _ => panic!("expected function"),
+            Self::TypeAlias(type_alias) => type_alias.node(),
+            _ => panic!("expected type alias"),
+        }
+    }
+
+    pub const fn as_function(&self) -> Option<&ast::StmtFunctionDef> {
+        match self {
+            Self::Function(function) => Some(function.node()),
+            _ => None,
         }
     }
 }
@@ -546,6 +582,8 @@ pub(crate) enum NodeWithScopeKey {
     ClassTypeParameters(NodeKey),
     Function(NodeKey),
     FunctionTypeParameters(NodeKey),
+    TypeAlias(NodeKey),
+    TypeAliasTypeParameters(NodeKey),
     Lambda(NodeKey),
     ListComprehension(NodeKey),
     SetComprehension(NodeKey),

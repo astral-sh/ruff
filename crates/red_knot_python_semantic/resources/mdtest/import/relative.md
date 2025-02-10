@@ -2,10 +2,14 @@
 
 ## Non-existent
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/bar.py
+`package/bar.py`:
+
+```py
 from .foo import X  # error: [unresolved-import]
 
 reveal_type(X)  # revealed: Unknown
@@ -13,49 +17,67 @@ reveal_type(X)  # revealed: Unknown
 
 ## Simple
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/foo.py
-X = 42
+`package/foo.py`:
+
+```py
+X: int = 42
 ```
 
-```py path=package/bar.py
+`package/bar.py`:
+
+```py
 from .foo import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Dotted
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/foo/bar/baz.py
-X = 42
+`package/foo/bar/baz.py`:
+
+```py
+X: int = 42
 ```
 
-```py path=package/bar.py
+`package/bar.py`:
+
+```py
 from .foo.bar.baz import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Bare to package
 
-```py path=package/__init__.py
-X = 42
+`package/__init__.py`:
+
+```py
+X: int = 42
 ```
 
-```py path=package/bar.py
+`package/bar.py`:
+
+```py
 from . import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Non-existent + bare to package
 
-```py path=package/bar.py
+`package/bar.py`:
+
+```py
 from . import X  # error: [unresolved-import]
 
 reveal_type(X)  # revealed: Unknown
@@ -63,19 +85,25 @@ reveal_type(X)  # revealed: Unknown
 
 ## Dunder init
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 from .foo import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
-```py path=package/foo.py
-X = 42
+`package/foo.py`:
+
+```py
+X: int = 42
 ```
 
 ## Non-existent + dunder init
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 from .foo import X  # error: [unresolved-import]
 
 reveal_type(X)  # revealed: Unknown
@@ -83,29 +111,41 @@ reveal_type(X)  # revealed: Unknown
 
 ## Long relative import
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/foo.py
-X = 42
+`package/foo.py`:
+
+```py
+X: int = 42
 ```
 
-```py path=package/subpackage/subsubpackage/bar.py
+`package/subpackage/subsubpackage/bar.py`:
+
+```py
 from ...foo import X
 
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: int
 ```
 
 ## Unbound symbol
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/foo.py
+`package/foo.py`:
+
+```py
 x  # error: [unresolved-reference]
 ```
 
-```py path=package/bar.py
+`package/bar.py`:
+
+```py
 from .foo import x  # error: [unresolved-import]
 
 reveal_type(x)  # revealed: Unknown
@@ -113,31 +153,86 @@ reveal_type(x)  # revealed: Unknown
 
 ## Bare to module
 
-```py path=package/__init__.py
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/foo.py
-X = 42
+`package/foo.py`:
+
+```py
+X: int = 42
 ```
 
-```py path=package/bar.py
-# TODO: support submodule imports
-from . import foo  # error: [unresolved-import]
+`package/bar.py`:
 
-y = foo.X
+```py
+from . import foo
 
-# TODO: should be `Literal[42]`
-reveal_type(y)  # revealed: Unknown
+reveal_type(foo.X)  # revealed: int
 ```
 
 ## Non-existent + bare to module
 
-```py path=package/__init__.py
+This test verifies that we emit an error when we try to import a symbol that is neither a submodule
+nor an attribute of `package`.
+
+`package/__init__.py`:
+
+```py
 ```
 
-```py path=package/bar.py
-# TODO: support submodule imports
+`package/bar.py`:
+
+```py
 from . import foo  # error: [unresolved-import]
 
 reveal_type(foo)  # revealed: Unknown
+```
+
+## Import submodule from self
+
+We don't currently consider `from...import` statements when building up the `imported_modules` set
+in the semantic index. When accessing an attribute of a module, we only consider it a potential
+submodule when that submodule name appears in the `imported_modules` set. That means that submodules
+that are imported via `from...import` are not visible to our type inference if you also access that
+submodule via the attribute on its parent package.
+
+`package/__init__.py`:
+
+```py
+```
+
+`package/foo.py`:
+
+```py
+X: int = 42
+```
+
+`package/bar.py`:
+
+```py
+from . import foo
+import package
+
+# error: [unresolved-attribute] "Type `<module 'package'>` has no attribute `foo`"
+reveal_type(package.foo.X)  # revealed: Unknown
+```
+
+## Relative imports at the top of a search path
+
+Relative imports at the top of a search path result in a runtime error:
+`ImportError: attempted relative import with no known parent package`. That's why Red Knot should
+disallow them.
+
+`parser.py`:
+
+```py
+X: int = 42
+```
+
+`__main__.py`:
+
+```py
+from .parser import X  # error: [unresolved-import]
 ```

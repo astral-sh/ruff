@@ -2,7 +2,8 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -39,8 +40,8 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// ## References
 /// - [Pandas documentation: `isnull`](https://pandas.pydata.org/docs/reference/api/pandas.isnull.html#pandas.isnull)
 /// - [Pandas documentation: `isna`](https://pandas.pydata.org/docs/reference/api/pandas.isna.html#pandas.isna)
-#[violation]
-pub struct PandasUseOfDotIsNull;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotIsNull;
 
 impl Violation for PandasUseOfDotIsNull {
     #[derive_message_formats]
@@ -79,8 +80,8 @@ impl Violation for PandasUseOfDotIsNull {
 /// ## References
 /// - [Pandas documentation: `notnull`](https://pandas.pydata.org/docs/reference/api/pandas.notnull.html#pandas.notnull)
 /// - [Pandas documentation: `notna`](https://pandas.pydata.org/docs/reference/api/pandas.notna.html#pandas.notna)
-#[violation]
-pub struct PandasUseOfDotNotNull;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotNotNull;
 
 impl Violation for PandasUseOfDotNotNull {
     #[derive_message_formats]
@@ -115,8 +116,8 @@ impl Violation for PandasUseOfDotNotNull {
 /// ## References
 /// - [Pandas documentation: Reshaping and pivot tables](https://pandas.pydata.org/docs/user_guide/reshaping.html)
 /// - [Pandas documentation: `pivot_table`](https://pandas.pydata.org/docs/reference/api/pandas.pivot_table.html#pandas.pivot_table)
-#[violation]
-pub struct PandasUseOfDotPivotOrUnstack;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotPivotOrUnstack;
 
 impl Violation for PandasUseOfDotPivotOrUnstack {
     #[derive_message_formats]
@@ -152,8 +153,8 @@ impl Violation for PandasUseOfDotPivotOrUnstack {
 /// ## References
 /// - [Pandas documentation: `melt`](https://pandas.pydata.org/docs/reference/api/pandas.melt.html)
 /// - [Pandas documentation: `stack`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.stack.html)
-#[violation]
-pub struct PandasUseOfDotStack;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotStack;
 
 impl Violation for PandasUseOfDotStack {
     #[derive_message_formats]
@@ -162,7 +163,11 @@ impl Violation for PandasUseOfDotStack {
     }
 }
 
-pub(crate) fn call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn call(checker: &Checker, func: &Expr) {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
+        return;
+    }
+
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
@@ -195,7 +200,5 @@ pub(crate) fn call(checker: &mut Checker, func: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(violation, func.range()));
+    checker.report_diagnostic(Diagnostic::new(violation, func.range()));
 }

@@ -73,6 +73,15 @@ enum SystemOrVendoredPathRef<'a> {
     Vendored(&'a VendoredPath),
 }
 
+impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SystemOrVendoredPathRef::System(system) => system.fmt(f),
+            SystemOrVendoredPathRef::Vendored(vendored) => vendored.fmt(f),
+        }
+    }
+}
+
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
@@ -159,8 +168,8 @@ impl SearchPaths {
 
         let SearchPathSettings {
             extra_paths,
-            src_root,
-            custom_typeshed,
+            src_roots,
+            custom_typeshed: typeshed,
             site_packages: site_packages_paths,
         } = settings;
 
@@ -177,20 +186,18 @@ impl SearchPaths {
             static_paths.push(SearchPath::extra(system, path)?);
         }
 
-        tracing::debug!("Adding first-party search path '{src_root}'");
-        static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        for src_root in src_roots {
+            tracing::debug!("Adding first-party search path '{src_root}'");
+            static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        }
 
-        let (typeshed_versions, stdlib_path) = if let Some(custom_typeshed) = custom_typeshed {
-            let custom_typeshed = canonicalize(custom_typeshed, system);
-            tracing::debug!("Adding custom-stdlib search path '{custom_typeshed}'");
+        let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
+            let typeshed = canonicalize(typeshed, system);
+            tracing::debug!("Adding custom-stdlib search path '{typeshed}'");
 
-            files.try_add_root(
-                db.upcast(),
-                &custom_typeshed,
-                FileRootKind::LibrarySearchPath,
-            );
+            files.try_add_root(db.upcast(), &typeshed, FileRootKind::LibrarySearchPath);
 
-            let versions_path = custom_typeshed.join("stdlib/VERSIONS");
+            let versions_path = typeshed.join("stdlib/VERSIONS");
 
             let versions_content = system.read_to_string(&versions_path).map_err(|error| {
                 SearchPathValidationError::FailedToReadVersionsFile {
@@ -201,7 +208,7 @@ impl SearchPaths {
 
             let parsed: TypeshedVersions = versions_content.parse()?;
 
-            let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
+            let search_path = SearchPath::custom_stdlib(db, &typeshed)?;
 
             (parsed, search_path)
         } else {
@@ -215,8 +222,14 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match site_packages_paths {
-            SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
-                .and_then(|venv| venv.site_packages_directories(system))?,
+            SitePackages::Derived { venv_path } => {
+                // TODO: We may want to warn here if the venv's python version is older
+                //  than the one resolved in the program settings because it indicates
+                //  that the `target-version` is incorrectly configured or that the
+                //  venv is out of date.
+                VirtualEnvironment::new(venv_path, system)
+                    .and_then(|venv| venv.site_packages_directories(system))?
+            }
             SitePackages::Known(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
@@ -416,7 +429,7 @@ impl<'db> Iterator for SearchPathIterator<'db> {
     }
 }
 
-impl<'db> FusedIterator for SearchPathIterator<'db> {}
+impl FusedIterator for SearchPathIterator<'_> {}
 
 /// Represents a single `.pth` file in a `site-packages` directory.
 /// One or more lines in a `.pth` file may be a (relative or absolute)
@@ -530,10 +543,10 @@ struct ModuleNameIngredient<'db> {
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, ModuleKind)> {
     let program = Program::get(db);
-    let target_version = program.target_version(db);
-    let resolver_state = ResolverContext::new(db, target_version);
+    let python_version = program.python_version(db);
+    let resolver_state = ResolverContext::new(db, python_version);
     let is_builtin_module =
-        ruff_python_stdlib::sys::is_builtin_module(target_version.minor, name.as_str());
+        ruff_python_stdlib::sys::is_builtin_module(python_version.minor, name.as_str());
 
     for search_path in search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
@@ -690,12 +703,12 @@ impl PackageKind {
 
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
-    pub(super) target_version: PythonVersion,
+    pub(super) python_version: PythonVersion,
 }
 
 impl<'db> ResolverContext<'db> {
-    pub(super) fn new(db: &'db dyn Db, target_version: PythonVersion) -> Self {
-        Self { db, target_version }
+    pub(super) fn new(db: &'db dyn Db, python_version: PythonVersion) -> Self {
+        Self { db, python_version }
     }
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
@@ -716,8 +729,8 @@ mod tests {
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::ProgramSettings;
     use crate::PythonVersion;
+    use crate::{ProgramSettings, PythonPlatform};
 
     use super::*;
 
@@ -771,8 +784,8 @@ mod tests {
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_src_files(SRC)
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let builtins_module_name = ModuleName::new_static("builtins").unwrap();
@@ -789,8 +802,8 @@ mod tests {
         };
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -842,8 +855,8 @@ mod tests {
         };
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
@@ -887,8 +900,8 @@ mod tests {
         };
 
         let TestCase { db, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let nonexisting_modules = create_module_names(&[
@@ -931,8 +944,8 @@ mod tests {
         };
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY39)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY39)
             .build();
 
         let existing_modules = create_module_names(&[
@@ -973,8 +986,8 @@ mod tests {
         };
 
         let TestCase { db, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY39)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY39)
             .build();
 
         let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
@@ -997,8 +1010,8 @@ mod tests {
 
         let TestCase { db, src, .. } = TestCaseBuilder::new()
             .with_src_files(SRC)
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1022,7 +1035,7 @@ mod tests {
     fn stdlib_uses_vendored_typeshed_when_no_custom_typeshed_supplied() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_vendored_typeshed()
-            .with_target_version(PythonVersion::default())
+            .with_python_version(PythonVersion::default())
             .build();
 
         let pydoc_data_topics_name = ModuleName::new_static("pydoc_data.topics").unwrap();
@@ -1257,7 +1270,7 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use crate::program::Program;
+        use crate::{program::Program, PythonPlatform};
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
@@ -1289,11 +1302,12 @@ mod tests {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
-                target_version: PythonVersion::PY38,
+            ProgramSettings {
+                python_version: PythonVersion::PY38,
+                python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: src.clone(),
+                    src_roots: vec![src.clone()],
                     custom_typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
@@ -1333,7 +1347,7 @@ mod tests {
     fn deleting_an_unrelated_file_doesnt_change_module_resolution() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
             .with_src_files(&[("foo.py", "x = 1"), ("bar.py", "x = 2")])
-            .with_target_version(PythonVersion::PY38)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
@@ -1420,8 +1434,8 @@ mod tests {
             site_packages,
             ..
         } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1468,8 +1482,8 @@ mod tests {
             src,
             ..
         } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1508,8 +1522,8 @@ mod tests {
             ..
         } = TestCaseBuilder::new()
             .with_src_files(SRC)
-            .with_custom_typeshed(TYPESHED)
-            .with_target_version(PythonVersion::PY38)
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1794,11 +1808,12 @@ not_a_directory
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
+                    src_roots: vec![SystemPathBuf::from("/src")],
                     custom_typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,

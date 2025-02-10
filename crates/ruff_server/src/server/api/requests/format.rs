@@ -1,3 +1,4 @@
+use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use types::TextEdit;
 
@@ -5,7 +6,7 @@ use ruff_source_file::LineIndex;
 
 use crate::edit::{Replacement, ToRangeExt};
 use crate::fix::Fixes;
-use crate::resolve::is_document_excluded;
+use crate::resolve::is_document_excluded_for_formatting;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::{DocumentQuery, DocumentSnapshot};
@@ -64,7 +65,8 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     let text_document = snapshot
         .query()
         .as_single_document()
-        .expect("format should only be called on text documents or notebook cells");
+        .context("Failed to get text document for the format request")
+        .unwrap();
     let query = snapshot.query();
     format_text_document(
         text_document,
@@ -80,16 +82,14 @@ fn format_text_document(
     encoding: PositionEncoding,
     is_notebook: bool,
 ) -> Result<super::FormatResponse> {
-    let file_resolver_settings = query.settings().file_resolver();
-    let formatter_settings = query.settings().formatter();
+    let settings = query.settings();
 
     // If the document is excluded, return early.
     if let Some(file_path) = query.file_path() {
-        if is_document_excluded(
+        if is_document_excluded_for_formatting(
             &file_path,
-            file_resolver_settings,
-            None,
-            Some(formatter_settings),
+            &settings.file_resolver,
+            &settings.formatter,
             text_document.language_id(),
         ) {
             return Ok(None);
@@ -97,7 +97,7 @@ fn format_text_document(
     }
 
     let source = text_document.contents();
-    let formatted = crate::format::format(text_document, query.source_type(), formatter_settings)
+    let formatted = crate::format::format(text_document, query.source_type(), &settings.formatter)
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     let Some(mut formatted) = formatted else {
         return Ok(None);

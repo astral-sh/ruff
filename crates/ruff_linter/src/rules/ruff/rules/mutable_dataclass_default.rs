@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -54,8 +54,8 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 /// class A:
 ///     mutable_default: ClassVar[list[int]] = []
 /// ```
-#[violation]
-pub struct MutableDataclassDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableDataclassDefault;
 
 impl Violation for MutableDataclassDefault {
     #[derive_message_formats]
@@ -65,16 +65,12 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+    if dataclass_kind(class_def, semantic).is_none() {
         return;
     };
-
-    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
-        return;
-    }
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -92,7 +88,7 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::
         {
             let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

@@ -471,7 +471,13 @@ impl ToOwned for SystemPath {
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
 #[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
-pub struct SystemPathBuf(Utf8PathBuf);
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(transparent)
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
 impl SystemPathBuf {
     pub fn new() -> Self {
@@ -655,27 +661,6 @@ impl ruff_cache::CacheKey for SystemPath {
 impl ruff_cache::CacheKey for SystemPathBuf {
     fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
         self.as_path().cache_key(hasher);
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for SystemPath {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for SystemPathBuf {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for SystemPathBuf {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Utf8PathBuf::deserialize(deserializer).map(SystemPathBuf)
     }
 }
 

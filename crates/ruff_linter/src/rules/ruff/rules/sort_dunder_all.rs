@@ -1,5 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
@@ -54,21 +54,42 @@ use crate::rules::ruff::rules::sequence_sorting::{
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as always being safe, in that
+/// This rule's fix is marked as unsafe if there are any comments that take up
+/// a whole line by themselves inside the `__all__` definition, for example:
+/// ```py
+/// __all__ = [
+///     # eggy things
+///     "duck_eggs",
+///     "chicken_eggs",
+///     # hammy things
+///     "country_ham",
+///     "parma_ham",
+/// ]
+/// ```
+///
+/// This is a common pattern used to delimit categories within a module's API,
+/// but it would be out of the scope of this rule to attempt to maintain these
+/// categories when alphabetically sorting the items of `__all__`.
+///
+/// The fix is also marked as unsafe if there are more than two `__all__` items
+/// on a single line and that line also has a trailing comment, since here it
+/// is impossible to accurately gauge which item the comment should be moved
+/// with when sorting `__all__`:
+/// ```py
+/// __all__ = [
+///     "a", "c", "e",  # a comment
+///     "b", "d", "f",  # a second  comment
+/// ]
+/// ```
+///
+/// Other than this, the rule's fix is marked as always being safe, in that
 /// it should very rarely alter the semantics of any Python code.
 /// However, note that (although it's rare) the value of `__all__`
 /// could be read by code elsewhere that depends on the exact
 /// iteration order of the items in `__all__`, in which case this
 /// rule's fix could theoretically cause breakage.
-///
-/// Note also that for multiline `__all__` definitions
-/// that include comments on their own line, it can be hard
-/// to tell where the comments should be moved to when sorting
-/// the contents of `__all__`. While this rule's fix will
-/// never delete a comment, it might *sometimes* move a
-/// comment to an unexpected location.
-#[violation]
-pub struct UnsortedDunderAll;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsortedDunderAll;
 
 impl Violation for UnsortedDunderAll {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -88,7 +109,7 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Isort;
 /// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_assign(
-    checker: &mut Checker,
+    checker: &Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
 ) {
     if let [expr] = targets.as_slice() {
@@ -98,7 +119,7 @@ pub(crate) fn sort_dunder_all_assign(
 
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::StmtAugAssign) {
+pub(crate) fn sort_dunder_all_aug_assign(checker: &Checker, node: &ast::StmtAugAssign) {
     if node.op.is_add() {
         sort_dunder_all(checker, &node.target, &node.value);
     }
@@ -106,7 +127,7 @@ pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::Stmt
 
 /// Sort a tuple or list passed to `__all__.extend()`.
 pub(crate) fn sort_dunder_all_extend_call(
-    checker: &mut Checker,
+    checker: &Checker,
     ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
@@ -131,7 +152,7 @@ pub(crate) fn sort_dunder_all_extend_call(
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
+pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnAssign) {
     if let Some(value) = &node.value {
         sort_dunder_all(checker, &node.target, value);
     }
@@ -142,7 +163,7 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::Stmt
 /// This routine checks whether the tuple or list is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list was not sorted,
 /// it attempts to set a `Fix` on the violation.
-fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
+fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
     let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
@@ -186,7 +207,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Attempt to return `Some(fix)`, where `fix` is a `Fix`
@@ -208,37 +229,42 @@ fn create_fix(
     let locator = checker.locator();
     let is_multiline = locator.contains_line_break(range);
 
-    let sorted_source_code = {
-        // The machinery in the `MultilineDunderAllValue` is actually
-        // sophisticated enough that it would work just as well for
-        // single-line `__all__` definitions, and we could reduce
-        // the number of lines of code in this file by doing that.
-        // Unfortunately, however, `MultilineDunderAllValue::from_source_range()`
-        // must process every token in an `__all__` definition as
-        // part of its analysis, and this is quite slow. For
-        // single-line `__all__` definitions, it's also unnecessary,
-        // as it's impossible to have comments in between the
-        // `__all__` elements if the `__all__` definition is all on
-        // a single line. Therefore, as an optimisation, we do the
-        // bare minimum of token-processing for single-line `__all__`
-        // definitions:
-        if is_multiline {
-            let value = MultilineStringSequenceValue::from_source_range(
-                range,
-                kind,
-                locator,
-                checker.tokens(),
-                string_items,
-            )?;
-            assert_eq!(value.len(), elts.len());
-            value.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
+    // The machinery in the `MultilineDunderAllValue` is actually
+    // sophisticated enough that it would work just as well for
+    // single-line `__all__` definitions, and we could reduce
+    // the number of lines of code in this file by doing that.
+    // Unfortunately, however, `MultilineDunderAllValue::from_source_range()`
+    // must process every token in an `__all__` definition as
+    // part of its analysis, and this is quite slow. For
+    // single-line `__all__` definitions, it's also unnecessary,
+    // as it's impossible to have comments in between the
+    // `__all__` elements if the `__all__` definition is all on
+    // a single line. Therefore, as an optimisation, we do the
+    // bare minimum of token-processing for single-line `__all__`
+    // definitions:
+    let (sorted_source_code, applicability) = if is_multiline {
+        let value = MultilineStringSequenceValue::from_source_range(
+            range,
+            kind,
+            locator,
+            checker.tokens(),
+            string_items,
+        )?;
+        assert_eq!(value.len(), elts.len());
+        let applicability = if value.comment_complexity().is_complex() {
+            Applicability::Unsafe
         } else {
-            sort_single_line_elements_sequence(kind, elts, string_items, locator, SORTING_STYLE)
-        }
+            Applicability::Safe
+        };
+        let sorted_source =
+            value.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist());
+        (sorted_source, applicability)
+    } else {
+        let sorted_source =
+            sort_single_line_elements_sequence(kind, elts, string_items, locator, SORTING_STYLE);
+        (sorted_source, Applicability::Safe)
     };
 
-    Some(Fix::safe_edit(Edit::range_replacement(
-        sorted_source_code,
-        range,
-    )))
+    let edit = Edit::range_replacement(sorted_source_code, range);
+    Some(Fix::applicable_edit(edit, applicability))
 }

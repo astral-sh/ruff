@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -40,8 +40,8 @@ use super::helpers;
 ///     def __str__(self):
 ///         return f"{self.field}"
 /// ```
-#[violation]
-pub struct DjangoModelWithoutDunderStr;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoModelWithoutDunderStr;
 
 impl Violation for DjangoModelWithoutDunderStr {
     #[derive_message_formats]
@@ -51,7 +51,7 @@ impl Violation for DjangoModelWithoutDunderStr {
 }
 
 /// DJ008
-pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -64,7 +64,7 @@ pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::S
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         DjangoModelWithoutDunderStr,
         class_def.identifier(),
     ));

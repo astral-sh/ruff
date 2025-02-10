@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
@@ -37,8 +37,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
-#[violation]
-pub struct VerboseDecimalConstructor {
+#[derive(ViolationMetadata)]
+pub(crate) struct VerboseDecimalConstructor {
     replacement: String,
 }
 
@@ -57,7 +57,7 @@ impl Violation for VerboseDecimalConstructor {
 }
 
 /// FURB157
-pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -67,7 +67,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
     }
 
     // Decimal accepts arguments of the form: `Decimal(value='0', context=None)`
-    let Some(value) = call.arguments.find_argument("value", 0) else {
+    let Some(value) = call.arguments.find_argument_value("value", 0) else {
         return;
     };
 
@@ -152,14 +152,34 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             let Some(float) = float.as_string_literal_expr() else {
                 return;
             };
-            if !matches!(
-                float.value.to_str().to_lowercase().as_str(),
-                "inf" | "-inf" | "infinity" | "-infinity" | "nan"
-            ) {
+
+            let trimmed = float.value.to_str().trim();
+            let mut matches_non_finite_keyword = false;
+            for non_finite_keyword in [
+                "inf",
+                "+inf",
+                "-inf",
+                "infinity",
+                "+infinity",
+                "-infinity",
+                "nan",
+                "+nan",
+                "-nan",
+            ] {
+                if trimmed.eq_ignore_ascii_case(non_finite_keyword) {
+                    matches_non_finite_keyword = true;
+                    break;
+                }
+            }
+            if !matches_non_finite_keyword {
                 return;
             }
 
-            let replacement = checker.locator().slice(float).to_string();
+            let mut replacement = checker.locator().slice(float).to_string();
+            // `Decimal(float("-nan")) == Decimal("nan")`
+            if trimmed.eq_ignore_ascii_case("-nan") {
+                replacement.remove(replacement.find('-').unwrap());
+            }
             let mut diagnostic = Diagnostic::new(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
@@ -179,7 +199,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
         }
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 // ```console

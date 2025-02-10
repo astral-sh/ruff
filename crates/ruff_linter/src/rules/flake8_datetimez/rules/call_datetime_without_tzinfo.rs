@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
@@ -41,8 +41,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 /// ```
-#[violation]
-pub struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeWithoutTzinfo {
     #[derive_message_formats]
@@ -63,7 +63,7 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
-pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -76,17 +76,17 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::Ex
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 
-    let antipattern = match call.arguments.find_argument("tzinfo", 7) {
+    let antipattern = match call.arguments.find_argument_value("tzinfo", 7) {
         Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         CallDatetimeWithoutTzinfo(antipattern),
         call.range,
     ));

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,8 +41,8 @@ use crate::docstrings::Docstring;
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
-#[violation]
-pub struct EscapeSequenceInDocstring;
+#[derive(ViolationMetadata)]
+pub(crate) struct EscapeSequenceInDocstring;
 
 impl Violation for EscapeSequenceInDocstring {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -58,7 +58,7 @@ impl Violation for EscapeSequenceInDocstring {
 }
 
 /// D301
-pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
     // Docstring is already raw.
     if docstring.leading_quote().contains(['r', 'R']) {
         return;
@@ -106,7 +106,7 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
                 )));
             }
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
             break;
         }
     }

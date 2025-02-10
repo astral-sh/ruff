@@ -10,14 +10,14 @@ use crate::rules::flake8_use_pathlib::rules::{
     Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
 };
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
-    OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
-    OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove, OsRename,
-    OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
+    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathAbspath,
+    OsPathBasename, OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir,
+    OsPathIsfile, OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove,
+    OsRename, OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
 };
 use crate::settings::types::PythonVersion;
 
-pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     if let Some(diagnostic_kind) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -97,8 +97,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             // PTH205
             ["os", "path", "getctime"] => Some(OsPathGetctime.into()),
             // PTH123
-            ["" | "builtin", "open"] => {
-                // `closefd` and `openener` are not supported by pathlib, so check if they are
+            ["" | "builtins", "open"] => {
+                // `closefd` and `opener` are not supported by pathlib, so check if they are
                 // are set to non-default values.
                 // https://github.com/astral-sh/ruff/issues/7620
                 // Signature as of Python 3.11 (https://docs.python.org/3/library/functions.html#open):
@@ -115,7 +115,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                 // ```
                 if call
                     .arguments
-                    .find_argument("closefd", 6)
+                    .find_argument_value("closefd", 6)
                     .is_some_and(|expr| {
                         !matches!(
                             expr,
@@ -124,7 +124,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                     })
                     || call
                         .arguments
-                        .find_argument("opener", 7)
+                        .find_argument_value("opener", 7)
                         .is_some_and(|expr| !expr.is_none_literal_expr())
                     || call
                         .arguments
@@ -155,13 +155,15 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
                 Some(OsReadlink.into())
             }
+            // PTH208,
+            ["os", "listdir"] => Some(OsListdir.into()),
             _ => None,
         })
     {
         let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.func.range());
 
         if checker.enabled(diagnostic.kind.rule()) {
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

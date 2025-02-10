@@ -1,6 +1,6 @@
 use ast::ExceptHandler;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
@@ -18,8 +18,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-nested-blocks`
-#[violation]
-pub struct TooManyNestedBlocks {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyNestedBlocks {
     nested_blocks: usize,
     max_nested_blocks: usize,
 }
@@ -36,7 +36,7 @@ impl Violation for TooManyNestedBlocks {
 }
 
 /// PLR1702
-pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
     // Only enforce nesting within functions or methods.
     if !checker.semantic().current_scope().kind.is_function() {
         return;
@@ -74,7 +74,7 @@ pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         TooManyNestedBlocks {
             nested_blocks: count,
             max_nested_blocks,

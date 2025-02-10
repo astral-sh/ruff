@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::Scope;
@@ -40,8 +40,8 @@ use crate::importer::ImportRequest;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as migrating from `@singledispatchmethod` to
 /// `@singledispatch` may change the behavior of the code.
-#[violation]
-pub struct SingledispatchmethodFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct SingledispatchmethodFunction;
 
 impl Violation for SingledispatchmethodFunction {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -57,11 +57,7 @@ impl Violation for SingledispatchmethodFunction {
 }
 
 /// E1520
-pub(crate) fn singledispatchmethod_function(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };
@@ -111,7 +107,7 @@ pub(crate) fn singledispatchmethod_function(
                     [import_edit],
                 ))
             });
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

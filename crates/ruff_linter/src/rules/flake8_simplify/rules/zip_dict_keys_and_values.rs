@@ -1,5 +1,5 @@
 use ast::{ExprAttribute, ExprName, Identifier};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use ruff_python_semantic::analyze::typing::is_dict;
 ///
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
-#[violation]
-pub struct ZipDictKeysAndValues {
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipDictKeysAndValues {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }
@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCall) {
+pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
@@ -113,7 +113,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {

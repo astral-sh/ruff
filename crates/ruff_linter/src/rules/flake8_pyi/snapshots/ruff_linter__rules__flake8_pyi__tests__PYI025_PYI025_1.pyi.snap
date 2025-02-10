@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI025_1.pyi:8:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
    |
  7 | def f():
  8 |     from collections.abc import Set  # PYI025
    |                                 ^^^ PYI025
- 9 | 
+ 9 |
 10 | def f():
    |
    = help: Alias `Set` to `AbstractSet`
@@ -27,7 +26,7 @@ PYI025_1.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractS
 10 | def f():
 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
    |                                                   ^^^ PYI025
-12 | 
+12 |
 13 | def f():
    |
    = help: Alias `Set` to `AbstractSet`
@@ -80,10 +79,10 @@ PYI025_1.pyi:16:37: PYI025 [*] Use `from collections.abc import Set as AbstractS
 PYI025_1.pyi:33:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
    |
 31 |         print(Set)
-32 | 
+32 |
 33 | from collections.abc import Set
    |                             ^^^ PYI025
-34 | 
+34 |
 35 | def f():
    |
    = help: Alias `Set` to `AbstractSet`
@@ -126,7 +125,7 @@ PYI025_1.pyi:44:33: PYI025 [*] Use `from collections.abc import Set as AbstractS
 43 |     """Test: nonlocal symbol renaming."""
 44 |     from collections.abc import Set
    |                                 ^^^ PYI025
-45 | 
+45 |
 46 |     def g():
    |
    = help: Alias `Set` to `AbstractSet`

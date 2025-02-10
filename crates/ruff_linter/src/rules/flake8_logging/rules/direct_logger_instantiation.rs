@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -37,8 +37,8 @@ use crate::importer::ImportRequest;
 /// ```
 ///
 /// [Logger Objects]: https://docs.python.org/3/library/logging.html#logger-objects
-#[violation]
-pub struct DirectLoggerInstantiation;
+#[derive(ViolationMetadata)]
+pub(crate) struct DirectLoggerInstantiation;
 
 impl Violation for DirectLoggerInstantiation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -54,7 +54,7 @@ impl Violation for DirectLoggerInstantiation {
 }
 
 /// LOG001
-pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
@@ -74,6 +74,6 @@ pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::Exp
             let reference_edit = Edit::range_replacement(binding, call.func.range());
             Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

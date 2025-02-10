@@ -28,47 +28,47 @@ impl Convention {
     pub const fn rules_to_be_ignored(self) -> &'static [Rule] {
         match self {
             Convention::Google => &[
-                Rule::OneBlankLineBeforeClass,
-                Rule::OneBlankLineAfterClass,
+                Rule::IncorrectBlankLineBeforeClass,
+                Rule::IncorrectBlankLineAfterClass,
                 Rule::MultiLineSummarySecondLine,
-                Rule::SectionUnderlineNotOverIndented,
-                Rule::EndsInPeriod,
+                Rule::OverindentedSectionUnderline,
+                Rule::MissingTrailingPeriod,
                 Rule::NonImperativeMood,
                 Rule::DocstringStartsWithThis,
-                Rule::NewLineAfterSectionName,
-                Rule::DashedUnderlineAfterSection,
-                Rule::SectionUnderlineAfterName,
-                Rule::SectionUnderlineMatchesSectionLength,
-                Rule::BlankLineAfterLastSection,
+                Rule::MissingNewLineAfterSectionName,
+                Rule::MissingDashedUnderlineAfterSection,
+                Rule::MissingSectionUnderlineAfterName,
+                Rule::MismatchedSectionUnderlineLength,
+                Rule::MissingBlankLineAfterLastSection,
             ],
             Convention::Numpy => &[
                 Rule::UndocumentedPublicInit,
-                Rule::OneBlankLineBeforeClass,
+                Rule::IncorrectBlankLineBeforeClass,
                 Rule::MultiLineSummaryFirstLine,
                 Rule::MultiLineSummarySecondLine,
-                Rule::NoSignature,
-                Rule::BlankLineAfterLastSection,
-                Rule::EndsInPunctuation,
-                Rule::SectionNameEndsInColon,
+                Rule::SignatureInDocstring,
+                Rule::MissingBlankLineAfterLastSection,
+                Rule::MissingTerminalPunctuation,
+                Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
             ],
             Convention::Pep257 => &[
-                Rule::OneBlankLineBeforeClass,
+                Rule::IncorrectBlankLineBeforeClass,
                 Rule::MultiLineSummaryFirstLine,
                 Rule::MultiLineSummarySecondLine,
-                Rule::SectionNotOverIndented,
-                Rule::SectionUnderlineNotOverIndented,
+                Rule::OverindentedSection,
+                Rule::OverindentedSectionUnderline,
                 Rule::DocstringStartsWithThis,
-                Rule::CapitalizeSectionName,
-                Rule::NewLineAfterSectionName,
-                Rule::DashedUnderlineAfterSection,
-                Rule::SectionUnderlineAfterName,
-                Rule::SectionUnderlineMatchesSectionLength,
+                Rule::NonCapitalizedSectionName,
+                Rule::MissingNewLineAfterSectionName,
+                Rule::MissingDashedUnderlineAfterSection,
+                Rule::MissingSectionUnderlineAfterName,
+                Rule::MismatchedSectionUnderlineLength,
                 Rule::NoBlankLineAfterSection,
                 Rule::NoBlankLineBeforeSection,
-                Rule::BlankLineAfterLastSection,
-                Rule::EndsInPunctuation,
-                Rule::SectionNameEndsInColon,
+                Rule::MissingBlankLineAfterLastSection,
+                Rule::MissingTerminalPunctuation,
+                Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
             ],
         }
@@ -87,25 +87,13 @@ impl fmt::Display for Convention {
 
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
-    convention: Option<Convention>,
-    ignore_decorators: BTreeSet<String>,
-    property_decorators: BTreeSet<String>,
+    pub convention: Option<Convention>,
+    pub ignore_decorators: BTreeSet<String>,
+    pub property_decorators: BTreeSet<String>,
+    pub ignore_var_parameters: bool,
 }
 
 impl Settings {
-    #[must_use]
-    pub fn new(
-        convention: Option<Convention>,
-        ignore_decorators: impl IntoIterator<Item = String>,
-        property_decorators: impl IntoIterator<Item = String>,
-    ) -> Self {
-        Self {
-            convention,
-            ignore_decorators: ignore_decorators.into_iter().collect(),
-            property_decorators: property_decorators.into_iter().collect(),
-        }
-    }
-
     pub fn convention(&self) -> Option<Convention> {
         self.convention
     }
@@ -117,6 +105,10 @@ impl Settings {
     pub fn property_decorators(&self) -> DecoratorIterator {
         DecoratorIterator::new(&self.property_decorators)
     }
+
+    pub fn ignore_var_parameters(&self) -> bool {
+        self.ignore_var_parameters
+    }
 }
 
 impl fmt::Display for Settings {
@@ -127,7 +119,8 @@ impl fmt::Display for Settings {
             fields = [
                 self.convention | optional,
                 self.ignore_decorators | set,
-                self.property_decorators | set
+                self.property_decorators | set,
+                self.ignore_var_parameters
             ]
         }
         Ok(())

@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -27,8 +27,8 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 /// ## References
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
-#[violation]
-pub struct UnnecessaryRangeStart;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryRangeStart;
 
 impl AlwaysFixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 }
 
 /// PIE808
-pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     // `range` doesn't accept keyword arguments.
     if !call.arguments.keywords.is_empty() {
         return;
@@ -80,5 +80,5 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
         )
         .map(Fix::safe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

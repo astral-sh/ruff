@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
@@ -23,8 +23,8 @@ use crate::fix::edits::delete_stmt;
 /// class Foo:
 ///     def __repr__(self) -> str: ...
 /// ```
-#[violation]
-pub struct StrOrReprDefinedInStub {
+#[derive(ViolationMetadata)]
+pub(crate) struct StrOrReprDefinedInStub {
     name: String,
 }
 
@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for StrOrReprDefinedInStub {
 }
 
 /// PYI029
-pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     let Stmt::FunctionDef(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -94,5 +94,5 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

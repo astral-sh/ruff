@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI057.pyi:4:20: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
   |
@@ -24,7 +23,7 @@ PYI057.pyi:5:29: PYI057 Do not use `collections.abc.ByteString`, which has uncle
 PYI057.pyi:8:4: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
    |
  6 | from foo import ByteString
- 7 | 
+ 7 |
  8 | a: typing.ByteString
    |    ^^^^^^^^^^^^^^^^^ PYI057
  9 | b: collections.abc.ByteString

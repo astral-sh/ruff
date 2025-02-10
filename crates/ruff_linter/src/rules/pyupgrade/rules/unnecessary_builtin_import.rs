@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -29,8 +29,8 @@ use crate::fix;
 ///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
-#[violation]
-pub struct UnnecessaryBuiltinImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }
 
@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
 
 /// UP029
 pub(crate) fn unnecessary_builtin_import(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     module: &str,
     names: &[Alias],
@@ -138,5 +138,5 @@ pub(crate) fn unnecessary_builtin_import(
             checker.semantic().current_statement_parent_id(),
         )))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

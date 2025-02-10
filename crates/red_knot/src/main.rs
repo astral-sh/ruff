@@ -1,125 +1,29 @@
+use std::io::{self, BufWriter, Write};
 use std::process::{ExitCode, Termination};
+
+use anyhow::Result;
 use std::sync::Mutex;
 
+use crate::args::{Args, CheckCommand, Command};
+use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use red_knot_python_semantic::SitePackages;
+use red_knot_project::metadata::options::Options;
+use red_knot_project::watch::ProjectWatcher;
+use red_knot_project::{watch, Db};
+use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::watch;
-use red_knot_workspace::watch::WorkspaceWatcher;
-use red_knot_workspace::workspace::settings::Configuration;
-use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
-use target_version::TargetVersion;
 
-use crate::logging::{setup_tracing, Verbosity};
-
+mod args;
 mod logging;
-mod target_version;
+mod python_version;
 mod verbosity;
-
-#[derive(Debug, Parser)]
-#[command(
-    author,
-    name = "red-knot",
-    about = "An extremely fast Python type checker."
-)]
-#[command(version)]
-struct Args {
-    #[command(subcommand)]
-    pub(crate) command: Option<Command>,
-
-    #[arg(
-        long,
-        help = "Changes the current working directory.",
-        long_help = "Changes the current working directory before any specified operations. This affects the workspace and configuration discovery.",
-        value_name = "PATH"
-    )]
-    current_directory: Option<SystemPathBuf>,
-
-    #[arg(
-        long,
-        help = "Path to the virtual environment the project uses",
-        long_help = "\
-Path to the virtual environment the project uses. \
-If provided, red-knot will use the `site-packages` directory of this virtual environment \
-to resolve type information for the project's third-party dependencies.",
-        value_name = "PATH"
-    )]
-    venv_path: Option<SystemPathBuf>,
-
-    #[arg(
-        long,
-        value_name = "DIRECTORY",
-        help = "Custom directory to use for stdlib typeshed stubs"
-    )]
-    custom_typeshed_dir: Option<SystemPathBuf>,
-
-    #[arg(
-        long,
-        value_name = "PATH",
-        help = "Additional path to use as a module-resolution source (can be passed multiple times)"
-    )]
-    extra_search_path: Option<Vec<SystemPathBuf>>,
-
-    #[arg(
-        long,
-        help = "Python version to assume when resolving types",
-        value_name = "VERSION"
-    )]
-    target_version: Option<TargetVersion>,
-
-    #[clap(flatten)]
-    verbosity: Verbosity,
-
-    #[arg(
-        long,
-        help = "Run in watch mode by re-running whenever files change",
-        short = 'W'
-    )]
-    watch: bool,
-}
-
-impl Args {
-    fn to_configuration(&self, cli_cwd: &SystemPath) -> Configuration {
-        let mut configuration = Configuration::default();
-
-        if let Some(target_version) = self.target_version {
-            configuration.target_version = Some(target_version.into());
-        }
-
-        if let Some(venv_path) = &self.venv_path {
-            configuration.search_paths.site_packages = Some(SitePackages::Derived {
-                venv_path: SystemPath::absolute(venv_path, cli_cwd),
-            });
-        }
-
-        if let Some(custom_typeshed_dir) = &self.custom_typeshed_dir {
-            configuration.search_paths.custom_typeshed =
-                Some(SystemPath::absolute(custom_typeshed_dir, cli_cwd));
-        }
-
-        if let Some(extra_search_paths) = &self.extra_search_path {
-            configuration.search_paths.extra_paths = extra_search_paths
-                .iter()
-                .map(|path| Some(SystemPath::absolute(path, cli_cwd)))
-                .collect();
-        }
-
-        configuration
-    }
-}
-
-#[derive(Debug, clap::Subcommand)]
-pub enum Command {
-    /// Start the language server
-    Server,
-}
+mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
@@ -146,10 +50,21 @@ pub fn main() -> ExitStatus {
 fn run() -> anyhow::Result<ExitStatus> {
     let args = Args::parse_from(std::env::args());
 
-    if matches!(args.command, Some(Command::Server)) {
-        return run_server().map(|()| ExitStatus::Success);
+    match args.command {
+        Command::Server => run_server().map(|()| ExitStatus::Success),
+        Command::Check(check_args) => run_check(check_args),
+        Command::Version => version().map(|()| ExitStatus::Success),
     }
+}
 
+pub(crate) fn version() -> Result<()> {
+    let mut stdout = BufWriter::new(io::stdout().lock());
+    let version_info = crate::version::version();
+    writeln!(stdout, "red knot {}", &version_info)?;
+    Ok(())
+}
+
+fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
@@ -167,33 +82,29 @@ fn run() -> anyhow::Result<ExitStatus> {
     };
 
     let cwd = args
-        .current_directory
+        .project
         .as_ref()
         .map(|cwd| {
             if cwd.as_std_path().is_dir() {
                 Ok(SystemPath::absolute(cwd, &cli_base_path))
             } else {
-                Err(anyhow!(
-                    "Provided current-directory path `{cwd}` is not a directory"
-                ))
+                Err(anyhow!("Provided project path `{cwd}` is not a directory"))
             }
         })
         .transpose()?
         .unwrap_or_else(|| cli_base_path.clone());
 
-    let system = OsSystem::new(cwd.clone());
-    let cli_configuration = args.to_configuration(&cwd);
-    let workspace_metadata = WorkspaceMetadata::discover(
-        system.current_directory(),
-        &system,
-        Some(&cli_configuration),
-    )?;
+    let system = OsSystem::new(cwd);
+    let watch = args.watch;
+    let exit_zero = args.exit_zero;
 
-    // TODO: Use the `program_settings` to compute the key for the database's persistent
-    //   cache and load the cache if it exists.
-    let mut db = RootDatabase::new(workspace_metadata, system)?;
+    let cli_options = args.into_options();
+    let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
+    workspace_metadata.apply_cli_options(cli_options.clone());
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_configuration);
+    let mut db = ProjectDatabase::new(workspace_metadata, system)?;
+
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -205,7 +116,7 @@ fn run() -> anyhow::Result<ExitStatus> {
         }
     })?;
 
-    let exit_status = if args.watch {
+    let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
         main_loop.run(&mut db)
@@ -215,7 +126,11 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     std::mem::forget(db);
 
-    Ok(exit_status)
+    if exit_zero {
+        Ok(ExitStatus::Success)
+    } else {
+        Ok(exit_status)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -244,13 +159,13 @@ struct MainLoop {
     receiver: crossbeam_channel::Receiver<MainLoopMessage>,
 
     /// The file system watcher, if running in watch mode.
-    watcher: Option<WorkspaceWatcher>,
+    watcher: Option<ProjectWatcher>,
 
-    cli_configuration: Configuration,
+    cli_options: Options,
 }
 
 impl MainLoop {
-    fn new(cli_configuration: Configuration) -> (Self, MainLoopCancellationToken) {
+    fn new(cli_options: Options) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -258,27 +173,27 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                cli_configuration,
+                cli_options,
             },
             MainLoopCancellationToken { sender },
         )
     }
 
-    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<ExitStatus> {
+    fn watch(mut self, db: &mut ProjectDatabase) -> anyhow::Result<ExitStatus> {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
         })?;
 
-        self.watcher = Some(WorkspaceWatcher::new(watcher, db));
+        self.watcher = Some(ProjectWatcher::new(watcher, db));
 
         self.run(db);
 
         Ok(ExitStatus::Success)
     }
 
-    fn run(mut self, db: &mut RootDatabase) -> ExitStatus {
+    fn run(mut self, db: &mut ProjectDatabase) -> ExitStatus {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
         let result = self.main_loop(db);
@@ -288,7 +203,7 @@ impl MainLoop {
         result
     }
 
-    fn main_loop(&mut self, db: &mut RootDatabase) -> ExitStatus {
+    fn main_loop(&mut self, db: &mut ProjectDatabase) -> ExitStatus {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -297,10 +212,10 @@ impl MainLoop {
         while let Ok(message) = self.receiver.recv() {
             match message {
                 MainLoopMessage::CheckWorkspace => {
-                    let db = db.snapshot();
+                    let db = db.clone();
                     let sender = self.sender.clone();
 
-                    // Spawn a new task that checks the workspace. This needs to be done in a separate thread
+                    // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         if let Ok(result) = db.check() {
@@ -316,7 +231,17 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
-                    let has_diagnostics = !result.is_empty();
+                    let min_error_severity =
+                        if db.project().settings(db).terminal().error_on_warning {
+                            Severity::Warning
+                        } else {
+                            Severity::Error
+                        };
+
+                    let failed = result
+                        .iter()
+                        .any(|diagnostic| diagnostic.severity() >= min_error_severity);
+
                     if check_revision == revision {
                         #[allow(clippy::print_stdout)]
                         for diagnostic in result {
@@ -329,7 +254,7 @@ impl MainLoop {
                     }
 
                     if self.watcher.is_none() {
-                        return if has_diagnostics {
+                        return if failed {
                             ExitStatus::Failure
                         } else {
                             ExitStatus::Success
@@ -342,7 +267,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes, Some(&self.cli_configuration));
+                    db.apply_changes(changes, Some(&self.cli_options));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }

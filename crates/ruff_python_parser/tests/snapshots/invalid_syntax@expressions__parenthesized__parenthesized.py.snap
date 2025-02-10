@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/parenthesized.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -63,7 +62,7 @@ Module(
 1 | # Starred expression isn't allowed in a parenthesized expression.
 2 | (*x)
   |  ^^ Syntax Error: Starred expression cannot be used here
-3 | 
+3 |
 4 | # Unparenthesized named expression is allowed.
   |
 

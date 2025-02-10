@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -41,8 +41,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
 /// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
-#[violation]
-pub struct FunctionUsesLoopVariable {
+#[derive(ViolationMetadata)]
+pub(crate) struct FunctionUsesLoopVariable {
     name: String,
 }
 
@@ -277,7 +277,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
+pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
@@ -304,9 +304,8 @@ pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
         // loop, flag it.
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
-                if !checker.flake8_bugbear_seen.contains(&name.range()) {
-                    checker.flake8_bugbear_seen.push(name.range());
-                    checker.diagnostics.push(Diagnostic::new(
+                if checker.insert_flake8_bugbear_range(name.range()) {
+                    checker.report_diagnostic(Diagnostic::new(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
                         },

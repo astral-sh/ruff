@@ -76,3 +76,9 @@ def func():
 
     if msg.startswith(y) or msg.endswith(x) or msg.startswith("h"): # OK
         print("yes")
+
+
+def func():
+    "Regression test for https://github.com/astral-sh/ruff/issues/9663"
+    if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
+        print("yes")

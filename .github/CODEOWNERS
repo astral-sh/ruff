@@ -9,13 +9,15 @@
 /crates/ruff_formatter/ @MichaReiser
 /crates/ruff_python_formatter/ @MichaReiser
 /crates/ruff_python_parser/ @MichaReiser @dhruvmanila
+/crates/ruff_annotate_snippets/ @BurntSushi
 
 # flake8-pyi
 /crates/ruff_linter/src/rules/flake8_pyi/ @AlexWaygood
 
-# Script for fuzzing the parser
-/scripts/fuzz-parser/ @AlexWaygood
+# Script for fuzzing the parser/red-knot etc.
+/python/py-fuzzer/ @AlexWaygood
 
 # red-knot
 /crates/red_knot* @carljm @MichaReiser @AlexWaygood @sharkdp
 /crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp
+/scripts/knot_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp

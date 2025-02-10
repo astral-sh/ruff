@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
@@ -37,8 +37,8 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 ///
 /// ## Options
 /// - `lint.ruff.parenthesize-tuple-in-subscript`
-#[violation]
-pub struct IncorrectlyParenthesizedTupleInSubscript {
+#[derive(ViolationMetadata)]
+pub(crate) struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
 }
 
@@ -62,7 +62,7 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
 }
 
 /// RUF031
-pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
+pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &ExprSubscript) {
     let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_subscript;
 
     let Expr::Tuple(tuple_subscript) = &*subscript.slice else {
@@ -105,7 +105,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     };
     let edit = Edit::range_replacement(new_source, source_range);
 
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(
             IncorrectlyParenthesizedTupleInSubscript { prefer_parentheses },
             source_range,

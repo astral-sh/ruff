@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{is_dict, is_list};
 use ruff_python_semantic::SemanticModel;
@@ -43,8 +43,8 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html?highlight=list#mutable-sequence-types)
 /// - [Python documentation: `dict.clear()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#dict.clear)
-#[violation]
-pub struct DeleteFullSlice;
+#[derive(ViolationMetadata)]
+pub(crate) struct DeleteFullSlice;
 
 impl Violation for DeleteFullSlice {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -60,7 +60,7 @@ impl Violation for DeleteFullSlice {
 }
 
 /// FURB131
-pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete) {
+pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
     for target in &delete.targets {
         let Some(name) = match_full_slice(target, checker.semantic()) else {
             continue;
@@ -78,7 +78,7 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
             )));
         }
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::rules::pylint::helpers::SequenceIndexVisitor;
 /// for fruit_name, fruit_count in FRUITS.items():
 ///     print(fruit_count)
 /// ```
-#[violation]
-pub struct UnnecessaryDictIndexLookup;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDictIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     #[derive_message_formats]
@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
+pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFor) {
     let Some((dict_name, index_name, value_name)) = dict_items(&stmt_for.iter, &stmt_for.target)
     else {
         return;
@@ -64,12 +64,12 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
             Edit::range_replacement(value_name.id.to_string(), range),
             [noop(index_name), noop(value_name)],
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
     let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
@@ -109,7 +109,7 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker,
                 Edit::range_replacement(value_name.id.to_string(), range),
                 [noop(index_name), noop(value_name)],
             ));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

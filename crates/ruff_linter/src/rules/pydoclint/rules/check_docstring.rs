@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
@@ -9,6 +9,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
+use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -19,15 +20,15 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a "returns" section in
-/// their docstring.
+/// Checks for functions with `return` statements that do not have "Returns"
+/// sections in their docstrings.
 ///
 /// ## Why is this bad?
-/// Docstrings missing return sections are a sign of incomplete documentation
-/// or refactors.
+/// A missing "Returns" section is a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods, stubs functions, or
-/// functions that only return `None`.
+/// This rule is not enforced for abstract methods or functions that only return
+/// `None`. It is also ignored for "stub functions": functions where the body only
+/// consists of `pass`, `...`, `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -55,8 +56,8 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     """
 ///     return distance / time
 /// ```
-#[violation]
-pub struct DocstringMissingReturns;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingReturns;
 
 impl Violation for DocstringMissingReturns {
     #[derive_message_formats]
@@ -70,14 +71,15 @@ impl Violation for DocstringMissingReturns {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a "returns" section without
-/// needing one.
+/// Checks for function docstrings with unnecessary "Returns" sections.
 ///
 /// ## Why is this bad?
-/// Functions without an explicit return should not have a returns section
-/// in their docstrings.
+/// A function without an explicit `return` statement should not have a
+/// "Returns" section in its docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -105,8 +107,8 @@ impl Violation for DocstringMissingReturns {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
-#[violation]
-pub struct DocstringExtraneousReturns;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousReturns;
 
 impl Violation for DocstringExtraneousReturns {
     #[derive_message_formats]
@@ -121,15 +123,15 @@ impl Violation for DocstringExtraneousReturns {
 }
 
 /// ## What it does
-/// Checks for functions with yield statements missing a "yields" section in
-/// their docstring.
+/// Checks for functions with `yield` statements that do not have "Yields" sections in
+/// their docstrings.
 ///
 /// ## Why is this bad?
-/// Docstrings missing yields sections are a sign of incomplete documentation
-/// or refactors.
+/// A missing "Yields" section is a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods, stubs functions, or
-/// functions that only yield `None`.
+/// This rule is not enforced for abstract methods or functions that only yield `None`.
+/// It is also ignored for "stub functions": functions where the body only consists
+/// of `pass`, `...`, `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -157,8 +159,8 @@ impl Violation for DocstringExtraneousReturns {
 ///     for i in range(1, n + 1):
 ///         yield i
 /// ```
-#[violation]
-pub struct DocstringMissingYields;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingYields;
 
 impl Violation for DocstringMissingYields {
     #[derive_message_formats]
@@ -172,14 +174,15 @@ impl Violation for DocstringMissingYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a "yields" section without
-/// needing one.
+/// Checks for function docstrings with unnecessary "Yields" sections.
 ///
 /// ## Why is this bad?
-/// Functions which don't yield anything should not have a yields section
-/// in their docstrings.
+/// A function that doesn't yield anything should not have a "Yields" section
+/// in its docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -207,8 +210,8 @@ impl Violation for DocstringMissingYields {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
-#[violation]
-pub struct DocstringExtraneousYields;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousYields;
 
 impl Violation for DocstringExtraneousYields {
     #[derive_message_formats]
@@ -222,15 +225,17 @@ impl Violation for DocstringExtraneousYields {
 }
 
 /// ## What it does
-/// Checks for function docstrings that do not include documentation for all
-/// explicitly raised exceptions.
+/// Checks for function docstrings that do not document all explicitly raised
+/// exceptions.
 ///
 /// ## Why is this bad?
-/// If a function raises an exception without documenting it in its docstring,
-/// it can be misleading to users and/or a sign of incomplete documentation or
-/// refactors.
+/// A function should document all exceptions that are directly raised in some
+/// circumstances. Failing to document an exception that could be raised
+/// can be misleading to users and/or a sign of incomplete documentation.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -270,8 +275,8 @@ impl Violation for DocstringExtraneousYields {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
-#[violation]
-pub struct DocstringMissingException {
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingException {
     id: String,
 }
 
@@ -289,14 +294,16 @@ impl Violation for DocstringMissingException {
 }
 
 /// ## What it does
-/// Checks for function docstrings that include exceptions which are not
-/// explicitly raised.
+/// Checks for function docstrings that state that exceptions could be raised
+/// even though they are not directly raised in the function body.
 ///
 /// ## Why is this bad?
 /// Some conventions prefer non-explicit exceptions be omitted from the
 /// docstring.
 ///
-/// This rule is not enforced for stub functions.
+/// This rule is not enforced for abstract methods. It is also ignored for
+/// "stub functions": functions where the body only consists of `pass`, `...`,
+/// `raise NotImplementedError`, or similar.
 ///
 /// ## Example
 /// ```python
@@ -330,8 +337,13 @@ impl Violation for DocstringMissingException {
 ///     """
 ///     return distance / time
 /// ```
-#[violation]
-pub struct DocstringExtraneousException {
+///
+/// ## Known issues
+/// It may often be desirable to document *all* exceptions that a function
+/// could possibly raise, even those which are not explicitly raised using
+/// `raise` statements in the function body.
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
 }
 
@@ -832,9 +844,22 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
+fn is_one_line(docstring: &Docstring) -> bool {
+    let mut non_empty_line_count = 0;
+    for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {
+        if !line.trim().is_empty() {
+            non_empty_line_count += 1;
+        }
+        if non_empty_line_count > 1 {
+            return false;
+        }
+    }
+    true
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
@@ -847,9 +872,12 @@ pub(crate) fn check_docstring(
         return;
     };
 
+    if checker.settings.pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
+        return;
+    }
+
     let semantic = checker.semantic();
 
-    // Ignore stubs.
     if function_type::is_stub(function_def, semantic) {
         return;
     }
@@ -878,7 +906,7 @@ pub(crate) fn check_docstring(
         {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
-                if let Some(body_return) = body_entries.returns.first() {
+                if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {
                         Some(returns) => {
                             // Ignore it if it's annotated as returning `None`
@@ -893,7 +921,7 @@ pub(crate) fn check_docstring(
                             {
                                 diagnostics.push(Diagnostic::new(
                                     DocstringMissingReturns,
-                                    body_return.range(),
+                                    docstring.range(),
                                 ));
                             }
                         }
@@ -902,10 +930,8 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics.push(Diagnostic::new(
-                                DocstringMissingReturns,
-                                body_return.range(),
-                            ));
+                            diagnostics
+                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
                         }
                         _ => {}
                     }
@@ -917,7 +943,7 @@ pub(crate) fn check_docstring(
     // DOC402
     if checker.enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
-            if let Some(body_yield) = body_entries.yields.first() {
+            if !body_entries.yields.is_empty() {
                 match function_def.returns.as_deref() {
                     Some(returns)
                         if !generator_annotation_arguments(returns, semantic).is_some_and(
@@ -925,11 +951,11 @@ pub(crate) fn check_docstring(
                         ) =>
                     {
                         diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
                         diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
                     }
                     _ => {}
                 }
@@ -960,7 +986,7 @@ pub(crate) fn check_docstring(
                     DocstringMissingException {
                         id: (*name).to_string(),
                     },
-                    body_raise.range(),
+                    docstring.range(),
                 );
                 diagnostics.push(diagnostic);
             }
@@ -972,12 +998,11 @@ pub(crate) fn check_docstring(
     if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC202
         if checker.enabled(Rule::DocstringExtraneousReturns) {
-            if let Some(ref docstring_returns) = docstring_sections.returns {
+            if docstring_sections.returns.is_some() {
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
-                    let diagnostic =
-                        Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                    let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
                     diagnostics.push(diagnostic);
                 }
             }
@@ -985,10 +1010,9 @@ pub(crate) fn check_docstring(
 
         // DOC403
         if checker.enabled(Rule::DocstringExtraneousYields) {
-            if let Some(docstring_yields) = docstring_sections.yields {
+            if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
-                    let diagnostic =
-                        Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
+                    let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
                     diagnostics.push(diagnostic);
                 }
             }
@@ -1013,7 +1037,7 @@ pub(crate) fn check_docstring(
                         DocstringExtraneousException {
                             ids: extraneous_exceptions,
                         },
-                        docstring_raises.range(),
+                        docstring.range(),
                     );
                     diagnostics.push(diagnostic);
                 }
@@ -1021,5 +1045,5 @@ pub(crate) fn check_docstring(
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

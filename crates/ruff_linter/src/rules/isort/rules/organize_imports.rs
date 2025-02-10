@@ -1,7 +1,7 @@
 use itertools::{EitherOrBoth, Itertools};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
@@ -36,8 +36,8 @@ use crate::Locator;
 /// import numpy as np
 /// import pandas
 /// ```
-#[violation]
-pub struct UnsortedImports;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsortedImports;
 
 impl Violation for UnsortedImports {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -133,16 +133,15 @@ pub(crate) fn organize_imports(
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
-    let actual = locator.slice(range);
+    let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
+    let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
         return None;
     }
-
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
-        range,
+        fix_range,
     )));
     Some(diagnostic)
 }

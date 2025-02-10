@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_python_semantic::SemanticModel;
@@ -17,7 +17,8 @@ use crate::registry::AsRule;
 /// call to complete, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking call, use an equivalent asynchronous library
-/// or function.
+/// or function, like [`trio.run_process()`](https://trio.readthedocs.io/en/stable/reference-io.html#trio.run_process)
+/// or [`anyio.run_process()`](https://anyio.readthedocs.io/en/latest/api.html#anyio.run_process).
 ///
 /// ## Example
 /// ```python
@@ -30,8 +31,8 @@ use crate::registry::AsRule;
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
-#[violation]
-pub struct CreateSubprocessInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct CreateSubprocessInAsyncFunction;
 
 impl Violation for CreateSubprocessInAsyncFunction {
     #[derive_message_formats]
@@ -49,7 +50,8 @@ impl Violation for CreateSubprocessInAsyncFunction {
 /// call to complete, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking call, use an equivalent asynchronous library
-/// or function.
+/// or function, like [`trio.run_process()`](https://trio.readthedocs.io/en/stable/reference-io.html#trio.run_process)
+/// or [`anyio.run_process()`](https://anyio.readthedocs.io/en/latest/api.html#anyio.run_process).
 ///
 /// ## Example
 /// ```python
@@ -62,8 +64,8 @@ impl Violation for CreateSubprocessInAsyncFunction {
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
-#[violation]
-pub struct RunProcessInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct RunProcessInAsyncFunction;
 
 impl Violation for RunProcessInAsyncFunction {
     #[derive_message_formats]
@@ -81,7 +83,8 @@ impl Violation for RunProcessInAsyncFunction {
 /// call to complete, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking call, use an equivalent asynchronous library
-/// or function.
+/// or function, like [`trio.to_thread.run_sync()`](https://trio.readthedocs.io/en/latest/reference-core.html#trio.to_thread.run_sync)
+/// or [`anyio.to_thread.run_sync()`](https://anyio.readthedocs.io/en/latest/api.html#anyio.to_thread.run_sync).
 ///
 /// ## Example
 /// ```python
@@ -98,8 +101,8 @@ impl Violation for RunProcessInAsyncFunction {
 /// async def foo():
 ///     await asyncio.loop.run_in_executor(None, wait_for_process)
 /// ```
-#[violation]
-pub struct WaitForProcessInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct WaitForProcessInAsyncFunction;
 
 impl Violation for WaitForProcessInAsyncFunction {
     #[derive_message_formats]
@@ -109,7 +112,7 @@ impl Violation for WaitForProcessInAsyncFunction {
 }
 
 /// ASYNC220, ASYNC221, ASYNC222
-pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;
     }
@@ -143,12 +146,12 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
     };
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.func.range());
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 fn is_p_wait(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
-    let Some(arg) = call.arguments.find_argument("mode", 0) else {
+    let Some(arg) = call.arguments.find_argument_value("mode", 0) else {
         return true;
     };
 

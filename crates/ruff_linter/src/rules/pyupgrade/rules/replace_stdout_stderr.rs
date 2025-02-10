@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Keyword};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -36,8 +36,8 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ## References
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
-#[violation]
-pub struct ReplaceStdoutStderr;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReplaceStdoutStderr;
 
 impl Violation for ReplaceStdoutStderr {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -53,7 +53,7 @@ impl Violation for ReplaceStdoutStderr {
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
@@ -93,7 +93,7 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
             diagnostic
                 .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

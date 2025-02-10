@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
    |
 40 | x: Optional[int] = None
    |    ^^^^^^^^^^^^^ UP007
-41 | 
+41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |
    = help: Convert to `X | Y`

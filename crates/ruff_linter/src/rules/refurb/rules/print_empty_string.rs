@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
-#[violation]
-pub struct PrintEmptyString {
+#[derive(ViolationMetadata)]
+pub(crate) struct PrintEmptyString {
     reason: Reason,
 }
 
@@ -70,7 +70,7 @@ impl Violation for PrintEmptyString {
 }
 
 /// FURB105
-pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().match_builtin_expr(&call.func, "print") {
         return;
     }
@@ -96,7 +96,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 .into_fix(),
             );
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
 
         [arg] if arg.is_starred_expr() => {
@@ -124,7 +124,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     .into_fix(),
                 );
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -144,7 +144,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
             let empty_separator = call
                 .arguments
                 .find_keyword("sep")
-                .map_or(false, |keyword| is_empty_string(&keyword.value));
+                .is_some_and(|keyword| is_empty_string(&keyword.value));
             if !empty_separator {
                 return;
             }
@@ -186,7 +186,7 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     .into_fix(),
             );
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

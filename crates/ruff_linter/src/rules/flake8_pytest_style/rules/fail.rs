@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -45,8 +45,8 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
-#[violation]
-pub struct PytestFailWithoutMessage;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFailWithoutMessage;
 
 impl Violation for PytestFailWithoutMessage {
     #[derive_message_formats]
@@ -55,25 +55,17 @@ impl Violation for PytestFailWithoutMessage {
     }
 }
 
-pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_fail(&call.func, checker.semantic()) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)
-        let msg = call
+        if call
             .arguments
-            .find_argument("reason", 0)
-            .or_else(|| call.arguments.find_argument("msg", 0));
-
-        if let Some(msg) = msg {
-            if is_empty_or_null_string(msg) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
-            }
-        } else {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
+            .find_argument_value("reason", 0)
+            .or_else(|| call.arguments.find_argument_value("msg", 0))
+            .map_or(true, is_empty_or_null_string)
+        {
+            checker.report_diagnostic(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
         }
     }
 }

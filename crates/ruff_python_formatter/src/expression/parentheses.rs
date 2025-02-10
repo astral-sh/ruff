@@ -1,7 +1,7 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExpressionRef;
+use ruff_python_ast::ExprRef;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
     first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
@@ -93,9 +93,9 @@ pub enum Parentheses {
     Never,
 }
 
-/// Returns `true` if the [`ExpressionRef`] is enclosed by parentheses in the source code.
+/// Returns `true` if the [`ExprRef`] is enclosed by parentheses in the source code.
 pub(crate) fn is_expression_parenthesized(
-    expr: ExpressionRef,
+    expr: ExprRef,
     comment_ranges: &CommentRanges,
     contents: &str,
 ) -> bool {
@@ -449,7 +449,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::ExpressionRef;
+    use ruff_python_ast::ExprRef;
     use ruff_python_parser::parse_expression;
     use ruff_python_trivia::CommentRanges;
 
@@ -460,7 +460,7 @@ mod tests {
         let expression = r#"(b().c("")).d()"#;
         let parsed = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
-            ExpressionRef::from(parsed.expr()),
+            ExprRef::from(parsed.expr()),
             &CommentRanges::default(),
             expression
         ));

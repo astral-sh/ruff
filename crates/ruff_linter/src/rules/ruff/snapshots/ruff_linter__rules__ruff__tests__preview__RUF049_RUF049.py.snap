@@ -1,0 +1,66 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF049.py:10:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+ 8 | ## Errors
+ 9 |
+10 | @dataclass
+   | ^^^^^^^^^^ RUF049
+11 | class E(Enum): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`
+
+RUF049.py:14:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+14 | @dataclass  # Foobar
+   | ^^^^^^^^^^ RUF049
+15 | class E(Flag): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`
+
+RUF049.py:18:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+18 | @dataclass()
+   | ^^^^^^^^^^^^ RUF049
+19 | class E(IntEnum): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`
+
+RUF049.py:22:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+22 | @dataclass()  # Foobar
+   | ^^^^^^^^^^^^ RUF049
+23 | class E(IntFlag): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`
+
+RUF049.py:26:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+26 | / @dataclass(
+27 | |     frozen=True
+28 | | )
+   | |_^ RUF049
+29 |   class E(StrEnum): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`
+
+RUF049.py:32:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+32 | / @dataclass(  # Foobar
+33 | |     frozen=True
+34 | | )
+   | |_^ RUF049
+35 |   class E(ReprEnum): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`
+
+RUF049.py:38:1: RUF049 An enum class should not be decorated with `@dataclass`
+   |
+38 | / @dataclass(
+39 | |     frozen=True
+40 | | )  # Foobar
+   | |_^ RUF049
+41 |   class E(Enum): ...
+   |
+   = help: Remove either `@dataclass` or `Enum`

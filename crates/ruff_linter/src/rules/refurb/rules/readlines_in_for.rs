@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;
@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `io.IOBase.readlines`](https://docs.python.org/3/library/io.html#io.IOBase.readlines)
-#[violation]
+#[derive(ViolationMetadata)]
 pub(crate) struct ReadlinesInFor;
 
 impl AlwaysFixableViolation for ReadlinesInFor {
@@ -46,16 +46,16 @@ impl AlwaysFixableViolation for ReadlinesInFor {
 }
 
 /// FURB129
-pub(crate) fn readlines_in_for(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &StmtFor) {
     readlines_in_iter(checker, for_stmt.iter.as_ref());
 }
 
 /// FURB129
-pub(crate) fn readlines_in_comprehension(checker: &mut Checker, comprehension: &Comprehension) {
+pub(crate) fn readlines_in_comprehension(checker: &Checker, comprehension: &Comprehension) {
     readlines_in_iter(checker, &comprehension.iter);
 }
 
-fn readlines_in_iter(checker: &mut Checker, iter_expr: &Expr) {
+fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     let Expr::Call(expr_call) = iter_expr else {
         return;
     };
@@ -88,5 +88,5 @@ fn readlines_in_iter(checker: &mut Checker, iter_expr: &Expr) {
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
         expr_call.range().add_start(expr_attr.value.range().len()),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

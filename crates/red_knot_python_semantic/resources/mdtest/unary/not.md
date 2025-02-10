@@ -28,36 +28,34 @@ reveal_type(not b)  # revealed: Literal[False]
 reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 y = 1
 ```
 
 ## Union
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    if flag:
+        p = 1
+        q = 3.3
+        r = "hello"
+        s = "world"
+        t = 0
+    else:
+        p = "hello"
+        q = 4
+        r = ""
+        s = 0
+        t = ""
 
-flag = bool_instance()
-
-if flag:
-    p = 1
-    q = 3.3
-    r = "hello"
-    s = "world"
-    t = 0
-else:
-    p = "hello"
-    q = 4
-    r = ""
-    s = 0
-    t = ""
-
-reveal_type(not p)  # revealed: Literal[False]
-reveal_type(not q)  # revealed: bool
-reveal_type(not r)  # revealed: bool
-reveal_type(not s)  # revealed: bool
-reveal_type(not t)  # revealed: Literal[True]
+    reveal_type(not p)  # revealed: Literal[False]
+    reveal_type(not q)  # revealed: bool
+    reveal_type(not r)  # revealed: bool
+    reveal_type(not s)  # revealed: bool
+    reveal_type(not t)  # revealed: Literal[True]
 ```
 
 ## Integer literal
@@ -127,6 +125,8 @@ classes without a `__bool__` method, with or without `__len__`, must be inferred
 truthiness.
 
 ```py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
@@ -140,13 +140,6 @@ class AlwaysFalse:
 
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
-
-# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
-class BoolIsBool:
-    __bool__ = bool
-
-# revealed: bool
-reveal_type(not BoolIsBool())
 
 # At runtime, no `__bool__` and no `__len__` means truthy, but we can't rely on that, because
 # a subclass could add a `__bool__` method.

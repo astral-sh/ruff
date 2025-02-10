@@ -1,12 +1,14 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraint};
+use crate::semantic_index::constraint::{
+    Constraint, ConstraintNode, PatternConstraint, PatternConstraintKind,
+};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass,
-    KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
+    SubclassOfType, Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -54,6 +56,7 @@ pub(crate) fn narrowing_constraint<'db>(
     }
 }
 
+#[allow(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
@@ -62,6 +65,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Pattern(pattern), true).finish()
 }
 
+#[allow(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -70,6 +74,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), true).finish()
 }
 
+#[allow(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -78,28 +83,39 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
 }
 
-/// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
-///
-/// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
-/// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
-fn generate_classinfo_constraint<'db, F>(
-    db: &'db dyn Db,
-    classinfo: &Type<'db>,
-    to_constraint: F,
-) -> Option<Type<'db>>
-where
-    F: Fn(ClassLiteralType<'db>) -> Type<'db> + Copy,
-{
-    match classinfo {
-        Type::Tuple(tuple) => {
-            let mut builder = UnionBuilder::new(db);
-            for element in tuple.elements(db) {
-                builder = builder.add(generate_classinfo_constraint(db, element, to_constraint)?);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KnownConstraintFunction {
+    /// `builtins.isinstance`
+    IsInstance,
+    /// `builtins.issubclass`
+    IsSubclass,
+}
+
+impl KnownConstraintFunction {
+    /// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
+    ///
+    /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
+    /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
+    fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
+        let constraint_fn = |class| match self {
+            KnownConstraintFunction::IsInstance => Type::instance(class),
+            KnownConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
+        };
+
+        match classinfo {
+            Type::Tuple(tuple) => {
+                let mut builder = UnionBuilder::new(db);
+                for element in tuple.elements(db) {
+                    builder = builder.add(self.generate_constraint(db, *element)?);
+                }
+                Some(builder.build())
             }
-            Some(builder.build())
+            Type::ClassLiteral(ClassLiteralType { class }) => Some(constraint_fn(class)),
+            Type::SubclassOf(subclass_of_ty) => {
+                subclass_of_ty.subclass_of().into_class().map(constraint_fn)
+            }
+            _ => None,
         }
-        Type::ClassLiteral(class_literal_type) => Some(to_constraint(*class_literal_type)),
-        _ => None,
     }
 }
 
@@ -193,6 +209,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
+            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, is_positive)),
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
@@ -212,31 +229,15 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
 
-        match pattern.pattern(self.db).node() {
-            ast::Pattern::MatchValue(_) => {
-                None // TODO
+        match pattern.kind(self.db) {
+            PatternConstraintKind::Singleton(singleton, _guard) => {
+                self.evaluate_match_pattern_singleton(*subject, *singleton)
             }
-            ast::Pattern::MatchSingleton(singleton_pattern) => {
-                self.evaluate_match_pattern_singleton(subject, singleton_pattern)
+            PatternConstraintKind::Class(cls, _guard) => {
+                self.evaluate_match_pattern_class(*subject, *cls)
             }
-            ast::Pattern::MatchSequence(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchMapping(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchClass(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchStar(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchAs(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchOr(_) => {
-                None // TODO
-            }
+            // TODO: support more pattern kinds
+            PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,
         }
     }
 
@@ -251,23 +252,57 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
+    fn evaluate_expr_name(
+        &mut self,
+        expr_name: &ast::ExprName,
+        is_positive: bool,
+    ) -> NarrowingConstraints<'db> {
+        let ast::ExprName { id, .. } = expr_name;
+
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("Should always have a symbol for every Name node");
+        let mut constraints = NarrowingConstraints::default();
+
+        constraints.insert(
+            symbol,
+            if is_positive {
+                Type::AlwaysFalsy.negate(self.db)
+            } else {
+                Type::AlwaysTruthy.negate(self.db)
+            },
+        );
+
+        constraints
+    }
+
     fn evaluate_expr_compare(
         &mut self,
         expr_compare: &ast::ExprCompare,
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        fn is_narrowing_target_candidate(expr: &ast::Expr) -> bool {
+            matches!(expr, ast::Expr::Name(_) | ast::Expr::Call(_))
+        }
+
         let ast::ExprCompare {
             range: _,
             left,
             ops,
             comparators,
         } = expr_compare;
-        if !left.is_name_expr() && comparators.iter().all(|c| !c.is_name_expr()) {
-            // If none of the comparators are name expressions,
-            // we have no symbol to narrow down the type of.
+
+        // Performance optimization: early return if there are no potential narrowing targets.
+        if !is_narrowing_target_candidate(left)
+            && comparators
+                .iter()
+                .all(|c| !is_narrowing_target_candidate(c))
+        {
             return None;
         }
+
         if !is_positive && comparators.len() > 1 {
             // We can't negate a constraint made by a multi-comparator expression, since we can't
             // know which comparison part is the one being negated.
@@ -282,43 +317,96 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
-        for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            if let ast::Expr::Name(ast::ExprName {
-                range: _,
-                id,
-                ctx: _,
-            }) = left
-            {
-                // SAFETY: we should always have a symbol for every Name node.
-                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-                let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
 
-                match if is_positive { *op } else { op.negate() } {
-                    ast::CmpOp::IsNot => {
-                        if rhs_ty.is_singleton(self.db) {
-                            let ty = IntersectionBuilder::new(self.db)
-                                .add_negative(rhs_ty)
-                                .build();
-                            constraints.insert(symbol, ty);
-                        } else {
-                            // Non-singletons cannot be safely narrowed using `is not`
+        let mut last_rhs_ty: Option<Type> = None;
+
+        for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
+                inference.expression_type(left.scoped_expression_id(self.db, scope))
+            });
+            let rhs_ty = inference.expression_type(right.scoped_expression_id(self.db, scope));
+            last_rhs_ty = Some(rhs_ty);
+
+            match left {
+                ast::Expr::Name(ast::ExprName {
+                    range: _,
+                    id,
+                    ctx: _,
+                }) => {
+                    let symbol = self
+                        .symbols()
+                        .symbol_id_by_name(id)
+                        .expect("Should always have a symbol for every Name node");
+
+                    match if is_positive { *op } else { op.negate() } {
+                        ast::CmpOp::IsNot => {
+                            if rhs_ty.is_singleton(self.db) {
+                                let ty = IntersectionBuilder::new(self.db)
+                                    .add_negative(rhs_ty)
+                                    .build();
+                                constraints.insert(symbol, ty);
+                            } else {
+                                // Non-singletons cannot be safely narrowed using `is not`
+                            }
                         }
-                    }
-                    ast::CmpOp::Is => {
-                        constraints.insert(symbol, rhs_ty);
-                    }
-                    ast::CmpOp::NotEq => {
-                        if rhs_ty.is_single_valued(self.db) {
-                            let ty = IntersectionBuilder::new(self.db)
-                                .add_negative(rhs_ty)
-                                .build();
-                            constraints.insert(symbol, ty);
+                        ast::CmpOp::Is => {
+                            constraints.insert(symbol, rhs_ty);
                         }
-                    }
-                    _ => {
-                        // TODO other comparison types
+                        ast::CmpOp::NotEq => {
+                            if rhs_ty.is_single_valued(self.db) {
+                                let ty = IntersectionBuilder::new(self.db)
+                                    .add_negative(rhs_ty)
+                                    .build();
+                                constraints.insert(symbol, ty);
+                            }
+                        }
+                        ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
+                            constraints.insert(symbol, rhs_ty);
+                        }
+                        _ => {
+                            // TODO other comparison types
+                        }
                     }
                 }
+                ast::Expr::Call(ast::ExprCall {
+                    range: _,
+                    func: callable,
+                    arguments:
+                        ast::Arguments {
+                            args,
+                            keywords,
+                            range: _,
+                        },
+                }) if rhs_ty.is_class_literal() && keywords.is_empty() => {
+                    let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
+                        continue;
+                    };
+
+                    let is_valid_constraint = if is_positive {
+                        op == &ast::CmpOp::Is
+                    } else {
+                        op == &ast::CmpOp::IsNot
+                    };
+
+                    if !is_valid_constraint {
+                        continue;
+                    }
+
+                    let callable_ty =
+                        inference.expression_type(callable.scoped_expression_id(self.db, scope));
+
+                    if callable_ty
+                        .into_class_literal()
+                        .is_some_and(|c| c.class.is_known(self.db, KnownClass::Type))
+                    {
+                        let symbol = self
+                            .symbols()
+                            .symbol_id_by_name(id)
+                            .expect("Should always have a symbol for every Name node");
+                        constraints.insert(symbol, rhs_ty.to_instance(self.db));
+                    }
+                }
+                _ => {}
             }
         }
         Some(constraints)
@@ -333,46 +421,47 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
+        let callable_ty =
+            inference.expression_type(expr_call.func.scoped_expression_id(self.db, scope));
+
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
-        match inference
-            .expression_ty(expr_call.func.scoped_expression_id(self.db, scope))
-            .into_function_literal()
-            .and_then(|f| f.known(self.db))
-            .and_then(KnownFunction::constraint_function)
-        {
-            Some(function) if expr_call.arguments.keywords.is_empty() => {
-                if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
+        match callable_ty {
+            Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
+                let function = function_type
+                    .known(self.db)
+                    .and_then(KnownFunction::constraint_function)?;
+
+                let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
-                {
-                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                else {
+                    return None;
+                };
 
-                    let class_info_ty =
-                        inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
+                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    let to_constraint = match function {
-                        KnownConstraintFunction::IsInstance => {
-                            |class_literal: ClassLiteralType<'db>| {
-                                Type::instance(class_literal.class)
-                            }
-                        }
-                        KnownConstraintFunction::IsSubclass => {
-                            |class_literal: ClassLiteralType<'db>| {
-                                Type::subclass_of(class_literal.class)
-                            }
-                        }
-                    };
+                let class_info_ty =
+                    inference.expression_type(class_info.scoped_expression_id(self.db, scope));
 
-                    generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
-                        |constraint| {
-                            let mut constraints = NarrowingConstraints::default();
-                            constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
-                            constraints
-                        },
-                    )
-                } else {
-                    None
-                }
+                function
+                    .generate_constraint(self.db, class_info_ty)
+                    .map(|constraint| {
+                        let mut constraints = NarrowingConstraints::default();
+                        constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                        constraints
+                    })
+            }
+            // for the expression `bool(E)`, we further narrow the type based on `E`
+            Type::ClassLiteral(class_type)
+                if expr_call.arguments.args.len() == 1
+                    && expr_call.arguments.keywords.is_empty()
+                    && class_type.class.is_known(self.db, KnownClass::Bool) =>
+            {
+                self.evaluate_expression_node_constraint(
+                    &expr_call.arguments.args[0],
+                    expression,
+                    is_positive,
+                )
             }
             _ => None,
         }
@@ -380,18 +469,39 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
     fn evaluate_match_pattern_singleton(
         &mut self,
-        subject: &ast::Expr,
-        pattern: &ast::PatternMatchSingleton,
+        subject: Expression<'db>,
+        singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.as_name_expr() {
+        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-            let ty = match pattern.value {
+            let ty = match singleton {
                 ast::Singleton::None => Type::none(self.db),
                 ast::Singleton::True => Type::BooleanLiteral(true),
                 ast::Singleton::False => Type::BooleanLiteral(false),
             };
+            let mut constraints = NarrowingConstraints::default();
+            constraints.insert(symbol, ty);
+            Some(constraints)
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_match_pattern_class(
+        &mut self,
+        subject: Expression<'db>,
+        cls: Expression<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
+            // SAFETY: we should always have a symbol for every Name node.
+            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+            let scope = self.scope();
+            let inference = infer_expression_types(self.db, cls);
+            let ty = inference
+                .expression_type(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
+                .to_instance(self.db);
             let mut constraints = NarrowingConstraints::default();
             constraints.insert(symbol, ty);
             Some(constraints)
@@ -414,7 +524,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // filter our arms with statically known truthiness
             .filter(|expr| {
                 inference
-                    .expression_ty(expr.scoped_expression_id(self.db, scope))
+                    .expression_type(expr.scoped_expression_id(self.db, scope))
                     .bool(self.db)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,

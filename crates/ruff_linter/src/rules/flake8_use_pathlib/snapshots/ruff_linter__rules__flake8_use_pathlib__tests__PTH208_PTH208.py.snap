@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH208.py:3:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+  |
+1 | import os
+2 |
+3 | os.listdir('.')
+  | ^^^^^^^^^^ PTH208
+4 | os.listdir(b'.')
+  |
+
+PTH208.py:4:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+  |
+3 | os.listdir('.')
+4 | os.listdir(b'.')
+  | ^^^^^^^^^^ PTH208
+5 |
+6 | string_path = '.'
+  |
+
+PTH208.py:7:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+  |
+6 | string_path = '.'
+7 | os.listdir(string_path)
+  | ^^^^^^^^^^ PTH208
+8 |
+9 | bytes_path = b'.'
+  |
+
+PTH208.py:10:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+   |
+ 9 | bytes_path = b'.'
+10 | os.listdir(bytes_path)
+   | ^^^^^^^^^^ PTH208
+   |
+
+PTH208.py:16:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+   |
+15 | path_path = Path('.')
+16 | os.listdir(path_path)
+   | ^^^^^^^^^^ PTH208
+   |
+
+PTH208.py:19:4: PTH208 Use `pathlib.Path.iterdir()` instead.
+   |
+19 | if os.listdir("dir"):
+   |    ^^^^^^^^^^ PTH208
+20 |     ...
+   |
+
+PTH208.py:22:14: PTH208 Use `pathlib.Path.iterdir()` instead.
+   |
+20 |     ...
+21 |
+22 | if "file" in os.listdir("dir"):
+   |              ^^^^^^^^^^ PTH208
+23 |     ...
+   |

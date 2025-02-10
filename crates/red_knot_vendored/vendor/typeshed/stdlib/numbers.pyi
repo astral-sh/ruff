@@ -9,7 +9,7 @@
 
 from _typeshed import Incomplete
 from abc import ABCMeta, abstractmethod
-from typing import Literal, Protocol, overload
+from typing import ClassVar, Literal, Protocol, overload
 
 __all__ = ["Number", "Complex", "Real", "Rational", "Integral"]
 
@@ -102,6 +102,7 @@ class Complex(Number, _ComplexLike):
     def conjugate(self) -> _ComplexLike: ...
     @abstractmethod
     def __eq__(self, other: object) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague

@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
-C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:1:1: C405 [*] Unnecessary list literal (rewrite as a set literal)
   |
 1 | set([1, 2])
   | ^^^^^^^^^^^ C405
 2 | set((1, 2))
 3 | set([])
   |
-  = help: Rewrite as a `set` literal
+  = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 1   |-set([1, 2])
@@ -18,7 +17,7 @@ C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 3 3 | set([])
 4 4 | set(())
 
-C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:2:1: C405 [*] Unnecessary tuple literal (rewrite as a set literal)
   |
 1 | set([1, 2])
 2 | set((1, 2))
@@ -26,7 +25,7 @@ C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 3 | set([])
 4 | set(())
   |
-  = help: Rewrite as a `set` literal
+  = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 1 1 | set([1, 2])
@@ -36,7 +35,7 @@ C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 4 4 | set(())
 5 5 | set()
 
-C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:3:1: C405 [*] Unnecessary list literal (rewrite as a set literal)
   |
 1 | set([1, 2])
 2 | set((1, 2))
@@ -45,7 +44,7 @@ C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 4 | set(())
 5 | set()
   |
-  = help: Rewrite as a `set` literal
+  = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 1 1 | set([1, 2])
@@ -56,7 +55,7 @@ C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 5 5 | set()
 6 6 | set((1,))
 
-C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:4:1: C405 [*] Unnecessary tuple literal (rewrite as a set literal)
   |
 2 | set((1, 2))
 3 | set([])
@@ -65,7 +64,7 @@ C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 5 | set()
 6 | set((1,))
   |
-  = help: Rewrite as a `set` literal
+  = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 1 1 | set([1, 2])
@@ -78,7 +77,7 @@ C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 7 7 | set((
 8 8 |     1,
 
-C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:6:1: C405 [*] Unnecessary tuple literal (rewrite as a set literal)
   |
 4 | set(())
 5 | set()
@@ -87,7 +86,7 @@ C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 7 | set((
 8 |     1,
   |
-  = help: Rewrite as a `set` literal
+  = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 3 3 | set([])
@@ -99,7 +98,7 @@ C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 8 8 |     1,
 9 9 | ))
 
-C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:7:1: C405 [*] Unnecessary tuple literal (rewrite as a set literal)
    |
  5 |   set()
  6 |   set((1,))
@@ -110,7 +109,7 @@ C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 10 |   set([
 11 |       1,
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 4  4  | set(())
@@ -125,7 +124,7 @@ C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 11 11 |     1,
 12 12 | ])
 
-C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:10:1: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
  8 |       1,
  9 |   ))
@@ -136,7 +135,7 @@ C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 13 |   set(
 14 |       (1,)
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 7  7  | set((
@@ -151,7 +150,7 @@ C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 14 14 |     (1,)
 15 15 | )
 
-C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:13:1: C405 [*] Unnecessary tuple literal (rewrite as a set literal)
    |
 11 |       1,
 12 |   ])
@@ -162,7 +161,7 @@ C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 16 |   set(
 17 |       [1,]
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 10 10 | set([
@@ -176,7 +175,7 @@ C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
 17 15 |     [1,]
 18 16 | )
 
-C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:16:1: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 14 |       (1,)
 15 |   )
@@ -187,7 +186,7 @@ C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 19 |   f"{set([1,2,3])}"
 20 |   f"{set(['a', 'b'])}"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 13 13 | set(
@@ -201,7 +200,7 @@ C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 20 18 | f"{set(['a', 'b'])}"
 21 19 | f'{set(["a", "b"])}'
 
-C405.py:19:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:19:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 17 |     [1,]
 18 | )
@@ -210,7 +209,7 @@ C405.py:19:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 20 | f"{set(['a', 'b'])}"
 21 | f'{set(["a", "b"])}'
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 16 16 | set(
@@ -222,7 +221,7 @@ C405.py:19:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 21 21 | f'{set(["a", "b"])}'
 22 22 | 
 
-C405.py:20:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:20:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 18 | )
 19 | f"{set([1,2,3])}"
@@ -230,7 +229,7 @@ C405.py:20:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |    ^^^^^^^^^^^^^^^ C405
 21 | f'{set(["a", "b"])}'
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 17 17 |     [1,]
@@ -242,16 +241,16 @@ C405.py:20:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 22 22 | 
 23 23 | f"{set(['a', 'b']) - set(['a'])}"
 
-C405.py:21:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:21:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 19 | f"{set([1,2,3])}"
 20 | f"{set(['a', 'b'])}"
 21 | f'{set(["a", "b"])}'
    |    ^^^^^^^^^^^^^^^ C405
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 18 18 | )
@@ -263,16 +262,16 @@ C405.py:21:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 23 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 24 | f"{ set(['a', 'b']) - set(['a']) }"
 
-C405.py:23:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:23:4: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    |    ^^^^^^^^^^^^^^^ C405
 24 | f"{ set(['a', 'b']) - set(['a']) }"
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 20 20 | f"{set(['a', 'b'])}"
@@ -284,16 +283,16 @@ C405.py:23:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
 
-C405.py:23:22: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:23:22: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 21 | f'{set(["a", "b"])}'
-22 | 
+22 |
 23 | f"{set(['a', 'b']) - set(['a'])}"
    |                      ^^^^^^^^^^ C405
 24 | f"{ set(['a', 'b']) - set(['a']) }"
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 20 20 | f"{set(['a', 'b'])}"
@@ -305,7 +304,7 @@ C405.py:23:22: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
 
-C405.py:24:5: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:24:5: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -313,7 +312,7 @@ C405.py:24:5: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 21 21 | f'{set(["a", "b"])}'
@@ -324,7 +323,7 @@ C405.py:24:5: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
 
-C405.py:24:23: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:24:23: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -332,7 +331,7 @@ C405.py:24:23: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 21 21 | f'{set(["a", "b"])}'
@@ -343,7 +342,7 @@ C405.py:24:23: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
 
-C405.py:25:6: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:25:6: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -351,7 +350,7 @@ C405.py:25:6: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |      ^^^^^^^^^^^^^^^ C405
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 22 22 | 
@@ -361,7 +360,7 @@ C405.py:25:6: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    25 |+f"a { {'a', 'b'} - set(['a'])} b"
 26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
 
-C405.py:25:24: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:25:24: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 23 | f"{set(['a', 'b']) - set(['a'])}"
 24 | f"{ set(['a', 'b']) - set(['a']) }"
@@ -369,7 +368,7 @@ C405.py:25:24: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |                        ^^^^^^^^^^ C405
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 22 22 | 
@@ -379,14 +378,14 @@ C405.py:25:24: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    25 |+f"a {set(['a', 'b']) - {'a'} } b"
 26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
 
-C405.py:26:7: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:26:7: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 24 | f"{ set(['a', 'b']) - set(['a']) }"
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |       ^^^^^^^^^^^^^^^ C405
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 23 23 | f"{set(['a', 'b']) - set(['a'])}"
@@ -395,14 +394,14 @@ C405.py:26:7: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 26    |-f"a { set(['a', 'b']) - set(['a']) } b"
    26 |+f"a { {'a', 'b'} - set(['a']) } b"
 
-C405.py:26:25: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:26:25: C405 [*] Unnecessary list literal (rewrite as a set literal)
    |
 24 | f"{ set(['a', 'b']) - set(['a']) }"
 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26 | f"a { set(['a', 'b']) - set(['a']) } b"
    |                         ^^^^^^^^^^ C405
    |
-   = help: Rewrite as a `set` literal
+   = help: Rewrite as a set literal
 
 ℹ Unsafe fix
 23 23 | f"{set(['a', 'b']) - set(['a'])}"

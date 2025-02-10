@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -14,8 +14,8 @@ use crate::checkers::ast::Checker;
 ///
 /// At the module level, all names are global by default, so the `global`
 /// keyword is redundant.
-#[violation]
-pub struct GlobalAtModuleLevel;
+#[derive(ViolationMetadata)]
+pub(crate) struct GlobalAtModuleLevel;
 
 impl Violation for GlobalAtModuleLevel {
     #[derive_message_formats]
@@ -25,10 +25,8 @@ impl Violation for GlobalAtModuleLevel {
 }
 
 /// PLW0604
-pub(crate) fn global_at_module_level(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn global_at_module_level(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().current_scope().kind.is_module() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(GlobalAtModuleLevel, stmt.range()));
+        checker.report_diagnostic(Diagnostic::new(GlobalAtModuleLevel, stmt.range()));
     }
 }

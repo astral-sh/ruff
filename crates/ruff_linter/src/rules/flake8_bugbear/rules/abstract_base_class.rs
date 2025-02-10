@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::SemanticModel;
@@ -11,12 +11,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for abstract classes without abstract methods.
+/// Checks for abstract classes without abstract methods or properties.
+/// Annotated but unassigned class variables are regarded as abstract.
 ///
 /// ## Why is this bad?
 /// Abstract base classes are used to define interfaces. If an abstract base
-/// class has no abstract methods, you may have forgotten to add an abstract
-/// method to the class or omitted an `@abstractmethod` decorator.
+/// class has no abstract methods or properties, you may have forgotten
+/// to add an abstract method or property to the class,
+/// or omitted an `@abstractmethod` decorator.
 ///
 /// If the class is _not_ meant to be used as an interface, consider removing
 /// the `ABC` base class from the class definition.
@@ -24,9 +26,12 @@ use crate::registry::Rule;
 /// ## Example
 /// ```python
 /// from abc import ABC
+/// from typing import ClassVar
 ///
 ///
 /// class Foo(ABC):
+///     class_var: ClassVar[str] = "assigned"
+///
 ///     def method(self):
 ///         bar()
 /// ```
@@ -34,9 +39,12 @@ use crate::registry::Rule;
 /// Use instead:
 /// ```python
 /// from abc import ABC, abstractmethod
+/// from typing import ClassVar
 ///
 ///
 /// class Foo(ABC):
+///     class_var: ClassVar[str]  # unassigned
+///
 ///     @abstractmethod
 ///     def method(self):
 ///         bar()
@@ -44,8 +52,9 @@ use crate::registry::Rule;
 ///
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
-#[violation]
-pub struct AbstractBaseClassWithoutAbstractMethod {
+/// - [Python documentation: `typing.ClassVar`](https://docs.python.org/3/library/typing.html#typing.ClassVar)
+#[derive(ViolationMetadata)]
+pub(crate) struct AbstractBaseClassWithoutAbstractMethod {
     name: String,
 }
 
@@ -53,7 +62,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AbstractBaseClassWithoutAbstractMethod { name } = self;
-        format!("`{name}` is an abstract base class, but it has no abstract methods")
+        format!("`{name}` is an abstract base class, but it has no abstract methods or properties")
     }
 }
 
@@ -89,8 +98,8 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 ///
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
-#[violation]
-pub struct EmptyMethodWithoutAbstractDecorator {
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyMethodWithoutAbstractDecorator {
     name: String,
 }
 
@@ -135,7 +144,7 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 /// B024
 /// B027
 pub(crate) fn abstract_base_class(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     arguments: Option<&Arguments>,
@@ -187,7 +196,7 @@ pub(crate) fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(decorator_list, checker.semantic())
         {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
@@ -197,7 +206,7 @@ pub(crate) fn abstract_base_class(
     }
     if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },

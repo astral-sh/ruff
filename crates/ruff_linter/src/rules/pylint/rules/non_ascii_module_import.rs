@@ -1,7 +1,7 @@
 use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -29,8 +29,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
-#[violation]
-pub struct NonAsciiImportName {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonAsciiImportName {
     name: String,
     kind: Kind,
 }
@@ -63,13 +63,13 @@ enum Kind {
 }
 
 /// PLC2403
-pub(crate) fn non_ascii_module_import(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
     if let Some(asname) = &alias.asname {
         if asname.as_str().is_ascii() {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NonAsciiImportName {
                 name: asname.to_string(),
                 kind: Kind::Aliased,
@@ -81,7 +81,7 @@ pub(crate) fn non_ascii_module_import(checker: &mut Checker, alias: &Alias) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NonAsciiImportName {
                 name: alias.name.to_string(),
                 kind: Kind::Unaliased,

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{any_over_body, AwaitVisitor};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, StmtWith, WithItem};
@@ -38,8 +38,8 @@ use crate::rules::flake8_async::helpers::MethodName;
 /// - [`asyncio` timeouts](https://docs.python.org/3/library/asyncio-task.html#timeouts)
 /// - [`anyio` timeouts](https://anyio.readthedocs.io/en/stable/cancellation.html)
 /// - [`trio` timeouts](https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts)
-#[violation]
-pub struct CancelScopeNoCheckpoint {
+#[derive(ViolationMetadata)]
+pub(crate) struct CancelScopeNoCheckpoint {
     method_name: MethodName,
 }
 
@@ -53,7 +53,7 @@ impl Violation for CancelScopeNoCheckpoint {
 
 /// ASYNC100
 pub(crate) fn cancel_scope_no_checkpoint(
-    checker: &mut Checker,
+    checker: &Checker,
     with_stmt: &StmtWith,
     with_items: &[WithItem],
 ) {
@@ -98,7 +98,7 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         CancelScopeNoCheckpoint { method_name },
         with_stmt.range,
     ));

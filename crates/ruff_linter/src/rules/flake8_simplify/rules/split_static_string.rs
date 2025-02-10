@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringLiteral,
+    str::TripleQuotes, Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral,
     StringLiteralFlags, StringLiteralValue, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange};
@@ -41,9 +41,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
-/// ```
-#[violation]
-pub struct SplitStaticString;
+#[derive(ViolationMetadata)]
+pub(crate) struct SplitStaticString;
 
 impl Violation for SplitStaticString {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -60,14 +59,14 @@ impl Violation for SplitStaticString {
 
 /// SIM905
 pub(crate) fn split_static_string(
-    checker: &mut Checker,
+    checker: &Checker,
     attr: &str,
     call: &ExprCall,
-    str_value: &str,
+    str_value: &StringLiteralValue,
 ) {
     let ExprCall { arguments, .. } = call;
 
-    let maxsplit_arg = arguments.find_argument("maxsplit", 1);
+    let maxsplit_arg = arguments.find_argument_value("maxsplit", 1);
     let Some(maxsplit_value) = get_maxsplit_value(maxsplit_arg) else {
         return;
     };
@@ -79,7 +78,7 @@ pub(crate) fn split_static_string(
         Direction::Right
     };
 
-    let sep_arg = arguments.find_argument("sep", 0);
+    let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
             Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value),
@@ -113,21 +112,28 @@ pub(crate) fn split_static_string(
             },
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
-fn construct_replacement(elts: &[&str]) -> Expr {
+fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     Expr::List(ExprList {
         elts: elts
             .iter()
             .map(|elt| {
-                Expr::StringLiteral(ExprStringLiteral {
-                    value: StringLiteralValue::single(StringLiteral {
-                        value: (*elt).to_string().into_boxed_str(),
-                        range: TextRange::default(),
-                        flags: StringLiteralFlags::default(),
-                    }),
+                Expr::from(StringLiteral {
+                    value: Box::from(*elt),
                     range: TextRange::default(),
+                    // intentionally omit the triple quote flag, if set, to avoid strange
+                    // replacements like
+                    //
+                    // ```python
+                    // """
+                    // itemA
+                    // itemB
+                    // itemC
+                    // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
+                    // ```
+                    flags: flags.with_triple_quotes(TripleQuotes::No),
                 })
             })
             .collect(),
@@ -136,7 +142,7 @@ fn construct_replacement(elts: &[&str]) -> Expr {
     })
 }
 
-fn split_default(str_value: &str, max_split: i32) -> Option<Expr> {
+fn split_default(str_value: &StringLiteralValue, max_split: i32) -> Option<Expr> {
     // From the Python documentation:
     // > If sep is not specified or is None, a different splitting algorithm is applied: runs of
     // > consecutive whitespace are regarded as a single separator, and the result will contain
@@ -152,30 +158,36 @@ fn split_default(str_value: &str, max_split: i32) -> Option<Expr> {
             None
         }
         Ordering::Equal => {
-            let list_items: Vec<&str> = vec![str_value];
-            Some(construct_replacement(&list_items))
+            let list_items: Vec<&str> = vec![str_value.to_str()];
+            Some(construct_replacement(&list_items, str_value.flags()))
         }
         Ordering::Less => {
-            let list_items: Vec<&str> = str_value.split_whitespace().collect();
-            Some(construct_replacement(&list_items))
+            let list_items: Vec<&str> = str_value.to_str().split_whitespace().collect();
+            Some(construct_replacement(&list_items, str_value.flags()))
         }
     }
 }
 
-fn split_sep(str_value: &str, sep_value: &str, max_split: i32, direction: Direction) -> Expr {
+fn split_sep(
+    str_value: &StringLiteralValue,
+    sep_value: &str,
+    max_split: i32,
+    direction: Direction,
+) -> Expr {
+    let value = str_value.to_str();
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match direction {
-            Direction::Left => str_value.splitn(split_n + 1, sep_value).collect(),
-            Direction::Right => str_value.rsplitn(split_n + 1, sep_value).collect(),
+            Direction::Left => value.splitn(split_n + 1, sep_value).collect(),
+            Direction::Right => value.rsplitn(split_n + 1, sep_value).collect(),
         }
     } else {
         match direction {
-            Direction::Left => str_value.split(sep_value).collect(),
-            Direction::Right => str_value.rsplit(sep_value).collect(),
+            Direction::Left => value.split(sep_value).collect(),
+            Direction::Right => value.rsplit(sep_value).collect(),
         }
     };
 
-    construct_replacement(&list_items)
+    construct_replacement(&list_items, str_value.flags())
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.

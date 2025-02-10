@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-snapshot_kind: text
 ---
 C420.py:6:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
   |
@@ -61,7 +60,7 @@ C420.py:15:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fr
 C420.py:26:7: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 24 |         return data
-25 | 
+25 |
 26 |     f({c: "a" for c in "12345"})  # RUF025
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ C420
    |

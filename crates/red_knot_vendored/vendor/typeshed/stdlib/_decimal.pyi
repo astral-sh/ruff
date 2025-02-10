@@ -17,31 +17,24 @@ from decimal import (
     Rounded as Rounded,
     Subnormal as Subnormal,
     Underflow as Underflow,
+    _ContextManager,
 )
-from types import TracebackType
 from typing import Final
 from typing_extensions import TypeAlias
 
 _TrapType: TypeAlias = type[DecimalException]
 
-class _ContextManager:
-    new_context: Context
-    saved_context: Context
-    def __init__(self, new_context: Context) -> None: ...
-    def __enter__(self) -> Context: ...
-    def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
-
 __version__: Final[str]
 __libmpdec_version__: Final[str]
 
-ROUND_DOWN: Final[str]
-ROUND_HALF_UP: Final[str]
-ROUND_HALF_EVEN: Final[str]
-ROUND_CEILING: Final[str]
-ROUND_FLOOR: Final[str]
-ROUND_UP: Final[str]
-ROUND_HALF_DOWN: Final[str]
-ROUND_05UP: Final[str]
+ROUND_DOWN: Final = "ROUND_DOWN"
+ROUND_HALF_UP: Final = "ROUND_HALF_UP"
+ROUND_HALF_EVEN: Final = "ROUND_HALF_EVEN"
+ROUND_CEILING: Final = "ROUND_CEILING"
+ROUND_FLOOR: Final = "ROUND_FLOOR"
+ROUND_UP: Final = "ROUND_UP"
+ROUND_HALF_DOWN: Final = "ROUND_HALF_DOWN"
+ROUND_05UP: Final = "ROUND_05UP"
 HAVE_CONTEXTVAR: Final[bool]
 HAVE_THREADS: Final[bool]
 MAX_EMAX: Final[int]

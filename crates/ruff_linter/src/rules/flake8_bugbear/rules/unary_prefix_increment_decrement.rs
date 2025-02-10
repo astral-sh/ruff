@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Unary arithmetic and bitwise operations](https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations)
 /// - [Python documentation: Augmented assignment statements](https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements)
-#[violation]
-pub struct UnaryPrefixIncrementDecrement {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnaryPrefixIncrementDecrement {
     operator: UnaryPrefixOperatorType,
 }
 
@@ -51,7 +51,7 @@ impl Violation for UnaryPrefixIncrementDecrement {
 
 /// B002
 pub(crate) fn unary_prefix_increment_decrement(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,
@@ -61,7 +61,7 @@ pub(crate) fn unary_prefix_increment_decrement(
     };
     match (op, nested_op) {
         (UnaryOp::UAdd, UnaryOp::UAdd) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Increment,
                 },
@@ -69,7 +69,7 @@ pub(crate) fn unary_prefix_increment_decrement(
             ));
         }
         (UnaryOp::USub, UnaryOp::USub) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Decrement,
                 },

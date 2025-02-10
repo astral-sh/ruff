@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
 
@@ -27,8 +27,8 @@ use crate::importer::ImportRequest;
 ///
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
-#[violation]
-pub struct MathConstant {
+#[derive(ViolationMetadata)]
+pub(crate) struct MathConstant {
     literal: String,
     constant: &'static str,
 }
@@ -49,7 +49,7 @@ impl Violation for MathConstant {
 }
 
 /// FURB152
-pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLiteral) {
+pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral) {
     let Number::Float(value) = literal.value else {
         return;
     };
@@ -63,7 +63,7 @@ pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLite
             literal.range(),
         );
         diagnostic.try_set_fix(|| convert_to_constant(literal, constant.name(), checker));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

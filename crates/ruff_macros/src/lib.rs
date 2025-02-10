@@ -2,18 +2,21 @@
 
 use crate::cache_key::derive_cache_key;
 use crate::newtype_index::generate_newtype_index;
+use crate::violation_metadata::violation_metadata;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemFn, ItemStruct};
+use syn::{parse_macro_input, DeriveInput, Error, ItemFn, ItemStruct};
 
 mod cache_key;
+mod combine;
 mod combine_options;
 mod config;
 mod derive_message_formats;
+mod kebab_case;
 mod map_codes;
 mod newtype_index;
 mod rule_code_prefix;
 mod rule_namespace;
-mod violation;
+mod violation_metadata;
 
 #[proc_macro_derive(OptionsMetadata, attributes(option, doc, option_group))]
 pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
@@ -33,6 +36,27 @@ pub fn derive_combine_options(input: TokenStream) -> TokenStream {
         .into()
 }
 
+/// Automatically derives a `red_knot_project::project::Combine` implementation for the attributed type
+/// that calls `red_knot_project::project::Combine::combine` for each field.
+///
+/// The derive macro can only be used on structs. Enums aren't yet supported.
+#[proc_macro_derive(Combine)]
+pub fn derive_combine(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    combine::derive_impl(input)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Converts a screaming snake case identifier to a kebab case string.
+#[proc_macro]
+pub fn kebab_case(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as syn::Ident);
+
+    kebab_case::kebab_case(&input).into()
+}
+
 /// Generates a [`CacheKey`] implementation for the attributed type.
 ///
 /// Struct fields can be attributed with the `cache_key` field-attribute that supports:
@@ -47,12 +71,12 @@ pub fn cache_key(input: TokenStream) -> TokenStream {
     TokenStream::from(stream)
 }
 
-/// Adds an `explanation()` method from the doc comment.
-#[proc_macro_attribute]
-pub fn violation(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let violation = parse_macro_input!(item as ItemStruct);
-    violation::violation(&violation)
-        .unwrap_or_else(syn::Error::into_compile_error)
+#[proc_macro_derive(ViolationMetadata)]
+pub fn derive_violation_metadata(item: TokenStream) -> TokenStream {
+    let input: DeriveInput = parse_macro_input!(item);
+
+    violation_metadata(input)
+        .unwrap_or_else(Error::into_compile_error)
         .into()
 }
 

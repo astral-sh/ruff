@@ -1,7 +1,7 @@
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -22,8 +22,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `return`](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
-#[violation]
-pub struct ReturnOutsideFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReturnOutsideFunction;
 
 impl Violation for ReturnOutsideFunction {
     #[derive_message_formats]
@@ -32,13 +32,11 @@ impl Violation for ReturnOutsideFunction {
     }
 }
 
-pub(crate) fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn return_outside_function(checker: &Checker, stmt: &Stmt) {
     if matches!(
         checker.semantic().current_scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ReturnOutsideFunction, stmt.range()));
+        checker.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, stmt.range()));
     }
 }

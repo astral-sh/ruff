@@ -1,12 +1,17 @@
 import _tkinter
 import sys
-from _typeshed import Incomplete, MaybeNone, StrEnum, StrOrBytesPath
+from _typeshed import Incomplete, MaybeNone, StrOrBytesPath
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
 from types import TracebackType
-from typing import Any, Generic, Literal, NamedTuple, TypedDict, TypeVar, overload, type_check_only
+from typing import Any, ClassVar, Generic, Literal, NamedTuple, Protocol, TypedDict, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack, deprecated
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from enum import Enum
 
 if sys.version_info >= (3, 9):
     __all__ = [
@@ -186,53 +191,99 @@ _XYScrollCommand: TypeAlias = str | Callable[[float, float], object]
 _TakeFocusValue: TypeAlias = bool | Literal[0, 1, ""] | Callable[[str], bool | None]  # -takefocus in manual page named 'options'
 
 if sys.version_info >= (3, 11):
-    class _VersionInfoType(NamedTuple):
+    @type_check_only
+    class _VersionInfoTypeBase(NamedTuple):
         major: int
         minor: int
         micro: int
         releaselevel: str
         serial: int
 
-class EventType(StrEnum):
-    Activate = "36"
-    ButtonPress = "4"
-    Button = ButtonPress
-    ButtonRelease = "5"
-    Circulate = "26"
-    CirculateRequest = "27"
-    ClientMessage = "33"
-    Colormap = "32"
-    Configure = "22"
-    ConfigureRequest = "23"
-    Create = "16"
-    Deactivate = "37"
-    Destroy = "17"
-    Enter = "7"
-    Expose = "12"
-    FocusIn = "9"
-    FocusOut = "10"
-    GraphicsExpose = "13"
-    Gravity = "24"
-    KeyPress = "2"
-    Key = "2"
-    KeyRelease = "3"
-    Keymap = "11"
-    Leave = "8"
-    Map = "19"
-    MapRequest = "20"
-    Mapping = "34"
-    Motion = "6"
-    MouseWheel = "38"
-    NoExpose = "14"
-    Property = "28"
-    Reparent = "21"
-    ResizeRequest = "25"
-    Selection = "31"
-    SelectionClear = "29"
-    SelectionRequest = "30"
-    Unmap = "18"
-    VirtualEvent = "35"
-    Visibility = "15"
+    class _VersionInfoType(_VersionInfoTypeBase): ...
+
+if sys.version_info >= (3, 11):
+    class EventType(StrEnum):
+        Activate = "36"
+        ButtonPress = "4"
+        Button = ButtonPress
+        ButtonRelease = "5"
+        Circulate = "26"
+        CirculateRequest = "27"
+        ClientMessage = "33"
+        Colormap = "32"
+        Configure = "22"
+        ConfigureRequest = "23"
+        Create = "16"
+        Deactivate = "37"
+        Destroy = "17"
+        Enter = "7"
+        Expose = "12"
+        FocusIn = "9"
+        FocusOut = "10"
+        GraphicsExpose = "13"
+        Gravity = "24"
+        KeyPress = "2"
+        Key = "2"
+        KeyRelease = "3"
+        Keymap = "11"
+        Leave = "8"
+        Map = "19"
+        MapRequest = "20"
+        Mapping = "34"
+        Motion = "6"
+        MouseWheel = "38"
+        NoExpose = "14"
+        Property = "28"
+        Reparent = "21"
+        ResizeRequest = "25"
+        Selection = "31"
+        SelectionClear = "29"
+        SelectionRequest = "30"
+        Unmap = "18"
+        VirtualEvent = "35"
+        Visibility = "15"
+
+else:
+    class EventType(str, Enum):
+        Activate = "36"
+        ButtonPress = "4"
+        Button = ButtonPress
+        ButtonRelease = "5"
+        Circulate = "26"
+        CirculateRequest = "27"
+        ClientMessage = "33"
+        Colormap = "32"
+        Configure = "22"
+        ConfigureRequest = "23"
+        Create = "16"
+        Deactivate = "37"
+        Destroy = "17"
+        Enter = "7"
+        Expose = "12"
+        FocusIn = "9"
+        FocusOut = "10"
+        GraphicsExpose = "13"
+        Gravity = "24"
+        KeyPress = "2"
+        Key = "2"
+        KeyRelease = "3"
+        Keymap = "11"
+        Leave = "8"
+        Map = "19"
+        MapRequest = "20"
+        Mapping = "34"
+        Motion = "6"
+        MouseWheel = "38"
+        NoExpose = "14"
+        Property = "28"
+        Reparent = "21"
+        ResizeRequest = "25"
+        Selection = "31"
+        SelectionClear = "29"
+        SelectionRequest = "30"
+        Unmap = "18"
+        VirtualEvent = "35"
+        Visibility = "15"
 
 _W = TypeVar("_W", bound=Misc)
 # Events considered covariant because you should never assign to event.widget.
@@ -279,6 +330,7 @@ class Variable:
     def trace_vinfo(self): ...
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class StringVar(Variable):
     def __init__(self, master: Misc | None = None, value: str | None = None, name: str | None = None) -> None: ...
@@ -319,6 +371,9 @@ class _GridIndexInfo(TypedDict, total=False):
     uniform: str | None
     weight: int
 
+class _BusyInfo(TypedDict):
+    cursor: _Cursor
+
 class Misc:
     master: Misc | None
     tk: _tkinter.TkappType
@@ -352,7 +407,29 @@ class Misc:
     # after_idle is essentially partialmethod(after, "idle")
     def after_idle(self, func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str: ...
     def after_cancel(self, id: str) -> None: ...
+    if sys.version_info >= (3, 13):
+        def after_info(self, id: str | None = None) -> tuple[str, ...]: ...
+
     def bell(self, displayof: Literal[0] | Misc | None = 0) -> None: ...
+    if sys.version_info >= (3, 13):
+        # Supports options from `_BusyInfo``
+        def tk_busy_cget(self, option: Literal["cursor"]) -> _Cursor: ...
+        busy_cget = tk_busy_cget
+        def tk_busy_configure(self, cnf: Any = None, **kw: Any) -> Any: ...
+        tk_busy_config = tk_busy_configure
+        busy_configure = tk_busy_configure
+        busy_config = tk_busy_configure
+        def tk_busy_current(self, pattern: str | None = None) -> list[Misc]: ...
+        busy_current = tk_busy_current
+        def tk_busy_forget(self) -> None: ...
+        busy_forget = tk_busy_forget
+        def tk_busy_hold(self, **kw: Unpack[_BusyInfo]) -> None: ...
+        tk_busy = tk_busy_hold
+        busy_hold = tk_busy_hold
+        busy = tk_busy_hold
+        def tk_busy_status(self) -> bool: ...
+        busy_status = tk_busy_status
+
     def clipboard_get(self, *, displayof: Misc = ..., type: str = ...) -> str: ...
     def clipboard_clear(self, *, displayof: Misc = ...) -> None: ...
     def clipboard_append(self, string: str, *, displayof: Misc = ..., format: str = ..., type: str = ...) -> None: ...
@@ -576,7 +653,8 @@ class Misc:
     def __getitem__(self, key: str) -> Any: ...
     def cget(self, key: str) -> Any: ...
     def configure(self, cnf: Any = None) -> Any: ...
-    # TODO: config is an alias of configure, but adding that here creates lots of mypy errors
+    # TODO: config is an alias of configure, but adding that here creates
+    # conflict with the type of config in the subclasses. See #13149
 
 class CallWrapper:
     func: Incomplete
@@ -607,6 +685,38 @@ class YView:
     @overload
     def yview_scroll(self, number: _ScreenUnits, what: Literal["pixels"]) -> None: ...
 
+if sys.platform == "darwin":
+    @type_check_only
+    class _WmAttributes(TypedDict):
+        alpha: float
+        fullscreen: bool
+        modified: bool
+        notify: bool
+        titlepath: str
+        topmost: bool
+        transparent: bool
+        type: str  # Present, but not actually used on darwin
+
+elif sys.platform == "win32":
+    @type_check_only
+    class _WmAttributes(TypedDict):
+        alpha: float
+        transparentcolor: str
+        disabled: bool
+        fullscreen: bool
+        toolwindow: bool
+        topmost: bool
+
+else:
+    # X11
+    @type_check_only
+    class _WmAttributes(TypedDict):
+        alpha: float
+        topmost: bool
+        zoomed: bool
+        fullscreen: bool
+        type: str
+
 class Wm:
     @overload
     def wm_aspect(self, minNumer: int, minDenom: int, maxNumer: int, maxDenom: int) -> None: ...
@@ -615,12 +725,144 @@ class Wm:
         self, minNumer: None = None, minDenom: None = None, maxNumer: None = None, maxDenom: None = None
     ) -> tuple[int, int, int, int] | None: ...
     aspect = wm_aspect
+    if sys.version_info >= (3, 13):
+        @overload
+        def wm_attributes(self, *, return_python_dict: Literal[False] = False) -> tuple[Any, ...]: ...
+        @overload
+        def wm_attributes(self, *, return_python_dict: Literal[True]) -> _WmAttributes: ...
+
+    else:
+        @overload
+        def wm_attributes(self) -> tuple[Any, ...]: ...
+
     @overload
-    def wm_attributes(self) -> tuple[Any, ...]: ...
+    def wm_attributes(self, option: Literal["-alpha"], /) -> float: ...
+    @overload
+    def wm_attributes(self, option: Literal["-fullscreen"], /) -> bool: ...
+    @overload
+    def wm_attributes(self, option: Literal["-topmost"], /) -> bool: ...
+    if sys.platform == "darwin":
+        @overload
+        def wm_attributes(self, option: Literal["-modified"], /) -> bool: ...
+        @overload
+        def wm_attributes(self, option: Literal["-notify"], /) -> bool: ...
+        @overload
+        def wm_attributes(self, option: Literal["-titlepath"], /) -> str: ...
+        @overload
+        def wm_attributes(self, option: Literal["-transparent"], /) -> bool: ...
+        @overload
+        def wm_attributes(self, option: Literal["-type"], /) -> str: ...
+    elif sys.platform == "win32":
+        @overload
+        def wm_attributes(self, option: Literal["-transparentcolor"], /) -> str: ...
+        @overload
+        def wm_attributes(self, option: Literal["-disabled"], /) -> bool: ...
+        @overload
+        def wm_attributes(self, option: Literal["-toolwindow"], /) -> bool: ...
+    else:
+        # X11
+        @overload
+        def wm_attributes(self, option: Literal["-zoomed"], /) -> bool: ...
+        @overload
+        def wm_attributes(self, option: Literal["-type"], /) -> str: ...
+    if sys.version_info >= (3, 13):
+        @overload
+        def wm_attributes(self, option: Literal["alpha"], /) -> float: ...
+        @overload
+        def wm_attributes(self, option: Literal["fullscreen"], /) -> bool: ...
+        @overload
+        def wm_attributes(self, option: Literal["topmost"], /) -> bool: ...
+        if sys.platform == "darwin":
+            @overload
+            def wm_attributes(self, option: Literal["modified"], /) -> bool: ...
+            @overload
+            def wm_attributes(self, option: Literal["notify"], /) -> bool: ...
+            @overload
+            def wm_attributes(self, option: Literal["titlepath"], /) -> str: ...
+            @overload
+            def wm_attributes(self, option: Literal["transparent"], /) -> bool: ...
+            @overload
+            def wm_attributes(self, option: Literal["type"], /) -> str: ...
+        elif sys.platform == "win32":
+            @overload
+            def wm_attributes(self, option: Literal["transparentcolor"], /) -> str: ...
+            @overload
+            def wm_attributes(self, option: Literal["disabled"], /) -> bool: ...
+            @overload
+            def wm_attributes(self, option: Literal["toolwindow"], /) -> bool: ...
+        else:
+            # X11
+            @overload
+            def wm_attributes(self, option: Literal["zoomed"], /) -> bool: ...
+            @overload
+            def wm_attributes(self, option: Literal["type"], /) -> str: ...
+
     @overload
     def wm_attributes(self, option: str, /): ...
     @overload
-    def wm_attributes(self, option: str, value, /, *__other_option_value_pairs: Any) -> None: ...
+    def wm_attributes(self, option: Literal["-alpha"], value: float, /) -> Literal[""]: ...
+    @overload
+    def wm_attributes(self, option: Literal["-fullscreen"], value: bool, /) -> Literal[""]: ...
+    @overload
+    def wm_attributes(self, option: Literal["-topmost"], value: bool, /) -> Literal[""]: ...
+    if sys.platform == "darwin":
+        @overload
+        def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]: ...
+        @overload
+        def wm_attributes(self, option: Literal["-notify"], value: bool, /) -> Literal[""]: ...
+        @overload
+        def wm_attributes(self, option: Literal["-titlepath"], value: str, /) -> Literal[""]: ...
+        @overload
+        def wm_attributes(self, option: Literal["-transparent"], value: bool, /) -> Literal[""]: ...
+    elif sys.platform == "win32":
+        @overload
+        def wm_attributes(self, option: Literal["-transparentcolor"], value: str, /) -> Literal[""]: ...
+        @overload
+        def wm_attributes(self, option: Literal["-disabled"], value: bool, /) -> Literal[""]: ...
+        @overload
+        def wm_attributes(self, option: Literal["-toolwindow"], value: bool, /) -> Literal[""]: ...
+    else:
+        # X11
+        @overload
+        def wm_attributes(self, option: Literal["-zoomed"], value: bool, /) -> Literal[""]: ...
+        @overload
+        def wm_attributes(self, option: Literal["-type"], value: str, /) -> Literal[""]: ...
+
+    @overload
+    def wm_attributes(self, option: str, value, /, *__other_option_value_pairs: Any) -> Literal[""]: ...
+    if sys.version_info >= (3, 13):
+        if sys.platform == "darwin":
+            @overload
+            def wm_attributes(
+                self,
+                *,
+                alpha: float = ...,
+                fullscreen: bool = ...,
+                modified: bool = ...,
+                notify: bool = ...,
+                titlepath: str = ...,
+                topmost: bool = ...,
+                transparent: bool = ...,
+            ) -> None: ...
+        elif sys.platform == "win32":
+            @overload
+            def wm_attributes(
+                self,
+                *,
+                alpha: float = ...,
+                transparentcolor: str = ...,
+                disabled: bool = ...,
+                fullscreen: bool = ...,
+                toolwindow: bool = ...,
+                topmost: bool = ...,
+            ) -> None: ...
+        else:
+            # X11
+            @overload
+            def wm_attributes(
+                self, *, alpha: float = ..., topmost: bool = ..., zoomed: bool = ..., fullscreen: bool = ..., type: str = ...
+            ) -> None: ...
+
     attributes = wm_attributes
     def wm_client(self, name: str | None = None) -> str: ...
     client = wm_client
@@ -3403,11 +3645,14 @@ class OptionMenu(Menubutton):
     # configure, config, cget are inherited from Menubutton
     # destroy and __getitem__ are overridden, signature does not change
 
-# Marker to indicate that it is a valid bitmap/photo image. PIL implements compatible versions
-# which don't share a class hierarchy. The actual API is a __str__() which returns a valid name,
-# not something that type checkers can detect.
+# This matches tkinter's image classes (PhotoImage and BitmapImage)
+# and PIL's tkinter-compatible class (PIL.ImageTk.PhotoImage),
+# but not a plain PIL image that isn't tkinter compatible.
+# The reason is that PIL has width and height attributes, not methods.
 @type_check_only
-class _Image: ...
+class _Image(Protocol):
+    def width(self) -> int: ...
+    def height(self) -> int: ...
 
 @type_check_only
 class _BitmapImageLike(_Image): ...
@@ -3426,9 +3671,7 @@ class Image(_Image):
     def __getitem__(self, key): ...
     configure: Incomplete
     config: Incomplete
-    def height(self) -> int: ...
     def type(self): ...
-    def width(self) -> int: ...
 
 class PhotoImage(Image, _PhotoImageLike):
     # This should be kept in sync with PIL.ImageTK.PhotoImage.__init__()

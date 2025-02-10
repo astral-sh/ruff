@@ -2,13 +2,14 @@ use std::ffi::OsStr;
 use std::path::Path;
 
 pub use expression::*;
+pub use generated::*;
 pub use int::*;
-pub use node::{AnyNode, AnyNodeRef, AstNode, NodeKind};
 pub use nodes::*;
 
 pub mod comparable;
 pub mod docstrings;
 mod expression;
+mod generated;
 pub mod helpers;
 pub mod identifier;
 mod int;
@@ -68,7 +69,7 @@ pub enum TomlSourceType {
     Unrecognized,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PySourceType {
     /// The source is a Python file (`.py`).

@@ -1,14 +1,17 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_semantic::analyze::typing::is_immutable_func;
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
+};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
     dataclass_kind, is_class_var_annotation, is_dataclass_field, is_descriptor_class,
+    AttrsAutoAttribs, DataclassKind,
 };
 
 /// ## What it does
@@ -22,6 +25,9 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// If a field needs to be initialized with a mutable object, use the
 /// `field(default_factory=...)` pattern.
+///
+/// Attributes whose default arguments are `NewType` calls
+/// where the original type is immutable are ignored.
 ///
 /// ## Examples
 /// ```python
@@ -53,8 +59,8 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
-#[violation]
-pub struct FunctionCallInDataclassDefaultArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct FunctionCallInDataclassDefaultArgument {
     name: Option<String>,
 }
 
@@ -70,19 +76,35 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 }
 
 /// RUF009
-pub(crate) fn function_call_in_dataclass_default(
-    checker: &mut Checker,
-    class_def: &ast::StmtClassDef,
-) {
+pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
-    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
-        return;
-    }
+    let attrs_auto_attribs = match dataclass_kind {
+        DataclassKind::Stdlib => None,
+
+        DataclassKind::Attrs(auto_attribs) => match auto_attribs {
+            AttrsAutoAttribs::Unknown => return,
+
+            AttrsAutoAttribs::None => {
+                if any_annotated(&class_def.body) {
+                    Some(AttrsAutoAttribs::True)
+                } else {
+                    Some(AttrsAutoAttribs::False)
+                }
+            }
+
+            _ => Some(auto_attribs),
+        },
+    };
+
+    let dataclass_kind = match attrs_auto_attribs {
+        None => DataclassKind::Stdlib,
+        Some(auto_attribs) => DataclassKind::Attrs(auto_attribs),
+    };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
@@ -101,14 +123,26 @@ pub(crate) fn function_call_in_dataclass_default(
         else {
             continue;
         };
-        let Expr::Call(ast::ExprCall { func, .. }) = &**expr else {
+        let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() else {
             continue;
         };
 
-        if is_class_var_annotation(annotation, checker.semantic())
+        let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
+
+        // Non-explicit fields in an `attrs` dataclass
+        // with `auto_attribs=False` are class variables.
+        if matches!(attrs_auto_attribs, Some(AttrsAutoAttribs::False)) && !is_field {
+            continue;
+        }
+
+        if is_field
+            || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
+            || is_class_var_annotation(annotation, checker.semantic())
             || is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
-            || is_dataclass_field(func, checker.semantic(), dataclass_kind)
             || is_descriptor_class(func, checker.semantic())
+            || func.as_name_expr().is_some_and(|name| {
+                is_immutable_newtype_call(name, checker.semantic(), &extend_immutable_calls)
+            })
         {
             continue;
         }
@@ -118,6 +152,13 @@ pub(crate) fn function_call_in_dataclass_default(
         };
         let diagnostic = Diagnostic::new(kind, expr.range());
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
+}
+
+#[inline]
+fn any_annotated(class_body: &[Stmt]) -> bool {
+    class_body
+        .iter()
+        .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
 }

@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -63,8 +63,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `target-version`
-#[violation]
-pub struct FutureRewritableTypeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
 }
 
@@ -77,14 +77,14 @@ impl Violation for FutureRewritableTypeAnnotation {
 }
 
 /// FA100
-pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) {
     let name = checker
         .semantic()
         .resolve_qualified_name(expr)
         .map(|binding| binding.to_string());
 
     if let Some(name) = name {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             FutureRewritableTypeAnnotation { name },
             expr.range(),
         ));

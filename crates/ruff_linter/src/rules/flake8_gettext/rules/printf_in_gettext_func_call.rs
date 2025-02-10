@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -39,8 +39,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
-#[violation]
-pub struct PrintfInGetTextFuncCall;
+#[derive(ViolationMetadata)]
+pub(crate) struct PrintfInGetTextFuncCall;
 
 impl Violation for PrintfInGetTextFuncCall {
     #[derive_message_formats]
@@ -51,7 +51,7 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::Mod { .. },
@@ -61,8 +61,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) 
         {
             if left.is_string_literal_expr() {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                    .report_diagnostic(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
             }
         }
     }

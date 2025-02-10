@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3.11/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3.11/library/functions.html#max)
-#[violation]
-pub struct IfExprMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct IfExprMinMax {
     min_max: MinMax,
     expression: SourceCodeSnippet,
     replacement: SourceCodeSnippet,
@@ -76,7 +76,7 @@ impl Violation for IfExprMinMax {
 }
 
 /// FURB136
-pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
+pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -146,7 +146,7 @@ pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

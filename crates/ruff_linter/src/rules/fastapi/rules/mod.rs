@@ -7,7 +7,7 @@ mod fastapi_redundant_response_model;
 mod fastapi_unused_path_parameter;
 
 use ruff_python_ast as ast;
-use ruff_python_semantic::analyze::typing::resolve_assignment;
+use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
 
 /// Returns `true` if the function is a FastAPI route.
@@ -15,10 +15,10 @@ pub(crate) fn is_fastapi_route(
     function_def: &ast::StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {
-    return function_def
+    function_def
         .decorator_list
         .iter()
-        .any(|decorator| is_fastapi_route_decorator(decorator, semantic).is_some());
+        .any(|decorator| is_fastapi_route_decorator(decorator, semantic).is_some())
 }
 
 /// Returns `true` if the decorator is indicative of a FastAPI route.
@@ -41,11 +41,11 @@ pub(crate) fn is_fastapi_route_call(call_expr: &ast::ExprCall, semantic: &Semant
     ) {
         return false;
     }
-
-    resolve_assignment(value, semantic).is_some_and(|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            ["fastapi", "FastAPI" | "APIRouter"]
-        )
-    })
+    let Some(name) = value.as_name_expr() else {
+        return false;
+    };
+    let Some(binding_id) = semantic.resolve_name(name) else {
+        return false;
+    };
+    typing::is_fastapi_route(semantic.binding(binding_id), semantic)
 }

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::{Ranged, TextSize};
@@ -49,8 +49,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `target-version`
-#[violation]
-pub struct FutureRequiredTypeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureRequiredTypeAnnotation {
     reason: Reason,
 }
 
@@ -84,7 +84,7 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
 }
 
 /// FA102
-pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr, reason: Reason) {
+pub(crate) fn future_required_type_annotation(checker: &Checker, expr: &Expr, reason: Reason) {
     let mut diagnostic = Diagnostic::new(FutureRequiredTypeAnnotation { reason }, expr.range());
     let required_import = NameImport::ImportFrom(MemberNameImport::member(
         "__future__".to_string(),
@@ -95,5 +95,5 @@ pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr
             .importer()
             .add_import(&required_import, TextSize::default()),
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

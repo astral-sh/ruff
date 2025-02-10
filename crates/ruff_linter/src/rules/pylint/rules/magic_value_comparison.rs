@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -45,8 +45,8 @@ use crate::rules::pylint::settings::ConstantType;
 /// - `lint.pylint.allow-magic-value-types`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
-#[violation]
-pub struct MagicValueComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct MagicValueComparison {
     value: String,
 }
 
@@ -99,7 +99,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
     for (left, right) in std::iter::once(left).chain(comparators).tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
@@ -111,7 +111,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
     for comparison_expr in std::iter::once(left).chain(comparators) {
         if let Some(value) = as_literal(comparison_expr) {
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     MagicValueComparison {
                         value: checker.locator().slice(comparison_expr).to_string(),
                     },

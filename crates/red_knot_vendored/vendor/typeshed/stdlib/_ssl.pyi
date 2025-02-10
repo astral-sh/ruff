@@ -12,7 +12,7 @@ from ssl import (
     SSLWantWriteError as SSLWantWriteError,
     SSLZeroReturnError as SSLZeroReturnError,
 )
-from typing import Any, Literal, TypedDict, final, overload
+from typing import Any, ClassVar, Literal, TypedDict, final, overload
 from typing_extensions import NotRequired, Self, TypeAlias
 
 _PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
@@ -119,6 +119,7 @@ class MemoryBIO:
 
 @final
 class SSLSession:
+    __hash__: ClassVar[None]  # type: ignore[assignment]
     @property
     def has_ticket(self) -> bool: ...
     @property
@@ -239,9 +240,7 @@ OP_SINGLE_ECDH_USE: int
 OP_NO_COMPRESSION: int
 OP_ENABLE_MIDDLEBOX_COMPAT: int
 OP_NO_RENEGOTIATION: int
-if sys.version_info >= (3, 11):
-    OP_IGNORE_UNEXPECTED_EOF: int
-elif sys.version_info >= (3, 8) and sys.platform == "linux":
+if sys.version_info >= (3, 11) or sys.platform == "linux":
     OP_IGNORE_UNEXPECTED_EOF: int
 if sys.version_info >= (3, 12):
     OP_LEGACY_SERVER_CONNECT: int

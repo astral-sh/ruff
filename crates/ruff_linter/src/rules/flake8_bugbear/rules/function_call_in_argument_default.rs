@@ -1,14 +1,14 @@
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Expr, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::{
-    is_immutable_annotation, is_immutable_func, is_mutable_func,
+    is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
 use ruff_python_semantic::SemanticModel;
 
@@ -22,12 +22,12 @@ use crate::checkers::ast::Checker;
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
 ///
-/// Calls can be marked as an exception to this rule with the
-/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
+/// Parameters with immutable type annotations will be ignored by this rule.
+/// Those whose default arguments are `NewType` calls where the original type
+/// is immutable are also ignored.
 ///
-/// Arguments with immutable type annotations will be ignored by this rule.
-/// Types outside of the standard library can be marked as immutable with the
-/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option as well.
+/// Calls and types outside of the standard library can be marked as an exception
+/// to this rule with the [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Example
 ///
@@ -64,8 +64,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
-#[violation]
-pub struct FunctionCallInDefaultArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct FunctionCallInDefaultArgument {
     name: Option<String>,
 }
 
@@ -105,6 +105,9 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
             Expr::Call(ast::ExprCall { func, .. }) => {
                 if !is_mutable_func(func, self.semantic)
                     && !is_immutable_func(func, self.semantic, self.extend_immutable_calls)
+                    && !func.as_name_expr().is_some_and(|name| {
+                        is_immutable_newtype_call(name, self.semantic, self.extend_immutable_calls)
+                    })
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
@@ -125,7 +128,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
@@ -136,22 +139,17 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
         .collect();
 
     let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);
-    for ParameterWithDefault {
-        default,
-        parameter,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        if let Some(expr) = &default {
-            if !parameter.annotation.as_ref().is_some_and(|expr| {
+    for parameter in parameters.iter_non_variadic_params() {
+        if let Some(default) = parameter.default() {
+            if !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), &extend_immutable_calls)
             }) {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(default);
             }
         }
     }
 
     for (check, range) in visitor.diagnostics {
-        checker.diagnostics.push(Diagnostic::new(check, range));
+        checker.report_diagnostic(Diagnostic::new(check, range));
     }
 }

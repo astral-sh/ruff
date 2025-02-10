@@ -1,7 +1,7 @@
 from _typeshed import Incomplete, SupportsGetItem, SupportsLenAndGetItem, Unused
 from abc import abstractmethod
 from collections.abc import Iterable, Iterator, MutableSequence
-from typing import Final
+from typing import ClassVar, Final
 from typing_extensions import Self, TypeAlias
 
 from .fixer_base import BaseFix
@@ -24,6 +24,7 @@ class Base:
     was_changed: bool
     was_checked: bool
     def __eq__(self, other: object) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
     @abstractmethod
     def _eq(self, other: Base) -> bool: ...
     @abstractmethod

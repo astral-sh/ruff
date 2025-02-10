@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -37,10 +38,15 @@ use crate::checkers::ast::Checker;
 ///     b: str
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there are any comments within the
+/// range of the `TypedDict` definition, as these will be dropped by the
+/// autofix.
+///
 /// ## References
 /// - [Python documentation: `typing.TypedDict`](https://docs.python.org/3/library/typing.html#typing.TypedDict)
-#[violation]
-pub struct ConvertTypedDictFunctionalToClass {
+#[derive(ViolationMetadata)]
+pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
 }
 
@@ -61,7 +67,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 
 /// UP013
 pub(crate) fn convert_typed_dict_functional_to_class(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,
@@ -91,9 +97,10 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             total_keyword,
             base_class,
             checker.generator(),
+            checker.comment_ranges(),
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
@@ -265,14 +272,22 @@ fn convert_to_class(
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
     generator: Generator,
+    comment_ranges: &CommentRanges,
 ) -> Fix {
-    Fix::safe_edit(Edit::range_replacement(
-        generator.stmt(&create_class_def_stmt(
-            class_name,
-            body,
-            total_keyword,
-            base_class,
-        )),
-        stmt.range(),
-    ))
+    Fix::applicable_edit(
+        Edit::range_replacement(
+            generator.stmt(&create_class_def_stmt(
+                class_name,
+                body,
+                total_keyword,
+                base_class,
+            )),
+            stmt.range(),
+        ),
+        if comment_ranges.intersects(stmt.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    )
 }

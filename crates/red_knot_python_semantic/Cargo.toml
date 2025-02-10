@@ -13,18 +13,21 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true }
 ruff_index = { workspace = true }
+ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_python_literal = { workspace = true }
+ruff_python_trivia = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 countme = { workspace = true }
+drop_bomb = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
@@ -33,6 +36,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
@@ -49,6 +53,11 @@ anyhow = { workspace = true }
 dir-test = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
+quickcheck = { version = "1.0.3", default-features = false }
+quickcheck_macros = { version = "1.0.0" }
+
+[features]
+serde = ["ruff_db/serde", "dep:serde"]
 
 [lints]
 workspace = true

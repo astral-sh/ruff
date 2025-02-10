@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::StringLike;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,8 +36,8 @@ use super::super::settings::Quote;
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesInlineString {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
 
@@ -93,8 +93,8 @@ impl Violation for BadQuotesInlineString {
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesMultilineString {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesMultilineString {
     preferred_quote: Quote,
 }
 
@@ -148,8 +148,8 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesDocstring {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesDocstring {
     preferred_quote: Quote,
 }
 
@@ -250,7 +250,7 @@ fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool
 }
 
 /// Q002
-fn docstring(checker: &mut Checker, range: TextRange) {
+fn docstring(checker: &Checker, range: TextRange) {
     let quotes_settings = &checker.settings.flake8_quotes;
     let locator = checker.locator();
 
@@ -261,7 +261,7 @@ fn docstring(checker: &mut Checker, range: TextRange) {
     {
         // Fixing this would result in a one-sided multi-line docstring, which would
         // introduce a syntax error.
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BadQuotesDocstring {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
@@ -298,11 +298,11 @@ fn docstring(checker: &mut Checker, range: TextRange) {
         fixed_contents,
         range,
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Q000, Q001
-fn strings(checker: &mut Checker, sequence: &[TextRange]) {
+fn strings(checker: &Checker, sequence: &[TextRange]) {
     let quotes_settings = &checker.settings.flake8_quotes;
     let locator = checker.locator();
 
@@ -373,7 +373,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
@@ -391,7 +391,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -406,7 +406,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -433,13 +433,13 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     // Ignore if the string is part of a forward reference. For example,
     // `x: "Literal['foo', 'bar']"`.
     if checker.semantic().in_string_type_definition() {

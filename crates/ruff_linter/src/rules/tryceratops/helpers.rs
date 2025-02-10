@@ -22,7 +22,7 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
+impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(call) = expr {
             match call.func.as_ref() {

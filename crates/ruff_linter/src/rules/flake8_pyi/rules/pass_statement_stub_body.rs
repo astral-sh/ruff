@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -24,8 +24,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
-#[violation]
-pub struct PassStatementStubBody;
+#[derive(ViolationMetadata)]
+pub(crate) struct PassStatementStubBody;
 
 impl AlwaysFixableViolation for PassStatementStubBody {
     #[derive_message_formats]
@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for PassStatementStubBody {
 }
 
 /// PYI009
-pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn pass_statement_stub_body(checker: &Checker, body: &[Stmt]) {
     let [Stmt::Pass(pass)] = body else {
         return;
     };
@@ -49,5 +49,5 @@ pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
         "...".to_string(),
         pass.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -1,5 +1,6 @@
 # ruff: noqa: PYI036 # This is the module declaring BaseException
 import _ast
+import _sitebuiltins
 import _typeshed
 import sys
 import types
@@ -46,7 +47,6 @@ from typing import (  # noqa: Y022
     Mapping,
     MutableMapping,
     MutableSequence,
-    NoReturn,
     Protocol,
     Sequence,
     SupportsAbs,
@@ -107,7 +107,7 @@ class object:
     @property
     def __class__(self) -> type[Self]: ...
     @__class__.setter
-    def __class__(self, type: type[object], /) -> None: ...
+    def __class__(self, type: type[Self], /) -> None: ...
     def __init__(self) -> None: ...
     def __new__(cls) -> Self: ...
     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
@@ -1362,8 +1362,10 @@ def compile(
     *,
     _feature_version: int = -1,
 ) -> Any: ...
-def copyright() -> None: ...
-def credits() -> None: ...
+
+copyright: _sitebuiltins._Printer
+credits: _sitebuiltins._Printer
+
 def delattr(obj: object, name: str, /) -> None: ...
 def dir(o: object = ..., /) -> list[str]: ...
 @overload
@@ -1418,7 +1420,7 @@ else:
         /,
     ) -> None: ...
 
-def exit(code: sys._ExitCode = None) -> NoReturn: ...
+exit: _sitebuiltins.Quitter
 
 class filter(Generic[_T]):
     @overload
@@ -1452,7 +1454,9 @@ def getattr(o: object, name: str, default: _T, /) -> Any | _T: ...
 def globals() -> dict[str, Any]: ...
 def hasattr(obj: object, name: str, /) -> bool: ...
 def hash(obj: object, /) -> int: ...
-def help(request: object = ...) -> None: ...
+
+help: _sitebuiltins._Helper
+
 def hex(number: int | SupportsIndex, /) -> str: ...
 def id(obj: object, /) -> int: ...
 def input(prompt: object = "", /) -> str: ...
@@ -1478,23 +1482,25 @@ else:
 def isinstance(obj: object, class_or_tuple: _ClassInfo, /) -> bool: ...
 def issubclass(cls: type, class_or_tuple: _ClassInfo, /) -> bool: ...
 def len(obj: Sized, /) -> int: ...
-def license() -> None: ...
+
+license: _sitebuiltins._Printer
+
 def locals() -> dict[str, Any]: ...
 
 class map(Generic[_S]):
     @overload
-    def __new__(cls, func: Callable[[_T1], _S], iter1: Iterable[_T1], /) -> Self: ...
+    def __new__(cls, func: Callable[[_T1], _S], iterable: Iterable[_T1], /) -> Self: ...
     @overload
-    def __new__(cls, func: Callable[[_T1, _T2], _S], iter1: Iterable[_T1], iter2: Iterable[_T2], /) -> Self: ...
+    def __new__(cls, func: Callable[[_T1, _T2], _S], iterable: Iterable[_T1], iter2: Iterable[_T2], /) -> Self: ...
     @overload
     def __new__(
-        cls, func: Callable[[_T1, _T2, _T3], _S], iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /
+        cls, func: Callable[[_T1, _T2, _T3], _S], iterable: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /
     ) -> Self: ...
     @overload
     def __new__(
         cls,
         func: Callable[[_T1, _T2, _T3, _T4], _S],
-        iter1: Iterable[_T1],
+        iterable: Iterable[_T1],
         iter2: Iterable[_T2],
         iter3: Iterable[_T3],
         iter4: Iterable[_T4],
@@ -1504,7 +1510,7 @@ class map(Generic[_S]):
     def __new__(
         cls,
         func: Callable[[_T1, _T2, _T3, _T4, _T5], _S],
-        iter1: Iterable[_T1],
+        iterable: Iterable[_T1],
         iter2: Iterable[_T2],
         iter3: Iterable[_T3],
         iter4: Iterable[_T4],
@@ -1515,7 +1521,7 @@ class map(Generic[_S]):
     def __new__(
         cls,
         func: Callable[..., _S],
-        iter1: Iterable[Any],
+        iterable: Iterable[Any],
         iter2: Iterable[Any],
         iter3: Iterable[Any],
         iter4: Iterable[Any],
@@ -1721,7 +1727,8 @@ def pow(base: _SupportsPow3[_E, _M, _T_co], exp: _E, mod: _M) -> _T_co: ...
 def pow(base: _SupportsSomeKindOfPow, exp: float, mod: None = None) -> Any: ...
 @overload
 def pow(base: _SupportsSomeKindOfPow, exp: complex, mod: None = None) -> complex: ...
-def quit(code: sys._ExitCode = None) -> NoReturn: ...
+
+quit: _sitebuiltins.Quitter
 
 class reversed(Generic[_T]):
     @overload
@@ -1957,19 +1964,36 @@ class NameError(Exception):
 
 class ReferenceError(Exception): ...
 class RuntimeError(Exception): ...
-
-class StopAsyncIteration(Exception):
-    value: Any
+class StopAsyncIteration(Exception): ...
 
 class SyntaxError(Exception):
     msg: str
+    filename: str | None
     lineno: int | None
     offset: int | None
     text: str | None
-    filename: str | None
+    # Errors are displayed differently if this attribute exists on the exception.
+    # The value is always None.
+    print_file_and_line: None
     if sys.version_info >= (3, 10):
         end_lineno: int | None
         end_offset: int | None
+
+    @overload
+    def __init__(self) -> None: ...
+    @overload
+    def __init__(self, msg: object, /) -> None: ...
+    # Second argument is the tuple (filename, lineno, offset, text)
+    @overload
+    def __init__(self, msg: str, info: tuple[str | None, int | None, int | None, str | None], /) -> None: ...
+    if sys.version_info >= (3, 10):
+        # end_lineno and end_offset must both be provided if one is.
+        @overload
+        def __init__(
+            self, msg: str, info: tuple[str | None, int | None, int | None, str | None, int | None, int | None], /
+        ) -> None: ...
+    # If you provide more than two arguments, it still creates the SyntaxError, but
+    # the arguments from the info tuple are not parsed. This form is omitted.
 
 class SystemError(Exception): ...
 class TypeError(Exception): ...

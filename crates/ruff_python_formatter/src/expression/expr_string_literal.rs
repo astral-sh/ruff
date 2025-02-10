@@ -1,13 +1,16 @@
-use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
-
+use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
+use crate::string::implicit::{
+    FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
+    ImplicitConcatenatedLayout,
+};
 use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
+use ruff_formatter::FormatRuleWithOptions;
+use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
@@ -38,6 +41,23 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
                     format_flat.set_docstring(self.kind.is_docstring());
                     return format_flat.fmt(f);
                 }
+
+                // ```py
+                // def test():
+                // (
+                //      r"a"
+                //      "b"
+                // )
+                // ```
+                if self.kind.is_docstring() {
+                    return parenthesize_if_expands(
+                        &FormatImplicitConcatenatedStringExpanded::new(
+                            item.into(),
+                            ImplicitConcatenatedLayout::Multipart,
+                        ),
+                    )
+                    .fmt(f);
+                }
             }
 
             in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
@@ -53,7 +73,7 @@ impl NeedsParentheses for ExprStringLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if StringLike::String(self).is_multiline(context.source()) {
+        } else if StringLike::String(self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:232:1: D207 [*] Docstring is under-indented
     |
 230 |     """Summary.
-231 | 
+231 |
 232 | Description.
-    |  D207
-233 | 
+    | ^ D207
+233 |
 234 |     """
     |
     = help: Increase indentation
@@ -26,9 +25,9 @@ D.py:232:1: D207 [*] Docstring is under-indented
 D.py:244:1: D207 [*] Docstring is under-indented
     |
 242 |     Description.
-243 | 
+243 |
 244 | """
-    |  D207
+    | ^ D207
     |
     = help: Increase indentation
 
@@ -45,9 +44,9 @@ D.py:244:1: D207 [*] Docstring is under-indented
 D.py:440:1: D207 [*] Docstring is under-indented
     |
 438 | def docstring_start_in_same_line(): """First Line.
-439 | 
+439 |
 440 |     Second Line
-    |  D207
+    | ^ D207
 441 |     """
     |
     = help: Increase indentation
@@ -66,7 +65,7 @@ D.py:441:1: D207 [*] Docstring is under-indented
     |
 440 |     Second Line
 441 |     """
-    |  D207
+    | ^ D207
     |
     = help: Increase indentation
 

@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -29,8 +29,8 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// def foo(arg: int = ...) -> None: ...
 /// ```
-#[violation]
-pub struct NumericLiteralTooLong;
+#[derive(ViolationMetadata)]
+pub(crate) struct NumericLiteralTooLong;
 
 impl AlwaysFixableViolation for NumericLiteralTooLong {
     #[derive_message_formats]
@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for NumericLiteralTooLong {
 }
 
 /// PYI054
-pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
     if expr.range().len() <= TextSize::new(10) {
         return;
     }
@@ -55,5 +55,5 @@ pub(crate) fn numeric_literal_too_long(checker: &mut Checker, expr: &Expr) {
         "...".to_string(),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

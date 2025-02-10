@@ -1,9 +1,9 @@
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::unpack::Unpack;
@@ -60,20 +60,6 @@ impl<'db> Definition<'db> {
     pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_binding()
     }
-
-    pub(crate) fn is_builtin_definition(self, db: &'db dyn Db) -> bool {
-        file_to_module(db, self.file(db)).is_some_and(|module| {
-            module.search_path().is_standard_library() && matches!(&**module.name(), "builtins")
-        })
-    }
-
-    /// Return true if this symbol was defined in the `typing` or `typing_extensions` modules
-    pub(crate) fn is_typing_definition(self, db: &'db dyn Db) -> bool {
-        file_to_module(db, self.file(db)).is_some_and(|module| {
-            module.search_path().is_standard_library()
-                && matches!(&**module.name(), "typing" | "typing_extensions")
-        })
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -83,12 +69,15 @@ pub(crate) enum DefinitionNodeRef<'a> {
     For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
+    TypeAlias(&'a ast::StmtTypeAlias),
     NamedExpression(&'a ast::ExprNamed),
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
     AugmentedAssignment(&'a ast::StmtAugAssign),
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
-    Parameter(ast::AnyParameterRef<'a>),
+    VariadicPositionalParameter(&'a ast::Parameter),
+    VariadicKeywordParameter(&'a ast::Parameter),
+    Parameter(&'a ast::ParameterWithDefault),
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
@@ -106,6 +95,12 @@ impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
 impl<'a> From<&'a ast::StmtClassDef> for DefinitionNodeRef<'a> {
     fn from(node: &'a ast::StmtClassDef) -> Self {
         Self::Class(node)
+    }
+}
+
+impl<'a> From<&'a ast::StmtTypeAlias> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::StmtTypeAlias) -> Self {
+        Self::TypeAlias(node)
     }
 }
 
@@ -181,8 +176,8 @@ impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
-impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node: ast::AnyParameterRef<'a>) -> Self {
+impl<'a> From<&'a ast::ParameterWithDefault> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::ParameterWithDefault) -> Self {
         Self::Parameter(node)
     }
 }
@@ -216,8 +211,10 @@ pub(crate) struct WithItemDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'a> {
+    pub(crate) unpack: Option<Unpack<'a>>,
     pub(crate) iterable: &'a ast::Expr,
-    pub(crate) target: &'a ast::ExprName,
+    pub(crate) name: &'a ast::ExprName,
+    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
@@ -265,6 +262,9 @@ impl<'db> DefinitionNodeRef<'db> {
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
             }
+            DefinitionNodeRef::TypeAlias(type_alias) => {
+                DefinitionKind::TypeAlias(AstNodeRef::new(parsed, type_alias))
+            }
             DefinitionNodeRef::NamedExpression(named) => {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
@@ -286,12 +286,16 @@ impl<'db> DefinitionNodeRef<'db> {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
+                unpack,
                 iterable,
-                target,
+                name,
+                first,
                 is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
+                target: TargetKind::from(unpack),
                 iterable: AstNodeRef::new(parsed.clone(), iterable),
-                target: AstNodeRef::new(parsed, target),
+                name: AstNodeRef::new(parsed, name),
+                first,
                 is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
@@ -305,14 +309,15 @@ impl<'db> DefinitionNodeRef<'db> {
                 first,
                 is_async,
             }),
-            DefinitionNodeRef::Parameter(parameter) => match parameter {
-                ast::AnyParameterRef::Variadic(parameter) => {
-                    DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
-                }
-                ast::AnyParameterRef::NonVariadic(parameter) => {
-                    DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
-                }
-            },
+            DefinitionNodeRef::VariadicPositionalParameter(parameter) => {
+                DefinitionKind::VariadicPositionalParameter(AstNodeRef::new(parsed, parameter))
+            }
+            DefinitionNodeRef::VariadicKeywordParameter(parameter) => {
+                DefinitionKind::VariadicKeywordParameter(AstNodeRef::new(parsed, parameter))
+            }
+            DefinitionNodeRef::Parameter(parameter) => {
+                DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
+            }
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 node,
                 target,
@@ -358,6 +363,7 @@ impl<'db> DefinitionNodeRef<'db> {
             }
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
+            Self::TypeAlias(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
             Self::Assignment(AssignmentDefinitionNodeRef {
                 value: _,
@@ -368,15 +374,16 @@ impl<'db> DefinitionNodeRef<'db> {
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::For(ForStmtDefinitionNodeRef {
+                unpack: _,
                 iterable: _,
-                target,
+                name,
+                first: _,
                 is_async: _,
-            }) => target.into(),
+            }) => name.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
-            Self::Parameter(node) => match node {
-                ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
-                ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
-            },
+            Self::VariadicPositionalParameter(node) => node.into(),
+            Self::VariadicKeywordParameter(node) => node.into(),
+            Self::Parameter(node) => node.into(),
             Self::WithItem(WithItemDefinitionNodeRef {
                 node: _,
                 target,
@@ -434,14 +441,16 @@ pub enum DefinitionKind<'db> {
     ImportFrom(ImportFromDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
+    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
-    For(ForStmtDefinitionKind),
+    For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind),
-    Parameter(AstNodeRef<ast::Parameter>),
-    ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
+    VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
+    VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
+    Parameter(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(ExceptHandlerDefinitionKind),
@@ -451,18 +460,51 @@ pub enum DefinitionKind<'db> {
 }
 
 impl DefinitionKind<'_> {
+    /// Returns the [`TextRange`] of the definition target.
+    ///
+    /// A definition target would mainly be the node representing the symbol being defined i.e.,
+    /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
+    ///
+    /// This is mainly used for logging and debugging purposes.
+    pub(crate) fn target_range(&self) -> TextRange {
+        match self {
+            DefinitionKind::Import(alias) => alias.range(),
+            DefinitionKind::ImportFrom(import) => import.alias().range(),
+            DefinitionKind::Function(function) => function.name.range(),
+            DefinitionKind::Class(class) => class.name.range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
+            DefinitionKind::NamedExpression(named) => named.target.range(),
+            DefinitionKind::Assignment(assignment) => assignment.name().range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.target.range(),
+            DefinitionKind::For(for_stmt) => for_stmt.name().range(),
+            DefinitionKind::Comprehension(comp) => comp.target().range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
+            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
+            DefinitionKind::Parameter(parameter) => parameter.parameter.name.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target().range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
+            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
+            DefinitionKind::TypeVar(type_var) => type_var.name.range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.name.range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
+        }
+    }
+
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
+            | DefinitionKind::TypeAlias(_)
             | DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
             // a parameter always binds a value, but is only a declaration if annotated
-            DefinitionKind::Parameter(parameter) => {
+            DefinitionKind::VariadicPositionalParameter(parameter)
+            | DefinitionKind::VariadicKeywordParameter(parameter) => {
                 if parameter.annotation.is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
@@ -470,7 +512,7 @@ impl DefinitionKind<'_> {
                 }
             }
             // presence of a default is irrelevant, same logic as for a no-default parameter
-            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
+            DefinitionKind::Parameter(parameter_with_default) => {
                 if parameter_with_default.parameter.annotation.is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
@@ -621,22 +663,32 @@ impl WithItemDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct ForStmtDefinitionKind {
+pub struct ForStmtDefinitionKind<'db> {
+    target: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::ExprName>,
+    name: AstNodeRef<ast::ExprName>,
+    first: bool,
     is_async: bool,
 }
 
-impl ForStmtDefinitionKind {
+impl<'db> ForStmtDefinitionKind<'db> {
     pub(crate) fn iterable(&self) -> &ast::Expr {
         self.iterable.node()
     }
 
-    pub(crate) fn target(&self) -> &ast::ExprName {
-        self.target.node()
+    pub(crate) fn target(&self) -> TargetKind<'db> {
+        self.target
     }
 
-    pub(crate) fn is_async(&self) -> bool {
+    pub(crate) fn name(&self) -> &ast::ExprName {
+        self.name.node()
+    }
+
+    pub(crate) const fn is_first(&self) -> bool {
+        self.first
+    }
+
+    pub(crate) const fn is_async(&self) -> bool {
         self.is_async
     }
 }
@@ -682,6 +734,12 @@ impl From<&ast::StmtClassDef> for DefinitionNodeKey {
     }
 }
 
+impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
+    fn from(node: &ast::StmtTypeAlias) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
 impl From<&ast::ExprName> for DefinitionNodeKey {
     fn from(node: &ast::ExprName) -> Self {
         Self(NodeKey::from_node(node))
@@ -706,12 +764,6 @@ impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
     }
 }
 
-impl From<&ast::StmtFor> for DefinitionNodeKey {
-    fn from(value: &ast::StmtFor) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
 impl From<&ast::Parameter> for DefinitionNodeKey {
     fn from(node: &ast::Parameter) -> Self {
         Self(NodeKey::from_node(node))
@@ -721,6 +773,15 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
         Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
+    fn from(value: ast::AnyParameterRef) -> Self {
+        Self(match value {
+            ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
+            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(node),
+        })
     }
 }
 

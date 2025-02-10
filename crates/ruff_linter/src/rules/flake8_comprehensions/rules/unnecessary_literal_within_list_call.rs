@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use super::helpers;
 
 /// ## What it does
-/// Checks for `list` calls that take unnecessary list or tuple literals as
+/// Checks for `list()` calls that take unnecessary list or tuple literals as
 /// arguments.
 ///
 /// ## Why is this bad?
@@ -17,7 +17,7 @@ use super::helpers;
 ///
 /// If a list literal is passed in, then the outer call to `list()` should be
 /// removed. Otherwise, if a tuple literal is passed in, then it should be
-/// rewritten as a `list` literal.
+/// rewritten as a list literal.
 ///
 /// ## Examples
 /// ```python
@@ -34,42 +34,40 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryLiteralWithinListCall {
-    literal: String,
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryLiteralWithinListCall {
+    kind: LiteralKind,
 }
 
 impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinListCall { literal } = self;
-        if literal == "list" {
-            format!(
-                "Unnecessary `{literal}` literal passed to `list()` (remove the outer call to \
-                 `list()`)"
-            )
-        } else {
-            format!(
-                "Unnecessary `{literal}` literal passed to `list()` (rewrite as a `list` literal)"
-            )
+        match self.kind {
+            LiteralKind::List => {
+                "Unnecessary list literal passed to `list()` (remove the outer call to `list()`)"
+                    .to_string()
+            }
+            LiteralKind::Tuple => {
+                "Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)"
+                    .to_string()
+            }
         }
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryLiteralWithinListCall { literal } = self;
-        {
-            if literal == "list" {
-                "Remove outer `list` call".to_string()
-            } else {
-                "Rewrite as a `list` literal".to_string()
-            }
+        match self.kind {
+            LiteralKind::List => "Remove outer `list()` call".to_string(),
+            LiteralKind::Tuple => "Rewrite as a single list literal".to_string(),
         }
     }
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
+        return;
+    }
+    if call.arguments.args.len() > 1 {
         return;
     }
     let Some(argument) =
@@ -77,24 +75,22 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
     else {
         return;
     };
+    let Some(argument_kind) = LiteralKind::try_from_expr(argument) else {
+        return;
+    };
     if !checker.semantic().has_builtin_binding("list") {
         return;
     }
-    let argument_kind = match argument {
-        Expr::Tuple(_) => "tuple",
-        Expr::List(_) => "list",
-        _ => return,
-    };
 
-    let mut diagnostic = Diagnostic::new(
+    let diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinListCall {
-            literal: argument_kind.to_string(),
+            kind: argument_kind,
         },
         call.range(),
     );
 
     // Convert `list([1, 2])` to `[1, 2]`
-    diagnostic.set_fix({
+    let fix = {
         // Delete from the start of the call to the start of the argument.
         let call_start = Edit::deletion(call.start(), argument.start());
 
@@ -121,7 +117,23 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         } else {
             Fix::unsafe_edits(call_start, [call_end])
         }
-    });
+    };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic.with_fix(fix));
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum LiteralKind {
+    Tuple,
+    List,
+}
+
+impl LiteralKind {
+    const fn try_from_expr(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::Tuple(_) => Some(Self::Tuple),
+            Expr::List(_) => Some(Self::List),
+            _ => None,
+        }
+    }
 }

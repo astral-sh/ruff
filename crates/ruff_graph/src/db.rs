@@ -1,7 +1,12 @@
 use anyhow::Result;
+use std::sync::Arc;
 use zip::CompressionMethod;
 
-use red_knot_python_semantic::{Db, Program, ProgramSettings, PythonVersion, SearchPathSettings};
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
+use red_knot_python_semantic::{
+    default_lint_registry, Db, Program, ProgramSettings, PythonPlatform, PythonVersion,
+    SearchPathSettings,
+};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
@@ -14,53 +19,33 @@ static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::Lazy
 });
 
 #[salsa::db]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: OsSystem,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_roots(
-        mut src_roots: impl Iterator<Item = SystemPathBuf>,
-        target_version: PythonVersion,
+        src_roots: Vec<SystemPathBuf>,
+        python_version: PythonVersion,
     ) -> Result<Self> {
-        let search_paths = {
-            // Use the first source root.
-            let src_root = src_roots
-                .next()
-                .ok_or_else(|| anyhow::anyhow!("No source roots provided"))?;
-
-            let mut search_paths = SearchPathSettings::new(src_root);
-
-            // Add the remaining source roots as extra paths.
-            search_paths.extra_paths.extend(src_roots);
-
-            search_paths
-        };
+        let search_paths = SearchPathSettings::new(src_roots);
 
         let db = Self::default();
         Program::from_settings(
             &db,
-            &ProgramSettings {
-                target_version,
+            ProgramSettings {
+                python_version,
+                python_platform: PythonPlatform::default(),
                 search_paths,
             },
         )?;
 
         Ok(db)
-    }
-
-    /// Create a snapshot of the current database.
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            storage: self.storage.clone(),
-            system: self.system.clone(),
-            files: self.files.snapshot(),
-        }
     }
 }
 
@@ -92,6 +77,14 @@ impl SourceDb for ModuleDb {
 impl Db for ModuleDb {
     fn is_file_open(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
     }
 }
 

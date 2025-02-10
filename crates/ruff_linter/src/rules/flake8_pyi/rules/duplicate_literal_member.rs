@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::typing::traverse_literal;
@@ -30,13 +30,13 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
-/// Note that the fix will flatten nested literals into a single top-level
-/// literal.
+/// Note that while the fix may flatten nested literals into a single top-level literal,
+/// the semantics of the annotation will remain unchanged.
 ///
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
-#[violation]
-pub struct DuplicateLiteralMember {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateLiteralMember {
     duplicate_name: String,
 }
 
@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for DuplicateLiteralMember {
 }
 
 /// PYI062
-pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr) {
+pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
@@ -109,5 +109,5 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
         }
     };
 
-    checker.diagnostics.append(&mut diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

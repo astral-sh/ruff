@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_assignment.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -298,24 +297,92 @@ aaaaa[aaaaaaaaaaa] = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
     =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
 )
-```
 
-## Outputs
-### Output 1
-```
-indent-style               = space
-line-width                 = 88
-indent-width               = 4
-quote-style                = Double
-line-ending                = LineFeed
-magic-trailing-comma       = Respect
-docstring-code             = Disabled
-docstring-code-line-width  = "dynamic"
-preview                    = Enabled
-target_version             = Py38
-source_type                = Python
-```
 
+# Trailing last-part comments
+
+a = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a: Literal[str] = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a += (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = (
+    r"a"
+    r"b"  # belongs to `b`
+)
+
+a = (
+    "a"
+    "b"
+)  # belongs to the assignment
+
+a = (((
+    "a"
+    "b"  # belongs to `b`
+)))
+
+a = (((
+    "a"
+    "b"
+) # belongs to the f-string expression
+))
+
+a = (
+    "a" "b"  # belongs to the f-string expression
+)
+
+a = (
+    "a" "b"
+    # belongs to the f-string expression
+)
+
+# There's no "right" answer if some parts are on the same line while others are on separate lines.
+# This is likely a comment for one of the last two parts but could also just be a comment for the entire f-string expression.
+# Because there's no right answer, follow what we do elsewhere and associate the comment with the outer-most node which
+# is the f-string expression.
+a = (
+    "a"
+    "b" "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # belongs to the f-string expression
+)
+
+logger.error(
+    f"Failed to run task {task} for job"  
+    f"with id {str(job.id)}" # type: ignore[union-attr]
+)
+
+a = (10 +
+     "Exception in {call_back_name} "
+     f"'{msg}'"  # belongs to binary operation
+)
+
+a = 10 + (
+    "Exception in {call_back_name} "
+    f"'{msg}'"  # belongs to f-string
+)
+
+self._attr_unique_id = (
+    f"{self._device.temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address}_"
+    f"{self._device._setpoint_shift.group_address}"  # noqa: SLF001
+)
+
+return (
+    f"Exception in {call_back_name} when handling msg on "
+    f"'{msg.topic}': '{msg.payload}'"  # type: ignore[str-bytes-safe]
+)```
+
+## Output
 ```python
 ## Implicit concatenated strings with a trailing comment but a non splittable target.
 
@@ -634,5 +701,78 @@ aaaaa[aaaaaaaaaaa] = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
     =}"
     "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+
+# Trailing last-part comments
+
+a = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a: Literal[str] = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a += (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = (
+    r"a"
+    r"b"  # belongs to `b`
+)
+
+a = "ab"  # belongs to the assignment
+
+a = (
+    "a"
+    "b"  # belongs to `b`
+)
+
+a = "ab"  # belongs to the f-string expression
+
+a = "ab"  # belongs to the f-string expression
+
+a = (
+    "ab"
+    # belongs to the f-string expression
+)
+
+# There's no "right" answer if some parts are on the same line while others are on separate lines.
+# This is likely a comment for one of the last two parts but could also just be a comment for the entire f-string expression.
+# Because there's no right answer, follow what we do elsewhere and associate the comment with the outer-most node which
+# is the f-string expression.
+a = (
+    "a"
+    "b"
+    "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+)  # belongs to the f-string expression
+
+logger.error(
+    f"Failed to run task {task} for jobwith id {str(job.id)}"  # type: ignore[union-attr]
+)
+
+a = (
+    10 + f"Exception in {{call_back_name}} '{msg}'"  # belongs to binary operation
+)
+
+a = 10 + (
+    f"Exception in {{call_back_name}} '{msg}'"  # belongs to f-string
+)
+
+self._attr_unique_id = (
+    f"{self._device.temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address_state}_"
+    f"{self._device.target_temperature.group_address}_"
+    f"{self._device._setpoint_shift.group_address}"  # noqa: SLF001
+)
+
+return (
+    f"Exception in {call_back_name} when handling msg on "
+    f"'{msg.topic}': '{msg.payload}'"  # type: ignore[str-bytes-safe]
 )
 ```

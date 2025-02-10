@@ -1,7 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -61,8 +60,8 @@ use super::helpers::{
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
-#[violation]
-pub struct PytestFixtureIncorrectParenthesesStyle {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
     actual: Parentheses,
 }
@@ -112,8 +111,8 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
-pub struct PytestFixturePositionalArgs {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixturePositionalArgs {
     function: String,
 }
 
@@ -153,8 +152,8 @@ impl Violation for PytestFixturePositionalArgs {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
-pub struct PytestExtraneousScopeFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestExtraneousScopeFunction;
 
 impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     #[derive_message_formats]
@@ -167,8 +166,8 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
-/// ## Deprecation
-/// Marking fixtures that do not return a value with an underscore
+/// ## Removal
+/// This rule has been removed because marking fixtures that do not return a value with an underscore
 /// isn't a practice recommended by the pytest community.
 ///
 /// ## What it does
@@ -215,21 +214,23 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
-pub struct PytestMissingFixtureNameUnderscore {
-    function: String,
-}
+#[derive(ViolationMetadata)]
+#[deprecated(note = "PT004 has been removed")]
+pub(crate) struct PytestMissingFixtureNameUnderscore;
 
+#[allow(deprecated)]
 impl Violation for PytestMissingFixtureNameUnderscore {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestMissingFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` does not return anything, add leading underscore")
+        unreachable!("PT004 has been removed");
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Fixture `{function}` does not return anything, add leading underscore"]
     }
 }
 
-/// ## Deprecation
-/// Marking fixtures that do not return a value with an underscore
+/// ## Removal
+/// This rule has been removed because marking fixtures that do not return a value with an underscore
 /// isn't a practice recommended by the pytest community.
 ///
 /// ## What it does
@@ -278,16 +279,18 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
-pub struct PytestIncorrectFixtureNameUnderscore {
-    function: String,
-}
+#[derive(ViolationMetadata)]
+#[deprecated(note = "PT005 has been removed")]
+pub(crate) struct PytestIncorrectFixtureNameUnderscore;
 
+#[allow(deprecated)]
 impl Violation for PytestIncorrectFixtureNameUnderscore {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestIncorrectFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` returns a value, remove leading underscore")
+        unreachable!("PT005 has been removed");
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Fixture `{function}` returns a value, remove leading underscore"]
     }
 }
 
@@ -336,8 +339,8 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
-#[violation]
-pub struct PytestFixtureParamWithoutValue {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixtureParamWithoutValue {
     name: String,
 }
 
@@ -384,8 +387,8 @@ impl Violation for PytestFixtureParamWithoutValue {
 ///
 /// ## References
 /// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
-#[violation]
-pub struct PytestDeprecatedYieldFixture;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestDeprecatedYieldFixture;
 
 impl Violation for PytestDeprecatedYieldFixture {
     #[derive_message_formats]
@@ -443,8 +446,8 @@ impl Violation for PytestDeprecatedYieldFixture {
 /// ## References
 /// - [`pytest` documentation: Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
 /// - [`pytest` documentation: Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
-#[violation]
-pub struct PytestFixtureFinalizerCallback;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixtureFinalizerCallback;
 
 impl Violation for PytestFixtureFinalizerCallback {
     #[derive_message_formats]
@@ -491,8 +494,8 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///
 /// ## References
 /// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
-#[violation]
-pub struct PytestUselessYieldFixture {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUselessYieldFixture {
     name: String,
 }
 
@@ -548,8 +551,8 @@ impl AlwaysFixableViolation for PytestUselessYieldFixture {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
-#[violation]
-pub struct PytestErroneousUseFixturesOnFixture;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestErroneousUseFixturesOnFixture;
 
 impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
     #[derive_message_formats]
@@ -591,8 +594,8 @@ impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
 ///
 /// ## References
 /// - [PyPI: `pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
-#[violation]
-pub struct PytestUnnecessaryAsyncioMarkOnFixture;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUnnecessaryAsyncioMarkOnFixture;
 
 impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     #[derive_message_formats]
@@ -661,7 +664,7 @@ fn fixture_decorator<'a>(
 }
 
 fn pytest_fixture_parentheses(
-    checker: &mut Checker,
+    checker: &Checker,
     decorator: &Decorator,
     fix: Fix,
     expected: Parentheses,
@@ -672,11 +675,11 @@ fn pytest_fixture_parentheses(
         decorator.range(),
     );
     diagnostic.set_fix(fix);
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// PT001, PT002, PT003
-fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Decorator) {
+fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decorator) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
@@ -701,7 +704,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
 
             if checker.enabled(Rule::PytestFixturePositionalArgs) {
                 if !arguments.args.is_empty() {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),
                         },
@@ -724,7 +727,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                             )
                             .map(Fix::unsafe_edit)
                         });
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -749,41 +752,12 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
     }
 }
 
-/// PT004, PT005, PT022
-fn check_fixture_returns(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    name: &str,
-    body: &[Stmt],
-    returns: Option<&Expr>,
-) {
+/// PT022
+fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: Option<&Expr>) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
         visitor.visit_stmt(stmt);
-    }
-
-    if checker.enabled(Rule::PytestIncorrectFixtureNameUnderscore)
-        && visitor.has_return_with_value
-        && name.starts_with('_')
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            PytestIncorrectFixtureNameUnderscore {
-                function: name.to_string(),
-            },
-            stmt.identifier(),
-        ));
-    } else if checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
-        && !visitor.has_return_with_value
-        && !visitor.has_yield_from
-        && !name.starts_with('_')
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            PytestMissingFixtureNameUnderscore {
-                function: name.to_string(),
-            },
-            stmt.identifier(),
-        ));
     }
 
     if checker.enabled(Rule::PytestUselessYieldFixture) {
@@ -828,16 +802,16 @@ fn check_fixture_returns(
         } else {
             diagnostic.set_fix(Fix::safe_edit(yield_edit));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// PT019
-fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
+fn check_test_function_args(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
-        let name = &parameter.parameter.name;
+        let name = parameter.name();
         if name.starts_with('_') {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 PytestFixtureParamWithoutValue {
                     name: name.to_string(),
                 },
@@ -848,9 +822,9 @@ fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
 }
 
 /// PT020
-fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
+fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
     if is_pytest_yield_fixture(decorator, checker.semantic()) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
         ));
@@ -858,7 +832,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, body: &[Stmt]) {
+fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: &[Stmt]) {
     if !parameters.includes("request") {
         return;
     }
@@ -870,7 +844,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, bo
     }
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             PytestFixtureFinalizerCallback,
             addfinalizer.range(),
         ));
@@ -878,7 +852,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, bo
 }
 
 /// PT024, PT025
-fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
+fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
     for (expr, marker) in get_mark_decorators(decorators) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
@@ -886,7 +860,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 let range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -896,15 +870,14 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 let line_range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line_range)));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
 }
 
 pub(crate) fn fixture(
-    checker: &mut Checker,
-    stmt: &Stmt,
+    checker: &Checker,
     name: &str,
     parameters: &Parameters,
     returns: Option<&Expr>,
@@ -924,12 +897,10 @@ pub(crate) fn fixture(
             check_fixture_decorator_name(checker, decorator);
         }
 
-        if (checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
-            || checker.enabled(Rule::PytestIncorrectFixtureNameUnderscore)
-            || checker.enabled(Rule::PytestUselessYieldFixture))
+        if checker.enabled(Rule::PytestUselessYieldFixture)
             && !is_abstract(decorators, checker.semantic())
         {
-            check_fixture_returns(checker, stmt, name, body, returns);
+            check_fixture_returns(checker, name, body, returns);
         }
 
         if checker.enabled(Rule::PytestFixtureFinalizerCallback) {

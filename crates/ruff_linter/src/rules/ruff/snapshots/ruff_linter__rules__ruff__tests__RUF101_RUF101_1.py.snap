@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF101_1.py:5:15: RUF101 [*] `TCH002` is a redirect to `TC002`
+  |
+3 | RUF101 should trigger here because the TCH rules have been recoded to TC.
+4 | """
+5 | # ruff: noqa: TCH002
+  |               ^^^^^^ RUF101
+6 |
+7 | from __future__ import annotations
+  |
+  = help: Replace with `TC002`
+
+ℹ Safe fix
+2 2 | 
+3 3 | RUF101 should trigger here because the TCH rules have been recoded to TC.
+4 4 | """
+5   |-# ruff: noqa: TCH002
+  5 |+# ruff: noqa: TC002
+6 6 | 
+7 7 | from __future__ import annotations
+8 8 |

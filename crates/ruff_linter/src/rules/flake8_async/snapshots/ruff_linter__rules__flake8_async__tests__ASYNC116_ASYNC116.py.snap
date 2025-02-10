@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
-snapshot_kind: text
 ---
 ASYNC116.py:11:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
 10 |     # These examples are probably not meant to ever wake up:
 11 |     await trio.sleep(100000)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^^ ASYNC116
-12 | 
+12 |
 13 |     # 'inf literal' overflow trick
    |
    = help: Replace with `trio.sleep_forever()`
@@ -27,7 +26,7 @@ ASYNC116.py:14:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 13 |     # 'inf literal' overflow trick
 14 |     await trio.sleep(1e999)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^ ASYNC116
-15 | 
+15 |
 16 |     await trio.sleep(86399)
    |
    = help: Replace with `trio.sleep_forever()`
@@ -68,7 +67,7 @@ ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 18 |     await trio.sleep(86400.01)  # error: 116, "async"
 19 |     await trio.sleep(86401)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^ ASYNC116
-20 | 
+20 |
 21 |     await trio.sleep(-1)  # will raise a runtime error
    |
    = help: Replace with `trio.sleep_forever()`
@@ -153,7 +152,7 @@ ASYNC116.py:64:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 63 |     # These examples are probably not meant to ever wake up:
 64 |     await anyio.sleep(100000)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^^^ ASYNC116
-65 | 
+65 |
 66 |     # 'inf literal' overflow trick
    |
    = help: Replace with `asyncio.sleep_forever()`
@@ -181,7 +180,7 @@ ASYNC116.py:67:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 66 |     # 'inf literal' overflow trick
 67 |     await anyio.sleep(1e999)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^^ ASYNC116
-68 | 
+68 |
 69 |     await anyio.sleep(86399)
    |
    = help: Replace with `asyncio.sleep_forever()`
@@ -238,7 +237,7 @@ ASYNC116.py:72:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 71 |     await anyio.sleep(86400.01)  # error: 116, "async"
 72 |     await anyio.sleep(86401)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^^ ASYNC116
-73 | 
+73 |
 74 |     await anyio.sleep(-1)  # will raise a runtime error
    |
    = help: Replace with `asyncio.sleep_forever()`

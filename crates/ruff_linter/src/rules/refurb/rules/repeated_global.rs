@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: the `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 /// - [Python documentation: the `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
-#[violation]
-pub struct RepeatedGlobal {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedGlobal {
     global_kind: GlobalKind,
 }
 
@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for RepeatedGlobal {
 }
 
 /// FURB154
-pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
+pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
     while let Some(idx) = suite
         .iter()
         .position(|stmt| GlobalKind::from_stmt(stmt).is_some())
@@ -74,7 +74,7 @@ pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
         // diagnostic.
         if let [first, .., last] = globals_sequence {
             let range = first.range().cover(last.range());
-            checker.diagnostics.push(
+            checker.report_diagnostic(
                 Diagnostic::new(RepeatedGlobal { global_kind }, range).with_fix(Fix::safe_edit(
                     Edit::range_replacement(
                         format!(

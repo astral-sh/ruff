@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{identifier::Identifier, Decorator, Parameters, Stmt};
 use ruff_python_semantic::analyze::visibility::is_property;
 
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
-#[violation]
-pub struct PropertyWithParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct PropertyWithParameters;
 
 impl Violation for PropertyWithParameters {
     #[derive_message_formats]
@@ -46,7 +46,7 @@ impl Violation for PropertyWithParameters {
 
 /// PLR0206
 pub(crate) fn property_with_parameters(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     decorator_list: &[Decorator],
     parameters: &Parameters,
@@ -57,8 +57,6 @@ pub(crate) fn property_with_parameters(
     let semantic = checker.semantic();
     let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
     if is_property(decorator_list, extra_property_decorators, semantic) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
+        checker.report_diagnostic(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
     }
 }

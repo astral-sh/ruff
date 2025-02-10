@@ -84,3 +84,39 @@ field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union me
 # duplicates of the outer `int`), but not three times (which would indicate that
 # we incorrectly re-checked the nested union).
 field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+
+# Should emit in cases with nested `typing.Union`
+field26: typing.Union[typing.Union[int, int]]  # PYI016: Duplicate union member `int`
+
+# Should emit in cases with nested `typing.Union`
+field27: typing.Union[typing.Union[typing.Union[int, int]]]  # PYI016: Duplicate union member `int`
+
+# Should emit in cases with mixed `typing.Union` and `|`
+field28: typing.Union[int | int]  # Error
+
+# Should emit twice in cases with multiple nested `typing.Union`
+field29: typing.Union[int, typing.Union[typing.Union[int, int]]]  # Error
+
+# Should emit once in cases with multiple nested `typing.Union`
+field30: typing.Union[int, typing.Union[typing.Union[int, str]]]  # Error
+
+# Should emit once, and fix to `typing.Union[float, int]`
+field31: typing.Union[float, typing.Union[int | int]]  # Error
+
+# Should emit once, and fix to `typing.Union[float, int]`
+field32: typing.Union[float, typing.Union[int | int | int]]  # Error
+
+# Test case for mixed union type fix
+field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
+
+# Test case for mixed union type
+field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
+
+field35: "int | str | int"  # Error
+
+
+
+# Technically, this falls into the domain of the rule but it is an unlikely edge case,
+# only works if you have from `__future__ import annotations` at the top of the file,
+# and stringified annotations are discouraged in stub files.
+field36: "int | str" | int  # Ok

@@ -98,7 +98,7 @@ reveal_type(x)
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
+# revealed: Literal[1, "a", b"foo"]
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -106,23 +106,19 @@ reveal_type(x)
 ## With non-callable iterator
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    class NotIterable:
+        if flag:
+            __iter__: int = 1
+        else:
+            __iter__: None = None
 
-flag = bool_instance()
+    for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
+        pass
 
-class NotIterable:
-    if flag:
-        __iter__ = 1
-    else:
-        __iter__ = None
-
-for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
-    pass
-
-# revealed: Unknown
-# error: [possibly-unresolved-reference]
-reveal_type(x)
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ## Invalid iterable
@@ -139,7 +135,7 @@ for x in nonsense:  # error: "Object of type `Literal[123]` is not iterable"
 class NotIterable:
     def __getitem__(self, key: int) -> int:
         return 42
-    __iter__ = None
+    __iter__: None = None
 
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
@@ -160,13 +156,9 @@ class Test2:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def bool_instance() -> bool:
-    return True
-
-flag = bool_instance()
-
-for x in Test() if flag else Test2():
-    reveal_type(x)  # revealed: int
+def _(flag: bool):
+    for x in Test() if flag else Test2():
+        reveal_type(x)  # revealed: int
 ```
 
 ## Union type as iterator
@@ -215,13 +207,9 @@ class Test2:
     def __iter__(self) -> TestIter3 | TestIter4:
         return TestIter3()
 
-def bool_instance() -> bool:
-    return True
-
-flag = bool_instance()
-
-for x in Test() if flag else Test2():
-    reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
+def _(flag: bool):
+    for x in Test() if flag else Test2():
+        reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method
@@ -235,12 +223,10 @@ class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def coinflip() -> bool:
-    return True
-
-# error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
-for x in Test() if coinflip() else 42:
-    reveal_type(x)  # revealed: int
+def _(flag: bool):
+    # error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
+    for x in Test() if flag else 42:
+        reveal_type(x)  # revealed: int
 ```
 
 ## Union type as iterable where one union element has invalid `__iter__` method
@@ -258,12 +244,10 @@ class Test2:
     def __iter__(self) -> int:
         return 42
 
-def coinflip() -> bool:
-    return True
-
-# error: "Object of type `Test | Test2` is not iterable"
-for x in Test() if coinflip() else Test2():
-    reveal_type(x)  # revealed: Unknown
+def _(flag: bool):
+    # error: "Object of type `Test | Test2` is not iterable"
+    for x in Test() if flag else Test2():
+        reveal_type(x)  # revealed: Unknown
 ```
 
 ## Union type as iterator where one union element has no `__next__` method

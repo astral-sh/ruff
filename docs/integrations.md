@@ -46,13 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
@@ -61,12 +61,12 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
 - `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
 
-For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
+For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ```yaml
-- uses: astral-sh/ruff-action@v1
+- uses: astral-sh/ruff-action@v3
   with:
-    version: 0.0.259
+    version: 0.8.0
     args: check --select B
     src: "./src"
 ```
@@ -80,7 +80,7 @@ You can add the following configuration to `.gitlab-ci.yml` to run a `ruff forma
   stage: build
   interruptible: true
   image:
-    name: ghcr.io/astral-sh/ruff:0.7.4-alpine
+    name: ghcr.io/astral-sh/ruff:0.9.6-alpine
   before_script:
     - cd $CI_PROJECT_DIR
     - ruff --version
@@ -106,7 +106,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.4
+  rev: v0.9.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -119,7 +119,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.4
+  rev: v0.9.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -128,20 +128,20 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
     - id: ruff-format
 ```
 
-To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowed filetypes:
+To avoid running on Jupyter Notebooks, remove `jupyter` from the list of allowed filetypes:
 
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.4
+  rev: v0.9.6
   hooks:
     # Run the linter.
     - id: ruff
-      types_or: [ python, pyi, jupyter ]
+      types_or: [ python, pyi ]
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
-      types_or: [ python, pyi, jupyter ]
+      types_or: [ python, pyi ]
 ```
 
 When running with `--fix`, Ruff's lint hook should be placed _before_ Ruff's formatter hook, and

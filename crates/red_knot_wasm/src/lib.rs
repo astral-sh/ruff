@@ -3,9 +3,10 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_workspace::db::{Db, RootDatabase};
-use red_knot_workspace::workspace::settings::Configuration;
-use red_knot_workspace::workspace::WorkspaceMetadata;
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::value::RangedValue;
+use red_knot_project::ProjectMetadata;
+use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -33,7 +34,7 @@ pub fn run() {
 
 #[wasm_bindgen]
 pub struct Workspace {
-    db: RootDatabase,
+    db: ProjectDatabase,
     system: WasmSystem,
 }
 
@@ -42,17 +43,19 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace = WorkspaceMetadata::discover(
-            SystemPath::new(root),
-            &system,
-            Some(&Configuration {
-                target_version: Some(settings.target_version.into()),
-                ..Configuration::default()
-            }),
-        )
-        .map_err(into_error)?;
 
-        let db = RootDatabase::new(workspace, system.clone()).map_err(into_error)?;
+        let mut workspace =
+            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
+
+        workspace.apply_cli_options(Options {
+            environment: Some(EnvironmentOptions {
+                python_version: Some(RangedValue::cli(settings.python_version.into())),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+
+        let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
 
         Ok(Self { db, system })
     }
@@ -67,7 +70,7 @@ impl Workspace {
         let file = system_path_to_file(&self.db, path).expect("File to exist");
         file.sync(&mut self.db);
 
-        self.db.workspace().open_file(&mut self.db, file);
+        self.db.project().open_file(&mut self.db, file);
 
         Ok(FileHandle {
             file,
@@ -95,7 +98,7 @@ impl Workspace {
     pub fn close_file(&mut self, file_id: &FileHandle) -> Result<(), Error> {
         let file = file_id.file;
 
-        self.db.workspace().close_file(&mut self.db, file);
+        self.db.project().close_file(&mut self.db, file);
         self.system
             .fs
             .remove_file(&file_id.path)
@@ -170,22 +173,22 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Settings {
-    pub target_version: TargetVersion,
+    pub python_version: PythonVersion,
 }
 #[wasm_bindgen]
 impl Settings {
     #[wasm_bindgen(constructor)]
-    pub fn new(target_version: TargetVersion) -> Self {
-        Self { target_version }
+    pub fn new(python_version: PythonVersion) -> Self {
+        Self { python_version }
     }
 }
 
 #[wasm_bindgen]
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum TargetVersion {
+pub enum PythonVersion {
     Py37,
-    #[default]
     Py38,
+    #[default]
     Py39,
     Py310,
     Py311,
@@ -193,16 +196,16 @@ pub enum TargetVersion {
     Py313,
 }
 
-impl From<TargetVersion> for red_knot_python_semantic::PythonVersion {
-    fn from(value: TargetVersion) -> Self {
+impl From<PythonVersion> for red_knot_python_semantic::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
         match value {
-            TargetVersion::Py37 => Self::PY37,
-            TargetVersion::Py38 => Self::PY38,
-            TargetVersion::Py39 => Self::PY39,
-            TargetVersion::Py310 => Self::PY310,
-            TargetVersion::Py311 => Self::PY311,
-            TargetVersion::Py312 => Self::PY312,
-            TargetVersion::Py313 => Self::PY313,
+            PythonVersion::Py37 => Self::PY37,
+            PythonVersion::Py38 => Self::PY38,
+            PythonVersion::Py39 => Self::PY39,
+            PythonVersion::Py310 => Self::PY310,
+            PythonVersion::Py311 => Self::PY311,
+            PythonVersion::Py312 => Self::PY312,
+            PythonVersion::Py313 => Self::PY313,
         }
     }
 }
@@ -251,7 +254,7 @@ impl System for WasmSystem {
     fn read_virtual_path_to_notebook(
         &self,
         _path: &SystemVirtualPath,
-    ) -> Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
+    ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
@@ -283,11 +286,24 @@ impl System for WasmSystem {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            red_knot_python_semantic::PythonVersion::from(PythonVersion::default()),
+            red_knot_python_semantic::PythonVersion::default()
+        );
+    }
 }

@@ -9,11 +9,6 @@
 //! parent scopes have been fully traversed. Individual rules may also perform internal traversals
 //! of the AST.
 //!
-//! While the [`Checker`] is typically passed by mutable reference to the individual lint rule
-//! implementations, most of its constituent components are intended to be treated immutably, with
-//! the exception of the [`Diagnostic`] vector, which is intended to be mutated by the individual
-//! lint rules. In the future, this should be formalized in the API.
-//!
 //! The individual [`Visitor`] implementations within the [`Checker`] typically proceed in four
 //! steps:
 //!
@@ -31,7 +26,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -41,15 +36,15 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
-    UnaryOp,
+    self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
+    Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
-use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_parser::{ParseError, Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -189,7 +184,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
-    module: Module<'a>,
+    pub(crate) module: Module<'a>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
@@ -221,9 +216,9 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
-    pub(crate) diagnostics: Vec<Diagnostic>,
-    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
-    pub(crate) flake8_bugbear_seen: Vec<TextRange>,
+    diagnostics: RefCell<Vec<Diagnostic>>,
+    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
+    flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
@@ -234,7 +229,7 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
-        parsed_annotations_arena: &'a typed_arena::Arena<ParsedAnnotation>,
+        parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -248,6 +243,11 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
+        let mut semantic = SemanticModel::new(&settings.typing_modules, path, module);
+        if settings.preview.is_enabled() {
+            // Set the feature flag to test `TYPE_CHECKING` semantic changes
+            semantic.flags |= SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION;
+        }
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -263,11 +263,11 @@ impl<'a> Checker<'a> {
             stylist,
             indexer,
             importer: Importer::new(parsed, locator, stylist),
-            semantic: SemanticModel::new(&settings.typing_modules, path, module),
+            semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
-            diagnostics: Vec::default(),
-            flake8_bugbear_seen: Vec::default(),
+            diagnostics: RefCell::default(),
+            flake8_bugbear_seen: RefCell::default(),
             cell_offsets,
             notebook_index,
             last_stmt_end: TextSize::default(),
@@ -282,7 +282,7 @@ impl<'a> Checker<'a> {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
-        // unused members on a single import. We need to pre-emptively omit any
+        // unused members on a single import. We need to preemptively omit any
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.
@@ -294,11 +294,31 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        Generator::new(
-            self.stylist.indentation(),
-            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
-            self.stylist.line_ending(),
-        )
+        Generator::new(self.stylist.indentation(), self.stylist.line_ending())
+    }
+
+    /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
+    /// AST.
+    fn preferred_quote(&self) -> Quote {
+        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+    }
+
+    /// Return the default string flags a generated `StringLiteral` node should use, given where we
+    /// are in the AST.
+    pub(crate) fn default_string_flags(&self) -> ast::StringLiteralFlags {
+        ast::StringLiteralFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
+    /// Return the default bytestring flags a generated `ByteStringLiteral` node should use, given
+    /// where we are in the AST.
+    pub(crate) fn default_bytes_flags(&self) -> ast::BytesLiteralFlags {
+        ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
+    }
+
+    /// Return the default f-string flags a generated `FString` node should use, given where we are
+    /// in the AST.
+    pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
+        ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
@@ -335,6 +355,30 @@ impl<'a> Checker<'a> {
     /// Returns the [`CommentRanges`] for the parsed source code.
     pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
         self.indexer.comment_ranges()
+    }
+
+    /// Push a new [`Diagnostic`] to the collection in the [`Checker`]
+    pub(crate) fn report_diagnostic(&self, diagnostic: Diagnostic) {
+        let mut diagnostics = self.diagnostics.borrow_mut();
+        diagnostics.push(diagnostic);
+    }
+
+    /// Extend the collection of [`Diagnostic`] objects in the [`Checker`]
+    pub(crate) fn report_diagnostics<I>(&self, diagnostics: I)
+    where
+        I: IntoIterator<Item = Diagnostic>,
+    {
+        let mut checker_diagnostics = self.diagnostics.borrow_mut();
+        checker_diagnostics.extend(diagnostics);
+    }
+
+    /// Adds a [`TextRange`] to the set of ranges of variable names
+    /// flagged in `flake8-bugbear` violations so far.
+    ///
+    /// Returns whether the value was newly inserted.
+    pub(crate) fn insert_flake8_bugbear_range(&self, range: TextRange) -> bool {
+        let mut ranges = self.flake8_bugbear_seen.borrow_mut();
+        ranges.insert(range)
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
@@ -425,7 +469,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn parse_type_annotation(
         &self,
         annotation: &ast::ExprStringLiteral,
-    ) -> Option<&'a ParsedAnnotation> {
+    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
     }
@@ -441,12 +485,19 @@ impl<'a> Checker<'a> {
         match_fn: impl FnOnce(&ast::Expr) -> bool,
     ) -> bool {
         if let ast::Expr::StringLiteral(string_annotation) = expr {
-            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation) else {
+            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation).ok() else {
                 return false;
             };
             match_fn(parsed_annotation.expression())
         } else {
             match_fn(expr)
+        }
+    }
+
+    /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
+    pub(crate) fn report_type_diagnostic(&self, diagnostic: Diagnostic) {
+        if !self.semantic.in_no_type_check() {
+            self.report_diagnostic(diagnostic);
         }
     }
 }
@@ -504,7 +555,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
-                    || imports::is_os_environ_modification(stmt, self.semantic()))
+                    || imports::is_os_environ_modification(stmt, self.semantic())
+                    || imports::is_pytest_importorskip(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -721,6 +773,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // deferred.
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
+
+                    if self
+                        .semantic
+                        .match_typing_expr(&decorator.expression, "no_type_check")
+                    {
+                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
+                    }
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
@@ -879,9 +938,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit
-                    .type_param_definitions
-                    .push((value, self.semantic.snapshot()));
+                self.visit_deferred_type_alias_value(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -952,7 +1009,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(expr) = value {
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                        self.visit_type_definition(expr);
+                        self.visit_annotated_type_alias_value(expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -964,10 +1021,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 msg,
                 range: _,
             }) => {
+                let snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ASSERT_STATEMENT;
                 self.visit_boolean_test(test);
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
+                self.semantic.flags = snapshot;
             }
             Stmt::With(ast::StmtWith {
                 items,
@@ -1235,6 +1295,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::TypeVar)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                            {
+                                Some(typing::Callable::TypeAliasType)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
                                 Some(typing::Callable::NamedTuple)
@@ -1277,6 +1342,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
+
+                            if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
+                                flake8_type_checking::rules::runtime_cast_value(self, arg);
+                            }
                         }
                         for arg in args {
                             self.visit_expr(arg);
@@ -1306,10 +1375,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 range: _,
                             } = keyword;
                             if let Some(id) = arg {
-                                if id.as_str() == "bound" {
+                                if matches!(&**id, "bound" | "default") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    Some(typing::Callable::TypeAliasType) => {
+                        // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if matches!(&**id, "value" | "type_params") {
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1497,6 +1584,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
+                        Some(typing::SubscriptKind::TypedDict) => {
+                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = slice.as_ref() {
+                                for item in items {
+                                    if let Some(key) = &item.key {
+                                        self.visit_non_type_definition(key);
+                                        self.visit_type_definition(&item.value);
+                                    } else {
+                                        self.visit_non_type_definition(&item.value);
+                                    }
+                                }
+                            } else {
+                                self.visit_non_type_definition(slice);
+                            }
+                        }
                         None => {
                             self.visit_expr(slice);
                             self.visit_expr_context(ctx);
@@ -1682,12 +1783,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
         // Step 1: Binding
         match type_param {
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
-            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
-            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range, .. }) => {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. })
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => {
                 self.add_binding(
                     name.as_str(),
-                    *range,
+                    name.range(),
                     BindingKind::TypeParam,
                     BindingFlags::empty(),
                 );
@@ -1842,6 +1943,45 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
     }
 
+    /// Visit an [`Expr`], and treat it as the value expression
+    /// of a [PEP 613] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    fn visit_annotated_type_alias_value(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::ANNOTATED_TYPE_ALIAS;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as the value expression
+    /// of a [PEP 695] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// type OptStr = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    fn visit_deferred_type_alias_value(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        // even though we don't visit these nodes immediately we need to
+        // modify the semantic flags before we push the expression and its
+        // corresponding semantic snapshot
+        self.semantic.flags |= SemanticModelFlags::DEFERRED_TYPE_ALIAS;
+        self.visit
+            .type_param_definitions
+            .push((expr, self.semantic.snapshot()));
+        self.semantic.flags = snapshot;
+    }
+
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
@@ -1900,6 +2040,9 @@ impl<'a> Checker<'a> {
 
         if self.semantic.in_exception_handler() {
             flags |= BindingFlags::IN_EXCEPT_HANDLER;
+        }
+        if self.semantic.in_assert_statement() {
+            flags |= BindingFlags::IN_ASSERT_STATEMENT;
         }
 
         // Create the `Binding`.
@@ -1999,6 +2142,21 @@ impl<'a> Checker<'a> {
         let mut flags = BindingFlags::empty();
         if helpers::is_unpacking_assignment(parent, expr) {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
+        }
+
+        match parent {
+            Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                // TODO: It is a bit unfortunate that we do this check twice
+                //       maybe we should change how we visit this statement
+                //       so the semantic flag for the type alias sticks around
+                //       until after we've handled this store, so we can check
+                //       the flag instead of duplicating this check
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                    flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
+                }
+            }
+            _ => {}
         }
 
         let scope = self.semantic.current_scope();
@@ -2227,45 +2385,66 @@ impl<'a> Checker<'a> {
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
-                let annotation_parse_result = self.parse_type_annotation(string_expr);
-                if let Some(parsed_annotation) = annotation_parse_result {
-                    self.parsed_type_annotation = Some(parsed_annotation);
+                match self.parse_type_annotation(string_expr) {
+                    Ok(parsed_annotation) => {
+                        self.parsed_type_annotation = Some(parsed_annotation);
 
-                    let annotation = string_expr.value.to_str();
-                    let range = string_expr.range();
+                        let annotation = string_expr.value.to_str();
+                        let range = string_expr.range();
 
-                    self.semantic.restore(snapshot);
+                        self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.in_typing_only_annotation() {
-                        if self.enabled(Rule::QuotedAnnotation) {
-                            pyupgrade::rules::quoted_annotation(self, annotation, range);
+                        if self.semantic.in_annotation()
+                            && self.semantic.in_typing_only_annotation()
+                        {
+                            if self.enabled(Rule::QuotedAnnotation) {
+                                pyupgrade::rules::quoted_annotation(self, annotation, range);
+                            }
                         }
+                        if self.source_type.is_stub() {
+                            if self.enabled(Rule::QuotedAnnotationInStub) {
+                                flake8_pyi::rules::quoted_annotation_in_stub(
+                                    self, annotation, range,
+                                );
+                            }
+                        }
+
+                        let type_definition_flag = match parsed_annotation.kind() {
+                            AnnotationKind::Simple => {
+                                SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION
+                            }
+                            AnnotationKind::Complex => {
+                                SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                            }
+                        };
+
+                        self.semantic.flags |=
+                            SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
+                        let parsed_expr = parsed_annotation.expression();
+                        self.visit_expr(parsed_expr);
+                        if self.semantic.in_type_alias_value() {
+                            // stub files are covered by PYI020
+                            if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
+                                flake8_type_checking::rules::quoted_type_alias(
+                                    self,
+                                    parsed_expr,
+                                    string_expr,
+                                );
+                            }
+                        }
+                        self.parsed_type_annotation = None;
                     }
-                    if self.source_type.is_stub() {
-                        if self.enabled(Rule::QuotedAnnotationInStub) {
-                            flake8_pyi::rules::quoted_annotation_in_stub(self, annotation, range);
-                        }
-                    }
+                    Err(parse_error) => {
+                        self.semantic.restore(snapshot);
 
-                    let type_definition_flag = match parsed_annotation.kind() {
-                        AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => {
-                            SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                            self.report_type_diagnostic(Diagnostic::new(
+                                pyflakes::rules::ForwardAnnotationSyntaxError {
+                                    parse_error: parse_error.error.to_string(),
+                                },
+                                string_expr.range(),
+                            ));
                         }
-                    };
-
-                    self.semantic.flags |=
-                        SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(parsed_annotation.expression());
-                    self.parsed_type_annotation = None;
-                } else {
-                    if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                        self.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::ForwardAnnotationSyntaxError {
-                                body: string_expr.value.to_string(),
-                            },
-                            string_expr.range(),
-                        ));
                     }
                 }
             }
@@ -2401,7 +2580,7 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                            self.diagnostics.push(
+                            self.diagnostics.get_mut().push(
                                 Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
@@ -2416,7 +2595,7 @@ impl<'a> Checker<'a> {
                             if self.settings.preview.is_enabled()
                                 || !self.path.ends_with("__init__.py")
                             {
-                                self.diagnostics.push(
+                                self.diagnostics.get_mut().push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
@@ -2437,12 +2616,12 @@ impl<'a> Checker<'a> {
 }
 
 struct ParsedAnnotationsCache<'a> {
-    arena: &'a typed_arena::Arena<ParsedAnnotation>,
-    by_offset: RefCell<FxHashMap<TextSize, Option<&'a ParsedAnnotation>>>,
+    arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
+    by_offset: RefCell<FxHashMap<TextSize, Result<&'a ParsedAnnotation, &'a ParseError>>>,
 }
 
 impl<'a> ParsedAnnotationsCache<'a> {
-    fn new(arena: &'a typed_arena::Arena<ParsedAnnotation>) -> Self {
+    fn new(arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>) -> Self {
         Self {
             arena,
             by_offset: RefCell::default(),
@@ -2453,17 +2632,15 @@ impl<'a> ParsedAnnotationsCache<'a> {
         &self,
         annotation: &ast::ExprStringLiteral,
         source: &str,
-    ) -> Option<&'a ParsedAnnotation> {
+    ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         *self
             .by_offset
             .borrow_mut()
             .entry(annotation.start())
             .or_insert_with(|| {
-                if let Ok(annotation) = parse_type_annotation(annotation, source) {
-                    Some(self.arena.alloc(annotation))
-                } else {
-                    None
-                }
+                self.arena
+                    .alloc(parse_type_annotation(annotation, source))
+                    .as_ref()
             })
     }
 
@@ -2542,13 +2719,13 @@ pub(crate) fn check_ast(
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
     analyze::definitions(&mut checker);
-    analyze::bindings(&mut checker);
-    analyze::unresolved_references(&mut checker);
+    analyze::bindings(&checker);
+    analyze::unresolved_references(&checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
     checker.analyze.scopes.push(ScopeId::global());
-    analyze::deferred_scopes(&mut checker);
+    analyze::deferred_scopes(&checker);
 
-    checker.diagnostics
+    checker.diagnostics.take()
 }

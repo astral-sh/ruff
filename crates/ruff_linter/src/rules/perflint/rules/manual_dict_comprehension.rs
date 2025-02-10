@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -41,8 +41,8 @@ use crate::checkers::ast::Checker;
 /// pairs = (("a", 1), ("b", 2))
 /// result.update({x: y for x, y in pairs if y % 2})
 /// ```
-#[violation]
-pub struct ManualDictComprehension;
+#[derive(ViolationMetadata)]
+pub(crate) struct ManualDictComprehension;
 
 impl Violation for ManualDictComprehension {
     #[derive_message_formats]
@@ -52,7 +52,7 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+pub(crate) fn manual_dict_comprehension(checker: &Checker, target: &Expr, body: &[Stmt]) {
     let (stmt, if_test) = match body {
         // ```python
         // for idx, name in enumerate(names):
@@ -164,7 +164,5 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualDictComprehension, *range));
+    checker.report_diagnostic(Diagnostic::new(ManualDictComprehension, *range));
 }

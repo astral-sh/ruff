@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S603.py:4:1: S603 `subprocess` call: check for execution of untrusted input
   |
@@ -46,7 +45,7 @@ S603.py:8:1: S603 `subprocess` call: check for execution of untrusted input
  7 | check_output("true", shell=False)
  8 | run("true", shell=False)
    | ^^^ S603
- 9 | 
+ 9 |
 10 | # Values that falsey values are treated as false.
    |
 
@@ -84,7 +83,7 @@ S603.py:14:1: S603 `subprocess` call: check for execution of untrusted input
 13 | Popen("true", shell={})
 14 | Popen("true", shell=None)
    | ^^^^^ S603
-15 | 
+15 |
 16 | # Unknown values are treated as falsey.
    |
 
@@ -93,7 +92,7 @@ S603.py:17:1: S603 `subprocess` call: check for execution of untrusted input
 16 | # Unknown values are treated as falsey.
 17 | Popen("true", shell=True if True else False)
    | ^^^^^ S603
-18 | 
+18 |
 19 | # No value is also caught.
    |
 

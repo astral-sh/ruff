@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
 
 use crate::checkers::ast::Checker;
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// def func(version=ssl.PROTOCOL_TLSv1_2): ...
 /// ```
-#[violation]
-pub struct SslWithBadDefaults {
+#[derive(ViolationMetadata)]
+pub(crate) struct SslWithBadDefaults {
     protocol: String,
 }
 
@@ -48,7 +48,7 @@ impl Violation for SslWithBadDefaults {
 }
 
 /// S503
-pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFunctionDef) {
     for default in function_def
         .parameters
         .iter_non_variadic_params()
@@ -57,7 +57,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
         match default {
             Expr::Name(ast::ExprName { id, range, .. }) => {
                 if is_insecure_protocol(id.as_str()) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         SslWithBadDefaults {
                             protocol: id.to_string(),
                         },
@@ -67,7 +67,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
             }
             Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
                 if is_insecure_protocol(attr.as_str()) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         SslWithBadDefaults {
                             protocol: attr.to_string(),
                         },

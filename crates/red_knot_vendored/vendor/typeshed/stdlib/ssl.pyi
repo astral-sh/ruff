@@ -27,7 +27,7 @@ from _ssl import (
 )
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, NamedTuple, TypedDict, overload
+from typing import Any, Literal, NamedTuple, TypedDict, overload, type_check_only
 from typing_extensions import Never, Self, TypeAlias
 
 if sys.version_info >= (3, 13):
@@ -309,6 +309,8 @@ ALERT_DESCRIPTION_UNSUPPORTED_CERTIFICATE: AlertDescription
 ALERT_DESCRIPTION_UNSUPPORTED_EXTENSION: AlertDescription
 ALERT_DESCRIPTION_USER_CANCELLED: AlertDescription
 
+# This class is not exposed. It calls itself ssl._ASN1Object.
+@type_check_only
 class _ASN1ObjectBase(NamedTuple):
     nid: int
     shortname: str
@@ -323,6 +325,10 @@ class _ASN1Object(_ASN1ObjectBase):
     def fromname(cls, name: str) -> Self: ...
 
 class Purpose(_ASN1Object, enum.Enum):
+    # Normally this class would inherit __new__ from _ASN1Object, but
+    # because this is an enum, the inherited __new__ is replaced at runtime with
+    # Enum.__new__.
+    def __new__(cls, value: object) -> Self: ...
     SERVER_AUTH = (129, "serverAuth", "TLS Web Server Authentication", "1.3.6.1.5.5.7.3.2")  # pyright: ignore[reportCallIssue]
     CLIENT_AUTH = (130, "clientAuth", "TLS Web Client Authentication", "1.3.6.1.5.5.7.3.1")  # pyright: ignore[reportCallIssue]
 

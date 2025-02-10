@@ -11,7 +11,7 @@ use crate::edit::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use red_knot_workspace::db::{Db, RootDatabase};
+use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};
 
@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: RootDatabase,
+        db: ProjectDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
@@ -46,7 +46,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     }
 }
 
-fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
+fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec<Diagnostic> {
     let Some(file) = snapshot.file(db) else {
         tracing::info!(
             "No file found for snapshot for `{}`",
@@ -75,9 +75,9 @@ fn to_lsp_diagnostic(
     diagnostic: &dyn ruff_db::diagnostic::Diagnostic,
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
-    let range = if let Some(range) = diagnostic.range() {
-        let index = line_index(db.upcast(), diagnostic.file());
-        let source = source_text(db.upcast(), diagnostic.file());
+    let range = if let (Some(file), Some(range)) = (diagnostic.file(), diagnostic.range()) {
+        let index = line_index(db.upcast(), file);
+        let source = source_text(db.upcast(), file);
 
         range.to_range(&source, &index, encoding)
     } else {
@@ -86,14 +86,15 @@ fn to_lsp_diagnostic(
 
     let severity = match diagnostic.severity() {
         Severity::Info => DiagnosticSeverity::INFORMATION,
-        Severity::Error => DiagnosticSeverity::ERROR,
+        Severity::Warning => DiagnosticSeverity::WARNING,
+        Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
     };
 
     Diagnostic {
         range,
         severity: Some(severity),
         tags: None,
-        code: Some(NumberOrString::String(diagnostic.rule().to_string())),
+        code: Some(NumberOrString::String(diagnostic.id().to_string())),
         code_description: None,
         source: Some("red-knot".into()),
         message: diagnostic.message().into_owned(),

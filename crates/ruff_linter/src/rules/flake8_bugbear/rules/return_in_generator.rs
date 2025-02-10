@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::statement_visitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
@@ -79,8 +79,8 @@ use crate::checkers::ast::Checker;
 ///         for file_type in file_types:
 ///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
-#[violation]
-pub struct ReturnInGenerator;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReturnInGenerator;
 
 impl Violation for ReturnInGenerator {
     #[derive_message_formats]
@@ -91,7 +91,7 @@ impl Violation for ReturnInGenerator {
 }
 
 /// B901
-pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunctionDef) {
     if function_def.name.id == "__await__" {
         return;
     }
@@ -101,9 +101,7 @@ pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunc
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ReturnInGenerator, return_));
+            checker.report_diagnostic(Diagnostic::new(ReturnInGenerator, return_));
         }
     }
 }

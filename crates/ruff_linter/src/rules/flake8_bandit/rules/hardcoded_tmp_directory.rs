@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, StringLike};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -33,13 +33,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.flake8-bandit.hardcoded-tmp-directory`
+/// - `lint.flake8-bandit.hardcoded-tmp-directory-extend`
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-377](https://cwe.mitre.org/data/definitions/377.html)
 /// - [Common Weakness Enumeration: CWE-379](https://cwe.mitre.org/data/definitions/379.html)
 /// - [Python documentation: `tempfile`](https://docs.python.org/3/library/tempfile.html)
-#[violation]
-pub struct HardcodedTempFile {
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedTempFile {
     string: String,
 }
 
@@ -55,7 +56,7 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike) {
+pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
     match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => {
             check(checker, value.to_str(), string.range());
@@ -78,7 +79,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike)
     }
 }
 
-fn check(checker: &mut Checker, value: &str, range: TextRange) {
+fn check(checker: &Checker, value: &str, range: TextRange) {
     if !checker
         .settings
         .flake8_bandit
@@ -101,7 +102,7 @@ fn check(checker: &mut Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         HardcodedTempFile {
             string: value.to_string(),
         },

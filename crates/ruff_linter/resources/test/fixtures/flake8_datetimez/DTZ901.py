@@ -13,6 +13,12 @@ datetime.datetime.min.replace(hour=...)
 datetime.datetime.max.replace(tzinfo=...)
 datetime.datetime.min.replace(tzinfo=...)
 
+datetime.datetime.max.time()
+datetime.datetime.min.time()
+
+datetime.datetime.max.time(foo=...)
+datetime.datetime.min.time(foo=...)
+
 
 from datetime import datetime
 
@@ -28,3 +34,9 @@ datetime.min.replace(hour=...)
 # No error
 datetime.max.replace(tzinfo=...)
 datetime.min.replace(tzinfo=...)
+
+datetime.max.time()
+datetime.min.time()
+
+datetime.max.time(foo=...)
+datetime.min.time(foo=...)

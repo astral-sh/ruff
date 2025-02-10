@@ -1,100 +1,145 @@
 #![allow(clippy::disallowed_names)]
 
+use std::borrow::Cow;
+use std::ops::Range;
+
 use rayon::ThreadPoolBuilder;
+use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::value::RangedValue;
+use red_knot_project::watch::{ChangeEvent, ChangedKind};
+use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use red_knot_python_semantic::PythonVersion;
-use red_knot_workspace::db::{Db, RootDatabase};
-use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
-use red_knot_workspace::workspace::settings::Configuration;
-use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashSet;
 
 struct Case {
-    db: RootDatabase,
+    db: ProjectDatabase,
     fs: MemoryFileSystem,
     re: File,
     re_path: SystemPathBuf,
 }
 
-const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
-
-static EXPECTED_DIAGNOSTICS: &[&str] = &[
-    // We don't support `*` imports yet:
-    "error[unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
-    // We don't support terminal statements in control flow yet:
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:108:17 Conflicting declared types for `second_char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:267:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:364:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:381:13 Conflicting declared types for `char`: Unknown, str | None",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:395:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:455:9 Name `nest` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:482:16 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:566:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:590:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
+// "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
+static TOMLLIB_FILES: [TestFile; 4] = [
+    TestFile::new(
+        "tomllib/__init__.py",
+        include_str!("../resources/tomllib/__init__.py"),
+    ),
+    TestFile::new(
+        "tomllib/_parser.py",
+        include_str!("../resources/tomllib/_parser.py"),
+    ),
+    TestFile::new(
+        "tomllib/_re.py",
+        include_str!("../resources/tomllib/_re.py"),
+    ),
+    TestFile::new(
+        "tomllib/_types.py",
+        include_str!("../resources/tomllib/_types.py"),
+    ),
 ];
 
-fn get_test_file(name: &str) -> TestFile {
-    let path = format!("tomllib/{name}");
-    let url = format!("{TOMLLIB_312_URL}/{name}");
-    TestFile::try_download(&path, &url).unwrap()
-}
+/// A structured set of fields we use to do diagnostic comparisons.
+///
+/// This helps assert benchmark results. Previously, we would compare
+/// the actual diagnostic output, but using `insta` inside benchmarks is
+/// problematic, and updating the strings otherwise when diagnostic rendering
+/// changes is a PITA.
+type KeyDiagnosticFields = (
+    DiagnosticId,
+    Option<&'static str>,
+    Option<Range<usize>>,
+    Cow<'static, str>,
+    Severity,
+);
 
-fn tomllib_path(filename: &str) -> SystemPathBuf {
-    SystemPathBuf::from(format!("/src/tomllib/{filename}").as_str())
+static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
+    // We don't support `*` imports yet:
+    (
+        DiagnosticId::lint("unresolved-import"),
+        Some("/src/tomllib/_parser.py"),
+        Some(192..200),
+        Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
+        Severity::Error,
+    ),
+    // We don't handle intersections in `is_assignable_to` yet
+    (
+        DiagnosticId::lint("invalid-argument-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(20158..20172),
+        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-argument-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(20464..20479),
+        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-argument-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(20774..20786),
+        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("unused-ignore-comment"),
+        Some("/src/tomllib/_parser.py"),
+        Some(22299..22333),
+        Cow::Borrowed("Unused blanket `type: ignore` directive"),
+        Severity::Warning,
+    ),
+];
+
+fn tomllib_path(file: &TestFile) -> SystemPathBuf {
+    SystemPathBuf::from("src").join(file.name())
 }
 
 fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
-    let tomllib_filenames = ["__init__.py", "_parser.py", "_re.py", "_types.py"];
-    fs.write_files(tomllib_filenames.iter().map(|filename| {
-        (
-            tomllib_path(filename),
-            get_test_file(filename).code().to_string(),
-        )
-    }))
-    .unwrap();
-
-    let src_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::discover(
-        src_root,
-        &system,
-        Some(&Configuration {
-            target_version: Some(PythonVersion::PY312),
-            ..Configuration::default()
-        }),
+    fs.write_files(
+        TOMLLIB_FILES
+            .iter()
+            .map(|file| (tomllib_path(file), file.code().to_string())),
     )
     .unwrap();
 
-    let mut db = RootDatabase::new(metadata, system).unwrap();
+    let src_root = SystemPath::new("/src");
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+    metadata.apply_cli_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
 
-    let tomllib_files: FxHashSet<File> = tomllib_filenames
-        .iter()
-        .map(|filename| system_path_to_file(&db, tomllib_path(filename)).unwrap())
-        .collect();
-    db.workspace().set_open_files(&mut db, tomllib_files);
+    let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let mut tomllib_files = FxHashSet::default();
+    let mut re: Option<File> = None;
 
-    let re_path = tomllib_path("_re.py");
-    let re = system_path_to_file(&db, &re_path).unwrap();
+    for test_file in &TOMLLIB_FILES {
+        let file = system_path_to_file(&db, tomllib_path(test_file)).unwrap();
+        if test_file.name().ends_with("_re.py") {
+            re = Some(file);
+        }
+        tomllib_files.insert(file);
+    }
+
+    let re = re.unwrap();
+
+    db.project().set_open_files(&mut db, tomllib_files);
+
+    let re_path = re.path(&db).as_system_path().unwrap().to_owned();
     Case {
         db,
         fs,
@@ -123,15 +168,9 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_case();
 
-        let result: Vec<_> = case
-            .db
-            .check()
-            .unwrap()
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&case.db).to_string())
-            .collect();
+        let result: Vec<_> = case.db.check().unwrap();
 
-        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+        assert_diagnostics(&case.db, &result);
 
         case.fs
             .write_file(
@@ -174,18 +213,30 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_case,
             |case| {
                 let Case { db, .. } = case;
-                let result: Vec<_> = db
-                    .check()
-                    .unwrap()
-                    .into_iter()
-                    .map(|diagnostic| diagnostic.display(db).to_string())
-                    .collect();
+                let result: Vec<_> = db.check().unwrap();
 
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
+                assert_diagnostics(db, &result);
             },
             BatchSize::SmallInput,
         );
     });
+}
+
+#[track_caller]
+fn assert_diagnostics(db: &dyn Db, diagnostics: &[Box<dyn Diagnostic>]) {
+    let normalized: Vec<_> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            (
+                diagnostic.id(),
+                diagnostic.file().map(|file| file.path(db).as_str()),
+                diagnostic.range().map(Range::<usize>::from),
+                diagnostic.message(),
+                diagnostic.severity(),
+            )
+        })
+        .collect();
+    assert_eq!(&normalized, EXPECTED_DIAGNOSTICS);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);

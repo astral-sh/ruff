@@ -39,7 +39,8 @@ mod tests {
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_1.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_2.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_3.py"))]
-    #[test_case(Rule::NonPEP604Annotation, Path::new("UP007.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP045.py"))]
     #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"))]
@@ -57,6 +58,7 @@ mod tests {
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
@@ -77,19 +79,35 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_8.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_9.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_10.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_other_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_other_utf8.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_utf8.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_utf8_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_code_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_code_utf8_utf8.py"))]
+    #[test_case(
+        Rule::UTF8EncodingDeclaration,
+        Path::new("UP009_hashbang_utf8_other.py")
+    )]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_many_empty_lines.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010.py"))]
-    #[test_case(Rule::UnpackedListComprehension, Path::new("UP027.py"))]
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"))]
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
+    #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
@@ -100,13 +118,32 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
-    fn preview(rule_code: Rule, path: &Path) -> Result<()> {
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
-            Path::new("pyupgrade").join(path),
+            Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn up007_preview() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP045.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion)
             },
         )?;
         assert_messages!(diagnostics);
@@ -203,7 +240,10 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rules([
+                    Rule::NonPEP604AnnotationUnion,
+                    Rule::NonPEP604AnnotationOptional,
+                ])
             },
         )?;
         assert_messages!(diagnostics);
@@ -216,7 +256,10 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py310,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rules([
+                    Rule::NonPEP604AnnotationUnion,
+                    Rule::NonPEP604AnnotationOptional,
+                ])
             },
         )?;
         assert_messages!(diagnostics);

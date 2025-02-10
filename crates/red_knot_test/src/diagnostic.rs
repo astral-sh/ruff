@@ -144,7 +144,7 @@ struct DiagnosticWithLine<T> {
 mod tests {
     use crate::db::Db;
     use crate::diagnostic::Diagnostic;
-    use ruff_db::diagnostic::Severity;
+    use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -190,16 +190,16 @@ mod tests {
     }
 
     impl Diagnostic for DummyDiagnostic {
-        fn rule(&self) -> &str {
-            "dummy"
+        fn id(&self) -> DiagnosticId {
+            DiagnosticId::Lint(LintName::of("dummy"))
         }
 
         fn message(&self) -> Cow<str> {
             "dummy".into()
         }
 
-        fn file(&self) -> File {
-            self.file
+        fn file(&self) -> Option<File> {
+            Some(self.file)
         }
 
         fn range(&self) -> Option<TextRange> {

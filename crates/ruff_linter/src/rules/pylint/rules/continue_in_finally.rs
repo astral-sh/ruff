@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `target-version`
-#[violation]
-pub struct ContinueInFinally;
+#[derive(ViolationMetadata)]
+pub(crate) struct ContinueInFinally;
 
 impl Violation for ContinueInFinally {
     #[derive_message_formats]
@@ -46,12 +46,10 @@ impl Violation for ContinueInFinally {
     }
 }
 
-fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
+fn traverse_body(checker: &Checker, body: &[Stmt]) {
     for stmt in body {
         if stmt.is_continue_stmt() {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ContinueInFinally, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(ContinueInFinally, stmt.range()));
         }
 
         match stmt {
@@ -86,6 +84,6 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// PLE0116
-pub(crate) fn continue_in_finally(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn continue_in_finally(checker: &Checker, body: &[Stmt]) {
     traverse_body(checker, body);
 }

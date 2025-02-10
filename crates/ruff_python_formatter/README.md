@@ -19,8 +19,8 @@ filed in the issue tracker. If you've identified a new deviation, please [file a
 
 When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
 and so more deviations should be expected, especially around the treatment of end-of-line comments.
-For details, see [Black compatibility](https://docs.astral.sh/ruff/formatter/#black-compatibility).
+For details, see [Style Guide](https://docs.astral.sh/ruff/formatter/#style-guide).
 
 ## Getting started
 
-The Ruff formatter is available as of Ruff v0.1.2. Head to [The Ruff Formatter](https://docs.astral.sh/ruff/formatter/) for usage instructions and a comparison to Black.
+Head to [The Ruff Formatter](https://docs.astral.sh/ruff/formatter/) for usage instructions and a comparison to Black.

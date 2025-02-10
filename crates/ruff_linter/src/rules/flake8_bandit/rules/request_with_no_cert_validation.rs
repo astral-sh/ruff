@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_const_false;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-295](https://cwe.mitre.org/data/definitions/295.html)
-#[violation]
-pub struct RequestWithNoCertValidation {
+#[derive(ViolationMetadata)]
+pub(crate) struct RequestWithNoCertValidation {
     string: String,
 }
 
@@ -46,7 +46,7 @@ impl Violation for RequestWithNoCertValidation {
 }
 
 /// S501
-pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::ExprCall) {
     if let Some(target) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -61,7 +61,7 @@ pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast:
     {
         if let Some(keyword) = call.arguments.find_keyword("verify") {
             if is_const_false(&keyword.value) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },

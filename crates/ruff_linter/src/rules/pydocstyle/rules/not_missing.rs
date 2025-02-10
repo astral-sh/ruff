@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
@@ -61,8 +61,8 @@ use crate::registry::Rule;
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicModule;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicModule;
 
 impl Violation for UndocumentedPublicModule {
     #[derive_message_formats]
@@ -144,8 +144,8 @@ impl Violation for UndocumentedPublicModule {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicClass;
 
 impl Violation for UndocumentedPublicClass {
     #[derive_message_formats]
@@ -226,8 +226,8 @@ impl Violation for UndocumentedPublicClass {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicMethod;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicMethod;
 
 impl Violation for UndocumentedPublicMethod {
     #[derive_message_formats]
@@ -316,8 +316,8 @@ impl Violation for UndocumentedPublicMethod {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicFunction;
 
 impl Violation for UndocumentedPublicFunction {
     #[derive_message_formats]
@@ -359,8 +359,8 @@ impl Violation for UndocumentedPublicFunction {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicPackage;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicPackage;
 
 impl Violation for UndocumentedPublicPackage {
     #[derive_message_formats]
@@ -416,8 +416,8 @@ impl Violation for UndocumentedPublicPackage {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedMagicMethod;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedMagicMethod;
 
 impl Violation for UndocumentedMagicMethod {
     #[derive_message_formats]
@@ -471,8 +471,8 @@ impl Violation for UndocumentedMagicMethod {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicNestedClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicNestedClass;
 
 impl Violation for UndocumentedPublicNestedClass {
     #[derive_message_formats]
@@ -519,8 +519,8 @@ impl Violation for UndocumentedPublicNestedClass {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicInit;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicInit;
 
 impl Violation for UndocumentedPublicInit {
     #[derive_message_formats]
@@ -531,7 +531,7 @@ impl Violation for UndocumentedPublicInit {
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub(crate) fn not_missing(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     visibility: Visibility,
 ) -> bool {
@@ -552,7 +552,7 @@ pub(crate) fn not_missing(
                 return true;
             }
             if checker.enabled(Rule::UndocumentedPublicModule) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicModule,
                     TextRange::default(),
                 ));
@@ -564,7 +564,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicPackage) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicPackage,
                     TextRange::default(),
                 ));
@@ -576,9 +576,10 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicClass) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(UndocumentedPublicClass, class.identifier()));
+                checker.report_diagnostic(Diagnostic::new(
+                    UndocumentedPublicClass,
+                    class.identifier(),
+                ));
             }
             false
         }
@@ -587,7 +588,7 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicNestedClass) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     UndocumentedPublicNestedClass,
                     function.identifier(),
                 ));
@@ -602,7 +603,7 @@ pub(crate) fn not_missing(
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicFunction,
                         function.identifier(),
                     ));
@@ -620,7 +621,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_init(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicInit) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicInit,
                         function.identifier(),
                     ));
@@ -628,7 +629,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_new(&function.name) || is_call(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
                     ));
@@ -636,7 +637,7 @@ pub(crate) fn not_missing(
                 true
             } else if is_magic(&function.name) {
                 if checker.enabled(Rule::UndocumentedMagicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedMagicMethod,
                         function.identifier(),
                     ));
@@ -644,7 +645,7 @@ pub(crate) fn not_missing(
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndocumentedPublicMethod,
                         function.identifier(),
                     ));

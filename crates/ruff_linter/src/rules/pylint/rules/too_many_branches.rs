@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
@@ -142,8 +142,8 @@ use ruff_python_ast::identifier::Identifier;
 ///
 /// ## Options
 /// - `lint.pylint.max-branches`
-#[violation]
-pub struct TooManyBranches {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyBranches {
     branches: usize,
     max_branches: usize,
 }

@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 /// if sys.version_info >= (3, 10):
 ///     __all__ += ["C"]
 /// ```
-#[violation]
-pub struct UnsupportedMethodCallOnAll {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsupportedMethodCallOnAll {
     name: String,
 }
 
@@ -54,7 +54,7 @@ impl Violation for UnsupportedMethodCallOnAll {
 }
 
 /// PYI056
-pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr) {
+pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
@@ -67,7 +67,7 @@ pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr)
     if !is_unsupported_method(attr.as_str()) {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnsupportedMethodCallOnAll {
             name: attr.to_string(),
         },

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -45,8 +45,8 @@ impl fmt::Display for VarKind {
 ///
 /// _T = TypeVar("_T")
 /// ```
-#[violation]
-pub struct UnprefixedTypeParam {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnprefixedTypeParam {
     kind: VarKind,
 }
 
@@ -59,7 +59,7 @@ impl Violation for UnprefixedTypeParam {
 }
 
 /// PYI001
-pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Expr]) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -106,7 +106,5 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         return;
     };
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
+    checker.report_diagnostic(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
 }

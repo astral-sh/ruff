@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
-#[violation]
-pub struct SetAttrWithConstant;
+#[derive(ViolationMetadata)]
+pub(crate) struct SetAttrWithConstant;
 
 impl AlwaysFixableViolation for SetAttrWithConstant {
     #[derive_message_formats]
@@ -61,12 +61,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
 }
 
 /// B010
-pub(crate) fn setattr_with_constant(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let [obj, name, value] = args else {
         return;
     };
@@ -100,7 +95,7 @@ pub(crate) fn setattr_with_constant(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

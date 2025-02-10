@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Decorator;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 
-#[violation]
-pub struct WhitespaceAfterDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct WhitespaceAfterDecorator;
 
 impl AlwaysFixableViolation for WhitespaceAfterDecorator {
     #[derive_message_formats]
@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for WhitespaceAfterDecorator {
 }
 
 /// E204
-pub(crate) fn whitespace_after_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn whitespace_after_decorator(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let decorator_text = checker.locator().slice(decorator);
 
@@ -64,7 +64,7 @@ pub(crate) fn whitespace_after_decorator(checker: &mut Checker, decorator_list: 
 
                 let mut diagnostic = Diagnostic::new(WhitespaceAfterDecorator, range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

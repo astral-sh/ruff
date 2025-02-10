@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
@@ -29,8 +29,8 @@ use super::super::detection::comment_contains_code;
 /// - `lint.task-tags`
 ///
 /// [#4845]: https://github.com/astral-sh/ruff/issues/4845
-#[violation]
-pub struct CommentedOutCode;
+#[derive(ViolationMetadata)]
+pub(crate) struct CommentedOutCode;
 
 impl Violation for CommentedOutCode {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
@@ -90,33 +90,15 @@ where
     let line_end = locator.full_line_end(script_start.end());
     let rest = locator.after(line_end);
     let mut end_offset = None;
-    let mut lines = UniversalNewlineIterator::with_offset(rest, line_end);
+    let lines = UniversalNewlineIterator::with_offset(rest, line_end);
 
-    while let Some(line) = lines.next() {
+    for line in lines {
         let Some(content) = script_line_content(&line) else {
             break;
         };
 
         if content == "///" {
-            // > Precedence for an ending line # /// is given when the next line is not a valid
-            // > embedded content line as described above.
-            // > For example, the following is a single fully valid block:
-            // > ```python
-            // > # /// some-toml
-            // > # embedded-csharp = """
-            // > # /// <summary>
-            // > # /// text
-            // > # ///
-            // > # /// </summary>
-            // > # public class MyClass { }
-            // > # """
-            // > # ///
-            // ````
-            if lines.next().is_some_and(|line| is_valid_script_line(&line)) {
-                continue;
-            }
             end_offset = Some(line.full_end());
-            break;
         }
     }
 
@@ -150,10 +132,6 @@ fn script_line_content(line: &str) -> Option<&str> {
 
     // > If there are characters after the # then the first character MUST be a space.
     rest.strip_prefix(' ')
-}
-
-fn is_valid_script_line(line: &str) -> bool {
-    script_line_content(line).is_some()
 }
 
 /// Returns `true` if line contains an own-line comment.

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S608.py:2:10: S608 Possible SQL injection vector through string-based query construction
   |
@@ -46,14 +45,14 @@ S608.py:6:10: S608 Possible SQL injection vector through string-based query cons
 5 | query4 = "SELECT {} FROM table;".format(var)
 6 | query5 = f"SELECT * FROM table WHERE var = {var}"
   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-7 | 
+7 |
 8 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
   |
 
 S608.py:8:10: S608 Possible SQL injection vector through string-based query construction
    |
  6 | query5 = f"SELECT * FROM table WHERE var = {var}"
- 7 | 
+ 7 |
  8 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
  9 | query7 = "DELETE FROM table WHERE VAR = " + var
@@ -94,14 +93,14 @@ S608.py:12:11: S608 Possible SQL injection vector through string-based query con
 11 | query9 = "DELETE FROM table WHERE var = {}".format(var)
 12 | query10 = f"DELETE FROM table WHERE var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-13 | 
+13 |
 14 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
    |
 
 S608.py:14:11: S608 Possible SQL injection vector through string-based query construction
    |
 12 | query10 = f"DELETE FROM table WHERE var = {var}"
-13 | 
+13 |
 14 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
 15 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
@@ -132,14 +131,14 @@ S608.py:17:11: S608 Possible SQL injection vector through string-based query con
 16 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
 17 | query14 = f"INSERT INTO {table} VALUES var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-18 | 
+18 |
 19 | query15 = "UPDATE %s SET var = %s" % (table, var)
    |
 
 S608.py:19:11: S608 Possible SQL injection vector through string-based query construction
    |
 17 | query14 = f"INSERT INTO {table} VALUES var = {var}"
-18 | 
+18 |
 19 | query15 = "UPDATE %s SET var = %s" % (table, var)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
 20 | query16 = "UPDATE " + table + " SET var = " + var
@@ -170,14 +169,14 @@ S608.py:22:11: S608 Possible SQL injection vector through string-based query con
 21 | query17 = "UPDATE {} SET var = {}".format(table, var)
 22 | query18 = f"UPDATE {table} SET var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-23 | 
+23 |
 24 | query19 = "select %s from table" % (var,)
    |
 
 S608.py:24:11: S608 Possible SQL injection vector through string-based query construction
    |
 22 | query18 = f"UPDATE {table} SET var = {var}"
-23 | 
+23 |
 24 | query19 = "select %s from table" % (var,)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
 25 | query20 = "select var from " + table
@@ -218,14 +217,14 @@ S608.py:28:11: S608 Possible SQL injection vector through string-based query con
 27 | query22 = "select {} from table;".format(var)
 28 | query23 = f"select * from table where var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-29 | 
+29 |
 30 | query24 = "delete from table where var = %s" % (var,)
    |
 
 S608.py:30:11: S608 Possible SQL injection vector through string-based query construction
    |
 28 | query23 = f"select * from table where var = {var}"
-29 | 
+29 |
 30 | query24 = "delete from table where var = %s" % (var,)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
 31 | query25 = "delete from table where var = " + var
@@ -266,14 +265,14 @@ S608.py:34:11: S608 Possible SQL injection vector through string-based query con
 33 | query27 = "delete from table where var = {}".format(var)
 34 | query28 = f"delete from table where var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-35 | 
+35 |
 36 | query29 = "insert into table values (%s)" % (var,)
    |
 
 S608.py:36:11: S608 Possible SQL injection vector through string-based query construction
    |
 34 | query28 = f"delete from table where var = {var}"
-35 | 
+35 |
 36 | query29 = "insert into table values (%s)" % (var,)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
 37 | query30 = "insert into table values (" + var + ")"
@@ -304,14 +303,14 @@ S608.py:39:11: S608 Possible SQL injection vector through string-based query con
 38 | query31 = "insert into {} values ({})".format(table, var)
 39 | query32 = f"insert into {table} values var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-40 | 
+40 |
 41 | query33 = "update %s set var = %s" % (table, var)
    |
 
 S608.py:41:11: S608 Possible SQL injection vector through string-based query construction
    |
 39 | query32 = f"insert into {table} values var = {var}"
-40 | 
+40 |
 41 | query33 = "update %s set var = %s" % (table, var)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
 42 | query34 = "update " + table + " set var = " + var
@@ -342,7 +341,7 @@ S608.py:44:11: S608 Possible SQL injection vector through string-based query con
 43 | query35 = "update {} set var = {}".format(table, var)
 44 | query36 = f"update {table} set var = {var}"
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-45 | 
+45 |
 46 | # multi-line failures
    |
 
@@ -357,7 +356,7 @@ S608.py:48:12: S608 Possible SQL injection vector through string-based query con
 51 | |     WHERE var = %s
 52 | |     """ % var
    | |_____________^ S608
-53 |   
+53 |
 54 |   def query38():
    |
 
@@ -371,7 +370,7 @@ S608.py:55:12: S608 Possible SQL injection vector through string-based query con
 58 | |     WHERE var =
 59 | |     """ + var
    | |_____________^ S608
-60 |   
+60 |
 61 |   def query39():
    |
 
@@ -385,7 +384,7 @@ S608.py:62:12: S608 Possible SQL injection vector through string-based query con
 65 | |     WHERE var = {}
 66 | |     """.format(var)
    | |___________________^ S608
-67 |   
+67 |
 68 |   def query40():
    |
 
@@ -399,7 +398,7 @@ S608.py:69:12: S608 Possible SQL injection vector through string-based query con
 72 | |     WHERE var = {var}
 73 | |     """
    | |_______^ S608
-74 |   
+74 |
 75 |   def query41():
    |
 
@@ -407,8 +406,7 @@ S608.py:77:9: S608 Possible SQL injection vector through string-based query cons
    |
 75 |   def query41():
 76 |       return (
-77 |           "SELECT * "
-   |  _________^
+77 | /         "SELECT * "
 78 | |         "FROM table "
 79 | |         f"WHERE var = {var}"
    | |____________________________^ S608
@@ -449,7 +447,7 @@ S608.py:86:30: S608 Possible SQL injection vector through string-based query con
 85 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
 86 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-87 | 
+87 |
 88 | # # pass
    |
 
@@ -458,7 +456,7 @@ S608.py:98:11: S608 Possible SQL injection vector through string-based query con
  97 | # # INSERT without INTO (e.g. MySQL and derivatives)
  98 | query46 = "INSERT table VALUES (%s)" % (var,)
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
- 99 | 
+ 99 |
 100 | # # REPLACE (e.g. MySQL and derivatives, SQLite)
     |
 
@@ -476,7 +474,7 @@ S608.py:102:11: S608 Possible SQL injection vector through string-based query co
 101 | query47 = "REPLACE INTO table VALUES (%s)" % (var,)
 102 | query48 = "REPLACE table VALUES (%s)" % (var,)
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-103 | 
+103 |
 104 | query49 = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
     |
 
@@ -494,7 +492,7 @@ S608.py:112:1: S608 Possible SQL injection vector through string-based query con
 111 | "SELECT * FROM " + ("table1" if x > 0 else "table2") # query50
 112 | "SELECT * FROM " + ("table1" if x > 0 else ["table2"]) # query51
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-113 | 
+113 |
 114 | # test cases from #12044
     |
 
@@ -507,7 +505,7 @@ S608.py:117:12: S608 Possible SQL injection vector through string-based query co
 119 | |     FROM bar
 120 | |     """
     | |_______^ S608
-121 |   
+121 |
 122 |   def query53():
     |
 
@@ -521,7 +519,7 @@ S608.py:123:12: S608 Possible SQL injection vector through string-based query co
 126 | |     FROM bar
 127 | |     """
     | |_______^ S608
-128 |   
+128 |
 129 |   def query54():
     |
 
@@ -535,46 +533,72 @@ S608.py:130:12: S608 Possible SQL injection vector through string-based query co
 133 | |         bar
 134 | |     """
     | |_______^ S608
-135 |   
+135 |
 136 |   query55 = f"""SELECT * FROM
     |
 
 S608.py:136:11: S608 Possible SQL injection vector through string-based query construction
     |
 134 |       """
-135 |   
+135 |
 136 |   query55 = f"""SELECT * FROM
     |  ___________^
 137 | | {var}.table
 138 | | """
     | |___^ S608
-139 |   
+139 |
 140 |   query56 = f"""SELECT *
     |
 
 S608.py:140:11: S608 Possible SQL injection vector through string-based query construction
     |
 138 |   """
-139 |   
+139 |
 140 |   query56 = f"""SELECT *
     |  ___________^
 141 | | FROM {var}.table
 142 | | """
     | |___^ S608
-143 |   
+143 |
 144 |   query57 = f"""
     |
 
 S608.py:144:11: S608 Possible SQL injection vector through string-based query construction
     |
 142 |   """
-143 |   
+143 |
 144 |   query57 = f"""
     |  ___________^
 145 | | SELECT *
 146 | | FROM {var}.table
 147 | | """
     | |___^ S608
-148 |   
+148 |
 149 |   query57 = f"""
+    |
+
+S608.py:160:11: S608 Possible SQL injection vector through string-based query construction
+    |
+159 |   # https://github.com/astral-sh/ruff/issues/15653
+160 |   query59 = f"""
+    |  ___________^
+161 | |     SELECT *, foo
+162 | |     FROM ({user_input}) raw
+163 | | """
+    | |___^ S608
+164 |   query60 = f"""
+165 |       SELECT *,
+    |
+
+S608.py:164:11: S608 Possible SQL injection vector through string-based query construction
+    |
+162 |       FROM ({user_input}) raw
+163 |   """
+164 |   query60 = f"""
+    |  ___________^
+165 | |     SELECT *,
+166 | |         foo
+167 | |     FROM ({user_input}) raw
+168 | | """
+    | |___^ S608
     |

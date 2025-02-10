@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -40,8 +40,8 @@ use crate::importer::ImportRequest;
 ///
 /// ## References
 /// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
-#[violation]
-pub struct LRUCacheWithMaxsizeNone;
+#[derive(ViolationMetadata)]
+pub(crate) struct LRUCacheWithMaxsizeNone;
 
 impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
     #[derive_message_formats]
@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
@@ -101,7 +101,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                         Edit::range_replacement(binding, decorator.expression.range());
                     Ok(Fix::safe_edits(import_edit, [reference_edit]))
                 });
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

@@ -279,7 +279,7 @@ impl<'a> Iterator for SectionContextsIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for SectionContextsIter<'a> {
+impl DoubleEndedIterator for SectionContextsIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let back = self.inner.next_back()?;
         Some(SectionContext {
@@ -526,6 +526,22 @@ fn is_docstring_section(
                 if section_kind.as_str() != verbatim {
                     return false;
                 }
+            }
+
+            // If the section has a preceding empty line, assume it's _not_ a subsection, as in:
+            // ```python
+            // def func(args: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Args:
+            //         args: The arguments to the function.
+            //
+            //     returns:
+            //         The return value of the function.
+            //     """
+            // ```
+            if previous_line.is_some_and(|line| line.trim().is_empty()) {
+                return true;
             }
 
             // If the section isn't underlined, and isn't title-cased, assume it's a subsection,

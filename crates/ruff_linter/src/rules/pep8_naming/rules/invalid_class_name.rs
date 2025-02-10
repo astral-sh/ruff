@@ -1,7 +1,7 @@
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
@@ -35,8 +35,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#class-names
-#[violation]
-pub struct InvalidClassName {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidClassName {
     name: String,
 }
 
@@ -54,7 +54,7 @@ pub(crate) fn invalid_class_name(
     name: &str,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    let stripped = name.strip_prefix('_').unwrap_or(name);
+    let stripped = name.trim_start_matches('_');
     if !stripped.chars().next().is_some_and(char::is_uppercase) || stripped.contains('_') {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) {

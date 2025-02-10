@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
@@ -64,8 +64,8 @@ impl CallKind {
 /// - [Python documentation: `issubclass`](https://docs.python.org/3/library/functions.html#issubclass)
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
-#[violation]
-pub struct NonPEP604Isinstance {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP604Isinstance {
     kind: CallKind,
 }
 
@@ -81,12 +81,7 @@ impl AlwaysFixableViolation for NonPEP604Isinstance {
 }
 
 /// UP038
-pub(crate) fn use_pep604_isinstance(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let Some(types) = args.get(1) else {
         return;
     };
@@ -107,7 +102,7 @@ pub(crate) fn use_pep604_isinstance(
     let Some(kind) = CallKind::from_name(builtin_function_name) else {
         return;
     };
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(NonPEP604Isinstance { kind }, expr.range()).with_fix(Fix::unsafe_edit(
             Edit::range_replacement(
                 checker.generator().expr(&pep_604_union(&tuple.elts)),

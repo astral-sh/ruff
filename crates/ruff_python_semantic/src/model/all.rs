@@ -70,7 +70,7 @@ impl Ranged for DunderAllDefinition<'_> {
     }
 }
 
-impl<'a> SemanticModel<'a> {
+impl SemanticModel<'_> {
     /// Extract the names bound to a given __all__ assignment.
     pub fn extract_dunder_all_names<'expr>(
         &self,

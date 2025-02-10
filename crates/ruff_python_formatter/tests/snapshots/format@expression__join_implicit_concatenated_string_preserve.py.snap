@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_preserve.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -18,6 +17,15 @@ a = "different '" 'quote "are fine"'  # join
 
 # Already invalid Pre Python 312
 f"{'Hy "User"'}" f'{"Hy 'User'"}'
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/15514
+params = {}
+string = "this is my string with " f'"{params.get("mine")}"'
+string = f'"{params.get("mine")} ' f"with {'nested single quoted string'}"
+string = f"{'''inner ' '''}" f'{"""inner " """}'
+string = f"{10 + len('bar')=}" f"{10 + len('bar')=}"
+string = f"{10 + len('bar')=}" f'{10 + len("bar")=}'
 ```
 
 ## Outputs
@@ -31,8 +39,8 @@ line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
-preview                    = Enabled
-target_version             = Py38
+preview                    = Disabled
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -50,6 +58,15 @@ a = "different 'quote \"are fine\""  # join
 
 # Already invalid Pre Python 312
 f"{'Hy "User"'}{"Hy 'User'"}"
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/15514
+params = {}
+string = f"this is my string with \"{params.get('mine')}\""
+string = f'"{params.get("mine")} with {"nested single quoted string"}'
+string = f"{'''inner ' '''}" f'{"""inner " """}'
+string = f"{10 + len('bar')=}{10 + len('bar')=}"
+string = f"{10 + len('bar')=}" f'{10 + len("bar")=}'
 ```
 
 
@@ -63,7 +80,7 @@ line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
-preview                    = Enabled
+preview                    = Disabled
 target_version             = Py312
 source_type                = Python
 ```
@@ -82,4 +99,13 @@ a = "different 'quote \"are fine\""  # join
 
 # Already invalid Pre Python 312
 f"{'Hy "User"'}{"Hy 'User'"}"
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/15514
+params = {}
+string = f"this is my string with \"{params.get("mine")}\""
+string = f'"{params.get("mine")} with {'nested single quoted string'}'
+string = f"{'''inner ' '''}{"""inner " """}"
+string = f"{10 + len('bar')=}{10 + len('bar')=}"
+string = f"{10 + len('bar')=}{10 + len("bar")=}"
 ```

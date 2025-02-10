@@ -3,7 +3,7 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -47,8 +47,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
-#[violation]
-pub struct SortedMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }
 
@@ -79,7 +79,7 @@ impl Violation for SortedMinMax {
 }
 
 /// FURB192
-pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) {
     if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
@@ -201,7 +201,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

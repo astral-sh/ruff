@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_text_size::Ranged;
@@ -77,8 +77,8 @@ use crate::importer::ImportRequest;
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
 
-#[violation]
-pub struct ReplaceStrEnum {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReplaceStrEnum {
     name: String,
 }
 
@@ -97,7 +97,7 @@ impl Violation for ReplaceStrEnum {
 }
 
 /// UP042
-pub(crate) fn replace_str_enum(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
         // class does not inherit anything, exit early
         return;
@@ -154,5 +154,5 @@ pub(crate) fn replace_str_enum(checker: &mut Checker, class_def: &ast::StmtClass
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

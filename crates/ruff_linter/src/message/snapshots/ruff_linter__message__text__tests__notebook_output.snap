@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_linter/src/message/text.rs
 expression: content
-snapshot_kind: text
 ---
 notebook.ipynb:cell 1:2:8: F401 [*] `os` imported but unused
   |
@@ -16,7 +15,7 @@ notebook.ipynb:cell 2:2:8: F401 [*] `math` imported but unused
 1 | # cell 2
 2 | import math
   |        ^^^^ F401
-3 | 
+3 |
 4 | print('hello world')
   |
   = help: Remove unused import: `math`

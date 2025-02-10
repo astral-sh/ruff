@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
@@ -56,8 +56,8 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 ///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-ignorelist`
-#[violation]
-pub struct BuiltinAttributeShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinAttributeShadowing {
     kind: Kind,
     name: String,
     row: SourceRow,
@@ -84,7 +84,6 @@ pub(crate) fn builtin_attribute_shadowing(
     scope_id: ScopeId,
     scope: &Scope,
     class_def: &ast::StmtClassDef,
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (name, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
@@ -136,7 +135,7 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),

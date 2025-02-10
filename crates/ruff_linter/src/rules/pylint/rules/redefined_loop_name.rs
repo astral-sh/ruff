@@ -4,7 +4,7 @@ use regex::Regex;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_semantic::SemanticModel;
@@ -48,8 +48,8 @@ use crate::checkers::ast::Checker;
 ///         f = path2.open()
 ///     print(f.readline())  # prints a line from path2
 /// ```
-#[violation]
-pub struct RedefinedLoopName {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedefinedLoopName {
     name: String,
     outer_kind: OuterBindingKind,
     inner_kind: InnerBindingKind,
@@ -144,7 +144,7 @@ struct InnerForWithAssignTargetsVisitor<'a, 'b> {
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
+impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
         match stmt {
@@ -338,7 +338,7 @@ fn assignment_targets_from_assign_targets<'a>(
 }
 
 /// PLW2901
-pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
@@ -399,5 +399,5 @@ pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
         }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }

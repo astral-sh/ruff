@@ -2,7 +2,7 @@ use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,8 +52,8 @@ use crate::checkers::ast::Checker;
 ///     except Exception:
 ///         logger.error("Oops")
 /// ```
-#[violation]
-pub struct RaiseVanillaClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseVanillaClass;
 
 impl Violation for RaiseVanillaClass {
     #[derive_message_formats]
@@ -63,7 +63,7 @@ impl Violation for RaiseVanillaClass {
 }
 
 /// TRY002
-pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_vanilla_class(checker: &Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(map_callable(expr))
@@ -74,8 +74,6 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
             )
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RaiseVanillaClass, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(RaiseVanillaClass, expr.range()));
     }
 }

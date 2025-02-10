@@ -2,7 +2,7 @@ use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
@@ -43,10 +43,10 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct EndsInPunctuation;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTerminalPunctuation;
 
-impl Violation for EndsInPunctuation {
+impl Violation for MissingTerminalPunctuation {
     /// `None` in the case a fix is never available or otherwise Some
     /// [`FixAvailability`] describing the available fix.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -62,7 +62,7 @@ impl Violation for EndsInPunctuation {
 }
 
 /// D415
-pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {
@@ -105,7 +105,7 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
         }
 
         if !trimmed.ends_with(['.', '!', '?']) {
-            let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());
+            let mut diagnostic = Diagnostic::new(MissingTerminalPunctuation, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -113,7 +113,7 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
                     line.start() + trimmed.text_len(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         };
     }
 }

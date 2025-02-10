@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30.py:798:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -41,7 +40,7 @@ E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition
 E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
 819 |     # another comment
-820 | 
+820 |
 821 | try:
     | ^^^ E305
 822 |     fn()
@@ -80,7 +79,7 @@ E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition
 E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
 844 |     blah, blah
-845 | 
+845 |
 846 | if __name__ == '__main__':
     | ^^ E305
 847 |     main()

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 dict_iter_missing_items.py:13:13: PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
@@ -24,7 +23,7 @@ dict_iter_missing_items.py:13:13: PLE1141 [*] Unpacking a dictionary in iteratio
 dict_iter_missing_items.py:16:13: PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 14 |     pass
-15 | 
+15 |
 16 | for k, v in d_tuple_incorrect_tuple:
    |             ^^^^^^^^^^^^^^^^^^^^^^^ PLE1141
 17 |     pass

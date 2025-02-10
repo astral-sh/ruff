@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -59,8 +59,8 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 ///     return item
 /// ```
 
-#[violation]
-pub struct FastApiRedundantResponseModel;
+#[derive(ViolationMetadata)]
+pub(crate) struct FastApiRedundantResponseModel;
 
 impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     #[derive_message_formats]
@@ -73,11 +73,8 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     }
 }
 
-/// RUF102
-pub(crate) fn fastapi_redundant_response_model(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+/// FAST001
+pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: &StmtFunctionDef) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
@@ -98,7 +95,7 @@ pub(crate) fn fastapi_redundant_response_model(
             )
             .map(Fix::unsafe_edit)
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

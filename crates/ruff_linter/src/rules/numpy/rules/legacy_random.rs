@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -45,8 +45,8 @@ use crate::checkers::ast::Checker;
 /// [Legacy Random Generation]: https://numpy.org/doc/stable/reference/random/legacy.html#legacy
 /// [Random Sampling]: https://numpy.org/doc/stable/reference/random/index.html#random-quick-start
 /// [NEP 19]: https://numpy.org/neps/nep-0019-rng-policy.html
-#[violation]
-pub struct NumpyLegacyRandom {
+#[derive(ViolationMetadata)]
+pub(crate) struct NumpyLegacyRandom {
     method_name: String,
 }
 
@@ -59,7 +59,7 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -137,7 +137,7 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                 }
             })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },

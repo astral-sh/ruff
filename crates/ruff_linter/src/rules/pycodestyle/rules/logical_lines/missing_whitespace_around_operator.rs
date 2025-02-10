@@ -1,11 +1,11 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 
 /// ## What it does
 /// Checks for missing whitespace around all operators.
@@ -28,8 +28,8 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E225
-#[violation]
-pub struct MissingWhitespaceAroundOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
     #[derive_message_formats]
@@ -61,8 +61,8 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E226
-#[violation]
-pub struct MissingWhitespaceAroundArithmeticOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
     #[derive_message_formats]
@@ -94,8 +94,8 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E227
-#[violation]
-pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     #[derive_message_formats]
@@ -127,8 +127,8 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E228
-#[violation]
-pub struct MissingWhitespaceAroundModuloOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundModuloOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
     #[derive_message_formats]
@@ -146,6 +146,7 @@ pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
+    let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
     let first_token = tokens
         .by_ref()
@@ -162,6 +163,8 @@ pub(crate) fn missing_whitespace_around_operator(
     while let Some(token) = tokens.next() {
         let kind = token.kind();
 
+        definition_state.visit_token_kind(kind);
+
         if is_non_logical_token(kind) {
             continue;
         }
@@ -174,8 +177,11 @@ pub(crate) fn missing_whitespace_around_operator(
             _ => {}
         };
 
-        let needs_space = if kind == TokenKind::Equal && (parens > 0 || fstrings > 0) {
+        let needs_space = if kind == TokenKind::Equal
+            && (parens > 0 || fstrings > 0 || definition_state.in_type_params())
+        {
             // Allow keyword args, defaults: foo(bar=None) and f-strings: f'{foo=}'
+            // Also ignore `foo[T=int]`, which is handled by E251.
             NeedsSpace::No
         } else if kind == TokenKind::Slash {
             // Tolerate the "/" operator in function definition

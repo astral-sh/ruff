@@ -1,31 +1,46 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
-DOC202_numpy.py:24:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
+DOC202_numpy.py:16:5: DOC202 Docstring should not have a returns section because the function doesn't return anything
    |
-22 |           A number
-23 |   
-24 | /     Returns
+14 |   # DOC202
+15 |   def foo(num: int) -> str:
+16 | /     """
+17 | |     Do something
+18 | |
+19 | |     Parameters
+20 | |     ----------
+21 | |     num : int
+22 | |         A number
+23 | |
+24 | |     Returns
 25 | |     -------
 26 | |     str
 27 | |         A string
 28 | |     """
-   | |____^ DOC202
+   | |_______^ DOC202
 29 |       print('test')
    |
    = help: Remove the "Returns" section
 
-DOC202_numpy.py:44:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
+DOC202_numpy.py:36:9: DOC202 Docstring should not have a returns section because the function doesn't return anything
    |
-42 |               A number
-43 |   
-44 | /         Returns
+34 |       # DOC202
+35 |       def foo(self) -> str:
+36 | /         """
+37 | |         Do something
+38 | |
+39 | |         Parameters
+40 | |         ----------
+41 | |         num : int
+42 | |             A number
+43 | |
+44 | |         Returns
 45 | |         -------
 46 | |         str
 47 | |             A string
 48 | |         """
-   | |________^ DOC202
+   | |___________^ DOC202
 49 |           print('test')
    |
    = help: Remove the "Returns" section
