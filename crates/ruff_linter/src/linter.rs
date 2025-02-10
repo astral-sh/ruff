@@ -300,7 +300,7 @@ pub fn check_path(
         diagnostics.extend(
             parsed
                 .syntax_errors(settings.target_version.into())
-                .flat_map(|error| try_diagnostic_from_syntax_error(error, &settings.rules)),
+                .filter_map(|error| try_diagnostic_from_syntax_error(error, &settings.rules)),
         );
 
         // Remove fixes for any rules marked as unfixable.
