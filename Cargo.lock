@@ -2752,6 +2752,7 @@ dependencies = [
  "countme",
  "dashmap 6.1.0",
  "dunce",
+ "etcetera",
  "filetime",
  "glob",
  "ignore",
