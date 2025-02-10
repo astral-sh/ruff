@@ -263,7 +263,7 @@ export default function Editor({
                   id="diagnostics"
                   minSize={3}
                   order={1}
-                  className="my-2 flex flex-grow"
+                  className="my-2 flex grow"
                 >
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}

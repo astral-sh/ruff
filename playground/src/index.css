@@ -1,6 +1,71 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-ayu-accent: #ffac2f;
+
+  --color-ayu-background: #f8f9fa;
+  --color-ayu-background-dark: #0b0e14;
+
+  --color-black: #261230;
+  --color-white: #ffffff;
+  --color-radiate: #d7ff64;
+  --color-flare: #6340ac;
+  --color-rock: #78876e;
+  --color-galaxy: #261230;
+  --color-space: #30173d;
+  --color-comet: #6f5d6f;
+  --color-cosmic: #de5fe9;
+  --color-sun: #ffac2f;
+  --color-electron: #46ebe1;
+  --color-aurora: #46eb74;
+  --color-constellation: #5f6de9;
+  --color-neutron: #cff3cf;
+  --color-proton: #f6afbc;
+  --color-nebula: #cdcbfb;
+  --color-supernova: #f1aff6;
+  --color-starlight: #f4f4f1;
+  --color-lunar: #fbf2fc;
+  --color-asteroid: #e3cee3;
+  --color-crater: #f0dfdf;
+
+  --font-heading:
+    Alliance Platt, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, monospace, Apple Color Emoji, Segoe UI Emoji;
+  --font-body:
+    Alliance Text, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    sans-serif, Apple Color Emoji, Segoe UI Emoji;
+  --font-mono: Roboto Mono;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 * {
   box-sizing: border-box;
@@ -17,8 +82,8 @@ html,
 }
 
 .shadow-copied {
-  --tw-shadow: 0 0 0 1px theme("colors.white"),
-    inset 0 0 0 1px theme("colors.white");
+  --tw-shadow: 0 0 0 1px var(--color-white),
+    inset 0 0 0 1px var(--color-white);
   --tw-shadow-colored: 0 0 0 1px var(--tw-shadow-color),
     inset 0 0 0 1px var(--tw-shadow-color);
 
