@@ -297,6 +297,12 @@ pub fn check_path(
     }
 
     if parsed.is_valid() {
+        diagnostics.extend(
+            parsed
+                .syntax_errors(settings.target_version.into())
+                .flat_map(try_diagnostic_from_syntax_error),
+        );
+
         // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
             if !settings.rules.should_fix(diagnostic.kind.rule()) {
@@ -323,6 +329,16 @@ pub fn check_path(
     }
 
     diagnostics
+}
+
+fn try_diagnostic_from_syntax_error(syntax_error: &SyntaxError) -> Option<Diagnostic> {
+    match syntax_error.kind {
+        ruff_python_parser::SyntaxErrorKind::LateFutureImport => Some(Diagnostic::new(
+            crate::rules::pyflakes::rules::LateFutureImport,
+            syntax_error.range,
+        )),
+        _ => None,
+    }
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -467,7 +483,13 @@ fn diagnostics_to_messages<'a>(
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
         .chain(syntax_errors.map(|syntax_error| {
-            Message::from_syntax_error(syntax_error, file.deref().clone(), target_version)
+            let noqa_offset = directives.noqa_line_for.resolve(syntax_error.range.start());
+            Message::from_syntax_error(
+                syntax_error,
+                file.deref().clone(),
+                target_version,
+                noqa_offset,
+            )
         }))
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
