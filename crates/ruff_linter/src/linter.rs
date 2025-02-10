@@ -298,6 +298,10 @@ pub fn check_path(
     }
 
     if parsed.is_valid() {
+        // TODO(brent) I think this might cause duplicates when calling `diagnostics_to_messages`
+        // because that function chains `syntax_errors` with `diagnostics` after we've added some
+        // `syntax_errors` directly into `diagnostics` here. maybe `Message`s get deduplicated and
+        // it doesn't matter? this does not appear to be the case, though.
         diagnostics.extend(
             parsed
                 .syntax_errors(settings.target_version.into())
