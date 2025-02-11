@@ -39,8 +39,9 @@ pub(crate) struct Expression<'db> {
     pub(crate) file_scope: FileScopeId,
 
     /// The expression node.
-    #[return_ref]
+    #[no_eq]
     #[tracked]
+    #[return_ref]
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
     /// Should this expression be inferred as a normal expression or a type expression?

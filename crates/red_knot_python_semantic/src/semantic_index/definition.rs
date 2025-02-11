@@ -432,6 +432,13 @@ impl DefinitionCategory {
     }
 }
 
+/// The kind of a definition.
+///
+/// ## Usage in salsa tracked structs
+///
+/// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
+/// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
+/// for an in-depth explanation of why this is necessary.
 #[derive(Clone, Debug, Hash)]
 pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
