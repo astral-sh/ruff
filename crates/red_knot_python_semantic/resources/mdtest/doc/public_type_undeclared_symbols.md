@@ -97,9 +97,12 @@ reveal_type(OptionalInt.value)
 
 ## What is meant by 'public' type?
 
-We refer to the 'public' type of a symbol if we assign a type to the *use* of a symbol from another
-scope. *Within* the same scope, we use a narrower type of `T_inferred` for undeclared symbols, as
-there is no way that the symbol could have been reassigned. For example:
+We apply different semantics depending on whether a symbol is accessed from the same scope in which
+it was originally defined, or whether it is accessed from an external scope. External scopes will
+see the symbol's "public type", which has been discussed above. But within the same scope the symbol
+was defined in, we use a narrower type of `T_inferred` for undeclared symbols. This is because, from
+the perspective of this scope, there is no way that the value of the symbol could have been
+reassigned from external scopes. For example:
 
 ```py
 class Wrapper:
