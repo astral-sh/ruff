@@ -123,7 +123,6 @@ def _():
     def f():
         # revealed: Unknown | Literal[2]
         [reveal_type(x) for a in range(0)]
-
     x = 2
 ```
 
@@ -158,7 +157,6 @@ def _():
         def g():
             # revealed: Unknown | Literal[2]
             reveal_type(x)
-
     x = 2
 ```
 
