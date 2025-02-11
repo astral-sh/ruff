@@ -231,7 +231,7 @@ fn run_test(
                 })
                 .collect();
 
-            let (type_diagnostics, syntax_diagnostics) = match catch_unwind(|| {
+            let (type_diagnostics, _syntax_diagnostics) = match catch_unwind(|| {
                 check_types(db, test_file.file)
             }) {
                 Ok(type_diagnostics) => type_diagnostics,
@@ -262,11 +262,6 @@ fn run_test(
             };
             diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
                 let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new((*diagnostic).clone());
-                diagnostic
-            }));
-
-            diagnostics.extend(syntax_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
                 diagnostic
             }));
 
