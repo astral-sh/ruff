@@ -8,6 +8,7 @@ use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
+use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashSet;
 
 impl ProjectDatabase {
@@ -47,7 +48,7 @@ impl ProjectDatabase {
             if let Some(path) = change.system_path() {
                 if matches!(
                     path.file_name(),
-                    Some(".gitignore" | ".ignore" | "ruff.toml" | ".ruff.toml" | "pyproject.toml")
+                    Some(".gitignore" | ".ignore" | "knot.toml" | "pyproject.toml")
                 ) {
                     // Changes to ignore files or settings can change the project structure or add/remove files.
                     project_changed = true;
@@ -144,6 +145,12 @@ impl ProjectDatabase {
                         metadata.apply_cli_options(cli_options.clone());
                     }
 
+                    if let Err(error) = metadata.apply_configuration_files(self.system()) {
+                        tracing::error!(
+                            "Failed to apply configuration files, continuing without applying them: {error}"
+                        );
+                    }
+
                     let program_settings = metadata.to_program_settings(self.system());
 
                     let program = Program::get(self);
@@ -201,9 +208,16 @@ impl ProjectDatabase {
                         return WalkState::Continue;
                     }
 
-                    let mut paths = added_paths.lock().unwrap();
+                    if entry
+                        .path()
+                        .extension()
+                        .and_then(PySourceType::try_from_extension)
+                        .is_some()
+                    {
+                        let mut paths = added_paths.lock().unwrap();
 
-                    paths.push(entry.into_path());
+                        paths.push(entry.into_path());
+                    }
 
                     WalkState::Continue
                 })

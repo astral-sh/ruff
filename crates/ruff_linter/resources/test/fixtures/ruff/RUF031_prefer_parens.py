@@ -42,3 +42,7 @@ import typing
 type Y = typing.Literal[1, 2]
 Z: typing.TypeAlias = dict[int, int]
 class Foo(dict[str, int]): pass
+
+# Skip tuples of length one that are single-starred expressions
+# https://github.com/astral-sh/ruff/issues/16077
+d[*x]

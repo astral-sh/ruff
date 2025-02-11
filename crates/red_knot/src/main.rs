@@ -22,7 +22,6 @@ use salsa::plumbing::ZalsaDatabase;
 mod args;
 mod logging;
 mod python_version;
-mod verbosity;
 mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
@@ -99,10 +98,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let exit_zero = args.exit_zero;
 
     let cli_options = args.into_options();
-    let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
-    workspace_metadata.apply_cli_options(cli_options.clone());
+    let mut project_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
+    project_metadata.apply_cli_options(cli_options.clone());
+    project_metadata.apply_configuration_files(&system)?;
 
-    let mut db = ProjectDatabase::new(workspace_metadata, system)?;
+    let mut db = ProjectDatabase::new(project_metadata, system)?;
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 

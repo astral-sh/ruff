@@ -61,7 +61,6 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
-use crate::types::statistics::TypeStatistics;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -117,7 +116,9 @@ fn infer_definition_types_cycle_recovery<'db>(
     let mut inference = TypeInference::empty(input.scope(db));
     let category = input.category(db);
     if category.is_declaration() {
-        inference.declarations.insert(input, Type::unknown().into());
+        inference
+            .declarations
+            .insert(input, TypeAndQualifiers::unknown());
     }
     if category.is_binding() {
         inference.bindings.insert(input, Type::unknown());
@@ -237,7 +238,7 @@ impl<'db> InferenceRegion<'db> {
 }
 
 /// The inferred types for a single region.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
@@ -299,14 +300,6 @@ impl<'db> TypeInference<'db> {
         self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
-    }
-
-    pub(super) fn statistics(&self) -> TypeStatistics {
-        let mut statistics = TypeStatistics::default();
-        for ty in self.expressions.values() {
-            statistics.increment(*ty);
-        }
-        statistics
     }
 }
 
@@ -928,7 +921,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     inferred_ty.display(self.db())
                 ),
             );
-            Type::unknown().into()
+            TypeAndQualifiers::unknown()
         };
         self.types.declarations.insert(declaration, ty);
     }
@@ -3478,19 +3471,17 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let value_ty = self.infer_expression(value);
         match value_ty.member(self.db(), &attr.id) {
-            Symbol::Type(member_ty, boundness) => {
-                if boundness == Boundness::PossiblyUnbound {
-                    self.context.report_lint(
-                        &POSSIBLY_UNBOUND_ATTRIBUTE,
-                        attribute.into(),
-                        format_args!(
-                            "Attribute `{}` on type `{}` is possibly unbound",
-                            attr.id,
-                            value_ty.display(self.db()),
-                        ),
-                    );
-                }
-
+            Symbol::Type(member_ty, Boundness::Bound) => member_ty,
+            Symbol::Type(member_ty, Boundness::PossiblyUnbound) => {
+                self.context.report_lint(
+                    &POSSIBLY_UNBOUND_ATTRIBUTE,
+                    attribute.into(),
+                    format_args!(
+                        "Attribute `{}` on type `{}` is possibly unbound",
+                        attr.id,
+                        value_ty.display(self.db()),
+                    ),
+                );
                 member_ty
             }
             Symbol::Unbound => {
@@ -4884,7 +4875,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     bytes.into(),
                     format_args!("Type expressions cannot use bytes literal"),
                 );
-                Type::unknown().into()
+                TypeAndQualifiers::unknown()
             }
 
             ast::Expr::FString(fstring) => {
@@ -4894,7 +4885,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Type expressions cannot use f-strings"),
                 );
                 self.infer_fstring_expression(fstring);
-                Type::unknown().into()
+                TypeAndQualifiers::unknown()
             }
 
             ast::Expr::Name(name) => match name.ctx {
@@ -4915,7 +4906,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .into(),
                     }
                 }
-                ast::ExprContext::Invalid => Type::unknown().into(),
+                ast::ExprContext::Invalid => TypeAndQualifiers::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!().into(),
             },
 
@@ -4953,7 +4944,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 inner_annotation_ty
                             } else {
                                 self.infer_type_expression(slice);
-                                Type::unknown().into()
+                                TypeAndQualifiers::unknown()
                             }
                         } else {
                             report_invalid_arguments_to_annotated(
@@ -5022,7 +5013,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     DeferredExpressionState::InStringAnnotation,
                 )
             }
-            None => Type::unknown().into(),
+            None => TypeAndQualifiers::unknown(),
         }
     }
 }
@@ -6463,6 +6454,7 @@ mod tests {
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
+
         assert_function_query_was_not_run(
             &db,
             infer_expression_types,

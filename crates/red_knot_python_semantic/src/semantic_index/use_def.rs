@@ -278,7 +278,7 @@ mod symbol_state;
 type AllConstraints<'db> = IndexVec<ScopedConstraintId, Constraint<'db>>;
 
 /// Applicable definitions and constraints for every use of a name.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
     /// this represents the implicit "unbound"/"undeclared" definition of every symbol.
@@ -410,7 +410,7 @@ type EagerNestedScopeBindingsMap =
     FxHashMap<(ScopedEagerNestedScopeId, ScopedSymbolId), SymbolBindings>;
 
 /// Either live bindings or live declarations for a symbol.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 enum SymbolDefinitions {
     Bindings(SymbolBindings),
     Declarations(SymbolDeclarations),

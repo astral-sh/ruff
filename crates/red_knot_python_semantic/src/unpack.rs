@@ -28,16 +28,15 @@ use crate::Db;
 /// * an argument of a cross-module query
 #[salsa::tracked]
 pub(crate) struct Unpack<'db> {
-    #[id]
     pub(crate) file: File,
 
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
     /// expression is `(a, b)`.
     #[no_eq]
     #[return_ref]
+    #[tracked]
     pub(crate) target: AstNodeRef<ast::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
@@ -45,7 +44,6 @@ pub(crate) struct Unpack<'db> {
     #[no_eq]
     pub(crate) value: UnpackValue<'db>,
 
-    #[no_eq]
     count: countme::Count<Unpack<'static>>,
 }
 
@@ -62,7 +60,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub(crate) enum UnpackValue<'db> {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable(Expression<'db>),

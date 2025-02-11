@@ -229,8 +229,14 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Box<dyn Diagnostic>]) {
         .map(|diagnostic| {
             (
                 diagnostic.id(),
-                diagnostic.file().map(|file| file.path(db).as_str()),
-                diagnostic.range().map(Range::<usize>::from),
+                diagnostic
+                    .span()
+                    .map(|span| span.file())
+                    .map(|file| file.path(db).as_str()),
+                diagnostic
+                    .span()
+                    .and_then(|span| span.range())
+                    .map(Range::<usize>::from),
                 diagnostic.message(),
                 diagnostic.severity(),
             )

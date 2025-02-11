@@ -25,7 +25,7 @@ use crate::Db;
 ///
 /// x = foo()
 /// ```
-#[derive(Debug)]
+#[derive(Debug, salsa::Update)]
 pub(crate) struct AstIds {
     /// Maps expressions to their expression id.
     expressions: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
@@ -226,6 +226,7 @@ impl From<EagerNestedScopeRef<'_>> for EagerNestedScopeNodeKey {
 
 /// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
+#[derive(salsa::Update)]
 pub struct ScopedExpressionId;
 
 pub trait HasScopedExpressionId {
@@ -347,7 +348,7 @@ pub(crate) mod node_key {
 
     use crate::node_key::NodeKey;
 
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {

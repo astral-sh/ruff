@@ -8,14 +8,13 @@ pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::{FileType, SystemPath};
 use ruff_python_ast::PySourceType;
-use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::Durability;
 use salsa::Setter;
@@ -345,7 +344,13 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         boxed
     }));
 
-    diagnostics.sort_unstable_by_key(|diagnostic| diagnostic.range().unwrap_or_default().start());
+    diagnostics.sort_unstable_by_key(|diagnostic| {
+        diagnostic
+            .span()
+            .and_then(|span| span.range())
+            .unwrap_or_default()
+            .start()
+    });
 
     diagnostics
 }
@@ -458,12 +463,8 @@ impl Diagnostic for IOErrorDiagnostic {
         self.error.to_string().into()
     }
 
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        None
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file))
     }
 
     fn severity(&self) -> Severity {

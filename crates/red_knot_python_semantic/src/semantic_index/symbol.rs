@@ -98,18 +98,16 @@ impl From<FileSymbolId> for ScopedSymbolId {
 
 /// Symbol ID that uniquely identifies a symbol inside a [`Scope`].
 #[newtype_index]
+#[derive(salsa::Update)]
 pub struct ScopedSymbolId;
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
 pub struct ScopeId<'db> {
-    #[id]
     pub file: File,
 
-    #[id]
     pub file_scope_id: FileScopeId,
 
-    #[no_eq]
     count: countme::Count<ScopeId<'static>>,
 }
 
@@ -207,6 +205,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
+#[derive(salsa::Update)]
 pub struct FileScopeId;
 
 impl FileScopeId {
@@ -225,7 +224,7 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, salsa::Update)]
 pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
@@ -278,7 +277,7 @@ pub enum ScopeKind {
 }
 
 /// Symbol table for a specific [`Scope`].
-#[derive(Debug, Default)]
+#[derive(Debug, Default, salsa::Update)]
 pub struct SymbolTable {
     /// The symbols in this scope.
     symbols: IndexVec<ScopedSymbolId, Symbol>,
@@ -494,7 +493,7 @@ impl NodeWithScopeRef<'_> {
 }
 
 /// Node that introduces a new scope.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, salsa::Update)]
 pub enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),

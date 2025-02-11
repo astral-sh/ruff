@@ -329,7 +329,7 @@ fn union<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type
 
 mod stable {
     use super::union;
-    use crate::types::{KnownClass, Type};
+    use crate::types::Type;
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
@@ -419,13 +419,13 @@ mod stable {
     // All types should be assignable to `object`
     type_property_test!(
         all_types_assignable_to_object, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Object.to_instance(db))
+        forall types t. t.is_assignable_to(db, Type::object(db))
     );
 
     // And for fully static types, they should also be subtypes of `object`
     type_property_test!(
         all_fully_static_types_subtype_of_object, db,
-        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, KnownClass::Object.to_instance(db))
+        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, Type::object(db))
     );
 
     // Never should be assignable to every type

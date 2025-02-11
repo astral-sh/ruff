@@ -164,19 +164,11 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     fn message(&self) -> Cow<str>;
 
-    /// The file this diagnostic is associated with.
-    ///
-    /// File can be `None` for diagnostics that don't originate from a file.
-    /// For example:
-    /// * A diagnostic indicating that a directory couldn't be read.
-    /// * A diagnostic related to a CLI argument
-    fn file(&self) -> Option<File>;
-
-    /// The primary range of the diagnostic in `file`.
+    /// The primary span of the diagnostic.
     ///
     /// The range can be `None` if the diagnostic doesn't have a file
     /// or it applies to the entire file (e.g. the file should be executable but isn't).
-    fn range(&self) -> Option<TextRange>;
+    fn span(&self) -> Option<Span>;
 
     fn severity(&self) -> Severity;
 
@@ -188,6 +180,47 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
             db,
             diagnostic: self,
         }
+    }
+}
+
+/// A span represents the source of a diagnostic.
+///
+/// It consists of a `File` and an optional range into that file. When the
+/// range isn't present, it semantically implies that the diagnostic refers to
+/// the entire file. For example, when the file should be executable but isn't.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Span {
+    file: File,
+    range: Option<TextRange>,
+}
+
+impl Span {
+    /// Returns the `File` attached to this `Span`.
+    pub fn file(&self) -> File {
+        self.file
+    }
+
+    /// Returns the range, if available, attached to this `Span`.
+    ///
+    /// When there is no range, it is convention to assume that this `Span`
+    /// refers to the corresponding `File` as a whole. In some cases, consumers
+    /// of this API may use the range `0..0` to represent this case.
+    pub fn range(&self) -> Option<TextRange> {
+        self.range
+    }
+
+    /// Returns a new `Span` with the given `range` attached to it.
+    pub fn with_range(self, range: TextRange) -> Span {
+        Span {
+            range: Some(range),
+            ..self
+        }
+    }
+}
+
+impl From<File> for Span {
+    fn from(file: File) -> Span {
+        Span { file, range: None }
     }
 }
 
@@ -236,8 +269,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             let rendered = renderer.render(message);
             writeln!(f, "{rendered}")
         };
-        match (self.diagnostic.file(), self.diagnostic.range()) {
-            (None, _) => {
+        match self.diagnostic.span() {
+            None => {
                 // NOTE: This is pretty sub-optimal. It doesn't render well. We
                 // really want a snippet, but without a `File`, we can't really
                 // render anything. It looks like this case currently happens
@@ -248,20 +281,20 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 let msg = format!("{}: {}", self.diagnostic.id(), self.diagnostic.message());
                 render(f, level.title(&msg))
             }
-            (Some(file), range) => {
-                let path = file.path(self.db).to_string();
-                let source = source_text(self.db, file);
+            Some(span) => {
+                let path = span.file.path(self.db).to_string();
+                let source = source_text(self.db, span.file);
                 let title = self.diagnostic.id().to_string();
                 let message = self.diagnostic.message();
 
-                let Some(range) = range else {
+                let Some(range) = span.range else {
                     let snippet = Snippet::source(source.as_str()).origin(&path).line_start(1);
                     return render(f, level.title(&title).snippet(snippet));
                 };
 
                 // The bits below are a simplified copy from
                 // `crates/ruff_linter/src/message/text.rs`.
-                let index = line_index(self.db, file);
+                let index = line_index(self.db, span.file);
                 let source_code = SourceCode::new(source.as_str(), &index);
 
                 let content_start_index = source_code.line_index(range.start());
@@ -315,12 +348,8 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -340,12 +369,8 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -362,12 +387,8 @@ impl Diagnostic for Box<dyn Diagnostic> {
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -384,12 +405,8 @@ impl Diagnostic for &'_ dyn Diagnostic {
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -406,12 +423,8 @@ impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -440,12 +453,8 @@ impl Diagnostic for ParseDiagnostic {
         self.error.error.to_string().into()
     }
 
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        Some(self.error.location)
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file).with_range(self.error.location))
     }
 
     fn severity(&self) -> Severity {

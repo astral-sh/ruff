@@ -133,7 +133,7 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct SearchPaths {
+pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
     static_paths: Vec<SearchPath>,

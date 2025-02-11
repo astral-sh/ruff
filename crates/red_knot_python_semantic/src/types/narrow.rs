@@ -152,13 +152,13 @@ fn merge_constraints_or<'db>(
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
             }
             Entry::Vacant(entry) => {
-                entry.insert(KnownClass::Object.to_instance(db));
+                entry.insert(Type::object(db));
             }
         }
     }
     for (key, value) in into.iter_mut() {
         if !from.contains_key(key) {
-            *value = KnownClass::Object.to_instance(db);
+            *value = Type::object(db);
         }
     }
 }
@@ -231,10 +231,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         match pattern.kind(self.db) {
             PatternConstraintKind::Singleton(singleton, _guard) => {
-                self.evaluate_match_pattern_singleton(*subject, *singleton)
+                self.evaluate_match_pattern_singleton(subject, *singleton)
             }
             PatternConstraintKind::Class(cls, _guard) => {
-                self.evaluate_match_pattern_class(*subject, *cls)
+                self.evaluate_match_pattern_class(subject, *cls)
             }
             // TODO: support more pattern kinds
             PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,
