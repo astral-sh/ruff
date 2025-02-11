@@ -114,6 +114,7 @@ impl SyntaxChecker {
     }
 
     pub fn enter_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
+        // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_docstring_boundary && value.is_string_literal_expr() =>
@@ -123,14 +124,9 @@ impl SyntaxChecker {
             Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
                 self.seen_docstring_boundary = true;
                 // Allow __future__ imports until we see a non-__future__ import.
-                if let Some("__future__") = module.as_deref() {
-                } else {
+                if !matches!(module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }
-            }
-            Stmt::Import(_) => {
-                self.seen_docstring_boundary = true;
-                self.seen_futures_boundary = true;
             }
             _ => {
                 self.seen_docstring_boundary = true;
@@ -138,6 +134,7 @@ impl SyntaxChecker {
             }
         }
 
+        // check for errors
         self.check(stmt);
     }
 }
