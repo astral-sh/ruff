@@ -100,7 +100,12 @@ c_instance.declared_and_bound = 1
 #### Variable declared in class body and not bound anywhere
 
 If a variable is declared in the class body but not bound anywhere, we still consider it a pure
-instance variable and allow access to it via instances.
+instance variable and allow access to it via instances. But we raise a diagnostic if it is accessed
+on the class itself. The only exceptions to this rules are:
+
+- Stubs - e.g. stubs for extension modules define many attributes that are not bound anywhere.
+- ClassVars defined on ABC's - this is a typical pattern in Python, with actual binding only
+    happening in subclasses.
 
 ```py
 class C:
@@ -115,6 +120,43 @@ reveal_type(C.only_declared)  # revealed: Unknown
 
 # TODO: mypy and pyright do not show an error here, but we plan to emit one.
 C.only_declared = "overwritten on class"
+```
+
+Stubs:
+
+```pyi
+class C:
+    only_declared: str
+
+reveal_type(C.only_declared)  # revealed: str
+```
+
+ClassVars on ABC's:
+
+```py
+from abc import ABC, ABCMeta
+from typing import ClassVar
+
+class MyABC(ABC):
+    non_class_var: str
+    class_var: ClassVar[str]
+
+# error: [unresolved-attribute] "Type `Literal[MyABC]` has no attribute `non_class_var`"
+reveal_type(MyABC.non_class_var)  # revealed: Unknown
+
+reveal_type(MyABC.class_var)  # revealed: str
+
+# TODO: this should raise, since MyABC is a ClassLiteral, not SubclassOf
+MyABC.class_var = "overwritten on class"
+
+class MyABCWithMeta(metaclass=ABCMeta):
+    non_class_var: str
+    class_var: ClassVar[str]
+
+# error: [unresolved-attribute] "Type `Literal[MyABCWithMeta]` has no attribute `non_class_var`"
+reveal_type(MyABCWithMeta.non_class_var)  # revealed: Unknown
+
+reveal_type(MyABCWithMeta.class_var)  # revealed: str
 ```
 
 #### Mixed declarations/bindings in class body and `__init__`
