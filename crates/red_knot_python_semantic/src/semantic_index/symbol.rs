@@ -158,20 +158,18 @@ impl<'db> ScopeId<'db> {
         outer_scope: ScopeId,
     ) -> Option<ScopedEagerNestedScopeId> {
         match self.node(db) {
-            NodeWithScopeKind::Class(class) => {
-                Some(class.scoped_eager_nested_scope_id(db, outer_scope))
-            }
+            NodeWithScopeKind::Class(class) => class.scoped_eager_nested_scope_id(db, outer_scope),
             NodeWithScopeKind::ListComprehension(list_comp) => {
-                Some(list_comp.scoped_eager_nested_scope_id(db, outer_scope))
+                list_comp.scoped_eager_nested_scope_id(db, outer_scope)
             }
             NodeWithScopeKind::GeneratorExpression(generator) => {
-                Some(generator.scoped_eager_nested_scope_id(db, outer_scope))
+                generator.scoped_eager_nested_scope_id(db, outer_scope)
             }
             NodeWithScopeKind::SetComprehension(set_comp) => {
-                Some(set_comp.scoped_eager_nested_scope_id(db, outer_scope))
+                set_comp.scoped_eager_nested_scope_id(db, outer_scope)
             }
             NodeWithScopeKind::DictComprehension(dict_comp) => {
-                Some(dict_comp.scoped_eager_nested_scope_id(db, outer_scope))
+                dict_comp.scoped_eager_nested_scope_id(db, outer_scope)
             }
             NodeWithScopeKind::ClassTypeParameters(_)
             | NodeWithScopeKind::Function(_)

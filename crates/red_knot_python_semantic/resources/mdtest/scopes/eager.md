@@ -42,9 +42,10 @@ def foo():
         reveal_type(x)  # revealed: int
         def bar():
             # error: [possibly-unresolved-reference]
-            # revealed: int
+            # revealed: Unknown | int
             [reveal_type(x) for _ in IntIterable()]
 
+    # error: [possibly-unresolved-reference]
     reveal_type(x)  # revealed: int
 ```
 

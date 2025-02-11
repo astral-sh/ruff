@@ -402,7 +402,8 @@ impl<'db> UseDefMap<'db> {
 /// Mapping of `{key: value}` in which:
 /// - The key is an `(x, y)` tuple:
 ///   - The element `x` identifies an eager nested scope
-///   - The element `y` identifies a symbol referenced in that nested scope
+///   - The element `y` identifies the ID in an enclosing scope of a symbol referenced in that
+///     nested scope
 /// - The value represents the bindings of the symbol `y` in `x`'s outer scope
 ///   available at the point in the control flow where the eager nested scope `x` is defined.
 type EagerNestedScopeBindingsMap =

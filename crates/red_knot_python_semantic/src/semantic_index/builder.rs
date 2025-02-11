@@ -221,35 +221,31 @@ impl<'db> SemanticIndexBuilder<'db> {
         let popped_scope = &mut scopes[popped_scope_id];
         popped_scope.extend_descendents(children_end);
 
-        // We might have just popped the root scope off the stack, so this might be an empty stack!
-        if let Some(ScopeInfo {
-            file_scope_id: outer_scope,
-            ..
-        }) = self.scope_stack.last().copied()
-        {
-            let mut use_def_maps = std::mem::take(&mut self.use_def_maps);
-            let current_use_def_map = &mut use_def_maps[outer_scope];
-
-            if let Some(eager_nested_scope) = popped_scope.node().as_eager_nested_scope() {
-                let eager_nested_scope_id = self
-                    .current_ast_ids()
-                    .record_eager_nested_scope(eager_nested_scope);
-
-                for symbol in self.symbol_tables[popped_scope_id].symbols() {
-                    let current_symbol_table = &self.symbol_tables[outer_scope];
-                    if let Some(symbol_id) = current_symbol_table.symbol_id_by_name(symbol.name()) {
-                        let symbol = current_symbol_table.symbol(symbol_id);
-                        if symbol.is_bound() || symbol.is_declared() {
-                            current_use_def_map.snapshot_symbol_state_for_eager_nested_scope(
+        // If the scope that we just popped off is an eager scope, we need to "lock" our view of
+        // which bindings and/or declarations reach each of the uses in the scope.
+        if let Some(eager_nested_scope) = popped_scope.node().as_eager_nested_scope() {
+            for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
+                // Loop through each enclosing scope, looking for the innermost one that binds or
+                // declares the symbol.
+                for enclosing_scope_info in self.scope_stack.iter().rev() {
+                    let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+                    let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+                    if let Some(enclosing_symbol_id) =
+                        enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
+                    {
+                        let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                        if enclosing_symbol.is_bound() || enclosing_symbol.is_declared() {
+                            let eager_nested_scope_id = self.ast_ids[enclosing_scope_id]
+                                .record_eager_nested_scope(eager_nested_scope);
+                            let enclosing_use_def_map = &mut self.use_def_maps[enclosing_scope_id];
+                            enclosing_use_def_map.snapshot_symbol_state_for_eager_nested_scope(
                                 eager_nested_scope_id,
-                                symbol_id,
+                                enclosing_symbol_id,
                             );
                         }
                     }
                 }
             }
-
-            self.use_def_maps = use_def_maps;
         }
 
         self.scopes = scopes;

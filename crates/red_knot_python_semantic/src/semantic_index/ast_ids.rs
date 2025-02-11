@@ -49,8 +49,11 @@ impl AstIds {
     }
 
     #[track_caller]
-    fn eager_nested_scope_id(&self, key: EagerNestedScopeNodeKey) -> ScopedEagerNestedScopeId {
-        self.eager_nested_scopes[&key]
+    fn eager_nested_scope_id(
+        &self,
+        key: EagerNestedScopeNodeKey,
+    ) -> Option<ScopedEagerNestedScopeId> {
+        self.eager_nested_scopes.get(&key).copied()
     }
 }
 
@@ -94,7 +97,7 @@ pub(super) trait HasScopedEagerNestedScopeId {
         &self,
         db: &dyn Db,
         outer_scope: ScopeId,
-    ) -> ScopedEagerNestedScopeId;
+    ) -> Option<ScopedEagerNestedScopeId>;
 }
 
 // A list comprehension executes its nested scope eagerly;
@@ -105,7 +108,7 @@ impl HasScopedEagerNestedScopeId for ast::ExprListComp {
         &self,
         db: &dyn Db,
         outer_scope: ScopeId,
-    ) -> ScopedEagerNestedScopeId {
+    ) -> Option<ScopedEagerNestedScopeId> {
         ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
     }
 }
@@ -118,7 +121,7 @@ impl HasScopedEagerNestedScopeId for ast::ExprDictComp {
         &self,
         db: &dyn Db,
         outer_scope: ScopeId,
-    ) -> ScopedEagerNestedScopeId {
+    ) -> Option<ScopedEagerNestedScopeId> {
         ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
     }
 }
@@ -131,7 +134,7 @@ impl HasScopedEagerNestedScopeId for ast::ExprSetComp {
         &self,
         db: &dyn Db,
         outer_scope: ScopeId,
-    ) -> ScopedEagerNestedScopeId {
+    ) -> Option<ScopedEagerNestedScopeId> {
         ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
     }
 }
@@ -151,7 +154,7 @@ impl HasScopedEagerNestedScopeId for ast::ExprGenerator {
         &self,
         db: &dyn Db,
         outer_scope: ScopeId,
-    ) -> ScopedEagerNestedScopeId {
+    ) -> Option<ScopedEagerNestedScopeId> {
         ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
     }
 }
@@ -162,7 +165,7 @@ impl HasScopedEagerNestedScopeId for ast::StmtClassDef {
         &self,
         db: &dyn Db,
         outer_scope: ScopeId,
-    ) -> ScopedEagerNestedScopeId {
+    ) -> Option<ScopedEagerNestedScopeId> {
         ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
     }
 }
@@ -319,11 +322,10 @@ impl AstIdsBuilder {
         node: impl Into<EagerNestedScopeNodeKey>,
     ) -> ScopedEagerNestedScopeId {
         let nested_scope_id = self.eager_nested_scopes.len().into();
-
-        self.eager_nested_scopes
-            .insert(node.into(), nested_scope_id);
-
-        nested_scope_id
+        *self
+            .eager_nested_scopes
+            .entry(node.into())
+            .or_insert(nested_scope_id)
     }
 
     pub(super) fn finish(mut self) -> AstIds {
