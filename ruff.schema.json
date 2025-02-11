@@ -1005,8 +1005,19 @@
       "description": "Options for the `flake8-builtins` plugin.",
       "type": "object",
       "properties": {
+        "allowed-modules": {
+          "description": "List of builtin module names to allow.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "builtins-allowed-modules": {
           "description": "List of builtin module names to allow.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1017,6 +1028,7 @@
         },
         "builtins-ignorelist": {
           "description": "Ignore list of builtins.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1026,6 +1038,24 @@
           }
         },
         "builtins-strict-checking": {
+          "description": "Compare module names instead of full module paths.",
+          "deprecated": true,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ignorelist": {
+          "description": "Ignore list of builtins.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "strict-checking": {
           "description": "Compare module names instead of full module paths.",
           "type": [
             "boolean",
