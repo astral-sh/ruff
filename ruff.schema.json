@@ -1015,8 +1015,19 @@
       "description": "Options for the `flake8-builtins` plugin.",
       "type": "object",
       "properties": {
+        "allowed-modules": {
+          "description": "List of builtin module names to allow.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "builtins-allowed-modules": {
           "description": "List of builtin module names to allow.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1027,6 +1038,7 @@
         },
         "builtins-ignorelist": {
           "description": "Ignore list of builtins.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1036,6 +1048,24 @@
           }
         },
         "builtins-strict-checking": {
+          "description": "Compare module names instead of full module paths.",
+          "deprecated": true,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ignorelist": {
+          "description": "Ignore list of builtins.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "strict-checking": {
           "description": "Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).\n\nIn preview mode the default value is `false` rather than `true`.",
           "type": [
             "boolean",
