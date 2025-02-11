@@ -29,7 +29,7 @@ This is a deliberate choice to prevent false positive errors on untyped code.
 More generally, we infer `Unknown | T_inferred` for undeclared symbols, where `T_inferred` is the
 inferred type of the right-hand side of the assignment. This gradual type represents an *unknown*
 fully-static type that is *at least as large as* `T_inferred`. It accurately describes our static
-knowlege about this type. In the example above, we don't know what values `wrapper.value` could
+knowledge about this type. In the example above, we don't know what values `wrapper.value` could
 possibly contain, but we *do know* that `None` is a possibility. This allows us to catch errors
 where `wrapper.value` is used in a way that is incompatible with `None`:
 
