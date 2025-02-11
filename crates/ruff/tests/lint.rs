@@ -2318,7 +2318,7 @@ fn create_a005_module_structure(tempdir: &TempDir) -> Result<()> {
     Ok(())
 }
 
-/// Test A005 with `builtins-strict-checking = true`
+/// Test A005 with `strict-checking = true`
 #[test]
 fn a005_module_shadowing_strict() -> Result<()> {
     let tempdir = TempDir::new()?;
@@ -2330,7 +2330,7 @@ fn a005_module_shadowing_strict() -> Result<()> {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
-            .arg(r#"lint.flake8-builtins.builtins-strict-checking = true"#)
+            .arg(r#"lint.flake8-builtins.strict-checking = true"#)
             .args(["--select", "A005"])
             .current_dir(tempdir.path()),
             @r"
@@ -2352,7 +2352,7 @@ fn a005_module_shadowing_strict() -> Result<()> {
     Ok(())
 }
 
-/// Test A005 with `builtins-strict-checking = false`
+/// Test A005 with `strict-checking = false`
 #[test]
 fn a005_module_shadowing_non_strict() -> Result<()> {
     let tempdir = TempDir::new()?;
@@ -2364,7 +2364,7 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
-            .arg(r#"lint.flake8-builtins.builtins-strict-checking = false"#)
+            .arg(r#"lint.flake8-builtins.strict-checking = false"#)
             .args(["--select", "A005"])
             .current_dir(tempdir.path()),
             @r"
@@ -2383,7 +2383,7 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
     Ok(())
 }
 
-/// Test A005 with `builtins-strict-checking` unset
+/// Test A005 with `strict-checking` unset
 /// TODO(brent) This should currently match the strict version, but after the next minor
 /// release it will match the non-strict version directly above
 #[test]
