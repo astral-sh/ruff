@@ -111,7 +111,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     };
 
     // extract helpful info from expression of the form
-    // `if cmp_left op cmp_right: body_left = body_right`
+    // `if cmp_left op cmp_right: target = assignment_value`
     let cmp_left = ComparableExpr::from(left);
     let cmp_right = ComparableExpr::from(right);
     let target = ComparableExpr::from(body_target);
@@ -131,7 +131,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     else if cmp_left == assignment_value && cmp_right == target {
         match op {
             CmpOp::Lt => (MinMax::Min, true),
-            CmpOp::LtE => (MinMax::Min, true),
+            CmpOp::LtE => (MinMax::Min, false),
             CmpOp::Gt => (MinMax::Max, true),
             CmpOp::GtE => (MinMax::Max, false),
             _ => return,
