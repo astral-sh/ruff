@@ -410,7 +410,7 @@ pub(crate) enum NodeWithScopeRef<'a> {
     GeneratorExpression(&'a ast::ExprGenerator),
 }
 
-impl<'a> NodeWithScopeRef<'a> {
+impl NodeWithScopeRef<'_> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
     /// # Safety
