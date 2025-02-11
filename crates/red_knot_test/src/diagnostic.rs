@@ -26,7 +26,8 @@ where
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
                 line_number: diagnostic
-                    .range()
+                    .span()
+                    .and_then(|span| span.range())
                     .map_or(OneIndexed::from_zero_indexed(0), |range| {
                         line_index.line_index(range.start())
                     }),
@@ -144,7 +145,7 @@ struct DiagnosticWithLine<T> {
 mod tests {
     use crate::db::Db;
     use crate::diagnostic::Diagnostic;
-    use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
+    use ruff_db::diagnostic::{DiagnosticId, LintName, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -198,12 +199,8 @@ mod tests {
             "dummy".into()
         }
 
-        fn file(&self) -> Option<File> {
-            Some(self.file)
-        }
-
-        fn range(&self) -> Option<TextRange> {
-            Some(self.range)
+        fn span(&self) -> Option<Span> {
+            Some(Span::from(self.file).with_range(self.range))
         }
 
         fn severity(&self) -> Severity {
