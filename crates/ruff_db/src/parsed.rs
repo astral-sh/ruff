@@ -73,6 +73,14 @@ impl std::fmt::Debug for ParsedModule {
     }
 }
 
+impl PartialEq for ParsedModule {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for ParsedModule {}
+
 #[cfg(test)]
 mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file};

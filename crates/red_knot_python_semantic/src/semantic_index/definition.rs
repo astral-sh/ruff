@@ -25,22 +25,19 @@ use crate::Db;
 #[salsa::tracked]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
-    #[id]
     pub(crate) file: File,
 
     /// The scope in which the definition occurs.
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The symbol defined.
-    #[id]
     pub(crate) symbol: ScopedSymbolId,
 
     #[no_eq]
     #[return_ref]
+    #[tracked]
     pub(crate) kind: DefinitionKind<'db>,
 
-    #[no_eq]
     count: countme::Count<Definition<'static>>,
 }
 
@@ -435,7 +432,14 @@ impl DefinitionCategory {
     }
 }
 
-#[derive(Clone, Debug)]
+/// The kind of a definition.
+///
+/// ## Usage in salsa tracked structs
+///
+/// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
+/// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
+/// for an in-depth explanation of why this is necessary.
+#[derive(Clone, Debug, Hash)]
 pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
     ImportFrom(ImportFromDefinitionKind),
@@ -540,7 +544,7 @@ impl DefinitionKind<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
     Sequence(Unpack<'db>),
     Name,
@@ -555,7 +559,7 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 #[allow(dead_code)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
@@ -573,7 +577,7 @@ impl MatchPatternDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ComprehensionDefinitionKind {
     iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::ExprName>,
@@ -599,7 +603,7 @@ impl ComprehensionDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
@@ -615,7 +619,7 @@ impl ImportFromDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct AssignmentDefinitionKind<'db> {
     target: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
@@ -641,7 +645,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct WithItemDefinitionKind {
     node: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::ExprName>,
@@ -662,7 +666,7 @@ impl WithItemDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ForStmtDefinitionKind<'db> {
     target: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -693,7 +697,7 @@ impl<'db> ForStmtDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ExceptHandlerDefinitionKind {
     handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
     is_star: bool,
@@ -713,7 +717,7 @@ impl ExceptHandlerDefinitionKind {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
 pub(crate) struct DefinitionNodeKey(NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {

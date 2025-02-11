@@ -231,10 +231,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         match pattern.kind(self.db) {
             PatternConstraintKind::Singleton(singleton, _guard) => {
-                self.evaluate_match_pattern_singleton(*subject, *singleton)
+                self.evaluate_match_pattern_singleton(subject, *singleton)
             }
             PatternConstraintKind::Class(cls, _guard) => {
-                self.evaluate_match_pattern_class(*subject, *cls)
+                self.evaluate_match_pattern_class(subject, *cls)
             }
             // TODO: support more pattern kinds
             PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,

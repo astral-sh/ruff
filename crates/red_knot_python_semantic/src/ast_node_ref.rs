@@ -12,7 +12,29 @@ use ruff_db::parsed::ParsedModule;
 /// Holding on to any [`AstNodeRef`] prevents the [`ParsedModule`] from being released.
 ///
 /// ## Equality
-/// Two `AstNodeRef` are considered equal if their wrapped nodes are equal.
+/// Two `AstNodeRef` are considered equal if their pointer addresses are equal.
+///
+/// ## Usage in salsa tracked structs
+/// It's important that [`AstNodeRef`] fields in salsa tracked structs are tracked fields
+/// (attributed with `#[tracked`]). It prevents that the tracked struct gets a new ID
+/// everytime the AST changes, which in turn, invalidates the result of any query
+/// that takes said tracked struct as a query argument or returns the tracked struct as part of its result.
+///
+/// For example, marking the [`AstNodeRef`] as tracked on `Expression`
+/// has the effect that salsa will consider the expression as "unchanged" for as long as it:
+///
+/// * belongs to the same file
+/// * belongs to the same scope
+/// * has the same kind
+/// * was created in the same order
+///
+/// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
+/// us some form of scope-stable identity for expressions. Only queries accessing the node field
+/// run on every AST change. All other queries only run when the expression's identity changes.
+///
+/// The one exception to this is if it is known that all queries tacking the tracked struct
+/// as argument or returning it as part of their result are known to access the node field.
+/// Marking the field tracked is then unnecessary.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// Owned reference to the node's [`ParsedModule`].
@@ -67,23 +89,17 @@ where
     }
 }
 
-impl<T> PartialEq for AstNodeRef<T>
-where
-    T: PartialEq,
-{
+impl<T> PartialEq for AstNodeRef<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.node().eq(other.node())
+        self.node.eq(&other.node)
     }
 }
 
-impl<T> Eq for AstNodeRef<T> where T: Eq {}
+impl<T> Eq for AstNodeRef<T> {}
 
-impl<T> Hash for AstNodeRef<T>
-where
-    T: Hash,
-{
+impl<T> Hash for AstNodeRef<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node().hash(state);
+        self.node.hash(state);
     }
 }
 
@@ -117,7 +133,7 @@ mod tests {
         let stmt_cloned = &cloned.syntax().body[0];
         let cloned_node = unsafe { AstNodeRef::new(cloned.clone(), stmt_cloned) };
 
-        assert_eq!(node1, cloned_node);
+        assert_ne!(node1, cloned_node);
 
         let other_raw = parse_unchecked_source("2 + 2", PySourceType::Python);
         let other = ParsedModule::new(other_raw);

@@ -56,7 +56,6 @@ mod mro;
 mod narrow;
 mod signatures;
 mod slots;
-mod statistics;
 mod string_annotation;
 mod subclass_of;
 mod type_ordering;
@@ -2589,7 +2588,7 @@ bitflags! {
 ///
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
-#[derive(Clone, Debug, Copy, Eq, PartialEq)]
+#[derive(Clone, Debug, Copy, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     qualifiers: TypeQualifiers,
@@ -4400,7 +4399,7 @@ impl<'db> TypeAliasType<'db> {
 }
 
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: Class<'db>,
     explicit_metaclass_of: Class<'db>,
@@ -4443,7 +4442,7 @@ impl<'db> From<InstanceType<'db>> for Type<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
 }
@@ -4455,7 +4454,7 @@ impl<'db> MetaclassError<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) enum MetaclassErrorKind<'db> {
     /// The class has incompatible metaclasses in its inheritance hierarchy.
     ///

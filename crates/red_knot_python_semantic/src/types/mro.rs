@@ -10,7 +10,7 @@ use crate::Db;
 /// The inferred method resolution order of a given class.
 ///
 /// See [`Class::iter_mro`] for more details.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, salsa::Update)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
@@ -236,7 +236,7 @@ impl<'db> Iterator for MroIterator<'db> {
 
 impl std::iter::FusedIterator for MroIterator<'_> {}
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) struct MroError<'db> {
     kind: MroErrorKind<'db>,
     fallback_mro: Mro<'db>,
@@ -256,7 +256,7 @@ impl<'db> MroError<'db> {
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) enum MroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///
