@@ -439,7 +439,7 @@ impl DefinitionCategory {
 /// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
 /// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
 /// for an in-depth explanation of why this is necessary.
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
     ImportFrom(ImportFromDefinitionKind),
@@ -559,7 +559,7 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
@@ -577,7 +577,7 @@ impl MatchPatternDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct ComprehensionDefinitionKind {
     iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::ExprName>,
@@ -603,7 +603,7 @@ impl ComprehensionDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
@@ -619,7 +619,7 @@ impl ImportFromDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct AssignmentDefinitionKind<'db> {
     target: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
@@ -645,7 +645,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct WithItemDefinitionKind {
     node: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::ExprName>,
@@ -666,7 +666,7 @@ impl WithItemDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct ForStmtDefinitionKind<'db> {
     target: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -697,7 +697,7 @@ impl<'db> ForStmtDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct ExceptHandlerDefinitionKind {
     handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
     is_star: bool,

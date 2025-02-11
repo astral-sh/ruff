@@ -36,6 +36,7 @@ pub(crate) struct Unpack<'db> {
     /// expression is `(a, b)`.
     #[no_eq]
     #[return_ref]
+    #[tracked]
     pub(crate) target: AstNodeRef<ast::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
