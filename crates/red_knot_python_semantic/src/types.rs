@@ -126,6 +126,37 @@ fn symbol<'db>(
     name: &str,
 ) -> Symbol<'db> {
     #[salsa::tracked]
+    fn internal_symbol_by_id<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        is_dunder_slots: bool,
+        symbol_id: ScopedSymbolId,
+    ) -> Symbol<'db> {
+        symbol_by_id(
+            db,
+            SymbolLookup::Internal,
+            scope,
+            is_dunder_slots,
+            symbol_id,
+        )
+    }
+
+    #[salsa::tracked]
+    fn external_symbol_by_id<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        is_dunder_slots: bool,
+        symbol_id: ScopedSymbolId,
+    ) -> Symbol<'db> {
+        symbol_by_id(
+            db,
+            SymbolLookup::External,
+            scope,
+            is_dunder_slots,
+            symbol_id,
+        )
+    }
+
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         lookup: SymbolLookup,
@@ -230,7 +261,10 @@ fn symbol<'db>(
     let is_dunder_slots = name == "__slots__";
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, lookup, scope, is_dunder_slots, symbol))
+        .map(|symbol| match lookup {
+            SymbolLookup::Internal => internal_symbol_by_id(db, scope, is_dunder_slots, symbol),
+            SymbolLookup::External => external_symbol_by_id(db, scope, is_dunder_slots, symbol),
+        })
         .unwrap_or(Symbol::Unbound)
 }
 
