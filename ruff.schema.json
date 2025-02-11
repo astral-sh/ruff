@@ -1026,7 +1026,7 @@
           }
         },
         "builtins-strict-checking": {
-          "description": "Compare module names instead of full module paths.",
+          "description": "Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).",
           "type": [
             "boolean",
             "null"
