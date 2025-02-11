@@ -35,9 +35,7 @@ use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::visitor::{
-    source_order::SourceOrderVisitor, walk_except_handler, walk_pattern, Visitor,
-};
+use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
     ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
@@ -524,7 +522,7 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.syntax_checker.visit_stmt(stmt);
+        self.syntax_checker.enter_stmt(stmt);
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);

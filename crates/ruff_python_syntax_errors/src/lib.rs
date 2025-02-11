@@ -4,10 +4,7 @@
 //! [`SourceOrderVisitor::enter_node`] method should be called on every node by
 //! a parent `Visitor`.
 
-use ruff_python_ast::{
-    visitor::source_order::{walk_stmt, SourceOrderVisitor, TraversalSignal},
-    AnyNodeRef, Stmt, StmtExpr, StmtImportFrom, StmtMatch,
-};
+use ruff_python_ast::{Stmt, StmtExpr, StmtImportFrom, StmtMatch};
 use ruff_text_size::TextRange;
 
 pub struct SyntaxChecker {
@@ -92,10 +89,10 @@ impl SyntaxErrorKind {
     }
 }
 
-impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        match node {
-            AnyNodeRef::StmtMatch(StmtMatch { range, .. }) => {
+impl SyntaxChecker {
+    fn check(&mut self, stmt: &ruff_python_ast::Stmt) {
+        match stmt {
+            Stmt::Match(StmtMatch { range, .. }) => {
                 if self.target_version < PythonVersion::PY310 {
                     self.errors.push(SyntaxError {
                         kind: SyntaxErrorKind::MatchBeforePy310,
@@ -104,7 +101,7 @@ impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
                     });
                 }
             }
-            AnyNodeRef::StmtImportFrom(StmtImportFrom { range, module, .. }) => {
+            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
                 if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
                     self.errors.push(SyntaxError {
                         kind: SyntaxErrorKind::LateFutureImport,
@@ -113,101 +110,11 @@ impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
                     });
                 }
             }
-            AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtClassDef(_)
-            | AnyNodeRef::StmtReturn(_)
-            | AnyNodeRef::StmtDelete(_)
-            | AnyNodeRef::StmtTypeAlias(_)
-            | AnyNodeRef::StmtAssign(_)
-            | AnyNodeRef::StmtAugAssign(_)
-            | AnyNodeRef::StmtAnnAssign(_)
-            | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtWhile(_)
-            | AnyNodeRef::StmtIf(_)
-            | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtRaise(_)
-            | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtAssert(_)
-            | AnyNodeRef::StmtImport(_)
-            | AnyNodeRef::StmtGlobal(_)
-            | AnyNodeRef::StmtNonlocal(_)
-            | AnyNodeRef::StmtExpr(_)
-            | AnyNodeRef::StmtPass(_)
-            | AnyNodeRef::StmtBreak(_)
-            | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtIpyEscapeCommand(_)
-            | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamed(_)
-            | AnyNodeRef::ExprBinOp(_)
-            | AnyNodeRef::ExprUnaryOp(_)
-            | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIf(_)
-            | AnyNodeRef::ExprDict(_)
-            | AnyNodeRef::ExprSet(_)
-            | AnyNodeRef::ExprListComp(_)
-            | AnyNodeRef::ExprSetComp(_)
-            | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGenerator(_)
-            | AnyNodeRef::ExprAwait(_)
-            | AnyNodeRef::ExprYield(_)
-            | AnyNodeRef::ExprYieldFrom(_)
-            | AnyNodeRef::ExprCompare(_)
-            | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFString(_)
-            | AnyNodeRef::ExprStringLiteral(_)
-            | AnyNodeRef::ExprBytesLiteral(_)
-            | AnyNodeRef::ExprNumberLiteral(_)
-            | AnyNodeRef::ExprBooleanLiteral(_)
-            | AnyNodeRef::ExprNoneLiteral(_)
-            | AnyNodeRef::ExprEllipsisLiteral(_)
-            | AnyNodeRef::ExprAttribute(_)
-            | AnyNodeRef::ExprSubscript(_)
-            | AnyNodeRef::ExprStarred(_)
-            | AnyNodeRef::ExprName(_)
-            | AnyNodeRef::ExprList(_)
-            | AnyNodeRef::ExprTuple(_)
-            | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprIpyEscapeCommand(_)
-            | AnyNodeRef::ExceptHandlerExceptHandler(_)
-            | AnyNodeRef::FStringExpressionElement(_)
-            | AnyNodeRef::FStringLiteralElement(_)
-            | AnyNodeRef::PatternMatchValue(_)
-            | AnyNodeRef::PatternMatchSingleton(_)
-            | AnyNodeRef::PatternMatchSequence(_)
-            | AnyNodeRef::PatternMatchMapping(_)
-            | AnyNodeRef::PatternMatchClass(_)
-            | AnyNodeRef::PatternMatchStar(_)
-            | AnyNodeRef::PatternMatchAs(_)
-            | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::TypeParamTypeVar(_)
-            | AnyNodeRef::TypeParamTypeVarTuple(_)
-            | AnyNodeRef::TypeParamParamSpec(_)
-            | AnyNodeRef::FStringFormatSpec(_)
-            | AnyNodeRef::PatternArguments(_)
-            | AnyNodeRef::PatternKeyword(_)
-            | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Parameters(_)
-            | AnyNodeRef::Parameter(_)
-            | AnyNodeRef::ParameterWithDefault(_)
-            | AnyNodeRef::Keyword(_)
-            | AnyNodeRef::Alias(_)
-            | AnyNodeRef::WithItem(_)
-            | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_)
-            | AnyNodeRef::ElifElseClause(_)
-            | AnyNodeRef::TypeParams(_)
-            | AnyNodeRef::FString(_)
-            | AnyNodeRef::StringLiteral(_)
-            | AnyNodeRef::BytesLiteral(_)
-            | AnyNodeRef::Identifier(_) => {}
+            _ => {}
         }
-        TraversalSignal::Skip
     }
 
-    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
+    pub fn enter_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_docstring_boundary && value.is_string_literal_expr() =>
@@ -231,7 +138,8 @@ impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
                 self.seen_futures_boundary = true;
             }
         }
-        walk_stmt(self, stmt);
+
+        self.check(stmt);
     }
 }
 
@@ -240,7 +148,7 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_debug_snapshot;
-    use ruff_python_ast::{visitor::source_order::SourceOrderVisitor, PySourceType};
+    use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
 
     use crate::{PythonVersion, SyntaxChecker, SyntaxError};
@@ -251,7 +159,9 @@ mod tests {
         let source_type = PySourceType::from(path);
         let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
         let mut checker = SyntaxChecker::new(target_version);
-        checker.visit_body(parsed.suite());
+        for stmt in parsed.suite() {
+            checker.enter_stmt(stmt);
+        }
         checker.errors
     }
 

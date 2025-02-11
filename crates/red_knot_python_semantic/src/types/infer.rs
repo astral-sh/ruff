@@ -39,7 +39,6 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
 use ruff_python_syntax_errors::SyntaxChecker;
 use ruff_text_size::{Ranged, TextRange};
@@ -1273,7 +1272,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_statement(&mut self, statement: &ast::Stmt) {
-        self.syntax_checker.visit_stmt(statement);
+        self.syntax_checker.enter_stmt(statement);
         match statement {
             ast::Stmt::FunctionDef(function) => self.infer_function_definition_statement(function),
             ast::Stmt::ClassDef(class) => self.infer_class_definition_statement(class),

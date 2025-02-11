@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::slice::Iter;
 use std::sync::Arc;
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity, Span};
 use ruff_db::files::File;
 use ruff_python_syntax_errors::SyntaxError;
 use ruff_text_size::TextRange;
@@ -56,16 +56,12 @@ impl OldDiagnosticTrait for SyntaxDiagnostic {
         Cow::from(&self.message)
     }
 
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        Some(self.range)
-    }
-
     fn severity(&self) -> ruff_db::diagnostic::Severity {
         Severity::Error
+    }
+
+    fn span(&self) -> Option<ruff_db::diagnostic::Span> {
+        Some(Span::from(self.file).with_range(self.range))
     }
 }
 
