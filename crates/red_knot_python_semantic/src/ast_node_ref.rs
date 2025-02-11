@@ -103,12 +103,9 @@ where
 
 impl<T> Eq for AstNodeRef<T> where T: Eq {}
 
-impl<T> Hash for AstNodeRef<T>
-where
-    T: Hash,
-{
+impl<T> Hash for AstNodeRef<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node().hash(state);
+        self.node.hash(state);
     }
 }
 
