@@ -50,7 +50,7 @@ def f():
 
     class Foo:
         def f(self):
-            # revealed: Literal[2]
+            # revealed: Unknown | Literal[2]
             reveal_type(x)
 
     x = 2
