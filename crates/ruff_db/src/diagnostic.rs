@@ -188,7 +188,7 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 /// It consists of a `File` and an optional range into that file. When the
 /// range isn't present, it semantically implies that the diagnostic refers to
 /// the entire file. For example, when the file should be executable but isn't.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     file: File,
     range: Option<TextRange>,

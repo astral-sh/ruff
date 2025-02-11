@@ -383,7 +383,7 @@ impl Diagnostic for OptionDiagnostic {
     }
 
     fn span(&self) -> Option<Span> {
-        self.span
+        self.span.clone()
     }
 
     fn severity(&self) -> Severity {
