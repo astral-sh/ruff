@@ -5,8 +5,8 @@
 //! a parent `Visitor`.
 
 use ruff_python_ast::{
-    visitor::source_order::{SourceOrderVisitor, TraversalSignal},
-    AnyNodeRef, StmtMatch,
+    visitor::source_order::{walk_stmt, SourceOrderVisitor, TraversalSignal},
+    AnyNodeRef, Stmt, StmtExpr, StmtImportFrom, StmtMatch,
 };
 use ruff_text_size::TextRange;
 
@@ -16,6 +16,10 @@ pub struct SyntaxChecker {
     target_version: PythonVersion,
     /// The cumulative set of syntax errors found when visiting the source AST.
     errors: Vec<SyntaxError>,
+
+    /// these could be grouped into a bitflags struct like `SemanticModel`
+    seen_futures_boundary: bool,
+    seen_docstring_boundary: bool,
 }
 
 impl SyntaxChecker {
@@ -23,11 +27,13 @@ impl SyntaxChecker {
         Self {
             target_version,
             errors: Vec::new(),
+            seen_futures_boundary: false,
+            seen_docstring_boundary: false,
         }
     }
 
-    pub fn finish(self) -> impl Iterator<Item = SyntaxError> {
-        self.errors.into_iter()
+    pub fn finish(&self) -> impl Iterator<Item = &SyntaxError> {
+        self.errors.iter()
     }
 }
 
@@ -64,6 +70,9 @@ impl SyntaxError {
                 major = self.target_version.major,
                 minor = self.target_version.minor,
             ),
+            SyntaxErrorKind::LateFutureImport => {
+				"__future__ imports must be at the top of the file".to_string()
+			}
         }
     }
 }
@@ -71,12 +80,14 @@ impl SyntaxError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SyntaxErrorKind {
     MatchBeforePy310,
+    LateFutureImport,
 }
 
 impl SyntaxErrorKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
+            SyntaxErrorKind::LateFutureImport => "late-future-import",
         }
     }
 }
@@ -88,6 +99,15 @@ impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
                 if self.target_version < PythonVersion::PY310 {
                     self.errors.push(SyntaxError {
                         kind: SyntaxErrorKind::MatchBeforePy310,
+                        range: *range,
+                        target_version: self.target_version,
+                    });
+                }
+            }
+            AnyNodeRef::StmtImportFrom(StmtImportFrom { range, module, .. }) => {
+                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
+                    self.errors.push(SyntaxError {
+                        kind: SyntaxErrorKind::LateFutureImport,
                         range: *range,
                         target_version: self.target_version,
                     });
@@ -111,7 +131,6 @@ impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
             | AnyNodeRef::StmtTry(_)
             | AnyNodeRef::StmtAssert(_)
             | AnyNodeRef::StmtImport(_)
-            | AnyNodeRef::StmtImportFrom(_)
             | AnyNodeRef::StmtGlobal(_)
             | AnyNodeRef::StmtNonlocal(_)
             | AnyNodeRef::StmtExpr(_)
@@ -186,6 +205,33 @@ impl<'a> SourceOrderVisitor<'a> for SyntaxChecker {
             | AnyNodeRef::Identifier(_) => {}
         }
         TraversalSignal::Skip
+    }
+
+    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
+        match stmt {
+            Stmt::Expr(StmtExpr { value, .. })
+                if !self.seen_docstring_boundary && value.is_string_literal_expr() =>
+            {
+                self.seen_docstring_boundary = true;
+            }
+            Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
+                self.seen_docstring_boundary = true;
+                // Allow __future__ imports until we see a non-__future__ import.
+                if let Some("__future__") = module.as_deref() {
+                } else {
+                    self.seen_futures_boundary = true;
+                }
+            }
+            Stmt::Import(_) => {
+                self.seen_docstring_boundary = true;
+                self.seen_futures_boundary = true;
+            }
+            _ => {
+                self.seen_docstring_boundary = true;
+                self.seen_futures_boundary = true;
+            }
+        }
+        walk_stmt(self, stmt);
     }
 }
 

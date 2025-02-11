@@ -26,7 +26,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use ruff_python_syntax_errors::SyntaxChecker;
+use ruff_python_syntax_errors::{SyntaxChecker, SyntaxError, SyntaxErrorKind};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -66,6 +66,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
+use crate::rules::pyflakes::rules::LateFutureImport;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -2748,18 +2749,27 @@ pub(crate) fn check_ast(
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&checker);
 
-    // checker.syntax_checker.
+    checker.report_diagnostics(
+        checker
+            .syntax_checker
+            .finish()
+            .filter_map(|error| try_diagnostic_from_syntax_error(error, &checker)),
+    );
 
-    let mut diagnostics = checker.diagnostics.take();
+    checker.diagnostics.take()
+}
 
-    diagnostics.extend(checker.syntax_checker.finish().map(|error| {
-        Diagnostic::new(
+fn try_diagnostic_from_syntax_error(error: &SyntaxError, checker: &Checker) -> Option<Diagnostic> {
+    match error.kind {
+        SyntaxErrorKind::MatchBeforePy310 => Some(Diagnostic::new(
             crate::rules::syntax::VersionSyntaxError {
                 message: error.message(),
             },
             error.range,
-        )
-    }));
-
-    diagnostics
+        )),
+        SyntaxErrorKind::LateFutureImport if checker.enabled(Rule::LateFutureImport) => {
+            Some(Diagnostic::new(LateFutureImport, error.range))
+        }
+        SyntaxErrorKind::LateFutureImport => None,
+    }
 }
