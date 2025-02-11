@@ -33,12 +33,12 @@ pub(crate) enum Symbol<'db> {
 }
 
 impl<'db> Symbol<'db> {
-    /// Smart constructor that creates a `Symbol` with boundness [`Boundness::Bound`].
+    /// Constructor that creates a `Symbol` with boundness [`Boundness::Bound`].
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
         Symbol::Type(ty.into(), Boundness::Bound)
     }
 
-    /// Smart constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
+    /// Constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     pub(crate) fn todo(message: &'static str) -> Self {
         Symbol::Type(todo_type!(message), Boundness::Bound)

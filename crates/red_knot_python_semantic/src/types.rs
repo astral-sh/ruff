@@ -403,7 +403,7 @@ fn symbol_from_bindings<'db>(
 pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
 
 impl SymbolAndQualifiers<'_> {
-    /// Smart constructor to create a [`SymbolAndQualifiers`] instance with a [`TodoType`] type
+    /// Constructor that creates a [`SymbolAndQualifiers`] instance with a [`TodoType`] type
     /// and no qualifiers.
     fn todo(message: &'static str) -> Self {
         Self(Symbol::todo(message), TypeQualifiers::empty())
@@ -2589,7 +2589,7 @@ impl<'db> TypeAndQualifiers<'db> {
         Self { inner, qualifiers }
     }
 
-    /// Smart constructor to create a [`TypeAndQualifiers`] instance with type `Unknown` and no qualifiers.
+    /// Constructor that creates a [`TypeAndQualifiers`] instance with type `Unknown` and no qualifiers.
     pub(crate) fn unknown() -> Self {
         Self {
             inner: Type::unknown(),
