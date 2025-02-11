@@ -31,17 +31,13 @@ use ruff_db::parsed::ParsedModule;
 /// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
 /// us some form of scope-stable identity for expressions. Only queries accessing the node field
 /// run on every AST change. All other queries only run when the expression's identity changes.
-///
-/// The one exception to this is if it is known that all queries tacking the tracked struct
-/// as argument or returning it as part of their result are known to access the node field.
-/// Marking the field tracked is then unnecessary.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// Owned reference to the node's [`ParsedModule`].
     ///
     /// The node's reference is guaranteed to remain valid as long as it's enclosing
     /// [`ParsedModule`] is alive.
-    _parsed: ParsedModule,
+    parsed: ParsedModule,
 
     /// Pointer to the referenced node.
     node: std::ptr::NonNull<T>,
@@ -59,7 +55,7 @@ impl<T> AstNodeRef<T> {
     /// the invariant `node belongs to parsed` is upheld.
     pub(super) unsafe fn new(parsed: ParsedModule, node: &T) -> Self {
         Self {
-            _parsed: parsed,
+            parsed,
             node: std::ptr::NonNull::from(node),
         }
     }
@@ -89,17 +85,30 @@ where
     }
 }
 
-impl<T> PartialEq for AstNodeRef<T> {
+impl<T> PartialEq for AstNodeRef<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
-        self.node.eq(&other.node)
+        if self.parsed == other.parsed {
+            // Comparing the pointer addresses is sufficient to determine equality
+            // if the parsed are the same.
+            self.node.eq(&other.node)
+        } else {
+            // Otherwise perform a deep comparison.
+            self.node().eq(other.node())
+        }
     }
 }
 
-impl<T> Eq for AstNodeRef<T> {}
+impl<T> Eq for AstNodeRef<T> where T: Eq {}
 
-impl<T> Hash for AstNodeRef<T> {
+impl<T> Hash for AstNodeRef<T>
+where
+    T: Hash,
+{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node.hash(state);
+        self.node().hash(state);
     }
 }
 
@@ -133,7 +142,7 @@ mod tests {
         let stmt_cloned = &cloned.syntax().body[0];
         let cloned_node = unsafe { AstNodeRef::new(cloned.clone(), stmt_cloned) };
 
-        assert_ne!(node1, cloned_node);
+        assert_eq!(node1, cloned_node);
 
         let other_raw = parse_unchecked_source("2 + 2", PySourceType::Python);
         let other = ParsedModule::new(other_raw);
