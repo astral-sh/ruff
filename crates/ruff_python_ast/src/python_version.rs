@@ -89,6 +89,15 @@ impl From<(u8, u8)> for PythonVersion {
     }
 }
 
+impl From<PythonVersion> for ruff_python_syntax_errors::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        Self {
+            major: value.major,
+            minor: value.minor,
+        }
+    }
+}
+
 impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let PythonVersion { major, minor } = self;

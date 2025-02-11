@@ -39,7 +39,9 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
+use ruff_python_syntax_errors::SyntaxChecker;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -61,6 +63,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
+use crate::syntax::{SyntaxDiagnostic, SyntaxDiagnostics};
 use crate::types::call::{Argument, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
@@ -87,7 +90,7 @@ use crate::types::{
 use crate::types::{CallableType, GeneralCallableType, ParameterKind, Signature};
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, Program};
 
 use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
@@ -355,6 +358,8 @@ pub(crate) struct TypeInference<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
+    syntax_diagnostics: SyntaxDiagnostics,
+
     /// The scope this region is part of.
     scope: ScopeId<'db>,
 
@@ -372,6 +377,7 @@ impl<'db> TypeInference<'db> {
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
+            syntax_diagnostics: SyntaxDiagnostics::default(),
             scope,
             cycle_fallback_type: None,
         }
@@ -386,6 +392,7 @@ impl<'db> TypeInference<'db> {
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
+            syntax_diagnostics: SyntaxDiagnostics::default(),
         }
     }
 
@@ -430,6 +437,10 @@ impl<'db> TypeInference<'db> {
 
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
+    }
+
+    pub(crate) fn syntax_diagnostics(&self) -> &SyntaxDiagnostics {
+        &self.syntax_diagnostics
     }
 
     fn shrink_to_fit(&mut self) {
@@ -533,6 +544,8 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// expression could be deferred if the file has `from __future__ import annotations` import or
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
+
+    syntax_checker: SyntaxChecker,
 }
 
 impl<'db> TypeInferenceBuilder<'db> {
@@ -550,6 +563,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Self {
         let scope = region.scope(db);
 
+        let target_version = Program::try_get(db)
+            .map(|program| program.python_version(db))
+            .unwrap_or_default();
+
         Self {
             context: InferContext::new(db, scope),
             index,
@@ -557,6 +574,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             return_types_and_ranges: vec![],
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
+            syntax_checker: SyntaxChecker::new(target_version.into()),
         }
     }
 
@@ -1255,6 +1273,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_statement(&mut self, statement: &ast::Stmt) {
+        self.syntax_checker.visit_stmt(statement);
         match statement {
             ast::Stmt::FunctionDef(function) => self.infer_function_definition_statement(function),
             ast::Stmt::ClassDef(class) => self.infer_class_definition_statement(class),
@@ -5812,7 +5831,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     pub(super) fn finish(mut self) -> TypeInference<'db> {
         self.infer_region();
+        let file = self.file();
         self.types.diagnostics = self.context.finish();
+        self.types.syntax_diagnostics.extend(
+            self.syntax_checker
+                .finish()
+                .map(|error| SyntaxDiagnostic::from_syntax_error(&error, file)),
+        );
         self.types.shrink_to_fit();
         self.types
     }
@@ -7258,7 +7283,7 @@ mod tests {
     #[track_caller]
     fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
         let file = system_path_to_file(db, filename).unwrap();
-        let diagnostics = check_types(db, file);
+        let (diagnostics, _) = check_types(db, file);
 
         assert_diagnostic_messages(diagnostics, expected);
     }

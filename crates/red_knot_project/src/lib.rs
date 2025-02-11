@@ -419,7 +419,7 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> 
         diagnostic
     }));
 
-    diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
+    diagnostics.extend(check_types(db.upcast(), file).0.iter().map(|diagnostic| {
         let boxed: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
         boxed
     }));
