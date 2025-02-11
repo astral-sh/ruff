@@ -163,9 +163,9 @@ def _():
 ## Eager scope within a lazy scope within another eager scope
 
 We have a list comprehension (eager scope), enclosed within a function definition (lazy scope),
-enclosed within a class definition, all of which we must pass through before encountering any
-binding of `x`. Even though the last scope we pass through is eager, the lookup is lazy, since we
-encountered a lazy scope on the way.
+enclosed within a class definition (eager scope), all of which we must pass through before
+encountering any binding of `x`. Even though the last scope we pass through is eager, the lookup is
+lazy, since we encountered a lazy scope on the way.
 
 ```py
 def _():
