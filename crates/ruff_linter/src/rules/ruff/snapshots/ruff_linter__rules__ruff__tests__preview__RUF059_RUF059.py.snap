@@ -81,3 +81,11 @@ RUF059.py:52:18: RUF059 Parameter overshadows symbol from outer scope
    |                  ^^^^^^^^^ RUF059
    |
    = help: Rename parameter
+
+RUF059.py:56:24: RUF059 Parameter overshadows symbol from outer scope
+   |
+55 | class Outer11[T]:
+56 |     def inner_11(self, T): ...
+   |                        ^ RUF059
+   |
+   = help: Rename parameter
