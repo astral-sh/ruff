@@ -21,6 +21,9 @@ def f():
 
         # revealed: int
         [reveal_type(x) for _ in IntIterable()]
+
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)  # revealed: int
 ```
 
 ## Eager scopes inside lazy scopes
@@ -36,35 +39,49 @@ class IntIterable:
 
 def foo():
     for x in IntIterable():
+        reveal_type(x)  # revealed: int
         def bar():
             # error: [possibly-unresolved-reference]
             # revealed: int
             [reveal_type(x) for _ in IntIterable()]
+
+    reveal_type(x)  # revealed: int
 ```
 
 ## Lazy scopes inside eager scopes
+
+Since the class definition is resolved eagerly, the first `reveal_type` only sees the `x = 1`
+binding. However, the function inside of the class definition is resolved lazily, so it sees the
+public type of `x`. Because `x` has no declared type, we currently widen the inferred type to
+include `Unknown`.
+
+(Put another way, the lazy scopes created for the two functions see the outer `x` in the same way,
+even though one of them appears inside an eager class definition scope.)
 
 ```py
 def f():
     x = 1
 
     class Foo:
-        def f(self):
-            # revealed: Unknown | Literal[2]
-            reveal_type(x)
+        def in_class(self):
+            reveal_type(x)  # revealed: Unknown | Literal[2]
+
+    def outside_class(self):
+        reveal_type(x)  # revealed: Unknown | Literal[2]
 
     x = 2
 ```
 
 ## Class scopes
 
+Class definitions are evaluated eagerly, and see the bindings at the point of definition.
+
 ```py
 def f():
     x = 1
 
     class Foo:
-        # revealed: Literal[1]
-        reveal_type(x)
+        reveal_type(x)  # revealed: Literal[1]
 
     x = 2
 ```
