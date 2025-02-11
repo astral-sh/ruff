@@ -126,6 +126,23 @@ fn symbol<'db>(
     name: &str,
 ) -> Symbol<'db> {
     #[salsa::tracked]
+    fn internal_symbol_by_id<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol_id: ScopedSymbolId,
+    ) -> Symbol<'db> {
+        symbol_by_id(db, SymbolLookup::Internal, scope, symbol_id)
+    }
+
+    #[salsa::tracked]
+    fn external_symbol_by_id<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol_id: ScopedSymbolId,
+    ) -> Symbol<'db> {
+        symbol_by_id(db, SymbolLookup::External, scope, symbol_id)
+    }
+
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         lookup: SymbolLookup,
@@ -230,7 +247,10 @@ fn symbol<'db>(
 
     symbol_table(db, scope)
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, lookup, scope, symbol))
+        .map(|symbol| match lookup {
+            SymbolLookup::Internal => internal_symbol_by_id(db, scope, symbol),
+            SymbolLookup::External => external_symbol_by_id(db, scope, symbol),
+        })
         .unwrap_or(Symbol::Unbound)
 }
 
