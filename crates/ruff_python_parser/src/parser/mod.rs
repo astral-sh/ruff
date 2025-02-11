@@ -5,6 +5,7 @@ use bitflags::bitflags;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::error::SyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
@@ -19,8 +20,16 @@ mod pattern;
 mod progress;
 mod recovery;
 mod statement;
+
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Default)]
+struct SyntaxErrorState {
+    /// Whether or not the [`Parser`] has traversed past the "top-of-file" import boundary.
+    seen_futures_boundary: bool,
+    seen_docstring_boundary: bool,
+}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -31,6 +40,12 @@ pub(crate) struct Parser<'src> {
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
+
+    /// Stores non-fatal syntax errors found during parsing, such as version-related errors and
+    /// errors detected by the Python compiler.
+    syntax_errors: Vec<SyntaxError>,
+
+    syntax_error_state: SyntaxErrorState,
 
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
@@ -63,6 +78,8 @@ impl<'src> Parser<'src> {
             mode,
             source,
             errors: Vec::new(),
+            syntax_errors: Vec::new(),
+            syntax_error_state: SyntaxErrorState::default(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
@@ -159,6 +176,7 @@ impl<'src> Parser<'src> {
                 syntax,
                 tokens: Tokens::new(tokens),
                 errors: parse_errors,
+                syntax_errors: self.syntax_errors,
             };
         }
 
@@ -190,6 +208,7 @@ impl<'src> Parser<'src> {
             syntax,
             tokens: Tokens::new(tokens),
             errors: merged,
+            syntax_errors: self.syntax_errors,
         }
     }
 

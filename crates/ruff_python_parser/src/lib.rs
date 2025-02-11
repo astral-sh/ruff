@@ -67,7 +67,9 @@
 use std::iter::FusedIterator;
 use std::ops::Deref;
 
-pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::error::{
+    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, SyntaxError, SyntaxErrorKind,
+};
 pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
@@ -77,6 +79,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use version::PythonVersion;
 
 mod error;
 pub mod lexer;
@@ -86,6 +89,7 @@ mod token;
 mod token_set;
 mod token_source;
 pub mod typing;
+pub mod version;
 
 /// Parse a full Python module usually consisting of multiple lines.
 ///
@@ -300,6 +304,7 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
+    syntax_errors: Vec<SyntaxError>,
 }
 
 impl<T> Parsed<T> {
@@ -316,6 +321,16 @@ impl<T> Parsed<T> {
     /// Returns a list of syntax errors found during parsing.
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
+    }
+
+    /// Returns the syntax errors for `target_version`.
+    pub fn syntax_errors(
+        &self,
+        target_version: PythonVersion,
+    ) -> impl Iterator<Item = &SyntaxError> {
+        self.syntax_errors
+            .iter()
+            .filter(move |error| target_version < error.version())
     }
 
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
@@ -368,6 +383,7 @@ impl Parsed<Mod> {
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
+                syntax_errors: self.syntax_errors,
             }),
             Mod::Expression(_) => None,
         }
@@ -387,6 +403,7 @@ impl Parsed<Mod> {
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
+                syntax_errors: self.syntax_errors,
             }),
         }
     }

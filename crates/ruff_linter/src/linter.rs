@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
+use ruff_python_parser::version::PythonVersion;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -13,7 +14,7 @@ use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, Parsed};
+use ruff_python_parser::{ParseError, Parsed, SyntaxError, SyntaxErrorKind};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -32,6 +33,7 @@ use crate::package::PackageRoot;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
+use crate::settings::rule_table::RuleTable;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -291,6 +293,16 @@ pub fn check_path(
     }
 
     if parsed.is_valid() {
+        // TODO(brent) I think this might cause duplicates when calling `diagnostics_to_messages`
+        // because that function chains `syntax_errors` with `diagnostics` after we've added some
+        // `syntax_errors` directly into `diagnostics` here. maybe `Message`s get deduplicated and
+        // it doesn't matter? this does not appear to be the case, though.
+        diagnostics.extend(
+            parsed
+                .syntax_errors(settings.target_version.into())
+                .filter_map(|error| try_diagnostic_from_syntax_error(error, &settings.rules)),
+        );
+
         // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
             if !settings.rules.should_fix(diagnostic.kind.rule()) {
@@ -317,6 +329,21 @@ pub fn check_path(
     }
 
     diagnostics
+}
+
+fn try_diagnostic_from_syntax_error(
+    syntax_error: &SyntaxError,
+    rules: &RuleTable,
+) -> Option<Diagnostic> {
+    match syntax_error.kind {
+        SyntaxErrorKind::LateFutureImport if rules.enabled(Rule::LateFutureImport) => {
+            Some(Diagnostic::new(
+                crate::rules::pyflakes::rules::LateFutureImport,
+                syntax_error.range,
+            ))
+        }
+        _ => None,
+    }
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -426,21 +453,25 @@ pub fn lint_only(
         messages: diagnostics_to_messages(
             diagnostics,
             parsed.errors(),
+            parsed.syntax_errors(settings.target_version.into()),
             path,
             &locator,
             &directives,
+            settings.target_version.into(),
         ),
         has_syntax_error: !parsed.is_valid(),
     }
 }
 
 /// Convert from diagnostics to messages.
-fn diagnostics_to_messages(
+fn diagnostics_to_messages<'a>(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
+    syntax_errors: impl Iterator<Item = &'a SyntaxError>,
     path: &Path,
     locator: &Locator,
     directives: &Directives,
+    target_version: PythonVersion,
 ) -> Vec<Message> {
     let file = LazyCell::new(|| {
         let mut builder =
@@ -456,6 +487,15 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
+        .chain(syntax_errors.map(|syntax_error| {
+            let noqa_offset = directives.noqa_line_for.resolve(syntax_error.range.start());
+            Message::from_syntax_error(
+                syntax_error,
+                file.deref().clone(),
+                target_version,
+                noqa_offset,
+            )
+        }))
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -573,9 +613,11 @@ pub fn lint_fix<'a>(
                 messages: diagnostics_to_messages(
                     diagnostics,
                     parsed.errors(),
+                    parsed.syntax_errors(settings.target_version.into()),
                     path,
                     &locator,
                     &directives,
+                    settings.target_version.into(),
                 ),
                 has_syntax_error: !is_valid_syntax,
             },

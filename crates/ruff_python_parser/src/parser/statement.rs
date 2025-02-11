@@ -16,7 +16,7 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType};
+use crate::{Mode, ParseErrorType, SyntaxError, SyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 use super::Parenthesized;
@@ -260,7 +260,7 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html>
     fn parse_simple_statement(&mut self) -> Stmt {
-        match self.current_token_kind() {
+        let stmt = match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
             TokenKind::Import => Stmt::Import(self.parse_import_statement()),
             TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
@@ -315,7 +315,26 @@ impl<'src> Parser<'src> {
                     })
                 }
             }
+        };
+
+        let is_string_literal = stmt
+            .as_expr_stmt()
+            .is_some_and(|expr| expr.value.is_string_literal_expr());
+
+        let is_future_import = stmt
+            .as_import_from_stmt()
+            .is_some_and(|import| matches!(import.module.as_deref(), Some("__future__")));
+
+        if !self.syntax_error_state.seen_docstring_boundary && is_string_literal {
+            // do nothing, this is the docstring
+        } else if !is_future_import {
+            self.syntax_error_state.seen_futures_boundary = true;
         }
+
+        // anything we see sets the docstring boundary
+        self.syntax_error_state.seen_docstring_boundary = true;
+
+        stmt
     }
 
     /// Parses a delete statement.
@@ -619,11 +638,26 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
+        let range = self.node_range(start);
+
+        // Allow __future__ imports until we see a non-__future__ import.
+        match module.as_deref() {
+            Some("__future__") => {
+                if self.syntax_error_state.seen_futures_boundary {
+                    self.syntax_errors.push(SyntaxError {
+                        kind: SyntaxErrorKind::LateFutureImport,
+                        range,
+                    });
+                }
+            }
+            _ => self.syntax_error_state.seen_futures_boundary = true,
+        }
+
         ast::StmtImportFrom {
             module,
             names,
             level: leading_dots,
-            range: self.node_range(start),
+            range,
         }
     }
 
@@ -2262,10 +2296,17 @@ impl<'src> Parser<'src> {
 
         let cases = self.parse_match_body();
 
+        let range = self.node_range(start);
+
+        self.syntax_errors.push(SyntaxError {
+            kind: SyntaxErrorKind::MatchBeforePy310,
+            range,
+        });
+
         ast::StmtMatch {
             subject: Box::new(subject),
             cases,
-            range: self.node_range(start),
+            range,
         }
     }
 
