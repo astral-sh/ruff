@@ -178,6 +178,22 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
     /// or it applies to the entire file (e.g. the file should be executable but isn't).
     fn range(&self) -> Option<TextRange>;
 
+    /// The primary span of the diagnostic.
+    ///
+    /// The range can be `None` if the diagnostic doesn't have a file
+    /// or it applies to the entire file (e.g. the file should be executable but isn't).
+    fn span(&self) -> Option<Span> {
+        // NOTE: This temporary implementation specifically rejects the
+        // possible case of a present `TextRange` but a missing `File`.
+        // During this re-factor, we'll specifically prevent this case
+        // from happening by construction.
+        let mut span = self.file().map(Span::from)?;
+        if let Some(range) = self.range() {
+            span = span.with_range(range);
+        }
+        Some(span)
+    }
+
     fn severity(&self) -> Severity;
 
     fn display<'a>(&'a self, db: &'a dyn Db) -> DisplayDiagnostic<'a>
@@ -188,6 +204,32 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
             db,
             diagnostic: self,
         }
+    }
+}
+
+/// A span represents the source of a diagnostic.
+///
+/// It consists of a `File` and an optional range into that file. When the
+/// range isn't present, it semantically implies that the diagnostic refers to
+/// the entire file. For example, when the file should be executable but isn't.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    file: File,
+    range: Option<TextRange>,
+}
+
+impl Span {
+    pub fn with_range(self, range: TextRange) -> Span {
+        Span {
+            range: Some(range),
+            ..self
+        }
+    }
+}
+
+impl From<File> for Span {
+    fn from(file: File) -> Span {
+        Span { file, range: None }
     }
 }
 
@@ -236,8 +278,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             let rendered = renderer.render(message);
             writeln!(f, "{rendered}")
         };
-        match (self.diagnostic.file(), self.diagnostic.range()) {
-            (None, _) => {
+        match self.diagnostic.span() {
+            None => {
                 // NOTE: This is pretty sub-optimal. It doesn't render well. We
                 // really want a snippet, but without a `File`, we can't really
                 // render anything. It looks like this case currently happens
@@ -248,20 +290,20 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 let msg = format!("{}: {}", self.diagnostic.id(), self.diagnostic.message());
                 render(f, level.title(&msg))
             }
-            (Some(file), range) => {
-                let path = file.path(self.db).to_string();
-                let source = source_text(self.db, file);
+            Some(span) => {
+                let path = span.file.path(self.db).to_string();
+                let source = source_text(self.db, span.file);
                 let title = self.diagnostic.id().to_string();
                 let message = self.diagnostic.message();
 
-                let Some(range) = range else {
+                let Some(range) = span.range else {
                     let snippet = Snippet::source(source.as_str()).origin(&path).line_start(1);
                     return render(f, level.title(&title).snippet(snippet));
                 };
 
                 // The bits below are a simplified copy from
                 // `crates/ruff_linter/src/message/text.rs`.
-                let index = line_index(self.db, file);
+                let index = line_index(self.db, span.file);
                 let source_code = SourceCode::new(source.as_str(), &index);
 
                 let content_start_index = source_code.line_index(range.start());
