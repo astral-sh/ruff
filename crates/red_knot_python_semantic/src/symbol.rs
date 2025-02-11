@@ -40,6 +40,7 @@ impl<'db> Symbol<'db> {
 
     /// Constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
+    #[allow(unused_variables)]
     pub(crate) fn todo(message: &'static str) -> Self {
         Symbol::Type(todo_type!(message), Boundness::Bound)
     }
