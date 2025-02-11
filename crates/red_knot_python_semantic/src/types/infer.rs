@@ -3349,6 +3349,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
+            // Note that we skip the scope containing the use that we are resolving, since we
+            // already looked for the symbol there up above.
             let mut look_up_eagerly = scope.is_eager(db);
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
