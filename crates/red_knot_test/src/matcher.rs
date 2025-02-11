@@ -257,7 +257,8 @@ impl Matcher {
 
     fn column<T: Diagnostic>(&self, diagnostic: &T) -> OneIndexed {
         diagnostic
-            .range()
+            .span()
+            .and_then(|span| span.range())
             .map(|range| {
                 self.line_index
                     .source_location(range.start(), &self.source)
@@ -383,14 +384,6 @@ mod tests {
 
         fn message(&self) -> Cow<str> {
             self.message.into()
-        }
-
-        fn file(&self) -> Option<File> {
-            Some(self.file)
-        }
-
-        fn range(&self) -> Option<TextRange> {
-            Some(self.range)
         }
 
         fn span(&self) -> Option<Span> {

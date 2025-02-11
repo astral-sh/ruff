@@ -385,14 +385,6 @@ impl Diagnostic for OptionDiagnostic {
         Cow::Borrowed(&self.message)
     }
 
-    fn file(&self) -> Option<File> {
-        self.file
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        self.range
-    }
-
     fn span(&self) -> Option<Span> {
         let mut span = self.file.map(Span::from)?;
         if let Some(range) = self.range {

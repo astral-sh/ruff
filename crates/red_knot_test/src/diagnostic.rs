@@ -26,7 +26,8 @@ where
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
                 line_number: diagnostic
-                    .range()
+                    .span()
+                    .and_then(|span| span.range())
                     .map_or(OneIndexed::from_zero_indexed(0), |range| {
                         line_index.line_index(range.start())
                     }),
@@ -196,14 +197,6 @@ mod tests {
 
         fn message(&self) -> Cow<str> {
             "dummy".into()
-        }
-
-        fn file(&self) -> Option<File> {
-            Some(self.file)
-        }
-
-        fn range(&self) -> Option<TextRange> {
-            Some(self.range)
         }
 
         fn span(&self) -> Option<Span> {

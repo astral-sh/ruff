@@ -802,14 +802,6 @@ impl Diagnostic for TypeCheckDiagnostic {
         TypeCheckDiagnostic::message(self).into()
     }
 
-    fn file(&self) -> Option<File> {
-        Some(TypeCheckDiagnostic::file(self))
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        Some(Ranged::range(self))
-    }
-
     fn span(&self) -> Option<Span> {
         Some(Span::from(self.file).with_range(self.range))
     }

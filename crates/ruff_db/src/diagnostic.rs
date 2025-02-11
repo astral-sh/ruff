@@ -164,20 +164,6 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     fn message(&self) -> Cow<str>;
 
-    /// The file this diagnostic is associated with.
-    ///
-    /// File can be `None` for diagnostics that don't originate from a file.
-    /// For example:
-    /// * A diagnostic indicating that a directory couldn't be read.
-    /// * A diagnostic related to a CLI argument
-    fn file(&self) -> Option<File>;
-
-    /// The primary range of the diagnostic in `file`.
-    ///
-    /// The range can be `None` if the diagnostic doesn't have a file
-    /// or it applies to the entire file (e.g. the file should be executable but isn't).
-    fn range(&self) -> Option<TextRange>;
-
     /// The primary span of the diagnostic.
     ///
     /// The range can be `None` if the diagnostic doesn't have a file
@@ -209,6 +195,21 @@ pub struct Span {
 }
 
 impl Span {
+    /// Returns the `File` attached to this `Span`.
+    pub fn file(&self) -> File {
+        self.file
+    }
+
+    /// Returns the range, if available, attached to this `Span`.
+    ///
+    /// When there is no range, it is convention to assume that this `Span`
+    /// refers to the corresponding `File` as a whole. In some cases, consumers
+    /// of this API may use the range `0..0` to represent this case.
+    pub fn range(&self) -> Option<TextRange> {
+        self.range
+    }
+
+    /// Returns a new `Span` with the given `range` attached to it.
     pub fn with_range(self, range: TextRange) -> Span {
         Span {
             range: Some(range),
@@ -347,14 +348,6 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
-    }
-
     fn span(&self) -> Option<Span> {
         (**self).span()
     }
@@ -376,14 +369,6 @@ where
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
-    }
-
     fn span(&self) -> Option<Span> {
         (**self).span()
     }
@@ -400,14 +385,6 @@ impl Diagnostic for Box<dyn Diagnostic> {
 
     fn message(&self) -> Cow<str> {
         (**self).message()
-    }
-
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
     }
 
     fn span(&self) -> Option<Span> {
@@ -428,14 +405,6 @@ impl Diagnostic for &'_ dyn Diagnostic {
         (**self).message()
     }
 
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
-    }
-
     fn span(&self) -> Option<Span> {
         (**self).span()
     }
@@ -452,14 +421,6 @@ impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
 
     fn message(&self) -> Cow<str> {
         (**self).message()
-    }
-
-    fn file(&self) -> Option<File> {
-        (**self).file()
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        (**self).range()
     }
 
     fn span(&self) -> Option<Span> {
@@ -490,14 +451,6 @@ impl Diagnostic for ParseDiagnostic {
 
     fn message(&self) -> Cow<str> {
         self.error.error.to_string().into()
-    }
-
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        Some(self.error.location)
     }
 
     fn span(&self) -> Option<Span> {
