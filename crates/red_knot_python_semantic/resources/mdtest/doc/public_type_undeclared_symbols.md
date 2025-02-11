@@ -43,12 +43,12 @@ def f(w: Wrapper) -> None:
     c = chr(w.value)
 ```
 
-## False negatives
+## Explicit lack of knowledge
 
-In the first example, we demonstrated how our behavior prevents false positives. However, it can
-also prevent false negatives. The following example contains a bug, but Mypy and Pyright do not
-catch it. To make this a bit more realistic, imagine that `OptionalInt` is imported from an
-external, untyped module:
+The following example demonstrates how Mypy and Pyright's type inference of fully-static types in
+these situations can lead to false-negatives, even though everything appears to be (statically)
+typed. To make this a bit more realistic, imagine that `OptionalInt` is imported from an external,
+untyped module:
 
 `optional_int.py`:
 
@@ -63,23 +63,21 @@ def reset(o):
 It is then used like this:
 
 ```py
-from typing_extensions import assert_type
 from optional_int import OptionalInt, reset
 
 o = OptionalInt()
-
 reset(o)  # Oh no...
 
-# This assertion is incorrect, but Mypy and Pyright do not catch it. We raise the following
-# error: "Actual type `Unknown | Literal[10]` is not the same as asserted type `int`"
-assert_type(o.value, int)
+# Mypy and Pyright infer a fully-static type of `int` here, which appears to make the
+# subsequent division operation safe -- but it is not. We infer the following type:
+reveal_type(o.value)  # revealed: Unknown | Literal[10]
 
 print(o.value // 2)  # Runtime error!
 ```
 
-To be fair, we only catch this due to the `assert_type` call. But the type of
-`Unknown | Literal[10]` for `o.value` reflects more accurately what the possible values of `o.value`
-are.
+We do not catch this mistake either, but we accurately reflect our lack of knowledge about
+`o.value`. Together with a possible future type-checker mode that would detect the prevalance of
+dynamic types, this could help developers catch such mistakes.
 
 ## Stricter behavior
 
