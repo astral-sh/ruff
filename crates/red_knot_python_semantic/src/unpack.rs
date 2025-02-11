@@ -3,7 +3,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 use crate::Db;
@@ -86,17 +85,6 @@ impl<'db> UnpackValue<'db> {
         match self {
             UnpackValue::Assign(expr) | UnpackValue::Iterable(expr) => expr,
         }
-    }
-
-    /// Returns the [`ScopedExpressionId`] of the underlying expression.
-    pub(crate) fn scoped_expression_id(
-        self,
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-    ) -> ScopedExpressionId {
-        self.expression()
-            .node_ref(db)
-            .scoped_expression_id(db, scope)
     }
 
     /// Returns the expression as an [`AnyNodeRef`].
