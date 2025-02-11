@@ -211,6 +211,9 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// Syntax errors
+    #[prefix = "SYN"]
+    Syntax,
 }
 
 pub trait RuleNamespace: Sized {

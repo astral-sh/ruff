@@ -6,8 +6,9 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use red_knot_python_semantic::register_lints;
+use red_knot_python_semantic::syntax::SyntaxDiagnostic;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::{register_lints, Program};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
@@ -15,6 +16,7 @@ use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::{FileType, SystemPath};
 use ruff_python_ast::PySourceType;
+use ruff_python_syntax_errors::check_syntax;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::Durability;
@@ -339,6 +341,22 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
         diagnostic
     }));
+
+    if parsed.errors().is_empty() {
+        // plain `Program::get` was panicking here with `called unwrap on None value`
+        let target_version = Program::try_get(db)
+            .map(|program| program.python_version(db))
+            .unwrap_or_default();
+        diagnostics.extend(
+            check_syntax(parsed, target_version.into())
+                .iter()
+                .map(|error| {
+                    let boxed: Box<dyn Diagnostic> =
+                        Box::new(SyntaxDiagnostic::from_syntax_error(error, file));
+                    boxed
+                }),
+        );
+    }
 
     diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
         let boxed: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
