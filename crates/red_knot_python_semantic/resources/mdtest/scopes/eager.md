@@ -2,9 +2,9 @@
 
 ## Comprehension scopes inside `for` loops
 
-The list comprehension here is eagerly executed, so the `x` variable is definitely bound
-from the perspective of the nested scope, even though it's potentially *unbound* from the
-perspective of code after the `for` loop in the outer scope.
+The list comprehension here is eagerly executed, so the `x` variable is definitely bound from the
+perspective of the nested scope, even though it's potentially *unbound* from the perspective of code
+after the `for` loop in the outer scope.
 
 ```py
 class IntIterator:
@@ -44,7 +44,6 @@ def foo():
             # error: [possibly-unresolved-reference]
             # revealed: Unknown | int
             [reveal_type(x) for _ in IntIterable()]
-
     # error: [possibly-unresolved-reference]
     reveal_type(x)  # revealed: int
 ```
@@ -69,7 +68,6 @@ def f():
 
     def outside_class(self):
         reveal_type(x)  # revealed: Unknown | Literal[2]
-
     x = 2
 ```
 
@@ -86,7 +84,8 @@ def f():
 
     x = 2
 ```
+
 ## Generator expressions
 
-TODO Generator expressions don't necessarily run eagerly, but in practice
-usually they do, so assuming they do is the better default:
+TODO Generator expressions don't necessarily run eagerly, but in practice usually they do, so
+assuming they do is the better default:
