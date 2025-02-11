@@ -114,39 +114,36 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     // `if cmp_left op cmp_right: body_left = body_right`
     let cmp_left = ComparableExpr::from(left);
     let cmp_right = ComparableExpr::from(right);
-    let body_left = ComparableExpr::from(body_target);
-    let body_right = ComparableExpr::from(body_value);
+    let target = ComparableExpr::from(body_target);
+    let assignment_value = ComparableExpr::from(body_value);
 
-    // these booleans are used to understand in which case we are.
-    // The two possible cases that the rule addresses are:
-    // - `if cmp_left op cmp_right: cmp_left = cmp_right`
-    // - `if cmp_left op cmp_right: cmp_right = cmp_left `
-    let cmp_left_is_body_left = cmp_left == body_left;
-    let cmp_right_is_body_right = cmp_right == body_right;
-    let cmp_left_is_body_right = cmp_left == body_right;
-    let cmp_right_is_body_left = cmp_right == body_left;
+    // Ex): if a < b: a = b
+    let (min_max, flip_args) = if cmp_left == target && cmp_right == assignment_value {
+        match op {
+            CmpOp::Lt => (MinMax::Max, false),
+            CmpOp::LtE => (MinMax::Max, true),
+            CmpOp::Gt => (MinMax::Min, false),
+            CmpOp::GtE => (MinMax::Min, true),
+            _ => return,
+        }
+    }
+    // Ex): `if a < b: b = a`
+    else if cmp_left == assignment_value && cmp_right == target {
+        match op {
+            CmpOp::Lt => (MinMax::Min, true),
+            CmpOp::LtE => (MinMax::Min, true),
+            CmpOp::Gt => (MinMax::Max, true),
+            CmpOp::GtE => (MinMax::Max, false),
+            _ => return,
+        }
+    } else {
+        return;
+    };
 
-    let (min_max, arg1, arg2) = match (
-        cmp_left_is_body_left,
-        cmp_right_is_body_right,
-        cmp_left_is_body_right,
-        cmp_right_is_body_left,
-    ) {
-        (true, true, false, false) => match op {
-            CmpOp::LtE => (MinMax::Max, right, &**left),
-            CmpOp::GtE => (MinMax::Min, right, &**left),
-            CmpOp::Gt => (MinMax::Min, &**left, right),
-            CmpOp::Lt => (MinMax::Max, &**left, right),
-            _ => return,
-        },
-        (false, false, true, true) => match op {
-            CmpOp::LtE => (MinMax::Min, right, &**left),
-            CmpOp::GtE => (MinMax::Max, &**left, right),
-            CmpOp::Gt => (MinMax::Max, right, &**left),
-            CmpOp::Lt => (MinMax::Min, right, &**left),
-            _ => return,
-        },
-        _ => return,
+    let (arg1, arg2) = if flip_args {
+        (right, &**left)
+    } else {
+        (&**left, right)
     };
 
     let replacement = format!(
