@@ -23,6 +23,12 @@ use crate::settings::LinterSettings;
 /// Standard-library modules can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-allowed-modules`] configuration option.
 ///
+/// By default, only the last component of the module name is considered, so `logging.py`,
+/// `a/logging.py`, `a/b/logging.py`, and so on would all clash with the builtin `logging` module.
+/// With the [`lint.flake8-builtins.builtins-strict-checking`] option set to `false`, the module
+/// path is considered, so only a top-level `logging.py` or `logging/__init__.py` will trigger the
+/// rule and `utils/logging.py`, for example, would not.
+///
 /// This rule is not applied to stub files, as the name of a stub module is out
 /// of the control of the author of the stub file. Instead, a stub should aim to
 /// faithfully emulate the runtime module it is stubbing.
@@ -43,6 +49,7 @@ use crate::settings::LinterSettings;
 ///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
+/// - `lint.flake8-builtins.builtins-strict-checking`
 #[derive(ViolationMetadata)]
 pub(crate) struct StdlibModuleShadowing {
     name: String,

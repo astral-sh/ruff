@@ -1149,6 +1149,8 @@ pub struct Flake8BuiltinsOptions {
         example = "builtins-strict-checking = false"
     )]
     /// Compare module names instead of full module paths.
+    ///
+    /// Used by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).
     pub builtins_strict_checking: Option<bool>,
 }
 
