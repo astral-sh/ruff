@@ -103,9 +103,26 @@ where
 
 impl<T> Eq for AstNodeRef<T> where T: Eq {}
 
-impl<T> Hash for AstNodeRef<T> {
+impl<T> Hash for AstNodeRef<T>
+where
+    T: Hash,
+{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node.hash(state);
+        self.node().hash(state);
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe impl<T> salsa::Update for AstNodeRef<T> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = &mut (*old_pointer);
+
+        if old_ref.parsed == new_value.parsed && old_ref.node.eq(&new_value.node) {
+            false
+        } else {
+            *old_ref = new_value;
+            true
+        }
     }
 }
 
