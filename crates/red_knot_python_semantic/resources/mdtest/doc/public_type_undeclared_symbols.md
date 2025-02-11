@@ -88,9 +88,15 @@ class, this would probably be:
 class OptionalInt:
     value: int | None = 10
 
+o = OptionalInt()
+
 # The following public type is now
 # revealed: int | None
-reveal_type(OptionalInt.value)
+reveal_type(o.value)
+
+# Incompatible assignments are now caught:
+# error: "Object of type `Literal["a"]` is not assignable to attribute `value` of type `int | None`"
+o.value = "a"
 ```
 
 ## What is meant by 'public' type?
