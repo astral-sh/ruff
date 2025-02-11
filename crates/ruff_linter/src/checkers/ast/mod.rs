@@ -26,6 +26,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
+use ruff_python_syntax_errors::SyntaxChecker;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -34,7 +35,9 @@ use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{
+    source_order::SourceOrderVisitor, walk_except_handler, walk_pattern, Visitor,
+};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
     ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
@@ -225,6 +228,9 @@ pub(crate) struct Checker<'a> {
     docstring_state: DocstringState,
     /// The target [`PythonVersion`] for version-dependent checks
     target_version: PythonVersion,
+
+    #[allow(clippy::struct_field_names)]
+    syntax_checker: SyntaxChecker,
 }
 
 impl<'a> Checker<'a> {
@@ -272,6 +278,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
+            syntax_checker: SyntaxChecker::new(target_version),
         }
     }
 }
@@ -516,6 +523,8 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        self.syntax_checker.visit_stmt(stmt);
+
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -2739,5 +2748,18 @@ pub(crate) fn check_ast(
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&checker);
 
-    checker.diagnostics.take()
+    // checker.syntax_checker.
+
+    let mut diagnostics = checker.diagnostics.take();
+
+    diagnostics.extend(checker.syntax_checker.finish().map(|error| {
+        Diagnostic::new(
+            crate::rules::syntax::VersionSyntaxError {
+                message: error.message(),
+            },
+            error.range,
+        )
+    }));
+
+    diagnostics
 }

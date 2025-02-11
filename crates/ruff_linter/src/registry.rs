@@ -211,6 +211,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// Version-related syntax errors
+    #[prefix = "SYN"]
+    VersionSyntaxErrors,
 }
 
 pub trait RuleNamespace: Sized {
