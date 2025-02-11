@@ -1,91 +1,182 @@
-# Some scopes are eagerly executed
+# Eager scopes
 
-## Comprehension scopes inside `for` loops
+Some scopes are executed eagerly: references to variables defined in enclosing scopes are resolved
+_immediately_. This is in constrast to (for instance) function scopes, where those references are
+resolved when the function is called.
 
-The list comprehension here is eagerly executed, so the `x` variable is definitely bound from the
-perspective of the nested scope, even though it's potentially *unbound* from the perspective of code
-after the `for` loop in the outer scope.
+## Function definitions
+
+Function definitions are evaluated lazily.
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
+x = 1
 
 def f():
-    for x in IntIterable():
-        reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: Unknown | Literal[2]
 
-        # revealed: int
-        [reveal_type(x) for _ in IntIterable()]
-
-    # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: int
+x = 2
 ```
 
-## Eager scopes inside lazy scopes
+## Class definitions
+
+Class definitions are evaluated eagerly.
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
-def foo():
-    for x in IntIterable():
-        reveal_type(x)  # revealed: int
-        def bar():
-            # error: [possibly-unresolved-reference]
-            # revealed: Unknown | int
-            [reveal_type(x) for _ in IntIterable()]
-    # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: int
-```
-
-## Lazy scopes inside eager scopes
-
-Since the class definition is resolved eagerly, the first `reveal_type` only sees the `x = 1`
-binding. However, the function inside of the class definition is resolved lazily, so it sees the
-public type of `x`. Because `x` has no declared type, we currently widen the inferred type to
-include `Unknown`.
-
-(Put another way, the lazy scopes created for the two functions see the outer `x` in the same way,
-even though one of them appears inside an eager class definition scope.)
-
-```py
-def f():
+def _():
     x = 1
 
-    class Foo:
-        def in_class(self):
-            reveal_type(x)  # revealed: Unknown | Literal[2]
+    class A:
+        reveal_type(x)  # revealed: Literal[1]
 
-    def outside_class(self):
-        reveal_type(x)  # revealed: Unknown | Literal[2]
     x = 2
 ```
 
-## Class scopes
+## List comprehensions
 
-Class definitions are evaluated eagerly, and see the bindings at the point of definition.
+List comprehensions are evaluated eagerly.
 
 ```py
-def f():
+def _():
     x = 1
 
-    class Foo:
-        reveal_type(x)  # revealed: Literal[1]
+    # revealed: Literal[1]
+    [reveal_type(x) for a in range(0)]
+
+    x = 2
+```
+
+## Set comprehensions
+
+Set comprehensions are evaluated eagerly.
+
+```py
+def _():
+    x = 1
+
+    # revealed: Literal[1]
+    {reveal_type(x) for a in range(0)}
+
+    x = 2
+```
+
+## Dict comprehensions
+
+Dict comprehensions are evaluated eagerly.
+
+```py
+def _():
+    x = 1
+
+    # revealed: Literal[1]
+    {a: reveal_type(x) for a in range(0)}
 
     x = 2
 ```
 
 ## Generator expressions
 
-TODO Generator expressions don't necessarily run eagerly, but in practice usually they do, so
-assuming they do is the better default:
+Generator expressions don't necessarily run eagerly, but in practice usually they do, so assuming
+they do is the better default.
+
+```py
+def _():
+    x = 1
+
+    # revealed: Literal[1]
+    list(reveal_type(x) for a in range(0))
+
+    x = 2
+```
+
+## Lazy scopes are "sticky"
+
+As we look through each enclosing scope when resolving a reference, lookups become lazy as soon as
+we encounter any lazy scope, even if there are other eager scopes that enclose it.
+
+### Eager scope within eager scope
+
+If we don't encounter a lazy scope, lookup remains eager. The resolved binding is not necessarily in
+the immediately enclosing scope. Here, the list comprehension and class definition are both eager
+scopes, and we immediately resolve the use of `x` to (only) the `x = 1` binding.
+
+```py
+def _():
+    x = 1
+
+    class A:
+        # revealed: Literal[1]
+        [reveal_type(x) for a in range(0)]
+
+    x = 2
+```
+
+### Eager scope within a lazy scope
+
+The list comprehension is an eager scope, and it is enclosed within a function definition, which is
+a lazy scope. Because we pass through this lazy scope before encountering any bindings or
+definitions, the lookup is lazy.
+
+```py
+def _():
+    x = 1
+
+    def f():
+        # revealed: Unknown | Literal[2]
+        [reveal_type(x) for a in range(0)]
+
+    x = 2
+```
+
+### Lazy scope within an eager scope
+
+The function definition is a lazy scope, and it is enclosed within a class definition, which is an
+eager scope. Even though we pass through an eager scope before encountering any bindings or
+definitions, the lookup remains lazy.
+
+```py
+def _():
+    x = 1
+
+    class A:
+        def f():
+            # revealed: Unknown | Literal[2]
+            reveal_type(x)
+
+    x = 2
+```
+
+### Lazy scope within a lazy scope
+
+No matter how many lazy scopes we pass through before encountering a binding or definition, the
+lookup remains lazy.
+
+```py
+def _():
+    x = 1
+
+    def f():
+        def g():
+            # revealed: Unknown | Literal[2]
+            reveal_type(x)
+
+    x = 2
+```
+
+## Eager scope within a lazy scope within another eager scope
+
+We have a list comprehension (eager scope), enclosed within a function definition (lazy scope),
+enclosed within a class definition, all of which we must pass through before encountering any
+binding of `x`. Even though the last scope we pass through is eager, the lookup is lazy, since we
+encountered a lazy scope on the way.
+
+```py
+def _():
+    x = 1
+
+    class A:
+        def f():
+            # revealed: Unknown | Literal[2]
+            [reveal_type(x) for a in range(0)]
+
+    x = 2
+```
