@@ -8,7 +8,7 @@ pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
@@ -464,6 +464,10 @@ impl Diagnostic for IOErrorDiagnostic {
 
     fn range(&self) -> Option<TextRange> {
         None
+    }
+
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file))
     }
 
     fn severity(&self) -> Severity {

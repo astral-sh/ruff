@@ -182,17 +182,7 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
     ///
     /// The range can be `None` if the diagnostic doesn't have a file
     /// or it applies to the entire file (e.g. the file should be executable but isn't).
-    fn span(&self) -> Option<Span> {
-        // NOTE: This temporary implementation specifically rejects the
-        // possible case of a present `TextRange` but a missing `File`.
-        // During this re-factor, we'll specifically prevent this case
-        // from happening by construction.
-        let mut span = self.file().map(Span::from)?;
-        if let Some(range) = self.range() {
-            span = span.with_range(range);
-        }
-        Some(span)
-    }
+    fn span(&self) -> Option<Span>;
 
     fn severity(&self) -> Severity;
 
@@ -365,6 +355,10 @@ where
         (**self).range()
     }
 
+    fn span(&self) -> Option<Span> {
+        (**self).span()
+    }
+
     fn severity(&self) -> Severity {
         (**self).severity()
     }
@@ -390,6 +384,10 @@ where
         (**self).range()
     }
 
+    fn span(&self) -> Option<Span> {
+        (**self).span()
+    }
+
     fn severity(&self) -> Severity {
         (**self).severity()
     }
@@ -410,6 +408,10 @@ impl Diagnostic for Box<dyn Diagnostic> {
 
     fn range(&self) -> Option<TextRange> {
         (**self).range()
+    }
+
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -434,6 +436,10 @@ impl Diagnostic for &'_ dyn Diagnostic {
         (**self).range()
     }
 
+    fn span(&self) -> Option<Span> {
+        (**self).span()
+    }
+
     fn severity(&self) -> Severity {
         (**self).severity()
     }
@@ -454,6 +460,10 @@ impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
 
     fn range(&self) -> Option<TextRange> {
         (**self).range()
+    }
+
+    fn span(&self) -> Option<Span> {
+        (**self).span()
     }
 
     fn severity(&self) -> Severity {
@@ -488,6 +498,10 @@ impl Diagnostic for ParseDiagnostic {
 
     fn range(&self) -> Option<TextRange> {
         Some(self.error.location)
+    }
+
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file).with_range(self.error.location))
     }
 
     fn severity(&self) -> Severity {

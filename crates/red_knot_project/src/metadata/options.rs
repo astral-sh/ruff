@@ -4,7 +4,7 @@ use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelect
 use red_knot_python_semantic::{
     ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
 };
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
@@ -391,6 +391,14 @@ impl Diagnostic for OptionDiagnostic {
 
     fn range(&self) -> Option<TextRange> {
         self.range
+    }
+
+    fn span(&self) -> Option<Span> {
+        let mut span = self.file.map(Span::from)?;
+        if let Some(range) = self.range {
+            span = span.with_range(range);
+        }
+        Some(span)
     }
 
     fn severity(&self) -> Severity {
