@@ -1,8 +1,7 @@
-//! [`SyntaxChecker`] for AST-based syntax errors. //
+//! [`SyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SourceOrderVisitor::enter_node`] method should be called on every node by
-//! a parent `Visitor`.
+//! [`SyntaxChecker::enter_stmt`] method should be called on every node by a parent `Visitor`.
 
 use ruff_python_ast::{Stmt, StmtExpr, StmtImportFrom, StmtMatch};
 use ruff_text_size::TextRange;
