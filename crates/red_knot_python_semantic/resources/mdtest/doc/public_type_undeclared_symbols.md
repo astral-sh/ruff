@@ -36,11 +36,11 @@ where `wrapper.value` is used in a way that is incompatible with `None`:
 ```py
 def f(w: Wrapper) -> None:
     # This is fine
-    x: int | None = w.value
+    v: int | None = w.value
 
-    # This is not okay because `w.value` could be `None`. We therefore raise the following
-    # error: "Object of type `Unknown | None` is not assignable to `int`"
-    y: int = w.value
+    # This function call is incorrect, because `w.value` could be `None`. We therefore emit the following
+    # error: "`Unknown | None` cannot be assigned to parameter 1 (`i`) of function `chr`; expected type `int`"
+    c = chr(w.value)
 ```
 
 ## False negatives
