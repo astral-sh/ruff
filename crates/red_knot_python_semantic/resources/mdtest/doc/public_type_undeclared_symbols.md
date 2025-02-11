@@ -17,10 +17,10 @@ wrapper.value = 1
 ```
 
 Mypy and Pyright both infer a type of `None` for the type of `wrapper.value`. Consequently, both
-tools raise an error when trying to assign `1` to `wrapper.value`. But there is nothing wrong with
-this program. Raising an error here violates the [gradual guarantee] which states that *"Removing
+tools emit an error when trying to assign `1` to `wrapper.value`. But there is nothing wrong with
+this program. Emitting an error here violates the [gradual guarantee] which states that *"Removing
 type annotations (making the program more dynamic) should not result in additional static type
-errors."*: If `value` were annotated with `int | None` here, Mypy and Pyright would not raise any
+errors."*: If `value` were annotated with `int | None` here, Mypy and Pyright would not emit any
 errors.
 
 By inferring `Unknown | None` instead, we allow arbitrary values to be assigned to `wrapper.value`.
@@ -45,10 +45,10 @@ def f(w: Wrapper) -> None:
 
 ## False negatives
 
-In the first example, we demonstrated how our behavior prevents false positives. Howeer, it can also
-prevent false negatives. The following example contains a bug, but Mypy and Pyright do not catch it.
-To make this a bit more realistic, imagine that `OptionalInt` is important from an external, untyped
-module:
+In the first example, we demonstrated how our behavior prevents false positives. However, it can
+also prevent false negatives. The following example contains a bug, but Mypy and Pyright do not
+catch it. To make this a bit more realistic, imagine that `OptionalInt` is imported from an
+external, untyped module:
 
 `optional_int.py`:
 
