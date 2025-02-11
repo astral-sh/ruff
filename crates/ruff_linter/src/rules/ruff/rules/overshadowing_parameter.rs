@@ -1,11 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::StmtFunctionDef;
 use ruff_python_semantic::{
     Binding, BindingId, BindingKind, ScopeId, ScopeKind, Scopes, SemanticModel,
-    TypingOnlyBindingsStatus,
 };
-use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::fixture_decorator;
@@ -58,9 +55,7 @@ pub(crate) fn overshadowing_parameter(checker: &Checker, binding: &Binding) -> O
     }
 
     let semantic = checker.semantic();
-    let function = binding.statement(semantic)?.as_function_def_stmt()?;
-
-    let (parent_scope, overshadowed) = find_overshadowed_binding(binding, function, checker)?;
+    let (parent_scope, overshadowed) = find_overshadowed_binding(binding, checker)?;
 
     if parent_scope.is_global() && binding_is_pytest_fixture(overshadowed, semantic) {
         return None;
@@ -69,15 +64,27 @@ pub(crate) fn overshadowing_parameter(checker: &Checker, binding: &Binding) -> O
     Some(Diagnostic::new(OvershadowingParameter, binding.range))
 }
 
-/// Look for an existing binding from outer scopes with the same name as `binding`.
+/// Look for an existing binding from outer scopes
+/// with the same name as `binding`
+/// using [`SemanticModel::lookup_symbol_in_scope`].
 ///
-/// If the parent scope has that name, return its binding.
-/// Otherwise, use [`SemanticModel::simulate_runtime_load_at_location_in_scope`].
-fn find_overshadowed_binding(
-    binding: &Binding,
-    function: &StmtFunctionDef,
-    checker: &Checker,
-) -> Option<(ScopeId, BindingId)> {
+/// If the parent scope is that of a class, it is skipped.
+/// This is because from within the function,
+/// a class-based binding cannot be accessed directly,
+/// except for class-level type parameters,
+/// which are bound to [`ScopeKind::Type`] scopes.
+///
+/// For example:
+///
+/// ```python
+/// class C[T]:
+///     def __init__(self, a, T):  # Same as `T` the type parameter
+///         self._a = a  # Not `a` the property/method
+///
+///     @property
+///     def a(self): ...
+/// ```
+fn find_overshadowed_binding(binding: &Binding, checker: &Checker) -> Option<(ScopeId, BindingId)> {
     let semantic = checker.semantic();
     let source = checker.source();
     let scopes = &semantic.scopes;
@@ -87,16 +94,14 @@ fn find_overshadowed_binding(
     let binding_name = binding.name(source);
     let parent_scope = &scopes[parent_scope_id];
 
-    if let Some(overshadowed) = parent_scope.get(binding_name) {
-        return Some((parent_scope_id, overshadowed));
-    }
+    let scope_to_start_searching_in = if parent_scope.kind.is_class() {
+        parent_scope.parent?
+    } else {
+        parent_scope_id
+    };
 
-    let overshadowed = semantic.simulate_runtime_load_at_location_in_scope(
-        binding_name,
-        TextRange::at(function.start(), 1.into()),
-        parent_scope_id,
-        TypingOnlyBindingsStatus::Allowed,
-    )?;
+    let overshadowed =
+        semantic.lookup_symbol_in_scope(binding_name, scope_to_start_searching_in, false)?;
 
     Some((parent_scope_id, overshadowed))
 }
@@ -105,7 +110,7 @@ fn find_overshadowed_binding(
 /// in which `parameter` is defined.
 ///
 /// This is necessary since the immediate parent scope of a function scope
-/// is always its "type" scope (see [`BindingKind::TypeParam`]).
+/// is always its "type" scope (see [`ScopeKind::Type`]).
 fn actual_parent_scope(parameter: &Binding, scopes: &Scopes) -> Option<ScopeId> {
     let current = &scopes[parameter.scope];
 

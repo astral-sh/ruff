@@ -52,6 +52,10 @@ def outer_10():
     def inner_10(outer_100): ...
 
 
+class Outer11[T]:
+    def inner_11(self, T): ...
+
+
 ### No errors
 
 def outer_100(): ...
@@ -69,3 +73,18 @@ def outer_103():
 
 def outer_104():
     def inner_104[outer_104](): ...
+
+
+class Outer105:
+    a = 1
+    def inner_105(self, a): ...
+
+
+class Outer106:
+    def inner_105(self, a): ...
+    a = 1
+
+
+class Outer107:
+    def inner_105(self, a): ...
+    def a(self): ...
