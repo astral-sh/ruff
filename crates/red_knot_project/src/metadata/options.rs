@@ -5,10 +5,9 @@ use red_knot_python_semantic::{
     ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
 };
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -189,7 +188,14 @@ impl Options {
                         ),
                     };
 
-                    diagnostics.push(diagnostic.with_file(file).with_range(rule_name.range()));
+                    let span = file.map(Span::from).map(|span| {
+                        if let Some(range) = rule_name.range() {
+                            span.with_range(range)
+                        } else {
+                            span
+                        }
+                    });
+                    diagnostics.push(diagnostic.with_span(span));
                 }
             }
         }
@@ -348,8 +354,7 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
-    file: Option<File>,
-    range: Option<TextRange>,
+    span: Option<Span>,
 }
 
 impl OptionDiagnostic {
@@ -358,21 +363,13 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
-            file: None,
-            range: None,
+            span: None,
         }
     }
 
     #[must_use]
-    fn with_file(mut self, file: Option<File>) -> Self {
-        self.file = file;
-        self
-    }
-
-    #[must_use]
-    fn with_range(mut self, range: Option<TextRange>) -> Self {
-        self.range = range;
-        self
+    fn with_span(self, span: Option<Span>) -> Self {
+        OptionDiagnostic { span, ..self }
     }
 }
 
@@ -386,11 +383,7 @@ impl Diagnostic for OptionDiagnostic {
     }
 
     fn span(&self) -> Option<Span> {
-        let mut span = self.file.map(Span::from)?;
-        if let Some(range) = self.range {
-            span = span.with_range(range);
-        }
-        Some(span)
+        self.span
     }
 
     fn severity(&self) -> Severity {
