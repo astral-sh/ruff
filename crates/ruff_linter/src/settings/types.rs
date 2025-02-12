@@ -74,13 +74,6 @@ impl From<PythonVersion> for pep440_rs::Version {
     }
 }
 
-impl From<PythonVersion> for ruff_python_syntax_errors::PythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        let (major, minor) = value.as_tuple();
-        Self { major, minor }
-    }
-}
-
 impl PythonVersion {
     pub const fn as_tuple(&self) -> (u8, u8) {
         match self {

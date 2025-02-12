@@ -573,7 +573,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             return_types_and_ranges: vec![],
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
-            syntax_checker: SyntaxChecker::new(target_version.into()),
+            syntax_checker: SyntaxChecker::new(target_version),
         }
     }
 
