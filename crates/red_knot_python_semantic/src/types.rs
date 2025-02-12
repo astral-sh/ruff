@@ -108,7 +108,9 @@ fn widen_type_for_undeclared_public_symbol<'db>(
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SymbolLookup {
+    /// Look up the symbol as seen from within the same module.
     Internal,
+    /// Look up the symbol as seen from outside the module.
     External,
 }
 
@@ -402,11 +404,6 @@ fn symbol_from_bindings<'db>(
             let binding = binding?;
 
             if is_non_exported(binding) {
-                tracing::debug!(
-                    "Skipping non-exported declaration at {:?} in {}",
-                    binding.kind(db).target_range(),
-                    binding.file(db).path(db),
-                );
                 return None;
             }
 
@@ -536,11 +533,6 @@ fn symbol_from_declarations<'db>(
             let declaration = declaration?;
 
             if is_non_exported(declaration) {
-                tracing::debug!(
-                    "Skipping non-exported declaration at {:?} in {}",
-                    declaration.kind(db).target_range(),
-                    declaration.file(db).path(db),
-                );
                 return None;
             }
 
