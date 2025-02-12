@@ -587,12 +587,12 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-cncf-kubernetes
         ["airflow", "executors", "kubernetes_executor_types", "ALL_NAMESPACES"] => Replacement::ProviderName{
-                name: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES",
+            name: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
         ["airflow", "executors", "kubernetes_executor_types", "POD_EXECUTOR_DONE_KEY"] => Replacement::ProviderName{
-                name: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
+            name: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
