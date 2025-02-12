@@ -59,7 +59,7 @@ pub struct Project {
 impl Project {
     pub(super) fn resolve_requires_python_lower_bound(
         &self,
-    ) -> Result<Option<RangedValue<PythonVersion>>, TooLargeRequiresPythonError> {
+    ) -> Result<Option<RangedValue<PythonVersion>>, ResolveRequiresPythonError> {
         let Some(requires_python) = self.requires_python.as_ref() else {
             return Ok(None);
         };
@@ -81,8 +81,12 @@ impl Project {
             // right move. Overall, using `>` without a patch release is most likely bogus.
             Bound::Excluded(version) => version,
 
-            // Ex) `<3.10`
-            Bound::Unbounded => return Ok(None),
+            // Ex) `<3.10` or ``
+            Bound::Unbounded => {
+                return Err(ResolveRequiresPythonError::NoLowerBound(
+                    requires_python.to_string(),
+                ))
+            }
         };
 
         // Take the major and minor version
@@ -96,8 +100,10 @@ impl Project {
 
         tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
 
-        let major = u8::try_from(major).map_err(|_| TooLargeRequiresPythonError::Major(major))?;
-        let minor = u8::try_from(minor).map_err(|_| TooLargeRequiresPythonError::Major(minor))?;
+        let major =
+            u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
+        let minor =
+            u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(minor))?;
 
         let python_version = PythonVersion::from((major, minor));
 
@@ -110,11 +116,13 @@ impl Project {
 }
 
 #[derive(Debug, Error)]
-pub enum TooLargeRequiresPythonError {
+pub enum ResolveRequiresPythonError {
     #[error("The major version `{0}` is larger than the maximum supported value 255")]
-    Major(u64),
+    TooLargeMajor(u64),
     #[error("The minor version `{0}` is larger than the maximum supported value 255")]
-    Minor(u64),
+    TooLargeMinor(u64),
+    #[error("value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`).")]
+    NoLowerBound(String),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
