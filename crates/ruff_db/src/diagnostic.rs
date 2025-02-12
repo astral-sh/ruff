@@ -172,13 +172,18 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     fn severity(&self) -> Severity;
 
-    fn display<'a>(&'a self, db: &'a dyn Db) -> DisplayDiagnostic<'a>
+    fn display<'db, 'diag, 'config>(
+        &'diag self,
+        db: &'db dyn Db,
+        config: &'config DisplayDiagnosticConfig,
+    ) -> DisplayDiagnostic<'db, 'diag, 'config>
     where
         Self: Sized,
     {
         DisplayDiagnostic {
             db,
             diagnostic: self,
+            config,
         }
     }
 }
@@ -232,18 +237,29 @@ pub enum Severity {
     Fatal,
 }
 
-pub struct DisplayDiagnostic<'db> {
-    db: &'db dyn Db,
-    diagnostic: &'db dyn Diagnostic,
+/// Configuration for rendering diagnostics.
+#[derive(Clone, Debug, Default)]
+pub struct DisplayDiagnosticConfig {
+    /// Whether to enable colors or not.
+    ///
+    /// Disabled by default.
+    color: bool,
 }
 
-impl<'db> DisplayDiagnostic<'db> {
-    pub fn new(db: &'db dyn Db, diagnostic: &'db dyn Diagnostic) -> Self {
-        Self { db, diagnostic }
+impl DisplayDiagnosticConfig {
+    /// Whether to enable colors or not.
+    pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig { color: yes }
     }
 }
 
-impl std::fmt::Display for DisplayDiagnostic<'_> {
+pub struct DisplayDiagnostic<'db, 'diag, 'config> {
+    db: &'db dyn Db,
+    diagnostic: &'diag dyn Diagnostic,
+    config: &'config DisplayDiagnosticConfig,
+}
+
+impl std::fmt::Display for DisplayDiagnostic<'_, '_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let level = match self.diagnostic.severity() {
             Severity::Info => Level::Info,
@@ -260,7 +276,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
         };
 
         let render = |f: &mut std::fmt::Formatter, message| {
-            let renderer = if !cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize() {
+            let renderer = if self.config.color {
                 Renderer::styled()
             } else {
                 Renderer::plain()
