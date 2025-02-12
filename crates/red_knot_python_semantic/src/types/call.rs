@@ -10,6 +10,7 @@ mod bind;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{bind_call, CallBinding};
 
+#[must_use]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum CallOutcome<'db> {
     Callable {
@@ -48,6 +49,10 @@ impl<'db> CallOutcome<'db> {
             called_ty,
             outcomes: outcomes.into_iter().collect(),
         }
+    }
+
+    pub(super) fn is_possibly_unbound(&self) -> bool {
+        matches!(self, Self::PossiblyUnboundDunderCall { .. })
     }
 
     /// Get the return type of the call, or `None` if not callable.
@@ -215,24 +220,23 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
+#[must_use]
+#[derive(Debug)]
 pub(super) enum CallDunderOutcome<'db> {
     Call(CallOutcome<'db>),
-    PossiblyUnbound(CallOutcome<'db>),
     MethodNotAvailable,
 }
 
 impl<'db> CallDunderOutcome<'db> {
-    pub(super) fn call_outcome(&self) -> Option<&CallOutcome<'db>> {
-        match self {
-            Self::Call(outcome) | Self::PossiblyUnbound(outcome) => Some(outcome),
-            Self::MethodNotAvailable => None,
-        }
-    }
-
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::Call(outcome) => outcome.return_type(db),
-            Self::PossiblyUnbound { .. } => None,
+            Self::Call(outcome) => {
+                if outcome.is_possibly_unbound() {
+                    None
+                } else {
+                    outcome.return_type(db)
+                }
+            }
             Self::MethodNotAvailable => None,
         }
     }
@@ -293,6 +297,7 @@ impl<'db> NotCallableError<'db> {
     }
 }
 
+#[must_use]
 #[derive(Debug)]
 pub(super) enum CallDunderLenOutcome<'db> {
     /// The length is statically known.
@@ -300,9 +305,6 @@ pub(super) enum CallDunderLenOutcome<'db> {
 
     /// The length is determined by calling `__len__`.
     Call(CallOutcome<'db>),
-
-    /// The length is determined by calling `__len__` but it isn't always bound.
-    PossiblyUnbound(CallOutcome<'db>),
 
     /// The object doesn't have a `__len__` method and, thus, doesn't implement sized.
     MethodNotAvailable,
@@ -315,8 +317,7 @@ impl<'db> CallDunderLenOutcome<'db> {
                 // TODO: Fall back to `int` if value is too large?
                 i64::try_from(*len).ok().map(Type::IntLiteral)
             }
-            CallDunderLenOutcome::Call(call_outcome)
-            | CallDunderLenOutcome::PossiblyUnbound(call_outcome) => call_outcome.return_type(db),
+            CallDunderLenOutcome::Call(call_outcome) => call_outcome.return_type(db),
             CallDunderLenOutcome::MethodNotAvailable => None,
         }
     }

@@ -50,7 +50,9 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
-use crate::types::call::{Argument, CallArguments, CallOutcome};
+use crate::types::call::{
+    Argument, CallArguments, CallDunderLenOutcome, CallDunderOutcome, CallOutcome,
+};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
@@ -3346,7 +3348,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             KnownFunction::Len => {
-                // TODO: Assert that the argument implements the `Sized` protocol (correctly).
+                let Some(sized) = binding.one_parameter_type() else {
+                    return call;
+                };
+
+                if let CallDunderLenOutcome::Call(_) = sized.__len__(self.db()) {
+                    // TODO: Assert that the argument implements the `Sized` protocol (correctly).
+                }
             }
             _ => {}
         }
@@ -3671,14 +3679,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let Some(call) = operand_type
-                    .call_dunder(
-                        self.db(),
-                        unary_dunder_method,
-                        &CallArguments::positional([operand_type]),
-                    )
-                    .call_outcome()
-                {
+                if let CallDunderOutcome::Call(call) = operand_type.call_dunder(
+                    self.db(),
+                    unary_dunder_method,
+                    &CallArguments::positional([operand_type]),
+                ) {
                     match call.return_type_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {

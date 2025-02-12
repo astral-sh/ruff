@@ -1907,9 +1907,6 @@ impl<'db> Type<'db> {
         match self.call_dunder(db, "__len__", &CallArguments::positional([*self])) {
             CallDunderOutcome::MethodNotAvailable => CallDunderLenOutcome::MethodNotAvailable,
             CallDunderOutcome::Call(outcome) => CallDunderLenOutcome::Call(outcome),
-            CallDunderOutcome::PossiblyUnbound(outcome) => {
-                CallDunderLenOutcome::PossiblyUnbound(outcome)
-            }
         }
     }
 
@@ -1918,9 +1915,8 @@ impl<'db> Type<'db> {
     ///
     /// In the second case, the return type of `len()` in `typeshed` (`int`)
     /// is used as a fallback.
+    #[must_use]
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let len = self.__len__(db).return_type(db)?;
-
         fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 Type::IntLiteral(value) => (value >= 0).then_some(ty),
@@ -1936,11 +1932,12 @@ impl<'db> Type<'db> {
             }
         }
 
+        let len = self.__len__(db).return_type(db)?;
+
         non_negative_int_literal(db, len)
     }
 
     /// Return the outcome of calling an object of this type.
-    #[must_use]
     fn call(self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> CallOutcome<'db> {
         match self {
             Type::FunctionLiteral(function_type) => {
@@ -2068,15 +2065,18 @@ impl<'db> Type<'db> {
                             not_callable_ty: self,
                         }
                     }
+                    // Turn "possibly unbound object of type `Literal['__call__']`"
+                    // into "`X` not callable (possibly unbound `__call__` method)"
+                    CallDunderOutcome::Call(CallOutcome::PossiblyUnboundDunderCall {
+                        called_ty: _,
+                        call_outcome,
+                    }) => CallOutcome::PossiblyUnboundDunderCall {
+                        called_ty: self,
+                        call_outcome,
+                    },
+
                     CallDunderOutcome::Call(outcome) => outcome,
-                    CallDunderOutcome::PossiblyUnbound(call_outcome) => {
-                        // Turn "possibly unbound object of type `Literal['__call__']`"
-                        // into "`X` not callable (possibly unbound `__call__` method)"
-                        CallOutcome::PossiblyUnboundDunderCall {
-                            called_ty: self,
-                            call_outcome: Box::new(call_outcome),
-                        }
-                    }
+
                     CallDunderOutcome::MethodNotAvailable => {
                         // Turn "`X.__call__` unbound" into "`X` not callable"
                         CallOutcome::NotCallable {
@@ -2111,7 +2111,6 @@ impl<'db> Type<'db> {
     /// `receiver_ty` must be `Type::Instance(_)` or `Type::ClassLiteral`.
     ///
     /// TODO: handle `super()` objects properly
-    #[must_use]
     fn call_bound(
         self,
         db: &'db dyn Db,
@@ -2163,7 +2162,10 @@ impl<'db> Type<'db> {
                 CallDunderOutcome::Call(callable_ty.call(db, arguments))
             }
             Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                CallDunderOutcome::PossiblyUnbound(callable_ty.call(db, arguments))
+                CallDunderOutcome::Call(CallOutcome::PossiblyUnboundDunderCall {
+                    call_outcome: Box::new(callable_ty.call(db, arguments)),
+                    called_ty: callable_ty,
+                })
             }
             Symbol::Unbound => CallDunderOutcome::MethodNotAvailable,
         }
@@ -2187,8 +2189,7 @@ impl<'db> Type<'db> {
         let dunder_iter_result =
             self.call_dunder(db, "__iter__", &CallArguments::positional([self]));
         match dunder_iter_result {
-            CallDunderOutcome::Call(ref call_outcome)
-            | CallDunderOutcome::PossiblyUnbound(ref call_outcome) => {
+            CallDunderOutcome::Call(ref call_outcome) => {
                 let Some(iterator_ty) = call_outcome.return_type(db) else {
                     return IterationOutcome::NotIterable {
                         not_iterable_ty: self,
@@ -2199,7 +2200,7 @@ impl<'db> Type<'db> {
                     .call_dunder(db, "__next__", &CallArguments::positional([iterator_ty]))
                     .return_type(db)
                 {
-                    if matches!(dunder_iter_result, CallDunderOutcome::PossiblyUnbound(..)) {
+                    if call_outcome.is_possibly_unbound() {
                         IterationOutcome::PossiblyUnboundDunderIter {
                             iterable_ty: self,
                             element_ty,
