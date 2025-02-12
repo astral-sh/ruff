@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{
-    Binding, BindingId, BindingKind, ScopeId, ScopeKind, Scopes, SemanticModel,
+    Binding, BindingId, BindingKind, Scope, ScopeId, ScopeKind, Scopes, SemanticModel,
 };
 
 use crate::checkers::ast::Checker;
@@ -98,9 +98,8 @@ fn find_overshadowed_binding(binding: &Binding, checker: &Checker) -> Option<(Sc
     let source = checker.source();
     let scopes = &semantic.scopes;
 
-    let parent_scope_id = actual_parent_scope(binding, scopes)?;
-
-    let binding_name = binding.name(source);
+    let current_scope = &scopes[binding.scope];
+    let parent_scope_id = actual_parent_scope(current_scope, scopes)?;
     let parent_scope = &scopes[parent_scope_id];
 
     let scope_to_start_searching_in = if parent_scope.kind.is_class() {
@@ -109,24 +108,30 @@ fn find_overshadowed_binding(binding: &Binding, checker: &Checker) -> Option<(Sc
         parent_scope_id
     };
 
+    let binding_name = binding.name(source);
     let overshadowed =
         semantic.lookup_symbol_in_scope(binding_name, scope_to_start_searching_in, false)?;
 
     Some((parent_scope_id, overshadowed))
 }
 
-/// Return the grandparent scope of the function scope
-/// in which `parameter` is defined.
+/// If the current scope is that of a lambda, return the parent scope.
+/// If the current scope is that of a function, return the grandparent scope.
 ///
-/// This is necessary since the immediate parent scope of a function scope
+/// This is necessary since the immediate parent of a function scope
 /// is always its "type" scope (see [`ScopeKind::Type`]).
-fn actual_parent_scope(parameter: &Binding, scopes: &Scopes) -> Option<ScopeId> {
-    let current = &scopes[parameter.scope];
+/// On the other hand, lambdas do not have such a wrapper scope.
+fn actual_parent_scope(current: &Scope, scopes: &Scopes) -> Option<ScopeId> {
+    match current.kind {
+        ScopeKind::Lambda(_) => current.parent,
+        ScopeKind::Function(_) => {
+            let type_scope_id = current.parent?;
+            let type_scope = &scopes[type_scope_id];
 
-    let type_scope_id = current.parent?;
-    let type_scope = &scopes[type_scope_id];
-
-    type_scope.parent
+            type_scope.parent
+        }
+        _ => None,
+    }
 }
 
 fn binding_is_pytest_fixture(id: BindingId, semantic: &SemanticModel) -> bool {
