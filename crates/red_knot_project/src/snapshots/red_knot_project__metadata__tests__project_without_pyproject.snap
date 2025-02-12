@@ -1,9 +1,0 @@
----
-source: crates/red_knot_project/src/metadata.rs
-expression: project
----
-ProjectMetadata(
-  name: Name("app"),
-  root: "/app",
-  options: Options(),
-)
