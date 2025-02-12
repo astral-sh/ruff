@@ -35,7 +35,7 @@ in strict mode.
 ```py
 def f(x: type):
     reveal_type(x)  # revealed: type
-    reveal_type(x.__repr__)  # revealed: @Todo(bound method)
+    reveal_type(x.__repr__)  # revealed: <bound method `__repr__` of `type`>
 
 class A: ...
 
@@ -50,7 +50,7 @@ x: type = A()  # error: [invalid-assignment]
 ```py
 def f(x: type[object]):
     reveal_type(x)  # revealed: type
-    reveal_type(x.__repr__)  # revealed: @Todo(bound method)
+    reveal_type(x.__repr__)  # revealed: <bound method `__repr__` of `type`>
 
 class A: ...
 

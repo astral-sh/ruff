@@ -1005,8 +1005,8 @@ reveal_type(f.__kwdefaults__)  # revealed: @Todo(generics) | None
 Some attributes are special-cased, however:
 
 ```py
-reveal_type(f.__get__)  # revealed: @Todo(`__get__` method on functions)
-reveal_type(f.__call__)  # revealed: @Todo(`__call__` method on functions)
+reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(f.__call__)  # revealed: <bound method `__call__` of `Literal[f]`>
 ```
 
 ### Int-literal attributes
@@ -1015,7 +1015,7 @@ Most attribute accesses on int-literal types are delegated to `builtins.int`, si
 integers are instances of that class:
 
 ```py
-reveal_type((2).bit_length)  # revealed: @Todo(bound method)
+reveal_type((2).bit_length)  # revealed: <bound method `bit_length` of `Literal[2]`>
 reveal_type((2).denominator)  # revealed: @Todo(@property)
 ```
 
@@ -1029,11 +1029,11 @@ reveal_type((2).real)  # revealed: Literal[2]
 ### Bool-literal attributes
 
 Most attribute accesses on bool-literal types are delegated to `builtins.bool`, since all literal
-bols are instances of that class:
+bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: @Todo(bound method)
-reveal_type(False.__or__)  # revealed: @Todo(bound method)
+reveal_type(True.__and__)  # revealed: @Todo(decorated method)
+reveal_type(False.__or__)  # revealed: @Todo(decorated method)
 ```
 
 Some attributes are special-cased, however:
@@ -1048,8 +1048,8 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `buitins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: @Todo(bound method)
-reveal_type(b"foo".endswith)  # revealed: @Todo(bound method)
+reveal_type(b"foo".join)  # revealed: <bound method `join` of `Literal[b"foo"]`>
+reveal_type(b"foo".endswith)  # revealed: <bound method `endswith` of `Literal[b"foo"]`>
 ```
 
 ## Instance attribute edge cases
@@ -1134,6 +1134,42 @@ class C:
 # TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
 # error: [unresolved-attribute]
 reveal_type(C().x)  # revealed: Unknown
+```
+
+### Builtin types attributes
+
+This test can probably be removed eventually, but we currently include it because we do not yet
+understand generic bases and protocols, and we want to make sure that we can still use builtin types
+in our tests in the meantime. See the corresponding TODO in `Type::static_member` for more
+information.
+
+```py
+class C:
+    a_int: int = 1
+    a_str: str = "a"
+    a_bytes: bytes = b"a"
+    a_bool: bool = True
+    a_float: float = 1.0
+    a_complex: complex = 1 + 1j
+    a_tuple: tuple[int] = (1,)
+    a_range: range = range(1)
+    a_slice: slice = slice(1)
+    a_memoryview: memoryview = memoryview(b"a")
+    a_type: type = int
+    a_none: None = None
+
+reveal_type(C.a_int)  # revealed: int
+reveal_type(C.a_str)  # revealed: str
+reveal_type(C.a_bytes)  # revealed: bytes
+reveal_type(C.a_bool)  # revealed: bool
+reveal_type(C.a_float)  # revealed: int | float
+reveal_type(C.a_complex)  # revealed: int | float | complex
+reveal_type(C.a_tuple)  # revealed: tuple[int]
+reveal_type(C.a_range)  # revealed: range
+reveal_type(C.a_slice)  # revealed: slice
+reveal_type(C.a_memoryview)  # revealed: memoryview
+reveal_type(C.a_type)  # revealed: type
+reveal_type(C.a_none)  # revealed: None
 ```
 
 ## References
