@@ -179,24 +179,3 @@ confusables.py:61:20: RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH 
 61 | x: '''"""'Literal["ﮨ"]'"""'''
    |                    ^ RUF001
    |
-
-confusables.py:61:20: RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?
-   |
-60 | from typing import Literal
-61 | x: '''"""'Literal["ﮨ"]'"""'''
-   |                    ^ RUF001
-   |
-
-confusables.py:61:20: RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?
-   |
-60 | from typing import Literal
-61 | x: '''"""'Literal["ﮨ"]'"""'''
-   |                    ^ RUF001
-   |
-
-confusables.py:61:20: RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?
-   |
-60 | from typing import Literal
-61 | x: '''"""'Literal["ﮨ"]'"""'''
-   |                    ^ RUF001
-   |
