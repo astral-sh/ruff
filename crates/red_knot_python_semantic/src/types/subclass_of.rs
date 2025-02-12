@@ -65,7 +65,7 @@ impl<'db> SubclassOfType<'db> {
     }
 
     pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        Type::from(self.subclass_of).member(db, name)
+        Type::from(self.subclass_of).non_descriptor_member(db, name)
     }
 
     /// Return `true` if `self` is a subtype of `other`.

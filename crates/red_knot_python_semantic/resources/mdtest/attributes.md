@@ -951,7 +951,7 @@ Most attribute accesses on int-literal types are delegated to `builtins.int`, si
 integers are instances of that class:
 
 ```py
-reveal_type((2).bit_length)  # revealed: @Todo(bound method)
+reveal_type((2).bit_length)  # revealed: Literal[bit_length]
 reveal_type((2).denominator)  # revealed: @Todo(@property)
 ```
 
@@ -968,8 +968,8 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bols are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: @Todo(bound method)
-reveal_type(False.__or__)  # revealed: @Todo(bound method)
+reveal_type(True.__and__)  # revealed: @Todo(decorated method)
+reveal_type(False.__or__)  # revealed: @Todo(decorated method)
 ```
 
 Some attributes are special-cased, however:
@@ -984,8 +984,8 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `buitins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: @Todo(bound method)
-reveal_type(b"foo".endswith)  # revealed: @Todo(bound method)
+reveal_type(b"foo".join)  # revealed: Literal[join]
+reveal_type(b"foo".endswith)  # revealed: Literal[endswith]
 ```
 
 ## Instance attribute edge cases

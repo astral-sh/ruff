@@ -22,22 +22,25 @@ class Ten:
         pass
 
 class C:
-    ten = Ten()
+    ten: Ten = Ten()
 
 c = C()
 
-# TODO: this should be `Literal[10]`
-reveal_type(c.ten)  # revealed: Unknown | Ten
+reveal_type(c.ten)  # revealed: Literal[10]
 
-# TODO: This should `Literal[10]`
-reveal_type(C.ten)  # revealed: Unknown | Ten
+reveal_type(C.ten)  # revealed: Literal[10]
 
-# These are fine:
+# TODO: This should be allowed
+# error: [invalid-assignment]
 c.ten = 10
+
 C.ten = 10
 
-# TODO: Both of these should be errors
+# TODO: This should be an error, but the error message should mention the parameter type of `__set__`:
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
 c.ten = 11
+
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 C.ten = 11
 ```
 
@@ -57,24 +60,76 @@ class FlexibleInt:
         self._value = int(value)
 
 class C:
-    flexible_int = FlexibleInt()
+    flexible_int: FlexibleInt = FlexibleInt()
 
 c = C()
 
-# TODO: should be `int | None`
-reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
+reveal_type(c.flexible_int)  # revealed: int | None
 
+# TODO: this should not be
+# error: [invalid-assignment]
 c.flexible_int = 42  # okay
+# error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
-# TODO: should be `int | None`
-reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
+reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: should be an error
+# TODO: the error message here should be improved
+# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `flexible_int` of type `FlexibleInt`"
 c.flexible_int = None  # not okay
 
-# TODO: should be `int | None`
-reveal_type(c.flexible_int)  # revealed: Unknown | FlexibleInt
+reveal_type(c.flexible_int)  # revealed: int | None
+```
+
+## Data and non-data descriptors
+
+Descriptors that define `__set__` or `__delete__` are called data descriptors (e.g. properties),
+while those that only define `__get__` are called non-data descriptors (e.g. `classmethod` or
+`staticmethod`).
+
+The precedence chain for attribute access is:
+
+- Data descriptors
+- Instance attributes
+- Non-data descriptors
+
+```py
+from typing import Literal
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data descriptor"]:
+        return "data descriptor"
+
+    def __set__(self, instance: object, value) -> None:
+        pass
+
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data descriptor"]:
+        return "non-data descriptor"
+
+class C:
+    data_descriptor = DataDescriptor()
+    non_data_descriptor = NonDataDescriptor()
+
+    def __init__(self):
+        self.data_descriptor = "instance attribute"
+        self.non_data_descriptor = "instance attribute"
+
+c = C()
+
+# TODO: Should be `Unknown | Literal["data descriptor"]`
+reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data descriptor", "instance attribute"]
+
+# TODO: Should be `Unknown | Literal["instance attribute"]`
+reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data descriptor", "instance attribute"]
+```
+
+Access on the class itself only sees the descriptors:
+
+```py
+reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data descriptor"]
+
+reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data descriptor"]
 ```
 
 ## Built-in `property` descriptor
@@ -101,7 +156,7 @@ c = C()
 reveal_type(c._name)  # revealed: str | None
 
 # Should be `str`
-reveal_type(c.name)  # revealed: @Todo(bound method)
+reveal_type(c.name)  # revealed: @Todo(decorated method)
 
 # Should be `builtins.property`
 reveal_type(C.name)  # revealed: Literal[name]
@@ -142,7 +197,7 @@ reveal_type(c1)  # revealed: @Todo(return type)
 reveal_type(C.get_name())  # revealed: @Todo(return type)
 
 # TODO: should be `str`
-reveal_type(C("42").get_name())  # revealed: @Todo(bound method)
+reveal_type(C("42").get_name())  # revealed: @Todo(decorated method)
 ```
 
 ## Descriptors only work when used as class variables
@@ -162,7 +217,8 @@ class C:
     def __init__(self):
         self.ten = Ten()
 
-reveal_type(C().ten)  # revealed: Unknown | Ten
+# TODO: Should be Unknown | Ten
+reveal_type(C().ten)  # revealed: Unknown | Literal[10]
 ```
 
 ## Descriptors distinguishing between class and instance access
@@ -189,10 +245,10 @@ class C:
     d = Descriptor()
 
 # TODO: should be `Literal["called on class object"]
-reveal_type(C.d)  # revealed: Unknown | Descriptor
+reveal_type(C.d)  # revealed: Unknown | LiteralString
 
 # TODO: should be `Literal["called on instance"]
-reveal_type(C().d)  # revealed: Unknown | Descriptor
+reveal_type(C().d)  # revealed: Unknown | LiteralString
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html
