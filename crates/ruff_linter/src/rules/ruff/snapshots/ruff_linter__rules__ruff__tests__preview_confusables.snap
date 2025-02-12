@@ -168,6 +168,8 @@ confusables.py:58:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD 
 57 | # Implicit string concatenation
 58 | x = "𝐁ad" f"𝐁ad string"
    |      ^ RUF001
+59 |
+60 | from typing import Literal
    |
 
 confusables.py:58:13: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
@@ -175,4 +177,13 @@ confusables.py:58:13: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD
 57 | # Implicit string concatenation
 58 | x = "𝐁ad" f"𝐁ad string"
    |             ^ RUF001
+59 |
+60 | from typing import Literal
+   |
+
+confusables.py:61:20: RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?
+   |
+60 | from typing import Literal
+61 | x: '''"""'Literal["ﮨ"]'"""'''
+   |                    ^ RUF001
    |
