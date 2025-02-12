@@ -173,6 +173,12 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
     /// or it applies to the entire file (e.g. the file should be executable but isn't).
     fn span(&self) -> Option<Span>;
 
+    /// Returns an optional sequence of "secondary" messages (with spans) to
+    /// include in the rendering of this diagnostic.
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        &[]
+    }
+
     fn severity(&self) -> Severity;
 
     fn display<'db, 'diag, 'config>(
@@ -187,6 +193,22 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
             db,
             diagnostic: self,
             config,
+        }
+    }
+}
+
+/// A single secondary message assigned to a `Diagnostic`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SecondaryDiagnosticMessage {
+    span: Span,
+    message: String,
+}
+
+impl SecondaryDiagnosticMessage {
+    pub fn new(span: Span, message: impl Into<String>) -> SecondaryDiagnosticMessage {
+        SecondaryDiagnosticMessage {
+            span,
+            message: message.into(),
         }
     }
 }
@@ -219,10 +241,12 @@ impl Span {
 
     /// Returns a new `Span` with the given `range` attached to it.
     pub fn with_range(self, range: TextRange) -> Span {
-        Span {
-            range: Some(range),
-            ..self
-        }
+        self.with_optional_range(Some(range))
+    }
+
+    /// Returns a new `Span` with the given optional `range` attached to it.
+    pub fn with_optional_range(self, range: Option<TextRange>) -> Span {
+        Span { range, ..self }
     }
 }
 
@@ -311,6 +335,14 @@ impl std::fmt::Display for DisplayDiagnostic<'_, '_, '_> {
             &span,
             &self.diagnostic.message(),
         ));
+        for secondary_msg in self.diagnostic.secondary_messages() {
+            message.add_snippet(Snippet::new(
+                self.db,
+                Severity::Info,
+                &secondary_msg.span,
+                &secondary_msg.message,
+            ));
+        }
         render(f, message.to_annotate())
     }
 }
@@ -445,6 +477,10 @@ where
         (**self).span()
     }
 
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        (**self).secondary_messages()
+    }
+
     fn severity(&self) -> Severity {
         (**self).severity()
     }
@@ -466,6 +502,10 @@ where
         (**self).span()
     }
 
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        (**self).secondary_messages()
+    }
+
     fn severity(&self) -> Severity {
         (**self).severity()
     }
@@ -482,6 +522,10 @@ impl Diagnostic for Box<dyn Diagnostic> {
 
     fn span(&self) -> Option<Span> {
         (**self).span()
+    }
+
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        (**self).secondary_messages()
     }
 
     fn severity(&self) -> Severity {
@@ -502,6 +546,10 @@ impl Diagnostic for &'_ dyn Diagnostic {
         (**self).span()
     }
 
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        (**self).secondary_messages()
+    }
+
     fn severity(&self) -> Severity {
         (**self).severity()
     }
@@ -518,6 +566,10 @@ impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
 
     fn span(&self) -> Option<Span> {
         (**self).span()
+    }
+
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        (**self).secondary_messages()
     }
 
     fn severity(&self) -> Severity {

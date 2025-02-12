@@ -2,7 +2,7 @@ use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::{
-    diagnostic::{DiagnosticId, Severity},
+    diagnostic::{DiagnosticId, SecondaryDiagnosticMessage, Severity},
     files::File,
 };
 use ruff_python_ast::AnyNodeRef;
@@ -74,6 +74,17 @@ impl<'db> InferContext<'db> {
         node: AnyNodeRef,
         message: fmt::Arguments,
     ) {
+        self.report_lint_with_secondary_messages(lint, node, message, vec![]);
+    }
+
+    /// Reports a lint located at `node`.
+    pub(super) fn report_lint_with_secondary_messages(
+        &self,
+        lint: &'static LintMetadata,
+        node: AnyNodeRef,
+        message: fmt::Arguments,
+        secondary_messages: Vec<SecondaryDiagnosticMessage>,
+    ) {
         if !self.db.is_file_open(self.file) {
             return;
         }
@@ -94,7 +105,13 @@ impl<'db> InferContext<'db> {
             return;
         }
 
-        self.report_diagnostic(node, DiagnosticId::Lint(lint.name()), severity, message);
+        self.report_diagnostic(
+            node,
+            DiagnosticId::Lint(lint.name()),
+            severity,
+            message,
+            secondary_messages,
+        );
     }
 
     /// Adds a new diagnostic.
@@ -106,6 +123,7 @@ impl<'db> InferContext<'db> {
         id: DiagnosticId,
         severity: Severity,
         message: fmt::Arguments,
+        secondary_messages: Vec<SecondaryDiagnosticMessage>,
     ) {
         if !self.db.is_file_open(self.file) {
             return;
@@ -123,6 +141,7 @@ impl<'db> InferContext<'db> {
             message: message.to_string(),
             range: node.range(),
             severity,
+            secondary_messages,
         });
     }
 
