@@ -22,7 +22,7 @@ class Ten:
         pass
 
 class C:
-    ten: Ten = Ten()
+    ten = Ten()
 
 c = C()
 
@@ -30,16 +30,14 @@ reveal_type(c.ten)  # revealed: Literal[10]
 
 reveal_type(C.ten)  # revealed: Literal[10]
 
-# TODO: This should be allowed
-# error: [invalid-assignment]
+# These are fine:
 c.ten = 10
-
 C.ten = 10
 
-# TODO: This should be an error, but the error message should mention the parameter type of `__set__`:
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
+# TODO: This should be an error
 c.ten = 11
 
+# TODO: This is not the correct error message
 # error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 C.ten = 11
 ```
@@ -60,22 +58,18 @@ class FlexibleInt:
         self._value = int(value)
 
 class C:
-    flexible_int: FlexibleInt = FlexibleInt()
+    flexible_int = FlexibleInt()
 
 c = C()
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: this should not be
-# error: [invalid-assignment]
 c.flexible_int = 42  # okay
-# error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: the error message here should be improved
-# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `flexible_int` of type `FlexibleInt`"
+# TODO: should be an error
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -118,18 +112,18 @@ class C:
 c = C()
 
 # TODO: Should be `Unknown | Literal["data descriptor"]`
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data descriptor", "instance attribute"]
+reveal_type(c.data_descriptor)  # revealed: Literal["data descriptor"]
 
 # TODO: Should be `Unknown | Literal["instance attribute"]`
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data descriptor", "instance attribute"]
+reveal_type(c.non_data_descriptor)  # revealed: Literal["non-data descriptor"]
 ```
 
 Access on the class itself only sees the descriptors:
 
 ```py
-reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data descriptor"]
+reveal_type(C.data_descriptor)  # revealed: Literal["data descriptor"]
 
-reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data descriptor"]
+reveal_type(C.non_data_descriptor)  # revealed: Literal["non-data descriptor"]
 ```
 
 ## Built-in `property` descriptor
@@ -159,7 +153,7 @@ reveal_type(c._name)  # revealed: str | None
 reveal_type(c.name)  # revealed: @Todo(decorated method)
 
 # Should be `builtins.property`
-reveal_type(C.name)  # revealed: Literal[name]
+reveal_type(C.name)  # revealed: <function `name`>
 
 # This is fine:
 c.name = "new"
@@ -218,7 +212,7 @@ class C:
         self.ten = Ten()
 
 # TODO: Should be Unknown | Ten
-reveal_type(C().ten)  # revealed: Unknown | Literal[10]
+reveal_type(C().ten)  # revealed: Literal[10]
 ```
 
 ## Descriptors distinguishing between class and instance access
@@ -245,10 +239,10 @@ class C:
     d = Descriptor()
 
 # TODO: should be `Literal["called on class object"]
-reveal_type(C.d)  # revealed: Unknown | LiteralString
+reveal_type(C.d)  # revealed: LiteralString
 
 # TODO: should be `Literal["called on instance"]
-reveal_type(C().d)  # revealed: Unknown | LiteralString
+reveal_type(C().d)  # revealed: LiteralString
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

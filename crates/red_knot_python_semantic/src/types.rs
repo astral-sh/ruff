@@ -589,6 +589,8 @@ pub enum Type<'db> {
     Never,
     /// A specific function object
     FunctionLiteral(FunctionType<'db>),
+    ///
+    BoundMethod(BoundMethodType<'db>),
     /// A specific module object
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
@@ -646,6 +648,11 @@ impl<'db> Type<'db> {
 
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    fn is_none(&self, db: &'db dyn Db) -> bool {
+        self.into_instance()
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NoneType))
     }
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
@@ -847,6 +854,7 @@ impl<'db> Type<'db> {
             | Type::Dynamic(_)
             | Type::Never
             | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
@@ -994,6 +1002,10 @@ impl<'db> Type<'db> {
             // This will change in a way similar to the `LiteralString`/`StringLiteral()` case above
             // when we add support for `typing.Callable`.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
+                .to_instance(db)
+                .is_subtype_of(db, target),
+
+            (Type::BoundMethod(_), _) => KnownClass::FunctionType // TODO: MethodType?
                 .to_instance(db)
                 .is_subtype_of(db, target),
 
@@ -1295,6 +1307,7 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::KnownInstance(..)),
@@ -1304,6 +1317,7 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::KnownInstance(..)),
@@ -1318,6 +1332,7 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
                 | Type::IntLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
@@ -1329,6 +1344,7 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
                 | Type::IntLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
@@ -1357,6 +1373,7 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
                 | Type::ModuleLiteral(..),
             )
             | (
@@ -1367,6 +1384,7 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
                 | Type::ModuleLiteral(..),
                 Type::SubclassOf(_),
             ) => true,
@@ -1471,6 +1489,13 @@ impl<'db> Type<'db> {
                 !KnownClass::FunctionType.is_subclass_of(db, class)
             }
 
+            (Type::BoundMethod(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::BoundMethod(..)) => {
+                // A `Type::BoundMethod()` must be an instance of exactly `types.FunctionType`
+                // (it cannot be an instance of a `types.FunctionType` subclass)
+                !KnownClass::FunctionType.is_subclass_of(db, class)
+            }
+
             (Type::ModuleLiteral(..), other @ Type::Instance(..))
             | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
@@ -1516,6 +1541,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
+            | Type::BoundMethod(..)
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -1580,6 +1606,7 @@ impl<'db> Type<'db> {
             Type::SubclassOf(..) => false,
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
+            | Type::BoundMethod(..)
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
@@ -1618,6 +1645,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(..)
+            | Type::BoundMethod(..)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
             | Type::IntLiteral(..)
@@ -1704,9 +1732,19 @@ impl<'db> Type<'db> {
 
             Type::Never => Symbol::todo("attribute lookup on Never"),
 
-            Type::FunctionLiteral(_) => match name {
-                "__get__" => Symbol::todo("`__get__` method on functions"),
+            Type::FunctionLiteral(function) => match name {
+                "__get__" => Symbol::bound(Type::BoundMethod(BoundMethodType::new(
+                    db,
+                    BoundMethodKind::DunderGet(*function),
+                    None,
+                ))),
                 "__call__" => Symbol::todo("`__call__` method on functions"),
+                _ => KnownClass::FunctionType.to_instance(db).member(db, name),
+            },
+
+            Type::BoundMethod(..) => match name {
+                "__get__" => Symbol::bound(self),
+                "__call__" => Symbol::todo("`__call__` method on bound methods"),
                 _ => KnownClass::FunctionType.to_instance(db).member(db, name),
             },
 
@@ -1774,7 +1812,7 @@ impl<'db> Type<'db> {
             }
 
             Type::IntLiteral(_) => match name {
-                "real" | "numerator" => Symbol::bound(self), // TODO: remove these special cases?
+                "real" | "numerator" => Symbol::bound(self),
                 // TODO more attributes could probably be usefully special-cased
                 _ => KnownClass::Int
                     .to_instance(db)
@@ -1788,23 +1826,13 @@ impl<'db> Type<'db> {
                     .non_descriptor_member(db, name),
             },
 
-            Type::StringLiteral(_) => {
-                // TODO defer to `typing.LiteralString`/`builtins.str` methods
-                // from typeshed's stubs
-                KnownClass::Str
-                    .to_instance(db)
-                    .non_descriptor_member(db, name)
-                // Symbol::todo("Attribute access on `StringLiteral` types")
-            }
+            Type::StringLiteral(_) => KnownClass::Str
+                .to_instance(db)
+                .non_descriptor_member(db, name),
 
-            Type::LiteralString => {
-                // TODO defer to `typing.LiteralString`/`builtins.str` methods
-                // from typeshed's stubs
-                KnownClass::Str
-                    .to_instance(db)
-                    .non_descriptor_member(db, name)
-                // Symbol::todo("Attribute access on `LiteralString` types")
-            }
+            Type::LiteralString => KnownClass::Str
+                .to_instance(db)
+                .non_descriptor_member(db, name),
 
             Type::BytesLiteral(_) => KnownClass::Bytes
                 .to_instance(db)
@@ -1843,56 +1871,26 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         let _span = tracing::info_span!("try_call_dunder_get", ?self, ?instance, ?owner).entered();
 
-        match self {
-            Type::FunctionLiteral(function) => {
-                if instance.is_some() {
-                    Type::FunctionLiteral(FunctionType::new(
-                        db,
-                        function.name(db),
-                        function.known(db),
-                        function.body_scope(db),
-                        function.decorators(db),
-                        true,
-                    ))
-                } else {
-                    *self
-                }
+        let dunder_get = self
+            .non_descriptor_member(db, "__get__") // TODO should this be .member?
+            .ignore_possibly_unbound();
+
+        tracing::info!("__get__ member: {:?}", dunder_get);
+
+        if let Some(dunder_get) = dunder_get {
+            if let Some(return_ty) = dunder_get
+                .call(
+                    db,
+                    &CallArguments::positional([instance.unwrap_or(Type::none(db)), owner]),
+                )
+                .return_type(db)
+            {
+                return_ty
+            } else {
+                *self
             }
-            Type::Union(union) => {
-                let mut builder = UnionBuilder::new(db);
-
-                for ty in union.elements(db) {
-                    let ty = ty.try_call_dunder_get(db, instance, owner);
-                    builder = builder.add(ty);
-                }
-
-                builder.build()
-            }
-            _ => {
-                let dunder_get = self
-                    .non_descriptor_member(db, "__get__") // TODO should this be .member?
-                    .ignore_possibly_unbound();
-
-                tracing::info!("__get__ member: {:?}", dunder_get);
-
-                if let Some(dunder_get) = dunder_get {
-                    // dbg!(dunder_get);
-
-                    if let Some(return_ty) = dunder_get
-                        .call(
-                            db,
-                            &CallArguments::positional([instance.unwrap_or(Type::none(db)), owner]),
-                        )
-                        .return_type(db)
-                    {
-                        return_ty
-                    } else {
-                        *self
-                    }
-                } else {
-                    *self
-                }
-            }
+        } else {
+            *self
         }
     }
 
@@ -1910,7 +1908,13 @@ impl<'db> Type<'db> {
         tracing::info!("Non-descriptor member: {:?}", member);
 
         match self {
-            Type::Instance(..) => {
+            Type::Instance(..)
+            | Type::StringLiteral(..)
+            | Type::LiteralString
+            | Type::BooleanLiteral(..)
+            | Type::IntLiteral(..)
+            | Type::BytesLiteral(..)
+            | Type::SliceLiteral(..) => {
                 let instance = Some(*self);
                 let owner = self.to_meta_type(db);
 
@@ -1922,7 +1926,19 @@ impl<'db> Type<'db> {
 
                 member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner))
             }
-            _ => member,
+            // TODO: Some of these should probably moved up to the instances branch
+            Type::Dynamic(..)
+            | Type::Never
+            | Type::SubclassOf(..)
+            | Type::Union(..)
+            | Type::Intersection(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::FunctionLiteral(..)
+            | Type::BoundMethod(..)
+            | Type::ModuleLiteral(..)
+            | Type::KnownInstance(..)
+            | Type::Tuple(..) => member,
         }
     }
 
@@ -1934,6 +1950,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) | Type::Never => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
+            Type::BoundMethod(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 class.metaclass(db).to_instance(db).bool(db)
@@ -2051,13 +2068,38 @@ impl<'db> Type<'db> {
     #[must_use]
     fn call(self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> CallOutcome<'db> {
         match self {
-            Type::FunctionLiteral(function_type) => {
-                let arguments = if function_type.bound_method(db) {
-                    arguments.with_self(self)
-                } else {
-                    arguments.clone() //TODO
-                };
+            Type::BoundMethod(bound_method_type) => {
+                let instance = bound_method_type.instance(db);
+                match bound_method_type.method(db) {
+                    BoundMethodKind::Method(method) => {
+                        let arguments = if let Some(self_ty) = instance {
+                            arguments.with_self(*self_ty)
+                        } else {
+                            arguments.clone() //TODO
+                        };
 
+                        let binding = bind_call(db, &arguments, method.signature(db), Some(self));
+                        CallOutcome::callable(binding)
+                    }
+                    BoundMethodKind::DunderGet(function) => {
+                        let first_argument = arguments.first_argument();
+                        let bound_instance = if first_argument.is_some_and(|ty| ty.is_none(db)) {
+                            None
+                        } else {
+                            Some(Box::new(first_argument.unwrap()))
+                        };
+
+                        let return_ty = Type::BoundMethod(BoundMethodType::new(
+                            db,
+                            BoundMethodKind::Method(function),
+                            bound_instance,
+                        ));
+                        let binding = CallBinding::from_return_type(return_ty);
+                        CallOutcome::callable(binding)
+                    }
+                }
+            }
+            Type::FunctionLiteral(function_type) => {
                 let mut binding =
                     bind_call(db, &arguments, function_type.signature(db), Some(self));
                 match function_type.known(db) {
@@ -2412,6 +2454,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
+            | Type::BoundMethod(..)
             | Type::Instance(_)
             | Type::KnownInstance(_)
             | Type::ModuleLiteral(_)
@@ -2582,6 +2625,7 @@ impl<'db> Type<'db> {
             Type::SliceLiteral(_) => KnownClass::Slice.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::BoundMethod(..) => todo!(),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
@@ -3619,8 +3663,6 @@ pub struct FunctionType<'db> {
 
     /// types of all decorators on this function
     decorators: Box<[Type<'db>]>,
-
-    bound_method: bool,
 }
 
 #[salsa::tracked]
@@ -3805,6 +3847,18 @@ impl KnownFunction {
             | Self::StaticAssert => ParameterExpectations::AllValueExpressions,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BoundMethodKind<'db> {
+    Method(FunctionType<'db>),
+    DunderGet(FunctionType<'db>),
+}
+
+#[salsa::interned]
+pub struct BoundMethodType<'db> {
+    pub(crate) method: BoundMethodKind<'db>,
+    pub(crate) instance: Option<Box<Type<'db>>>,
 }
 
 /// Describes whether the parameters in a function expect value expressions or type expressions.

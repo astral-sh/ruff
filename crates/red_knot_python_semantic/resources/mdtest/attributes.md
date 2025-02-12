@@ -941,7 +941,7 @@ reveal_type(f.__kwdefaults__)  # revealed: @Todo(generics) | None
 Some attributes are special-cased, however:
 
 ```py
-reveal_type(f.__get__)  # revealed: @Todo(`__get__` method on functions)
+reveal_type(f.__get__)  # revealed: <function `__get__`>
 reveal_type(f.__call__)  # revealed: @Todo(`__call__` method on functions)
 ```
 
@@ -951,7 +951,7 @@ Most attribute accesses on int-literal types are delegated to `builtins.int`, si
 integers are instances of that class:
 
 ```py
-reveal_type((2).bit_length)  # revealed: Literal[bit_length]
+reveal_type((2).bit_length)  # revealed: <bound method: `bit_length` of `Literal[2]`>
 reveal_type((2).denominator)  # revealed: @Todo(@property)
 ```
 
@@ -984,8 +984,8 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `buitins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: Literal[join]
-reveal_type(b"foo".endswith)  # revealed: Literal[endswith]
+reveal_type(b"foo".join)  # revealed: <bound method: `join` of `Literal[b"foo"]`>
+reveal_type(b"foo".endswith)  # revealed: <bound method: `endswith` of `Literal[b"foo"]`>
 ```
 
 ## Instance attribute edge cases
