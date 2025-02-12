@@ -22,9 +22,9 @@ pub(crate) use self::signatures::Signature;
 pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::attribute_assignment::AttributeAssignment;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -4239,6 +4239,46 @@ impl<'db> Class<'db> {
                     // We found an un-annotated attribute assignment of the form:
                     //
                     //     self.name = <value>
+
+                    // Check for a special case - unannotated assignments in `__init__` method
+                    // that assign a method param with declared type. E.g.:
+                    // ```python
+                    // class A:
+                    //     def __init__(self, name: str):
+                    //         self.name = name
+                    // ```
+                    // In this case we infer attribute type as if it had been declared with
+                    // the type of the value assigned to it, without union with Unknown.
+                    let value_expr_node = value.node_ref(db).node();
+
+                    if let ast::Expr::Name(name_expr) = value_expr_node {
+                        let expr_scope_id = value.scope(db);
+
+                        let use_def_map = use_def_map(db, expr_scope_id);
+
+                        // Check that the last (and implicitly only) reachable binding of the name
+                        // is in the function definition (parameter declaration).
+                        let bindings =
+                            use_def_map.bindings_at_use(name_expr.scoped_use_id(db, expr_scope_id));
+
+                        if bindings.last().is_some_and(|binding| {
+                            binding.binding.is_some_and(|definition| {
+                                matches!(definition.kind(db), DefinitionKind::Parameter(_))
+                                    && definition.category(db).is_declaration()
+                            })
+                        }) {
+                            if let Some(ast::StmtFunctionDef { name, .. }) =
+                                expr_scope_id.node(db).as_function()
+                            {
+                                if name.as_str() == "__init__" {
+                                    let annotation_ty = infer_expression_type(db, *value);
+
+                                    // TODO: check if there are conflicting declarations
+                                    return Symbol::bound(annotation_ty);
+                                }
+                            };
+                        }
+                    }
 
                     let inferred_ty = infer_expression_type(db, *value);
 

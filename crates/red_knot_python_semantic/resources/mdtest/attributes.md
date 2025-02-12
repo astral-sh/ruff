@@ -23,6 +23,12 @@ class C:
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
 
+        param = param if param is None else param + 42
+        self.inferred_from_redefined_param = param
+
+    def other_method(self, param: str) -> None:
+        self.inferred_from_param_not_in_init = param
+
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
@@ -30,8 +36,7 @@ reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a
 # TODO: Same here. This should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
-# TODO: should be `int | None`
-reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
+reveal_type(c_instance.inferred_from_param)  # revealed: int | None
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
 
@@ -41,13 +46,17 @@ reveal_type(c_instance.declared_and_bound)  # revealed: bool
 # mypy and pyright do not show an error here.
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
+reveal_type(c_instance.inferred_from_redefined_param)  # revealed: Unknown | None | int
+
+reveal_type(c_instance.inferred_from_param_not_in_init)  # revealed: Unknown | str
+
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
 c_instance.inferred_from_value = "value set on instance"
 
 # This assignment is also fine:
 c_instance.inferred_from_param = None
 
-# TODO: this should be an error (incompatible types in assignment)
+# error: [invalid-assignment] "Object of type `Literal["incompatible"]` is not assignable to attribute `inferred_from_param` of type `int | None`"
 c_instance.inferred_from_param = "incompatible"
 
 # TODO: we already show an error here but the message might be improved?
