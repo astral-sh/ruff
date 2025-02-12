@@ -11,7 +11,7 @@ use crate::{declare_lint, Db};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
@@ -808,12 +808,6 @@ impl Diagnostic for TypeCheckDiagnostic {
 
     fn severity(&self) -> Severity {
         self.severity
-    }
-}
-
-impl Ranged for TypeCheckDiagnostic {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 
