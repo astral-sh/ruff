@@ -874,7 +874,7 @@ expected `.`, `]`
             return Err(anyhow!("Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`).");
+        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
 
         Ok(())
     }
@@ -899,7 +899,7 @@ expected `.`, `]`
             return Err(anyhow!("Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`).");
+        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
 
         Ok(())
     }

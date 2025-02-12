@@ -105,13 +105,11 @@ impl Project {
         let minor =
             u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(minor))?;
 
-        let python_version = PythonVersion::from((major, minor));
-
-        Ok(Some(if let Some(range) = requires_python.range() {
-            RangedValue::with_range(python_version, requires_python.source().clone(), range)
-        } else {
-            RangedValue::new(python_version, requires_python.source().clone())
-        }))
+        Ok(Some(
+            requires_python
+                .clone()
+                .map_value(|_| PythonVersion::from((major, minor))),
+        ))
     }
 }
 
@@ -121,7 +119,7 @@ pub enum ResolveRequiresPythonError {
     TooLargeMajor(u64),
     #[error("The minor version `{0}` is larger than the maximum supported value 255")]
     TooLargeMinor(u64),
-    #[error("value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`).")]
+    #[error("value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.")]
     NoLowerBound(String),
 }
 
