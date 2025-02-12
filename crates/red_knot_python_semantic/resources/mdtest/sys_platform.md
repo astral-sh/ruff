@@ -66,6 +66,6 @@ It is [recommended](https://docs.python.org/3/library/sys.html#sys.platform) to 
 ```py
 import sys
 
-reveal_type(sys.platform.startswith("freebsd"))  # revealed: @Todo(Attribute access on `LiteralString` types)
-reveal_type(sys.platform.startswith("linux"))  # revealed: @Todo(Attribute access on `LiteralString` types)
+reveal_type(sys.platform.startswith("freebsd"))  # revealed: bool
+reveal_type(sys.platform.startswith("linux"))  # revealed: bool
 ```

@@ -8,8 +8,8 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType, Type,
-    UnionType,
+    CallableType, ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
+    Type, UnionType,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -88,6 +88,24 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
+            Type::Callable(CallableType::BoundMethod(bound_method)) => {
+                f.write_str("<bound method `")?;
+                f.write_str(bound_method.function(self.db).name(self.db))?;
+                f.write_str("` of `")?;
+                bound_method
+                    .self_instance(self.db)
+                    .display(self.db)
+                    .fmt(f)?;
+                f.write_str("`>")
+            }
+            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                f.write_str("<method-wrapper `__get__` of `")?;
+                f.write_str(function.name(self.db))?;
+                f.write_str("`>")
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                f.write_str("<wrapper-descriptor `__get__` of `function` objects>")
+            }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),

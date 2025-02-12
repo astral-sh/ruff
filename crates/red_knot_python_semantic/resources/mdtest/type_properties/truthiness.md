@@ -75,3 +75,19 @@ class Boom:
 
 reveal_type(bool(Boom()))  # revealed: bool
 ```
+
+### Possibly unbound __bool__ method
+
+```py
+from typing import Literal
+
+def flag() -> bool:
+    return True
+
+class PossiblyUnboundTrue:
+    if flag():
+        def __bool__(self) -> Literal[True]:
+            return True
+
+reveal_type(bool(PossiblyUnboundTrue()))  # revealed: bool
+```
