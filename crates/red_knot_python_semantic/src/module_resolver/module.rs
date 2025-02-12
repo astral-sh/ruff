@@ -109,6 +109,7 @@ pub enum KnownModule {
     #[allow(dead_code)]
     Abc, // currently only used in tests
     Collections,
+    Inspect,
     KnotExtensions,
 }
 
@@ -123,6 +124,7 @@ impl KnownModule {
             Self::Sys => "sys",
             Self::Abc => "abc",
             Self::Collections => "collections",
+            Self::Inspect => "inspect",
             Self::KnotExtensions => "knot_extensions",
         }
     }
@@ -149,6 +151,7 @@ impl KnownModule {
             "sys" => Some(Self::Sys),
             "abc" => Some(Self::Abc),
             "collections" => Some(Self::Collections),
+            "inspect" => Some(Self::Inspect),
             "knot_extensions" => Some(Self::KnotExtensions),
             _ => None,
         }
