@@ -1,0 +1,98 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF060.py:4:5: RUF060 Implicitly concatenated string in literal collection
+  |
+3 |   _ = [
+4 | /     "a"
+5 | |     "b"
+  | |_______^ RUF060
+6 |   ]
+  |
+  = help: Add a comma or parenthesize the string
+
+RUF060.py:9:9: RUF060 Implicitly concatenated string in literal collection
+   |
+ 9 |   _ = {a, "b" "c"      # This part is caught by ISC001
+   |  _________^
+10 | |         "d", e}      # This part isn't
+   | |___________^ RUF060
+   |
+   = help: Add a comma or parenthesize the string
+
+RUF060.py:14:13: RUF060 Implicitly concatenated string in literal collection
+   |
+13 |   _ = [
+14 |       "a", b, "c"
+   |  _____________^
+15 | |     "d", e, "f"
+   | |_______^ RUF060
+16 |   ]
+   |
+   = help: Add a comma or parenthesize the string
+
+RUF060.py:27:5: RUF060 Implicitly concatenated string in literal collection
+   |
+25 |   _ = {
+26 |       "a",
+27 | /     f"{b}"
+28 | |     "c",
+   | |_______^ RUF060
+29 |       d
+30 |   }
+   |
+   = help: Add a comma or parenthesize the string
+
+RUF060.py:34:5: RUF060 Implicitly concatenated string in literal collection
+   |
+33 |   _ = [
+34 | /     "a"
+35 | |     "b"
+36 | |     f"{c}",
+   | |__________^ RUF060
+37 |       "d"
+38 |   ]
+   |
+   = help: Add a comma or parenthesize the string
+
+RUF060.py:42:5: RUF060 Implicitly concatenated string in literal collection
+   |
+41 |   _ = (
+42 | /     '''
+43 | |     lorem
+44 | |     ipsum
+45 | |     '''
+46 | |
+47 | |     f"""
+48 | |     {foo}
+49 | |     bar
+50 | |     """,
+   | |_______^ RUF060
+51 |       d
+52 |   )
+   |
+   = help: Add a comma or parenthesize the string
+
+RUF060.py:61:5: RUF060 Implicitly concatenated string in literal collection
+   |
+59 |       "-e",
+60 |       "ssh",
+61 | /     "--exclude=.git"  # equivalent to ignore-vcs
+62 | |     "--delete",
+   | |______________^ RUF060
+63 |       "/root/code/api/",
+64 |       "user@remote:/app/"
+   |
+   = help: Add a comma or parenthesize the string
+
+RUF060.py:64:5: RUF060 Implicitly concatenated string in literal collection
+   |
+62 |       "--delete",
+63 |       "/root/code/api/",
+64 | /     "user@remote:/app/"
+65 | |     # Preserve symlinks as-is  (equivalent to --symlink-mode=posix-raw)
+66 | |     "--links",
+   | |_____________^ RUF060
+67 |   ]
+   |
+   = help: Add a comma or parenthesize the string

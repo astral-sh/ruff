@@ -36,6 +36,7 @@ pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
 pub(crate) use starmap_zip::*;
 pub(crate) use static_key_dict_comprehension::*;
+pub(crate) use suspicious_implicitly_concatenated_string::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_cast_to_int::*;
@@ -95,6 +96,7 @@ mod sort_dunder_slots;
 mod starmap_zip;
 mod static_key_dict_comprehension;
 mod suppression_comment_visitor;
+mod suspicious_implicitly_concatenated_string;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
 mod unnecessary_cast_to_int;

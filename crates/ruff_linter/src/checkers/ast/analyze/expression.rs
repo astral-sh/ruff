@@ -204,6 +204,16 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     checker.report_diagnostic(diagnostic);
                 }
             }
+
+            if ctx.is_load() {
+                if checker.enabled(Rule::SuspiciousImplicitlyConcatenatedString) {
+                    ruff::rules::suspicious_implicitly_concatenated_string(
+                        checker,
+                        expr.into(),
+                        elts,
+                    );
+                }
+            }
         }
         Expr::Name(ast::ExprName { id, ctx, range }) => {
             match ctx {
@@ -1191,6 +1201,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         Expr::Set(set) => {
             if checker.enabled(Rule::DuplicateValue) {
                 flake8_bugbear::rules::duplicate_value(checker, set);
+            }
+            if checker.enabled(Rule::SuspiciousImplicitlyConcatenatedString) {
+                ruff::rules::suspicious_implicitly_concatenated_string(
+                    checker,
+                    expr.into(),
+                    &set.elts,
+                );
             }
         }
         Expr::Yield(_) => {
