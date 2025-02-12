@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -16,10 +17,19 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 SNIPPED_RE = re.compile(
-    r"(?P<before>^(?P<indent> *)```(?:\s*(?P<language>\w+))?\n)"
+    r"(?P<before>^(?P<indent>\x20*)```(?:\s*(?P<language>\w+))?\n)"
     r"(?P<code>.*?)"
     r"(?P<after>^(?P=indent)```\s*$)",
     re.DOTALL | re.MULTILINE,
+)
+
+# https://www.rexegg.com/regex-best-trick.html
+BACKTICKED_SHORTCUT_LINK_RE = re.compile(
+    rf"""(?msx)
+    (?:{SNIPPED_RE}
+    |  \[`(?P<name>[^`\n]+)`](?![\[(])
+    )
+    """
 )
 
 # For some rules, we don't want Ruff to fix the formatting as this would "fix" the
@@ -238,6 +248,28 @@ def format_file(file: Path, error_known: bool, args: argparse.Namespace) -> int:
     return 0
 
 
+def find_backticked_shortcut_links(
+    path: Path, all_config_names: dict[str, object]
+) -> set[str]:
+    """Check for links of the form ```[`foobar`]```.
+
+    See explanation at #16010.
+    """
+
+    with path.open() as file:
+        contents = file.read()
+
+    broken_link_names: set[str] = set()
+
+    for match in BACKTICKED_SHORTCUT_LINK_RE.finditer(contents):
+        name = match["name"]
+
+        if name is not None and name not in all_config_names:
+            broken_link_names.add(name)
+
+    return broken_link_names
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Check code snippets in docs are formatted by Ruff."""
     parser = argparse.ArgumentParser(
@@ -291,8 +323,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("Please remove them and re-run.")
             return 1
 
+    ruff_config_output = subprocess.check_output(
+        ["ruff", "config", "--output-format", "json"], encoding="utf-8"
+    )
+    all_config_names = json.loads(ruff_config_output)
+
     violations = 0
     errors = 0
+    broken_links: dict[str, set[str]] = {}
     print("Checking docs formatting...")
     for file in [*static_docs, *generated_docs]:
         rule_name = file.name.split(".")[0]
@@ -307,13 +345,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif result == 2 and not error_known:
             errors += 1
 
+        broken_links_in_file = find_backticked_shortcut_links(file, all_config_names)
+
+        if broken_links_in_file:
+            broken_links[file.name] = broken_links_in_file
+
     if violations > 0:
         print(f"Formatting violations identified: {violations}")
 
     if errors > 0:
         print(f"New code block parse errors identified: {errors}")
 
-    if violations > 0 or errors > 0:
+    if broken_links:
+        print()
+        print("Do not use backticked shortcut links (```[`foobar`]```).")
+        print(
+            "They work with Mkdocs but cannot be rendered by CommonMark and GFM-compliant implementers."
+        )
+        print("Instead, use an explicit label:")
+        print("```markdown")
+        print("[`lorem.ipsum`][lorem-ipsum]")
+        print()
+        print("[lorem-ipsum]: https://example.com/")
+        print("```")
+
+        print()
+        print("The following links are found to be broken:")
+
+        for filename, link_names in broken_links.items():
+            print(f"- {filename}:")
+            print("\n".join(f"  - {name}" for name in link_names))
+
+    if violations > 0 or errors > 0 or broken_links:
         return 1
 
     print("All docs are formatted correctly.")
