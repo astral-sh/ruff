@@ -56,6 +56,19 @@ class Outer11[T]:
     def inner_11(self, T): ...
 
 
+def outer_12():
+    a = 0
+    _ = lambda a: a + 1
+
+
+def outer_13():
+    _ = lambda a: lambda a, b: a + b - 1
+
+
+def outer_14():
+    _ = (lambda a, b: a - b / 2 for a, b in [])
+
+
 ### No errors
 
 def outer_100(): ...
@@ -88,3 +101,13 @@ class Outer106:
 class Outer107:
     def inner_105(self, a): ...
     def a(self): ...
+
+
+class Outer108:
+    _ = lambda a: a + 1
+    a = 0
+
+
+class Outer109:
+    a = 0
+    _ = [lambda a: a @ 3 for _ in [1]]
