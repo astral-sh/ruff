@@ -3247,30 +3247,33 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-
-        let call_outcome = function_type.call(self.db(), &call_arguments);
-
-        self.check_call(call_expression, function_type, &call_outcome);
+        let call_outcome = self.check_call(function_type, &call_arguments, call_expression);
 
         call_outcome.unwrap_with_diagnostic(&self.context, call_expression.into())
     }
 
     fn check_call(
         &self,
-        call_expression: &ast::ExprCall,
         callee: Type<'db>,
-        outcome: &CallOutcome,
-    ) {
+        arguments: &CallArguments<'_, 'db>,
+        call_expression: &ast::ExprCall,
+    ) -> CallOutcome<'db> {
+        let call = callee.call(self.db(), arguments);
+
         let Type::FunctionLiteral(function_type) = callee else {
-            return;
+            return call;
         };
 
-        let CallOutcome::Callable { binding } = outcome else {
-            return;
+        let CallOutcome::Callable { binding } = &call else {
+            return call;
         };
 
-        match function_type.known(self.db()) {
-            Some(KnownFunction::RevealType) => {
+        let Some(known) = function_type.known(self.db()) else {
+            return call;
+        };
+
+        match known {
+            KnownFunction::RevealType => {
                 let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
                 self.context.report_diagnostic(
                     call_expression.into(),
@@ -3279,9 +3282,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Revealed type is `{}`", revealed_ty.display(self.db())),
                 );
             }
-            Some(KnownFunction::AssertType) => {
+
+            KnownFunction::AssertType => {
                 let [actual_ty, asserted_ty] = binding.parameter_types() else {
-                    return;
+                    return call;
                 };
 
                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
@@ -3297,9 +3301,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            Some(KnownFunction::StaticAssert) => {
+            KnownFunction::StaticAssert => {
                 let Some((parameter_ty, message)) = binding.two_parameter_types() else {
-                    return;
+                    return call;
                 };
 
                 let truthiness = parameter_ty.bool(self.db());
@@ -3342,6 +3346,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {}
         }
+
+        call
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
