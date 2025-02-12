@@ -3,6 +3,8 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{
     Binding, BindingId, BindingKind, Scope, ScopeId, ScopeKind, Scopes, SemanticModel,
 };
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::fixture_decorator;
@@ -40,16 +42,22 @@ use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 ///
 /// [A002]: https://docs.astral.sh/ruff/rules/builtin-argument-shadowing
 #[derive(ViolationMetadata)]
-pub(crate) struct RedefinedOuterName;
+pub(crate) struct RedefinedOuterName {
+    name: String,
+    overshadowed_line: u32,
+}
 
 impl Violation for RedefinedOuterName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Parameter overshadows symbol from outer scope".to_string()
+        format!(
+            "Redefining name `{}` from outer scope (line {})",
+            self.name, self.overshadowed_line
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Rename parameter".to_string())
+        Some("Rename parameter, or remove it if they are the same object".to_string())
     }
 }
 
@@ -59,6 +67,10 @@ pub(crate) fn redefined_outer_name(checker: &Checker, binding: &Binding) -> Opti
         return None;
     }
 
+    redefined_outer_name_parameter(checker, binding)
+}
+
+fn redefined_outer_name_parameter(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     let semantic = checker.semantic();
     let (parent_scope, overshadowed) = find_overshadowed_binding(binding, checker)?;
 
@@ -66,12 +78,20 @@ pub(crate) fn redefined_outer_name(checker: &Checker, binding: &Binding) -> Opti
         return None;
     }
 
+    let overshadowed = semantic.binding(overshadowed);
+
     // Parameters shadowing builtins are already reported by A005
-    if semantic.binding(overshadowed).kind.is_builtin() {
+    if overshadowed.kind.is_builtin() {
         return None;
     }
 
-    Some(Diagnostic::new(RedefinedOuterName, binding.range))
+    let source = checker.source();
+    let kind = RedefinedOuterName {
+        name: binding.name(source).to_string(),
+        overshadowed_line: source.count_lines(TextRange::up_to(overshadowed.start())) + 1,
+    };
+
+    Some(Diagnostic::new(kind, binding.range))
 }
 
 /// Look for an existing binding from outer scopes
