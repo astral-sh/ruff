@@ -27,7 +27,9 @@ use crate::settings::LinterSettings;
 /// `utils/logging.py`, and `utils/logging/__init__.py` would all clash with the builtin `logging`
 /// module. With the [`lint.flake8-builtins.builtins-strict-checking`] option set to `false`, the
 /// module path is considered, so only a top-level `logging.py` or `logging/__init__.py` will
-/// trigger the rule and `utils/logging.py`, for example, would not.
+/// trigger the rule and `utils/logging.py`, for example, would not. In preview mode, the default
+/// value of [`lint.flake8-builtins.builtins-strict-checking`] is `false` rather than `true` in
+/// stable mode.
 ///
 /// This rule is not applied to stub files, as the name of a stub module is out
 /// of the control of the author of the stub file. Instead, a stub should aim to

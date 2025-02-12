@@ -1151,6 +1151,8 @@ pub struct Flake8BuiltinsOptions {
     /// Compare module names instead of full module paths.
     ///
     /// Used by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).
+    ///
+    /// In preview mode the default value is `false` rather than `true`.
     pub builtins_strict_checking: Option<bool>,
 }
 
