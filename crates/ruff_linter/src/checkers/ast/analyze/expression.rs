@@ -1176,6 +1176,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::ExcInfoOutsideExceptHandler) {
                 flake8_logging::rules::exc_info_outside_except_handler(checker, call);
             }
+            if checker.enabled(Rule::FromisoformatReplaceZ) {
+                refurb::rules::fromisoformat_replace_z(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
