@@ -53,7 +53,7 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: true,
+                    strict_checking: true,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -83,7 +83,7 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: strict,
+                    strict_checking: strict,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -106,7 +106,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path(src.join(path.parent().unwrap()))],
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: false,
+                    strict_checking: false,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -130,7 +130,7 @@ mod tests {
             &LinterSettings {
                 project_root: test_resource_path(src.join(path.parent().unwrap())),
                 flake8_builtins: flake8_builtins::settings::Settings {
-                    builtins_strict_checking: false,
+                    strict_checking: false,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -156,7 +156,7 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: super::settings::Settings {
-                    builtins_ignorelist: vec!["id".to_string(), "dir".to_string()],
+                    ignorelist: vec!["id".to_string(), "dir".to_string()],
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![rule_code])
@@ -199,8 +199,8 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
                 flake8_builtins: super::settings::Settings {
-                    builtins_allowed_modules: vec!["xml".to_string(), "logging".to_string()],
-                    builtins_strict_checking: true,
+                    allowed_modules: vec!["xml".to_string(), "logging".to_string()],
+                    strict_checking: true,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![rule_code])
