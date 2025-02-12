@@ -29,6 +29,7 @@
 use std::num::NonZeroU32;
 
 use itertools::{Either, Itertools};
+use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
@@ -49,7 +50,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::{Argument, CallArguments, CallOutcome};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
@@ -58,7 +59,8 @@ use crate::types::diagnostic::{
     INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER,
     INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
@@ -3245,9 +3247,86 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        function_type
-            .call(self.db(), &call_arguments)
-            .unwrap_with_diagnostic(&self.context, call_expression.into())
+
+        let call_outcome = function_type.call(self.db(), &call_arguments);
+
+        if let CallOutcome::Callable { binding } = &call_outcome {
+            if let Type::FunctionLiteral(function_type) = function_type {
+                match function_type.known(self.db()) {
+                    Some(KnownFunction::RevealType) => {
+                        let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                        self.context.report_diagnostic(
+                            call_expression.into(),
+                            DiagnosticId::RevealedType,
+                            Severity::Info,
+                            format_args!("Revealed type is `{}`", revealed_ty.display(self.db())),
+                        );
+                    }
+                    Some(KnownFunction::AssertType) => {
+                        if let [actual_ty, asserted_ty] = binding.parameter_types() {
+                            if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
+                                self.context.report_lint(
+                                    &TYPE_ASSERTION_FAILURE,
+                                    call_expression.into(),
+                                    format_args!(
+                                        "Actual type `{}` is not the same as asserted type `{}`",
+                                        actual_ty.display(self.db()),
+                                        asserted_ty.display(self.db()),
+                                    ),
+                                );
+                            }
+                        };
+                    }
+
+                    Some(KnownFunction::StaticAssert) => {
+                        if let Some((parameter_ty, message)) = binding.two_parameter_types() {
+                            let truthiness = parameter_ty.bool(self.db());
+
+                            if !truthiness.is_always_true() {
+                                if let Some(message) =
+                                    message.into_string_literal().map(|s| &**s.value(self.db()))
+                                {
+                                    self.context.report_lint(
+                                        &STATIC_ASSERT_ERROR,
+                                        call_expression.into(),
+                                        format_args!("Static assertion error: {message}"),
+                                    );
+                                } else if parameter_ty == Type::BooleanLiteral(false) {
+                                    self.context.report_lint(
+                                        &STATIC_ASSERT_ERROR,
+                                        call_expression.into(),
+                                        format_args!(
+                                            "Static assertion error: argument evaluates to `False`"
+                                        ),
+                                    );
+                                } else if truthiness.is_always_false() {
+                                    self.context.report_lint(
+                                        &STATIC_ASSERT_ERROR,
+                                        call_expression.into(),
+                                        format_args!(
+                                            "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                            parameter_ty=parameter_ty.display(self.db())
+                                        ),
+                                    );
+                                } else {
+                                    self.context.report_lint(
+                                        &STATIC_ASSERT_ERROR,
+                                        call_expression.into(),
+                                        format_args!(
+                                            "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                            parameter_ty=parameter_ty.display(self.db())
+                                        ),
+                                    );
+                                };
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        call_outcome.unwrap_with_diagnostic(&self.context, call_expression.into())
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
