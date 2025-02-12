@@ -193,6 +193,13 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    pub(crate) fn three_parameter_types(&self) -> Option<(Type<'db>, Type<'db>, Type<'db>)> {
+        match self.parameter_types() {
+            [first, second, third] => Some((*first, *second, *third)),
+            _ => None,
+        }
+    }
+
     fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
         match self.callable_ty {
             Type::FunctionLiteral(function) => Some(function.name(db)),
