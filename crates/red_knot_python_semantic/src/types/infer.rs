@@ -3251,83 +3251,98 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let call_outcome = function_type.call(self.db(), &call_arguments);
 
-        if let CallOutcome::Callable { binding } = &call_outcome {
-            if let Type::FunctionLiteral(function_type) = function_type {
-                match function_type.known(self.db()) {
-                    Some(KnownFunction::RevealType) => {
-                        let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        self.context.report_diagnostic(
-                            call_expression.into(),
-                            DiagnosticId::RevealedType,
-                            Severity::Info,
-                            format_args!("Revealed type is `{}`", revealed_ty.display(self.db())),
-                        );
-                    }
-                    Some(KnownFunction::AssertType) => {
-                        if let [actual_ty, asserted_ty] = binding.parameter_types() {
-                            if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
-                                self.context.report_lint(
-                                    &TYPE_ASSERTION_FAILURE,
-                                    call_expression.into(),
-                                    format_args!(
-                                        "Actual type `{}` is not the same as asserted type `{}`",
-                                        actual_ty.display(self.db()),
-                                        asserted_ty.display(self.db()),
-                                    ),
-                                );
-                            }
-                        };
-                    }
-
-                    Some(KnownFunction::StaticAssert) => {
-                        if let Some((parameter_ty, message)) = binding.two_parameter_types() {
-                            let truthiness = parameter_ty.bool(self.db());
-
-                            if !truthiness.is_always_true() {
-                                if let Some(message) =
-                                    message.into_string_literal().map(|s| &**s.value(self.db()))
-                                {
-                                    self.context.report_lint(
-                                        &STATIC_ASSERT_ERROR,
-                                        call_expression.into(),
-                                        format_args!("Static assertion error: {message}"),
-                                    );
-                                } else if parameter_ty == Type::BooleanLiteral(false) {
-                                    self.context.report_lint(
-                                        &STATIC_ASSERT_ERROR,
-                                        call_expression.into(),
-                                        format_args!(
-                                            "Static assertion error: argument evaluates to `False`"
-                                        ),
-                                    );
-                                } else if truthiness.is_always_false() {
-                                    self.context.report_lint(
-                                        &STATIC_ASSERT_ERROR,
-                                        call_expression.into(),
-                                        format_args!(
-                                            "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
-                                            parameter_ty=parameter_ty.display(self.db())
-                                        ),
-                                    );
-                                } else {
-                                    self.context.report_lint(
-                                        &STATIC_ASSERT_ERROR,
-                                        call_expression.into(),
-                                        format_args!(
-                                            "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
-                                            parameter_ty=parameter_ty.display(self.db())
-                                        ),
-                                    );
-                                };
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+        self.check_call(call_expression, function_type, &call_outcome);
 
         call_outcome.unwrap_with_diagnostic(&self.context, call_expression.into())
+    }
+
+    fn check_call(
+        &self,
+        call_expression: &ast::ExprCall,
+        callee: Type<'db>,
+        outcome: &CallOutcome,
+    ) {
+        let Type::FunctionLiteral(function_type) = callee else {
+            return;
+        };
+
+        let CallOutcome::Callable { binding } = outcome else {
+            return;
+        };
+
+        match function_type.known(self.db()) {
+            Some(KnownFunction::RevealType) => {
+                let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                self.context.report_diagnostic(
+                    call_expression.into(),
+                    DiagnosticId::RevealedType,
+                    Severity::Info,
+                    format_args!("Revealed type is `{}`", revealed_ty.display(self.db())),
+                );
+            }
+            Some(KnownFunction::AssertType) => {
+                let [actual_ty, asserted_ty] = binding.parameter_types() else {
+                    return;
+                };
+
+                if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
+                    self.context.report_lint(
+                        &TYPE_ASSERTION_FAILURE,
+                        call_expression.into(),
+                        format_args!(
+                            "Actual type `{}` is not the same as asserted type `{}`",
+                            actual_ty.display(self.db()),
+                            asserted_ty.display(self.db()),
+                        ),
+                    );
+                }
+            }
+
+            Some(KnownFunction::StaticAssert) => {
+                let Some((parameter_ty, message)) = binding.two_parameter_types() else {
+                    return;
+                };
+
+                let truthiness = parameter_ty.bool(self.db());
+
+                if !truthiness.is_always_true() {
+                    if let Some(message) =
+                        message.into_string_literal().map(|s| &**s.value(self.db()))
+                    {
+                        self.context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            call_expression.into(),
+                            format_args!("Static assertion error: {message}"),
+                        );
+                    } else if parameter_ty == Type::BooleanLiteral(false) {
+                        self.context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            call_expression.into(),
+                            format_args!("Static assertion error: argument evaluates to `False`"),
+                        );
+                    } else if truthiness.is_always_false() {
+                        self.context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            call_expression.into(),
+                            format_args!(
+                                "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                parameter_ty=parameter_ty.display(self.db())
+                            ),
+                        );
+                    } else {
+                        self.context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            call_expression.into(),
+                            format_args!(
+                                "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                parameter_ty=parameter_ty.display(self.db())
+                            ),
+                        );
+                    };
+                }
+            }
+            _ => {}
+        }
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
