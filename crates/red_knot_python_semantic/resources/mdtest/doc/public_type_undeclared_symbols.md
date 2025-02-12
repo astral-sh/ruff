@@ -34,13 +34,16 @@ possibly contain, but we *do know* that `None` is a possibility. This allows us 
 where `wrapper.value` is used in a way that is incompatible with `None`:
 
 ```py
+def accepts_int(i: int) -> None:
+    pass
+
 def f(w: Wrapper) -> None:
     # This is fine
     v: int | None = w.value
 
     # This function call is incorrect, because `w.value` could be `None`. We therefore emit the following
-    # error: "`Unknown | None` cannot be assigned to parameter 1 (`i`) of function `chr`; expected type `int`"
-    c = chr(w.value)
+    # error: "`Unknown | None` cannot be assigned to parameter 1 (`i`) of function `accepts_int`; expected type `int`"
+    c = accepts_int(w.value)
 ```
 
 ## Explicit lack of knowledge
@@ -76,7 +79,7 @@ print(o.value // 2)  # Runtime error!
 ```
 
 We do not catch this mistake either, but we accurately reflect our lack of knowledge about
-`o.value`. Together with a possible future type-checker mode that would detect the prevalance of
+`o.value`. Together with a possible future type-checker mode that would detect the prevalence of
 dynamic types, this could help developers catch such mistakes.
 
 ## Stricter behavior
