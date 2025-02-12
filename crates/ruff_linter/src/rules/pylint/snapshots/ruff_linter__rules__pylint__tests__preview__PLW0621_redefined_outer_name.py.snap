@@ -1,0 +1,124 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+redefined_outer_name.py:15:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+14 | def outer_1(a):
+15 |     def inner_1(a): ...
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:20:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+18 | def outer_2():
+19 |     a = 1
+20 |     def inner_2(a): ...
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:24:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+23 | def outer_3():
+24 |     def inner_3(a): ...
+   |                 ^ PLW0621
+25 |     a = 1
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:29:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+28 | def outer_4():
+29 |     def inner_4(outer_4): ...
+   |                 ^^^^^^^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:32:13: PLW0621 Parameter overshadows symbol from outer scope
+   |
+32 | def outer_5(global_a): ...
+   |             ^^^^^^^^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:36:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+35 | def outer_6():
+36 |     def inner_6(global_a): ...
+   |                 ^^^^^^^^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:40:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+39 | def outer_7():
+40 |     def inner_7(f): ...
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:44:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+43 | def outer_8():
+44 |     def inner_8(yf): ...
+   |                 ^^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:47:13: PLW0621 Parameter overshadows symbol from outer scope
+   |
+47 | def outer_9(outer_100):
+   |             ^^^^^^^^^ PLW0621
+48 |     ...
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:52:18: PLW0621 Parameter overshadows symbol from outer scope
+   |
+51 | def outer_10():
+52 |     def inner_10(outer_100): ...
+   |                  ^^^^^^^^^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:56:24: PLW0621 Parameter overshadows symbol from outer scope
+   |
+55 | class Outer11[T]:
+56 |     def inner_11(self, T): ...
+   |                        ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:61:16: PLW0621 Parameter overshadows symbol from outer scope
+   |
+59 | def outer_12():
+60 |     a = 0
+61 |     _ = lambda a: a + 1
+   |                ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:65:26: PLW0621 Parameter overshadows symbol from outer scope
+   |
+64 | def outer_13():
+65 |     _ = lambda a: lambda a, b: a + b - 1
+   |                          ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:69:17: PLW0621 Parameter overshadows symbol from outer scope
+   |
+68 | def outer_14():
+69 |     _ = (lambda a, b: a - b / 2 for a, b in [])
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter
+
+redefined_outer_name.py:69:20: PLW0621 Parameter overshadows symbol from outer scope
+   |
+68 | def outer_14():
+69 |     _ = (lambda a, b: a - b / 2 for a, b in [])
+   |                    ^ PLW0621
+   |
+   = help: Rename parameter
