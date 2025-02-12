@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -72,12 +72,12 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
 
     // Replace `)` with `}`.
     // Place `}` at argument's end or at trailing comma if present
-    let mut tokenizer = SimpleTokenizer::starts_at(
-        argument.end(),
-        checker.locator().slice(TextRange::up_to(call.end())),
-    );
-    let right_brace_loc = tokenizer
-        .find(|token| token.kind == SimpleTokenKind::Comma)
+    let after_arg_tokens = checker
+        .tokens()
+        .in_range(TextRange::new(argument.end(), call.end()));
+    let right_brace_loc = after_arg_tokens
+        .iter()
+        .find(|token| token.kind() == TokenKind::Comma)
         .map_or(call.arguments.end() - one, |comma| {
             comma.end() - TextSize::from(1)
         });
