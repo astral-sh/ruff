@@ -3,7 +3,10 @@ use std::fmt::Formatter;
 
 use thiserror::Error;
 
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
+use ruff_annotate_snippets::{
+    Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
+    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
+};
 use ruff_python_parser::ParseError;
 use ruff_source_file::{OneIndexed, SourceCode};
 use ruff_text_size::TextRange;
@@ -237,6 +240,24 @@ pub enum Severity {
     Fatal,
 }
 
+impl Severity {
+    fn to_annotate(self) -> AnnotateLevel {
+        match self {
+            Severity::Info => AnnotateLevel::Info,
+            Severity::Warning => AnnotateLevel::Warning,
+            Severity::Error => AnnotateLevel::Error,
+            // NOTE: Should we really collapse this to "error"?
+            //
+            // After collapsing this, the snapshot tests seem to reveal that we
+            // don't currently have any *tests* with a `fatal` severity level.
+            // And maybe *rendering* this as just an `error` is fine. If we
+            // really do need different rendering, then I think we can add a
+            // `Level::Fatal`. ---AG
+            Severity::Fatal => AnnotateLevel::Error,
+        }
+    }
+}
+
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug, Default)]
 pub struct DisplayDiagnosticConfig {
@@ -261,94 +282,150 @@ pub struct DisplayDiagnostic<'db, 'diag, 'config> {
 
 impl std::fmt::Display for DisplayDiagnostic<'_, '_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let level = match self.diagnostic.severity() {
-            Severity::Info => Level::Info,
-            Severity::Warning => Level::Warning,
-            Severity::Error => Level::Error,
-            // NOTE: Should we really collapse this to "error"?
-            //
-            // After collapsing this, the snapshot tests seem to reveal that we
-            // don't currently have any *tests* with a `fatal` severity level.
-            // And maybe *rendering* this as just an `error` is fine. If we
-            // really do need different rendering, then I think we can add a
-            // `Level::Fatal`. ---AG
-            Severity::Fatal => Level::Error,
-        };
-
         let render = |f: &mut std::fmt::Formatter, message| {
             let renderer = if self.config.color {
-                Renderer::styled()
+                AnnotateRenderer::styled()
             } else {
-                Renderer::plain()
+                AnnotateRenderer::plain()
             }
             .cut_indicator("…");
             let rendered = renderer.render(message);
             writeln!(f, "{rendered}")
         };
-        match self.diagnostic.span() {
-            None => {
-                // NOTE: This is pretty sub-optimal. It doesn't render well. We
-                // really want a snippet, but without a `File`, we can't really
-                // render anything. It looks like this case currently happens
-                // for configuration errors. It looks like we can probably
-                // produce a snippet for this if it comes from a file, but if
-                // it comes from the CLI, I'm not quite sure exactly what to
-                // do. ---AG
-                let msg = format!("{}: {}", self.diagnostic.id(), self.diagnostic.message());
-                render(f, level.title(&msg))
-            }
-            Some(span) => {
-                let path = span.file.path(self.db).to_string();
-                let source = source_text(self.db, span.file);
-                let title = self.diagnostic.id().to_string();
-                let message = self.diagnostic.message();
+        let Some(span) = self.diagnostic.span() else {
+            // NOTE: This is pretty sub-optimal. It doesn't render well. We
+            // really want a snippet, but without a `File`, we can't really
+            // render anything. It looks like this case currently happens
+            // for configuration errors. It looks like we can probably
+            // produce a snippet for this if it comes from a file, but if
+            // it comes from the CLI, I'm not quite sure exactly what to
+            // do. ---AG
+            let msg = format!("{}: {}", self.diagnostic.id(), self.diagnostic.message());
+            return render(f, self.diagnostic.severity().to_annotate().title(&msg));
+        };
 
-                let Some(range) = span.range else {
-                    let snippet = Snippet::source(source.as_str()).origin(&path).line_start(1);
-                    return render(f, level.title(&title).snippet(snippet));
-                };
+        let mut message = Message::new(self.diagnostic.severity(), self.diagnostic.id());
+        message.add_snippet(Snippet::new(
+            self.db,
+            self.diagnostic.severity(),
+            &span,
+            &self.diagnostic.message(),
+        ));
+        render(f, message.to_annotate())
+    }
+}
 
-                // The bits below are a simplified copy from
-                // `crates/ruff_linter/src/message/text.rs`.
-                let index = line_index(self.db, span.file);
-                let source_code = SourceCode::new(source.as_str(), &index);
+#[derive(Debug)]
+struct Message {
+    level: AnnotateLevel,
+    title: String,
+    snippets: Vec<Snippet>,
+}
 
-                let content_start_index = source_code.line_index(range.start());
-                let mut start_index = content_start_index.saturating_sub(2);
-                // Trim leading empty lines.
-                while start_index < content_start_index {
-                    if !source_code.line_text(start_index).trim().is_empty() {
-                        break;
-                    }
-                    start_index = start_index.saturating_add(1);
-                }
+#[derive(Debug)]
+struct Snippet {
+    source: String,
+    origin: String,
+    line_start: usize,
+    annotation: Option<Annotation>,
+}
 
-                let content_end_index = source_code.line_index(range.end());
-                let mut end_index = content_end_index
-                    .saturating_add(2)
-                    .min(OneIndexed::from_zero_indexed(index.line_count()));
-                // Trim trailing empty lines.
-                while end_index > content_end_index {
-                    if !source_code.line_text(end_index).trim().is_empty() {
-                        break;
-                    }
-                    end_index = end_index.saturating_sub(1);
-                }
+#[derive(Debug)]
+struct Annotation {
+    level: AnnotateLevel,
+    span: TextRange,
+    label: String,
+}
 
-                // Slice up the code frame and adjust our range.
-                let start_offset = source_code.line_start(start_index);
-                let end_offset = source_code.line_end(end_index);
-                let frame = source_code.slice(TextRange::new(start_offset, end_offset));
-                let span = range - start_offset;
-
-                let annotation = level.span(span.into()).label(&message);
-                let snippet = Snippet::source(frame)
-                    .origin(&path)
-                    .line_start(start_index.get())
-                    .annotation(annotation);
-                render(f, level.title(&title).snippet(snippet))
-            }
+impl Message {
+    fn new(severity: Severity, id: DiagnosticId) -> Message {
+        Message {
+            level: severity.to_annotate(),
+            title: id.to_string(),
+            snippets: vec![],
         }
+    }
+
+    fn add_snippet(&mut self, snippet: Snippet) {
+        self.snippets.push(snippet);
+    }
+
+    fn to_annotate(&self) -> AnnotateMessage<'_> {
+        self.level
+            .title(&self.title)
+            .snippets(self.snippets.iter().map(|snippet| snippet.to_annotate()))
+    }
+}
+
+impl Snippet {
+    fn new(db: &'_ dyn Db, severity: Severity, span: &Span, message: &str) -> Snippet {
+        let origin = span.file.path(db).to_string();
+        let source_text = source_text(db, span.file);
+        let Some(range) = span.range else {
+            return Snippet {
+                source: source_text.to_string(),
+                origin,
+                line_start: 1,
+                annotation: None,
+            };
+        };
+
+        // The bits below are a simplified copy from
+        // `crates/ruff_linter/src/message/text.rs`.
+        let index = line_index(db, span.file);
+        let source_code = SourceCode::new(source_text.as_str(), &index);
+
+        let content_start_index = source_code.line_index(range.start());
+        let mut start_index = content_start_index.saturating_sub(2);
+        // Trim leading empty lines.
+        while start_index < content_start_index {
+            if !source_code.line_text(start_index).trim().is_empty() {
+                break;
+            }
+            start_index = start_index.saturating_add(1);
+        }
+
+        let content_end_index = source_code.line_index(range.end());
+        let mut end_index = content_end_index
+            .saturating_add(2)
+            .min(OneIndexed::from_zero_indexed(index.line_count()));
+        // Trim trailing empty lines.
+        while end_index > content_end_index {
+            if !source_code.line_text(end_index).trim().is_empty() {
+                break;
+            }
+            end_index = end_index.saturating_sub(1);
+        }
+
+        // Slice up the code frame and adjust our range.
+        let start_offset = source_code.line_start(start_index);
+        let end_offset = source_code.line_end(end_index);
+        let frame = source_code.slice(TextRange::new(start_offset, end_offset));
+        let range = range - start_offset;
+
+        Snippet {
+            source: frame.to_string(),
+            origin,
+            line_start: start_index.get(),
+            annotation: Some(Annotation {
+                level: severity.to_annotate(),
+                span: range,
+                label: message.to_string(),
+            }),
+        }
+    }
+
+    fn to_annotate(&self) -> AnnotateSnippet<'_> {
+        AnnotateSnippet::source(&self.source)
+            .origin(&self.origin)
+            .line_start(self.line_start)
+            .annotations(self.annotation.as_ref().map(|a| a.to_annotate()))
+    }
+}
+
+impl Annotation {
+    fn to_annotate(&self) -> AnnotateAnnotation<'_> {
+        self.level.span(self.span.into()).label(&self.label)
     }
 }
 
