@@ -351,16 +351,16 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
-pub(super) enum CallDunderResult<'db> {
-    CallOutcome(CallOutcome<'db>),
+pub(super) enum CallDunderOutcome<'db> {
+    Call(CallOutcome<'db>),
     PossiblyUnbound(CallOutcome<'db>),
     MethodNotAvailable,
 }
 
-impl<'db> CallDunderResult<'db> {
+impl<'db> CallDunderOutcome<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::CallOutcome(outcome) => outcome.return_type(db),
+            Self::Call(outcome) => outcome.return_type(db),
             Self::PossiblyUnbound { .. } => None,
             Self::MethodNotAvailable => None,
         }
