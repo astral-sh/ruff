@@ -5,7 +5,7 @@ use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{Program, ProgramSettings, SearchPathSettings, SitePackages};
-use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -300,9 +300,7 @@ fn create_diagnostic_snapshot<D: Diagnostic>(
     test: &parser::MarkdownTest,
     diagnostics: impl IntoIterator<Item = D>,
 ) -> String {
-    // TODO(ag): Do something better than requiring this
-    // global state to be twiddled everywhere.
-    colored::control::set_override(false);
+    let display_config = DisplayDiagnosticConfig::default().color(false);
 
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
@@ -340,7 +338,7 @@ fn create_diagnostic_snapshot<D: Diagnostic>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot, "{}", diag.display(db)).unwrap();
+        writeln!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
