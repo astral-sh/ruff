@@ -180,7 +180,7 @@ fn replace_z_date_parent_and_offset<'a>(
         return None;
     }
 
-    Some((&**value, &*func, zero_offset))
+    Some((&**value, func, zero_offset))
 }
 
 fn strip_z_date_and_parent(call: &ExprCall) -> Option<(&Expr, &Expr)> {
