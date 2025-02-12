@@ -347,7 +347,7 @@ fn symbol_from_bindings<'db>(
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
-        binding.in_stub(db) && lookup.is_external() && !binding.is_reexported(db)
+        lookup.is_external() && !binding.is_reexported(db) && binding.in_stub(db)
     };
 
     let unbound_visibility = match bindings_with_constraints.peek() {
@@ -478,7 +478,7 @@ fn symbol_from_declarations<'db>(
     let mut declarations = declarations.peekable();
 
     let is_non_exported = |declaration: Definition<'db>| {
-        declaration.in_stub(db) && lookup.is_external() && !declaration.is_reexported(db)
+        lookup.is_external() && !declaration.is_reexported(db) && declaration.in_stub(db)
     };
 
     let undeclared_visibility = match declarations.peek() {
