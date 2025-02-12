@@ -8,10 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 
 /// ## What it does
-/// Checks for parameters that have the same name as a symbol from outer scopes.
+/// Checks for variables that share the same name as a name defined in an outer scope.
 ///
 /// ## Why is this bad?
 /// Having two symbols with the same name is confusing and may lead to bugs.
+/// Currently, this rule only report parameters.
 ///
 /// As an exception, parameters referencing Pytest fixtures are ignored.
 /// Parameters shadowing built-in symbols (e.g., `id` or `type`)
@@ -39,9 +40,9 @@ use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 ///
 /// [A002]: https://docs.astral.sh/ruff/rules/builtin-argument-shadowing
 #[derive(ViolationMetadata)]
-pub(crate) struct OvershadowingParameter;
+pub(crate) struct RedefinedOuterName;
 
-impl Violation for OvershadowingParameter {
+impl Violation for RedefinedOuterName {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Parameter overshadows symbol from outer scope".to_string()
@@ -52,8 +53,8 @@ impl Violation for OvershadowingParameter {
     }
 }
 
-/// RUF059
-pub(crate) fn overshadowing_parameter(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+/// PLW0621
+pub(crate) fn redefined_outer_name(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     if !matches!(binding.kind, BindingKind::Argument) {
         return None;
     }
@@ -70,7 +71,7 @@ pub(crate) fn overshadowing_parameter(checker: &Checker, binding: &Binding) -> O
         return None;
     }
 
-    Some(Diagnostic::new(OvershadowingParameter, binding.range))
+    Some(Diagnostic::new(RedefinedOuterName, binding.range))
 }
 
 /// Look for an existing binding from outer scopes

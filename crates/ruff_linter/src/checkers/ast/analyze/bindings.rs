@@ -25,7 +25,7 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::ForLoopWrites,
         Rule::CustomTypeVarForSelf,
         Rule::PrivateTypeParameter,
-        Rule::OvershadowingParameter,
+        Rule::RedefinedOuterName,
     ]) {
         return;
     }
@@ -130,8 +130,8 @@ pub(crate) fn bindings(checker: &Checker) {
                 checker.report_diagnostic(diagnostic);
             }
         }
-        if checker.enabled(Rule::OvershadowingParameter) {
-            if let Some(diagnostic) = ruff::rules::overshadowing_parameter(checker, binding) {
+        if checker.enabled(Rule::RedefinedOuterName) {
+            if let Some(diagnostic) = pylint::rules::redefined_outer_name(checker, binding) {
                 checker.report_diagnostic(diagnostic);
             }
         }

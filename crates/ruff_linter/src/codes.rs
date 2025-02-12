@@ -285,6 +285,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0604") => (RuleGroup::Stable, rules::pylint::rules::GlobalAtModuleLevel),
+        (Pylint, "W0621") => (RuleGroup::Preview, rules::pylint::rules::RedefinedOuterName),
         (Pylint, "W0642") => (RuleGroup::Stable, rules::pylint::rules::SelfOrClsAssignment),
         (Pylint, "W0711") => (RuleGroup::Stable, rules::pylint::rules::BinaryOpException),
         (Pylint, "W1501") => (RuleGroup::Stable, rules::pylint::rules::BadOpenMode),
@@ -1011,7 +1012,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Preview, rules::ruff::rules::StarmapZip),
-        (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::OvershadowingParameter),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 

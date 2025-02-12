@@ -442,6 +442,7 @@ mod tests {
     )]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
+    #[test_case(Rule::RedefinedOuterName, Path::new("redefined_outer_name.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
