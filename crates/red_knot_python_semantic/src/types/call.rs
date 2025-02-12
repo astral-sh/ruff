@@ -215,16 +215,23 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
-pub(super) enum CallDunderResult<'db> {
-    CallOutcome(CallOutcome<'db>),
+pub(super) enum CallDunderOutcome<'db> {
+    Call(CallOutcome<'db>),
     PossiblyUnbound(CallOutcome<'db>),
     MethodNotAvailable,
 }
 
-impl<'db> CallDunderResult<'db> {
+impl<'db> CallDunderOutcome<'db> {
+    pub(super) fn call_outcome(&self) -> Option<&CallOutcome<'db>> {
+        match self {
+            Self::Call(outcome) | Self::PossiblyUnbound(outcome) => Some(outcome),
+            Self::MethodNotAvailable => None,
+        }
+    }
+
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::CallOutcome(outcome) => outcome.return_type(db),
+            Self::Call(outcome) => outcome.return_type(db),
             Self::PossiblyUnbound { .. } => None,
             Self::MethodNotAvailable => None,
         }
@@ -282,6 +289,35 @@ impl<'db> NotCallableError<'db> {
                 callable_ty: called_ty,
                 ..
             } => *called_ty,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(super) enum CallDunderLenOutcome<'db> {
+    /// The length is statically known.
+    StaticallyKnown(usize),
+
+    /// The length is determined by calling `__len__`.
+    Call(CallOutcome<'db>),
+
+    /// The length is determined by calling `__len__` but it isn't always bound.
+    PossiblyUnbound(CallOutcome<'db>),
+
+    /// The object doesn't have a `__len__` method and, thus, doesn't implement sized.
+    MethodNotAvailable,
+}
+
+impl<'db> CallDunderLenOutcome<'db> {
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            CallDunderLenOutcome::StaticallyKnown(len) => {
+                // TODO: Fall back to `int` if value is too large?
+                i64::try_from(*len).ok().map(Type::IntLiteral)
+            }
+            CallDunderLenOutcome::Call(call_outcome)
+            | CallDunderLenOutcome::PossiblyUnbound(call_outcome) => call_outcome.return_type(db),
+            CallDunderLenOutcome::MethodNotAvailable => None,
         }
     }
 }

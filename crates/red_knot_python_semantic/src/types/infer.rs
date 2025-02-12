@@ -66,12 +66,12 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    todo_type, typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType,
-    DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
-    IterationOutcome, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate,
-    MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    todo_type, typing_extensions_symbol, Boundness, Class, ClassLiteralType, DynamicType,
+    FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
+    KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
+    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -3344,6 +3344,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     };
                 }
             }
+
+            KnownFunction::Len => {
+                // TODO: Assert that the argument implements the `Sized` protocol (correctly).
+            }
             _ => {}
         }
 
@@ -3667,12 +3671,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let CallDunderResult::CallOutcome(call)
-                | CallDunderResult::PossiblyUnbound(call) = operand_type.call_dunder(
-                    self.db(),
-                    unary_dunder_method,
-                    &CallArguments::positional([operand_type]),
-                ) {
+                if let Some(call) = operand_type
+                    .call_dunder(
+                        self.db(),
+                        unary_dunder_method,
+                        &CallArguments::positional([operand_type]),
+                    )
+                    .call_outcome()
+                {
                     match call.return_type_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {
