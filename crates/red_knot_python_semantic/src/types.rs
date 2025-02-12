@@ -1927,11 +1927,11 @@ impl<'db> Type<'db> {
 
         let return_ty = match self.call_dunder(db, "__len__", &CallArguments::positional([*self])) {
             // TODO: emit a diagnostic
-            CallDunderResult::MethodNotAvailable => return None,
-
-            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
-                outcome.return_type(db)?
+            CallDunderResult::MethodNotAvailable | CallDunderResult::PossiblyUnbound(_) => {
+                return None
             }
+
+            CallDunderResult::CallOutcome(outcome) => outcome.return_type(db)?,
         };
 
         non_negative_int_literal(db, return_ty)

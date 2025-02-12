@@ -113,7 +113,7 @@ impl<'db> CallOutcome<'db> {
                     }
                 })
                 .map(UnionBuilder::build),
-            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_type(db),
+            Self::PossiblyUnboundDunderCall { .. } => None,
             Self::StaticAssertionError { .. } => Some(Type::none(db)),
             Self::AssertType {
                 binding,
