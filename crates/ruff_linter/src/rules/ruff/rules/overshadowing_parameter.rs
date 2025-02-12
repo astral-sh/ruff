@@ -14,6 +14,8 @@ use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 /// Having two symbols with the same name is confusing and may lead to bugs.
 ///
 /// As an exception, parameters referencing Pytest fixtures are ignored.
+/// Parameters shadowing built-in symbols (e.g., `id` or `type`)
+/// are also not reported, as they are within the scope of [`builtin-argument-shadowing`][A002].
 ///
 /// ## Example
 ///
@@ -34,6 +36,8 @@ use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 /// def f(b):
 ///     print(b)
 /// ```
+///
+/// [A002]: https://docs.astral.sh/ruff/rules/builtin-argument-shadowing
 #[derive(ViolationMetadata)]
 pub(crate) struct OvershadowingParameter;
 
@@ -58,6 +62,11 @@ pub(crate) fn overshadowing_parameter(checker: &Checker, binding: &Binding) -> O
     let (parent_scope, overshadowed) = find_overshadowed_binding(binding, checker)?;
 
     if parent_scope.is_global() && binding_is_pytest_fixture(overshadowed, semantic) {
+        return None;
+    }
+
+    // Parameters shadowing builtins are already reported by A005
+    if semantic.binding(overshadowed).kind.is_builtin() {
         return None;
     }
 
