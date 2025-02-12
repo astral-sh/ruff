@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::str::{is_triple_quote, leading_quote};
+use ruff_python_ast::str::is_triple_quote;
 use ruff_python_semantic::Definition;
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -137,7 +137,6 @@ impl AlwaysFixableViolation for MultiLineSummarySecondLine {
 
 /// D212, D213
 pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring) {
-    let contents = docstring.contents;
     let body = docstring.body();
 
     if NewlineWithTrailingNewline::from(body.as_str())
@@ -146,7 +145,8 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
     {
         return;
     };
-    let mut content_lines = UniversalNewlineIterator::with_offset(contents, docstring.start());
+    let mut content_lines =
+        UniversalNewlineIterator::with_offset(docstring.contents(), docstring.start());
 
     let Some(first_line) = content_lines.next() else {
         return;
@@ -179,7 +179,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
-            let mut indentation = String::from(docstring.indentation);
+            let mut indentation = String::from(docstring.indentation());
             let mut fixable = true;
             if !indentation.chars().all(char::is_whitespace) {
                 fixable = false;
@@ -202,14 +202,16 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
             }
 
             if fixable {
-                let prefix = leading_quote(contents).unwrap();
                 // Use replacement instead of insert to trim possible whitespace between leading
                 // quote and text.
                 let repl = format!(
                     "{}{}{}",
                     checker.stylist().line_ending().as_str(),
                     indentation,
-                    first_line.strip_prefix(prefix).unwrap().trim_start()
+                    first_line
+                        .strip_prefix(docstring.opener())
+                        .unwrap()
+                        .trim_start()
                 );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(

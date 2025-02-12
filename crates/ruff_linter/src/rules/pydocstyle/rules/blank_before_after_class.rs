@@ -197,7 +197,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 // Delete the blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                     blank_lines_start,
-                    docstring.start() - docstring.indentation.text_len(),
+                    docstring.start() - docstring.indentation().text_len(),
                 )));
                 checker.report_diagnostic(diagnostic);
             }
@@ -210,7 +210,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
                     blank_lines_start,
-                    docstring.start() - docstring.indentation.text_len(),
+                    docstring.start() - docstring.indentation().text_len(),
                 )));
                 checker.report_diagnostic(diagnostic);
             }

@@ -1399,7 +1399,7 @@ fn blanks_and_section_underline(
 
             if checker.enabled(Rule::OverindentedSectionUnderline) {
                 let leading_space = leading_space(&non_blank_line);
-                if leading_space.len() > docstring.indentation.len() {
+                if leading_space.len() > docstring.indentation().len() {
                     let mut diagnostic = Diagnostic::new(
                         OverindentedSectionUnderline {
                             name: context.section_name().to_string(),
@@ -1412,7 +1412,7 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                         leading_space.text_len() + TextSize::from(1),
                     );
-                    let contents = clean_space(docstring.indentation);
+                    let contents = clean_space(docstring.indentation());
                     diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
                         Edit::range_deletion(range)
                     } else {
@@ -1540,7 +1540,7 @@ fn blanks_and_section_underline(
                     let content = format!(
                         "{}{}{}",
                         checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation),
+                        clean_space(docstring.indentation()),
                         "-".repeat(context.section_name().len()),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1621,7 +1621,7 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                clean_space(docstring.indentation),
+                clean_space(docstring.indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1671,7 +1671,7 @@ fn common_section(
 
     if checker.enabled(Rule::OverindentedSection) {
         let leading_space = leading_space(context.summary_line());
-        if leading_space.len() > docstring.indentation.len() {
+        if leading_space.len() > docstring.indentation().len() {
             let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 OverindentedSection {
@@ -1681,7 +1681,7 @@ fn common_section(
             );
 
             // Replace the existing indentation with whitespace of the appropriate length.
-            let content = clean_space(docstring.indentation);
+            let content = clean_space(docstring.indentation());
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
@@ -1738,7 +1738,7 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
+                        docstring.indentation()
                     ),
                     context.end() - del_len,
                     context.end(),

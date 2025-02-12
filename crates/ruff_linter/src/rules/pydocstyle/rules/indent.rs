@@ -179,8 +179,8 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         return;
     }
 
-    let mut has_seen_tab = docstring.indentation.contains('\t');
-    let docstring_indent_size = docstring.indentation.chars().count();
+    let mut has_seen_tab = docstring.indentation().contains('\t');
+    let docstring_indent_size = docstring.indentation().chars().count();
 
     // Lines, other than the last, that are over indented.
     let mut over_indented_lines = vec![];
@@ -226,7 +226,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    clean_space(docstring.indentation),
+                    clean_space(docstring.indentation()),
                     TextRange::at(line.start(), line_indent.text_len()),
                 )));
                 checker.report_diagnostic(diagnostic);
@@ -275,7 +275,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         if let Some(smallest_over_indent_size) = smallest_over_indent_size {
             for line in over_indented_lines {
                 let line_indent = leading_space(&line);
-                let indent = clean_space(docstring.indentation);
+                let indent = clean_space(docstring.indentation());
 
                 // We report over-indentation on every line. This isn't great, but
                 // enables the fix capability.
@@ -324,7 +324,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
             if last_line_over_indent > 0 && is_indent_only {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
-                let indent = clean_space(docstring.indentation);
+                let indent = clean_space(docstring.indentation());
                 let range = TextRange::at(last.start(), line_indent.text_len());
                 let edit = if indent.is_empty() {
                     Edit::range_deletion(range)

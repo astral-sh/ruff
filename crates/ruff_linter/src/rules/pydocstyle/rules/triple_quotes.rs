@@ -64,9 +64,8 @@ impl Violation for TripleSingleQuotes {
 
 /// D300
 pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
-    let leading_quote = docstring.leading_quote();
-
-    let prefixes = leading_quote.trim_end_matches(['\'', '"']).to_owned();
+    let opener = docstring.opener();
+    let prefixes = docstring.prefixes();
 
     let expected_quote = if docstring.body().contains("\"\"\"") {
         if docstring.body().contains("\'\'\'") {
@@ -79,7 +78,7 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
 
     match expected_quote {
         Quote::Single => {
-            if !leading_quote.ends_with("'''") {
+            if !opener.ends_with("'''") {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
 
@@ -95,7 +94,7 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
             }
         }
         Quote::Double => {
-            if !leading_quote.ends_with("\"\"\"") {
+            if !opener.ends_with("\"\"\"") {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
 
