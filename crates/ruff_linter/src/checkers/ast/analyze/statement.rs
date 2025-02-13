@@ -1081,6 +1081,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
+            if checker.enabled(Rule::UnnecessaryAssignment) {
+                pylint::rules::unnecessary_assignment(checker, if_);
+            }
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
                 flake8_type_checking::rules::empty_type_checking_block(checker, if_);
             }
