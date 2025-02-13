@@ -1020,14 +1020,6 @@ Run Ruff on every keystroke (`onType`) or on save (`onSave`).
 
 ### `nativeServer`
 
-!!! warning "Deprecated"
-
-    This setting has been deprecated with the deprecation of
-    [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). It was mainly used to provide a way to
-    switch between the native language server and
-    [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) during the transition period. Refer to the
-    [migration guide](migration.md) for more information.
-
 Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or
 automatically decide between the two based on the Ruff version and extension settings.
 

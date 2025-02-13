@@ -181,6 +181,8 @@ mod tests {
 
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
+    #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.py"))]
+    #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.pyi"))]
     fn py38(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("py38_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -186,7 +186,13 @@ pub(crate) fn ambiguous_unicode_character_comment(
 
 /// RUF001, RUF002
 pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like: StringLike) {
-    let context = if checker.semantic().in_pep_257_docstring() {
+    let semantic = checker.semantic();
+
+    if semantic.in_string_type_definition() {
+        return;
+    }
+
+    let context = if semantic.in_pep_257_docstring() {
         Context::Docstring
     } else {
         Context::String

@@ -73,6 +73,12 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
         return;
     }
 
+    // We should not handle single starred expressions
+    // (regardless of `prefer_parentheses`)
+    if matches!(&tuple_subscript.elts[..], &[Expr::Starred(_)]) {
+        return;
+    }
+
     // Adding parentheses in the presence of a slice leads to a syntax error.
     if prefer_parentheses && tuple_subscript.iter().any(Expr::is_slice_expr) {
         return;

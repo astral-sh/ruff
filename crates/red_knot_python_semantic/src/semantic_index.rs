@@ -1,12 +1,13 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use salsa::plumbing::AsId;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
+
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
+use salsa::Update;
 
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -123,7 +124,7 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
 }
 
 /// The symbol tables and use-def maps for all scopes in a file.
-#[derive(Debug)]
+#[derive(Debug, Update)]
 pub(crate) struct SemanticIndex<'db> {
     /// List of all symbol tables in this file, indexed by scope.
     symbol_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,

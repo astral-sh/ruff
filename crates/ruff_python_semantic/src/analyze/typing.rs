@@ -741,6 +741,22 @@ impl BuiltinTypeChecker for SetChecker {
     const EXPR_TYPE: PythonType = PythonType::Set;
 }
 
+struct StringChecker;
+
+impl BuiltinTypeChecker for StringChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "str";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::String;
+}
+
+struct BytesChecker;
+
+impl BuiltinTypeChecker for BytesChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "bytes";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Bytes;
+}
+
 struct TupleChecker;
 
 impl BuiltinTypeChecker for TupleChecker {
@@ -982,6 +998,16 @@ pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Test whether the given binding can be considered an instance of `float`.
 pub fn is_float(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<FloatChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `str`.
+pub fn is_string(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<StringChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `bytes`.
+pub fn is_bytes(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<BytesChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.

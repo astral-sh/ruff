@@ -1,9 +1,8 @@
 use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_trivia::textwrap;
-use std::any::Any;
 use std::panic::RefUnwindSafe;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::files::File;
 use crate::system::{
@@ -21,104 +20,91 @@ use super::walk_directory::WalkDirectoryBuilder;
 ///
 /// ## Warning
 /// Don't use this system for production code. It's intended for testing only.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct TestSystem {
-    inner: TestSystemInner,
+    inner: Arc<dyn System + RefUnwindSafe + Send + Sync>,
 }
 
 impl TestSystem {
+    /// Returns the [`InMemorySystem`].
+    ///
+    /// ## Panics
+    /// If the underlying test system isn't the [`InMemorySystem`].
+    pub fn in_memory(&self) -> &InMemorySystem {
+        self.as_in_memory()
+            .expect("The test db is not using a memory file system")
+    }
+
+    /// Returns the `InMemorySystem` or `None` if the underlying test system isn't the [`InMemorySystem`].
+    pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
+        self.system().as_any().downcast_ref::<InMemorySystem>()
+    }
+
     /// Returns the memory file system.
     ///
     /// ## Panics
-    /// If this test db isn't using a memory file system.
+    /// If the underlying test system isn't the [`InMemorySystem`].
     pub fn memory_file_system(&self) -> &MemoryFileSystem {
-        if let TestSystemInner::Stub(fs) = &self.inner {
-            fs
-        } else {
-            panic!("The test db is not using a memory file system");
-        }
+        self.in_memory().fs()
     }
 
     fn use_system<S>(&mut self, system: S)
     where
         S: System + Send + Sync + RefUnwindSafe + 'static,
     {
-        self.inner = TestSystemInner::System(Arc::new(system));
+        self.inner = Arc::new(system);
+    }
+
+    pub fn system(&self) -> &dyn System {
+        &*self.inner
     }
 }
 
 impl System for TestSystem {
-    fn path_metadata(&self, path: &SystemPath) -> crate::system::Result<Metadata> {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.metadata(path),
-            TestSystemInner::System(system) => system.path_metadata(path),
-        }
+    fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
+        self.system().path_metadata(path)
     }
 
-    fn read_to_string(&self, path: &SystemPath) -> crate::system::Result<String> {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.read_to_string(path),
-            TestSystemInner::System(system) => system.read_to_string(path),
-        }
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
+        self.system().canonicalize_path(path)
+    }
+
+    fn read_to_string(&self, path: &SystemPath) -> Result<String> {
+        self.system().read_to_string(path)
     }
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.read_to_notebook(path),
-            TestSystemInner::System(system) => system.read_to_notebook(path),
-        }
+        self.system().read_to_notebook(path)
     }
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.read_virtual_path_to_string(path),
-            TestSystemInner::System(system) => system.read_virtual_path_to_string(path),
-        }
+        self.system().read_virtual_path_to_string(path)
     }
 
     fn read_virtual_path_to_notebook(
         &self,
         path: &SystemVirtualPath,
     ) -> std::result::Result<Notebook, NotebookError> {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.read_virtual_path_to_notebook(path),
-            TestSystemInner::System(system) => system.read_virtual_path_to_notebook(path),
-        }
-    }
-
-    fn path_exists(&self, path: &SystemPath) -> bool {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.exists(path),
-            TestSystemInner::System(system) => system.path_exists(path),
-        }
-    }
-
-    fn is_directory(&self, path: &SystemPath) -> bool {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.is_directory(path),
-            TestSystemInner::System(system) => system.is_directory(path),
-        }
-    }
-
-    fn is_file(&self, path: &SystemPath) -> bool {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.is_file(path),
-            TestSystemInner::System(system) => system.is_file(path),
-        }
+        self.system().read_virtual_path_to_notebook(path)
     }
 
     fn current_directory(&self) -> &SystemPath {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.current_directory(),
-            TestSystemInner::System(system) => system.current_directory(),
-        }
+        self.system().current_directory()
+    }
+
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        self.system().user_config_directory()
+    }
+
+    fn read_directory<'a>(
+        &'a self,
+        path: &SystemPath,
+    ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
+        self.system().read_directory(path)
     }
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.walk_directory(path),
-            TestSystemInner::System(system) => system.walk_directory(path),
-        }
+        self.system().walk_directory(path)
     }
 
     fn glob(
@@ -128,37 +114,22 @@ impl System for TestSystem {
         Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
         PatternError,
     > {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => {
-                let iterator = fs.glob(pattern)?;
-                Ok(Box::new(iterator))
-            }
-            TestSystemInner::System(system) => system.glob(pattern),
-        }
+        self.system().glob(pattern)
     }
 
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn Any {
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+}
 
-    fn read_directory<'a>(
-        &'a self,
-        path: &SystemPath,
-    ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
-        match &self.inner {
-            TestSystemInner::System(fs) => fs.read_directory(path),
-            TestSystemInner::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
-        }
-    }
-
-    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
-        match &self.inner {
-            TestSystemInner::System(fs) => fs.canonicalize_path(path),
-            TestSystemInner::Stub(fs) => fs.canonicalize(path),
+impl Default for TestSystem {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(InMemorySystem::default()),
         }
     }
 }
@@ -173,8 +144,8 @@ pub trait DbWithTestSystem: Db + Sized {
 
     /// Writes the content of the given file and notifies the Db about the change.
     ///
-    /// # Panics
-    /// If the system isn't using the memory file system.
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
         let path = path.as_ref();
 
@@ -201,6 +172,9 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 
     /// Writes the content of the given virtual file.
+    ///
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
         let path = path.as_ref();
         self.test_system()
@@ -209,6 +183,9 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 
     /// Writes auto-dedented text to a file.
+    ///
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_dedented(&mut self, path: &str, content: &str) -> crate::system::Result<()> {
         self.write_file(path, textwrap::dedent(content))?;
         Ok(())
@@ -216,8 +193,8 @@ pub trait DbWithTestSystem: Db + Sized {
 
     /// Writes the content of the given files and notifies the Db about the change.
     ///
-    /// # Panics
-    /// If the system isn't using the memory file system for testing.
+    /// ## Panics
+    /// If the db isn't using the [`InMemorySystem`].
     fn write_files<P, C, I>(&mut self, files: I) -> crate::system::Result<()>
     where
         I: IntoIterator<Item = (P, C)>,
@@ -246,20 +223,94 @@ pub trait DbWithTestSystem: Db + Sized {
     /// Returns the memory file system.
     ///
     /// ## Panics
-    /// If this system isn't using a memory file system.
+    /// If the underlying test system isn't the [`InMemorySystem`].
     fn memory_file_system(&self) -> &MemoryFileSystem {
         self.test_system().memory_file_system()
     }
 }
 
-#[derive(Debug, Clone)]
-enum TestSystemInner {
-    Stub(MemoryFileSystem),
-    System(Arc<dyn System + RefUnwindSafe + Send + Sync>),
+#[derive(Default, Debug)]
+pub struct InMemorySystem {
+    user_config_directory: Mutex<Option<SystemPathBuf>>,
+    memory_fs: MemoryFileSystem,
 }
 
-impl Default for TestSystemInner {
-    fn default() -> Self {
-        Self::Stub(MemoryFileSystem::default())
+impl InMemorySystem {
+    pub fn fs(&self) -> &MemoryFileSystem {
+        &self.memory_fs
+    }
+
+    pub fn set_user_configuration_directory(&self, directory: Option<SystemPathBuf>) {
+        let mut user_directory = self.user_config_directory.lock().unwrap();
+        *user_directory = directory;
+    }
+}
+
+impl System for InMemorySystem {
+    fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
+        self.memory_fs.metadata(path)
+    }
+
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
+        self.memory_fs.canonicalize(path)
+    }
+
+    fn read_to_string(&self, path: &SystemPath) -> Result<String> {
+        self.memory_fs.read_to_string(path)
+    }
+
+    fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
+        let content = self.read_to_string(path)?;
+        Notebook::from_source_code(&content)
+    }
+
+    fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
+        self.memory_fs.read_virtual_path_to_string(path)
+    }
+
+    fn read_virtual_path_to_notebook(
+        &self,
+        path: &SystemVirtualPath,
+    ) -> std::result::Result<Notebook, NotebookError> {
+        let content = self.read_virtual_path_to_string(path)?;
+        Notebook::from_source_code(&content)
+    }
+
+    fn current_directory(&self) -> &SystemPath {
+        self.memory_fs.current_directory()
+    }
+
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        self.user_config_directory.lock().unwrap().clone()
+    }
+
+    fn read_directory<'a>(
+        &'a self,
+        path: &SystemPath,
+    ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
+        Ok(Box::new(self.memory_fs.read_directory(path)?))
+    }
+
+    fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
+        self.memory_fs.walk_directory(path)
+    }
+
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        PatternError,
+    > {
+        let iterator = self.memory_fs.glob(pattern)?;
+        Ok(Box::new(iterator))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }

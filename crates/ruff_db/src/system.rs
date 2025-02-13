@@ -1,13 +1,18 @@
 pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
+
+#[cfg(all(feature = "testing", feature = "os"))]
+pub use os::testing::UserConfigDirectoryOverrideGuard;
+
 #[cfg(feature = "os")]
 pub use os::OsSystem;
+
 use ruff_notebook::{Notebook, NotebookError};
 use std::error::Error;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::{fmt, io};
-pub use test::{DbWithTestSystem, TestSystem};
+pub use test::{DbWithTestSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
@@ -98,6 +103,11 @@ pub trait System: Debug {
 
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
+
+    /// Returns the directory path where user configurations are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn user_config_directory(&self) -> Option<SystemPathBuf>;
 
     /// Iterate over the contents of the directory at `path`.
     ///

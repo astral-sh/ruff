@@ -234,6 +234,13 @@ impl Configuration {
 
         let rules = lint.as_rule_table(lint_preview)?;
 
+        let flake8_builtins = lint
+            .flake8_builtins
+            .map(|builtins| builtins.into_settings(lint_preview))
+            .unwrap_or_else(|| {
+                ruff_linter::rules::flake8_builtins::settings::Settings::new(lint_preview)
+            });
+
         // LinterSettings validation
         let isort = lint
             .isort
@@ -335,10 +342,7 @@ impl Configuration {
                     .flake8_bugbear
                     .map(Flake8BugbearOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_builtins: lint
-                    .flake8_builtins
-                    .map(Flake8BuiltinsOptions::into_settings)
-                    .unwrap_or_default(),
+                flake8_builtins,
                 flake8_comprehensions: lint
                     .flake8_comprehensions
                     .map(Flake8ComprehensionsOptions::into_settings)

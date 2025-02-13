@@ -551,6 +551,21 @@ mod tests {
     ",
         "github_issue_15681_fix_test"
     )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        TYPE_CHECKING = False
+        if TYPE_CHECKING:
+            from typing import Any, Literal, Never, Self
+        else:
+            def __getattr__(name: str):
+                pass
+
+        __all__ = ['TYPE_CHECKING', 'Any', 'Literal', 'Never', 'Self']
+    ",
+        "github_issue_16045"
+    )]
     fn contents_preview(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,

@@ -106,47 +106,44 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     let [op] = &**ops else {
         return;
     };
-
     let [right] = &**comparators else {
         return;
     };
 
-    let left_cmp = ComparableExpr::from(left);
-    let body_target_cmp = ComparableExpr::from(body_target);
-    let right_cmp = ComparableExpr::from(right);
-    let body_value_cmp = ComparableExpr::from(body_value);
+    // extract helpful info from expression of the form
+    // `if cmp_left op cmp_right: target = assignment_value`
+    let cmp_left = ComparableExpr::from(left);
+    let cmp_right = ComparableExpr::from(right);
+    let target = ComparableExpr::from(body_target);
+    let assignment_value = ComparableExpr::from(body_value);
 
-    let left_is_target = left_cmp == body_target_cmp;
-    let right_is_target = right_cmp == body_target_cmp;
-    let left_is_value = left_cmp == body_value_cmp;
-    let right_is_value = right_cmp == body_value_cmp;
-
-    let min_max = match (
-        left_is_target,
-        right_is_target,
-        left_is_value,
-        right_is_value,
-    ) {
-        (true, false, false, true) => match op {
-            CmpOp::Lt | CmpOp::LtE => MinMax::Max,
-            CmpOp::Gt | CmpOp::GtE => MinMax::Min,
+    // Ex): if a < b: a = b
+    let (min_max, flip_args) = if cmp_left == target && cmp_right == assignment_value {
+        match op {
+            CmpOp::Lt => (MinMax::Max, false),
+            CmpOp::LtE => (MinMax::Max, true),
+            CmpOp::Gt => (MinMax::Min, false),
+            CmpOp::GtE => (MinMax::Min, true),
             _ => return,
-        },
-        (false, true, true, false) => match op {
-            CmpOp::Lt | CmpOp::LtE => MinMax::Min,
-            CmpOp::Gt | CmpOp::GtE => MinMax::Max,
+        }
+    }
+    // Ex): `if a < b: b = a`
+    else if cmp_left == assignment_value && cmp_right == target {
+        match op {
+            CmpOp::Lt => (MinMax::Min, true),
+            CmpOp::LtE => (MinMax::Min, false),
+            CmpOp::Gt => (MinMax::Max, true),
+            CmpOp::GtE => (MinMax::Max, false),
             _ => return,
-        },
-        _ => return,
+        }
+    } else {
+        return;
     };
 
-    // Determine whether to use `min()` or `max()`, and make sure that the first
-    // arg of the `min()` or `max()` method is equal to the target of the comparison.
-    // This is to be consistent with the Python implementation of the methods `min()` and `max()`.
-    let (arg1, arg2) = if left_is_target {
-        (&**left, right)
-    } else {
+    let (arg1, arg2) = if flip_args {
         (right, &**left)
+    } else {
+        (&**left, right)
     };
 
     let replacement = format!(

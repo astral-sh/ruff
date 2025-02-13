@@ -56,3 +56,6 @@ assert getattr(Labware(), "µL") == 1.5
 
 # Implicit string concatenation
 x = "𝐁ad" f"𝐁ad string"
+
+from typing import Literal
+x: '''"""'Literal["ﮨ"]'"""'''

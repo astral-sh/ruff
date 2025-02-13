@@ -236,14 +236,27 @@ fn version_always_less_than(
                 return Err(anyhow::anyhow!("invalid minor version: {if_minor}"));
             };
 
+            let if_micro = match check_version_iter.next() {
+                None => None,
+                Some(micro) => match micro.as_u8() {
+                    Some(micro) => Some(micro),
+                    None => anyhow::bail!("invalid micro version: {micro}"),
+                },
+            };
+
             Ok(if or_equal {
                 // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition won't always evaluate to `false`, so we want to return `false`.
                 if_minor < py_minor
             } else {
-                // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
-                // the condition _will_ always evaluate to `false`, so we want to return `true`.
-                if_minor <= py_minor
+                if let Some(if_micro) = if_micro {
+                    // Ex) `sys.version_info < 3.8.3`
+                    if_minor < py_minor || if_minor == py_minor && if_micro == 0
+                } else {
+                    // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
+                    // the condition _will_ always evaluate to `false`, so we want to return `true`.
+                    if_minor <= py_minor
+                }
             })
         }
     }

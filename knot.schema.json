@@ -35,6 +35,16 @@
           "type": "null"
         }
       ]
+    },
+    "terminal": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TerminalOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "additionalProperties": false,
@@ -683,6 +693,19 @@
           "description": "The root of the project, used for finding first-party modules.",
           "type": [
             "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "TerminalOptions": {
+      "type": "object",
+      "properties": {
+        "error-on-warning": {
+          "description": "Use exit code 1 if there are any warning-level diagnostics.\n\nDefaults to `false`.",
+          "type": [
+            "boolean",
             "null"
           ]
         }

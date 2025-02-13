@@ -71,7 +71,7 @@ pub(crate) fn call_datetime_today(checker: &Checker, func: &Expr, location: Text
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 

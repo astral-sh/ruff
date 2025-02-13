@@ -80,6 +80,16 @@ b''.rstrip(b'http://')
 ''.strip(r'\b\x09')
 ''.strip('\\\x5C')
 
+# Errors: Type inference
+b = b''
+b.strip(b'//')
+
+# Errors: Type inference (preview)
+foo: str = ""; bar: bytes = b""
+foo.rstrip("//")
+bar.lstrip(b"//")
+
+
 # OK: Different types
 b"".strip("//")
 "".strip(b"//")
@@ -93,13 +103,8 @@ b"".lstrip(b"//", foo = "bar")
 "".rstrip()
 
 # OK: Not literals
-foo: str = ""; bar: bytes = b""
 "".strip(foo)
 b"".strip(bar)
-
-# False negative
-foo.rstrip("//")
-bar.lstrip(b"//")
 
 # OK: Not `.[lr]?strip`
 "".mobius_strip("")

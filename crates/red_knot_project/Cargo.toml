@@ -13,7 +13,7 @@ license.workspace = true
 
 [dependencies]
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["os", "cache", "serde"] }
+ruff_db = { workspace = true, features = ["cache", "serde"] }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
@@ -24,7 +24,7 @@ anyhow = { workspace = true }
 crossbeam = { workspace = true }
 glob = { workspace = true }
 notify = { workspace = true }
-pep440_rs = { workspace = true }
+pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }

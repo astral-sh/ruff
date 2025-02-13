@@ -6,8 +6,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
-use ruff_notebook::{Notebook, NotebookError};
-
 use crate::system::{
     walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result,
     SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
@@ -131,14 +129,6 @@ impl MemoryFileSystem {
         read_to_string(self, path.as_ref())
     }
 
-    pub(crate) fn read_to_notebook(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> std::result::Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
-        let content = self.read_to_string(path)?;
-        ruff_notebook::Notebook::from_source_code(&content)
-    }
-
     pub(crate) fn read_virtual_path_to_string(
         &self,
         path: impl AsRef<SystemVirtualPath>,
@@ -149,14 +139,6 @@ impl MemoryFileSystem {
             .ok_or_else(not_found)?;
 
         Ok(file.content.clone())
-    }
-
-    pub(crate) fn read_virtual_path_to_notebook(
-        &self,
-        path: &SystemVirtualPath,
-    ) -> std::result::Result<Notebook, NotebookError> {
-        let content = self.read_virtual_path_to_string(path)?;
-        ruff_notebook::Notebook::from_source_code(&content)
     }
 
     pub fn exists(&self, path: &SystemPath) -> bool {

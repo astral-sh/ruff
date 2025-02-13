@@ -306,6 +306,8 @@ RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
 73 |     a = 4
 74 |     b = "{a:b} {a:^5}"
    |         ^^^^^^^^^^^^^^ RUF027
+75 |
+76 | # fstrings are never correct as type definitions
    |
    = help: Add `f` prefix
 
@@ -315,3 +317,6 @@ RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
 73 73 |     a = 4
 74    |-    b = "{a:b} {a:^5}"
    74 |+    b = f"{a:b} {a:^5}"
+75 75 | 
+76 76 | # fstrings are never correct as type definitions
+77 77 | # so we should always skip those

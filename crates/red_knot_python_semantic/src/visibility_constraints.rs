@@ -338,7 +338,7 @@ const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
 
 /// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
 /// maintain a separate set of visibility constraints for each scope in file.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct VisibilityConstraints<'db> {
     constraints: IndexVec<Atom, Constraint<'db>>,
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
@@ -627,7 +627,7 @@ impl<'db> VisibilityConstraints<'db> {
             ConstraintNode::Pattern(inner) => match inner.kind(db) {
                 PatternConstraintKind::Value(value, guard) => {
                     let subject_expression = inner.subject(db);
-                    let inference = infer_expression_types(db, *subject_expression);
+                    let inference = infer_expression_types(db, subject_expression);
                     let scope = subject_expression.scope(db);
                     let subject_ty = inference.expression_type(
                         subject_expression

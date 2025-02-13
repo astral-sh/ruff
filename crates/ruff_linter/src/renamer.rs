@@ -387,25 +387,36 @@ pub(crate) enum ShadowedKind {
 }
 
 impl ShadowedKind {
-    /// Determines the kind of shadowing or conflict for a given variable name.
+    /// Determines the kind of shadowing or conflict for the proposed new name of a given [`Binding`].
     ///
-    /// This function is useful for checking whether or not the `target` of a [`Rename::rename`]
+    /// This function is useful for checking whether or not the `target` of a [`Renamer::rename`]
     /// will shadow another binding.
-    pub(crate) fn new(name: &str, checker: &Checker, scope_id: ScopeId) -> ShadowedKind {
+    pub(crate) fn new(binding: &Binding, new_name: &str, checker: &Checker) -> ShadowedKind {
         // Check the kind in order of precedence
-        if is_keyword(name) {
+        if is_keyword(new_name) {
             return ShadowedKind::Keyword;
         }
 
         if is_python_builtin(
-            name,
+            new_name,
             checker.settings.target_version.minor(),
             checker.source_type.is_ipynb(),
         ) {
             return ShadowedKind::BuiltIn;
         }
 
-        if !checker.semantic().is_available_in_scope(name, scope_id) {
+        let semantic = checker.semantic();
+
+        if !semantic.is_available_in_scope(new_name, binding.scope) {
+            return ShadowedKind::Some;
+        }
+
+        if binding
+            .references()
+            .map(|reference_id| semantic.reference(reference_id).scope_id())
+            .dedup()
+            .any(|scope| !semantic.is_available_in_scope(new_name, scope))
+        {
             return ShadowedKind::Some;
         }
 

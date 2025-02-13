@@ -8,6 +8,7 @@ use crate::{nodes, Expr};
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+#[cfg_attr(feature = "salsa", derive(salsa::Update))]
 pub struct Name(compact_str::CompactString);
 
 impl Name {

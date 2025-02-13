@@ -98,7 +98,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -115,7 +115,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ----- stderr -----
     "###);
 
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")).arg("--extra-search-path").arg("../libs"), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -167,7 +167,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -576,6 +576,37 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
 }
 
 #[test]
+fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "knot.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+        "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       - Name `x` used when not defined
+      |
+
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
 fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     let case = TestCase::with_file(
         "test.py",
@@ -686,6 +717,109 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn user_configuration() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "project/knot.toml",
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "project/main.py",
+            r#"
+            y = 4 / 0
+
+            for a in range(0, y):
+                x = a
+
+            print(x)
+            "#,
+        ),
+    ])?;
+
+    let config_directory = case.root().join("home/.config");
+    let config_env_var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
+
+    warning: lint:possibly-unresolved-reference
+     --> <temp_dir>/project/main.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)
+      |       - Name `x` used when possibly not defined
+      |
+
+
+    ----- stderr -----
+    "###
+    );
+
+    // The user-level configuration promotes `possibly-unresolved-reference` to an error.
+    // Changing the level for `division-by-zero` has no effect, because the project-level configuration
+    // has higher precedence.
+    case.write_file(
+        config_directory.join("knot/knot.toml"),
+        r#"
+        [rules]
+        division-by-zero = "error"
+        possibly-unresolved-reference = "error"
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ----- Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
+
+    error: lint:possibly-unresolved-reference
+     --> <temp_dir>/project/main.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)
+      |       ^ Name `x` used when possibly not defined
+      |
+
+
+    ----- stderr -----
+    "###
+    );
+
+    Ok(())
+}
+
 struct TestCase {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,
@@ -753,7 +887,7 @@ impl TestCase {
         Ok(())
     }
 
-    fn project_dir(&self) -> &Path {
+    fn root(&self) -> &Path {
         &self.project_dir
     }
 

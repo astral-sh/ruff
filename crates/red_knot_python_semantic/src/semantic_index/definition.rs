@@ -25,22 +25,19 @@ use crate::Db;
 #[salsa::tracked]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
-    #[id]
     pub(crate) file: File,
 
     /// The scope in which the definition occurs.
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The symbol defined.
-    #[id]
     pub(crate) symbol: ScopedSymbolId,
 
     #[no_eq]
     #[return_ref]
+    #[tracked]
     pub(crate) kind: DefinitionKind<'db>,
 
-    #[no_eq]
     count: countme::Count<Definition<'static>>,
 }
 
@@ -435,6 +432,13 @@ impl DefinitionCategory {
     }
 }
 
+/// The kind of a definition.
+///
+/// ## Usage in salsa tracked structs
+///
+/// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
+/// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
+/// for an in-depth explanation of why this is necessary.
 #[derive(Clone, Debug)]
 pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
@@ -540,7 +544,7 @@ impl DefinitionKind<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
     Sequence(Unpack<'db>),
     Name,
@@ -713,7 +717,7 @@ impl ExceptHandlerDefinitionKind {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
 pub(crate) struct DefinitionNodeKey(NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {

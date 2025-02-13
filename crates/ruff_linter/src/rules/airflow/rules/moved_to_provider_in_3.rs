@@ -176,15 +176,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-celery
-        ["airflow", "config_templates", "default_celery", "DEFAULT_CELERY_CONFIG"] => Replacement::ImportPathMoved{
-            original_path: "airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG",
-            new_path: "airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG",
+        ["airflow", "config_templates", "default_celery", "DEFAULT_CELERY_CONFIG"] => Replacement::ProviderName{
+            name: "airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG",
             provider: "celery",
             version: "3.3.0"
         },
-        ["airflow", "executors", "celery_executor", "app"] => Replacement::ImportPathMoved{
-            original_path: "airflow.executors.celery_executor.app",
-            new_path: "airflow.providers.celery.executors.celery_executor_utils.app",
+        ["airflow", "executors", "celery_executor", "app"] => Replacement::ProviderName{
+            name: "airflow.providers.celery.executors.celery_executor_utils.app",
             provider: "celery",
             version: "3.3.0"
         },
@@ -200,15 +198,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-common-sql
-        ["airflow", "hooks", "dbapi", "ConnectorProtocol"] => Replacement::ImportPathMoved{
-            original_path: "airflow.hooks.dbapi.ConnectorProtocol",
-            new_path: "airflow.providers.common.sql.hooks.sql.ConnectorProtocol",
+        ["airflow", "hooks", "dbapi", "ConnectorProtocol"] => Replacement::ProviderName{
+            name: "airflow.providers.common.sql.hooks.sql.ConnectorProtocol",
             provider: "common-sql",
             version: "1.0.0"
         },
-        ["airflow", "hooks", "dbapi", "DbApiHook"] => Replacement::ImportPathMoved{
-            original_path: "airflow.hooks.dbapi.DbApiHook",
-            new_path: "airflow.providers.common.sql.hooks.sql.DbApiHook",
+        ["airflow", "hooks", "dbapi", "DbApiHook"] => Replacement::ProviderName{
+            name: "airflow.providers.common.sql.hooks.sql.DbApiHook",
             provider: "common-sql",
             version: "1.0.0"
         },
@@ -590,15 +586,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-cncf-kubernetes
-        ["airflow", "executors", "kubernetes_executor_types", "ALL_NAMESPACES"] => Replacement::ImportPathMoved{
-                original_path: "airflow.executors.kubernetes_executor_types.ALL_NAMESPACES",
-                new_path: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES",
+        ["airflow", "executors", "kubernetes_executor_types", "ALL_NAMESPACES"] => Replacement::ProviderName{
+            name: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
-        ["airflow", "executors", "kubernetes_executor_types", "POD_EXECUTOR_DONE_KEY"] => Replacement::ImportPathMoved{
-                original_path: "airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
-                new_path: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
+        ["airflow", "executors", "kubernetes_executor_types", "POD_EXECUTOR_DONE_KEY"] => Replacement::ProviderName{
+            name: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
@@ -903,74 +897,86 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
-        ["airflow", "operators", "datetime"] => Replacement::ImportPathMoved{
+        ["airflow", "operators", "bash", ..] => Replacement::ImportPathMoved{
+            original_path: "airflow.operators.bash",
+            new_path: "airflow.providers.standard.operators.bash",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "operators", "bash_operator", ..] => Replacement::ImportPathMoved{
+            original_path: "airflow.operators.bash_operator",
+            new_path: "airflow.providers.standard.operators.bash",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "operators", "datetime", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.operators.datetime",
             new_path: "airflow.providers.standard.time.operators.datetime",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "weekday"] => Replacement::ImportPathMoved{
+        ["airflow", "operators", "weekday", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.operators.weekday",
             new_path: "airflow.providers.standard.time.operators.weekday",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "sensors", "date_time"] => Replacement::ImportPathMoved{
+        ["airflow", "sensors", "date_time", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.sensors.date_time",
             new_path: "airflow.providers.standard.time.sensors.date_time",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "sensors", "time_sensor"] => Replacement::ImportPathMoved{
+        ["airflow", "sensors", "time_sensor", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.sensors.time_sensor",
             new_path: "airflow.providers.standard.time.sensors.time",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "sensors", "time_delta"] => Replacement::ImportPathMoved{
+        ["airflow", "sensors", "time_delta", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.sensors.time_delta",
             new_path: "airflow.providers.standard.time.sensors.time_delta",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "sensors", "weekday"] => Replacement::ImportPathMoved{
+        ["airflow", "sensors", "weekday", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.sensors.weekday",
             new_path: "airflow.providers.standard.time.sensors.weekday",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "hooks", "filesystem"] => Replacement::ImportPathMoved{
+        ["airflow", "hooks", "filesystem", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.hooks.filesystem",
             new_path: "airflow.providers.standard.hooks.filesystem",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "hooks", "package_index"] => Replacement::ImportPathMoved{
+        ["airflow", "hooks", "package_index", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.hooks.package_index",
             new_path: "airflow.providers.standard.hooks.package_index",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "hooks", "subprocess"] => Replacement::ImportPathMoved{
+        ["airflow", "hooks", "subprocess", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.hooks.subprocess",
             new_path: "airflow.providers.standard.hooks.subprocess",
             provider: "standard",
             version: "0.0.1"
         },
 
-        ["airflow", "triggers", "external_task"] => Replacement::ImportPathMoved{
+        ["airflow", "triggers", "external_task", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.triggers.external_task",
             new_path: "airflow.providers.standard.triggers.external_task",
             provider: "standard",
             version: "0.0.3"
         },
-        ["airflow", "triggers", "file"] => Replacement::ImportPathMoved{
+        ["airflow", "triggers", "file", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.triggers.file",
             new_path: "airflow.providers.standard.triggers.file",
             provider: "standard",
             version: "0.0.3"
         },
-        ["airflow", "triggers", "temporal"] => Replacement::ImportPathMoved{
+        ["airflow", "triggers", "temporal", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.triggers.temporal",
             new_path: "airflow.providers.standard.triggers.temporal",
             provider: "standard",

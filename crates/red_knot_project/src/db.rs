@@ -114,8 +114,8 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        self.project().rule_selection(self)
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.project().rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -186,7 +186,6 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        rule_selection: RuleSelection,
         project: Option<Project>,
     }
 
@@ -198,7 +197,6 @@ pub(crate) mod tests {
                 vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
-                rule_selection: RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY),
                 project: None,
             };
 
@@ -270,8 +268,8 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
-            &self.rule_selection
+        fn rule_selection(&self) -> Arc<RuleSelection> {
+            self.project().rules(self)
         }
 
         fn lint_registry(&self) -> &LintRegistry {

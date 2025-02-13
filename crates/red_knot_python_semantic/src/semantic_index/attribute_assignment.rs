@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 /// Describes an (annotated) attribute assignment that we discovered in a method
 /// body, typically of the form `self.x: int`, `self.x: int = …` or `self.x = …`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) enum AttributeAssignment<'db> {
     /// An attribute assignment with an explicit type annotation, either
     /// `self.x: <annotation>` or `self.x: <annotation> = …`.

@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingId, ScopeId};
+use ruff_python_semantic::{Binding, BindingId};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
@@ -179,7 +179,7 @@ pub(crate) fn used_dummy_variable(
     // Trim the leading underscores for further checks
     let trimmed_name = name.trim_start_matches('_');
 
-    let shadowed_kind = ShadowedKind::new(trimmed_name, checker, binding.scope);
+    let shadowed_kind = ShadowedKind::new(binding, trimmed_name, checker);
 
     let mut diagnostic = Diagnostic::new(
         UsedDummyVariable {
@@ -190,9 +190,7 @@ pub(crate) fn used_dummy_variable(
     );
 
     // Get the possible fix based on the scope
-    if let Some(new_name) =
-        get_possible_new_name(trimmed_name, shadowed_kind, binding.scope, checker)
-    {
+    if let Some(new_name) = get_possible_new_name(binding, trimmed_name, shadowed_kind, checker) {
         diagnostic.try_set_fix(|| {
             Renamer::rename(name, &new_name, scope, semantic, checker.stylist())
                 .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
@@ -204,9 +202,9 @@ pub(crate) fn used_dummy_variable(
 
 /// Suggests a potential alternative name to resolve a shadowing conflict.
 fn get_possible_new_name(
+    binding: &Binding,
     trimmed_name: &str,
     kind: ShadowedKind,
-    scope_id: ScopeId,
     checker: &Checker,
 ) -> Option<String> {
     // Construct the potential fix name based on ShadowedKind
@@ -223,10 +221,7 @@ fn get_possible_new_name(
     }
 
     // Ensure the fix name is not already taken in the scope or enclosing scopes
-    if !checker
-        .semantic()
-        .is_available_in_scope(&fix_name, scope_id)
-    {
+    if ShadowedKind::new(binding, &fix_name, checker).shadows_any() {
         return None;
     }
 

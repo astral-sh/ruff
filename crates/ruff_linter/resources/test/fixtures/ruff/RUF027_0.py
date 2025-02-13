@@ -72,3 +72,10 @@ def method_calls():
 def format_specifiers():
     a = 4
     b = "{a:b} {a:^5}"
+
+# fstrings are never correct as type definitions
+# so we should always skip those
+def in_type_def():
+    from typing import cast
+    a = 'int'
+    cast('f"{a}"','11')

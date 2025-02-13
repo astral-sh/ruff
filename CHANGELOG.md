@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.9.6
+
+### Preview features
+
+- \[`airflow`\] Add `external_task.{ExternalTaskMarker, ExternalTaskSensor}` for `AIR302` ([#16014](https://github.com/astral-sh/ruff/pull/16014))
+- \[`flake8-builtins`\] Make strict module name comparison optional (`A005`) ([#15951](https://github.com/astral-sh/ruff/pull/15951))
+- \[`flake8-pyi`\] Extend fix to Python \<= 3.9 for `redundant-none-literal` (`PYI061`) ([#16044](https://github.com/astral-sh/ruff/pull/16044))
+- \[`pylint`\] Also report when the object isn't a literal (`PLE1310`) ([#15985](https://github.com/astral-sh/ruff/pull/15985))
+- \[`ruff`\] Implement `indented-form-feed` (`RUF054`) ([#16049](https://github.com/astral-sh/ruff/pull/16049))
+- \[`ruff`\] Skip type definitions for `missing-f-string-syntax` (`RUF027`) ([#16054](https://github.com/astral-sh/ruff/pull/16054))
+
+### Rule changes
+
+- \[`flake8-annotations`\] Correct syntax for `typing.Union` in suggested return type fixes for `ANN20x` rules ([#16025](https://github.com/astral-sh/ruff/pull/16025))
+- \[`flake8-builtins`\] Match upstream module name comparison (`A005`) ([#16006](https://github.com/astral-sh/ruff/pull/16006))
+- \[`flake8-comprehensions`\] Detect overshadowed `list`/`set`/`dict`, ignore variadics and named expressions (`C417`) ([#15955](https://github.com/astral-sh/ruff/pull/15955))
+- \[`flake8-pie`\] Remove following comma correctly when the unpacked dictionary is empty (`PIE800`) ([#16008](https://github.com/astral-sh/ruff/pull/16008))
+- \[`flake8-simplify`\] Only trigger `SIM401` on known dictionaries ([#15995](https://github.com/astral-sh/ruff/pull/15995))
+- \[`pylint`\] Do not report calls when object type and argument type mismatch, remove custom escape handling logic (`PLE1310`) ([#15984](https://github.com/astral-sh/ruff/pull/15984))
+- \[`pyupgrade`\] Comments within parenthesized value ranges should not affect applicability (`UP040`) ([#16027](https://github.com/astral-sh/ruff/pull/16027))
+- \[`pyupgrade`\] Don't introduce invalid syntax when upgrading old-style type aliases with parenthesized multiline values (`UP040`) ([#16026](https://github.com/astral-sh/ruff/pull/16026))
+- \[`pyupgrade`\] Ensure we do not rename two type parameters to the same name (`UP049`) ([#16038](https://github.com/astral-sh/ruff/pull/16038))
+- \[`pyupgrade`\] \[`ruff`\] Don't apply renamings if the new name is shadowed in a scope of one of the references to the binding (`UP049`, `RUF052`) ([#16032](https://github.com/astral-sh/ruff/pull/16032))
+- \[`ruff`\] Update `RUF009` to behave similar to `B008` and ignore attributes with immutable types ([#16048](https://github.com/astral-sh/ruff/pull/16048))
+
+### Server
+
+- Root exclusions in the server to project root ([#16043](https://github.com/astral-sh/ruff/pull/16043))
+
+### Bug fixes
+
+- \[`flake8-datetime`\] Ignore `.replace()` calls while looking for `.astimezone` ([#16050](https://github.com/astral-sh/ruff/pull/16050))
+- \[`flake8-type-checking`\] Avoid `TC004` false positive where the runtime definition is provided by `__getattr__` ([#16052](https://github.com/astral-sh/ruff/pull/16052))
+
+### Documentation
+
+- Improve `ruff-lsp` migration document ([#16072](https://github.com/astral-sh/ruff/pull/16072))
+- Undeprecate `ruff.nativeServer` ([#16039](https://github.com/astral-sh/ruff/pull/16039))
+
 ## 0.9.5
 
 ### Preview features

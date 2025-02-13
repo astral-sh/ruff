@@ -75,11 +75,13 @@ fn to_lsp_diagnostic(
     diagnostic: &dyn ruff_db::diagnostic::Diagnostic,
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
-    let range = if let (Some(file), Some(range)) = (diagnostic.file(), diagnostic.range()) {
-        let index = line_index(db.upcast(), file);
-        let source = source_text(db.upcast(), file);
+    let range = if let Some(span) = diagnostic.span() {
+        let index = line_index(db.upcast(), span.file());
+        let source = source_text(db.upcast(), span.file());
 
-        range.to_range(&source, &index, encoding)
+        span.range()
+            .map(|range| range.to_range(&source, &index, encoding))
+            .unwrap_or_default()
     } else {
         Range::default()
     };

@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::{Imported, NodeId, Scope};
+use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -16,11 +16,12 @@ use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annota
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 
 /// ## What it does
-/// Checks for runtime imports defined in a type-checking block.
+/// Checks for imports that are required at runtime but are only defined in
+/// type-checking blocks.
 ///
 /// ## Why is this bad?
-/// The type-checking block is not executed at runtime, so the import will not
-/// be available at runtime.
+/// The type-checking block is not executed at runtime, so if the only definition
+/// of a symbol is in a type-checking block, it will not be available at runtime.
 ///
 /// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
@@ -101,6 +102,14 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
     // Collect all runtime imports by statement.
     let mut actions: FxHashMap<(NodeId, Action), Vec<ImportBinding>> = FxHashMap::default();
 
+    // If we have a module-level __getattr__ method we don't necessarily know that the
+    // references in __all__ refer to typing-only imports, the __getattr__ might be
+    // able to handle that attribute access and return the correct thing at runtime.
+    let ignore_dunder_all_references = checker
+        .semantic()
+        .lookup_symbol_in_scope("__getattr__", ScopeId::global(), false)
+        .is_some();
+
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
@@ -114,10 +123,10 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
 
         if binding.context.is_typing()
             && binding.references().any(|reference_id| {
-                checker
-                    .semantic()
-                    .reference(reference_id)
-                    .in_runtime_context()
+                let reference = checker.semantic().reference(reference_id);
+
+                reference.in_runtime_context()
+                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
             })
         {
             let Some(node_id) = binding.source else {

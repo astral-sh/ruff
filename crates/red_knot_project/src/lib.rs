@@ -3,18 +3,18 @@
 use crate::metadata::options::OptionDiagnostic;
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
+use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::{FileType, SystemPath};
 use ruff_python_ast::PySourceType;
-use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::Durability;
 use salsa::Setter;
@@ -66,12 +66,22 @@ pub struct Project {
     /// The metadata describing the project, including the unresolved options.
     #[return_ref]
     pub metadata: ProjectMetadata,
+
+    /// The resolved project settings.
+    #[return_ref]
+    pub settings: Settings,
+
+    /// Diagnostics that were generated when resolving the project settings.
+    #[return_ref]
+    settings_diagnostics: Vec<OptionDiagnostic>,
 }
 
 #[salsa::tracked]
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Self {
-        Project::builder(metadata)
+        let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+
+        Project::builder(metadata, settings, settings_diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
@@ -86,28 +96,35 @@ impl Project {
         self.metadata(db).name()
     }
 
+    /// Returns the resolved linter rules for the project.
+    ///
+    /// This is a salsa query to prevent re-computing queries if other, unrelated
+    /// settings change. For example, we don't want that changing the terminal settings
+    /// invalidates any type checking queries.
+    #[salsa::tracked]
+    pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
+        self.settings(db).to_rules()
+    }
+
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
         tracing::debug!("Reloading project");
         assert_eq!(self.root(db), metadata.root());
 
         if &metadata != self.metadata(db) {
+            let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+
+            if self.settings(db) != &settings {
+                self.set_settings(db).to(settings);
+            }
+
+            if self.settings_diagnostics(db) != &settings_diagnostics {
+                self.set_settings_diagnostics(db).to(settings_diagnostics);
+            }
+
             self.set_metadata(db).to(metadata);
         }
 
         self.reload_files(db);
-    }
-
-    pub fn rule_selection(self, db: &dyn Db) -> &RuleSelection {
-        let (selection, _) = self.rule_selection_with_diagnostics(db);
-        selection
-    }
-
-    #[salsa::tracked(return_ref)]
-    fn rule_selection_with_diagnostics(
-        self,
-        db: &dyn Db,
-    ) -> (RuleSelection, Vec<OptionDiagnostic>) {
-        self.metadata(db).options().to_rule_selection(db)
     }
 
     /// Checks all open files in the project and its dependencies.
@@ -118,8 +135,7 @@ impl Project {
         tracing::debug!("Checking project '{name}'", name = self.name(db));
 
         let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
-        let (_, options_diagnostics) = self.rule_selection_with_diagnostics(db);
-        diagnostics.extend(options_diagnostics.iter().map(|diagnostic| {
+        diagnostics.extend(self.settings_diagnostics(db).iter().map(|diagnostic| {
             let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
             diagnostic
         }));
@@ -151,9 +167,8 @@ impl Project {
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
-        let (_, options_diagnostics) = self.rule_selection_with_diagnostics(db);
-
-        let mut file_diagnostics: Vec<_> = options_diagnostics
+        let mut file_diagnostics: Vec<_> = self
+            .settings_diagnostics(db)
             .iter()
             .map(|diagnostic| {
                 let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
@@ -329,7 +344,13 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         boxed
     }));
 
-    diagnostics.sort_unstable_by_key(|diagnostic| diagnostic.range().unwrap_or_default().start());
+    diagnostics.sort_unstable_by_key(|diagnostic| {
+        diagnostic
+            .span()
+            .and_then(|span| span.range())
+            .unwrap_or_default()
+            .start()
+    });
 
     diagnostics
 }
@@ -442,12 +463,8 @@ impl Diagnostic for IOErrorDiagnostic {
         self.error.to_string().into()
     }
 
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        None
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file))
     }
 
     fn severity(&self) -> Severity {

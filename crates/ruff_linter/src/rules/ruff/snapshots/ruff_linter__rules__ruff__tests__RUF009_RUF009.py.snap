@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF009.py:20:41: RUF009 Do not perform function call `default_function` in dataclass defaults
    |
@@ -89,3 +90,13 @@ RUF009.py:95:19: RUF009 Do not perform function call `Invalid3` in dataclass def
 96 |
 97 |     # No errors
    |
+
+RUF009.py:109:35: RUF009 Do not perform function call `default_function` in dataclass defaults
+    |
+107 | @dataclass
+108 | class ShouldMatchB008RuleOfImmutableTypeAnnotationIgnored:
+109 |     this_is_not_fine: list[int] = default_function()
+    |                                   ^^^^^^^^^^^^^^^^^^ RUF009
+110 |     # ignored
+111 |     this_is_fine: int = f()
+    |

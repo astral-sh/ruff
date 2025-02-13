@@ -23,9 +23,9 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
-use crate::pyproject;
 use crate::pyproject::settings_toml;
 use crate::settings::Settings;
+use crate::{pyproject, FileResolverSettings};
 
 /// The configuration information from a `pyproject.toml` file.
 #[derive(Debug)]
@@ -778,8 +778,7 @@ impl std::fmt::Display for ExclusionKind {
 /// any of the exclusion criteria.
 pub fn match_any_exclusion(
     path: &Path,
-    exclude: &GlobSet,
-    extend_exclude: &GlobSet,
+    resolver_settings: &FileResolverSettings,
     lint_exclude: Option<&GlobSet>,
     format_exclude: Option<&GlobSet>,
 ) -> Option<ExclusionKind> {
@@ -787,10 +786,10 @@ pub fn match_any_exclusion(
         if let Some(basename) = path.file_name() {
             let path = Candidate::new(path);
             let basename = Candidate::new(basename);
-            if match_candidate_exclusion(&path, &basename, exclude) {
+            if match_candidate_exclusion(&path, &basename, &resolver_settings.exclude) {
                 return Some(ExclusionKind::Exclude);
             }
-            if match_candidate_exclusion(&path, &basename, extend_exclude) {
+            if match_candidate_exclusion(&path, &basename, &resolver_settings.extend_exclude) {
                 return Some(ExclusionKind::ExtendExclude);
             }
             if let Some(lint_exclude) = lint_exclude {
@@ -803,6 +802,11 @@ pub fn match_any_exclusion(
                     return Some(ExclusionKind::FormatExclude);
                 }
             }
+        }
+        if path == resolver_settings.project_root {
+            // Bail out; we'd end up past the project root on the next iteration
+            // (excludes etc. are thus "rooted" to the project).
+            break;
         }
     }
     None
@@ -829,12 +833,11 @@ impl std::fmt::Display for InclusionKind {
 /// criteria.
 pub fn match_any_inclusion(
     path: &Path,
-    include: &GlobSet,
-    extend_include: &GlobSet,
+    resolver_settings: &FileResolverSettings,
 ) -> Option<InclusionKind> {
-    if include.is_match(path) {
+    if resolver_settings.include.is_match(path) {
         Some(InclusionKind::Include)
-    } else if extend_include.is_match(path) {
+    } else if resolver_settings.extend_include.is_match(path) {
         Some(InclusionKind::ExtendInclude)
     } else {
         None

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D417.py:1:5: D417 Missing argument descriptions in the docstring for `f`: `y`, `z`
   |
@@ -64,4 +63,13 @@ D417.py:155:5: D417 Missing argument description in the docstring for `select_da
     |     ^^^^^^^^^^^ D417
 156 |     query: str,
 157 |     args: tuple,
+    |
+
+D417.py:199:5: D417 Missing argument description in the docstring for `should_fail`: `Args`
+    |
+198 | # undocumented argument with the same name as a section
+199 | def should_fail(payload, Args):
+    |     ^^^^^^^^^^^ D417
+200 |     """
+201 |     Send a message.
     |

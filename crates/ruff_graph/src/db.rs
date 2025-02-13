@@ -79,8 +79,8 @@ impl Db for ModuleDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
     }
 
     fn lint_registry(&self) -> &LintRegistry {

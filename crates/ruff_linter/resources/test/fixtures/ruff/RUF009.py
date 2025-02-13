@@ -97,3 +97,16 @@ class DataclassWithNewTypeFields:
     # No errors
     e: SpecialString = SpecialString("Lorem ipsum")
     f: NegativeInteger = NegativeInteger(-110)
+
+
+# Test for:
+# https://github.com/astral-sh/ruff/issues/15772
+def f() -> int:
+    return 0
+
+@dataclass
+class ShouldMatchB008RuleOfImmutableTypeAnnotationIgnored:
+    this_is_not_fine: list[int] = default_function()
+    # ignored
+    this_is_fine: int = f()
+

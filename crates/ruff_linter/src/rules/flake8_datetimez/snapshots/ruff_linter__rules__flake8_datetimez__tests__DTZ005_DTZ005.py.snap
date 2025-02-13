@@ -50,3 +50,56 @@ DTZ005.py:18:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
 20 | # uses `astimezone` method
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:28:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+27 | ## Errors
+28 | datetime.now().replace.astimezone()
+   | ^^^^^^^^^^^^^^ DTZ005
+29 | datetime.now().replace[0].astimezone()
+30 | datetime.now()().astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:29:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+27 | ## Errors
+28 | datetime.now().replace.astimezone()
+29 | datetime.now().replace[0].astimezone()
+   | ^^^^^^^^^^^^^^ DTZ005
+30 | datetime.now()().astimezone()
+31 | datetime.now().replace(datetime.now()).astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:30:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+28 | datetime.now().replace.astimezone()
+29 | datetime.now().replace[0].astimezone()
+30 | datetime.now()().astimezone()
+   | ^^^^^^^^^^^^^^ DTZ005
+31 | datetime.now().replace(datetime.now()).astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:31:24: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+29 | datetime.now().replace[0].astimezone()
+30 | datetime.now()().astimezone()
+31 | datetime.now().replace(datetime.now()).astimezone()
+   |                        ^^^^^^^^^^^^^^ DTZ005
+32 |
+33 | foo.replace(datetime.now().replace).astimezone()
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter
+
+DTZ005.py:33:13: DTZ005 `datetime.datetime.now()` called without a `tz` argument
+   |
+31 | datetime.now().replace(datetime.now()).astimezone()
+32 |
+33 | foo.replace(datetime.now().replace).astimezone()
+   |             ^^^^^^^^^^^^^^ DTZ005
+34 |
+35 | ## No errors
+   |
+   = help: Pass a `datetime.timezone` object to the `tz` parameter

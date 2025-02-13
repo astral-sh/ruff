@@ -46,15 +46,14 @@ fn format_text_document_range(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> Result<super::FormatResponse> {
-    let file_resolver_settings = query.settings().file_resolver();
-    let formatter_settings = query.settings().formatter();
+    let settings = query.settings();
 
     // If the document is excluded, return early.
     if let Some(file_path) = query.file_path() {
         if is_document_excluded_for_formatting(
             &file_path,
-            file_resolver_settings,
-            formatter_settings,
+            &settings.file_resolver,
+            &settings.formatter,
             text_document.language_id(),
         ) {
             return Ok(None);
@@ -67,7 +66,7 @@ fn format_text_document_range(
     let formatted_range = crate::format::format_range(
         text_document,
         query.source_type(),
-        formatter_settings,
+        &settings.formatter,
         range,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;

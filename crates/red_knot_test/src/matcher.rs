@@ -257,7 +257,8 @@ impl Matcher {
 
     fn column<T: Diagnostic>(&self, diagnostic: &T) -> OneIndexed {
         diagnostic
-            .range()
+            .span()
+            .and_then(|span| span.range())
             .map(|range| {
                 self.line_index
                     .source_location(range.start(), &self.source)
@@ -334,7 +335,7 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
@@ -385,12 +386,8 @@ mod tests {
             self.message.into()
         }
 
-        fn file(&self) -> Option<File> {
-            Some(self.file)
-        }
-
-        fn range(&self) -> Option<TextRange> {
-            Some(self.range)
+        fn span(&self) -> Option<Span> {
+            Some(Span::from(self.file).with_range(self.range))
         }
 
         fn severity(&self) -> Severity {
