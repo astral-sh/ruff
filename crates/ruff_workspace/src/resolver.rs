@@ -306,24 +306,34 @@ pub fn resolve_configuration(
 ) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
     let mut stack = vec![];
-    let mut next = Some(fs::normalize_path(pyproject));
-    while let Some(path) = next {
+    let mut next = Some((fs::normalize_path(pyproject), None::<PathBuf>));
+    while let Some((path, inherited_by)) = next {
         if seen.contains(&path) {
             bail!("Circular dependency detected in pyproject.toml");
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path)?;
+        let options = pyproject::load_options(&path).map_err(|err| match inherited_by {
+            Some(f) => err.context(format!(
+                "Failed to load path {} inherited by {}",
+                path.display(),
+                f.display(),
+            )),
+            None => err,
+        })?;
 
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, Some(&path), project_root)?;
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
-            fs::normalize_path_to(
-                extend,
-                path.parent()
-                    .expect("Expected pyproject.toml file to be in parent directory"),
+            (
+                fs::normalize_path_to(
+                    extend,
+                    path.parent()
+                        .expect("Expected pyproject.toml file to be in parent directory"),
+                ),
+                Some(path.clone()),
             )
         });
 
