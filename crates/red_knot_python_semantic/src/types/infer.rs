@@ -3461,7 +3461,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             &UNRESOLVED_ATTRIBUTE,
                             attribute.into(),
                             format_args!(
-                                "The attribute `{}` can only be accessed on instances of type `{}`, but not on the class object itself.",
+                                "Attribute `{}` can only be accessed on instances of type `{}`, not on the class object itself.",
                                 attr.id,
                                 value_ty.display(self.db())
                             ),
@@ -3520,7 +3520,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             &INVALID_ATTRIBUTE_ACCESS,
                             attribute.into(),
                             format_args!(
-                                "Cannot assign to pure instance attribute `{attr}` from a class of type `{ty}`",
+                                "Cannot assign to instance attribute `{attr}` from the class object `{ty}`",
                                 ty = value_ty.display(self.db()),
                             ),
                         );

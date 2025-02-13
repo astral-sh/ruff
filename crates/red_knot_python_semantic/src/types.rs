@@ -4174,10 +4174,10 @@ impl<'db> Class<'db> {
                     Ok(symbol_and_quals @ SymbolAndQualifiers(Symbol::Type(declared_ty, _), _)) => {
                         if symbol_and_quals.is_class_var() {
                             // TODO: Same as `symbol` function - We probably don't want to report `Bound` here
-                            // if the symbol is PossibleUnobund. This requires a bit of
+                            // if the symbol is possibly unbound. This requires a bit of
                             // design work though as we might want a different behavior for stubs and for
                             // normal modules.
-                            Symbol::Type(declared_ty, Boundness::Bound)
+                            Symbol::bound(declared_ty)
                         } else {
                             Symbol::Unbound
                         }
@@ -4186,7 +4186,7 @@ impl<'db> Class<'db> {
                         // Intentionally ignore conflicting declared types; that's not our problem,
                         // it's the problem of the module we are importing from.
                         if declared_ty.qualifiers().contains(TypeQualifiers::CLASS_VAR) {
-                            Symbol::Type(declared_ty.inner_type(), Boundness::Bound)
+                            Symbol::bound(declared_ty.inner_type())
                         } else {
                             // Declared but not as a ClassVar
                             Symbol::Unbound
@@ -4206,14 +4206,14 @@ impl<'db> Class<'db> {
                         Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
                         _,
                     )) => Symbol::Type(
-                        UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
+                        UnionType::from_elements(db, [inferred_ty, declared_ty]),
                         boundness,
                     ),
                     // Symbol has conflicting declared types
                     Err((ty, _)) => {
                         // Intentionally ignore conflicting declared types; that's not our problem,
                         // it's the problem of the module we are importing from.
-                        Symbol::Type(ty.inner_type(), Boundness::Bound)
+                        Symbol::bound(ty.inner_type())
                     }
                     // Symbol is undeclared, return the union of `Unknown` with the inferred type
                     Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
