@@ -210,16 +210,10 @@ pub(crate) fn invalid_string_characters(
 
         let mut diagnostic = Diagnostic::new(rule, range);
 
-        diagnostic.try_set_optional_fix(|| {
-            if token.is_raw_string() {
-                return Ok(None);
-            }
-
+        if !token.is_raw_string() {
             let edit = Edit::range_replacement(replacement.to_string(), range);
-            let fix = Fix::safe_edit(edit);
-
-            Ok(Some(fix))
-        });
+            diagnostic.set_fix(Fix::safe_edit(edit));
+        }
 
         diagnostics.push(diagnostic);
     }
