@@ -3567,8 +3567,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let CallDunderResult::CallOutcome(call)
-                | CallDunderResult::PossiblyUnbound(call) = operand_type.call_dunder(
+                if let CallDunderResult::CallOutcome(call) = operand_type.call_dunder(
                     self.db(),
                     unary_dunder_method,
                     &CallArguments::positional([operand_type]),

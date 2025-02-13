@@ -1929,9 +1929,7 @@ impl<'db> Type<'db> {
             // TODO: emit a diagnostic
             CallDunderResult::MethodNotAvailable => return None,
 
-            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
-                outcome.return_type(db)?
-            }
+            CallDunderResult::CallOutcome(outcome) => outcome.return_type(db)?,
         };
 
         non_negative_int_literal(db, return_ty)
@@ -2108,15 +2106,18 @@ impl<'db> Type<'db> {
                             not_callable_ty: self,
                         }
                     }
-                    CallDunderResult::CallOutcome(outcome) => outcome,
-                    CallDunderResult::PossiblyUnbound(call_outcome) => {
+                    CallDunderResult::CallOutcome(outcome) => match outcome {
                         // Turn "possibly unbound object of type `Literal['__call__']`"
                         // into "`X` not callable (possibly unbound `__call__` method)"
-                        CallOutcome::PossiblyUnboundDunderCall {
-                            called_ty: self,
-                            call_outcome: Box::new(call_outcome),
+                        CallOutcome::PossiblyUnboundDunder { call_outcome, .. } => {
+                            CallOutcome::PossiblyUnboundDunder {
+                                called_ty: self,
+                                call_outcome,
+                            }
                         }
-                    }
+                        outcome => outcome,
+                    },
+
                     CallDunderResult::MethodNotAvailable => {
                         // Turn "`X.__call__` unbound" into "`X` not callable"
                         CallOutcome::NotCallable {
@@ -2202,9 +2203,14 @@ impl<'db> Type<'db> {
             Symbol::Type(callable_ty, Boundness::Bound) => {
                 CallDunderResult::CallOutcome(callable_ty.call(db, arguments))
             }
+
             Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arguments))
+                CallDunderResult::CallOutcome(CallOutcome::PossiblyUnboundDunder {
+                    called_ty: self,
+                    call_outcome: Box::new(callable_ty.call(db, arguments)),
+                })
             }
+
             Symbol::Unbound => CallDunderResult::MethodNotAvailable,
         }
     }
@@ -2227,8 +2233,7 @@ impl<'db> Type<'db> {
         let dunder_iter_result =
             self.call_dunder(db, "__iter__", &CallArguments::positional([self]));
         match dunder_iter_result {
-            CallDunderResult::CallOutcome(ref call_outcome)
-            | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
+            CallDunderResult::CallOutcome(ref call_outcome) => {
                 let Some(iterator_ty) = call_outcome.return_type(db) else {
                     return IterationOutcome::NotIterable {
                         not_iterable_ty: self,
@@ -2239,7 +2244,7 @@ impl<'db> Type<'db> {
                     .call_dunder(db, "__next__", &CallArguments::positional([iterator_ty]))
                     .return_type(db)
                 {
-                    if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
+                    if call_outcome.is_possibly_unbound_dunder() {
                         IterationOutcome::PossiblyUnboundDunderIter {
                             iterable_ty: self,
                             element_ty,
@@ -4068,7 +4073,7 @@ impl<'db> Class<'db> {
                     }
                 }
 
-                CallOutcome::PossiblyUnboundDunderCall { called_ty, .. } => Err(MetaclassError {
+                CallOutcome::PossiblyUnboundDunder { called_ty, .. } => Err(MetaclassError {
                     kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
                 }),
 

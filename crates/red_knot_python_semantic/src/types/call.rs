@@ -36,7 +36,7 @@ pub(super) enum CallOutcome<'db> {
         called_ty: Type<'db>,
         outcomes: Box<[CallOutcome<'db>]>,
     },
-    PossiblyUnboundDunderCall {
+    PossiblyUnboundDunder {
         called_ty: Type<'db>,
         call_outcome: Box<CallOutcome<'db>>,
     },
@@ -88,6 +88,10 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
+    pub(super) const fn is_possibly_unbound_dunder(&self) -> bool {
+        matches!(self, Self::PossiblyUnboundDunder { .. })
+    }
+
     /// Get the return type of the call, or `None` if not callable.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -113,7 +117,7 @@ impl<'db> CallOutcome<'db> {
                     }
                 })
                 .map(UnionBuilder::build),
-            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_type(db),
+            Self::PossiblyUnboundDunder { call_outcome, .. } => call_outcome.return_type(db),
             Self::StaticAssertionError { .. } => Some(Type::none(db)),
             Self::AssertType {
                 binding,
@@ -224,7 +228,7 @@ impl<'db> CallOutcome<'db> {
                 not_callable_ty: *not_callable_ty,
                 return_ty: Type::unknown(),
             }),
-            Self::PossiblyUnboundDunderCall {
+            Self::PossiblyUnboundDunder {
                 called_ty,
                 call_outcome,
             } => Err(NotCallableError::PossiblyUnboundDunderCall {
@@ -353,15 +357,20 @@ impl<'db> CallOutcome<'db> {
 
 pub(super) enum CallDunderResult<'db> {
     CallOutcome(CallOutcome<'db>),
-    PossiblyUnbound(CallOutcome<'db>),
     MethodNotAvailable,
 }
 
 impl<'db> CallDunderResult<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::CallOutcome(outcome) => outcome.return_type(db),
-            Self::PossiblyUnbound { .. } => None,
+            Self::CallOutcome(outcome) => {
+                // TODO: Always call `outcome.return_type`, see https://github.com/astral-sh/ruff/issues/16123
+                if outcome.is_possibly_unbound_dunder() {
+                    None
+                } else {
+                    outcome.return_type(db)
+                }
+            }
             Self::MethodNotAvailable => None,
         }
     }
