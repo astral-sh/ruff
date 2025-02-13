@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
-use crate::settings::types::PythonVersion;
+use ruff_python_parser::python_version::PyVersion;
 
 /// ## What it does
 /// Checks for explicit use of dunder methods, like `__str__` and `__add__`.
@@ -214,7 +214,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.
-fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) -> bool {
+fn allowed_dunder_constants(dunder_method: &str, target_version: PyVersion) -> bool {
     if matches!(
         dunder_method,
         "__aexit__"
@@ -248,7 +248,7 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
         return true;
     }
 
-    if target_version < PythonVersion::Py310 && matches!(dunder_method, "__aiter__" | "__anext__") {
+    if target_version < PyVersion::Py310 && matches!(dunder_method, "__aiter__" | "__anext__") {
         return true;
     }
 

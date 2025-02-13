@@ -8,12 +8,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::flake8_builtins;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
 
@@ -217,7 +217,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                target_version: PythonVersion::Py38,
+                target_version: PyVersion::Py38,
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;

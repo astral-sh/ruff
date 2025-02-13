@@ -8,10 +8,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_parser::python_version::PyVersion;
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -128,7 +128,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_annotations/auto_return_type.py"),
             &LinterSettings {
-                target_version: PythonVersion::Py38,
+                target_version: PyVersion::Py38,
                 ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,

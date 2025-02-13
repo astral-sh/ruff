@@ -8,6 +8,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::assert_messages;
@@ -15,8 +16,6 @@ mod tests {
 
     use crate::settings::LinterSettings;
     use crate::test::test_path;
-
-    use crate::settings::types::PythonVersion;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
@@ -83,12 +82,12 @@ mod tests {
     #[test_case(
         Rule::ClassAsDataStructure,
         Path::new("class_as_data_structure.py"),
-        PythonVersion::Py39
+        PyVersion::Py39
     )]
     fn rules_with_target_version(
         rule_code: Rule,
         path: &Path,
-        target_version: PythonVersion,
+        target_version: PyVersion,
     ) -> Result<()> {
         let snapshot = format!(
             "{}_py{}{}_{}",

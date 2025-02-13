@@ -1,9 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::SemanticModel;
 
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of `Unpack[]` on Python 3.11 and above, and suggests
@@ -53,7 +54,7 @@ impl Violation for NonPEP646Unpack {
 
 /// UP044
 pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
-    if checker.settings.target_version < PythonVersion::Py311 {
+    if checker.settings.target_version < PyVersion::Py311 {
         return;
     }
 

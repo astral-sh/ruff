@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
-use crate::settings::types::PythonVersion;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
+use ruff_python_parser::python_version::PyVersion;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
 use super::types::{ImportBlock, Importable};
@@ -96,7 +96,7 @@ pub(crate) fn categorize<'a>(
     package: Option<PackageRoot<'_>>,
     detect_same_package: bool,
     known_modules: &'a KnownModules,
-    target_version: PythonVersion,
+    target_version: PyVersion,
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,
@@ -182,7 +182,7 @@ pub(crate) fn categorize_imports<'a>(
     package: Option<PackageRoot<'_>>,
     detect_same_package: bool,
     known_modules: &'a KnownModules,
-    target_version: PythonVersion,
+    target_version: PyVersion,
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,

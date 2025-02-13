@@ -1,12 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for an exception that is not raised.
@@ -66,11 +66,7 @@ pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExp
 }
 
 /// Returns `true` if the given expression is a builtin exception.
-fn is_builtin_exception(
-    expr: &Expr,
-    semantic: &SemanticModel,
-    target_version: PythonVersion,
-) -> bool {
+fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel, target_version: PyVersion) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {

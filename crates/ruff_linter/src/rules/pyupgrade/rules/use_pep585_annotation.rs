@@ -3,12 +3,12 @@ use ruff_python_ast::Expr;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for the use of generics that can be replaced with standard library
@@ -98,7 +98,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+                    let applicability = if checker.settings.target_version >= PyVersion::Py310 {
                         Applicability::Safe
                     } else {
                         Applicability::Unsafe
@@ -122,7 +122,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                     Ok(Fix::applicable_edits(
                         import_edit,
                         [reference_edit],
-                        if checker.settings.target_version >= PythonVersion::Py310 {
+                        if checker.settings.target_version >= PyVersion::Py310 {
                             Applicability::Safe
                         } else {
                             Applicability::Unsafe

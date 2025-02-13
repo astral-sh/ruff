@@ -11,6 +11,7 @@ use std::sync::LazyLock;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
+use ruff_python_parser::python_version::PyVersion;
 
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};
@@ -21,9 +22,7 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use crate::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
-};
+use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -220,7 +219,7 @@ pub struct LinterSettings {
     pub per_file_ignores: CompiledPerFileIgnoreList,
     pub fix_safety: FixSafetyTable,
 
-    pub target_version: PythonVersion,
+    pub target_version: PyVersion,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
 
@@ -362,7 +361,7 @@ impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
-            target_version: PythonVersion::latest(),
+            target_version: PyVersion::latest(),
             ..Self::default()
         }
     }
@@ -370,7 +369,7 @@ impl LinterSettings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
-            target_version: PythonVersion::latest(),
+            target_version: PyVersion::latest(),
             ..Self::default()
         }
     }
@@ -378,7 +377,7 @@ impl LinterSettings {
     pub fn new(project_root: &Path) -> Self {
         Self {
             exclude: FilePatternSet::default(),
-            target_version: PythonVersion::default(),
+            target_version: PyVersion::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
                 .iter()
@@ -439,7 +438,7 @@ impl LinterSettings {
     }
 
     #[must_use]
-    pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
+    pub fn with_target_version(mut self, target_version: PyVersion) -> Self {
         self.target_version = target_version;
         self
     }

@@ -1,9 +1,9 @@
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bugbear::rules::is_infinite_iterable;
-use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprCall;
+use ruff_python_parser::python_version::PyVersion;
 
 /// ## What it does
 /// Checks for `itertools.batched` calls without an explicit `strict` parameter.
@@ -59,7 +59,7 @@ impl Violation for BatchedWithoutExplicitStrict {
 
 /// B911
 pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall) {
-    if checker.settings.target_version < PythonVersion::Py313 {
+    if checker.settings.target_version < PyVersion::Py313 {
         return;
     }
 

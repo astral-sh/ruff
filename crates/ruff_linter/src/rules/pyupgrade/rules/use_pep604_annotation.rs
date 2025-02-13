@@ -4,13 +4,14 @@ use ruff_diagnostics::{
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::settings::types::{PreviewMode, PythonVersion};
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -141,7 +142,7 @@ pub(crate) fn non_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
-    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+    let applicability = if checker.settings.target_version >= PyVersion::Py310 {
         Applicability::Safe
     } else {
         Applicability::Unsafe

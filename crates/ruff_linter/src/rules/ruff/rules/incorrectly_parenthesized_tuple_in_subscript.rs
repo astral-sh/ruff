@@ -1,9 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_python_parser::python_version::PyVersion;
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for consistent style regarding whether nonempty tuples in subscripts
@@ -88,7 +89,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     // to a syntax error in Python 3.10.
     // This is no longer a syntax error starting in Python 3.11
     // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
-    if checker.settings.target_version <= PythonVersion::Py310
+    if checker.settings.target_version <= PyVersion::Py310
         && !prefer_parentheses
         && tuple_subscript.iter().any(Expr::is_starred_expr)
     {

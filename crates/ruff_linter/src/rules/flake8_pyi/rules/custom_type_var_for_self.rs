@@ -4,6 +4,7 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
+use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
@@ -12,7 +13,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, ResolutionError};
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for methods that use custom [`TypeVar`s][typing_TypeVar] in their
@@ -547,7 +547,7 @@ fn replace_custom_typevar_with_self(
 /// This is because it was added to the `typing` module on Python 3.11,
 /// but is available from the backport package `typing_extensions` on all versions.
 fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
+    let source_module = if checker.settings.target_version >= PyVersion::Py311 {
         "typing"
     } else {
         "typing_extensions"

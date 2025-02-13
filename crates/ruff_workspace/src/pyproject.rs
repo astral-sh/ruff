@@ -7,7 +7,7 @@ use log::debug;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
 
-use ruff_linter::settings::types::PythonVersion;
+use ruff_python_parser::python_version::PyVersion;
 
 use crate::options::Options;
 
@@ -151,7 +151,7 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
             if let Some(project) = pyproject.project {
                 if let Some(requires_python) = project.requires_python {
                     ruff.target_version =
-                        PythonVersion::get_minimum_supported_version(&requires_python);
+                        PyVersion::get_minimum_supported_version(&requires_python);
                 }
             }
         }

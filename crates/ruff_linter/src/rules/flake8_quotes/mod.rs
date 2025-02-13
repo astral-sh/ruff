@@ -8,11 +8,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -62,7 +62,7 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..LinterSettings::for_rule(Rule::AvoidableEscapedQuote)
-                    .with_target_version(PythonVersion::Py311)
+                    .with_target_version(PyVersion::Py311)
             },
         )?;
         assert_messages!(diagnostics);
@@ -81,7 +81,7 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..LinterSettings::for_rule(Rule::AvoidableEscapedQuote)
-                    .with_target_version(PythonVersion::Py311)
+                    .with_target_version(PyVersion::Py311)
             },
         )?;
         assert_messages!(diagnostics);
