@@ -165,3 +165,10 @@ class NoReturnAnnotations:
 class MultipleBoundParameters:
     def m[S: int, T: int](self: S, other: T) -> S: ...
     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
+
+
+MetaType = TypeVar("MetaType")
+
+class MetaTestClass(type):
+    def m(cls: MetaType) -> MetaType:
+        return cls
