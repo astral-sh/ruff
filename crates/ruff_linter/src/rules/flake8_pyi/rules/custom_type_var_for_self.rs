@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
-use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, ScopeKind, SemanticModel};
+use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -129,15 +129,13 @@ pub(crate) fn custom_type_var_instead_of_self(
         .next()?;
 
     let self_or_cls_annotation = self_or_cls_parameter.annotation()?;
+    let parent_class = current_scope.kind.as_class()?;
 
-    let ScopeKind::Class(parent_def) = current_scope.kind else {
-        return None;
-    };
-
-    // Skip any abstract, static, metaclasses, and overloaded methods.
+    // Skip any abstract/static/overloaded methods,
+    // and any methods in metaclasses
     if is_abstract(decorator_list, semantic)
         || is_overload(decorator_list, semantic)
-        || is_metaclass(parent_def, semantic).is_yes()
+        || is_metaclass(parent_class, semantic).is_yes()
     {
         return None;
     }
