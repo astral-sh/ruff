@@ -161,6 +161,10 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    pub(super) fn callable_type(&self) -> Type<'db> {
+        self.callable_ty
+    }
+
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }
@@ -200,6 +204,10 @@ impl<'db> CallBinding<'db> {
         for error in &self.errors {
             error.report_diagnostic(context, node, callable_name);
         }
+    }
+
+    pub(super) fn has_binding_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 }
 
