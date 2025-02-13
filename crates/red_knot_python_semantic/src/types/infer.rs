@@ -194,6 +194,20 @@ pub(crate) fn infer_expression_types<'db>(
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
 }
 
+// Similar to `infer_expression_types` (with the same restrictions). Directly returns the
+// type of the overall expression. This is a salsa query because it accesses `node_ref`,
+// which is sensitive to changes in the AST. Making it a query allows downstream queries
+// to short-circuit if the result type has not changed.
+#[salsa::tracked]
+pub(crate) fn infer_expression_type<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Type<'db> {
+    let inference = infer_expression_types(db, expression);
+    let expr_scope = expression.scope(db);
+    inference.expression_type(expression.node_ref(db).scoped_expression_id(db, expr_scope))
+}
+
 /// Infer the types for an [`Unpack`] operation.
 ///
 /// This infers the expression type and performs structural match against the target expression
