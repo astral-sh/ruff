@@ -58,6 +58,27 @@ unnecessary_assignment.py:10:4: PLR6103 [*] Use walrus operator `(bad3 := 'examp
 12 11 | 
 13 12 | def foo():
 
+unnecessary_assignment.py:15:8: PLR6103 [*] Use walrus operator `(bad4 := 0)`.
+   |
+13 | def foo():
+14 |     bad4 = 0
+15 |     if bad4: # [consider-using-assignment-expr]
+   |        ^^^^ PLR6103
+16 |         pass
+   |
+   = help: Move variable assignment into if statement using walrus operator `(bad4 := 0)`.
+
+ℹ Unsafe fix
+11 11 |     pass
+12 12 | 
+13 13 | def foo():
+14    |-    bad4 = 0
+15    |-    if bad4: # [consider-using-assignment-expr]
+   14 |+    if (bad4 := 0): # [consider-using-assignment-expr]
+16 15 |         pass
+17 16 | 
+18 17 | bad5 = (
+
 unnecessary_assignment.py:30:4: PLR6103 [*] Use walrus operator `(bad5 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example')`.
    |
 28 |     'example',
