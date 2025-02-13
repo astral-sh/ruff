@@ -50,10 +50,6 @@ impl<'db> Definition<'db> {
         self.kind(db).category()
     }
 
-    pub(crate) fn in_stub(self, db: &'db dyn Db) -> bool {
-        self.file(db).is_stub(db.upcast())
-    }
-
     pub(crate) fn is_declaration(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_declaration()
     }
