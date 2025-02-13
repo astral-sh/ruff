@@ -134,3 +134,20 @@ def _(flag: bool):
     with Manager() as f:
         reveal_type(f)  # revealed: str
 ```
+
+## Invalid `__enter__` signature
+
+```py
+class Manager:
+    def __enter__() -> str:
+        return "foo"
+
+    def __exit__(self, exc_type, exc_value, traceback): ...
+
+context_expr = Manager()
+
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` of type `Literal[__enter__]` is not callable"
+with context_expr as f:
+    # TODO: Should this be Unknown?
+    reveal_type(f)  # revealed: str
+```
