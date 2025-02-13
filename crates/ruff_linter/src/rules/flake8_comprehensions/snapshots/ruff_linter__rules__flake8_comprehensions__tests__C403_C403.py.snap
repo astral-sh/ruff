@@ -292,6 +292,8 @@ C403.py:29:5: C403 [*] Unnecessary list comprehension (rewrite as a set comprehe
 33 | |  x for x in range(3)]
 34 | |  ))))
    | |_____^ C403
+35 |
+36 |   # Test trailing comma case
    |
    = help: Rewrite as a set comprehension
 
@@ -308,3 +310,21 @@ C403.py:29:5: C403 [*] Unnecessary list comprehension (rewrite as a set comprehe
    29 |+s = { # outer set comment
    30 |+ # comprehension comment
    31 |+ x for x in range(3)}
+35 32 | 
+36 33 | # Test trailing comma case
+37 34 | s = set([x for x in range(3)],)
+
+C403.py:37:5: C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
+   |
+36 | # Test trailing comma case
+37 | s = set([x for x in range(3)],)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C403
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+34 34 |  ))))
+35 35 | 
+36 36 | # Test trailing comma case
+37    |-s = set([x for x in range(3)],)
+   37 |+s = {x for x in range(3)}
