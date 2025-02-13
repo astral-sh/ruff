@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use bitflags::bitflags;
+use ruff_python_ast::traversal::EnclosingSuite;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
@@ -1435,7 +1436,12 @@ impl<'a> SemanticModel<'a> {
     }
 
     pub fn previous_statement(&self, stmt: &'a Stmt) -> Option<&Stmt> {
-        self.previous_statements(stmt)?.next()
+        if self.at_top_level() {
+            EnclosingSuite::new(self.definitions.python_ast()?, stmt)?.previous_sibling()
+        } else {
+            let current_statement_parent = self.current_statement_parent()?;
+            traversal::suite(stmt, current_statement_parent)?.previous_sibling()
+        }
     }
 
     pub fn previous_statements(&self, stmt: &'a Stmt) -> Option<impl Iterator<Item = &Stmt>> {
