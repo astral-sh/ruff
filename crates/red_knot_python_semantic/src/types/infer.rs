@@ -67,9 +67,9 @@ use crate::types::{
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType,
     FunctionType, InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome,
     KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
-    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, SymbolLookup, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    RequiresExplicitReExport, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
+    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -871,22 +871,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
-        let declared_ty = symbol_from_declarations(self.db(), SymbolLookup::Internal, declarations)
-            .map(|SymbolAndQualifiers(s, _)| s.ignore_possibly_unbound().unwrap_or(Type::unknown()))
-            .unwrap_or_else(|(ty, conflicting)| {
-                // TODO point out the conflicting declarations in the diagnostic?
-                let symbol_table = self.index.symbol_table(binding.file_scope(self.db()));
-                let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
-                self.context.report_lint(
-                    &CONFLICTING_DECLARATIONS,
-                    node,
-                    format_args!(
-                        "Conflicting declared types for `{symbol_name}`: {}",
-                        conflicting.display(self.db())
-                    ),
-                );
-                ty.inner_type()
-            });
+        let declared_ty =
+            symbol_from_declarations(self.db(), declarations, RequiresExplicitReExport::No)
+                .map(|SymbolAndQualifiers(s, _)| {
+                    s.ignore_possibly_unbound().unwrap_or(Type::unknown())
+                })
+                .unwrap_or_else(|(ty, conflicting)| {
+                    // TODO point out the conflicting declarations in the diagnostic?
+                    let symbol_table = self.index.symbol_table(binding.file_scope(self.db()));
+                    let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
+                    self.context.report_lint(
+                        &CONFLICTING_DECLARATIONS,
+                        node,
+                        format_args!(
+                            "Conflicting declared types for `{symbol_name}`: {}",
+                            conflicting.display(self.db())
+                        ),
+                    );
+                    ty.inner_type()
+                });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
@@ -906,9 +909,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = symbol_from_bindings(self.db(), SymbolLookup::Internal, prior_bindings)
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::Never);
+        let inferred_ty =
+            symbol_from_bindings(self.db(), prior_bindings, RequiresExplicitReExport::No)
+                .ignore_possibly_unbound()
+                .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
         } else {
@@ -3309,8 +3313,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
                 symbol_from_bindings(
                     db,
-                    SymbolLookup::Internal,
                     use_def.public_bindings(symbol_id),
+                    RequiresExplicitReExport::No,
                 )
             } else {
                 assert!(
@@ -3321,7 +3325,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
-            symbol_from_bindings(db, SymbolLookup::Internal, use_def.bindings_at_use(use_id))
+            symbol_from_bindings(
+                db,
+                use_def.bindings_at_use(use_id),
+                RequiresExplicitReExport::No,
+            )
         };
 
         let symbol = local_scope_symbol.or_fall_back_to(db, || {
@@ -3372,7 +3380,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(db, SymbolLookup::Internal, enclosing_scope_id, symbol_name);
+                    return symbol(db, enclosing_scope_id, symbol_name);
                 }
             }
 
@@ -3383,7 +3391,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if file_scope_id.is_global() {
                         Symbol::Unbound
                     } else {
-                        global_symbol(db, SymbolLookup::Internal, self.file(), symbol_name)
+                        global_symbol(db, self.file(), symbol_name)
                     }
                 })
                 // Not found in globals? Fallback to builtins
@@ -6055,7 +6063,7 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        symbol(db, SymbolLookup::Internal, scope, symbol_name)
+        symbol(db, scope, symbol_name)
     }
 
     #[track_caller]
@@ -6271,7 +6279,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -6280,7 +6288,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "bool");
 
@@ -6297,7 +6305,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -6307,7 +6315,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
@@ -6333,7 +6341,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "int");
 
@@ -6343,7 +6351,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol(&db, SymbolLookup::Internal, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "int");
 
@@ -6390,7 +6398,7 @@ mod tests {
         )?;
 
         let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-        let attr_ty = global_symbol(&db, SymbolLookup::Internal, file_main, "x").expect_type();
+        let attr_ty = global_symbol(&db, file_main, "x").expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int | None");
 
         // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
@@ -6405,7 +6413,7 @@ mod tests {
 
         let events = {
             db.clear_salsa_events();
-            let attr_ty = global_symbol(&db, SymbolLookup::Internal, file_main, "x").expect_type();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
@@ -6424,7 +6432,7 @@ mod tests {
 
         let events = {
             db.clear_salsa_events();
-            let attr_ty = global_symbol(&db, SymbolLookup::Internal, file_main, "x").expect_type();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };

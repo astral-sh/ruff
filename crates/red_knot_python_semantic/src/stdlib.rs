@@ -2,7 +2,7 @@ use crate::module_resolver::{resolve_module, KnownModule};
 use crate::semantic_index::global_scope;
 use crate::semantic_index::symbol::ScopeId;
 use crate::symbol::Symbol;
-use crate::types::{global_symbol, SymbolLookup};
+use crate::types::{imported_symbol, module_type_symbol};
 use crate::Db;
 
 /// Lookup the type of `symbol` in a given known module
@@ -14,7 +14,10 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> Symbol<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| global_symbol(db, SymbolLookup::External, module.file(), symbol))
+        .map(|module| {
+            imported_symbol(db, &module, symbol)
+                .or_fall_back_to(db, || module_type_symbol(db, symbol))
+        })
         .unwrap_or(Symbol::Unbound)
 }
 
