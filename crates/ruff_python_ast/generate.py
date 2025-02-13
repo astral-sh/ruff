@@ -167,7 +167,9 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         }
         """)
 
-        out.append("#[allow(dead_code)]")  # Not all is_methods are used
+        out.append(
+            "#[allow(dead_code, clippy::match_wildcard_for_single_variants)]"
+        )  # Not all is_methods are used
         out.append(f"impl {group.name} {{")
         for node in group.nodes:
             is_name = to_snake_case(node.variant)
@@ -179,10 +181,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                 out.append(f"""
                     #[inline]
                     pub const fn is_{is_name}(&self) -> bool {{
-                        match self {{
-                            {match_arm}(_) => true,
-                            _ => false,
-                        }}
+                        matches!(self, {match_arm}(_))
                     }}
 
                     #[inline]
@@ -197,7 +196,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                     pub fn expect_{is_name}(self) -> {node.ty} {{
                         match self {{
                             {match_arm}(val) => val,
-                            _ => panic!("called expect on {{:?}}", self),
+                            _ => panic!("called expect on {{self:?}}"),
                         }}
                     }}
 
@@ -221,9 +220,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                 out.append(f"""
                     #[inline]
                     pub const fn is_{is_name}(&self) -> bool {{
-                        match self {{
-                            {match_arm}(_) => true,
-                        }}
+                        matches!(self, {match_arm}(_))
                     }}
 
                     #[inline]

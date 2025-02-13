@@ -29,14 +29,11 @@ impl ruff_text_size::Ranged for Mod {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Mod {
     #[inline]
     pub const fn is_module(&self) -> bool {
-        match self {
-            Self::Module(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Module(_))
     }
 
     #[inline]
@@ -51,7 +48,7 @@ impl Mod {
     pub fn expect_module(self) -> crate::ModModule {
         match self {
             Self::Module(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -73,10 +70,7 @@ impl Mod {
 
     #[inline]
     pub const fn is_expression(&self) -> bool {
-        match self {
-            Self::Expression(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Expression(_))
     }
 
     #[inline]
@@ -91,7 +85,7 @@ impl Mod {
     pub fn expect_expression(self) -> crate::ModExpression {
         match self {
             Self::Expression(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -324,14 +318,11 @@ impl ruff_text_size::Ranged for Stmt {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Stmt {
     #[inline]
     pub const fn is_function_def_stmt(&self) -> bool {
-        match self {
-            Self::FunctionDef(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::FunctionDef(_))
     }
 
     #[inline]
@@ -346,7 +337,7 @@ impl Stmt {
     pub fn expect_function_def_stmt(self) -> crate::StmtFunctionDef {
         match self {
             Self::FunctionDef(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -368,10 +359,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_class_def_stmt(&self) -> bool {
-        match self {
-            Self::ClassDef(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::ClassDef(_))
     }
 
     #[inline]
@@ -386,7 +374,7 @@ impl Stmt {
     pub fn expect_class_def_stmt(self) -> crate::StmtClassDef {
         match self {
             Self::ClassDef(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -408,10 +396,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_return_stmt(&self) -> bool {
-        match self {
-            Self::Return(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Return(_))
     }
 
     #[inline]
@@ -426,7 +411,7 @@ impl Stmt {
     pub fn expect_return_stmt(self) -> crate::StmtReturn {
         match self {
             Self::Return(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -448,10 +433,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_delete_stmt(&self) -> bool {
-        match self {
-            Self::Delete(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Delete(_))
     }
 
     #[inline]
@@ -466,7 +448,7 @@ impl Stmt {
     pub fn expect_delete_stmt(self) -> crate::StmtDelete {
         match self {
             Self::Delete(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -488,10 +470,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_type_alias_stmt(&self) -> bool {
-        match self {
-            Self::TypeAlias(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::TypeAlias(_))
     }
 
     #[inline]
@@ -506,7 +485,7 @@ impl Stmt {
     pub fn expect_type_alias_stmt(self) -> crate::StmtTypeAlias {
         match self {
             Self::TypeAlias(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -528,10 +507,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_assign_stmt(&self) -> bool {
-        match self {
-            Self::Assign(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Assign(_))
     }
 
     #[inline]
@@ -546,7 +522,7 @@ impl Stmt {
     pub fn expect_assign_stmt(self) -> crate::StmtAssign {
         match self {
             Self::Assign(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -568,10 +544,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_aug_assign_stmt(&self) -> bool {
-        match self {
-            Self::AugAssign(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::AugAssign(_))
     }
 
     #[inline]
@@ -586,7 +559,7 @@ impl Stmt {
     pub fn expect_aug_assign_stmt(self) -> crate::StmtAugAssign {
         match self {
             Self::AugAssign(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -608,10 +581,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_ann_assign_stmt(&self) -> bool {
-        match self {
-            Self::AnnAssign(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::AnnAssign(_))
     }
 
     #[inline]
@@ -626,7 +596,7 @@ impl Stmt {
     pub fn expect_ann_assign_stmt(self) -> crate::StmtAnnAssign {
         match self {
             Self::AnnAssign(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -648,10 +618,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_for_stmt(&self) -> bool {
-        match self {
-            Self::For(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::For(_))
     }
 
     #[inline]
@@ -666,7 +633,7 @@ impl Stmt {
     pub fn expect_for_stmt(self) -> crate::StmtFor {
         match self {
             Self::For(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -688,10 +655,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_while_stmt(&self) -> bool {
-        match self {
-            Self::While(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::While(_))
     }
 
     #[inline]
@@ -706,7 +670,7 @@ impl Stmt {
     pub fn expect_while_stmt(self) -> crate::StmtWhile {
         match self {
             Self::While(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -728,10 +692,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_if_stmt(&self) -> bool {
-        match self {
-            Self::If(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::If(_))
     }
 
     #[inline]
@@ -746,7 +707,7 @@ impl Stmt {
     pub fn expect_if_stmt(self) -> crate::StmtIf {
         match self {
             Self::If(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -768,10 +729,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_with_stmt(&self) -> bool {
-        match self {
-            Self::With(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::With(_))
     }
 
     #[inline]
@@ -786,7 +744,7 @@ impl Stmt {
     pub fn expect_with_stmt(self) -> crate::StmtWith {
         match self {
             Self::With(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -808,10 +766,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_match_stmt(&self) -> bool {
-        match self {
-            Self::Match(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Match(_))
     }
 
     #[inline]
@@ -826,7 +781,7 @@ impl Stmt {
     pub fn expect_match_stmt(self) -> crate::StmtMatch {
         match self {
             Self::Match(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -848,10 +803,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_raise_stmt(&self) -> bool {
-        match self {
-            Self::Raise(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Raise(_))
     }
 
     #[inline]
@@ -866,7 +818,7 @@ impl Stmt {
     pub fn expect_raise_stmt(self) -> crate::StmtRaise {
         match self {
             Self::Raise(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -888,10 +840,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_try_stmt(&self) -> bool {
-        match self {
-            Self::Try(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Try(_))
     }
 
     #[inline]
@@ -906,7 +855,7 @@ impl Stmt {
     pub fn expect_try_stmt(self) -> crate::StmtTry {
         match self {
             Self::Try(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -928,10 +877,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_assert_stmt(&self) -> bool {
-        match self {
-            Self::Assert(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Assert(_))
     }
 
     #[inline]
@@ -946,7 +892,7 @@ impl Stmt {
     pub fn expect_assert_stmt(self) -> crate::StmtAssert {
         match self {
             Self::Assert(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -968,10 +914,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_import_stmt(&self) -> bool {
-        match self {
-            Self::Import(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Import(_))
     }
 
     #[inline]
@@ -986,7 +929,7 @@ impl Stmt {
     pub fn expect_import_stmt(self) -> crate::StmtImport {
         match self {
             Self::Import(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1008,10 +951,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_import_from_stmt(&self) -> bool {
-        match self {
-            Self::ImportFrom(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::ImportFrom(_))
     }
 
     #[inline]
@@ -1026,7 +966,7 @@ impl Stmt {
     pub fn expect_import_from_stmt(self) -> crate::StmtImportFrom {
         match self {
             Self::ImportFrom(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1048,10 +988,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_global_stmt(&self) -> bool {
-        match self {
-            Self::Global(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Global(_))
     }
 
     #[inline]
@@ -1066,7 +1003,7 @@ impl Stmt {
     pub fn expect_global_stmt(self) -> crate::StmtGlobal {
         match self {
             Self::Global(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1088,10 +1025,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_nonlocal_stmt(&self) -> bool {
-        match self {
-            Self::Nonlocal(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Nonlocal(_))
     }
 
     #[inline]
@@ -1106,7 +1040,7 @@ impl Stmt {
     pub fn expect_nonlocal_stmt(self) -> crate::StmtNonlocal {
         match self {
             Self::Nonlocal(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1128,10 +1062,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_expr_stmt(&self) -> bool {
-        match self {
-            Self::Expr(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Expr(_))
     }
 
     #[inline]
@@ -1146,7 +1077,7 @@ impl Stmt {
     pub fn expect_expr_stmt(self) -> crate::StmtExpr {
         match self {
             Self::Expr(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1168,10 +1099,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_pass_stmt(&self) -> bool {
-        match self {
-            Self::Pass(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Pass(_))
     }
 
     #[inline]
@@ -1186,7 +1114,7 @@ impl Stmt {
     pub fn expect_pass_stmt(self) -> crate::StmtPass {
         match self {
             Self::Pass(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1208,10 +1136,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_break_stmt(&self) -> bool {
-        match self {
-            Self::Break(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Break(_))
     }
 
     #[inline]
@@ -1226,7 +1151,7 @@ impl Stmt {
     pub fn expect_break_stmt(self) -> crate::StmtBreak {
         match self {
             Self::Break(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1248,10 +1173,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_continue_stmt(&self) -> bool {
-        match self {
-            Self::Continue(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Continue(_))
     }
 
     #[inline]
@@ -1266,7 +1188,7 @@ impl Stmt {
     pub fn expect_continue_stmt(self) -> crate::StmtContinue {
         match self {
             Self::Continue(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1288,10 +1210,7 @@ impl Stmt {
 
     #[inline]
     pub const fn is_ipy_escape_command_stmt(&self) -> bool {
-        match self {
-            Self::IpyEscapeCommand(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::IpyEscapeCommand(_))
     }
 
     #[inline]
@@ -1306,7 +1225,7 @@ impl Stmt {
     pub fn expect_ipy_escape_command_stmt(self) -> crate::StmtIpyEscapeCommand {
         match self {
             Self::IpyEscapeCommand(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1595,14 +1514,11 @@ impl ruff_text_size::Ranged for Expr {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Expr {
     #[inline]
     pub const fn is_bool_op_expr(&self) -> bool {
-        match self {
-            Self::BoolOp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::BoolOp(_))
     }
 
     #[inline]
@@ -1617,7 +1533,7 @@ impl Expr {
     pub fn expect_bool_op_expr(self) -> crate::ExprBoolOp {
         match self {
             Self::BoolOp(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1639,10 +1555,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_named_expr(&self) -> bool {
-        match self {
-            Self::Named(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Named(_))
     }
 
     #[inline]
@@ -1657,7 +1570,7 @@ impl Expr {
     pub fn expect_named_expr(self) -> crate::ExprNamed {
         match self {
             Self::Named(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1679,10 +1592,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_bin_op_expr(&self) -> bool {
-        match self {
-            Self::BinOp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::BinOp(_))
     }
 
     #[inline]
@@ -1697,7 +1607,7 @@ impl Expr {
     pub fn expect_bin_op_expr(self) -> crate::ExprBinOp {
         match self {
             Self::BinOp(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1719,10 +1629,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_unary_op_expr(&self) -> bool {
-        match self {
-            Self::UnaryOp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::UnaryOp(_))
     }
 
     #[inline]
@@ -1737,7 +1644,7 @@ impl Expr {
     pub fn expect_unary_op_expr(self) -> crate::ExprUnaryOp {
         match self {
             Self::UnaryOp(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1759,10 +1666,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_lambda_expr(&self) -> bool {
-        match self {
-            Self::Lambda(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Lambda(_))
     }
 
     #[inline]
@@ -1777,7 +1681,7 @@ impl Expr {
     pub fn expect_lambda_expr(self) -> crate::ExprLambda {
         match self {
             Self::Lambda(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1799,10 +1703,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_if_expr(&self) -> bool {
-        match self {
-            Self::If(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::If(_))
     }
 
     #[inline]
@@ -1817,7 +1718,7 @@ impl Expr {
     pub fn expect_if_expr(self) -> crate::ExprIf {
         match self {
             Self::If(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1839,10 +1740,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_dict_expr(&self) -> bool {
-        match self {
-            Self::Dict(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Dict(_))
     }
 
     #[inline]
@@ -1857,7 +1755,7 @@ impl Expr {
     pub fn expect_dict_expr(self) -> crate::ExprDict {
         match self {
             Self::Dict(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1879,10 +1777,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_set_expr(&self) -> bool {
-        match self {
-            Self::Set(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Set(_))
     }
 
     #[inline]
@@ -1897,7 +1792,7 @@ impl Expr {
     pub fn expect_set_expr(self) -> crate::ExprSet {
         match self {
             Self::Set(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1919,10 +1814,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_list_comp_expr(&self) -> bool {
-        match self {
-            Self::ListComp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::ListComp(_))
     }
 
     #[inline]
@@ -1937,7 +1829,7 @@ impl Expr {
     pub fn expect_list_comp_expr(self) -> crate::ExprListComp {
         match self {
             Self::ListComp(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1959,10 +1851,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_set_comp_expr(&self) -> bool {
-        match self {
-            Self::SetComp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::SetComp(_))
     }
 
     #[inline]
@@ -1977,7 +1866,7 @@ impl Expr {
     pub fn expect_set_comp_expr(self) -> crate::ExprSetComp {
         match self {
             Self::SetComp(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -1999,10 +1888,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_dict_comp_expr(&self) -> bool {
-        match self {
-            Self::DictComp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::DictComp(_))
     }
 
     #[inline]
@@ -2017,7 +1903,7 @@ impl Expr {
     pub fn expect_dict_comp_expr(self) -> crate::ExprDictComp {
         match self {
             Self::DictComp(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2039,10 +1925,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_generator_expr(&self) -> bool {
-        match self {
-            Self::Generator(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Generator(_))
     }
 
     #[inline]
@@ -2057,7 +1940,7 @@ impl Expr {
     pub fn expect_generator_expr(self) -> crate::ExprGenerator {
         match self {
             Self::Generator(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2079,10 +1962,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_await_expr(&self) -> bool {
-        match self {
-            Self::Await(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Await(_))
     }
 
     #[inline]
@@ -2097,7 +1977,7 @@ impl Expr {
     pub fn expect_await_expr(self) -> crate::ExprAwait {
         match self {
             Self::Await(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2119,10 +1999,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_yield_expr(&self) -> bool {
-        match self {
-            Self::Yield(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Yield(_))
     }
 
     #[inline]
@@ -2137,7 +2014,7 @@ impl Expr {
     pub fn expect_yield_expr(self) -> crate::ExprYield {
         match self {
             Self::Yield(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2159,10 +2036,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_yield_from_expr(&self) -> bool {
-        match self {
-            Self::YieldFrom(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::YieldFrom(_))
     }
 
     #[inline]
@@ -2177,7 +2051,7 @@ impl Expr {
     pub fn expect_yield_from_expr(self) -> crate::ExprYieldFrom {
         match self {
             Self::YieldFrom(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2199,10 +2073,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_compare_expr(&self) -> bool {
-        match self {
-            Self::Compare(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Compare(_))
     }
 
     #[inline]
@@ -2217,7 +2088,7 @@ impl Expr {
     pub fn expect_compare_expr(self) -> crate::ExprCompare {
         match self {
             Self::Compare(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2239,10 +2110,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_call_expr(&self) -> bool {
-        match self {
-            Self::Call(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Call(_))
     }
 
     #[inline]
@@ -2257,7 +2125,7 @@ impl Expr {
     pub fn expect_call_expr(self) -> crate::ExprCall {
         match self {
             Self::Call(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2279,10 +2147,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_f_string_expr(&self) -> bool {
-        match self {
-            Self::FString(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::FString(_))
     }
 
     #[inline]
@@ -2297,7 +2162,7 @@ impl Expr {
     pub fn expect_f_string_expr(self) -> crate::ExprFString {
         match self {
             Self::FString(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2319,10 +2184,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_string_literal_expr(&self) -> bool {
-        match self {
-            Self::StringLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::StringLiteral(_))
     }
 
     #[inline]
@@ -2337,7 +2199,7 @@ impl Expr {
     pub fn expect_string_literal_expr(self) -> crate::ExprStringLiteral {
         match self {
             Self::StringLiteral(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2359,10 +2221,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_bytes_literal_expr(&self) -> bool {
-        match self {
-            Self::BytesLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::BytesLiteral(_))
     }
 
     #[inline]
@@ -2377,7 +2236,7 @@ impl Expr {
     pub fn expect_bytes_literal_expr(self) -> crate::ExprBytesLiteral {
         match self {
             Self::BytesLiteral(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2399,10 +2258,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_number_literal_expr(&self) -> bool {
-        match self {
-            Self::NumberLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::NumberLiteral(_))
     }
 
     #[inline]
@@ -2417,7 +2273,7 @@ impl Expr {
     pub fn expect_number_literal_expr(self) -> crate::ExprNumberLiteral {
         match self {
             Self::NumberLiteral(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2439,10 +2295,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_boolean_literal_expr(&self) -> bool {
-        match self {
-            Self::BooleanLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::BooleanLiteral(_))
     }
 
     #[inline]
@@ -2457,7 +2310,7 @@ impl Expr {
     pub fn expect_boolean_literal_expr(self) -> crate::ExprBooleanLiteral {
         match self {
             Self::BooleanLiteral(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2479,10 +2332,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_none_literal_expr(&self) -> bool {
-        match self {
-            Self::NoneLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::NoneLiteral(_))
     }
 
     #[inline]
@@ -2497,7 +2347,7 @@ impl Expr {
     pub fn expect_none_literal_expr(self) -> crate::ExprNoneLiteral {
         match self {
             Self::NoneLiteral(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2519,10 +2369,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_ellipsis_literal_expr(&self) -> bool {
-        match self {
-            Self::EllipsisLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::EllipsisLiteral(_))
     }
 
     #[inline]
@@ -2537,7 +2384,7 @@ impl Expr {
     pub fn expect_ellipsis_literal_expr(self) -> crate::ExprEllipsisLiteral {
         match self {
             Self::EllipsisLiteral(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2559,10 +2406,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_attribute_expr(&self) -> bool {
-        match self {
-            Self::Attribute(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Attribute(_))
     }
 
     #[inline]
@@ -2577,7 +2421,7 @@ impl Expr {
     pub fn expect_attribute_expr(self) -> crate::ExprAttribute {
         match self {
             Self::Attribute(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2599,10 +2443,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_subscript_expr(&self) -> bool {
-        match self {
-            Self::Subscript(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Subscript(_))
     }
 
     #[inline]
@@ -2617,7 +2458,7 @@ impl Expr {
     pub fn expect_subscript_expr(self) -> crate::ExprSubscript {
         match self {
             Self::Subscript(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2639,10 +2480,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_starred_expr(&self) -> bool {
-        match self {
-            Self::Starred(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Starred(_))
     }
 
     #[inline]
@@ -2657,7 +2495,7 @@ impl Expr {
     pub fn expect_starred_expr(self) -> crate::ExprStarred {
         match self {
             Self::Starred(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2679,10 +2517,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_name_expr(&self) -> bool {
-        match self {
-            Self::Name(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Name(_))
     }
 
     #[inline]
@@ -2697,7 +2532,7 @@ impl Expr {
     pub fn expect_name_expr(self) -> crate::ExprName {
         match self {
             Self::Name(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2719,10 +2554,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_list_expr(&self) -> bool {
-        match self {
-            Self::List(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::List(_))
     }
 
     #[inline]
@@ -2737,7 +2569,7 @@ impl Expr {
     pub fn expect_list_expr(self) -> crate::ExprList {
         match self {
             Self::List(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2759,10 +2591,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_tuple_expr(&self) -> bool {
-        match self {
-            Self::Tuple(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Tuple(_))
     }
 
     #[inline]
@@ -2777,7 +2606,7 @@ impl Expr {
     pub fn expect_tuple_expr(self) -> crate::ExprTuple {
         match self {
             Self::Tuple(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2799,10 +2628,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_slice_expr(&self) -> bool {
-        match self {
-            Self::Slice(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Slice(_))
     }
 
     #[inline]
@@ -2817,7 +2643,7 @@ impl Expr {
     pub fn expect_slice_expr(self) -> crate::ExprSlice {
         match self {
             Self::Slice(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2839,10 +2665,7 @@ impl Expr {
 
     #[inline]
     pub const fn is_ipy_escape_command_expr(&self) -> bool {
-        match self {
-            Self::IpyEscapeCommand(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::IpyEscapeCommand(_))
     }
 
     #[inline]
@@ -2857,7 +2680,7 @@ impl Expr {
     pub fn expect_ipy_escape_command_expr(self) -> crate::ExprIpyEscapeCommand {
         match self {
             Self::IpyEscapeCommand(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -2898,13 +2721,11 @@ impl ruff_text_size::Ranged for ExceptHandler {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl ExceptHandler {
     #[inline]
     pub const fn is_except_handler(&self) -> bool {
-        match self {
-            Self::ExceptHandler(_) => true,
-        }
+        matches!(self, Self::ExceptHandler(_))
     }
 
     #[inline]
@@ -2963,14 +2784,11 @@ impl ruff_text_size::Ranged for FStringElement {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl FStringElement {
     #[inline]
     pub const fn is_expression(&self) -> bool {
-        match self {
-            Self::Expression(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Expression(_))
     }
 
     #[inline]
@@ -2985,7 +2803,7 @@ impl FStringElement {
     pub fn expect_expression(self) -> crate::FStringExpressionElement {
         match self {
             Self::Expression(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3007,10 +2825,7 @@ impl FStringElement {
 
     #[inline]
     pub const fn is_literal(&self) -> bool {
-        match self {
-            Self::Literal(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Literal(_))
     }
 
     #[inline]
@@ -3025,7 +2840,7 @@ impl FStringElement {
     pub fn expect_literal(self) -> crate::FStringLiteralElement {
         match self {
             Self::Literal(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3122,14 +2937,11 @@ impl ruff_text_size::Ranged for Pattern {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Pattern {
     #[inline]
     pub const fn is_match_value(&self) -> bool {
-        match self {
-            Self::MatchValue(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchValue(_))
     }
 
     #[inline]
@@ -3144,7 +2956,7 @@ impl Pattern {
     pub fn expect_match_value(self) -> crate::PatternMatchValue {
         match self {
             Self::MatchValue(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3166,10 +2978,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_singleton(&self) -> bool {
-        match self {
-            Self::MatchSingleton(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchSingleton(_))
     }
 
     #[inline]
@@ -3184,7 +2993,7 @@ impl Pattern {
     pub fn expect_match_singleton(self) -> crate::PatternMatchSingleton {
         match self {
             Self::MatchSingleton(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3206,10 +3015,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_sequence(&self) -> bool {
-        match self {
-            Self::MatchSequence(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchSequence(_))
     }
 
     #[inline]
@@ -3224,7 +3030,7 @@ impl Pattern {
     pub fn expect_match_sequence(self) -> crate::PatternMatchSequence {
         match self {
             Self::MatchSequence(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3246,10 +3052,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_mapping(&self) -> bool {
-        match self {
-            Self::MatchMapping(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchMapping(_))
     }
 
     #[inline]
@@ -3264,7 +3067,7 @@ impl Pattern {
     pub fn expect_match_mapping(self) -> crate::PatternMatchMapping {
         match self {
             Self::MatchMapping(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3286,10 +3089,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_class(&self) -> bool {
-        match self {
-            Self::MatchClass(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchClass(_))
     }
 
     #[inline]
@@ -3304,7 +3104,7 @@ impl Pattern {
     pub fn expect_match_class(self) -> crate::PatternMatchClass {
         match self {
             Self::MatchClass(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3326,10 +3126,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_star(&self) -> bool {
-        match self {
-            Self::MatchStar(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchStar(_))
     }
 
     #[inline]
@@ -3344,7 +3141,7 @@ impl Pattern {
     pub fn expect_match_star(self) -> crate::PatternMatchStar {
         match self {
             Self::MatchStar(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3366,10 +3163,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_as(&self) -> bool {
-        match self {
-            Self::MatchAs(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchAs(_))
     }
 
     #[inline]
@@ -3384,7 +3178,7 @@ impl Pattern {
     pub fn expect_match_as(self) -> crate::PatternMatchAs {
         match self {
             Self::MatchAs(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3406,10 +3200,7 @@ impl Pattern {
 
     #[inline]
     pub const fn is_match_or(&self) -> bool {
-        match self {
-            Self::MatchOr(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::MatchOr(_))
     }
 
     #[inline]
@@ -3424,7 +3215,7 @@ impl Pattern {
     pub fn expect_match_or(self) -> crate::PatternMatchOr {
         match self {
             Self::MatchOr(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3481,14 +3272,11 @@ impl ruff_text_size::Ranged for TypeParam {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl TypeParam {
     #[inline]
     pub const fn is_type_var(&self) -> bool {
-        match self {
-            Self::TypeVar(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::TypeVar(_))
     }
 
     #[inline]
@@ -3503,7 +3291,7 @@ impl TypeParam {
     pub fn expect_type_var(self) -> crate::TypeParamTypeVar {
         match self {
             Self::TypeVar(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3525,10 +3313,7 @@ impl TypeParam {
 
     #[inline]
     pub const fn is_type_var_tuple(&self) -> bool {
-        match self {
-            Self::TypeVarTuple(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::TypeVarTuple(_))
     }
 
     #[inline]
@@ -3543,7 +3328,7 @@ impl TypeParam {
     pub fn expect_type_var_tuple(self) -> crate::TypeParamTypeVarTuple {
         match self {
             Self::TypeVarTuple(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
@@ -3565,10 +3350,7 @@ impl TypeParam {
 
     #[inline]
     pub const fn is_param_spec(&self) -> bool {
-        match self {
-            Self::ParamSpec(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::ParamSpec(_))
     }
 
     #[inline]
@@ -3583,7 +3365,7 @@ impl TypeParam {
     pub fn expect_param_spec(self) -> crate::TypeParamParamSpec {
         match self {
             Self::ParamSpec(val) => val,
-            _ => panic!("called expect on {:?}", self),
+            _ => panic!("called expect on {self:?}"),
         }
     }
 
