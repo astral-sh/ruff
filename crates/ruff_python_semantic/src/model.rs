@@ -1443,7 +1443,7 @@ impl<'a> SemanticModel<'a> {
             self.definitions.python_ast()?
         } else {
             let current_statement_parent = self.current_statement_parent()?;
-            traversal::suite(stmt, current_statement_parent)?
+            traversal::suite(stmt, current_statement_parent)?.next_siblings()
         };
 
         Some(

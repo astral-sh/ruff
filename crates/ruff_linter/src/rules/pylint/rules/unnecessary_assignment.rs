@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::Name, Expr, ExprName, Stmt, StmtAssign, StmtIf};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::{checkers::ast::Checker, fix::edits::delete_stmt, settings::types::Py
 /// ## References
 /// - [PEP 572 – Assignment Expressions](https://peps.python.org/pep-0572/)
 /// - [What’s New In Python 3.8 - Assignment Expressions](https://docs.python.org/3/whatsnew/3.8.html#assignment-expressions)
-#[violation]
-pub struct UnnecessaryAssignment {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryAssignment {
     name: Name,
     assignment: String,
     parentheses: bool,
@@ -122,7 +122,7 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
     );
 
     // add found diagnostics
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// Find possible assignment before if statement
