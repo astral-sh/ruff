@@ -19,6 +19,7 @@ ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
 bstr = { workspace = true }
+clap = { workspace = true, optional = true }
 compact_str = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }

@@ -16,7 +16,7 @@ red_knot_python_semantic = { workspace = true }
 red_knot_project = { workspace = true, features = ["zstd"] }
 red_knot_server = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
-ruff_python_parser = { workspace = true }
+ruff_python_parser = { workspace = true, features = ["clap"] }
 
 anyhow = { workspace = true }
 chrono = { workspace = true }

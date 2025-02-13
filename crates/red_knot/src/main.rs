@@ -21,7 +21,6 @@ use salsa::plumbing::ZalsaDatabase;
 
 mod args;
 mod logging;
-mod python_version;
 mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]

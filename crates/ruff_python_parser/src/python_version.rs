@@ -166,3 +166,35 @@ mod schemars {
         }
     }
 }
+
+#[cfg(feature = "clap")]
+mod clap {
+    use clap::builder::PossibleValue;
+
+    impl clap::ValueEnum for super::PythonVersion {
+        fn value_variants<'a>() -> &'a [Self] {
+            &[
+                Self::PY37,
+                Self::PY38,
+                Self::PY39,
+                Self::PY310,
+                Self::PY311,
+                Self::PY312,
+                Self::PY313,
+            ]
+        }
+
+        fn to_possible_value(&self) -> Option<PossibleValue> {
+            match (self.major, self.minor) {
+                (3, 7) => Some(PossibleValue::new("3.7")),
+                (3, 8) => Some(PossibleValue::new("3.8")),
+                (3, 9) => Some(PossibleValue::new("3.9")),
+                (3, 10) => Some(PossibleValue::new("3.10")),
+                (3, 11) => Some(PossibleValue::new("3.11")),
+                (3, 12) => Some(PossibleValue::new("3.12")),
+                (3, 13) => Some(PossibleValue::new("3.13")),
+                _ => None,
+            }
+        }
+    }
+}
