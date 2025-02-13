@@ -621,7 +621,7 @@ impl<'db> VisibilityConstraints<'db> {
             ConstraintNode::Pattern(inner) => match inner.kind(db) {
                 PatternConstraintKind::Value(value, guard) => {
                     let subject_expression = inner.subject(db);
-                    let subject_ty = infer_expression_type(db, *subject_expression);
+                    let subject_ty = infer_expression_type(db, subject_expression);
                     let value_ty = infer_expression_type(db, *value);
 
                     if subject_ty.is_single_valued(db) {

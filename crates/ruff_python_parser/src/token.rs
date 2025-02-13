@@ -72,7 +72,8 @@ impl Token {
             .unwrap_or_else(|| panic!("token to be a string"))
     }
 
-    /// Returns true if the current token is a string and it is raw.
+    /// Returns the [`AnyStringFlags`] style for the current token of any string kind, or [`None`]
+    /// if the token is not a string.
     pub fn string_flags(self) -> Option<AnyStringFlags> {
         if self.is_any_string() {
             Some(self.flags.as_any_string_flags())
