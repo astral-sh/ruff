@@ -4186,7 +4186,7 @@ impl<'db> Class<'db> {
                         // Intentionally ignore conflicting declared types; that's not our problem,
                         // it's the problem of the module we are importing from.
                         if declared_ty.qualifiers().contains(TypeQualifiers::CLASS_VAR) {
-                            declared_ty.inner_type().into()
+                            Symbol::Type(declared_ty.inner_type(), Boundness::Bound)
                         } else {
                             // Declared but not as a ClassVar
                             Symbol::Unbound
@@ -4213,7 +4213,7 @@ impl<'db> Class<'db> {
                     Err((ty, _)) => {
                         // Intentionally ignore conflicting declared types; that's not our problem,
                         // it's the problem of the module we are importing from.
-                        ty.inner_type().into()
+                        Symbol::Type(ty.inner_type(), Boundness::Bound)
                     }
                     // Symbol is undeclared, return the union of `Unknown` with the inferred type
                     Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
