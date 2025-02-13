@@ -64,6 +64,11 @@ impl Token {
         self.flags.quote_style()
     }
 
+    /// Returns true if the current token is a string and it is raw.
+    pub fn is_raw_string(self) -> bool {
+        self.flags.is_raw_string()
+    }
+
     /// Returns `true` if this is any kind of string token.
     const fn is_any_string(self) -> bool {
         matches!(
