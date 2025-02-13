@@ -70,7 +70,7 @@ use crate::importer::ImportRequest;
 /// ```
 ///
 /// ## References
-/// - [`itertools` &sect; `chain.from_iterable`](https://docs.python.org/3/library/itertools.html#itertools.chain.from_iterable)
+/// - [`chain.from_iterable`](https://docs.python.org/3/library/itertools.html#itertools.chain.from_iterable)
 ///
 /// [RUF017]: https://docs.astral.sh/ruff/rules/quadratic-list-summation/
 #[derive(ViolationMetadata)]
