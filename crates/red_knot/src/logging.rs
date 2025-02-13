@@ -2,8 +2,10 @@
 
 use anyhow::Context;
 use colored::Colorize;
+use ruff_db::system::SystemPathBuf;
+use ruff_metrics::JsonRecorder;
 use std::fmt;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::BufWriter;
 use tracing::{Event, Subscriber};
 use tracing_subscriber::filter::LevelFilter;
@@ -251,4 +253,19 @@ where
 
         writeln!(writer)
     }
+}
+
+pub(crate) fn setup_metrics(dest: Option<&SystemPathBuf>) {
+    // If --metrics is not provided at all, don't collect any metrics.
+    let Some(dest) = dest else {
+        return;
+    };
+
+    let dest = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(dest.as_std_path())
+        .expect("cannot open metrics file");
+    let recorder = JsonRecorder::new(dest);
+    metrics::set_global_recorder(recorder).expect("metrics recorder already registered");
 }
