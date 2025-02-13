@@ -13,6 +13,7 @@ use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     QuoteStyle,
 };
+use ruff_python_parser::python_version::PyVersion;
 use ruff_source_file::find_newline;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -164,7 +165,7 @@ pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
     pub preview: PreviewMode,
-    pub target_version: ruff_python_formatter::PythonVersion,
+    pub target_version: PyVersion,
 
     pub line_width: LineWidth,
 

@@ -21,8 +21,6 @@ mod pyversion {
     pub enum PyVersion {
         Py37,
         Py38,
-        // Make sure to also change the default for `ruff_python_formatter::PyVersion`
-        // when changing the default here.
         #[default]
         Py39,
         Py310,

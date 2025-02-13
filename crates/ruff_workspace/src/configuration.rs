@@ -178,15 +178,7 @@ impl Configuration {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            target_version: match target_version {
-                PyVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
-                PyVersion::Py38 => ruff_python_formatter::PythonVersion::Py38,
-                PyVersion::Py39 => ruff_python_formatter::PythonVersion::Py39,
-                PyVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
-                PyVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
-                PyVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
-                PyVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
-            },
+            target_version,
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
