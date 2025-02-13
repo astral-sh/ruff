@@ -56,44 +56,24 @@ unnecessary_assignment.py:10:4: PLR6103 [*] Use walrus operator `(bad3 := 'examp
    9  |+if (bad3 := 'example') and bad3 == 'example': # [consider-using-assignment-expr]
 11 10 |     pass
 12 11 | 
-13 12 | 
+13 12 | def foo():
 
-unnecessary_assignment.py:16:8: PLR6103 [*] Use walrus operator `(bad4 := 0)`.
+unnecessary_assignment.py:30:4: PLR6103 [*] Use walrus operator `(bad5 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example')`.
    |
-14 | def foo():
-15 |     bad4 = 0
-16 |     if bad4: # [consider-using-assignment-expr]
-   |        ^^^^ PLR6103
-17 |         pass
-   |
-   = help: Move variable assignment into if statement using walrus operator `(bad4 := 0)`.
-
-ℹ Unsafe fix
-12 12 | 
-13 13 | 
-14 14 | def foo():
-15    |-    bad4 = 0
-16    |-    if bad4: # [consider-using-assignment-expr]
-   15 |+    if (bad4 := 0): # [consider-using-assignment-expr]
-17 16 |         pass
-18 17 | 
-19 18 | bad5 = (
-
-unnecessary_assignment.py:31:4: PLR6103 [*] Use walrus operator `(bad5 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example')`.
-   |
-29 |     'example',
-30 | )
-31 | if bad5: # [consider-using-assignment-expr]
+28 |     'example',
+29 | )
+30 | if bad5: # [consider-using-assignment-expr]
    |    ^^^^ PLR6103
-32 |     pass
+31 |     pass
    |
    = help: Move variable assignment into if statement using walrus operator `(bad5 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example')`.
 
 ℹ Unsafe fix
-16 16 |     if bad4: # [consider-using-assignment-expr]
-17 17 |         pass
-18 18 | 
-19    |-bad5 = (
+15 15 |     if bad4: # [consider-using-assignment-expr]
+16 16 |         pass
+17 17 | 
+18    |-bad5 = (
+19    |-    'example',
 20    |-    'example',
 21    |-    'example',
 22    |-    'example',
@@ -103,72 +83,50 @@ unnecessary_assignment.py:31:4: PLR6103 [*] Use walrus operator `(bad5 := 'examp
 26    |-    'example',
 27    |-    'example',
 28    |-    'example',
-29    |-    'example',
-30    |-)
-31    |-if bad5: # [consider-using-assignment-expr]
-   19 |+if (bad5 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example'): # [consider-using-assignment-expr]
-32 20 |     pass
-33 21 | 
-34 22 | bad6 = 'example'
+29    |-)
+30    |-if bad5: # [consider-using-assignment-expr]
+   18 |+if (bad5 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example'): # [consider-using-assignment-expr]
+31 19 |     pass
+32 20 | 
+33 21 | bad6 = 'example'
 
-unnecessary_assignment.py:35:4: PLR6103 [*] Use walrus operator `(bad6 := 'example')`.
+unnecessary_assignment.py:34:4: PLR6103 [*] Use walrus operator `(bad6 := 'example')`.
    |
-34 | bad6 = 'example'
-35 | if bad6 is not None: # [consider-using-assignment-expr]
+33 | bad6 = 'example'
+34 | if bad6 is not None: # [consider-using-assignment-expr]
    |    ^^^^ PLR6103
-36 |     pass
+35 |     pass
    |
    = help: Move variable assignment into if statement using walrus operator `(bad6 := 'example')`.
 
 ℹ Unsafe fix
-31 31 | if bad5: # [consider-using-assignment-expr]
-32 32 |     pass
-33 33 | 
-34    |-bad6 = 'example'
-35    |-if bad6 is not None: # [consider-using-assignment-expr]
-   34 |+if (bad6 := 'example') is not None: # [consider-using-assignment-expr]
-36 35 |     pass
-37 36 | 
-38 37 | bad7 = 'example'
+30 30 | if bad5: # [consider-using-assignment-expr]
+31 31 |     pass
+32 32 | 
+33    |-bad6 = 'example'
+34    |-if bad6 is not None: # [consider-using-assignment-expr]
+   33 |+if (bad6 := 'example') is not None: # [consider-using-assignment-expr]
+35 34 |     pass
+36 35 | 
+37 36 | bad7 = 'example'
 
-unnecessary_assignment.py:39:4: PLR6103 [*] Use walrus operator `(bad7 := 'example')`.
+unnecessary_assignment.py:38:4: PLR6103 [*] Use walrus operator `(bad7 := 'example')`.
    |
-38 | bad7 = 'example'
-39 | if bad7 == 'something': # [consider-using-assignment-expr]
+37 | bad7 = 'example'
+38 | if bad7: # [consider-using-assignment-expr]
    |    ^^^^ PLR6103
-40 |     pass
-41 | elif bad7 == 'something else':
+39 |     pass
+40 | print(bad7)
    |
    = help: Move variable assignment into if statement using walrus operator `(bad7 := 'example')`.
 
 ℹ Unsafe fix
-35 35 | if bad6 is not None: # [consider-using-assignment-expr]
-36 36 |     pass
-37 37 | 
-38    |-bad7 = 'example'
-39    |-if bad7 == 'something': # [consider-using-assignment-expr]
-   38 |+if (bad7 := 'example') == 'something': # [consider-using-assignment-expr]
-40 39 |     pass
-41 40 | elif bad7 == 'something else':
-42 41 |     pass
-
-unnecessary_assignment.py:45:4: PLR6103 [*] Use walrus operator `(bad8 := 'example')`.
-   |
-44 | bad8 = 'example'
-45 | if bad8: # [consider-using-assignment-expr]
-   |    ^^^^ PLR6103
-46 |     pass
-47 | print(bad8)
-   |
-   = help: Move variable assignment into if statement using walrus operator `(bad8 := 'example')`.
-
-ℹ Unsafe fix
-41 41 | elif bad7 == 'something else':
-42 42 |     pass
-43 43 | 
-44    |-bad8 = 'example'
-45    |-if bad8: # [consider-using-assignment-expr]
-   44 |+if (bad8 := 'example'): # [consider-using-assignment-expr]
-46 45 |     pass
-47 46 | print(bad8)
-48 47 |
+34 34 | if bad6 is not None: # [consider-using-assignment-expr]
+35 35 |     pass
+36 36 | 
+37    |-bad7 = 'example'
+38    |-if bad7: # [consider-using-assignment-expr]
+   37 |+if (bad7 := 'example'): # [consider-using-assignment-expr]
+39 38 |     pass
+40 39 | print(bad7)
+41 40 |
