@@ -2542,6 +2542,7 @@
       "additionalProperties": false
     },
     "PyVersion": {
+      "description": "Representation of supported Python versions.\n\nUnlike [`PythonVersion`](super::PythonVersion), this is deserialized from versions like `py39` rather than dotted versions like `3.9`.",
       "type": "string",
       "enum": [
         "py37",
