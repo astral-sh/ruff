@@ -64,7 +64,7 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    todo_type, typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType,
+    todo_type, typing_extensions_symbol, Boundness, CallDunderOutcome, Class, ClassLiteralType,
     DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
     IterationOutcome, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate,
     MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
@@ -3567,7 +3567,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let CallDunderResult::CallOutcome(call) = operand_type.call_dunder(
+                if let CallDunderOutcome::Call(call) = operand_type.call_dunder(
                     self.db(),
                     unary_dunder_method,
                     &CallArguments::positional([operand_type]),

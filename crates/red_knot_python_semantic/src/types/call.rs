@@ -355,15 +355,15 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
-pub(super) enum CallDunderResult<'db> {
-    CallOutcome(CallOutcome<'db>),
+pub(super) enum CallDunderOutcome<'db> {
+    Call(CallOutcome<'db>),
     MethodNotAvailable,
 }
 
-impl<'db> CallDunderResult<'db> {
+impl<'db> CallDunderOutcome<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::CallOutcome(outcome) => {
+            Self::Call(outcome) => {
                 // TODO: Always call `outcome.return_type`, see https://github.com/astral-sh/ruff/issues/16123
                 if outcome.is_possibly_unbound_dunder() {
                     None
