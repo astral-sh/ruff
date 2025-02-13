@@ -139,12 +139,9 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         out.append("")
         if group.rustdoc is not None:
             out.append(group.rustdoc)
-        out.append("#[derive(Clone, Debug, PartialEq, is_macro::Is)]")
+        out.append("#[derive(Clone, Debug, PartialEq)]")
         out.append(f"pub enum {group.owned_enum_ty} {{")
         for node in group.nodes:
-            if group.add_suffix_to_is_methods:
-                is_name = to_snake_case(node.variant + group.name)
-                out.append(f'#[is(name = "{is_name}")]')
             out.append(f"{node.variant}({node.ty}),")
         out.append("}")
 
@@ -169,6 +166,93 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
             }
         }
         """)
+
+        out.append(
+            "#[allow(dead_code, clippy::match_wildcard_for_single_variants)]"
+        )  # Not all is_methods are used
+        out.append(f"impl {group.name} {{")
+        for node in group.nodes:
+            is_name = to_snake_case(node.variant)
+            variant_name = node.variant
+            match_arm = f"Self::{variant_name}"
+            if group.add_suffix_to_is_methods:
+                is_name = to_snake_case(node.variant + group.name)
+            if len(group.nodes) > 1:
+                out.append(f"""
+                    #[inline]
+                    pub const fn is_{is_name}(&self) -> bool {{
+                        matches!(self, {match_arm}(_))
+                    }}
+
+                    #[inline]
+                    pub fn {is_name}(self) -> Option<{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                            _ => None,
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn expect_{is_name}(self) -> {node.ty} {{
+                        match self {{
+                            {match_arm}(val) => val,
+                            _ => panic!("called expect on {{self:?}}"),
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                            _ => None,
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                            _ => None,
+                        }}
+                    }}
+                           """)
+            elif len(group.nodes) == 1:
+                out.append(f"""
+                    #[inline]
+                    pub const fn is_{is_name}(&self) -> bool {{
+                        matches!(self, {match_arm}(_))
+                    }}
+
+                    #[inline]
+                    pub fn {is_name}(self) -> Option<{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn expect_{is_name}(self) -> {node.ty} {{
+                        match self {{
+                            {match_arm}(val) => val,
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                        }}
+                    }}
+                           """)
+
+        out.append("}")
 
     for node in ast.all_nodes:
         out.append(f"""
