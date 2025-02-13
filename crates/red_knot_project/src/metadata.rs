@@ -309,8 +309,8 @@ mod tests {
 
     use anyhow::{anyhow, Context};
     use insta::assert_ron_snapshot;
-    use red_knot_python_semantic::PythonVersion;
     use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_python_parser::python_version::PythonVersion;
 
     use crate::{ProjectDiscoveryError, ProjectMetadata};
 

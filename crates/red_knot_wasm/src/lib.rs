@@ -198,7 +198,7 @@ pub enum PythonVersion {
     Py313,
 }
 
-impl From<PythonVersion> for red_knot_python_semantic::PythonVersion {
+impl From<PythonVersion> for ruff_python_parser::python_version::PythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
             PythonVersion::Py37 => Self::PY37,
@@ -308,8 +308,8 @@ mod tests {
     #[test]
     fn same_default_as_python_version() {
         assert_eq!(
-            red_knot_python_semantic::PythonVersion::from(PythonVersion::default()),
-            red_knot_python_semantic::PythonVersion::default()
+            ruff_python_parser::python_version::PythonVersion::from(PythonVersion::default()),
+            ruff_python_parser::python_version::PythonVersion::default()
         );
     }
 }
