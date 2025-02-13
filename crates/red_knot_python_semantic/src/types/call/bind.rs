@@ -5,7 +5,7 @@ use crate::types::diagnostic::{
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::UnionType;
+use crate::types::{todo_type, UnionType};
 use ruff_python_ast as ast;
 
 /// Bind a [`CallArguments`] against a callable [`Signature`].
@@ -16,7 +16,7 @@ pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
     signature: &Signature<'db>,
-    callable_ty: Option<Type<'db>>,
+    callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
     let parameters = signature.parameters();
     // The type assigned to each parameter at this call site.
@@ -138,7 +138,7 @@ pub(crate) fn bind_call<'db>(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
-    callable_ty: Option<Type<'db>>,
+    callable_ty: Type<'db>,
 
     /// Return type of the call.
     return_ty: Type<'db>,
@@ -154,7 +154,7 @@ impl<'db> CallBinding<'db> {
     // TODO remove this constructor and construct always from `bind_call`
     pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
         Self {
-            callable_ty: None,
+            callable_ty: todo_type!("CallBinding::from_return_type"),
             return_ty,
             parameter_tys: Box::default(),
             errors: vec![],
@@ -189,8 +189,8 @@ impl<'db> CallBinding<'db> {
 
     fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
         match self.callable_ty {
-            Some(Type::FunctionLiteral(function)) => Some(function.name(db)),
-            Some(Type::ClassLiteral(class_type)) => Some(class_type.class.name(db)),
+            Type::FunctionLiteral(function) => Some(function.name(db)),
+            Type::ClassLiteral(class_type) => Some(class_type.class.name(db)),
             _ => None,
         }
     }

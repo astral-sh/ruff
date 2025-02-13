@@ -1942,7 +1942,7 @@ impl<'db> Type<'db> {
     fn call(self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> CallOutcome<'db> {
         match self {
             Type::FunctionLiteral(function_type) => {
-                let mut binding = bind_call(db, arguments, function_type.signature(db), Some(self));
+                let mut binding = bind_call(db, arguments, function_type.signature(db), self);
                 match function_type.known(db) {
                     Some(KnownFunction::RevealType) => {
                         let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
