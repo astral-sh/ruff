@@ -75,6 +75,7 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
+use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
@@ -3516,14 +3517,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let class_member = value_ty.member(self.db(), attr);
 
                         if class_member.is_unbound() {
-                            self.context.report_lint(
-                            &INVALID_ATTRIBUTE_ACCESS,
-                            attribute.into(),
-                            format_args!(
-                                "Cannot assign to instance attribute `{attr}` from the class object `{ty}`",
-                                ty = value_ty.display(self.db()),
-                            ),
-                        );
+                            if let Some(class) = match value_ty {
+                                Type::ClassLiteral(ClassLiteralType { class }) => Some(class),
+                                Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                                    match subclass_of.subclass_of() {
+                                        ClassBase::Class(class) => Some(class),
+                                        ClassBase::Dynamic(_) => None,
+                                    }
+                                }
+                                _ => None,
+                            } {
+                                let instance_member = class.instance_member(self.db(), attr);
+
+                                // Attribute is declared or bound on instance. Forbid access from the class object
+                                if !instance_member.0.is_unbound() {
+                                    self.context.report_lint(
+                                        &INVALID_ATTRIBUTE_ACCESS,
+                                        attribute.into(),
+                                        format_args!(
+                                            "Cannot assign to instance attribute `{attr}` from the class object `{ty}`",
+                                            ty = value_ty.display(self.db()),
+                                    ));
+                                }
+                            }
                         }
 
                         class_member

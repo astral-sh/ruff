@@ -51,11 +51,11 @@ c_instance.inferred_from_param = None
 c_instance.inferred_from_param = "incompatible"
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [unresolved-attribute] "The attribute `inferred_from_value` can only be accessed on instances of type `Literal[C]`, but not on the class object itself."
+# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `inferred_from_value` from a class of type `Literal[C]`"
+# error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `Literal[C]`"
 C.inferred_from_value = "overwritten on class"
 
 # This assignment is fine:
@@ -85,10 +85,10 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
-# error:  [unresolved-attribute] "The attribute `declared_and_bound` can only be accessed on instances of type `Literal[C]`, but not on the class object itself."
+# error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
 reveal_type(C.declared_and_bound)  # revealed: Unknown
 
-# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `declared_and_bound` from a class of type `Literal[C]`"
+# error: [invalid-attribute-access] "Cannot assign to instance attribute `declared_and_bound` from the class object `Literal[C]`"
 C.declared_and_bound = "overwritten on class"
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` of type `str | None`"
@@ -108,10 +108,10 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
-# error: [unresolved-attribute] "The attribute `only_declared` can only be accessed on instances of type `Literal[C]`, but not on the class object itself."
+# error: [unresolved-attribute] "Attribute `only_declared` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
 reveal_type(C.only_declared)  # revealed: Unknown
 
-# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `only_declared` from a class of type `Literal[C]`"
+# error: [invalid-attribute-access] "Cannot assign to instance attribute `only_declared` from the class object `Literal[C]`"
 C.only_declared = "overwritten on class"
 ```
 
@@ -187,7 +187,7 @@ reveal_type(c_instance.declared_and_bound)  # revealed: bool
 # error: [unresolved-attribute]
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
-# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `inferred_from_value` from a class of type `Literal[C]`"
+# error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `Literal[C]`"
 C.inferred_from_value = "overwritten on class"
 ```
 
@@ -592,7 +592,7 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 # TODO: should be no error when descriptor protocol is supported
 # and the assignment is properly attrbiuted to the class method.
-# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `pure_class_variable` from a class of type `Literal[C]`"
+# error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `Literal[C]`"
 C.pure_class_variable = "overwritten on class"
 
 # TODO: should be  `Unknown | Literal["value set in class method"]` or

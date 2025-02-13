@@ -29,6 +29,6 @@ def _(flag: bool):
     # error: [possibly-unbound-attribute] "Attribute `possibly_unbound` on type `Literal[A]` is possibly unbound"
     reveal_type(A.possibly_unbound)  # revealed: str
 
-    # error: [unresolved-attribute] "The attribute `non_existent` can only be accessed on instances of type `Literal[A]`, but not on the class object itself."
+    # error: [unresolved-attribute] "Attribute `non_existent` can only be accessed on instances of type `Literal[A]`, not on the class object itself."
     reveal_type(A.non_existent)  # revealed: Unknown
 ```

@@ -4155,7 +4155,6 @@ impl<'db> Class<'db> {
         fn class_symbol_by_id<'db>(
             db: &'db dyn Db,
             scope: ScopeId<'db>,
-            is_dunder_slots: bool,
             symbol_id: ScopedSymbolId,
         ) -> Symbol<'db> {
             let use_def = use_def_map(db, scope);
@@ -4217,6 +4216,14 @@ impl<'db> Class<'db> {
                     }
                     // Symbol is undeclared, return the union of `Unknown` with the inferred type
                     Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+                        let table = symbol_table(db, scope);
+                        // `__slots__` is a symbol with special behavior in Python's runtime. It can be
+                        // modified externally, but those changes do not take effect. We therefore issue
+                        // a diagnostic if we see it being modified externally. In type inference, we
+                        // can assign a "narrow" type to it even if it is not *declared*. This means, we
+                        // do not have to call [`widen_type_for_undeclared_public_symbol`].
+                        let is_dunder_slots = table.symbol(symbol_id).name() == "__slots__";
+
                         widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots)
                     }
                 },
@@ -4224,20 +4231,11 @@ impl<'db> Class<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let table = symbol_table(db, body_scope);
-
-        // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-        // modified externally, but those changes do not take effect. We therefore issue
-        // a diagnostic if we see it being modified externally. In type inference, we
-        // can assign a "narrow" type to it even if it is not *declared*. This means, we
-        // do not have to call [`widen_type_for_undeclared_public_symbol`].
-        let is_dunder_slots = name == "__slots__";
-
-        if let Some(symbol_id) = table.symbol_id_by_name(name) {
-            class_symbol_by_id(db, body_scope, is_dunder_slots, symbol_id)
-        } else {
-            Symbol::Unbound
-        }
+        symbol_table(db, body_scope)
+            .symbol_id_by_name(name)
+            .map_or(Symbol::Unbound, |symbol_id| {
+                class_symbol_by_id(db, body_scope, symbol_id)
+            })
     }
 
     /// Returns the `name` attribute of an instance of this class.
