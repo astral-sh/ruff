@@ -1,0 +1,220 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB179_1.py:22:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+21 | def flatten_via_generator(rows):
+22 |     return (col for row in rows for col in row)
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+23 |
+24 | def flatten_via_list_comp(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+19 19 | # these should match
+20 20 | 
+21 21 | def flatten_via_generator(rows):
+22    |-    return (col for row in rows for col in row)
+   22 |+    return itertools.chain.from_iterable(row)
+23 23 | 
+24 24 | def flatten_via_list_comp(rows):
+25 25 |     return [col for row in rows for col in row]
+
+FURB179_1.py:25:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+24 | def flatten_via_list_comp(rows):
+25 |     return [col for row in rows for col in row]
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+26 |
+27 | def flatten_via_set_comp(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+22 22 |     return (col for row in rows for col in row)
+23 23 | 
+24 24 | def flatten_via_list_comp(rows):
+25    |-    return [col for row in rows for col in row]
+   25 |+    return itertools.chain.from_iterable(row)
+26 26 | 
+27 27 | def flatten_via_set_comp(rows):
+28 28 |     return {col for row in rows for col in row}
+
+FURB179_1.py:28:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+27 | def flatten_via_set_comp(rows):
+28 |     return {col for row in rows for col in row}
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+29 |
+30 | def flatten_with_function_source():
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+25 25 |     return [col for row in rows for col in row]
+26 26 | 
+27 27 | def flatten_via_set_comp(rows):
+28    |-    return {col for row in rows for col in row}
+   28 |+    return itertools.chain.from_iterable(row)
+29 29 | 
+30 30 | def flatten_with_function_source():
+31 31 |     return (col for row in f() for col in row)
+
+FURB179_1.py:31:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+30 | def flatten_with_function_source():
+31 |     return (col for row in f() for col in row)
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+32 |
+33 | def flatten_via_sum(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+28 28 |     return {col for row in rows for col in row}
+29 29 | 
+30 30 | def flatten_with_function_source():
+31    |-    return (col for row in f() for col in row)
+   31 |+    return itertools.chain.from_iterable(row)
+32 32 | 
+33 33 | def flatten_via_sum(rows):
+34 34 |     return sum(rows, [])
+
+FURB179_1.py:37:18: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+36 | def flatten_via_chain_splat(rows):
+37 |     return chain(*rows)
+   |                  ^^^^^ FURB179
+38 |
+39 | def flatten_via_chain_splat_2(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+34 34 |     return sum(rows, [])
+35 35 | 
+36 36 | def flatten_via_chain_splat(rows):
+37    |-    return chain(*rows)
+   37 |+    return chain.from_iterable(rows)
+38 38 | 
+39 39 | def flatten_via_chain_splat_2(rows):
+40 40 |     return itertools.chain(*rows)
+
+FURB179_1.py:40:28: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+39 | def flatten_via_chain_splat_2(rows):
+40 |     return itertools.chain(*rows)
+   |                            ^^^^^ FURB179
+41 |
+42 | def flatten_via_reduce_add(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+37 37 |     return chain(*rows)
+38 38 | 
+39 39 | def flatten_via_chain_splat_2(rows):
+40    |-    return itertools.chain(*rows)
+   40 |+    return itertools.chain.from_iterable(rows)
+41 41 | 
+42 42 | def flatten_via_reduce_add(rows):
+43 43 |     return reduce(add, rows)
+
+FURB179_1.py:43:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+42 | def flatten_via_reduce_add(rows):
+43 |     return reduce(add, rows)
+   |            ^^^^^^^^^^^^^^^^^ FURB179
+44 |
+45 | def flatten_via_reduce_add_with_default(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+40 40 |     return itertools.chain(*rows)
+41 41 | 
+42 42 | def flatten_via_reduce_add(rows):
+43    |-    return reduce(add, rows)
+   43 |+    return itertools.chain.from_iterable(rows)
+44 44 | 
+45 45 | def flatten_via_reduce_add_with_default(rows):
+46 46 |     return reduce(add, rows, [])
+
+FURB179_1.py:46:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+45 | def flatten_via_reduce_add_with_default(rows):
+46 |     return reduce(add, rows, [])
+   |            ^^^^^^^^^^^^^^^^^^^^^ FURB179
+47 |
+48 | def flatten_via_reduce_concat(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+43 43 |     return reduce(add, rows)
+44 44 | 
+45 45 | def flatten_via_reduce_add_with_default(rows):
+46    |-    return reduce(add, rows, [])
+   46 |+    return itertools.chain.from_iterable(rows)
+47 47 | 
+48 48 | def flatten_via_reduce_concat(rows):
+49 49 |     return reduce(concat, rows)
+
+FURB179_1.py:49:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+48 | def flatten_via_reduce_concat(rows):
+49 |     return reduce(concat, rows)
+   |            ^^^^^^^^^^^^^^^^^^^^ FURB179
+50 |
+51 | def flatten_via_reduce_concat_with_default(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+46 46 |     return reduce(add, rows, [])
+47 47 | 
+48 48 | def flatten_via_reduce_concat(rows):
+49    |-    return reduce(concat, rows)
+   49 |+    return itertools.chain.from_iterable(rows)
+50 50 | 
+51 51 | def flatten_via_reduce_concat_with_default(rows):
+52 52 |     return reduce(concat, rows, [])
+
+FURB179_1.py:52:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+51 | def flatten_via_reduce_concat_with_default(rows):
+52 |     return reduce(concat, rows, [])
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+53 |
+54 | def flatten_via_reduce_full_namespace(rows):
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+49 49 |     return reduce(concat, rows)
+50 50 | 
+51 51 | def flatten_via_reduce_concat_with_default(rows):
+52    |-    return reduce(concat, rows, [])
+   52 |+    return itertools.chain.from_iterable(rows)
+53 53 | 
+54 54 | def flatten_via_reduce_full_namespace(rows):
+55 55 |     return functools.reduce(operator.add, rows)
+
+FURB179_1.py:55:12: FURB179 [*] Use `chain.from_iterable()` instead
+   |
+54 | def flatten_via_reduce_full_namespace(rows):
+55 |     return functools.reduce(operator.add, rows)
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+   |
+   = help: Replace with `chain.from_iterable()`
+
+ℹ Unsafe fix
+52 52 |     return reduce(concat, rows, [])
+53 53 | 
+54 54 | def flatten_via_reduce_full_namespace(rows):
+55    |-    return functools.reduce(operator.add, rows)
+   55 |+    return itertools.chain.from_iterable(rows)
+56 56 | 
+57 57 | 
+58 58 | # these should not
