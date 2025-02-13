@@ -29,6 +29,7 @@ static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
 unicode-normalization = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
 ruff_annotate_snippets = { workspace = true }

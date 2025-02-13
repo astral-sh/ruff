@@ -3092,6 +3092,7 @@ dependencies = [
  "unicode-normalization",
  "unicode_names2",
  "walkdir",
+ "wasm-bindgen",
 ]
 
 [[package]]
