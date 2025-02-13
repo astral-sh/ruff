@@ -4,6 +4,7 @@ use std::iter::FusedIterator;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
+use ruff_db::python_version::PythonVersion;
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
 
@@ -11,7 +12,7 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
 use crate::site_packages::VirtualEnvironment;
-use crate::{Program, PythonVersion, SearchPathSettings, SitePackages};
+use crate::{Program, SearchPathSettings, SitePackages};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -719,6 +720,7 @@ impl<'db> ResolverContext<'db> {
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
+    use ruff_db::python_version::PythonVersion;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
@@ -729,7 +731,6 @@ mod tests {
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::PythonVersion;
     use crate::{ProgramSettings, PythonPlatform};
 
     use super::*;
