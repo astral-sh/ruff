@@ -19,7 +19,6 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
-use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
@@ -33,7 +32,7 @@ mod use_def;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator,
+    DeclarationsIterator, UseDefMap,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
@@ -220,7 +219,7 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the id of the parent scope.
     pub(crate) fn parent_scope_id(&self, scope_id: FileScopeId) -> Option<FileScopeId> {
         let scope = self.scope(scope_id);
-        scope.parent
+        scope.parent()
     }
 
     /// Returns the parent scope of `scope_id`.
@@ -312,7 +311,7 @@ impl<'a> Iterator for AncestorsIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let current_id = self.next_id?;
         let current = &self.scopes[current_id];
-        self.next_id = current.parent;
+        self.next_id = current.parent();
 
         Some((current_id, current))
     }
@@ -328,7 +327,7 @@ pub struct DescendentsIter<'a> {
 impl<'a> DescendentsIter<'a> {
     fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
         let scope = &symbol_table.scopes[scope_id];
-        let scopes = &symbol_table.scopes[scope.descendents.clone()];
+        let scopes = &symbol_table.scopes[scope.descendents().clone()];
 
         Self {
             next_id: scope_id + 1,
@@ -378,7 +377,7 @@ impl<'a> Iterator for ChildrenIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.descendents
-            .find(|(_, scope)| scope.parent == Some(self.parent))
+            .find(|(_, scope)| scope.parent() == Some(self.parent))
     }
 }
 
