@@ -34,8 +34,8 @@ use crate::importer::ImportRequest;
 /// a = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
 ///
 /// chain(*a)
-/// reduce(add, a); reduce(add, a, [])
-/// reduce(concat, a); reduce(concat, a, [])
+/// reduce(add, a, [])
+/// reduce(concat, a)
 ///
 /// (y for x in a for y in x)
 /// [y for x in a for y in x]
@@ -217,7 +217,7 @@ fn replace_with_chain_from_iterable(
                 range: TextRange::default(),
             })),
             attr: Identifier {
-                id: Name::new("from_iterable".to_string()),
+                id: Name::new("from_iterable"),
                 range: TextRange::default(),
             },
             ctx: ExprContext::Load,
