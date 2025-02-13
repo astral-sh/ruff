@@ -72,6 +72,7 @@ type AssignmentBeforeIfStmt<'a> = (&'a Expr, &'a ExprName, &'a StmtAssign);
 
 /// PLR6103
 pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
+    // early out - unsupported python versions
     if checker.settings.target_version < PythonVersion::Py38 {
         return;
     }
@@ -81,7 +82,12 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
     let previous_assignment = PreviousAssignment::new(checker.semantic());
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
-    // case - if check (`if test1:`)
+    // early out - only simple if checks, without elif or else clauses
+    if !&stmt.elif_else_clauses.is_empty() {
+        return;
+    }
+
+    // case - simple if checks (`if test1:`)
     if let Some(unreferenced_binding) =
         find_assignment_before_if_stmt(&previous_assignment, if_test, if_test)
     {
@@ -108,18 +114,6 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
 
         _ => {}
     }
-
-    // case - elif else clauses (`elif test1:`)
-    diagnostics.extend(
-        stmt.elif_else_clauses
-            .iter()
-            .filter_map(|elif_else_clause| {
-                elif_else_clause.test.as_ref().and_then(|elif_check| {
-                    find_assignment_before_if_stmt(&previous_assignment, elif_check, elif_check)
-                })
-            })
-            .map(|assignment_before_if| create_diagnostic(checker, assignment_before_if)),
-    );
 
     // add found diagnostics
     checker.report_diagnostics(diagnostics);

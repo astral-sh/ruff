@@ -10,7 +10,6 @@ bad3 = 'example'
 if bad3 and bad3 == 'example': # [consider-using-assignment-expr]
     pass
 
-
 def foo():
     bad4 = 0
     if bad4: # [consider-using-assignment-expr]
@@ -36,15 +35,9 @@ if bad6 is not None: # [consider-using-assignment-expr]
     pass
 
 bad7 = 'example'
-if bad7 == 'something': # [consider-using-assignment-expr]
+if bad7: # [consider-using-assignment-expr]
     pass
-elif bad7 == 'something else':
-    pass
-
-bad8 = 'example'
-if bad8: # [consider-using-assignment-expr]
-    pass
-print(bad8)
+print(bad7)
 
 good1_1 = 'example'
 good1_2 = 'example'
@@ -73,6 +66,26 @@ for good6 in [1, 2, 3]:
     if good6: # correct, used like it is intented
         pass
 
-if good7 := 'example': # [consider-using-assignment-expr]
+if good7 := 'example': # correct, already using `:=` operator
     pass
 print(good7)
+
+good_8 = 'example'
+if good_8 == 'something': # correct, not a simple if statement, has elif
+    pass
+elif good_8 == 'something else':
+    pass
+
+good_9 = 'example'
+if good_9 == 'something': # correct, not a simple if statement, has else
+    pass
+else:
+    pass
+
+good_10 = 'example'
+if good_10 == 'something': # correct, not a simple if statement, has elif and else
+    pass
+elif good_10 == 'something else':
+    pass
+else:
+    pass
