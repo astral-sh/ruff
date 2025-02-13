@@ -112,7 +112,6 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
-        is_dunder_slots: bool,
         symbol_id: ScopedSymbolId,
     ) -> Symbol<'db> {
         let use_def = use_def_map(db, scope);
@@ -153,7 +152,15 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
                 let bindings = use_def.public_bindings(symbol_id);
                 let inferred = symbol_from_bindings(db, bindings);
 
-                widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots || is_final)
+                // `__slots__` is a symbol with special behavior in Python's runtime. It can be
+                // modified externally, but those changes do not take effect. We therefore issue
+                // a diagnostic if we see it being modified externally. In type inference, we
+                // can assign a "narrow" type to it even if it is not *declared*. This means, we
+                // do not have to call [`widen_type_for_undeclared_public_symbol`].
+                let is_considered_non_modifiable =
+                    is_final || symbol_table(db, scope).symbol(symbol_id).name() == "__slots__";
+
+                widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
             }
             // Symbol has conflicting declared types
             Err((declared_ty, _)) => {
@@ -203,16 +210,9 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         }
     }
 
-    let table = symbol_table(db, scope);
-    // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-    // modified externally, but those changes do not take effect. We therefore issue
-    // a diagnostic if we see it being modified externally. In type inference, we
-    // can assign a "narrow" type to it even if it is not *declared*. This means, we
-    // do not have to call [`widen_type_for_undeclared_public_symbol`].
-    let is_dunder_slots = name == "__slots__";
-    table
+    symbol_table(db, scope)
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, scope, is_dunder_slots, symbol))
+        .map(|symbol_id| symbol_by_id(db, scope, symbol_id))
         .unwrap_or(Symbol::Unbound)
 }
 
