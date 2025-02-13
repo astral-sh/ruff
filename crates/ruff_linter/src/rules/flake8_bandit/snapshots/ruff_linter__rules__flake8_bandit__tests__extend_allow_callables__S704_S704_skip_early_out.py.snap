@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S704_skip_early_out.py:7:1: S704 Unsafe use of `webhelpers.html.literal` detected
+  |
+5 | #       markupsafe or flask first.
+6 | content = "<script>alert('Hello, world!')</script>"
+7 | literal(f"unsafe {content}")  # S704
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S704
+  |
