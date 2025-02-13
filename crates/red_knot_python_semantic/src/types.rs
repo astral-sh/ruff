@@ -1661,9 +1661,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Deque
                     | KnownClass::OrderedDict
                     | KnownClass::StdlibAlias
-                    | KnownClass::TypeVar
-                    | KnownClass::Abc
-                    | KnownClass::AbcMeta,
+                    | KnownClass::TypeVar,
                 ) => false,
                 None => false,
             },
@@ -2720,9 +2718,6 @@ pub enum KnownClass {
     OrderedDict,
     // sys
     VersionInfo,
-    // abc
-    Abc,
-    AbcMeta,
 }
 
 impl<'db> KnownClass {
@@ -2769,8 +2764,6 @@ impl<'db> KnownClass {
             // which is impossible to replicate in the stubs since the sole instance of the class
             // also has that name in the `sys` module.)
             Self::VersionInfo => "_version_info",
-            Self::Abc => "ABC",
-            Self::AbcMeta => "ABCMeta",
         }
     }
 
@@ -2842,7 +2835,6 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
-            Self::Abc | Self::AbcMeta => KnownModule::Abc,
         }
     }
 
@@ -2879,9 +2871,7 @@ impl<'db> KnownClass {
             | Self::StdlibAlias
             | Self::BaseException
             | Self::BaseExceptionGroup
-            | Self::TypeVar
-            | Self::Abc
-            | Self::AbcMeta => false,
+            | Self::TypeVar => false,
         }
     }
 
@@ -2919,8 +2909,6 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
-            "ABC" => Self::Abc,
-            "ABCMeta" => Self::AbcMeta,
             _ => return None,
         };
 
@@ -2961,8 +2949,7 @@ impl<'db> KnownClass {
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
-            },
-            Self::Abc | Self::AbcMeta => module == KnownModule::Abc,
+            }
         }
     }
 }
@@ -3943,20 +3930,6 @@ impl<'db> Class<'db> {
             .any(|decorator| decorator.is_known(db, KnownFunction::Final))
     }
 
-    /// Is this class directly inheriting from `abc.ABC` or has `abc.ABCMeta` metaclass?
-    fn is_explicit_abstract(self, db: &'db dyn Db) -> bool {
-        self.fully_static_explicit_bases(db)
-            .any(|base| base.is_known(db, KnownClass::Abc))
-            || self
-                .explicit_metaclass(db)
-                .is_some_and(|metaclass| match metaclass {
-                    Type::ClassLiteral(ClassLiteralType { class }) => {
-                        class.is_known(db, KnownClass::AbcMeta)
-                    }
-                    _ => false,
-                })
-    }
-
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
     /// If the MRO is unresolvable, return an error indicating why the class's MRO
     /// cannot be accurately determined. The error returned contains a fallback MRO
@@ -4161,126 +4134,97 @@ impl<'db> Class<'db> {
         Symbol::Unbound
     }
 
-    /// Returns the inferred type of the class member named `name`.
+    /// Returns the inferred type of the class member named `name`. Only bound members
+    /// or those marked as ClassVars are considered.
     ///
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let body_scope = self.body_scope(db);
-        let table = symbol_table(db, body_scope);
-
-        if let Some(sym) = table.symbol_by_name(name) {
-            let is_stub = self.body_scope(db).file(db).is_stub(db.upcast());
-            let is_abstract = self.is_explicit_abstract(db);
-            let is_bound = sym.is_bound();
-
-            // We only allow unbound symbols in stubs and abstract classes. Furthermore
-            // only stubs can have them without ClassVar qualifier.
-            // E.g. the following is allowed in a stub:
-            // ```python
-            // class FromCExtension:
-            //    symbol: int
-            // ```
-            if !is_stub && !is_abstract && !is_bound {
-                // Exit early if we have undbound symbol in non-stub or abstract class.
-                return Symbol::Unbound;
-            }
-
-            // This can't be None of course, because we just found it but Rust doesn't know that.
-            let Some(symbol_id) = table.symbol_id_by_name(name) else {
-                return Symbol::Unbound;
-            };
-
-            // TODO: this was extracted from `symbol` function since we need qualifiers,
-            // but the common logic should be re-integrated. Probably implementing:
-            // https://github.com/astral-sh/ruff/blob/0019d39f6e7a9588abf8645680cbef88bbcb22f4/crates/red_knot_python_semantic/resources/mdtest/boundness_declaredness/public.md?plain=1#L1
-
-            let use_def = use_def_map(db, body_scope);
+        #[salsa::tracked]
+        fn class_symbol_by_id<'db>(
+            db: &'db dyn Db,
+            scope: ScopeId<'db>,
+            is_dunder_slots: bool,
+            symbol_id: ScopedSymbolId,
+        ) -> Symbol<'db> {
+            let use_def = use_def_map(db, scope);
 
             // If the symbol is declared, the public type is based on declarations; otherwise, it's based
             // on inference from bindings.
 
             let declarations = use_def.public_declarations(symbol_id);
             let declared = symbol_from_declarations(db, declarations);
-            let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
+            let bindings = use_def.public_bindings(symbol_id);
+            let inferred = symbol_from_bindings(db, bindings);
 
-            let resolve = |is_class_var: bool, symbol: Symbol<'db>| {
-                if is_bound {
-                    // Allow only bound declared types
-                    return symbol;
-                }
-
-                if is_stub {
-                    // Allow any declared type in stubs
-                    return symbol;
-                }
-
-                if is_abstract && is_class_var {
-                    // Allow only unbound ClassVar declared type in abstract classes
-                    return symbol;
-                }
-
-                Symbol::Unbound
-            };
-
-            match declared {
-                // Symbol is declared, trust the declared type but check if this allowed
-                Ok(symbol @ SymbolAndQualifiers(Symbol::Type(_, Boundness::Bound), _)) => {
-                    resolve(symbol.is_class_var(), symbol.0)
-                }
-                // Symbol is possibly declared
-                Ok(
-                    symbol @ SymbolAndQualifiers(
-                        Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
-                        _,
-                    ),
-                ) => {
-                    let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
-
-                    match inferred {
-                        // Symbol is possibly undeclared and definitely unbound
-                        Symbol::Unbound => {
-                            // TODO: We probably don't want to report `Bound` here. This requires a bit of
+            match inferred {
+                // Symbol is possibly undeclared and definitely unbound. Only allow declared ClassVars.
+                Symbol::Unbound => match declared {
+                    Ok(symbol_and_quals @ SymbolAndQualifiers(Symbol::Type(declared_ty, _), _)) => {
+                        if symbol_and_quals.is_class_var() {
+                            // TODO: Same as `symbol` function - We probably don't want to report `Bound` here
+                            // if the symbol is PossibleUnobund. This requires a bit of
                             // design work though as we might want a different behavior for stubs and for
                             // normal modules.
-                            resolve(
-                                symbol.is_class_var(),
-                                Symbol::Type(declared_ty, Boundness::Bound),
-                            )
+                            Symbol::Type(declared_ty, Boundness::Bound)
+                        } else {
+                            Symbol::Unbound
                         }
-                        // Symbol is possibly undeclared and (possibly) bound
-                        Symbol::Type(inferred_ty, boundness) => resolve(
-                            symbol.is_class_var(),
-                            Symbol::Type(
-                                UnionType::from_elements(
-                                    db,
-                                    [inferred_ty, declared_ty].iter().copied(),
-                                ),
-                                boundness,
-                            ),
-                        ),
                     }
-                }
-                // Symbol is undeclared, return the union of `Unknown` with the inferred type
-                Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
-                    let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
-
-                    widen_type_for_undeclared_public_symbol(
-                        db,
-                        inferred,
-                        name == "__slots__" || is_final,
-                    )
-                }
-                // Symbol has conflicting declared types
-                Err((declared_ty, _)) => {
-                    // Intentionally ignore conflicting declared types; that's not our problem,
-                    // it's the problem of the module we are importing from.
-                    resolve(false, declared_ty.inner_type().into())
-                }
+                    Err((declared_ty, _)) => {
+                        // Intentionally ignore conflicting declared types; that's not our problem,
+                        // it's the problem of the module we are importing from.
+                        if declared_ty.qualifiers().contains(TypeQualifiers::CLASS_VAR) {
+                            declared_ty.inner_type().into()
+                        } else {
+                            // Declared but not as a ClassVar
+                            Symbol::Unbound
+                        }
+                    }
+                    // Undeclared
+                    _ => Symbol::Unbound,
+                },
+                // Symbol is possibly undeclared but (possibly) bound
+                Symbol::Type(inferred_ty, boundness) => match declared {
+                    // Declared and bound - trust the declared type
+                    Ok(SymbolAndQualifiers(symbol @ Symbol::Type(_, Boundness::Bound), _)) => {
+                        symbol
+                    }
+                    // Possibly declared and possibly bound - union the inferred and declared types
+                    Ok(SymbolAndQualifiers(
+                        Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
+                        _,
+                    )) => Symbol::Type(
+                        UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
+                        boundness,
+                    ),
+                    // Symbol has conflicting declared types
+                    Err((ty, _)) => {
+                        // Intentionally ignore conflicting declared types; that's not our problem,
+                        // it's the problem of the module we are importing from.
+                        ty.inner_type().into()
+                    }
+                    // Symbol is undeclared, return the union of `Unknown` with the inferred type
+                    Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+                        widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots)
+                    }
+                },
             }
+        }
+
+        let body_scope = self.body_scope(db);
+        let table = symbol_table(db, body_scope);
+
+        // `__slots__` is a symbol with special behavior in Python's runtime. It can be
+        // modified externally, but those changes do not take effect. We therefore issue
+        // a diagnostic if we see it being modified externally. In type inference, we
+        // can assign a "narrow" type to it even if it is not *declared*. This means, we
+        // do not have to call [`widen_type_for_undeclared_public_symbol`].
+        let is_dunder_slots = name == "__slots__";
+
+        if let Some(symbol_id) = table.symbol_id_by_name(name) {
+            class_symbol_by_id(db, body_scope, is_dunder_slots, symbol_id)
         } else {
             Symbol::Unbound
         }

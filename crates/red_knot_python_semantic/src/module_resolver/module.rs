@@ -106,7 +106,8 @@ pub enum KnownModule {
     TypingExtensions,
     Typing,
     Sys,
-    Abc,
+    #[allow(dead_code)]
+    Abc, // currently only used in tests
     Collections,
     KnotExtensions,
 }

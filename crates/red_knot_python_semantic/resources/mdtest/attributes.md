@@ -50,13 +50,12 @@ c_instance.inferred_from_param = None
 # TODO: this should be an error (incompatible types in assignment)
 c_instance.inferred_from_param = "incompatible"
 
-# TODO: we already show an error here but the message might be improved?
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `inferred_from_value`"
+# error: [unresolved-attribute] "The attribute `inferred_from_value` can only be accessed on instances of type `Literal[C]`, but not on the class object itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
-# TODO: this should be an error (pure instance variables cannot be accessed on the class)
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
+# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `inferred_from_value` from a class of type `Literal[C]`"
 C.inferred_from_value = "overwritten on class"
 
 # This assignment is fine:
@@ -86,11 +85,10 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
-# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `declared_and_bound`"
+# error:  [unresolved-attribute] "The attribute `declared_and_bound` can only be accessed on instances of type `Literal[C]`, but not on the class object itself."
 reveal_type(C.declared_and_bound)  # revealed: Unknown
 
-# TODO: same as above. We plan to emit a diagnostic here, even if both mypy
-# and pyright allow this.
+# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `declared_and_bound` from a class of type `Literal[C]`"
 C.declared_and_bound = "overwritten on class"
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` of type `str | None`"
@@ -100,12 +98,7 @@ c_instance.declared_and_bound = 1
 #### Variable declared in class body and not bound anywhere
 
 If a variable is declared in the class body but not bound anywhere, we still consider it a pure
-instance variable and allow access to it via instances. But we raise a diagnostic if it is accessed
-on the class itself. The only exceptions to this rules are:
-
-- Stubs - e.g. stubs for extension modules define many attributes that are not bound anywhere.
-- ClassVars defined on ABC's - this is a typical pattern in Python, with actual binding only
-    happening in subclasses.
+instance variable and allow access to it via instances.
 
 ```py
 class C:
@@ -115,48 +108,11 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
-# error: [unresolved-attribute] "Type `Literal[C]` has no attribute `only_declared`"
+# error: [unresolved-attribute] "The attribute `only_declared` can only be accessed on instances of type `Literal[C]`, but not on the class object itself."
 reveal_type(C.only_declared)  # revealed: Unknown
 
-# TODO: mypy and pyright do not show an error here, but we plan to emit one.
+# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `only_declared` from a class of type `Literal[C]`"
 C.only_declared = "overwritten on class"
-```
-
-Stubs:
-
-```pyi
-class C:
-    only_declared: str
-
-reveal_type(C.only_declared)  # revealed: str
-```
-
-ClassVars on ABC's:
-
-```py
-from abc import ABC, ABCMeta
-from typing import ClassVar
-
-class MyABC(ABC):
-    non_class_var: str
-    class_var: ClassVar[str]
-
-# error: [unresolved-attribute] "Type `Literal[MyABC]` has no attribute `non_class_var`"
-reveal_type(MyABC.non_class_var)  # revealed: Unknown
-
-reveal_type(MyABC.class_var)  # revealed: str
-
-# TODO: this should raise, since MyABC is a ClassLiteral, not SubclassOf
-MyABC.class_var = "overwritten on class"
-
-class MyABCWithMeta(metaclass=ABCMeta):
-    non_class_var: str
-    class_var: ClassVar[str]
-
-# error: [unresolved-attribute] "Type `Literal[MyABCWithMeta]` has no attribute `non_class_var`"
-reveal_type(MyABCWithMeta.non_class_var)  # revealed: Unknown
-
-reveal_type(MyABCWithMeta.class_var)  # revealed: str
 ```
 
 #### Mixed declarations/bindings in class body and `__init__`
@@ -231,7 +187,7 @@ reveal_type(c_instance.declared_and_bound)  # revealed: bool
 # error: [unresolved-attribute]
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
-# TODO: this should be an error
+# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `inferred_from_value` from a class of type `Literal[C]`"
 C.inferred_from_value = "overwritten on class"
 ```
 
@@ -634,6 +590,9 @@ C.class_method()
 # error: [unresolved-attribute]
 reveal_type(C.pure_class_variable)  # revealed: Unknown
 
+# TODO: should be no error when descriptor protocol is supported
+# and the assignment is properly attrbiuted to the class method.
+# error: [invalid-attribute-access] "Cannot assign to pure instance attribute `pure_class_variable` from a class of type `Literal[C]`"
 C.pure_class_variable = "overwritten on class"
 
 # TODO: should be  `Unknown | Literal["value set in class method"]` or

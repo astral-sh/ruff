@@ -3472,15 +3472,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 member_ty
             }
             Symbol::Unbound => {
-                self.context.report_lint(
-                    &UNRESOLVED_ATTRIBUTE,
-                    attribute.into(),
-                    format_args!(
-                        "Type `{}` has no attribute `{}`",
-                        value_ty.display(self.db()),
-                        attr.id
+                match value_ty {
+                    Type::ClassLiteral(_) | Type::SubclassOf(_) => {
+                        self.context.report_lint(
+                            &UNRESOLVED_ATTRIBUTE,
+                            attribute.into(),
+                            format_args!(
+                                "The attribute `{}` can only be accessed on instances of type `{}`, but not on the class object itself.",
+                                attr.id,
+                                value_ty.display(self.db())
+                            ),
+                        );
+                    }
+                    _ => self.context.report_lint(
+                        &UNRESOLVED_ATTRIBUTE,
+                        attribute.into(),
+                        format_args!(
+                            "Type `{}` has no attribute `{}`",
+                            value_ty.display(self.db()),
+                            attr.id
+                        ),
                     ),
-                );
+                };
+
                 Type::unknown()
             }
         }
@@ -3499,10 +3513,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
 
-                let symbol = if let Type::Instance(instance) = value_ty {
-                    let instance_member = instance.class.instance_member(self.db(), attr);
-                    if instance_member.is_class_var() {
-                        self.context.report_lint(
+                let symbol = match value_ty {
+                    Type::Instance(instance) => {
+                        let instance_member = instance.class.instance_member(self.db(), attr);
+                        if instance_member.is_class_var() {
+                            self.context.report_lint(
                             &INVALID_ATTRIBUTE_ACCESS,
                             attribute.into(),
                             format_args!(
@@ -3510,11 +3525,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ty = value_ty.display(self.db()),
                             ),
                         );
-                    }
+                        }
 
-                    instance_member.0
-                } else {
-                    value_ty.member(self.db(), attr)
+                        instance_member.0
+                    }
+                    Type::ClassLiteral(_) | Type::SubclassOf(_) => {
+                        let class_member = value_ty.member(self.db(), attr);
+
+                        if class_member.is_unbound() {
+                            self.context.report_lint(
+                            &INVALID_ATTRIBUTE_ACCESS,
+                            attribute.into(),
+                            format_args!(
+                                "Cannot assign to pure instance attribute `{attr}` from a class of type `{ty}`",
+                                ty = value_ty.display(self.db()),
+                            ),
+                        );
+                        }
+
+                        class_member
+                    }
+                    _ => value_ty.member(self.db(), attr),
                 };
 
                 // TODO: The unbound-case might also yield a diagnostic, but we can not activate
