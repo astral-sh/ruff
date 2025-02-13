@@ -1120,7 +1120,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "169") => (RuleGroup::Stable, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),
         (Refurb, "177") => (RuleGroup::Stable, rules::refurb::rules::ImplicitCwd),
-        (Refurb, "179") => (RuleGroup::Stable, rules::refurb::rules::ReimplementedChainFromIterable),
+        (Refurb, "179") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedChainFromIterable),
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Stable, rules::refurb::rules::HashlibDigestHex),
         (Refurb, "187") => (RuleGroup::Stable, rules::refurb::rules::ListReverseCopy),
