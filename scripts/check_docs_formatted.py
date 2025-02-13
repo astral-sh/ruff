@@ -23,7 +23,12 @@ SNIPPED_RE = re.compile(
     re.DOTALL | re.MULTILINE,
 )
 
-# https://www.rexegg.com/regex-best-trick.html
+# Long explanation: https://www.rexegg.com/regex-best-trick.html
+#
+# Short explanation:
+# Match both code blocks and shortcut links, then discard the former.
+# Whatever matched by the second branch is guaranteed to never be
+# part of a code block, as that would already be caught by the first.
 BACKTICKED_SHORTCUT_LINK_RE = re.compile(
     rf"""(?msx)
     (?:{SNIPPED_RE}
@@ -251,7 +256,7 @@ def format_file(file: Path, error_known: bool, args: argparse.Namespace) -> int:
 def find_backticked_shortcut_links(
     path: Path, all_config_names: dict[str, object]
 ) -> set[str]:
-    """Check for links of the form ```[`foobar`]```.
+    """Check for links of the form: [`foobar`].
 
     See explanation at #16010.
     """
@@ -358,7 +363,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if broken_links:
         print()
-        print("Do not use backticked shortcut links (```[`foobar`]```).")
+        print("Do not use backticked shortcut links: [`foobar`]")
         print(
             "They work with Mkdocs but cannot be rendered by CommonMark and GFM-compliant implementers."
         )
