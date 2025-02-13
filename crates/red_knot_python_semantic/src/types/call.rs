@@ -167,6 +167,7 @@ impl<'db> CallOutcome<'db> {
                     });
                 }
 
+                // TODO: Move to `infer_call_expression` after all so that this method doesn't require `context` or `node`.
                 if let Some(known_function) = binding
                     .callable_type()
                     .into_function_literal()
@@ -268,14 +269,14 @@ impl<'db> CallOutcome<'db> {
             } => {
                 let mut not_callable = vec![];
                 let mut union_builder = UnionBuilder::new(context.db());
+                // We want to only do the minimal amount of work necessary. 
                 for outcome in outcomes {
-                    let return_ty = match outcome {
-                        Self::NotCallable { not_callable_ty } => {
-                            not_callable.push(*not_callable_ty);
-                            Type::unknown()
+                    let return_ty = match outcome.return_type_result(context, node) {
+                        Ok(return_type) => return_type,
+                        Err(error) => {
+                            not_callable.push(error.called_type());
+                            error.return_type()
                         }
-                        // THIS Stinks
-                        _ => outcome.unwrap_with_diagnostic(context, node),
                     };
                     union_builder = union_builder.add(return_ty);
                 }

@@ -75,3 +75,39 @@ def _(flag: bool):
     x = f()  # error: "Object of type `Literal[1, "foo"]` is not callable"
     reveal_type(x)  # revealed: Unknown
 ```
+
+
+## Mismatching signatures
+
+Calling a union where the arguments don't match the signature of all variants.
+
+```py
+def f1(a: int): ...
+def f2(a: str): ...
+
+def _(flag: bool):
+    if flag:
+        f = f1
+    else:
+        f = f2
+
+    x = f(3)  # error: "Object of type `Literal[1, "foo"]` is not callable"
+    reveal_type(x)  # revealed: Unknown
+```
+
+
+## Any non callable variant
+
+```py
+def f1(a: int): ...
+def f2(a: str): ...
+
+def _(flag: bool):
+    if flag:
+        f = f1
+    else:
+        f = "str"
+
+    x = f(3)  # error: "Object of type `Literal[1, "foo"]` is not callable"
+    reveal_type(x)  # revealed: Unknown
+```
