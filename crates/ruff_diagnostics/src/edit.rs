@@ -39,7 +39,7 @@ impl Edit {
 
     /// Creates an edit that replaces the content in `range` with `content`.
     pub fn range_replacement(content: String, range: TextRange) -> Self {
-        debug_assert!(!content.is_empty(), "Prefer `Edit::deletion`");
+        debug_assert!(!content.is_empty(), "Prefer `Fix::deletion`");
 
         Self {
             content: Some(Box::from(content)),
