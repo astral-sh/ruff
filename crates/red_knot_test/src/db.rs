@@ -3,12 +3,13 @@ use std::sync::Arc;
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
     default_lint_registry, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
-    PythonVersion, SearchPathSettings,
+    SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
+use ruff_python_parser::python_version::PythonVersion;
 
 #[salsa::db]
 #[derive(Clone)]

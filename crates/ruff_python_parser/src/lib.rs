@@ -81,6 +81,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 mod error;
 pub mod lexer;
 mod parser;
+pub mod python_version;
 mod string;
 mod token;
 mod token_set;

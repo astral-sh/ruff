@@ -22,6 +22,8 @@ bstr = { workspace = true }
 compact_str = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
