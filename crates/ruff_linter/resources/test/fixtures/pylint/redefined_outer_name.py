@@ -1,5 +1,5 @@
+from __future__ import annotations
 import pytest
-
 @pytest.fixture
 def f(): ...
 
@@ -58,15 +58,29 @@ class Outer11[T]:
 
 def outer_12():
     a = 0
-    _ = lambda a: a + 1
+    inner_12 = lambda a: a + 1
 
 
 def outer_13():
-    _ = lambda a: lambda a, b: a + b - 1
+    inner_13 = lambda a: lambda a, b: a + b - 1
 
 
 def outer_14():
-    _ = (lambda a, b: a - b / 2 for a, b in [])
+    inner_14 = (lambda a, b: a - b / 2 for a, b in [])
+
+
+def outer_15():
+    try:
+        ...
+    except RuntimeError as e:
+        def inner_15(e): ...
+
+
+def outer_16():
+    try:
+        ...
+    except RuntimeError as e:
+        inner_16 = lambda e: ...
 
 
 ### No errors
@@ -110,4 +124,32 @@ class Outer108:
 
 class Outer109:
     a = 0
-    _ = [lambda a: a @ 3 for _ in [1]]
+    inner_109 = [lambda a: a @ 3 for _ in [1]]
+
+
+def outer_110(annotations): ...
+
+
+def outer_111():
+    _a = 0
+
+    def inner_111(_a): ...
+
+
+def outer_112():
+    inner_112 = lambda _a: ...
+    _a = 0
+
+
+class Outer113:
+    try:
+        ...
+    except RuntimeError as e:
+        def inner_113(e): ...
+
+
+class Outer114:
+    try:
+        ...
+    except RuntimeError as e:
+        inner_114 = lambda e: ...
