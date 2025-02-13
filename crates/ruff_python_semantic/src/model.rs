@@ -1900,6 +1900,13 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
     }
 
+    /// Return `true` if the model is visiting the type expression of
+    /// a `typing.cast` call.
+    pub const fn in_cast_type_expression(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::CAST_TYPE_EXPRESSION)
+    }
+
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
@@ -2156,7 +2163,7 @@ bitflags! {
 bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct SemanticModelFlags: u32 {
+    pub struct SemanticModelFlags: u64 {
         /// The model is in a type annotation that will only be evaluated when running a type
         /// checker.
         ///
@@ -2564,6 +2571,16 @@ bitflags! {
         /// test out the semantic change only in preview. This flag will go
         /// away once this change has been stabilized.
         const NEW_TYPE_CHECKING_BLOCK_DETECTION = 1 << 31;
+
+        /// The model is visiting the type expression of a `typing.cast` call.
+        ///
+        /// For example, the model might be visiting `float` in
+        /// ```python
+        /// from typing import cast
+        ///
+        /// cast(float, 5)
+        /// ```
+        const CAST_TYPE_EXPRESSION = 1 << 32;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
