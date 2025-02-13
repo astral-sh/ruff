@@ -183,8 +183,7 @@ reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# TODO: We already show an error here, but the message might be improved?
-# error: [unresolved-attribute]
+# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `Literal[C]`"
