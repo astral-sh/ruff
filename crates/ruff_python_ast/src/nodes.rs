@@ -1633,6 +1633,14 @@ impl StringLiteral {
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
+
+    /// The range of the string literal in source, excluding its opener and closer.
+    pub fn content_range(&self) -> TextRange {
+        TextRange::new(
+            self.start() + self.flags.opener_len(),
+            self.end() - self.flags.closer_len(),
+        )
+    }
 }
 
 impl From<StringLiteral> for Expr {
