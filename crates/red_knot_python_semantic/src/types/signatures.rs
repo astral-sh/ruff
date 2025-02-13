@@ -322,13 +322,13 @@ pub(crate) enum ParameterKind<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb};
-    use crate::types::{global_symbol, FunctionType, KnownClass, SymbolLookup};
+    use crate::types::{global_symbol, FunctionType, KnownClass};
     use ruff_db::system::DbWithTestSystem;
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
-        global_symbol(db, SymbolLookup::Internal, module, "f")
+        global_symbol(db, module, "f")
             .expect_type()
             .expect_function_literal()
     }
