@@ -146,6 +146,10 @@ impl<'db> CallOutcome<'db> {
                 );
                 return_ty
             }
+            Err(NotCallableError::BindingError { binding, .. }) => {
+                binding.report_diagnostics(context, node);
+                binding.return_type()
+            }
         }
     }
 
@@ -155,97 +159,91 @@ impl<'db> CallOutcome<'db> {
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
-        // TODO should this method emit diagnostics directly, or just return results that allow the
-        // caller to decide about emitting diagnostics? Currently it emits binding diagnostics, but
-        // only non-callable diagnostics in the union case, which is inconsistent.
         match self {
             Self::Callable { binding } => {
-                binding.report_diagnostics(context, node);
+                if binding.has_binding_errors() {
+                    return Err(NotCallableError::BindingError {
+                        binding: binding.clone(),
+                    });
+                }
 
-                if !binding.has_binding_errors() {
-                    if let Type::FunctionLiteral(function_type) = binding.callable_type() {
-                        if let Some(known_function) = function_type.known(context.db()) {
-                            // TODO: Should we skip those diagnostics if there's any binding error?
-                            match known_function {
-                                KnownFunction::RevealType => {
-                                    if let Some(revealed_type) = binding.one_parameter_type() {
-                                        context.report_diagnostic(
-                                            node,
-                                            DiagnosticId::RevealedType,
-                                            Severity::Info,
-                                            format_args!(
-                                                "Revealed type is `{}`",
-                                                revealed_type.display(context.db())
-                                            ),
-                                        );
-                                    }
-                                }
-                                KnownFunction::AssertType => {
-                                    if let [actual_ty, asserted_ty] = binding.parameter_types() {
-                                        if !actual_ty
-                                            .is_gradual_equivalent_to(context.db(), *asserted_ty)
-                                        {
-                                            context.report_lint(
-                                                &TYPE_ASSERTION_FAILURE,
-                                                node,
-                                                format_args!(
-                                                    "Actual type `{}` is not the same as asserted type `{}`",
-                                                    actual_ty.display(context.db()),
-                                                    asserted_ty.display(context.db()),
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                KnownFunction::StaticAssert => {
-                                    if let Some((parameter_ty, message)) =
-                                        binding.two_parameter_types()
-                                    {
-                                        let truthiness = parameter_ty.bool(context.db());
-
-                                        if !truthiness.is_always_true() {
-                                            if let Some(message) = message
-                                                .into_string_literal()
-                                                .map(|s| &**s.value(context.db()))
-                                            {
-                                                context.report_lint(
-                                                    &STATIC_ASSERT_ERROR,
-                                                    node,
-                                                    format_args!(
-                                                        "Static assertion error: {message}"
-                                                    ),
-                                                );
-                                            } else if parameter_ty == Type::BooleanLiteral(false) {
-                                                context.report_lint(
-                                                    &STATIC_ASSERT_ERROR,
-                                                    node,
-                                                    format_args!("Static assertion error: argument evaluates to `False`"),
-                                                );
-                                            } else if truthiness.is_always_false() {
-                                                context.report_lint(
-                                                    &STATIC_ASSERT_ERROR,
-                                                    node,
-                                                    format_args!(
-                                                        "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
-                                                        parameter_ty=parameter_ty.display(context.db())
-                                                    ),
-                                                );
-                                            } else {
-                                                context.report_lint(
-                                                    &STATIC_ASSERT_ERROR,
-                                                    node,
-                                                    format_args!(
-                                                        "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
-                                                        parameter_ty=parameter_ty.display(context.db())
-                                                    ),
-                                                );
-                                            };
-                                        }
-                                    }
-                                }
-                                _ => {}
+                if let Some(known_function) = binding
+                    .callable_type()
+                    .into_function_literal()
+                    .and_then(|function_type| function_type.known(context.db()))
+                {
+                    match known_function {
+                        KnownFunction::RevealType => {
+                            if let Some(revealed_type) = binding.one_parameter_type() {
+                                context.report_diagnostic(
+                                    node,
+                                    DiagnosticId::RevealedType,
+                                    Severity::Info,
+                                    format_args!(
+                                        "Revealed type is `{}`",
+                                        revealed_type.display(context.db())
+                                    ),
+                                );
                             }
                         }
+                        KnownFunction::AssertType => {
+                            if let [actual_ty, asserted_ty] = binding.parameter_types() {
+                                if !actual_ty.is_gradual_equivalent_to(context.db(), *asserted_ty) {
+                                    context.report_lint(
+                                            &TYPE_ASSERTION_FAILURE,
+                                            node,
+                                            format_args!(
+                                                "Actual type `{}` is not the same as asserted type `{}`",
+                                                actual_ty.display(context.db()),
+                                                asserted_ty.display(context.db()),
+                                            ),
+                                        );
+                                }
+                            }
+                        }
+                        KnownFunction::StaticAssert => {
+                            if let Some((parameter_ty, message)) = binding.two_parameter_types() {
+                                let truthiness = parameter_ty.bool(context.db());
+
+                                if !truthiness.is_always_true() {
+                                    if let Some(message) = message
+                                        .into_string_literal()
+                                        .map(|s| &**s.value(context.db()))
+                                    {
+                                        context.report_lint(
+                                            &STATIC_ASSERT_ERROR,
+                                            node,
+                                            format_args!("Static assertion error: {message}"),
+                                        );
+                                    } else if parameter_ty == Type::BooleanLiteral(false) {
+                                        context.report_lint(
+                                                &STATIC_ASSERT_ERROR,
+                                                node,
+                                                format_args!("Static assertion error: argument evaluates to `False`"),
+                                            );
+                                    } else if truthiness.is_always_false() {
+                                        context.report_lint(
+                                                &STATIC_ASSERT_ERROR,
+                                                node,
+                                                format_args!(
+                                                    "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                                    parameter_ty=parameter_ty.display(context.db())
+                                                ),
+                                            );
+                                    } else {
+                                        context.report_lint(
+                                                &STATIC_ASSERT_ERROR,
+                                                node,
+                                                format_args!(
+                                                    "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                                    parameter_ty=parameter_ty.display(context.db())
+                                                ),
+                                            );
+                                    };
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
 
@@ -276,6 +274,7 @@ impl<'db> CallOutcome<'db> {
                             not_callable.push(*not_callable_ty);
                             Type::unknown()
                         }
+                        // THIS Stinks
                         _ => outcome.unwrap_with_diagnostic(context, node),
                     };
                     union_builder = union_builder.add(return_ty);
@@ -342,6 +341,9 @@ pub(super) enum NotCallableError<'db> {
         callable_ty: Type<'db>,
         return_ty: Type<'db>,
     },
+
+    /// The type is callable but there are binding errors
+    BindingError { binding: CallBinding<'db> },
 }
 
 impl<'db> NotCallableError<'db> {
@@ -352,6 +354,7 @@ impl<'db> NotCallableError<'db> {
             Self::UnionElement { return_ty, .. } => *return_ty,
             Self::UnionElements { return_ty, .. } => *return_ty,
             Self::PossiblyUnboundDunderCall { return_ty, .. } => *return_ty,
+            Self::BindingError { binding } => binding.return_type(),
         }
     }
 
@@ -370,6 +373,7 @@ impl<'db> NotCallableError<'db> {
                 callable_ty: called_ty,
                 ..
             } => *called_ty,
+            Self::BindingError { binding } => binding.callable_type(),
         }
     }
 }
