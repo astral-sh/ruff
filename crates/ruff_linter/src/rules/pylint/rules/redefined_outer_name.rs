@@ -1,10 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{
     Binding, BindingId, BindingKind, Scope, ScopeId, ScopeKind, Scopes, SemanticModel,
+    TypingOnlyBindingsStatus,
 };
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::fixture_decorator;
@@ -16,9 +18,12 @@ use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 /// Having two symbols with the same name is confusing and may lead to bugs.
 /// Currently, this rule only report parameters.
 ///
-/// As an exception, parameters referencing Pytest fixtures are ignored.
-/// Parameters shadowing built-in symbols (e.g., `id` or `type`)
-/// are also not reported, as they are within the scope of [`builtin-argument-shadowing`][A002].
+/// Exceptions to this rule include:
+/// * Parameters referencing Pytest fixtures.
+/// * Variables shadowing built-in symbols (e.g., `id` or `type`),
+///   as they are within the scope of [`builtin-argument-shadowing`][A002].
+/// * Variables shadowing a `__future__` import.
+/// * Variables whose names match [`lint.dummy-variable-rgx`].
 ///
 /// ## Example
 ///
@@ -39,6 +44,9 @@ use crate::rules::flake8_pytest_style::rules::fixture_decorator;
 /// def f(b):
 ///     print(b)
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
 ///
 /// [A002]: https://docs.astral.sh/ruff/rules/builtin-argument-shadowing
 #[derive(ViolationMetadata)]
@@ -71,6 +79,12 @@ pub(crate) fn redefined_outer_name(checker: &Checker, binding: &Binding) -> Opti
 }
 
 fn redefined_outer_name_parameter(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+    let binding_name = binding.name(checker.source());
+
+    if checker.settings.dummy_variable_rgx.is_match(binding_name) {
+        return None;
+    }
+
     let semantic = checker.semantic();
     let (parent_scope, overshadowed) = find_overshadowed_binding(binding, checker)?;
 
@@ -82,6 +96,10 @@ fn redefined_outer_name_parameter(checker: &Checker, binding: &Binding) -> Optio
 
     // Parameters shadowing builtins are already reported by A005
     if overshadowed.kind.is_builtin() {
+        return None;
+    }
+
+    if overshadowed.kind.is_future_import() {
         return None;
     }
 
@@ -130,10 +148,41 @@ fn find_overshadowed_binding(binding: &Binding, checker: &Checker) -> Option<(Sc
     };
 
     let binding_name = binding.name(source);
+
+    if let Some(overshadowed) =
+        semantic.lookup_symbol_in_scope(binding_name, scope_to_start_searching_in, false)
+    {
+        return Some((parent_scope_id, overshadowed));
+    }
+
+    if parent_scope.kind.is_class() {
+        return None;
+    }
+
     let overshadowed =
-        semantic.lookup_symbol_in_scope(binding_name, scope_to_start_searching_in, false)?;
+        find_exception_binding(binding, binding_name, current_scope.parent?, semantic)?;
 
     Some((parent_scope_id, overshadowed))
+}
+
+fn find_exception_binding(
+    binding: &Binding,
+    binding_name: &str,
+    scope: ScopeId,
+    semantic: &SemanticModel,
+) -> Option<BindingId> {
+    let overshadowed = semantic.simulate_runtime_load_at_location_in_scope(
+        binding_name,
+        TextRange::at(scope_start_offset(binding, semantic)?, 0.into()),
+        scope,
+        TypingOnlyBindingsStatus::Disallowed,
+    )?;
+
+    if !semantic.binding(overshadowed).kind.is_bound_exception() {
+        return None;
+    }
+
+    Some(overshadowed)
 }
 
 /// If the current scope is that of a lambda, return the parent scope.
@@ -153,6 +202,20 @@ fn actual_parent_scope(current: &Scope, scopes: &Scopes) -> Option<ScopeId> {
         }
         _ => None,
     }
+}
+
+/// Return the position right before the function/lambda
+/// the parameter is defined in.
+fn scope_start_offset(parameter: &Binding, semantic: &SemanticModel) -> Option<TextSize> {
+    if let Some(Expr::Lambda(lambda)) = parameter.expression(semantic) {
+        return Some(lambda.start());
+    }
+
+    if let Some(Stmt::FunctionDef(function)) = parameter.statement(semantic) {
+        return Some(function.start());
+    }
+
+    None
 }
 
 fn binding_is_pytest_fixture(id: BindingId, semantic: &SemanticModel) -> bool {
