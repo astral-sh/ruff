@@ -54,6 +54,10 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
 
+        (Type::BoundMethod(left), Type::BoundMethod(right)) => left.cmp(right),
+        (Type::BoundMethod(_), _) => Ordering::Less,
+        (_, Type::BoundMethod(_)) => Ordering::Greater,
+
         (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,

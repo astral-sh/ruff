@@ -72,6 +72,7 @@ impl<'db> ClassBase<'db> {
             Type::Never
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
+            | Type::BoundMethod(..)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
