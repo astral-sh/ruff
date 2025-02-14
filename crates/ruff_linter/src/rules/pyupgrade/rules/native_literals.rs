@@ -3,12 +3,11 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{
-    self as ast, AnyNodeRef, Expr, Int, LiteralExpressionRef, Operator, UnaryOp,
-};
+use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::rules::OperatorPrecedence;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
@@ -252,28 +251,8 @@ pub(crate) fn native_literals(
                 // Ex) `(1.0).real` is valid and `1.0.real` is too
                 (Some(Expr::Attribute(_)), LiteralType::Int, _) => format!("({arg_code})"),
 
-                // (-2.0).foo != -(2.0.foo) == -2.0.foo
-                (Some(Expr::Attribute(_)), LiteralType::Float, true) => format!("({arg_code})"),
-
-                (
-                    Some(
-                        // (-2)[1] != -(2[1]) == -2[1]
-                        Expr::Subscript(ast::ExprSubscript { value: lhs, .. })
-                        // (-2)() != -(2()) == -2()
-                        | Expr::Call(ast::ExprCall { func: lhs, .. })
-                        // (-2) ** 2 != -(2 ** 2) == -2 ** 2
-                        | Expr::BinOp(ast::ExprBinOp {
-                            left: lhs,
-                            op: Operator::Pow,
-                            ..
-                        })
-                        // (await -1) is a syntax error
-                        | Expr::Await(ast::ExprAwait { value: lhs, .. }),
-                    ),
-                    _,
-                    true,
-                ) => {
-                    if AnyNodeRef::from(&**lhs).ptr_eq(AnyNodeRef::from(call)) {
+                (Some(parent), _, _) => {
+                    if OperatorPrecedence::from(parent) > OperatorPrecedence::from(arg) {
                         format!("({arg_code})")
                     } else {
                         arg_code.to_string()
