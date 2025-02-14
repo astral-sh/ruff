@@ -22,7 +22,6 @@ mod python_platform;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;
-mod stdlib;
 mod suppression;
 pub(crate) mod symbol;
 pub mod types;

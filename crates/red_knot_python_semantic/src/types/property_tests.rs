@@ -27,9 +27,9 @@
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::db::tests::{setup_db, TestDb};
+use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    builtins_symbol, known_module_symbol, IntersectionBuilder, KnownClass, KnownInstanceType,
-    SubclassOfType, TupleType, Type, UnionType,
+    IntersectionBuilder, KnownClass, KnownInstanceType, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::KnownModule;
 use quickcheck::{Arbitrary, Gen};
