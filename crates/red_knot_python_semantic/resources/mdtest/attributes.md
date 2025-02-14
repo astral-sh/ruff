@@ -804,6 +804,67 @@ def _(flag: bool, flag1: bool, flag2: bool):
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 ```
 
+### Attribute possibly unbound on a subclass but not on a superclass
+
+```py
+def _(flag: bool):
+    class Foo:
+        x = 1
+
+    class Bar(Foo):
+        if flag:
+            x = 2
+
+    reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+```
+
+### Attribute possibly unbound on a subclass and on a superclass
+
+```py
+def _(flag: bool):
+    class Foo:
+        if flag:
+            x = 1
+
+    class Bar(Foo):
+        if flag:
+            x = 2
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+```
+
+### Attribute access on `Any`
+
+The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
+from this that attribute access on `Any` resolves to `Any` if the attribute does not exist on
+`object` -- but if the attribute *does* exist on `object`, the type of the attribute is
+`<type as it exists on object> & Any`.
+
+```py
+from typing import Any
+
+class Foo(Any): ...
+
+reveal_type(Foo.bar)  # revealed: Any
+reveal_type(Foo.__repr__)  # revealed: Literal[__repr__] & Any
+```
+
+Similar principles apply if `Any` appears in the middle of an inheritance hierarchy:
+
+```py
+from typing import ClassVar, Literal
+
+class A:
+    x: ClassVar[Literal[1]] = 1
+
+class B(Any): ...
+class C(B, A): ...
+
+reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Any, Literal[A], Literal[object]]
+reveal_type(C.x)  # revealed: Literal[1] & Any
+```
+
 ### Unions with all paths unbound
 
 If the symbol is unbound in all elements of the union, we detect that:
