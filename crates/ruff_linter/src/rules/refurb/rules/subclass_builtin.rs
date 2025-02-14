@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, StmtClassDef};
+use ruff_python_ast::{helpers::map_subscript, Arguments, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -77,9 +77,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
 
     // Check if the base class is a subscript expression so that only the name expr
     // is checked and modified.
-    let base_expr = base
-        .as_subscript_expr()
-        .map_or(base, |subscript| &*subscript.value);
+    let base_expr = map_subscript(base);
 
     let Some(symbol) = checker.semantic().resolve_builtin_symbol(base_expr) else {
         return;
