@@ -1,9 +1,10 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_python_ast::{self as ast, Decorator, Expr, StmtClassDef};
 
+use crate::analyze::class::{traverse_base_classes, TraversalContinuation};
 use crate::model::SemanticModel;
 use crate::{Module, ModuleSource};
 
@@ -262,5 +263,234 @@ pub(crate) fn class_visibility(class: &ast::StmtClassDef) -> Visibility {
         Visibility::Private
     } else {
         Visibility::Public
+    }
+}
+
+pub fn is_abc_abc(base: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
+        return false;
+    };
+
+    matches!(qualified_name.segments(), ["abc", "ABC"])
+}
+
+pub fn is_abc_abcmeta(base: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
+        return false;
+    };
+
+    matches!(qualified_name.segments(), ["abc", "ABCMeta"])
+}
+
+#[derive(Debug)]
+enum InspectableClass<'a> {
+    Imported(QualifiedName<'a>),
+    ClassDef(&'a StmtClassDef),
+}
+
+impl<'a> InspectableClass<'a> {
+    fn from(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<Self> {
+        let expr = map_subscript(expr);
+
+        let name = expr.as_name_expr()?;
+        let binding_id = semantic.only_binding(name)?;
+        let binding = semantic.binding(binding_id);
+
+        if let Some(class_def) = binding.statement(semantic)?.as_class_def_stmt() {
+            return Some(Self::ClassDef(class_def));
+        };
+
+        let qualified_name = semantic.resolve_qualified_name(expr)?;
+        Some(Self::Imported(qualified_name))
+    }
+
+    fn is_abc_abc(&self) -> bool {
+        match self {
+            Self::ClassDef(_) => false,
+            Self::Imported(qualified_name) => matches!(qualified_name.segments(), ["abc", "ABC"]),
+        }
+    }
+
+    fn is_abc_abcmeta(&self) -> bool {
+        match self {
+            Self::ClassDef(_) => false,
+            Self::Imported(qualified_name) => {
+                matches!(qualified_name.segments(), ["abc", "ABCMeta"])
+            }
+        }
+    }
+}
+
+/// Whether a given class is likely to be an abstract base class.
+///
+/// See [`ABCLikeliness::from`] for the algorithm.
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub enum ABCLikeliness {
+    No,
+    LikelyNo,
+    Unknown,
+    LikelyYes,
+    Yes,
+}
+
+impl ABCLikeliness {
+    /// Whether `self` is neither [`Self::No`] nor [`Self::LikelyNo`].
+    pub fn might_be_abstract(self) -> bool {
+        self > Self::LikelyNo
+    }
+}
+
+impl ABCLikeliness {
+    /// Given a class `A` which may or may not have a metaclass `M`:
+    ///
+    /// * If there are no explicit base classes,
+    ///   returns [`Self::No`].
+    ///
+    /// * If `M` is `ABCMeta`, or if `A` inherits from `ABC` directly,
+    ///   returns [`Self::Yes`].
+    ///   This relies on the assumption that, by doing so,
+    ///   the user wanted `A` to be abstract.
+    ///
+    /// * If `M` inherits from `ABCMeta`, returns [`Self::LikelyYes`].
+    ///
+    /// * For each *indirect* base class `B` of `A`, returns [`Self::LikelyYes`] if:
+    ///   * `B` is `ABC`, or
+    ///   * `B`'s metaclass is `ABCMeta` or a subclass thereof.
+    ///
+    /// * Otherwise, returns [`Self::LikelyNo`].
+    ///
+    /// From step 3 onwards, if any base/metaclass is found
+    /// not to be inspectable, returns [`Self::Unknown`].
+    pub fn from(class_def: &StmtClassDef, semantic: &SemanticModel) -> Self {
+        let Some(arguments) = class_def.arguments.as_ref() else {
+            return Self::No;
+        };
+
+        if arguments.is_empty() {
+            return Self::No;
+        }
+
+        if let Some(metaclass) = arguments.find_keyword("metaclass") {
+            if let Some(likeliness) = Self::from_metaclass(&metaclass.value, semantic, true) {
+                return likeliness;
+            }
+        };
+
+        for base_expr in class_def.bases() {
+            let Some(base) = InspectableClass::from(base_expr, semantic) else {
+                return Self::Unknown;
+            };
+
+            if base.is_abc_abc() {
+                return Self::Yes;
+            }
+
+            let InspectableClass::ClassDef(base_class_def) = base else {
+                continue;
+            };
+
+            let Some(arguments) = base_class_def.arguments.as_ref() else {
+                continue;
+            };
+
+            if arguments.is_empty() {
+                continue;
+            }
+
+            if let Some(metaclass) = arguments.find_keyword("metaclass") {
+                if let Some(likeliness) = Self::from_metaclass(&metaclass.value, semantic, false) {
+                    return likeliness;
+                }
+            };
+        }
+
+        let mut likeliness = Self::LikelyNo;
+
+        traverse_base_classes(class_def, semantic, &mut |expr| {
+            if class_def.bases().contains(expr) {
+                return TraversalContinuation::Continue;
+            }
+
+            let Some(base) = InspectableClass::from(expr, semantic) else {
+                likeliness = Self::Unknown;
+                return TraversalContinuation::Stop;
+            };
+
+            if base.is_abc_abc() {
+                likeliness = Self::LikelyYes;
+                return TraversalContinuation::Stop;
+            }
+
+            let InspectableClass::ClassDef(base_class_def) = base else {
+                return TraversalContinuation::Continue;
+            };
+
+            let Some(arguments) = base_class_def.arguments.as_ref() else {
+                return TraversalContinuation::Continue;
+            };
+
+            if arguments.is_empty() {
+                return TraversalContinuation::Continue;
+            }
+
+            let Some(metaclass) = arguments.find_keyword("metaclass") else {
+                return TraversalContinuation::Continue;
+            };
+
+            if let Some(new_likeliness) = Self::from_metaclass(&metaclass.value, semantic, false) {
+                likeliness = new_likeliness;
+                return TraversalContinuation::Stop;
+            }
+
+            TraversalContinuation::Continue
+        });
+
+        likeliness
+    }
+
+    fn from_metaclass(metaclass: &Expr, semantic: &SemanticModel, direct: bool) -> Option<Self> {
+        let Some(metaclass) = InspectableClass::from(metaclass, semantic) else {
+            return Some(Self::Unknown);
+        };
+
+        if metaclass.is_abc_abcmeta() {
+            return if direct {
+                Some(Self::Yes)
+            } else {
+                Some(Self::LikelyYes)
+            };
+        }
+
+        let InspectableClass::ClassDef(metaclass_class_def) = metaclass else {
+            return Some(Self::Unknown);
+        };
+
+        for base_expr in metaclass_class_def.bases() {
+            let Some(base) = InspectableClass::from(base_expr, semantic) else {
+                return Some(Self::Unknown);
+            };
+
+            if base.is_abc_abcmeta() {
+                return Some(Self::LikelyYes);
+            }
+        }
+
+        let mut likeliness = None;
+
+        traverse_base_classes(metaclass_class_def, semantic, &mut |expr| {
+            let Some(base) = InspectableClass::from(expr, semantic) else {
+                likeliness = Some(Self::Unknown);
+                return TraversalContinuation::Stop;
+            };
+
+            if base.is_abc_abcmeta() {
+                likeliness = Some(Self::LikelyYes);
+                return TraversalContinuation::Stop;
+            }
+
+            TraversalContinuation::Continue
+        });
+
+        likeliness
     }
 }

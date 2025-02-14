@@ -1,9 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, Stmt, StmtClassDef, StmtFunctionDef};
-use ruff_python_semantic::analyze::class::any_base_class;
-use ruff_python_semantic::analyze::visibility::AbstractDecoratorKind;
-use ruff_python_semantic::{BindingKind, NodeRef, SemanticModel};
+use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_semantic::analyze::visibility::{ABCLikeliness, AbstractDecoratorKind};
 
 use crate::checkers::ast::Checker;
 
@@ -113,127 +111,33 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
         return;
     }
 
-    if might_be_abstract(class, checker.semantic()) {
+    if ABCLikeliness::from(class, checker.semantic()).might_be_abstract() {
         return;
     }
 
     for stmt in &class.body {
-        check_class_body_stmt(checker, &class.name, stmt);
-    }
-}
-
-/// Returns false if the class is definitely not an abstract class.
-///
-/// A class is considered abstract when it inherits from a class
-/// created by `abc.ABCMeta` without implementing all abstract methods.
-///
-/// Thus, a class is *not* abstract when all of its bases are:
-/// * Inspectable
-/// * Do not have a metaclass that inherits from `abc.ABCMeta`
-fn might_be_abstract(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
-    if metaclass_might_be_abcmeta(class_def, semantic) {
-        return true;
-    }
-
-    any_base_class(class_def, semantic, &mut |base| {
-        if is_abc_abc(base, semantic) {
-            return true;
-        }
-
-        let Some(base_def) = find_class_def(base, semantic) else {
-            return true;
+        let Stmt::FunctionDef(StmtFunctionDef {
+            decorator_list,
+            name,
+            ..
+        }) = stmt
+        else {
+            continue;
         };
 
-        metaclass_might_be_abcmeta(base_def, semantic)
-    })
-}
+        let Some(decorator_kind) =
+            AbstractDecoratorKind::from_decorators(decorator_list, checker.semantic())
+        else {
+            continue;
+        };
 
-/// Returns false if the class is definitely not `abc.ABCMeta` or a subclass thereof.
-///
-/// A class is *not* a subclass of `ABCMeta` when all of its bases are:
-/// * Inspectable
-/// * Do not inherit from `ABCMeta`
-fn metaclass_might_be_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
-    let Some(arguments) = class_def.arguments.as_ref() else {
-        return false;
-    };
+        let class_name = class.name.to_string();
+        let kind = AbstractMethodInNormalClass {
+            decorator_kind,
+            class_name,
+        };
+        let diagnostic = Diagnostic::new(kind, name.range);
 
-    let Some(metaclass) = arguments.find_keyword("metaclass") else {
-        return false;
-    };
-    let metaclass = &metaclass.value;
-
-    if is_abc_abcmeta(metaclass, semantic) {
-        return true;
+        checker.report_diagnostic(diagnostic);
     }
-
-    let Some(metaclass_def) = find_class_def(metaclass, semantic) else {
-        return true;
-    };
-
-    any_base_class(metaclass_def, semantic, &mut |base| {
-        is_abc_abcmeta(base, semantic) || find_class_def(base, semantic).is_none()
-    })
-}
-
-fn is_abc_abc(base: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
-        return false;
-    };
-
-    matches!(qualified_name.segments(), ["abc", "ABC"])
-}
-
-fn is_abc_abcmeta(base: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
-        return false;
-    };
-
-    matches!(qualified_name.segments(), ["abc", "ABCMeta"])
-}
-
-fn find_class_def<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a StmtClassDef> {
-    let name = expr.as_name_expr()?;
-    let binding_id = semantic.only_binding(name)?;
-
-    let binding = semantic.binding(binding_id);
-
-    if !matches!(binding.kind, BindingKind::ClassDefinition(_)) {
-        return None;
-    }
-
-    let node_id = binding.source?;
-    let node = semantic.node(node_id);
-
-    let NodeRef::Stmt(Stmt::ClassDef(base_def)) = node else {
-        return None;
-    };
-
-    Some(base_def)
-}
-
-fn check_class_body_stmt(checker: &Checker, class_name: &str, stmt: &Stmt) {
-    let Stmt::FunctionDef(StmtFunctionDef {
-        decorator_list,
-        name,
-        ..
-    }) = stmt
-    else {
-        return;
-    };
-
-    let Some(decorator_kind) =
-        AbstractDecoratorKind::from_decorators(decorator_list, checker.semantic())
-    else {
-        return;
-    };
-
-    let class_name = class_name.to_string();
-    let kind = AbstractMethodInNormalClass {
-        decorator_kind,
-        class_name,
-    };
-    let diagnostic = Diagnostic::new(kind, name.range);
-
-    checker.report_diagnostic(diagnostic);
 }
