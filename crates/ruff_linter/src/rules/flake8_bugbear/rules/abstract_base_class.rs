@@ -3,7 +3,9 @@ use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
+use ruff_python_semantic::analyze::visibility::{
+    is_abc_abc, is_abc_abcmeta, is_abstract, is_overload,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -116,16 +118,8 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
     keywords.iter().any(|keyword| {
         keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
-            && semantic
-                .resolve_qualified_name(&keyword.value)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["abc", "ABCMeta"])
-                })
-    }) || bases.iter().any(|base| {
-        semantic
-            .resolve_qualified_name(base)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]))
-    })
+            && is_abc_abcmeta(&keyword.value, semantic)
+    }) || bases.iter().any(|base| is_abc_abc(base, semantic))
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
