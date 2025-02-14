@@ -101,3 +101,55 @@ reveal_type(bool([]))  # revealed: bool
 reveal_type(bool({}))  # revealed: bool
 reveal_type(bool(set()))  # revealed: bool
 ```
+
+## `__bool__` returning `NoReturn`
+
+```py
+from typing import NoReturn
+
+class NotBoolable:
+    def __bool__(self) -> NoReturn:
+        raise NotImplementedError("This object can't be converted to a boolean")
+
+# TODO: This should emit an error that `NotBoolable` can't be converted to a bool but it currently doesn't
+#   because `Never` is assignable to `bool`. This probably requires dead code analysis to fix.
+if NotBoolable():
+    ...
+```
+
+## Not callable `__bool__`
+
+```py
+class NotBoolable:
+    __bool__: int
+
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool because its `__bool__` attribute isn't callable."
+if NotBoolable():
+    ...
+```
+
+## Not-boolable union
+
+```py
+def test(cond: bool):
+    class NotBoolable:
+        __bool__ = None if cond else 3
+
+    # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+    if NotBoolable():
+        ...
+```
+
+## Union containing not-boolable variant
+
+```py
+def test(cond: bool):
+    class NotBoolable:
+        __bool__: int
+
+    a = 10 if cond else NotBoolable()
+
+    # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool because its `__bool__` attribute isn't callable."
+    if a:
+        ...
+```

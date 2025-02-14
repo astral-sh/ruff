@@ -107,6 +107,7 @@ more accurately.
 def flag() -> bool:
     return True
 
+# TODO: Not sure if this is correct but we're trying to convert `int` to a bool here? Is this intentional.
 x = int if flag() else str
 reveal_type(x)  # revealed: Literal[int, str]
 
@@ -266,7 +267,7 @@ def _(
     if af:
         reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
 
-    # TODO: Emit a diagnostic (`d` is not valid in boolean context)
+    # error: [not-boolable] "Object of type `MetaDeferred` can not be converted to a bool because the return type of its `__bool__` method (`MetaAmbiguous`) isn't assignable to `bool"
     if d:
         # TODO: Should be `Unknown`
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy

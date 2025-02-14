@@ -35,3 +35,13 @@ def _(flag: bool):
     x = 1 if flag else None
     reveal_type(x)  # revealed: Literal[1] | None
 ```
+
+## not-boolable condition
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+3 if NotBoolable() else 4
+```
