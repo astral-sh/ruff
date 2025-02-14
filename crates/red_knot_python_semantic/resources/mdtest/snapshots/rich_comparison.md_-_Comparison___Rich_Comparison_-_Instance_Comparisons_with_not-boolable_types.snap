@@ -1,0 +1,56 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: rich_comparison.md - Comparison: Rich Comparison - Instance Comparisons with not-boolable types
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instances/rich_comparison.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NotBoolable:
+ 2 |     __bool__ = 3
+ 3 | 
+ 4 | class Comparable:
+ 5 |     def __lt__(self, item) -> NotBoolable:
+ 6 |         return NotBoolable()
+ 7 | 
+ 8 |     def __gt__(self, item) -> NotBoolable:
+ 9 |         return NotBoolable()
+10 | 
+11 | # error: [not-boolable]
+12 | 10 < Comparable() < 20
+13 | # error: [not-boolable]
+14 | 10 < Comparable() < Comparable()
+```
+
+# Diagnostics
+
+```
+error: lint:not-boolable
+  --> /src/mdtest_snippet.py:12:1
+   |
+11 | # error: [not-boolable]
+12 | 10 < Comparable() < 20
+   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+13 | # error: [not-boolable]
+14 | 10 < Comparable() < Comparable()
+   |
+
+```
+
+```
+error: lint:not-boolable
+  --> /src/mdtest_snippet.py:14:1
+   |
+12 | 10 < Comparable() < 20
+13 | # error: [not-boolable]
+14 | 10 < Comparable() < Comparable()
+   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+   |
+
+```

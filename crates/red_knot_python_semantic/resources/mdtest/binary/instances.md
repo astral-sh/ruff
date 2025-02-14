@@ -351,6 +351,20 @@ class Y(Foo): ...
 reveal_type(X() + Y())  # revealed: int
 ```
 
+## Operations involving types that can't be converted to a `bool`
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+a = NotBoolable()
+
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+10 and a and True
+```
+
 ## Unsupported
 
 ### Dunder as instance attribute

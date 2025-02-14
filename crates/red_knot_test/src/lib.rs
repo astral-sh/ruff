@@ -256,7 +256,7 @@ fn run_test(
     if !snapshot_diagnostics.is_empty() {
         let snapshot =
             create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
-        let name = test.name().replace(' ', "_");
+        let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
                 snapshot_path => snapshot_path,

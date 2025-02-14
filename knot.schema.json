@@ -491,6 +491,16 @@
             }
           ]
         },
+        "not-boolable": {
+          "title": "detects usages of objects that can't be converted to a boolean in boolean contexts",
+          "description": "## What it does\nChecks for objects that can't be converted to a boolean but are used in a boolean contexts (e.g. condition, `bool(object)`).\n\n## Why is this bad?\nConverting an object that can't be converted to a boolean will raise a runtime error.\n\n## Examples\n\n```python\nclass NotBoolable:\n    __bool__ = None\n\nif NotBoolable():\n    pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "not-iterable": {
           "title": "detects iteration over an object that is not iterable",
           "description": "## What it does\nChecks for objects that are not iterable but are used in a context that requires them to be.\n\n## Why is this bad?\nIterating over an object that is not iterable will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nfor i in 34:  # TypeError: 'int' object is not iterable\n    pass\n```",

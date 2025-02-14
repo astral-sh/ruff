@@ -1,0 +1,43 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: tuples.md - Comparison: Tuples - Not-boolable elements
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NotBoolable:
+ 2 |     __bool__ = 5
+ 3 | 
+ 4 | class Comparable:
+ 5 |     def __lt__(self, other) -> NotBoolable:
+ 6 |         return NotBoolable()
+ 7 | 
+ 8 |     def __gt__(self, other) -> NotBoolable:
+ 9 |         return NotBoolable()
+10 | 
+11 | a = (1, Comparable())
+12 | b = (1, Comparable())
+13 | 
+14 | # error: [not-boolable]
+15 | a < b < b
+```
+
+# Diagnostics
+
+```
+error: lint:not-boolable
+  --> /src/mdtest_snippet.py:15:1
+   |
+14 | # error: [not-boolable]
+15 | a < b < b
+   | ^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+   |
+
+```

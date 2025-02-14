@@ -147,3 +147,17 @@ def _(flag: bool):
 
     reveal_type(y)  # revealed: Literal[0, 1]
 ```
+
+## not-boolable condition
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+if NotBoolable():
+    ...
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+elif NotBoolable():
+    ...
+```

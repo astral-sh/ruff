@@ -160,3 +160,24 @@ reveal_type(42 in A())  # revealed: bool
 # error: [unsupported-operator] "Operator `in` is not supported for types `str` and `A`, in comparing `Literal["hello"]` with `A`"
 reveal_type("hello" in A())  # revealed: bool
 ```
+
+## Not-boolable return type
+
+Python implicitly calls `bool` on the result of `__contains__`, so the return type must be
+convertible to `bool`.
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+class WithContains:
+    def __contains__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+10 in WithContains() and True
+# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+10 not in WithContains() or False
+```

@@ -43,3 +43,21 @@ def _(target: int):
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
+
+## not-boolable guard
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+def _(target: int, flag: NotBoolable):
+    y = 1
+    match target:
+        # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+        case 1 if flag:
+            y = 2
+        case 2:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[1, 2, 3]
+```

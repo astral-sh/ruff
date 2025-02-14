@@ -1,0 +1,53 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: membership_test.md - Comparison: Membership Test - Not-boolable return type
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instances/membership_test.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NotBoolable:
+ 2 |     __bool__ = 3
+ 3 | 
+ 4 | class WithContains:
+ 5 |     def __contains__(self, item) -> NotBoolable:
+ 6 |         return NotBoolable()
+ 7 | 
+ 8 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+ 9 | 10 in WithContains() and True
+10 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+11 | 10 not in WithContains() or False
+```
+
+# Diagnostics
+
+```
+error: lint:not-boolable
+  --> /src/mdtest_snippet.py:9:1
+   |
+ 8 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+ 9 | 10 in WithContains() and True
+   | ^^^^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+10 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+11 | 10 not in WithContains() or False
+   |
+
+```
+
+```
+error: lint:not-boolable
+  --> /src/mdtest_snippet.py:11:1
+   |
+ 9 | 10 in WithContains() and True
+10 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+11 | 10 not in WithContains() or False
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+   |
+
+```

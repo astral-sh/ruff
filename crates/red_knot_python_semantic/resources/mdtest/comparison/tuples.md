@@ -334,3 +334,25 @@ reveal_type(a is not c)  # revealed: Literal[True]
 For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
 // TODO
+
+## Not-boolable elements
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 5
+
+class Comparable:
+    def __lt__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+    def __gt__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+a = (1, Comparable())
+b = (1, Comparable())
+
+# error: [not-boolable]
+a < b < b
+```
