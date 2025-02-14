@@ -33,28 +33,15 @@ pub enum FromCodeError {
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
-    /// [Pyflakes](https://pypi.org/project/pyflakes/)
-    #[prefix = "F"]
-    Pyflakes,
-    /// [pycodestyle](https://pypi.org/project/pycodestyle/)
-    #[prefix = "E"]
-    #[prefix = "W"]
-    Pycodestyle,
-    /// [mccabe](https://pypi.org/project/mccabe/)
-    #[prefix = "C90"]
-    McCabe,
-    /// [isort](https://pypi.org/project/isort/)
-    #[prefix = "I"]
-    Isort,
-    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
-    #[prefix = "N"]
-    PEP8Naming,
-    /// [pydocstyle](https://pypi.org/project/pydocstyle/)
-    #[prefix = "D"]
-    Pydocstyle,
-    /// [pyupgrade](https://pypi.org/project/pyupgrade/)
-    #[prefix = "UP"]
-    Pyupgrade,
+    /// [Airflow](https://pypi.org/project/apache-airflow/)
+    #[prefix = "AIR"]
+    Airflow,
+    /// [eradicate](https://pypi.org/project/eradicate/)
+    #[prefix = "ERA"]
+    Eradicate,
+    /// [FastAPI](https://pypi.org/project/fastapi/)
+    #[prefix = "FAST"]
+    FastApi,
     /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,
@@ -172,45 +159,58 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
-    /// [eradicate](https://pypi.org/project/eradicate/)
-    #[prefix = "ERA"]
-    Eradicate,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
+    /// [isort](https://pypi.org/project/isort/)
+    #[prefix = "I"]
+    Isort,
+    /// [mccabe](https://pypi.org/project/mccabe/)
+    #[prefix = "C90"]
+    McCabe,
+    /// NumPy-specific rules
+    #[prefix = "NPY"]
+    Numpy,
     /// [pandas-vet](https://pypi.org/project/pandas-vet/)
     #[prefix = "PD"]
     PandasVet,
+    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
+    #[prefix = "N"]
+    PEP8Naming,
+    /// [Perflint](https://pypi.org/project/perflint/)
+    #[prefix = "PERF"]
+    Perflint,
+    /// [pycodestyle](https://pypi.org/project/pycodestyle/)
+    #[prefix = "E"]
+    #[prefix = "W"]
+    Pycodestyle,
+    /// [pydoclint](https://pypi.org/project/pydoclint/)
+    #[prefix = "DOC"]
+    Pydoclint,
+    /// [pydocstyle](https://pypi.org/project/pydocstyle/)
+    #[prefix = "D"]
+    Pydocstyle,
+    /// [Pyflakes](https://pypi.org/project/pyflakes/)
+    #[prefix = "F"]
+    Pyflakes,
     /// [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
     #[prefix = "PGH"]
     PygrepHooks,
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [tryceratops](https://pypi.org/project/tryceratops/)
-    #[prefix = "TRY"]
-    Tryceratops,
-    /// [flynt](https://pypi.org/project/flynt/)
-    #[prefix = "FLY"]
-    Flynt,
-    /// NumPy-specific rules
-    #[prefix = "NPY"]
-    Numpy,
-    /// [FastAPI](https://pypi.org/project/fastapi/)
-    #[prefix = "FAST"]
-    FastApi,
-    /// [Airflow](https://pypi.org/project/apache-airflow/)
-    #[prefix = "AIR"]
-    Airflow,
-    /// [Perflint](https://pypi.org/project/perflint/)
-    #[prefix = "PERF"]
-    Perflint,
+    /// [pyupgrade](https://pypi.org/project/pyupgrade/)
+    #[prefix = "UP"]
+    Pyupgrade,
     /// [refurb](https://pypi.org/project/refurb/)
     #[prefix = "FURB"]
     Refurb,
-    /// [pydoclint](https://pypi.org/project/pydoclint/)
-    #[prefix = "DOC"]
-    Pydoclint,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [tryceratops](https://pypi.org/project/tryceratops/)
+    #[prefix = "TRY"]
+    Tryceratops,
 }
 
 pub trait RuleNamespace: Sized {
@@ -430,6 +430,7 @@ pub mod clap_completion {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use std::mem::size_of;
 
     use strum::IntoEnumIterator;
@@ -492,5 +493,20 @@ mod tests {
     #[test]
     fn rule_size() {
         assert_eq!(2, size_of::<Rule>());
+    }
+
+    #[test]
+    fn linter_sorting() {
+        let names: Vec<_> = Linter::iter()
+            .map(|linter| linter.name().to_lowercase())
+            .collect();
+
+        let sorted: Vec<_> = names.iter().cloned().sorted().collect();
+
+        assert_eq!(
+            &names[..],
+            &sorted[..],
+            "Linters are not sorted alphabetically (case insensitive)"
+        );
     }
 }
