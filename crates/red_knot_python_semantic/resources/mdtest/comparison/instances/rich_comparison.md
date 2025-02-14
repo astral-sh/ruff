@@ -117,14 +117,11 @@ class B:
     def __ne__(self, other: str) -> B:
         return B()
 
-# TODO: should be `int` and `bytearray`.
-# Need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`.
-#
 # Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
 # this can only happen with an invalid override of these methods,
 # but we still support it.
-reveal_type(B() == A())  # revealed: B
-reveal_type(B() != A())  # revealed: B
+reveal_type(B() == A())  # revealed: int
+reveal_type(B() != A())  # revealed: bytearray
 
 reveal_type(B() < A())  # revealed: list
 reveal_type(B() <= A())  # revealed: set
@@ -222,9 +219,8 @@ class B(A):
     def __gt__(self, other: int) -> B:
         return B()
 
-# TODO: should be `A`, need to check argument type and fall back to LHS method
-reveal_type(A() < B())  # revealed: B
-reveal_type(A() > B())  # revealed: B
+reveal_type(A() < B())  # revealed: A
+reveal_type(A() > B())  # revealed: A
 ```
 
 ## Operations involving instances of classes inheriting from `Any`
@@ -272,9 +268,8 @@ class A:
     def __ne__(self, other: int) -> A:
         return A()
 
-# TODO: it should be `bool`, need to check arg type and fall back to `is` and `is not`
-reveal_type(A() == A())  # revealed: A
-reveal_type(A() != A())  # revealed: A
+reveal_type(A() == A())  # revealed: bool
+reveal_type(A() != A())  # revealed: bool
 ```
 
 ## Object Comparisons with Typeshed
@@ -305,12 +300,14 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# TODO: should be Unknown and emit diagnostic,
-# need to check arg type and should be failed
-reveal_type(1 < 2j)  # revealed: bool
-reveal_type(1 <= 2j)  # revealed: bool
-reveal_type(1 > 2j)  # revealed: bool
-reveal_type(1 >= 2j)  # revealed: bool
+# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 < 2j)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 <= 2j)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 > 2j)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 >= 2j)  # revealed: Unknown
 
 def f(x: bool, y: int):
     reveal_type(x < y)  # revealed: bool
