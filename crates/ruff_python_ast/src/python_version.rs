@@ -1,9 +1,11 @@
 use std::fmt;
 
+use ruff_macros::CacheKey;
+
 /// Representation of a Python version.
 ///
 /// N.B. This does not necessarily represent a Python version that we actually support.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, CacheKey)]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -46,6 +48,13 @@ impl PythonVersion {
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
     }
+
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::PY312
+    }
 }
 
 impl Default for PythonVersion {
@@ -81,13 +90,49 @@ impl fmt::Display for PythonVersion {
 }
 
 #[cfg(feature = "serde")]
-mod serde {
+pub mod adapter {
+    //! Module designed for use with the `serde` [`with`](https://serde.rs/field-attrs.html#with)
+    //! field attribute.
+    //!
+    //! The [`serialize`] and [`deserialize`] functions allow any type that implements `Serialize`
+    //! or `Deserialize` and `TryFrom<PythonVersion>` or `Into<PythonVersion>`, respectively, to use
+    //! its own (de)serialization method but still end up as a `PythonVersion`.
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
     use super::PythonVersion;
 
-    impl<'de> serde::Deserialize<'de> for PythonVersion {
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<PythonVersion, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de> + Into<PythonVersion>,
+    {
+        Ok(T::deserialize(deserializer)?.into())
+    }
+
+    pub fn serialize<S, T>(value: &PythonVersion, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize + TryFrom<PythonVersion>,
+        <T as TryFrom<PythonVersion>>::Error: std::fmt::Display,
+    {
+        let value = T::try_from(*value).map_err(|err| {
+            serde::ser::Error::custom(format!("failed to convert version: {err}"))
+        })?;
+        T::serialize(&value, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use serde::{Deserialize, Deserializer};
+
+    use super::PythonVersion;
+
+    impl<'de> Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            D: serde::Deserializer<'de>,
+            D: Deserializer<'de>,
         {
             let as_str = String::deserialize(deserializer)?;
 

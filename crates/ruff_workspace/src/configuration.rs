@@ -178,13 +178,13 @@ impl Configuration {
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
             target_version: match target_version {
-                PythonVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
-                PythonVersion::Py38 => ruff_python_formatter::PythonVersion::Py38,
-                PythonVersion::Py39 => ruff_python_formatter::PythonVersion::Py39,
-                PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
-                PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
-                PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
-                PythonVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
+                PythonVersion::Py37 => ruff_python_ast::python_version::PythonVersion::PY37,
+                PythonVersion::Py38 => ruff_python_ast::python_version::PythonVersion::PY38,
+                PythonVersion::Py39 => ruff_python_ast::python_version::PythonVersion::PY39,
+                PythonVersion::Py310 => ruff_python_ast::python_version::PythonVersion::PY310,
+                PythonVersion::Py311 => ruff_python_ast::python_version::PythonVersion::PY311,
+                PythonVersion::Py312 => ruff_python_ast::python_version::PythonVersion::PY312,
+                PythonVersion::Py313 => ruff_python_ast::python_version::PythonVersion::PY313,
             },
             line_width: self
                 .line_length
