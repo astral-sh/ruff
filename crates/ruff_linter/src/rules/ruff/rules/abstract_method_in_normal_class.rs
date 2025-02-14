@@ -212,7 +212,7 @@ fn find_class_def<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a
     Some(base_def)
 }
 
-fn check_class_body_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {
+fn check_class_body_stmt(checker: &Checker, class_name: &str, stmt: &Stmt) {
     let Stmt::FunctionDef(StmtFunctionDef {
         decorator_list,
         name,
@@ -235,5 +235,5 @@ fn check_class_body_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {
     };
     let diagnostic = Diagnostic::new(kind, name.range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
