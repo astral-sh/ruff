@@ -579,7 +579,7 @@ fn in_dunder_method_definition(semantic: &SemanticModel) -> bool {
 ///
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum OperatorPrecedence {
+pub(crate) enum OperatorPrecedence {
     /// The lowest (virtual) precedence level
     None,
     /// Precedence of `yield` and `yield from` expressions.
