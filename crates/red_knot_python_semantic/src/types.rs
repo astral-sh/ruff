@@ -34,7 +34,7 @@ use crate::semantic_index::{
 };
 use crate::stdlib::{known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
-use crate::symbol::{Boundness, Symbol};
+use crate::symbol::{Boundness, LookupError, LookupResult, Symbol};
 use crate::types::call::{
     bind_call, CallArguments, CallBinding, CallDunderResult, CallOutcome, StaticAssertionErrorKind,
 };
@@ -4219,21 +4219,42 @@ impl<'db> Class<'db> {
             return Symbol::bound(TupleType::from_elements(db, tuple_elements));
         }
 
+        // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
+        // in this variable. After we've traversed the MRO, we'll either:
+        // (1) Use that dynamic type as the type for this attribute,
+        //     if no other classes in the MRO define the attribute; or,
+        // (2) Intersect that dynamic type with the type of the attribute
+        //     from the non-gradual members of the class's MRO.
+        let mut dynamic_type_to_intersect_with: Option<Type<'db>> = None;
+
+        let mut lookup_result: LookupResult<'db> = Err(LookupError::Unbound);
+
         for superclass in self.iter_mro(db) {
             match superclass {
-                // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
-                // the type found on the next "real" class.
-                ClassBase::Dynamic(_) => return Type::from(superclass).member(db, name),
-                ClassBase::Class(class) => {
-                    let member = class.own_class_member(db, name);
-                    if !member.is_unbound() {
-                        return member;
-                    }
+                ClassBase::Dynamic(_) => {
+                    dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
+                ClassBase::Class(class) => {
+                    lookup_result = lookup_result.or_else(|lookup_error| {
+                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
+                    });
+                }
+            }
+            if lookup_result.is_ok() {
+                break;
             }
         }
 
-        Symbol::Unbound
+        match (Symbol::from(lookup_result), dynamic_type_to_intersect_with) {
+            (symbol, None) => symbol,
+            (Symbol::Type(ty, _), Some(dynamic_type)) => Symbol::bound(
+                IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_positive(dynamic_type)
+                    .build(),
+            ),
+            (Symbol::Unbound, Some(dynamic_type)) => Symbol::bound(dynamic_type),
+        }
     }
 
     /// Returns the inferred type of the class member named `name`.
