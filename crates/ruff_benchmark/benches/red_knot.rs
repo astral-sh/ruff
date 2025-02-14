@@ -8,13 +8,13 @@ use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::watch::{ChangeEvent, ChangedKind};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::PythonVersion;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_python_ast::python_version::PythonVersion;
 use rustc_hash::FxHashSet;
 
 struct Case {
