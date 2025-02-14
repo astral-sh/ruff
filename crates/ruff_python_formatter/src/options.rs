@@ -9,37 +9,6 @@ use ruff_python_ast::PySourceType;
 
 use ruff_python_ast::python_version::{self as ast, adapter};
 
-impl TryFrom<ast::PythonVersion> for PythonVersion {
-    type Error = String;
-
-    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
-        match value {
-            ast::PythonVersion::PY37 => Ok(Self::Py37),
-            ast::PythonVersion::PY38 => Ok(Self::Py38),
-            ast::PythonVersion::PY39 => Ok(Self::Py39),
-            ast::PythonVersion::PY310 => Ok(Self::Py310),
-            ast::PythonVersion::PY311 => Ok(Self::Py311),
-            ast::PythonVersion::PY312 => Ok(Self::Py312),
-            ast::PythonVersion::PY313 => Ok(Self::Py313),
-            _ => Err(format!("unrecognized python version {value}")),
-        }
-    }
-}
-
-impl From<PythonVersion> for ast::PythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
-        }
-    }
-}
-
 /// Resolved options for formatting one individual file. The difference to `FormatterSettings`
 /// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
 #[derive(Clone, Debug)]
@@ -525,13 +494,6 @@ pub enum PythonVersion {
 }
 
 impl PythonVersion {
-    /// Return `true` if the current version supports [PEP 701].
-    ///
-    /// [PEP 701]: https://peps.python.org/pep-0701/
-    pub fn supports_pep_701(self) -> bool {
-        self >= Self::Py312
-    }
-
     pub fn as_tuple(self) -> (u8, u8) {
         match self {
             Self::Py37 => (3, 7),
@@ -550,5 +512,36 @@ impl PythonVersion {
 
     pub fn minimal_supported() -> Self {
         Self::Py37
+    }
+}
+
+impl TryFrom<ast::PythonVersion> for PythonVersion {
+    type Error = String;
+
+    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
+        match value {
+            ast::PythonVersion::PY37 => Ok(Self::Py37),
+            ast::PythonVersion::PY38 => Ok(Self::Py38),
+            ast::PythonVersion::PY39 => Ok(Self::Py39),
+            ast::PythonVersion::PY310 => Ok(Self::Py310),
+            ast::PythonVersion::PY311 => Ok(Self::Py311),
+            ast::PythonVersion::PY312 => Ok(Self::Py312),
+            ast::PythonVersion::PY313 => Ok(Self::Py313),
+            _ => Err(format!("unrecognized python version {value}")),
+        }
+    }
+}
+
+impl From<PythonVersion> for ast::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        match value {
+            PythonVersion::Py37 => Self::PY37,
+            PythonVersion::Py38 => Self::PY38,
+            PythonVersion::Py39 => Self::PY39,
+            PythonVersion::Py310 => Self::PY310,
+            PythonVersion::Py311 => Self::PY311,
+            PythonVersion::Py312 => Self::PY312,
+            PythonVersion::Py313 => Self::PY313,
+        }
     }
 }
