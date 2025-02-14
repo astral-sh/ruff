@@ -1,10 +1,10 @@
 use crate::logging::Verbosity;
+use crate::python_version::PythonVersion;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_python_semantic::lint;
 use ruff_db::system::SystemPathBuf;
-use ruff_python_parser::python_version::PythonVersion;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -94,7 +94,9 @@ impl CheckCommand {
 
         Options {
             environment: Some(EnvironmentOptions {
-                python_version: self.python_version.map(RangedValue::cli),
+                python_version: self
+                    .python_version
+                    .map(|version| RangedValue::cli(version.into())),
                 venv_path: self.venv_path.map(RelativePathBuf::cli),
                 typeshed: self.typeshed.map(RelativePathBuf::cli),
                 extra_paths: self.extra_search_path.map(|extra_search_paths| {
