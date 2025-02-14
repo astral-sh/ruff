@@ -85,44 +85,6 @@ impl From<PythonVersion> for ast::PythonVersion {
     }
 }
 
-impl PythonVersion {
-    /// Return the latest supported Python version.
-    pub const fn latest() -> Self {
-        Self::Py313
-    }
-
-    pub const fn minimal_supported() -> Self {
-        Self::Py37
-    }
-
-    pub const fn as_tuple(&self) -> (u8, u8) {
-        match self {
-            Self::Py37 => (3, 7),
-            Self::Py38 => (3, 8),
-            Self::Py39 => (3, 9),
-            Self::Py310 => (3, 10),
-            Self::Py311 => (3, 11),
-            Self::Py312 => (3, 12),
-            Self::Py313 => (3, 13),
-        }
-    }
-
-    pub const fn major(&self) -> u8 {
-        self.as_tuple().0
-    }
-
-    pub const fn minor(&self) -> u8 {
-        self.as_tuple().1
-    }
-
-    /// Return `true` if the current version supports [PEP 701].
-    ///
-    /// [PEP 701]: https://peps.python.org/pep-0701/
-    pub fn supports_pep701(self) -> bool {
-        self >= Self::Py312
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
 pub enum PreviewMode {
     #[default]

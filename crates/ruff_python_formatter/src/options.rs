@@ -493,28 +493,6 @@ pub enum PythonVersion {
     Py313,
 }
 
-impl PythonVersion {
-    pub fn as_tuple(self) -> (u8, u8) {
-        match self {
-            Self::Py37 => (3, 7),
-            Self::Py38 => (3, 8),
-            Self::Py39 => (3, 9),
-            Self::Py310 => (3, 10),
-            Self::Py311 => (3, 11),
-            Self::Py312 => (3, 12),
-            Self::Py313 => (3, 13),
-        }
-    }
-
-    pub fn latest() -> Self {
-        Self::Py313
-    }
-
-    pub fn minimal_supported() -> Self {
-        Self::Py37
-    }
-}
-
 impl TryFrom<ast::PythonVersion> for PythonVersion {
     type Error = String;
 
