@@ -18,4 +18,68 @@ C417_1.py:7:10: C417 [*] Unnecessary `map()` usage (rewrite using a generator ex
   7 |+    list((x for x in []))
 8 8 | 
 9 9 | 
-10 10 | ### No errors
+10 10 | set(map(lambda x, y: x, nums, nums))
+
+C417_1.py:12:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+   |
+10 | set(map(lambda x, y: x, nums, nums))
+11 |
+12 | list(map(lambda x: (a := x), foo))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+13 |
+14 | list(map(lambda x: (a for a in \
+   |
+   = help: Replace `map()` with a list comprehension
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | set(map(lambda x, y: x, nums, nums))
+11 11 | 
+12    |-list(map(lambda x: (a := x), foo))
+   12 |+[(a := x) for x in foo]
+13 13 | 
+14 14 | list(map(lambda x: (a for a in \
+15 15 |                     range(x)), foo))
+
+C417_1.py:14:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+   |
+12 |   list(map(lambda x: (a := x), foo))
+13 |
+14 | / list(map(lambda x: (a for a in \
+15 | |                     range(x)), foo))
+   | |____________________________________^ C417
+16 |
+17 |   dict(map(lambda k, v: (k, v), keys, values))
+   |
+   = help: Replace `map()` with a list comprehension
+
+ℹ Unsafe fix
+11 11 | 
+12 12 | list(map(lambda x: (a := x), foo))
+13 13 | 
+14    |-list(map(lambda x: (a for a in \
+15    |-                    range(x)), foo))
+   14 |+[(a for a in \
+   15 |+                    range(x)) for x in foo]
+16 16 | 
+17 17 | dict(map(lambda k, v: (k, v), keys, values))
+18 18 | 
+
+C417_1.py:31:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+   |
+29 | )
+30 |
+31 | list(map(lambda x: list[...], foo))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map()` with a list comprehension
+
+ℹ Unsafe fix
+28 28 |     )
+29 29 | )
+30 30 | 
+31    |-list(map(lambda x: list[...], foo))
+   31 |+[list[...] for x in foo]
+32 32 | 
+33 33 | 
+34 34 | def unfixable():
