@@ -5,6 +5,7 @@ pub use expression::*;
 pub use generated::*;
 pub use int::*;
 pub use nodes::*;
+pub use operator_precedence::*;
 
 pub mod comparable;
 pub mod docstrings;
@@ -16,6 +17,7 @@ mod int;
 pub mod name;
 mod node;
 mod nodes;
+pub mod operator_precedence;
 pub mod parenthesize;
 pub mod relocate;
 pub mod script;
