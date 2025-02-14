@@ -11,9 +11,15 @@ See the [typing documentation] for more information.
 
 - `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
     supertype of `bool` (present in `bool`s bases and MRO).
+- `int` is not a subtype of `float`/`complex`, although this is muddied by the
+    [special case for float and complex] where annotations of `float` and `complex` are interpreted
+    as `int | float` and `int | float | complex`, respectively.
 
 ```py
-from knot_extensions import is_subtype_of, static_assert
+from knot_extensions import is_subtype_of, static_assert, TypeOf
+
+type JustFloat = TypeOf[1.0]
+type JustComplex = TypeOf[1j]
 
 static_assert(is_subtype_of(bool, bool))
 static_assert(is_subtype_of(bool, int))
@@ -27,6 +33,9 @@ static_assert(is_subtype_of(object, object))
 static_assert(not is_subtype_of(int, bool))
 static_assert(not is_subtype_of(int, str))
 static_assert(not is_subtype_of(object, int))
+
+static_assert(not is_subtype_of(int, JustFloat))
+static_assert(not is_subtype_of(int, JustComplex))
 
 static_assert(is_subtype_of(TypeError, Exception))
 static_assert(is_subtype_of(FloatingPointError, Exception))
@@ -74,7 +83,9 @@ static_assert(is_subtype_of(C, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import is_subtype_of, static_assert
+from knot_extensions import is_subtype_of, static_assert, TypeOf
+
+type JustFloat = TypeOf[1.0]
 
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
@@ -86,6 +97,8 @@ static_assert(is_subtype_of(Literal[1], int))
 static_assert(is_subtype_of(Literal[1], object))
 
 static_assert(not is_subtype_of(Literal[1], bool))
+
+static_assert(not is_subtype_of(Literal[1], JustFloat))
 
 # String literals
 static_assert(is_subtype_of(Literal["foo"], LiteralString))
@@ -443,4 +456,5 @@ static_assert(not is_subtype_of(Intersection[Unknown, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Unknown]))
 ```
 
+[special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
